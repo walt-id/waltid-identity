@@ -16,6 +16,8 @@ private enum WalletStatusText {
     static let startingWallet = "Starting wallet..."
     static let walletReady = "Wallet ready"
     static let resolvingCredentialOffer = "Resolving credential offer..."
+    static let reviewCredentialOffer = "Review credential offer"
+    static let credentialOfferDeclined = "Credential offer declined"
     static let receivingCredential = "Receiving credential..."
     static let transactionCodeRequired = "Transaction code required"
     static let resolvingPresentation = "Resolving presentation..."
@@ -62,6 +64,7 @@ class WalletViewModel: ObservableObject {
             receiveTask?.cancel()
             txCode = ""
             transactionCodeRequired = false
+            offerPreview = nil
         }
     }
     @Published var txCode = ""
@@ -71,6 +74,7 @@ class WalletViewModel: ObservableObject {
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
     @Published var selectedPresentationDisclosureOptions: Set<PresentationDisclosureSelection> = []
     @Published var selectedTab: WalletTab = .credentials
+    @Published var offerPreview: OfferPreview?
     @Published var lastReceivedCredentialIDs: [String] = []
     @Published var receiveCompleted = false
     @Published var presentationCompleted = false
@@ -82,14 +86,21 @@ class WalletViewModel: ObservableObject {
     private var receiveTask: Task<Void, Never>?
 
     var receiveUrlEntryEnabled: Bool {
-        !isLoading && !receiveCompleted
+        !isLoading && offerPreview == nil && !receiveCompleted
     }
 
     var receiveActionEnabled: Bool {
         isReady &&
             !offerUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            hasValidTransactionCode &&
             receiveUrlEntryEnabled
+    }
+
+    var offerReviewEnabled: Bool {
+        !isLoading && offerPreview != nil && !receiveCompleted
+    }
+
+    var acceptOfferEnabled: Bool {
+        offerReviewEnabled && hasValidTransactionCode
     }
 
     private var hasValidTransactionCode: Bool {
@@ -269,6 +280,7 @@ class WalletViewModel: ObservableObject {
             receiveTask?.cancel()
             selectedTab = .receive
             offerUrl = url.absoluteString
+            offerPreview = nil
             lastReceivedCredentialIDs = []
             receiveCompleted = false
             receiveNavigationResetKey += 1
@@ -298,6 +310,7 @@ class WalletViewModel: ObservableObject {
         offerUrl = ""
         txCode = ""
         transactionCodeRequired = false
+        offerPreview = nil
         lastReceivedCredentialIDs = []
         receiveCompleted = false
         receiveNavigationResetKey += 1
@@ -322,7 +335,7 @@ class WalletViewModel: ObservableObject {
         statusMessage = WalletStatusText.walletReady
     }
 
-    func receiveCredential() {
+    func previewOffer() {
         resetInputFocus()
         guard !isLoading else { return }
         let trimmedOfferUrl = offerUrl.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -330,36 +343,49 @@ class WalletViewModel: ObservableObject {
             setError(WalletStatusText.failure(WalletStatusText.receiveFailed, WalletStatusText.invalidOfferURL), tab: .receive)
             return
         }
-        let trimmedTxCode = txCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard hasValidTransactionCode else { return }
-        let previousCredentials = credentials
         let request = ReceiveRequest(offerURL: offer.absoluteString, navigationResetKey: receiveNavigationResetKey)
-        let requiresTransactionCode = transactionCodeRequired
 
-        setLoading(
-            requiresTransactionCode ? WalletStatusText.receivingCredential : WalletStatusText.resolvingCredentialOffer,
-            tab: .receive
-        )
+        setLoading(WalletStatusText.resolvingCredentialOffer, tab: .receive)
         receiveTask = Task {
             do {
-                if !requiresTransactionCode {
-                    let resolution = try await walletClient.resolveOffer(offer: offer)
-                    try Task.checkCancellation()
-                    guard isCurrent(request) else { return }
-                    if resolution.transactionCodeRequired {
-                        transactionCodeRequired = true
-                        isLoading = false
-                        isError = false
-                        statusTab = .receive
-                        statusMessage = WalletStatusText.transactionCodeRequired
-                        logE2E("STATUS \(statusMessage)")
-                        return
-                    }
+                let resolution = try await walletClient.resolveOffer(offer: offer)
+                try Task.checkCancellation()
+                guard isCurrent(request) else { return }
+                transactionCodeRequired = resolution.transactionCodeRequired
+                offerPreview = OfferPreview(
+                    credentialIssuer: resolution.credentialIssuer,
+                    offeredCredentials: resolution.offeredCredentials,
+                    transactionCodeRequired: resolution.transactionCodeRequired
+                )
+                setSuccess(WalletStatusText.reviewCredentialOffer, tab: .receive)
+            } catch is CancellationError {
+                return
+            } catch {
+                if isCurrent(request) {
+                    setError(WalletStatusText.failure(WalletStatusText.receiveFailed, error), tab: .receive)
                 }
+            }
+        }
+    }
 
+    func acceptOffer() {
+        resetInputFocus()
+        guard !isLoading, offerPreview != nil else { return }
+        let trimmedOfferUrl = offerUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let offer = URL(string: trimmedOfferUrl) else {
+            setError(WalletStatusText.failure(WalletStatusText.receiveFailed, WalletStatusText.invalidOfferURL), tab: .receive)
+            return
+        }
+        let trimmedTxCode = txCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let previousCredentials = credentials
+        let request = ReceiveRequest(offerURL: offer.absoluteString, navigationResetKey: receiveNavigationResetKey)
+
+        setLoading(WalletStatusText.receivingCredential, tab: .receive)
+        receiveTask = Task {
+            do {
                 try await completeReceive(
                     offer: offer,
-                    txCode: requiresTransactionCode ? trimmedTxCode : nil,
+                    txCode: transactionCodeRequired ? trimmedTxCode : nil,
                     previousCredentials: previousCredentials,
                     request: request
                 )
@@ -371,6 +397,15 @@ class WalletViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    func declineOffer() {
+        receiveTask?.cancel()
+        offerPreview = nil
+        txCode = ""
+        transactionCodeRequired = false
+        receiveNavigationResetKey += 1
+        setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
     }
 
     private func completeReceive(
@@ -397,6 +432,7 @@ class WalletViewModel: ObservableObject {
         let displayableReceivedCredentialIDs = receivedCredentialIDs.filter { refreshedCredentialIDs.contains($0) }
         guard !displayableReceivedCredentialIDs.isEmpty else {
             credentials = refreshedCredentials
+            offerPreview = nil
             lastReceivedCredentialIDs = []
             receiveCompleted = false
             setError(
@@ -410,6 +446,7 @@ class WalletViewModel: ObservableObject {
         }
 
         credentials = refreshedCredentials
+        offerPreview = nil
         lastReceivedCredentialIDs = displayableReceivedCredentialIDs
         receiveCompleted = true
         setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: .receive)

@@ -36,6 +36,8 @@ internal class MobileDemoWallet(
         mobileWallet.resolveOffer(offerUrl).let { resolution ->
             WalletDemoOfferResolution(
                 transactionCodeRequired = resolution.transactionCodeRequired,
+                credentialIssuer = resolution.credentialIssuer,
+                offeredCredentials = resolution.offeredCredentials,
             )
         }
 

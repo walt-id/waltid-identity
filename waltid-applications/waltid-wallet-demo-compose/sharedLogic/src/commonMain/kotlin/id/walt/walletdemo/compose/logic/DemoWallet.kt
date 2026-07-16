@@ -2,6 +2,8 @@ package id.walt.walletdemo.compose.logic
 
 data class WalletDemoOfferResolution(
     val transactionCodeRequired: Boolean,
+    val credentialIssuer: String,
+    val offeredCredentials: List<String>,
 )
 
 interface DemoWallet {
