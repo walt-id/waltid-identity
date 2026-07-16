@@ -161,6 +161,8 @@ class WalletDemoControllerTest {
         assertEquals(offerUrl, wallet.receivedOfferUrl)
         assertEquals("abc-123", wallet.receivedTxCode)
         assertTrue(controller.state.value.receiveCompleted)
+        assertEquals("", controller.state.value.requestDrafts.txCode)
+        assertFalse(controller.state.value.requestDrafts.transactionCodeRequired)
     }
 
     @Test

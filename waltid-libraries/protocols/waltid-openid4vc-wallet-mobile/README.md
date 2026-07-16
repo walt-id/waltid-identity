@@ -34,6 +34,21 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 - Present credentials using OpenID4VP.
 - Support mobile issuance flows using OAuth 2.0 client attestation.
 
+## Receiving credentials
+
+Resolve an offer before issuance so the application can collect a separately
+delivered transaction code when the issuer requires one:
+
+```kotlin
+val resolution = wallet.resolveOffer(offerUrl)
+val transactionCode = if (resolution.transactionCodeRequired) {
+    collectTransactionCode()
+} else {
+    null
+}
+val credentialIds = wallet.receive(offerUrl, txCode = transactionCode)
+```
+
 ## Persistence and encryption
 
 `MobileWalletConfig()` uses managed encrypted SQLDelight persistence by default on Android and iOS. Normal SDK users do not provide a database key: the SDK generates one per wallet database, stores it in platform-protected storage, and uses SQLCipher for the local wallet database.

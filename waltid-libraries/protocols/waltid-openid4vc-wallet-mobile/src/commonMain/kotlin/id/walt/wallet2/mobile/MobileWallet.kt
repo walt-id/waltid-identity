@@ -72,7 +72,11 @@ public data class MobileWalletCredential(
     public val credentialDataJson: String,
 )
 
-/** Result of resolving an OpenID4VCI credential offer before issuance. */
+/**
+ * Result of resolving an OpenID4VCI credential offer before issuance.
+ *
+ * @property transactionCodeRequired Whether the app must collect a transaction code from the user.
+ */
 public data class MobileWalletOfferResolution(
     public val transactionCodeRequired: Boolean,
 )
