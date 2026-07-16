@@ -2,6 +2,7 @@ import Foundation
 
 enum WalletAccessibilityID {
     static let status = identifier("status")
+    static let transactionDataProfilesWarning = identifier("transactionDataProfilesWarning")
     static let credentialsEmpty = identifier("credentials", "empty")
     static let credentialsTabContent = identifier("credentialsTabContent")
     static let offerInput = identifier("offerInput")

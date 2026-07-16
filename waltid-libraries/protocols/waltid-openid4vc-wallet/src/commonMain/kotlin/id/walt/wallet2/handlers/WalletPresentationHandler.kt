@@ -10,6 +10,9 @@ import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.verifier.openid.transactiondata.decodeList
+import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletSessionEvent
@@ -159,6 +162,7 @@ data class PreviewPresentationResult(
     val authorizationRequest: AuthorizationRequest,
     val credentialOptions: List<PresentationCredentialOption>,
     val credentialRequirements: List<PresentationCredentialRequirement>,
+    val transactionData: List<PresentationTransactionDataItem>,
 )
 
 data class PresentationCredentialRequirement(
@@ -184,6 +188,13 @@ data class PresentationDisclosure(
     val selectivelyDisclosable: Boolean,
     val required: Boolean,
     val selectable: Boolean,
+)
+
+data class PresentationTransactionDataItem(
+    val type: String,
+    val credentialQueryIds: List<String>,
+    val rawJson: JsonObject,
+    val details: JsonObject,
 )
 
 @Serializable
@@ -240,7 +251,8 @@ object WalletPresentationHandler {
     suspend fun presentCredential(
         wallet: Wallet,
         request: PresentCredentialRequest,
-        onEvent: suspend (WalletSessionEvent) -> Unit = {}
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ): WalletPresentResult {
         val key = resolveKey(wallet, request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
@@ -263,7 +275,8 @@ object WalletPresentationHandler {
                     }
             },
             holderPoliciesToRun = null,
-            runPolicies = request.runPolicies
+            runPolicies = request.runPolicies,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
         )
 
         if (result.isSuccess) {
@@ -283,7 +296,8 @@ object WalletPresentationHandler {
     suspend fun presentCredentialIsolated(
         wallet: Wallet,
         request: PresentCredentialIsolatedRequest,
-        onEvent: suspend (WalletSessionEvent) -> Unit = {}
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ): WalletPresentResult {
         val key = resolveKey(wallet, request.keyId)
             ?: error("No key available for isolated presentation")
@@ -304,7 +318,8 @@ object WalletPresentationHandler {
                     .also { onEvent(WalletSessionEvent.presentation_credentials_selected) }
             },
             holderPoliciesToRun = null,
-            runPolicies = null
+            runPolicies = null,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
         )
 
         if (result.isSuccess) {
@@ -319,13 +334,27 @@ object WalletPresentationHandler {
     suspend fun previewPresentation(
         wallet: Wallet,
         request: PreviewPresentationRequest,
-        onEvent: suspend (WalletSessionEvent) -> Unit = {}
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ): PreviewPresentationResult {
         onEvent(WalletSessionEvent.presentation_request_parsed)
         val resolvedAuthorizationRequest = resolveAuthorizationRequest(request.requestUrl)
-        rememberPreviewedAuthorizationRequest(wallet, request.requestUrl, resolvedAuthorizationRequest)
         val authorizationRequest = resolvedAuthorizationRequest.authorizationRequest
         val query = authorizationRequest.dcqlQuery ?: error("Missing dcql_query for AuthorizationRequest")
+        val transactionDataItems = validateRequestTransactionData(
+            transactionData = authorizationRequest.transactionData,
+            typeRegistry = transactionDataTypeRegistry,
+            credentialQueriesById = query.credentials.associateBy { it.id },
+        )
+        val transactionData = transactionDataItems.map { decoded ->
+            PresentationTransactionDataItem(
+                type = decoded.transactionData.type,
+                credentialQueryIds = decoded.transactionData.credentialIds,
+                rawJson = decoded.rawJson,
+                details = decoded.details,
+            )
+        }
+        rememberPreviewedAuthorizationRequest(wallet, request.requestUrl, resolvedAuthorizationRequest)
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
         val matched = selectFromStores(wallet, query, useWalletCredentialIds = true)
         onEvent(WalletSessionEvent.presentation_credentials_selected)
@@ -351,13 +380,15 @@ object WalletPresentationHandler {
                     )
                 }
             },
+            transactionData = transactionData,
         )
     }
 
     suspend fun submitPresentation(
         wallet: Wallet,
         request: SubmitPresentationRequest,
-        onEvent: suspend (WalletSessionEvent) -> Unit = {}
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ): WalletPresentResult {
         request.selectedCredentialOptions.requireValidPresentationCredentialSelection()
         val resolvedAuthorizationRequest = consumePreviewedAuthorizationRequest(wallet, request.requestUrl)
@@ -365,6 +396,10 @@ object WalletPresentationHandler {
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
         val selectedQueryIds = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.queryId }
+        validateSelectedTransactionDataCredentials(
+            resolvedAuthorizationRequest.authorizationRequest.transactionData.orEmpty(),
+            selectedQueryIds,
+        )
 
         onEvent(WalletSessionEvent.presentation_request_parsed)
 
@@ -398,6 +433,7 @@ object WalletPresentationHandler {
             },
             holderPoliciesToRun = null,
             runPolicies = request.runPolicies,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
         )
 
         if (result.isSuccess) {
@@ -855,6 +891,19 @@ object WalletPresentationHandler {
     }
 
     private fun ClaimsQuery.pathKey(): String = path.joinToString(".")
+
+    internal fun validateSelectedTransactionDataCredentials(
+        transactionData: List<String>,
+        selectedQueryIds: Set<String>,
+    ) {
+        decodeList(transactionData).forEach { decoded ->
+            val selectedTransactionCredentialIds = decoded.transactionData.credentialIds
+                .filter { it in selectedQueryIds }
+            require(selectedTransactionCredentialIds.size == 1) {
+                "transaction_data credential_ids must reference exactly one selected credential for transaction authorization"
+            }
+        }
+    }
 
     private fun DigitalCredential.toRawDcqlCredential(id: String): RawDcqlCredential {
         val sdvc = this as? id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential

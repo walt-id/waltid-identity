@@ -8,6 +8,7 @@ struct ContentView: UIViewControllerRepresentable {
     let attestationAttesterPath: String
     let attestationBearerToken: String
     let attestationHostHeader: String
+    let transactionDataProfilesUrl: String
 
     func makeUIViewController(context: Context) -> UIViewController {
         sharedUI.WalletDemoIosKt.walletDemoViewController(
@@ -15,7 +16,8 @@ struct ContentView: UIViewControllerRepresentable {
             attestationBaseUrl: attestationBaseUrl,
             attestationAttesterPath: attestationAttesterPath,
             attestationBearerToken: attestationBearerToken,
-            attestationHostHeader: attestationHostHeader
+            attestationHostHeader: attestationHostHeader,
+            transactionDataProfilesUrl: transactionDataProfilesUrl
         )
     }
 
@@ -29,6 +31,7 @@ struct ContentView: UIViewControllerRepresentable {
         attestationBaseUrl: "",
         attestationAttesterPath: "",
         attestationBearerToken: "",
-        attestationHostHeader: ""
+        attestationHostHeader: "",
+        transactionDataProfilesUrl: ""
     )
 }
