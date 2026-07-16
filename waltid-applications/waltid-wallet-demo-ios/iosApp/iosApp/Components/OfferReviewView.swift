@@ -8,8 +8,8 @@ struct OfferPreview {
 
 struct OfferReviewView: View {
     let preview: OfferPreview
-    let isEnabled: Bool
-    let isTxCodeEnabled: Bool
+    let isAcceptEnabled: Bool
+    let isReviewEnabled: Bool
     let txCode: String
     let onTxCodeChange: (String) -> Void
     let onAccept: () -> Void
@@ -65,7 +65,7 @@ struct OfferReviewView: View {
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(Color(.separator), lineWidth: 1)
                     )
-                    .disabled(!isTxCodeEnabled)
+                    .disabled(!isReviewEnabled)
                     .accessibilityIdentifier(WalletAccessibilityID.txCodeInput)
                 }
             }
@@ -74,12 +74,12 @@ struct OfferReviewView: View {
                 Button("Accept", action: onAccept)
                     .buttonStyle(.borderedProminent)
                     .tint(.waltBlue)
-                    .disabled(!isEnabled)
+                    .disabled(!isAcceptEnabled)
                     .accessibilityIdentifier(WalletAccessibilityID.offerAcceptButton)
 
                 Button("Decline", action: onDecline)
                     .buttonStyle(.bordered)
-                    .disabled(!isEnabled)
+                    .disabled(!isReviewEnabled)
                     .accessibilityIdentifier(WalletAccessibilityID.offerDeclineButton)
             }
         }

@@ -33,8 +33,8 @@ struct ReceiveView: View {
                     } else if let preview = viewModel.offerPreview {
                         OfferReviewView(
                             preview: preview,
-                            isEnabled: viewModel.acceptOfferEnabled,
-                            isTxCodeEnabled: viewModel.offerReviewEnabled,
+                            isAcceptEnabled: viewModel.acceptOfferEnabled,
+                            isReviewEnabled: viewModel.offerReviewEnabled,
                             txCode: viewModel.txCode,
                             onTxCodeChange: viewModel.updateTxCode,
                             onAccept: viewModel.acceptOffer,
