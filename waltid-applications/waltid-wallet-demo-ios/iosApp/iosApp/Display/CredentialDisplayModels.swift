@@ -86,6 +86,15 @@ struct ClaimItemPath: Hashable {
     static func topLevel(_ name: String) -> ClaimItemPath {
         ClaimItemPath(renderedID: .raw(name))
     }
+
+    static func transactionData(index: Int, field: DisplayTransactionDataField) -> ClaimItemPath {
+        ClaimItemPath(
+            renderedID: RenderedClaimPath
+                .raw(DisplayClaimPathRoot.transactionData.id)
+                .indexed(index)
+                .child(field.id)
+        )
+    }
 }
 
 private struct RenderedClaimPath: Hashable {
@@ -168,6 +177,13 @@ struct DisplayClaimPath {
         DisplayClaimPath(itemPath: ClaimItemPath.topLevel(name), components: [name])
     }
 
+    static func transactionData(index: Int, field: DisplayTransactionDataField) -> DisplayClaimPath {
+        DisplayClaimPath(
+            itemPath: ClaimItemPath.transactionData(index: index, field: field),
+            components: [DisplayClaimPathRoot.transactionData.id, field.id]
+        )
+    }
+
     func child(_ child: String) -> DisplayClaimPath {
         DisplayClaimPath(
             itemPath: itemPath.child(child),
@@ -182,10 +198,28 @@ struct DisplayClaimPath {
 
 enum DisplayClaimPathRoot {
     case root
+    case transactionData
 
     var id: String {
         switch self {
         case .root: return "$"
+        case .transactionData: return "transactionData"
+        }
+    }
+}
+
+enum DisplayTransactionDataField {
+    case type
+    case credentialQueryIDs
+    case details
+    case raw
+
+    var id: String {
+        switch self {
+        case .type: return "type"
+        case .credentialQueryIDs: return "credentialQueryIds"
+        case .details: return "details"
+        case .raw: return "raw"
         }
     }
 }

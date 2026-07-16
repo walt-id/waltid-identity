@@ -15,6 +15,7 @@ fun walletDemoViewController(
     attestationAttesterPath: String = "",
     attestationBearerToken: String = "",
     attestationHostHeader: String = "",
+    transactionDataProfilesUrl: String = "",
 ): UIViewController {
     val controller = WalletDemoController(
         createIosDemoWallet(
@@ -24,6 +25,7 @@ fun walletDemoViewController(
                 attestationAttesterPath = attestationAttesterPath,
                 attestationBearerToken = attestationBearerToken,
                 attestationHostHeader = attestationHostHeader,
+                transactionDataProfilesUrl = transactionDataProfilesUrl,
             )
         )
     )
