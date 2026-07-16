@@ -19,6 +19,7 @@ import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorit
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.SigningAlgId
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
+import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.sdjwt.metadata.issuer.JWTVCIssuerMetadata
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import io.ktor.client.HttpClient
