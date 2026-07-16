@@ -10,6 +10,7 @@ fun WalletDemoPresentationPreview.toVerifierDetails(): VerifierDetails =
         responseUri = responseUri,
         state = state,
         nonce = nonce,
+        verifierMetadataJson = verifierMetadataJson,
         transactionData = transactionData,
     )
 

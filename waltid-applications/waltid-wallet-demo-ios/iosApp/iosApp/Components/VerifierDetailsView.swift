@@ -13,12 +13,18 @@ struct VerifierDetailsView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Verifier")
                 .font(.subheadline.weight(.semibold))
-            Text(VerifierDisplayName.value(
-                verifierName: request.verifierName,
-                clientID: request.clientID,
-                responseURI: request.responseURI
-            ))
-                .font(.subheadline.weight(.medium))
+            MetadataIdentityCardView(
+                identity: CredentialDisplayNormalizer.metadataIdentity(
+                    title: "Verifier",
+                    rawJSON: request.verifierMetadataJSON,
+                    fallbackName: VerifierDisplayName.value(
+                        verifierName: request.verifierName,
+                        clientID: request.clientID,
+                        responseURI: request.responseURI
+                    ),
+                    fallbackSubtitle: request.clientID ?? "Verifier"
+                )
+            )
             DetailLine(label: "Trust", value: CredentialDisplayText.unknown)
             ForEach(transactionDataGroups) { group in
                 ClaimGroupView(group: group)

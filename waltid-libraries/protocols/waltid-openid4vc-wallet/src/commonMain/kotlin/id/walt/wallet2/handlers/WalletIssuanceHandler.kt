@@ -159,6 +159,7 @@ data class ResolveOfferResult(
     val credentialEndpoint: Url,
     val offeredCredentials: List<String>,
     val tokenEndpoint: Url? = null,
+    val issuerMetadataJson: String? = null,
 )
 
 @Serializable
@@ -529,7 +530,8 @@ object WalletIssuanceHandler {
             txCodeRequired = offer.grants?.preAuthorizedCode?.txCode != null,
             tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) },
             credentialEndpoint = Url(issuerMetadata.credentialEndpoint),
-            offeredCredentials = offeredCredentials.map { it.credentialConfigurationId }
+            offeredCredentials = offeredCredentials.map { it.credentialConfigurationId },
+            issuerMetadataJson = Json.encodeToString(JsonElement.serializer(), Json.encodeToJsonElement(issuerMetadata)),
         )
     }
 

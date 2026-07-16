@@ -108,6 +108,27 @@ enum CredentialDisplayNormalizer {
         }
     }
 
+    static func metadataIdentity(
+        title: String,
+        rawJSON: String?,
+        fallbackName: String?,
+        fallbackSubtitle: String
+    ) -> MetadataIdentityDisplay {
+        let trimmed = rawJSON?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let metadata: [CredentialDisplayJSONMember]?
+        if case .object(let members)? = CredentialDisplayJSONParser.parse(trimmed) {
+            metadata = members
+        } else {
+            metadata = nil
+        }
+
+        return MetadataIdentityDisplay(
+            title: metadata?.displayName ?? fallbackName?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty ?? title,
+            subtitle: fallbackSubtitle,
+            logoURI: metadata?.logoURI
+        )
+    }
+
     static func details(
         id: String,
         title: String,
@@ -456,11 +477,59 @@ private func confirmationKeyText(_ members: [CredentialDisplayJSONMember]) -> St
 }
 
 private extension Array where Element == CredentialDisplayJSONMember {
+    var displayName: String? {
+        stringValue(for: "client_name")
+            ?? localizedStringValue(prefix: "client_name")
+            ?? displayMembers?.stringValue(for: "name")
+            ?? stringValue(for: "name")
+            ?? stringValue(for: "credential_issuer")
+            ?? stringValue(for: "issuer")
+    }
+
+    var logoURI: String? {
+        stringValue(for: "logo_uri")
+            ?? localizedStringValue(prefix: "logo_uri")
+            ?? displayMembers?.logoMemberURI
+            ?? logoMemberURI
+    }
+
+    private var displayMembers: [CredentialDisplayJSONMember]? {
+        switch first(where: { $0.key == "display" })?.value {
+        case .array(let values):
+            for value in values {
+                if case .object(let members) = value {
+                    return members
+                }
+            }
+            return nil
+        case .object(let members):
+            return members
+        default:
+            return nil
+        }
+    }
+
+    private var logoMemberURI: String? {
+        if case .object(let logoMembers)? = first(where: { $0.key == "logo" })?.value {
+            return logoMembers.stringValue(for: "uri") ?? logoMembers.stringValue(for: "url")
+        }
+        return stringValue(for: "logo_uri")
+    }
+
     func stringValue(for key: String) -> String? {
         guard case .string(let value)? = first(where: { $0.key == key })?.value else {
             return nil
         }
         return value
+    }
+
+    func localizedStringValue(prefix: String) -> String? {
+        for member in self where member.key.hasPrefix("\(prefix)#") {
+            if case .string(let value) = member.value, !value.isEmpty {
+                return value
+            }
+        }
+        return nil
     }
 
     func stringOrNumberValue(for key: String) -> String? {

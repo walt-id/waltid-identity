@@ -482,14 +482,15 @@ public struct WalletAttestationConfiguration: Equatable, Sendable {
 
 /// Result of resolving an OpenID4VCI credential offer before issuance.
 public struct OfferResolution: Equatable, Sendable {
-    /// Whether the app must collect a transaction code from the user.
-    public let transactionCodeRequired: Bool
+    /// Transaction code metadata when the app must collect a code from the user.
+    public let transactionCode: TransactionCode?
 
-    /// Creates a credential-offer resolution result.
-    ///
-    /// - Parameter transactionCodeRequired: Whether the app must collect a transaction code.
-    public init(transactionCodeRequired: Bool) {
-        self.transactionCodeRequired = transactionCodeRequired
+    /// Raw issuer metadata encoded as JSON for app-side parsing and display.
+    public let issuerMetadataJSON: String?
+
+    public init(transactionCode: TransactionCode?, issuerMetadataJSON: String? = nil) {
+        self.transactionCode = transactionCode
+        self.issuerMetadataJSON = issuerMetadataJSON
     }
 }
 
@@ -661,6 +662,9 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     /// OpenID nonce value.
     public let nonce: String?
 
+    /// Raw verifier `client_metadata` encoded as JSON for app-side parsing and display.
+    public let verifierMetadataJSON: String?
+
     /// Decoded transaction data attached to the request.
     public let transactionData: [PresentationTransactionData]
 
@@ -673,6 +677,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     ///   - responseURI: Direct-post response URI when available.
     ///   - state: OpenID state value from the request.
     ///   - nonce: OpenID nonce value from the request.
+    ///   - verifierMetadataJSON: Raw verifier metadata encoded as JSON.
     ///   - transactionData: Decoded transaction data attached to the request.
     public init(
         clientID: String? = nil,
@@ -680,6 +685,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
         responseURI: URL? = nil,
         state: String? = nil,
         nonce: String? = nil,
+        verifierMetadataJSON: String? = nil,
         transactionData: [PresentationTransactionData] = []
     ) {
         self.clientID = clientID
@@ -687,6 +693,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
         self.responseURI = responseURI
         self.state = state
         self.nonce = nonce
+        self.verifierMetadataJSON = verifierMetadataJSON
         self.transactionData = transactionData
     }
 }

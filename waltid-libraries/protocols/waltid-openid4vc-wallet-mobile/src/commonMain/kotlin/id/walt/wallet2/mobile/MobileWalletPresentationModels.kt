@@ -33,6 +33,7 @@ public data class MobileWalletPresentationCredentialRequirement(
  * @property responseUri Verifier response URI to which the wallet will submit the presentation, when provided.
  * @property state OpenID4VP state value supplied by the verifier, when provided.
  * @property nonce OpenID4VP nonce value supplied by the verifier, when provided.
+ * @property verifierMetadataJson Raw verifier `client_metadata` encoded as JSON for app-side display.
  * @property transactionData Decoded transaction data items requested by the verifier.
  */
 public data class MobileWalletPresentationRequestInfo(
@@ -41,6 +42,7 @@ public data class MobileWalletPresentationRequestInfo(
     val responseUri: String?,
     val state: String?,
     val nonce: String?,
+    val verifierMetadataJson: String? = null,
     val transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
 )
 

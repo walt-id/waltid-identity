@@ -119,7 +119,8 @@ class WalletSdkBridgeTest {
         val result = bridge.resolveOffer("openid-credential-offer://issuer.example")
 
         assertIs<WalletBridgeResult.Success<MobileWalletOfferResolution>>(result)
-        assertEquals(true, result.value.transactionCodeRequired)
+        assertEquals(MobileWalletTxCodeInputMode.numeric, result.value.txCode?.inputMode)
+        assertEquals(6, result.value.txCode?.length)
         assertEquals("openid-credential-offer://issuer.example", operations.resolvedOfferUrl)
     }
 
@@ -579,7 +580,11 @@ class WalletSdkBridgeTest {
         override suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution {
             resolvedOfferUrl = offerUrl
             return MobileWalletOfferResolution(
-                transactionCodeRequired = true,
+                txCode = MobileWalletTxCode(
+                    inputMode = MobileWalletTxCodeInputMode.numeric,
+                    length = 6,
+                    issuerDescription = "Enter the issuer code",
+                ),
             )
         }
 

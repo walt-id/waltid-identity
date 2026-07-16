@@ -7,6 +7,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
+import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -32,9 +33,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
 
 /**
  * Result returned after a mobile wallet has been initialized with signing material and a DID.
@@ -75,10 +78,12 @@ public data class MobileWalletCredential(
 /**
  * Result of resolving an OpenID4VCI credential offer before issuance.
  *
- * @property transactionCodeRequired Whether the app must collect a transaction code from the user.
+ * @property txCode Transaction-code metadata when the app must collect a code from the user.
+ * @property issuerMetadataJson Raw issuer metadata encoded as JSON for app-side parsing and display.
  */
 public data class MobileWalletOfferResolution(
-    public val transactionCodeRequired: Boolean,
+    public val txCode: MobileWalletTxCode?,
+    public val issuerMetadataJson: String? = null,
 )
 
 /**
@@ -216,14 +221,24 @@ public class MobileWallet internal constructor(
      *
      * @param offerUrl Credential offer URL, including `openid-credential-offer://` URLs.
      */
-    public suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution =
-        WalletIssuanceHandler.resolveOffer(
+    public suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution {
+        val resolution = WalletIssuanceHandler.resolveOffer(
             ResolveOfferRequest(offerUrl = Url(offerUrl.trim())),
-        ).let { result ->
-            MobileWalletOfferResolution(
-                transactionCodeRequired = result.txCodeRequired,
-            )
-        }
+        )
+        return MobileWalletOfferResolution(
+            txCode = resolution.txCode?.let {
+                MobileWalletTxCode(
+                    inputMode = when (it.inputMode) {
+                        ResolveOfferTxCodeInputMode.numeric -> MobileWalletTxCodeInputMode.numeric
+                        ResolveOfferTxCodeInputMode.text -> MobileWalletTxCodeInputMode.text
+                    },
+                    length = it.length,
+                    issuerDescription = it.description,
+                )
+            },
+            issuerMetadataJson = resolution.issuerMetadataJson,
+        )
+    }
 
     /**
      * Receives credentials from an OpenID4VCI credential offer.
@@ -327,6 +342,15 @@ public class MobileWallet internal constructor(
                 responseUri = result.authorizationRequest.responseUri,
                 state = result.authorizationRequest.state,
                 nonce = result.authorizationRequest.nonce,
+                verifierMetadataJson = result.authorizationRequest.clientMetadata?.let {
+                    Json.encodeToString(
+                        JsonElement.serializer(),
+                        Json.encodeToJsonElement(
+                            AuthorizationRequest.serializer(),
+                            result.authorizationRequest,
+                        ).jsonObject["client_metadata"] ?: JsonNull,
+                    )
+                },
                 transactionData = result.transactionData.map { item ->
                     val profile = profilesByType[item.type]
                     MobileWalletTransactionDataItem(

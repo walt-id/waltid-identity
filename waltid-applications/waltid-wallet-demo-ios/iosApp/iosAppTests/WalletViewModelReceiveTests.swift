@@ -14,7 +14,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         viewModel.offerUrl = "openid-credential-offer://issuer.example"
         viewModel.receiveCredential()
         viewModel.receiveCredential()
-        try await waitUntil { viewModel.transactionCodeRequired }
+        try await waitUntil { viewModel.transactionCode != nil }
 
         let receiveCallsBeforeCode = await client.receiveCalls
         let resolveCalls = await client.resolveCalls
@@ -22,7 +22,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertEqual(receiveCallsBeforeCode, 0)
         XCTAssertEqual(resolveCalls, 1)
 
-        viewModel.txCode = " abc-123 "
+        viewModel.txCode = " 123456 "
         XCTAssertTrue(viewModel.receiveActionEnabled)
         viewModel.receiveCredential()
         try await waitUntil { viewModel.receiveCompleted }
@@ -30,10 +30,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let receiveCalls = await client.receiveCalls
         let receivedTxCodes = await client.receivedTxCodes
         XCTAssertEqual(receiveCalls, 1)
-        XCTAssertEqual(receivedTxCodes, ["abc-123"])
+        XCTAssertEqual(receivedTxCodes, ["123456"])
         XCTAssertEqual(viewModel.receivedCredentials.map(\.id), ["credential-1"])
-        XCTAssertEqual(viewModel.txCode, "")
-        XCTAssertFalse(viewModel.transactionCodeRequired)
     }
 
     func testChangingOfferClearsTransactionCodeState() async throws {
@@ -43,12 +41,12 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example/first"
         viewModel.receiveCredential()
-        try await waitUntil { viewModel.transactionCodeRequired }
+        try await waitUntil { viewModel.transactionCode != nil }
         viewModel.txCode = "1234"
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example/second"
 
-        XCTAssertFalse(viewModel.transactionCodeRequired)
+        XCTAssertNil(viewModel.transactionCode)
         XCTAssertEqual(viewModel.txCode, "")
     }
 
@@ -63,7 +61,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         try await Task.sleep(nanoseconds: 200_000_000)
 
         XCTAssertEqual(viewModel.offerUrl, "openid-credential-offer://issuer.example/replacement")
-        XCTAssertFalse(viewModel.transactionCodeRequired)
+        XCTAssertNil(viewModel.transactionCode)
         XCTAssertFalse(viewModel.isLoading)
         XCTAssertFalse(viewModel.isError)
     }
@@ -107,7 +105,13 @@ private actor TransactionCodeWalletClient: WalletClient {
         if resolveDelayNanoseconds > 0 {
             try? await Task.sleep(nanoseconds: resolveDelayNanoseconds)
         }
-        return OfferResolution(transactionCodeRequired: true)
+        return OfferResolution(
+            transactionCode: TransactionCode(
+                inputMode: .numeric,
+                length: 6,
+                description: "Enter the issuer code"
+            )
+        )
     }
 
     func receive(offer: URL, txCode: String?) async throws -> [String] {

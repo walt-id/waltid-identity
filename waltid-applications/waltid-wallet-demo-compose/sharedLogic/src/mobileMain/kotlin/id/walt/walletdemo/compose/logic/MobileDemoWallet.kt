@@ -32,8 +32,22 @@ internal class MobileDemoWallet(
             )
         }
 
-    override suspend fun resolveOffer(offerUrl: String): Boolean =
-        mobileWallet.resolveOffer(offerUrl).transactionCodeRequired
+    override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferResolution =
+        mobileWallet.resolveOffer(offerUrl).let { resolution ->
+            WalletDemoOfferResolution(
+                txCode = resolution.txCode?.let {
+                    WalletDemoTxCode(
+                        inputMode = when (it.inputMode) {
+                            MobileWalletTxCodeInputMode.numeric -> WalletDemoTxCodeInputMode.Numeric
+                            MobileWalletTxCodeInputMode.text -> WalletDemoTxCodeInputMode.Text
+                        },
+                        length = it.length,
+                        description = it.issuerDescription,
+                    )
+                },
+                issuerMetadataJson = resolution.issuerMetadataJson,
+            )
+        }
 
     override suspend fun receive(offerUrl: String, txCode: String?): List<String> =
         mobileWallet.receive(offerUrl, txCode = txCode)
@@ -99,6 +113,7 @@ private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentat
         responseUri = request.responseUri,
         state = request.state,
         nonce = request.nonce,
+        verifierMetadataJson = request.verifierMetadataJson,
         transactionData = CredentialDisplayNormalizer.transactionDataGroups(
             request.transactionData.map { item ->
                 WalletDemoTransactionDataItem(

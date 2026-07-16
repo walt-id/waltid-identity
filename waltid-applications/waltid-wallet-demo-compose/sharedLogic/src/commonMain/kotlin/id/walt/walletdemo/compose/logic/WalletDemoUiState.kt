@@ -7,6 +7,7 @@ data class WalletDemoUiState(
     val selectedTab: WalletDemoTab = WalletDemoTab.Credentials,
     val requestDrafts: WalletRequestDrafts = WalletRequestDrafts(),
     val lastReceivedCredentialIds: List<String> = emptyList(),
+    val lastIssuerMetadataJson: String? = null,
     val receiveCompleted: Boolean = false,
     val receiveNavigationResetKey: Int = 0,
     val presentationPreview: WalletDemoPresentationPreview? = null,

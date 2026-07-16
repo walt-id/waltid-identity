@@ -122,6 +122,24 @@ object CredentialDisplayNormalizer {
         }
     }
 
+    fun metadataIdentity(
+        title: String,
+        rawJson: String?,
+        fallbackName: String?,
+        fallbackSubtitle: String,
+    ): MetadataIdentityDisplay {
+        val metadata = rawJson
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?.let { value -> runCatching { json.parseToJsonElement(value).jsonObject }.getOrNull() }
+
+        return MetadataIdentityDisplay(
+            title = metadata?.displayName() ?: fallbackName?.takeIf { it.isNotBlank() } ?: title,
+            subtitle = fallbackSubtitle,
+            logoUri = metadata?.logoUri(),
+        )
+    }
+
     private fun WalletDemoTransactionDataItem.transactionDataTitle(): String {
         val title = displayName.trim()
         return when {
@@ -282,6 +300,45 @@ object CredentialDisplayNormalizer {
     private const val epochMillisecondsThreshold = 10_000_000_000L
     private const val imageWrapperClaimName = "elementValue"
 }
+
+private fun JsonObject.displayName(): String? =
+    stringValue("client_name")
+        ?: localizedStringValue("client_name")
+        ?: displayObject()?.stringValue("name")
+        ?: stringValue("name")
+        ?: stringValue("credential_issuer")
+        ?: stringValue("issuer")
+
+private fun JsonObject.logoUri(): String? =
+    stringValue("logo_uri")
+        ?: localizedStringValue("logo_uri")
+        ?: displayObject()?.let { display ->
+            (display["logo"] as? JsonObject)?.stringValue("uri")
+                ?: (display["logo"] as? JsonObject)?.stringValue("url")
+                ?: display.stringValue("logo_uri")
+        }
+        ?: (this["logo"] as? JsonObject)?.stringValue("uri")
+        ?: (this["logo"] as? JsonObject)?.stringValue("url")
+
+private fun JsonObject.displayObject(): JsonObject? =
+    (this["display"] as? JsonArray)
+        ?.firstOrNull { it is JsonObject }
+        ?.jsonObject
+        ?: this["display"] as? JsonObject
+
+private fun JsonObject.stringValue(name: String): String? =
+    (this[name] as? JsonPrimitive)
+        ?.contentOrNull
+        ?.takeIf { it.isNotBlank() }
+
+private fun JsonObject.localizedStringValue(prefix: String): String? =
+    entries
+        .firstOrNull { (key, value) ->
+            key.startsWith("$prefix#") && (value as? JsonPrimitive)?.contentOrNull?.isNotBlank() == true
+        }
+        ?.value
+        ?.jsonPrimitive
+        ?.contentOrNull
 
 private data class ClaimRow(
     val path: ClaimPath,

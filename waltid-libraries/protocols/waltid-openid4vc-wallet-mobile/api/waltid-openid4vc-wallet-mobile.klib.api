@@ -517,13 +517,16 @@ final class id.walt.wallet2.mobile/MobileWalletKeys { // id.walt.wallet2.mobile/
 }
 
 final class id.walt.wallet2.mobile/MobileWalletOfferResolution { // id.walt.wallet2.mobile/MobileWalletOfferResolution|null[0]
-    constructor <init>(kotlin/Boolean) // id.walt.wallet2.mobile/MobileWalletOfferResolution.<init>|<init>(kotlin.Boolean){}[0]
+    constructor <init>(id.walt.wallet2.mobile/MobileWalletTxCode?, kotlin/String? = ...) // id.walt.wallet2.mobile/MobileWalletOfferResolution.<init>|<init>(id.walt.wallet2.mobile.MobileWalletTxCode?;kotlin.String?){}[0]
 
-    final val transactionCodeRequired // id.walt.wallet2.mobile/MobileWalletOfferResolution.transactionCodeRequired|{}transactionCodeRequired[0]
-        final fun <get-transactionCodeRequired>(): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletOfferResolution.transactionCodeRequired.<get-transactionCodeRequired>|<get-transactionCodeRequired>(){}[0]
+    final val issuerMetadataJson // id.walt.wallet2.mobile/MobileWalletOfferResolution.issuerMetadataJson|{}issuerMetadataJson[0]
+        final fun <get-issuerMetadataJson>(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletOfferResolution.issuerMetadataJson.<get-issuerMetadataJson>|<get-issuerMetadataJson>(){}[0]
+    final val txCode // id.walt.wallet2.mobile/MobileWalletOfferResolution.txCode|{}txCode[0]
+        final fun <get-txCode>(): id.walt.wallet2.mobile/MobileWalletTxCode? // id.walt.wallet2.mobile/MobileWalletOfferResolution.txCode.<get-txCode>|<get-txCode>(){}[0]
 
-    final fun component1(): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletOfferResolution.component1|component1(){}[0]
-    final fun copy(kotlin/Boolean = ...): id.walt.wallet2.mobile/MobileWalletOfferResolution // id.walt.wallet2.mobile/MobileWalletOfferResolution.copy|copy(kotlin.Boolean){}[0]
+    final fun component1(): id.walt.wallet2.mobile/MobileWalletTxCode? // id.walt.wallet2.mobile/MobileWalletOfferResolution.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletOfferResolution.component2|component2(){}[0]
+    final fun copy(id.walt.wallet2.mobile/MobileWalletTxCode? = ..., kotlin/String? = ...): id.walt.wallet2.mobile/MobileWalletOfferResolution // id.walt.wallet2.mobile/MobileWalletOfferResolution.copy|copy(id.walt.wallet2.mobile.MobileWalletTxCode?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletOfferResolution.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletOfferResolution.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletOfferResolution.toString|toString(){}[0]
@@ -681,7 +684,7 @@ final class id.walt.wallet2.mobile/MobileWalletPresentationPreview { // id.walt.
 }
 
 final class id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo { // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo|null[0]
-    constructor <init>(kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataItem> = ...) // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataItem>){}[0]
+    constructor <init>(kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String? = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataItem> = ...) // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataItem>){}[0]
 
     final val clientId // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.clientId|{}clientId[0]
         final fun <get-clientId>(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.clientId.<get-clientId>|<get-clientId>(){}[0]
@@ -693,6 +696,8 @@ final class id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo { // id.w
         final fun <get-state>(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.state.<get-state>|<get-state>(){}[0]
     final val transactionData // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.transactionData|{}transactionData[0]
         final fun <get-transactionData>(): kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataItem> // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.transactionData.<get-transactionData>|<get-transactionData>(){}[0]
+    final val verifierMetadataJson // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.verifierMetadataJson|{}verifierMetadataJson[0]
+        final fun <get-verifierMetadataJson>(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.verifierMetadataJson.<get-verifierMetadataJson>|<get-verifierMetadataJson>(){}[0]
     final val verifierName // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.verifierName|{}verifierName[0]
         final fun <get-verifierName>(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.verifierName.<get-verifierName>|<get-verifierName>(){}[0]
 
@@ -701,8 +706,9 @@ final class id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo { // id.w
     final fun component3(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.component3|component3(){}[0]
     final fun component4(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.component4|component4(){}[0]
     final fun component5(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.component5|component5(){}[0]
-    final fun component6(): kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataItem> // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.component6|component6(){}[0]
-    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataItem> = ...): id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.copy|copy(kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataItem>){}[0]
+    final fun component6(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.component6|component6(){}[0]
+    final fun component7(): kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataItem> // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.component7|component7(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataItem> = ...): id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.copy|copy(kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataItem>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.toString|toString(){}[0]

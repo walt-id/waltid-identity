@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import id.walt.walletdemo.compose.logic.CredentialDisplayNormalizer
 import id.walt.walletdemo.compose.logic.VerifierDetails
 import id.walt.walletdemo.compose.logic.displayName
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
@@ -30,10 +31,13 @@ internal fun VerifierDetailsCard(verifier: VerifierDetails, modifier: Modifier =
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text("Verifier", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Text(
-            verifier.displayName,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
+        MetadataIdentityCard(
+            CredentialDisplayNormalizer.metadataIdentity(
+                title = "Verifier",
+                rawJson = verifier.verifierMetadataJson,
+                fallbackName = verifier.displayName,
+                fallbackSubtitle = verifier.clientId ?: "Verifier",
+            )
         )
         DetailLine("Trust", verifier.trustStatus)
         verifier.transactionData.forEach { group ->

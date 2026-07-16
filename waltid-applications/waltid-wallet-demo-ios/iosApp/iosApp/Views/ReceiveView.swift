@@ -22,9 +22,10 @@ struct ReceiveView: View {
                         focusResetKey: viewModel.inputFocusResetKey
                     )
 
-                    if viewModel.transactionCodeRequired {
+                    if let requirement = viewModel.transactionCode {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("This offer requires a transaction code.")
+                            Text(requirement.description.flatMap { $0.isEmpty ? nil : $0 }
+                                ?? "This offer requires a transaction code.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             SecureField(
@@ -35,7 +36,7 @@ struct ReceiveView: View {
                                 )
                             )
                                 .textContentType(.oneTimeCode)
-                                .keyboardType(.asciiCapable)
+                                .keyboardType(requirement.inputMode == .numeric ? .numberPad : .asciiCapable)
                                 .textInputAutocapitalization(.never)
                                 .disableAutocorrection(true)
                                 .padding(8)
@@ -74,6 +75,15 @@ struct ReceiveView: View {
 
                         Text("Received credentials")
                             .font(.subheadline.weight(.semibold))
+
+                        MetadataIdentityCardView(
+                            identity: CredentialDisplayNormalizer.metadataIdentity(
+                                title: "Issuer",
+                                rawJSON: viewModel.lastIssuerMetadataJSON,
+                                fallbackName: viewModel.receivedCredentials.first?.issuer,
+                                fallbackSubtitle: "Credential issuer"
+                            )
+                        )
 
                         ForEach(receivedDetails) { item in
                             CredentialCardButton(details: item) {

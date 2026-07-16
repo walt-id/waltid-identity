@@ -83,7 +83,7 @@ class MobileWalletIntegrationTest {
 
         val offer = EudiTestBackend.generateOffer()
         val resolution = client.resolveOffer(offer.offerUrl)
-        assertTrue(resolution.transactionCodeRequired, "EUDI offer should require a transaction code")
+        assertNotNull(resolution.txCode, "EUDI offer should require a transaction code")
         val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
         assertTrue(credentialIds.isNotEmpty(), "Should receive at least one credential")
     }

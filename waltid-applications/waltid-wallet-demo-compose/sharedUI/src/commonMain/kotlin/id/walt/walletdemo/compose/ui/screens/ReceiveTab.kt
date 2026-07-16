@@ -20,13 +20,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletDemoTxCodeInputMode
 import id.walt.walletdemo.compose.logic.WalletRequestDrafts
+import id.walt.walletdemo.compose.logic.CredentialDisplayNormalizer
 import id.walt.walletdemo.compose.logic.receivedCredentials
 import id.walt.walletdemo.compose.logic.receiveActionEnabled
 import id.walt.walletdemo.compose.logic.receiveUrlEntryEnabled
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.CredentialCard
+import id.walt.walletdemo.compose.ui.components.MetadataIdentityCard
 import id.walt.walletdemo.compose.ui.components.UrlActionSection
 
 @Composable
@@ -61,21 +64,31 @@ internal fun ReceiveTab(
             buttonTestTag = WalletUiTestTags.ReceiveButton,
             scanButtonTestTag = WalletUiTestTags.OfferScanButton,
             contentBeforeActions = {
-                if (requestDrafts.transactionCodeRequired) {
+                requestDrafts.txCodeRequirement?.let { requirement ->
                     Text(
-                        text = "This offer requires a transaction code.",
+                        text = requirement.description?.takeIf(String::isNotBlank)
+                            ?: "This offer requires a transaction code.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                     OutlinedTextField(
                         value = requestDrafts.txCode,
-                        onValueChange = onTxCodeChange,
+                        onValueChange = { value ->
+                            val accepted = when (requirement.inputMode) {
+                                WalletDemoTxCodeInputMode.Numeric -> value.filter(Char::isDigit)
+                                WalletDemoTxCodeInputMode.Text -> value
+                            }
+                            onTxCodeChange(requirement.length?.let(accepted::take) ?: accepted)
+                        },
                         label = { Text("Transaction code") },
                         singleLine = true,
                         enabled = state.receiveUrlEntryEnabled,
                         keyboardOptions = KeyboardOptions(
                             autoCorrectEnabled = false,
-                            keyboardType = KeyboardType.Password,
+                            keyboardType = when (requirement.inputMode) {
+                                WalletDemoTxCodeInputMode.Numeric -> KeyboardType.NumberPassword
+                                WalletDemoTxCodeInputMode.Text -> KeyboardType.Password
+                            },
                         ),
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier
@@ -94,6 +107,14 @@ internal fun ReceiveTab(
             ) {
                 Text("New receive")
             }
+            MetadataIdentityCard(
+                CredentialDisplayNormalizer.metadataIdentity(
+                    title = "Issuer",
+                    rawJson = state.lastIssuerMetadataJson,
+                    fallbackName = receivedCredentials.firstOrNull()?.issuer,
+                    fallbackSubtitle = "Credential issuer",
+                )
+            )
             Text("Received credentials", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             receivedCredentials.forEach { credential ->
                 CredentialCard(

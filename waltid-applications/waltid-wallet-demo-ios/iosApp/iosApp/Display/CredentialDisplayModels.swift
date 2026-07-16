@@ -17,6 +17,12 @@ struct ClaimGroup: Equatable, Identifiable {
     var id: String { title }
 }
 
+struct MetadataIdentityDisplay: Equatable {
+    let title: String
+    let subtitle: String
+    let logoURI: String?
+}
+
 struct ClaimItem: Equatable, Identifiable {
     let path: ClaimItemPath
     let pathComponents: [String]

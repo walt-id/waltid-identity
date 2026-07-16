@@ -61,17 +61,19 @@ class WalletViewModel: ObservableObject {
             guard offerUrl != oldValue else { return }
             receiveTask?.cancel()
             txCode = ""
-            transactionCodeRequired = false
+            transactionCode = nil
+            lastIssuerMetadataJSON = nil
         }
     }
     @Published var txCode = ""
-    @Published var transactionCodeRequired = false
+    @Published var transactionCode: TransactionCode?
     @Published var presentationRequestUrl = ""
     @Published var presentationPreview: PresentationPreview?
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
     @Published var selectedPresentationDisclosureOptions: Set<PresentationDisclosureSelection> = []
     @Published var selectedTab: WalletTab = .credentials
     @Published var lastReceivedCredentialIDs: [String] = []
+    @Published var lastIssuerMetadataJSON: String?
     @Published var receiveCompleted = false
     @Published var presentationCompleted = false
     @Published var receiveNavigationResetKey = 0
@@ -93,7 +95,11 @@ class WalletViewModel: ObservableObject {
     }
 
     private var hasValidTransactionCode: Bool {
-        !transactionCodeRequired || !txCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard let transactionCode else { return true }
+        let value = txCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !value.isEmpty &&
+            (transactionCode.length == nil || value.count == transactionCode.length) &&
+            (transactionCode.inputMode != .numeric || value.allSatisfy(\.isNumber))
     }
 
     var receivedCredentials: [Credential] {
@@ -270,6 +276,7 @@ class WalletViewModel: ObservableObject {
             selectedTab = .receive
             offerUrl = url.absoluteString
             lastReceivedCredentialIDs = []
+            lastIssuerMetadataJSON = nil
             receiveCompleted = false
             receiveNavigationResetKey += 1
             presentationPreview = nil
@@ -297,8 +304,9 @@ class WalletViewModel: ObservableObject {
         resetInputFocus()
         offerUrl = ""
         txCode = ""
-        transactionCodeRequired = false
+        transactionCode = nil
         lastReceivedCredentialIDs = []
+        lastIssuerMetadataJSON = nil
         receiveCompleted = false
         receiveNavigationResetKey += 1
         isLoading = false
@@ -334,7 +342,7 @@ class WalletViewModel: ObservableObject {
         guard hasValidTransactionCode else { return }
         let previousCredentials = credentials
         let request = ReceiveRequest(offerURL: offer.absoluteString, navigationResetKey: receiveNavigationResetKey)
-        let requiresTransactionCode = transactionCodeRequired
+        let requiresTransactionCode = transactionCode != nil
 
         setLoading(
             requiresTransactionCode ? WalletStatusText.receivingCredential : WalletStatusText.resolvingCredentialOffer,
@@ -346,8 +354,9 @@ class WalletViewModel: ObservableObject {
                     let resolution = try await walletClient.resolveOffer(offer: offer)
                     try Task.checkCancellation()
                     guard isCurrent(request) else { return }
-                    if resolution.transactionCodeRequired {
-                        transactionCodeRequired = true
+                    if let requirement = resolution.transactionCode {
+                        transactionCode = requirement
+                        lastIssuerMetadataJSON = resolution.issuerMetadataJSON
                         isLoading = false
                         isError = false
                         statusTab = .receive
@@ -355,13 +364,15 @@ class WalletViewModel: ObservableObject {
                         logE2E("STATUS \(statusMessage)")
                         return
                     }
+                    lastIssuerMetadataJSON = resolution.issuerMetadataJSON
                 }
 
                 try await completeReceive(
                     offer: offer,
                     txCode: requiresTransactionCode ? trimmedTxCode : nil,
                     previousCredentials: previousCredentials,
-                    request: request
+                    request: request,
+                    issuerMetadataJSON: lastIssuerMetadataJSON
                 )
             } catch is CancellationError {
                 return
@@ -377,7 +388,8 @@ class WalletViewModel: ObservableObject {
         offer: URL,
         txCode: String?,
         previousCredentials: [Credential],
-        request: ReceiveRequest
+        request: ReceiveRequest,
+        issuerMetadataJSON: String?
     ) async throws {
         try Task.checkCancellation()
         guard isCurrent(request) else { return }
@@ -398,6 +410,7 @@ class WalletViewModel: ObservableObject {
         guard !displayableReceivedCredentialIDs.isEmpty else {
             credentials = refreshedCredentials
             lastReceivedCredentialIDs = []
+            lastIssuerMetadataJSON = issuerMetadataJSON
             receiveCompleted = false
             setError(
                 WalletStatusText.failure(
@@ -411,14 +424,16 @@ class WalletViewModel: ObservableObject {
 
         credentials = refreshedCredentials
         lastReceivedCredentialIDs = displayableReceivedCredentialIDs
-        self.txCode = ""
-        self.transactionCodeRequired = false
+        lastIssuerMetadataJSON = issuerMetadataJSON
         receiveCompleted = true
         setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: .receive)
     }
 
     func updateTxCode(_ value: String) {
-        txCode = value
+        let accepted = transactionCode?.inputMode == .numeric
+            ? value.filter(\.isNumber)
+            : value
+        txCode = transactionCode?.length.map { String(accepted.prefix($0)) } ?? accepted
     }
 
     private func isCurrent(_ request: ReceiveRequest) -> Bool {

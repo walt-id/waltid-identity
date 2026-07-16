@@ -181,7 +181,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let offer = try await EudiTestBackend.shared.generateOffer()
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
         let resolution = try await wallet.resolveOffer(offer: offerURL)
-        XCTAssertTrue(resolution.transactionCodeRequired, "EUDI offer should require a transaction code")
+        XCTAssertNotNil(resolution.transactionCode, "EUDI offer should require a transaction code")
         let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
 
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")

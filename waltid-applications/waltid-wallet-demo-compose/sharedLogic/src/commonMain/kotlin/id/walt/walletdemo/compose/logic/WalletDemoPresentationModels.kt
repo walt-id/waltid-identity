@@ -6,6 +6,7 @@ data class WalletDemoPresentationPreview(
     val responseUri: String? = null,
     val state: String? = null,
     val nonce: String? = null,
+    val verifierMetadataJson: String? = null,
     val transactionData: List<ClaimGroup> = emptyList(),
     val credentialOptions: List<WalletDemoPresentationCredentialOption>,
     val credentialRequirements: List<WalletDemoPresentationCredentialRequirement> = emptyList(),
@@ -17,8 +18,15 @@ data class VerifierDetails(
     val responseUri: String? = null,
     val state: String? = null,
     val nonce: String? = null,
+    val verifierMetadataJson: String? = null,
     val transactionData: List<ClaimGroup> = emptyList(),
     val trustStatus: String = CredentialDisplayText.Unknown,
+)
+
+data class MetadataIdentityDisplay(
+    val title: String,
+    val subtitle: String,
+    val logoUri: String? = null,
 )
 
 data class WalletDemoPresentationCredentialRequirement(

@@ -76,9 +76,10 @@ class WalletDemoController(
                 requestDrafts = it.requestDrafts.copy(
                     offerUrl = value,
                     txCode = "",
-                    transactionCodeRequired = false,
+                    txCodeRequirement = null,
                 ),
                 lastReceivedCredentialIds = emptyList(),
+                lastIssuerMetadataJson = null,
                 receiveCompleted = false,
                 operation = WalletOperationState.Idle,
             )
@@ -113,9 +114,10 @@ class WalletDemoController(
                         requestDrafts = it.requestDrafts.copy(
                             offerUrl = url,
                             txCode = "",
-                            transactionCodeRequired = false,
+                            txCodeRequirement = null,
                         ),
                         lastReceivedCredentialIds = emptyList(),
+                        lastIssuerMetadataJson = null,
                         receiveCompleted = false,
                         receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
                         presentationPreview = null,
@@ -152,9 +154,10 @@ class WalletDemoController(
                 requestDrafts = it.requestDrafts.copy(
                     offerUrl = "",
                     txCode = "",
-                    transactionCodeRequired = false,
+                    txCodeRequirement = null,
                 ),
                 lastReceivedCredentialIds = emptyList(),
+                lastIssuerMetadataJson = null,
                 receiveCompleted = false,
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
                 operation = WalletOperationState.Idle,
@@ -183,9 +186,9 @@ class WalletDemoController(
         val offerUrl = current.requestDrafts.offerUrl.trim()
         if (!current.receiveActionEnabled || offerUrl.isBlank()) return
         val txCode = current.requestDrafts.txCode.trim().ifBlank { null }
-        val transactionCodeRequired = current.requestDrafts.transactionCodeRequired
+        val transactionCode = current.requestDrafts.txCodeRequirement
         val request = ReceiveRequest(offerUrl, current.receiveNavigationResetKey)
-        val initialOperation = if (!transactionCodeRequired) {
+        val initialOperation = if (transactionCode == null) {
             WalletOperationState.ResolvingOffer
         } else {
             WalletOperationState.Receiving
@@ -194,23 +197,27 @@ class WalletDemoController(
 
         receiveJob = scope.launch(dispatcher) {
             try {
-                if (!transactionCodeRequired) {
-                    val requiresTransactionCode = wallet.resolveOffer(offerUrl)
+                if (transactionCode == null) {
+                    val resolution = wallet.resolveOffer(offerUrl)
                     currentCoroutineContext().ensureActive()
                     if (!isCurrent(request)) return@launch
-                    if (requiresTransactionCode) {
+                    if (resolution.txCode != null) {
                         updateIfCurrent(request) {
                             it.copy(
-                                requestDrafts = it.requestDrafts.copy(transactionCodeRequired = true),
+                                requestDrafts = it.requestDrafts.copy(txCodeRequirement = resolution.txCode),
+                                lastIssuerMetadataJson = resolution.issuerMetadataJson,
                                 operation = WalletOperationState.Idle,
                             )
                         }
                         return@launch
                     }
+                    updateIfCurrent(request) {
+                        it.copy(lastIssuerMetadataJson = resolution.issuerMetadataJson)
+                    }
                 }
 
                 updateIfCurrent(request) { it.copy(operation = WalletOperationState.Receiving) }
-                receiveCredential(ready, request, txCode)
+                receiveCredential(ready, request, txCode, _state.value.lastIssuerMetadataJson)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Throwable) {
@@ -230,6 +237,7 @@ class WalletDemoController(
         ready: WalletSessionState.Ready,
         request: ReceiveRequest,
         txCode: String?,
+        issuerMetadataJson: String?,
     ) {
         currentCoroutineContext().ensureActive()
         if (!isCurrent(request)) return
@@ -258,6 +266,7 @@ class WalletDemoController(
                         tab = WalletDemoTab.Receive,
                     ),
                     lastReceivedCredentialIds = emptyList(),
+                    lastIssuerMetadataJson = issuerMetadataJson,
                     receiveCompleted = false,
                 )
             }
@@ -273,9 +282,10 @@ class WalletDemoController(
                 ),
                 requestDrafts = it.requestDrafts.copy(
                     txCode = "",
-                    transactionCodeRequired = false,
+                    txCodeRequirement = null,
                 ),
                 lastReceivedCredentialIds = displayableReceivedCredentialIds,
+                lastIssuerMetadataJson = issuerMetadataJson,
                 receiveCompleted = true,
             )
         }
