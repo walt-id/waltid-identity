@@ -3,12 +3,12 @@ package id.walt.openid4vci.requests.credential
 import id.walt.openid4vci.Client
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.prooftypes.Proofs
+import id.walt.openid4vci.requests.credential.encryption.CredentialResponseEncryptionParameters
 import id.walt.openid4vci.requests.generateRequestId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 import kotlin.time.Instant
-import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class DefaultCredentialRequest(
@@ -25,7 +25,7 @@ data class DefaultCredentialRequest(
     @SerialName("proofs")
     override val proofs: Proofs?,
     @SerialName("credential_response_encryption")
-    override val credentialResponseEncryption: JsonObject?,
+    override val credentialResponseEncryption: CredentialResponseEncryptionParameters?,
     @SerialName("request_form")
     override val requestForm: Map<String, List<String>> = emptyMap(),
     @SerialName("session")
