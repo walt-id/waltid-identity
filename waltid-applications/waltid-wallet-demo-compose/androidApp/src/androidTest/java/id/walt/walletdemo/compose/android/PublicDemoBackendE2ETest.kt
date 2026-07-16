@@ -51,16 +51,16 @@ class PublicDemoBackendE2ETest {
 
         clickByTag(device, "wallet.receiveButton")
         assertTrue(
-            "Transaction-code input did not appear. Latest status: ${latestStatus(device)}",
+            "Transaction-code input did not appear in offer review. Latest status: ${latestStatus(device)}",
             waitForResource(device, "wallet.txCodeInput", CREDENTIAL_OPERATION_TIMEOUT) != null,
         )
 
         setTextByTag(device, "wallet.txCodeInput", incorrectCodeFor(transactionCode))
         assertTrue(
-            "Receive button did not enable after entering a transaction code",
-            waitForResourceEnabled(device, "wallet.receiveButton", UI_ELEMENT_TIMEOUT),
+            "Accept button did not enable after entering a transaction code",
+            waitForResourceEnabled(device, "wallet.offerAcceptButton", UI_ELEMENT_TIMEOUT),
         )
-        clickByTag(device, "wallet.receiveButton")
+        clickByTag(device, "wallet.offerAcceptButton")
         assertTrue(
             "Incorrect transaction code was not rejected. Latest status: ${latestStatus(device)}",
             waitForStatus(
@@ -71,12 +71,18 @@ class PublicDemoBackendE2ETest {
             ),
         )
 
+        // After failure, offer review is dismissed — resolve the offer again
+        clickByTag(device, "wallet.receiveButton")
+        assertTrue(
+            "Transaction-code input did not reappear for retry. Latest status: ${latestStatus(device)}",
+            waitForResource(device, "wallet.txCodeInput", CREDENTIAL_OPERATION_TIMEOUT) != null,
+        )
         setTextByTag(device, "wallet.txCodeInput", transactionCode)
         assertTrue(
-            "Receive button did not re-enable after correcting the transaction code",
-            waitForResourceEnabled(device, "wallet.receiveButton", UI_ELEMENT_TIMEOUT),
+            "Accept button did not re-enable after correcting the transaction code",
+            waitForResourceEnabled(device, "wallet.offerAcceptButton", UI_ELEMENT_TIMEOUT),
         )
-        clickByTag(device, "wallet.receiveButton")
+        clickByTag(device, "wallet.offerAcceptButton")
         assertTrue(
             "Receive did not succeed after correcting the transaction code. Latest status: ${latestStatus(device)}",
             waitForStatus(
@@ -109,6 +115,14 @@ class PublicDemoBackendE2ETest {
         )
 
         clickByTag(device, "wallet.receiveButton")
+        val offerPreviewReady = waitForStatus(
+            device = device,
+            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
+            matcher = { it.startsWith("Review credential offer") },
+            failurePrefixes = listOf("Receive failed", "Bootstrap failed", "Present failed")
+        )
+        assertTrue("Offer preview did not appear. Latest status: ${latestStatus(device)}", offerPreviewReady)
+        clickByTag(device, "wallet.offerAcceptButton")
         val receiveSuccess = waitForStatus(
             device = device,
             timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
@@ -182,6 +196,14 @@ class PublicDemoBackendE2ETest {
         )
 
         clickByTag(device, "wallet.receiveButton")
+        val offerPreviewReady2 = waitForStatus(
+            device = device,
+            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
+            matcher = { it.startsWith("Review credential offer") },
+            failurePrefixes = listOf("Receive failed", "Bootstrap failed", "Present failed")
+        )
+        assertTrue("Offer preview did not appear. Latest status: ${latestStatus(device)}", offerPreviewReady2)
+        clickByTag(device, "wallet.offerAcceptButton")
         val receiveSuccess = waitForStatus(
             device = device,
             timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,

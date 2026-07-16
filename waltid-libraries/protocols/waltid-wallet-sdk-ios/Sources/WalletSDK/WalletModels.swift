@@ -485,11 +485,26 @@ public struct OfferResolution: Equatable, Sendable {
     /// Whether the app must collect a transaction code from the user.
     public let transactionCodeRequired: Bool
 
+    /// Issuer identifier (URL) from the credential offer.
+    public let credentialIssuer: String
+
+    /// Credential configuration IDs advertised in the offer.
+    public let offeredCredentials: [String]
+
     /// Creates a credential-offer resolution result.
     ///
-    /// - Parameter transactionCodeRequired: Whether the app must collect a transaction code.
-    public init(transactionCodeRequired: Bool) {
+    /// - Parameters:
+    ///   - transactionCodeRequired: Whether the app must collect a transaction code.
+    ///   - credentialIssuer: Issuer identifier from the credential offer.
+    ///   - offeredCredentials: Credential configuration identifiers advertised by the offer.
+    public init(
+        transactionCodeRequired: Bool,
+        credentialIssuer: String = "",
+        offeredCredentials: [String] = []
+    ) {
         self.transactionCodeRequired = transactionCodeRequired
+        self.credentialIssuer = credentialIssuer
+        self.offeredCredentials = offeredCredentials
     }
 }
 
