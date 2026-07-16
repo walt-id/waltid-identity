@@ -5,6 +5,7 @@ import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletKeyType
+import id.walt.wallet2.mobile.MobileWalletOfferResolution
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationPreview
@@ -58,6 +59,12 @@ public class WalletSdkBridge private constructor(
                 didMethod = didMethod,
             )
         }
+
+    /** Resolves a credential offer before issuance. */
+    public suspend fun resolveOffer(
+        offerUrl: String,
+    ): WalletBridgeResult<MobileWalletOfferResolution> =
+        walletBridgeCall { operations.resolveOffer(offerUrl = offerUrl) }
 
     /**
      * Receives credentials from an OpenID4VCI credential offer.
@@ -154,6 +161,8 @@ internal interface WalletSdkBridgeOperations {
         didMethod: String,
     ): MobileWalletBootstrapResult
 
+    suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution
+
     suspend fun receive(
         offerUrl: String,
         txCode: String?,
@@ -195,6 +204,9 @@ internal class MobileWalletSdkBridgeOperations(
             keyType = keyType,
             didMethod = didMethod,
         )
+
+    override suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution =
+        wallet.resolveOffer(offerUrl = offerUrl)
 
     override suspend fun receive(
         offerUrl: String,

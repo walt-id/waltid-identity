@@ -124,12 +124,88 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         add(screenshot)
     }
 
+    func testTransactionCodePromptRejectsWrongCodeAndRetriesAgainstPublicDemoIssuer2() async throws {
+        let scenario = try publicDemoScenario()
+        let offer = try await backend.createOffer(
+            scenario: scenario,
+            withGeneratedTransactionCode: true
+        )
+        let transactionCode = try XCTUnwrap(offer.txCode)
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: publicDemoEnvironment())
+
+        let readyStatus = ui.waitForStatus(
+            prefixes: ["Wallet ready", "Bootstrap failed"],
+            timeout: walletReadyTimeout
+        )
+        guard readyStatus == "Wallet ready" else {
+            XCTFail("Wallet did not become ready, status: \(readyStatus ?? "nil")")
+            return
+        }
+
+        ui.openDeepLink(offer.offerUrl)
+        guard ui.waitForTextInputValue(
+            identifier: "wallet.offerInput",
+            fallbackLabel: "Credential offer URL",
+            value: offer.offerUrl,
+            timeout: 20
+        ) else {
+            XCTFail("Offer URL did not appear after opening the deep link")
+            return
+        }
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+
+        let resolutionStatus = ui.waitForStatus(
+            prefixes: ["Transaction code required", "Receive failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        guard resolutionStatus == "Transaction code required" else {
+            XCTFail("Transaction-code prompt did not become ready, status: \(resolutionStatus ?? "nil")")
+            return
+        }
+
+        let txCodeInput = ui.textInput(identifier: "wallet.txCodeInput", fallbackLabel: "Transaction code")
+        guard txCodeInput.waitForExistence(timeout: 20) else {
+            XCTFail("Transaction-code input did not appear")
+            return
+        }
+
+        ui.replaceText(in: txCodeInput, value: incorrectCode(for: transactionCode))
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        let rejectedStatus = ui.waitForStatus(
+            prefixes: ["Receive failed"],
+            timeout: credentialOperationTimeout
+        )
+        guard rejectedStatus?.starts(with: "Receive failed") == true else {
+            XCTFail("Incorrect transaction code was not rejected, status: \(rejectedStatus ?? "nil")")
+            return
+        }
+
+        ui.replaceText(in: txCodeInput, value: transactionCode)
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        let receivedStatus = ui.waitForStatus(
+            prefixes: ["Received", "Receive failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        XCTAssertTrue(
+            receivedStatus?.starts(with: "Received") == true,
+            "Receive did not succeed after correcting the transaction code, status: \(receivedStatus ?? "nil")"
+        )
+    }
+
     private func publicDemoScenario() throws -> DemoCredentialScenario {
         try XCTUnwrap(DemoBackend.presentationScenarios.first { $0.id == "eudi-pid-mdoc" })
     }
 
     private func publicDemoEnvironment() -> [String: String] {
         ["TRANSACTION_DATA_PROFILES_URL": DemoBackend.transactionDataProfilesURL.absoluteString]
+    }
+
+    private func incorrectCode(for code: String) -> String {
+        precondition(!code.isEmpty, "Transaction code must not be empty")
+        let replacement = code.last == "0" ? "1" : "0"
+        return String(code.dropLast()) + replacement
     }
 }
 
