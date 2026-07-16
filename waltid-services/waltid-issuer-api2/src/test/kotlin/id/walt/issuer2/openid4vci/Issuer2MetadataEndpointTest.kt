@@ -171,6 +171,31 @@ class Issuer2MetadataEndpointTest {
         }
     }
 
+    private fun assertCredentialEncryptionMetadata(
+        credentialIssuerMetadata: CredentialIssuerMetadata,
+    ) {
+        val requestEncryption = assertNotNull(credentialIssuerMetadata.credentialRequestEncryption)
+        assertEquals(CredentialEncryptionProfile.encValuesSupported, requestEncryption.encValuesSupported)
+        assertFalse(requestEncryption.encryptionRequired)
+        assertNull(requestEncryption.zipValuesSupported)
+
+        val key = assertNotNull(requestEncryption.jwks["keys"]?.jsonArray?.singleOrNull()).jsonObject
+        assertEquals(CredentialEncryptionProfile.KEY_TYPE_EC, key["kty"]?.jsonPrimitive?.content)
+        assertEquals(CredentialEncryptionProfile.CURVE_P256, key["crv"]?.jsonPrimitive?.content)
+        assertEquals(CredentialEncryptionProfile.ALG_ECDH_ES, key["alg"]?.jsonPrimitive?.content)
+        assertEquals(CredentialEncryptionProfile.KEY_USE_ENC, key["use"]?.jsonPrimitive?.content)
+        assertNotNull(key["kid"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() })
+        assertNotNull(key["x"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() })
+        assertNotNull(key["y"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() })
+        assertNull(key["d"])
+
+        val responseEncryption = assertNotNull(credentialIssuerMetadata.credentialResponseEncryption)
+        assertEquals(CredentialEncryptionProfile.responseAlgValuesSupported, responseEncryption.algValuesSupported)
+        assertEquals(CredentialEncryptionProfile.encValuesSupported, responseEncryption.encValuesSupported)
+        assertFalse(responseEncryption.encryptionRequired)
+        assertNull(responseEncryption.zipValuesSupported)
+    }
+
     private suspend fun assertSelfHostedSdJwtVcTypeMetadata(
         client: HttpClient,
         credentialIssuerMetadata: CredentialIssuerMetadata,
