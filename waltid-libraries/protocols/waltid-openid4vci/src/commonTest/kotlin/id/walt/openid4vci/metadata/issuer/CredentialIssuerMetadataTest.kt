@@ -501,4 +501,23 @@ class CredentialIssuerMetadataTest {
         assertEquals("https://issuer.example/token", asMetadata.tokenEndpoint)
         assertEquals("https://issuer.example/jwks", asMetadata.jwksUri)
     }
+
+    private fun encryptionJwks() = buildJsonObject {
+        put(
+            "keys",
+            JsonArray(
+                listOf(
+                    buildJsonObject {
+                        put("kty", JsonPrimitive("EC"))
+                        put("kid", JsonPrimitive("ac"))
+                        put("use", JsonPrimitive("enc"))
+                        put("crv", JsonPrimitive("P-256"))
+                        put("alg", JsonPrimitive("ECDH-ES"))
+                        put("x", JsonPrimitive("YO4epjifD-KWeq1sL2tNmm36BhXnkJ0He-WqMYrp9Fk"))
+                        put("y", JsonPrimitive("Hekpm0zfK7C-YccH5iBjcIXgf6YdUvNUac_0At55Okk"))
+                    }
+                )
+            )
+        )
+    }
 }
