@@ -369,9 +369,6 @@ object WalletIssuanceHandler {
             onAttestationObtained = { onEvent(WalletSessionEvent.issuance_attestation_obtained) },
         )
 
-        val effectiveTxCode = request.txCode
-            ?: preAuthGrant.txCode?.value?.content
-
         val anonymousPreAuthorizedCode =
             asMetadata.preAuthorizedGrantAnonymousAccessSupported == true &&
                     request.tokenRequestHeaders.isEmpty() &&
@@ -380,7 +377,7 @@ object WalletIssuanceHandler {
         val tokenResponse = tokenBuilder.exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthGrant.preAuthorizedCode,
-            txCode = effectiveTxCode,
+            txCode = request.txCode,
             additionalHeaders = request.tokenRequestHeaders,
             attestationHeaders = attestationHeaders,
             anonymous = anonymousPreAuthorizedCode,
