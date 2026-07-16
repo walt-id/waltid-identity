@@ -76,6 +76,28 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     private val notificationService: IssuanceNotificationService,
     private val credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null,
 ) {
+    private var injectedCredentialNonceService: CredentialNonceService? = null
+    private val credentialNonceService by lazy { injectedCredentialNonceService ?: CredentialNonceService() }
+
+    constructor(
+        oauth2Provider: OAuth2Provider,
+        sessionService: IssuanceSessionService,
+        profileService: CredentialProfileService,
+        metadataService: MetadataService,
+        notificationService: IssuanceNotificationService,
+        credentialProofKeyAcceptance: CredentialProofKeyAcceptance?,
+        credentialNonceService: CredentialNonceService,
+    ) : this(
+        oauth2Provider = oauth2Provider,
+        sessionService = sessionService,
+        profileService = profileService,
+        metadataService = metadataService,
+        notificationService = notificationService,
+        credentialProofKeyAcceptance = credentialProofKeyAcceptance,
+    ) {
+        injectedCredentialNonceService = credentialNonceService
+    }
+
     private val json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
@@ -310,7 +332,18 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             )
         }
 
-        validateExpectedCredentialProofKey(observedRequestWithSession, observedSession)?.let { error ->
+        val credentialProofKey = try {
+            validateCredentialProof(observedRequestWithSession)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return oauth2Provider.writeCredentialError(
+                observedRequestWithSession,
+                OAuthError("invalid_proof", "Credential proof is invalid"),
+            )
+        }
+
+        validateExpectedCredentialProofKey(credentialProofKey, observedSession)?.let { error ->
             return oauth2Provider.writeCredentialError(observedRequestWithSession, error)
         }
 
@@ -363,7 +396,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
             credentialProofKeyAcceptance?.let { acceptance ->
                 val proofPublicKeyJwk = try {
-                    resolveCredentialProofKey(requestWithSession).getPublicKey().exportJWKObject()
+                    credentialProofKey.getPublicKey().exportJWKObject()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
@@ -491,7 +524,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     }
 
     fun createNonceResponse(): Map<String, String> =
-        mapOf("c_nonce" to UUID.randomUUID().toString())
+        mapOf("c_nonce" to credentialNonceService.issueNonce())
 
     private suspend fun createAuthorizationResponse(
         issuanceSession: IssuanceSession,
@@ -627,13 +660,11 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         this[name]?.jsonPrimitive?.contentOrNull
 
     private suspend fun validateExpectedCredentialProofKey(
-        request: CredentialRequest,
+        proofKey: Key,
         session: IssuanceSession,
     ): OAuthError? {
         val expectedJwk = session.expectedCredentialProofKeyJwk ?: return null
         return try {
-            requireNotNull(request.proofs?.jwt?.singleOrNull())
-            val proofKey = resolveCredentialProofKey(request)
             val expectedKey = JWKKey.importJWK(expectedJwk.toString()).getOrThrow()
             require(proofKey.getThumbprint() == expectedKey.getThumbprint()) {
                 "Credential proof key does not match the expected key"
@@ -646,11 +677,12 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         }
     }
 
-    private suspend fun resolveCredentialProofKey(request: CredentialRequest): Key {
+    private suspend fun validateCredentialProof(request: CredentialRequest): Key {
         val proof = requireNotNull(request.proofs?.jwt?.singleOrNull()) {
-            "A single JWT credential proof is required for this issuance session"
+            "Exactly one JWT credential proof is required"
         }
-        val key = proof.decodeJws().header.let { proofHeader ->
+        val decodedProof = proof.decodeJws()
+        val key = decodedProof.header.let { proofHeader ->
             when {
                 proofHeader["jwk"] is JsonObject ->
                     JWKKey.importJWK(requireNotNull(proofHeader["jwk"]).toString()).getOrThrow()
@@ -665,6 +697,30 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             }
         }
         key.verifyJws(proof).getOrThrow()
+
+        require(decodedProof.header["typ"]?.jsonPrimitive?.contentOrNull == "openid4vci-proof+jwt") {
+            "Credential proof typ is invalid"
+        }
+
+        val audiences = when (val audience = decodedProof.payload["aud"]) {
+            is JsonArray -> audience.map { it.jsonPrimitive.content }
+            is JsonPrimitive -> listOf(audience.content)
+            else -> emptyList()
+        }
+        require(metadataService.issuerBaseUrl() in audiences) { "Credential proof audience is invalid" }
+
+        val issuedAt = requireNotNull(decodedProof.payload["iat"]?.jsonPrimitive?.longOrNull) {
+            "Credential proof iat is missing or invalid"
+        }
+        val now = Clock.System.now().epochSeconds
+        require(issuedAt in (now - 5.minutes.inWholeSeconds)..(now + 60)) {
+            "Credential proof iat is outside the accepted window"
+        }
+
+        val nonce = requireNotNull(decodedProof.payload["nonce"]?.jsonPrimitive?.contentOrNull) {
+            "Credential proof nonce is missing"
+        }
+        require(credentialNonceService.consumeNonce(nonce)) { "Credential proof nonce is invalid or already used" }
         return key
     }
 
