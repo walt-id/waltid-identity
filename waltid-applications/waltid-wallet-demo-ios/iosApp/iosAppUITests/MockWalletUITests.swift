@@ -62,6 +62,11 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.buttons["wallet.receiveButton"].isEnabled)
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
         XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"
         )
@@ -114,6 +119,11 @@ final class MockWalletUITests: XCTestCase {
         ui.openDeepLink(offerUrl)
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
         XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"
         )
@@ -150,6 +160,11 @@ final class MockWalletUITests: XCTestCase {
             value: "openid-credential-offer://mock"
         )
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"
@@ -199,6 +214,11 @@ final class MockWalletUITests: XCTestCase {
         )
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
         XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"
         )
@@ -246,6 +266,11 @@ final class MockWalletUITests: XCTestCase {
         )
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
         XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"
         )
@@ -285,11 +310,21 @@ final class MockWalletUITests: XCTestCase {
         )
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Receiving credential", "Receive failed"], timeout: 10),
-            "Receiving credential..."
+            ui.waitForStatus(prefixes: ["Resolving credential offer", "Receive failed"], timeout: 10),
+            "Resolving credential offer..."
         )
         XCTAssertFalse(ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL").isEnabled)
         XCTAssertFalse(app.buttons["wallet.receiveButton"].isEnabled)
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Receiving credential", "Receive failed"], timeout: 10),
+            "Receiving credential..."
+        )
+        XCTAssertFalse(app.buttons["wallet.offerAcceptButton"].isEnabled)
         XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"
@@ -330,6 +365,11 @@ final class MockWalletUITests: XCTestCase {
         )
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
         XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"
         )
@@ -360,6 +400,11 @@ final class MockWalletUITests: XCTestCase {
             value: "openid-credential-offer://mock"
         )
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"
@@ -466,6 +511,11 @@ final class MockWalletUITests: XCTestCase {
         )
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
         XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"
         )
@@ -507,6 +557,11 @@ final class MockWalletUITests: XCTestCase {
         )
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
         XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"
         )
@@ -545,6 +600,11 @@ final class MockWalletUITests: XCTestCase {
         )
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
         XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"
         )
@@ -577,6 +637,11 @@ final class MockWalletUITests: XCTestCase {
             value: "openid-credential-offer://mock"
         )
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"
@@ -625,6 +690,11 @@ final class MockWalletUITests: XCTestCase {
             value: "openid-credential-offer://mock"
         )
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"

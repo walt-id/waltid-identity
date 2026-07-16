@@ -12,50 +12,35 @@ struct ReceiveView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    ScannableUrlEditor(
-                        title: "Receive",
-                        label: "Credential offer URL",
-                        text: $viewModel.offerUrl,
-                        inputIdentifier: WalletAccessibilityID.offerInput,
-                        scanButtonIdentifier: WalletAccessibilityID.offerScanButton,
-                        isEnabled: viewModel.receiveUrlEntryEnabled,
-                        focusResetKey: viewModel.inputFocusResetKey
-                    )
+                    if viewModel.offerPreview == nil {
+                        ScannableUrlEditor(
+                            title: "Receive",
+                            label: "Credential offer URL",
+                            text: $viewModel.offerUrl,
+                            inputIdentifier: WalletAccessibilityID.offerInput,
+                            scanButtonIdentifier: WalletAccessibilityID.offerScanButton,
+                            isEnabled: viewModel.receiveUrlEntryEnabled,
+                            focusResetKey: viewModel.inputFocusResetKey
+                        )
 
-                    if viewModel.transactionCodeRequired {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("This offer requires a transaction code.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            SecureField(
-                                "Transaction code",
-                                text: Binding(
-                                    get: { viewModel.txCode },
-                                    set: viewModel.updateTxCode
-                                )
-                            )
-                                .textContentType(.oneTimeCode)
-                                .keyboardType(.asciiCapable)
-                                .textInputAutocapitalization(.never)
-                                .disableAutocorrection(true)
-                                .padding(8)
-                                .frame(minHeight: 52)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color(.separator), lineWidth: 1)
-                                )
-                                .disabled(!viewModel.receiveUrlEntryEnabled)
-                                .accessibilityIdentifier(WalletAccessibilityID.txCodeInput)
+                        Button("Receive") {
+                            viewModel.previewOffer()
                         }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.waltBlue)
+                        .disabled(!viewModel.receiveActionEnabled)
+                        .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
+                    } else if let preview = viewModel.offerPreview {
+                        OfferReviewView(
+                            preview: preview,
+                            isEnabled: viewModel.acceptOfferEnabled,
+                            isTxCodeEnabled: viewModel.offerReviewEnabled,
+                            txCode: viewModel.txCode,
+                            onTxCodeChange: viewModel.updateTxCode,
+                            onAccept: viewModel.acceptOffer,
+                            onDecline: viewModel.declineOffer
+                        )
                     }
-
-                    Button("Receive") {
-                        viewModel.receiveCredential()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.waltBlue)
-                    .disabled(!viewModel.receiveActionEnabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
 
                     StatusBannerView(
                         message: viewModel.statusMessage(for: .receive),

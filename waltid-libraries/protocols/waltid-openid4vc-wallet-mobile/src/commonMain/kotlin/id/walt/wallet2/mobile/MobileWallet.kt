@@ -79,6 +79,10 @@ public data class MobileWalletCredential(
  */
 public data class MobileWalletOfferResolution(
     public val transactionCodeRequired: Boolean,
+    /** Issuer identifier (URL) from the credential offer. */
+    public val credentialIssuer: String,
+    /** Credential configuration IDs advertised in the offer. */
+    public val offeredCredentials: List<String>,
 )
 
 /**
@@ -222,6 +226,8 @@ public class MobileWallet internal constructor(
         ).let { result ->
             MobileWalletOfferResolution(
                 transactionCodeRequired = result.txCodeRequired,
+                credentialIssuer = result.credentialIssuer,
+                offeredCredentials = result.offeredCredentials,
             )
         }
 
