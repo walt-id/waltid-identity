@@ -89,7 +89,9 @@ object AuthorizationRequestResolver {
 
     private val defaultWalletCapabilities = WalletCapabilities()
 
-    private val defaultRequestUriPostWalletMetadata = buildRequestUriPostWalletMetadata(defaultWalletCapabilities)
+    private val defaultRequestUriPostWalletMetadata: String by lazy {
+        buildRequestUriPostWalletMetadata(defaultWalletCapabilities)
+    }
 
     private val unsupportedResponseTypes = setOf(OpenID4VPResponseType.CODE)
     private val responseTypesSupported = (OpenID4VPResponseType.entries - unsupportedResponseTypes)

@@ -1,6 +1,5 @@
 package id.waltid.openid4vp.wallet.response
 
-import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
@@ -236,8 +235,15 @@ class ResponseEncryptionHandlerTest {
 
     @Test
     fun encryptResponse_roundTripsAndUsesNegotiatedProtectedHeader() = runTest {
-        val privateKey = JWKKey.generate(KeyType.secp256r1)
-        val publicJwk = privateKey.getPublicKey().exportJWKObject()
+        // Import fixed key material instead of generating a key. Apple test runners do not
+        // provide a login keychain, and generated Signum keys otherwise fail while retrieving
+        // their public key with errSecNotAvailable (-25291).
+        val privateKey = JWKKey.importJWK(
+            """{"kty":"EC","crv":"P-256","d":"QN9Y3k_3Hy2OV0C5Pmez_ObEXJKcXonnMg3xTpcLOAg","x":"eTT2WdzlmOWBItdgSmsqB1_BP69wfuwOe1IYvaY1WdI","y":"wbOu3GP02JiOVIRQ_ufWLRNOmDB6seYAabCmsGBfr_4"}"""
+        ).getOrThrow()
+        val publicJwk = Json.parseToJsonElement(
+            """{"kty":"EC","crv":"P-256","x":"eTT2WdzlmOWBItdgSmsqB1_BP69wfuwOe1IYvaY1WdI","y":"wbOu3GP02JiOVIRQ_ufWLRNOmDB6seYAabCmsGBfr_4"}"""
+        ).jsonObject
         val encryptionJwk = JsonObject(
             publicJwk + mapOf(
                 "use" to JsonPrimitive("enc"),
