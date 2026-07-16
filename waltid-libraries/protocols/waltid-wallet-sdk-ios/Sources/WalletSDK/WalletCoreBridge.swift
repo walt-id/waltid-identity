@@ -9,6 +9,14 @@ protocol WalletCoreBridge: Sendable {
     func credentials() async throws -> [Credential]
     func deleteLocalData() async throws
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
+    func previewPresentation(request: URL) async throws -> PresentationPreview
+    func submitPresentation(
+        request: URL,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?,
+        runPolicies: Bool?
+    ) async throws -> PresentationResult
 }
 
 @available(macOS 10.15, *)
@@ -47,6 +55,20 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     }
 
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult {
+        throw unavailableError()
+    }
+
+    func previewPresentation(request: URL) async throws -> PresentationPreview {
+        throw unavailableError()
+    }
+
+    func submitPresentation(
+        request: URL,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?,
+        runPolicies: Bool?
+    ) async throws -> PresentationResult {
         throw unavailableError()
     }
 

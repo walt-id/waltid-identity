@@ -21,6 +21,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
 internal fun PinScreen(
@@ -71,7 +72,7 @@ internal fun PinScreen(
             isError = error != null,
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag("wallet.pinInput"),
+                .testTag(WalletUiTestTags.PinInput),
             singleLine = true,
         )
 
@@ -85,7 +86,7 @@ internal fun PinScreen(
                 isError = error != null,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("wallet.pinConfirmationInput"),
+                    .testTag(WalletUiTestTags.PinConfirmationInput),
                 singleLine = true,
             )
         }
@@ -99,7 +100,7 @@ internal fun PinScreen(
             enabled = !isBusy,
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag("wallet.pinSubmitButton"),
+                .testTag(WalletUiTestTags.PinSubmitButton),
         ) {
             Text(if (setup != null) "Set PIN" else "Unlock")
         }
