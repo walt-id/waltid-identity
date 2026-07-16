@@ -32,8 +32,10 @@ import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.token.TokenResponseOptions
 import id.walt.openid4vci.responses.token.withOptions
 import id.walt.openid4vci.responses.credential.CredentialResponse
+import id.walt.openid4vci.responses.credential.CredentialResponseBody
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
+import id.walt.openid4vci.responses.credential.toJsonObject
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
@@ -442,20 +444,45 @@ class DefaultOAuth2Provider(
         session: Session?,
         accessTokenContext: AccessTokenContext?
     ): CredentialRequestResult {
-        if (accessTokenContext != null) {
-            val verifier = config.accessTokenVerifier
-                ?: return CredentialRequestResult.Failure(
-                    OAuthError("invalid_request", "access token verifier not configured")
+        verifyCredentialAccessToken(accessTokenContext)?.let { return it }
+        return when (val result = config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())) {
+            is CredentialRequestResult.Success ->
+                if (result.request.credentialResponseEncryption != null) {
+                    CredentialRequestResult.Failure(
+                        OAuthError(
+                            "invalid_request",
+                            "credential_response_encryption requires an encrypted Credential Request",
+                        )
+                    )
+                } else {
+                    result
+                }
+
+            is CredentialRequestResult.Failure -> result
+        }
+    }
+
+    override suspend fun createCredentialRequest(
+        encryptedCredentialRequest: String,
+        session: Session?,
+        accessTokenContext: AccessTokenContext?
+    ): CredentialRequestResult {
+        verifyCredentialAccessToken(accessTokenContext)?.let { return it }
+        val decryptor = config.credentialRequestDecryptor
+            ?: return CredentialRequestResult.Failure(
+                OAuthError(
+                    CredentialErrorCodes.ENCRYPTION_NOT_SUPPORTED,
+                    "credential request encryption is not supported",
                 )
-            try {
-                verifier.verify(
-                    token = accessTokenContext.token,
-                    expectedIssuer = accessTokenContext.expectedIssuer,
-                    expectedAudience = accessTokenContext.expectedAudience,
-                )
-            } catch (e: Exception) {
-                return CredentialRequestResult.Failure(OAuthError("invalid_request", e.message))
-            }
+            )
+        val parameters = try {
+            decryptor.decrypt(encryptedCredentialRequest).toParametersMap()
+        } catch (e: CredentialRequestEncryptionNotSupported) {
+            return CredentialRequestResult.Failure(
+                OAuthError(CredentialErrorCodes.ENCRYPTION_NOT_SUPPORTED, e.message)
+            )
+        } catch (e: Exception) {
+            return CredentialRequestResult.Failure(OAuthError("invalid_request", e.message))
         }
         return config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())
     }
