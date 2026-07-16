@@ -180,10 +180,38 @@ class Issuer2MetadataServiceTest {
         )
     }
 
+    private fun assertCredentialEncryptionMetadata(metadata: id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata) {
+        val requestEncryption = assertNotNull(metadata.credentialRequestEncryption)
+        assertEquals(CredentialEncryptionProfile.encValuesSupported, requestEncryption.encValuesSupported)
+        assertFalse(requestEncryption.encryptionRequired)
+        assertNull(requestEncryption.zipValuesSupported)
+
+        val key = assertNotNull(requestEncryption.jwks["keys"]?.jsonArray?.singleOrNull()).jsonObject
+        assertEquals(CredentialEncryptionProfile.KEY_TYPE_EC, key["kty"]?.jsonPrimitive?.content)
+        assertEquals(CredentialEncryptionProfile.CURVE_P256, key["crv"]?.jsonPrimitive?.content)
+        assertEquals(CredentialEncryptionProfile.ALG_ECDH_ES, key["alg"]?.jsonPrimitive?.content)
+        assertEquals(CredentialEncryptionProfile.KEY_USE_ENC, key["use"]?.jsonPrimitive?.content)
+        assertNotNull(key["kid"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() })
+        assertNotNull(key["x"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() })
+        assertNotNull(key["y"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() })
+        assertNull(key["d"])
+
+        val responseEncryption = assertNotNull(metadata.credentialResponseEncryption)
+        assertEquals(CredentialEncryptionProfile.responseAlgValuesSupported, responseEncryption.algValuesSupported)
+        assertEquals(CredentialEncryptionProfile.encValuesSupported, responseEncryption.encValuesSupported)
+        assertFalse(responseEncryption.encryptionRequired)
+        assertNull(responseEncryption.zipValuesSupported)
+    }
+
     private object NoopIssuanceSessionRepository : IssuanceSessionRepository {
         override suspend fun save(session: IssuanceSession): IssuanceSession = session
         override suspend fun get(sessionId: String): IssuanceSession? = null
         override suspend fun list(): List<IssuanceSession> = emptyList()
         override suspend fun remove(sessionId: String) = Unit
+    }
+
+    private companion object {
+        const val CREDENTIAL_ENCRYPTION_KEY =
+            """{"type":"jwk","jwk":{"kty":"EC","d":"ZSHgIcRvbwV9s224kHUaFqkEPShCAdwXocGl_w3M42Q","crv":"P-256","kid":"issuer2-credential-encryption-key","x":"GWKpdL3jPoPJ5wKgSA-jxS2jgp-ZUDE6sIQbeB86vF0","y":"F3xAwH96_xVciV7mFQslU_eRQgP-5pSZiNf8bjMoGfo"}}"""
     }
 }
