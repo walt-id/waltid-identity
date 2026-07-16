@@ -437,6 +437,7 @@ class WalletDemoController(
                             credentials = credentials,
                         ),
                         operation = WalletOperationState.Idle,
+                        warning = result.warning,
                     )
                 }
             }.onFailure { error ->

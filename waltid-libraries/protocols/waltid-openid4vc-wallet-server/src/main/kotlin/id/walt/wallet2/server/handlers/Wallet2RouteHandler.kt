@@ -4,6 +4,7 @@ import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidService
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.StoredCredentialMetadata
 import id.walt.wallet2.data.Wallet
@@ -627,7 +628,14 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<PresentCredentialRequest>()
-                        call.respond(WalletPresentationHandler.presentCredential(wallet, req, noopOnEvent))
+                        call.respond(
+                            WalletPresentationHandler.presentCredential(
+                                wallet = wallet,
+                                request = req,
+                                onEvent = noopOnEvent,
+                                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                            )
+                        )
                     }
 
                     post("/isolated", {
@@ -637,7 +645,14 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<PresentCredentialIsolatedRequest>()
-                        call.respond(WalletPresentationHandler.presentCredentialIsolated(wallet, req, noopOnEvent))
+                        call.respond(
+                            WalletPresentationHandler.presentCredentialIsolated(
+                                wallet = wallet,
+                                request = req,
+                                onEvent = noopOnEvent,
+                                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                            )
+                        )
                     }
 
                     post("/resolve-request", {
