@@ -543,29 +543,52 @@ class DefaultOAuth2Provider(
     override fun writeCredentialResponse(
         request: CredentialRequest,
         response: CredentialResponse
-    ): CredentialResponseHttp =
-        CredentialResponseHttp(
+    ): CredentialResponseHttp {
+        val payload = response.toJsonObject()
+        val encryption = request.credentialResponseEncryption
+            ?: return CredentialResponseHttp(status = 200, payload = payload)
+
+        val encrypted = try {
+            config.credentialResponseEncryptor.encrypt(payload, encryption)
+        } catch (e: Exception) {
+            return writeCredentialError(
+                request,
+                OAuthError("invalid_request", e.message ?: "Credential response encryption failed"),
+            )
+        }
+        return CredentialResponseHttp(
             status = 200,
-            payload = buildMap {
-                response.credentials?.let { issued ->
-                    put(
-                        "credentials",
-                        buildJsonArray {
-                            issued.forEach { credentialEntry ->
-                                add(
-                                    JsonObject(
-                                        mapOf("credential" to credentialEntry.credential)
-                                    )
-                                )
-                            }
-                        }
-                    )
-                }
-                response.transactionId?.let { put("transaction_id", JsonPrimitive(it)) }
-                response.interval?.let { put("interval", JsonPrimitive(it)) }
-                response.notificationId?.let { put("notification_id", JsonPrimitive(it)) }
-            }
+            body = CredentialResponseBody.EncryptedJwt(encrypted),
         )
+    }
+
+    private suspend fun verifyCredentialAccessToken(accessTokenContext: AccessTokenContext?): CredentialRequestResult.Failure? {
+        if (accessTokenContext == null) return null
+        val verifier = config.accessTokenVerifier
+            ?: return CredentialRequestResult.Failure(
+                OAuthError("invalid_request", "access token verifier not configured")
+            )
+        return try {
+            verifier.verify(
+                token = accessTokenContext.token,
+                expectedIssuer = accessTokenContext.expectedIssuer,
+                expectedAudience = accessTokenContext.expectedAudience,
+            )
+            null
+        } catch (e: Exception) {
+            CredentialRequestResult.Failure(OAuthError("invalid_request", e.message))
+        }
+    }
+
+    private fun JsonObject.toParametersMap(): Map<String, List<String>> =
+        entries.associate { (key, value) ->
+            val encoded = if (value is JsonPrimitive && value.isString) {
+                value.content
+            } else {
+                value.toString()
+            }
+            key to listOf(encoded)
+        }
 
     private fun appendParams(base: String, parameters: Map<String, String>): String {
         if (parameters.isEmpty()) return base
