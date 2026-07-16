@@ -5,6 +5,10 @@ import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletKeyType
+import id.walt.wallet2.mobile.MobileWalletOfferResolution
+import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
+import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
+import id.walt.wallet2.mobile.MobileWalletPresentationPreview
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -56,6 +60,12 @@ public class WalletSdkBridge private constructor(
             )
         }
 
+    /** Resolves a credential offer before issuance. */
+    public suspend fun resolveOffer(
+        offerUrl: String,
+    ): WalletBridgeResult<MobileWalletOfferResolution> =
+        walletBridgeCall { operations.resolveOffer(offerUrl = offerUrl) }
+
     /**
      * Receives credentials from an OpenID4VCI credential offer.
      */
@@ -104,6 +114,36 @@ public class WalletSdkBridge private constructor(
             )
         }
 
+    /**
+     * Resolves and previews an OpenID4VP presentation request without submitting credentials.
+     */
+    public suspend fun previewPresentation(
+        requestUrl: String,
+    ): WalletBridgeResult<MobileWalletPresentationPreview> =
+        walletBridgeCall {
+            operations.previewPresentation(requestUrl = requestUrl)
+        }
+
+    /**
+     * Submits a presentation using user-selected wallet credential options.
+     */
+    public suspend fun submitPresentation(
+        requestUrl: String,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+        runPolicies: Boolean? = null,
+    ): WalletBridgeResult<MobileWalletPresentationResult> =
+        walletBridgeCall {
+            operations.submitPresentation(
+                requestUrl = requestUrl,
+                selectedCredentialOptions = selectedCredentialOptions,
+                selectedDisclosureOptions = selectedDisclosureOptions,
+                did = did,
+                runPolicies = runPolicies,
+            )
+        }
+
     internal companion object {
         internal fun forOperations(
             operations: WalletSdkBridgeOperations,
@@ -121,6 +161,8 @@ internal interface WalletSdkBridgeOperations {
         didMethod: String,
     ): MobileWalletBootstrapResult
 
+    suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution
+
     suspend fun receive(
         offerUrl: String,
         txCode: String?,
@@ -136,6 +178,19 @@ internal interface WalletSdkBridgeOperations {
         did: String?,
         runPolicies: Boolean?,
     ): MobileWalletPresentationResult
+
+    suspend fun previewPresentation(
+        requestUrl: String,
+    ): MobileWalletPresentationPreview
+
+    suspend fun submitPresentation(
+        requestUrl: String,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
+        did: String?,
+        runPolicies: Boolean?,
+    ): MobileWalletPresentationResult
+
 }
 
 internal class MobileWalletSdkBridgeOperations(
@@ -149,6 +204,9 @@ internal class MobileWalletSdkBridgeOperations(
             keyType = keyType,
             didMethod = didMethod,
         )
+
+    override suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution =
+        wallet.resolveOffer(offerUrl = offerUrl)
 
     override suspend fun receive(
         offerUrl: String,
@@ -177,4 +235,25 @@ internal class MobileWalletSdkBridgeOperations(
             did = did,
             runPolicies = runPolicies,
         )
+
+    override suspend fun previewPresentation(
+        requestUrl: String,
+    ): MobileWalletPresentationPreview =
+        wallet.previewPresentation(requestUrl = requestUrl)
+
+    override suspend fun submitPresentation(
+        requestUrl: String,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
+        did: String?,
+        runPolicies: Boolean?,
+    ): MobileWalletPresentationResult =
+        wallet.submitPresentation(
+            requestUrl = requestUrl,
+            selectedCredentialOptions = selectedCredentialOptions,
+            selectedDisclosureOptions = selectedDisclosureOptions,
+            did = did,
+            runPolicies = runPolicies,
+        )
+
 }

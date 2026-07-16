@@ -1,0 +1,88 @@
+name: Android eligibility
+
+on:
+  workflow_call:
+    inputs:
+      event-name:
+        description: "Caller event name"
+        required: true
+        type: string
+      ref:
+        description: "Caller git ref"
+        required: true
+        type: string
+      pr-number:
+        description: "Pull request number, if the caller is a PR event"
+        required: false
+        type: string
+        default: ""
+      pr-head-repo:
+        description: "Pull request head repository, if the caller is a PR event"
+        required: false
+        type: string
+        default: ""
+      pr-labels:
+        description: "JSON array of pull request label names"
+        required: false
+        type: string
+        default: "[]"
+      pr-draft:
+        description: "Whether the pull request is currently a draft"
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      should-run:
+        description: "Whether Android jobs should run"
+        value: ${{ jobs.decide.outputs.should-run }}
+      reason:
+        description: "Human-readable decision reason"
+        value: ${{ jobs.decide.outputs.reason }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  decide:
+    uses: ./.github/workflows/mobile-eligibility.yml
+    with:
+      event-name: ${{ inputs.event-name }}
+      ref: ${{ inputs.ref }}
+      pr-number: ${{ inputs.pr-number }}
+      pr-head-repo: ${{ inputs.pr-head-repo }}
+      pr-labels: ${{ inputs.pr-labels }}
+      pr-draft: ${{ inputs.pr-draft }}
+      platform-name: Android
+      platform-label: ci:android
+      path-patterns: |
+        [
+          ".github/workflows/android-device-tests.yml",
+          ".github/workflows/android-eligibility.yml",
+          ".github/workflows/mobile-eligibility.yml",
+          ".github/workflows/gradle.yml",
+          ".github/actions/checkout-repos/*",
+          ".github/actions/gradle-setup-action/*",
+          ".github/actions/set-properties/*",
+          ".github/scripts/mobile-ci/*android*",
+          "build-logic/*",
+          "build.gradle.kts",
+          "gradle/*",
+          "gradle.properties",
+          "gradlew",
+          "settings.gradle.kts",
+          "gradle/libs.versions.toml",
+          "*/src/commonMain/*",
+          "*/src/commonTest/*",
+          "*/src/androidMain/*",
+          "*/src/androidTest/*",
+          "*/src/androidDeviceTest/*",
+          "*/src/androidUnitTest/*",
+          "*/src/androidInstrumentedTest/*",
+          "waltid-applications/waltid-wallet-demo-compose/*",
+          "waltid-libraries/*/build.gradle.kts",
+          "waltid-libraries/*/*/build.gradle.kts",
+          "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
+          "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
+          "waltid-libraries/web/waltid-web-data-fetching/*"
+        ]

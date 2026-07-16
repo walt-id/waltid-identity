@@ -9,5 +9,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView(viewModel: WalletViewModel())
+    ContentView(viewModel: WalletViewModel.mockForUITests())
 }

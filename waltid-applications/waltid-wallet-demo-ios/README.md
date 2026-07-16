@@ -30,6 +30,16 @@ The demo uses the default managed encrypted local persistence. Wallet database f
 
 The UI stays focused on the production default. Non-default persistence options, including provided database keys and custom credential stores, are documented and covered by SDK and demo integration tests.
 
+## Public demo backend defaults
+
+Clean demo installs use the public walt.id demo profile endpoint for OpenID4VP transaction-data support:
+
+```text
+https://wallet.demo.walt.id/wallet-api/transaction-data-profiles
+```
+
+Override it with the `TRANSACTION_DATA_PROFILES_URL` launch environment variable or `UserDefaults` key. Wallet attestation values remain explicit overrides through `ATTESTATION_*` environment/UserDefaults values; no bearer token is defaulted.
+
 ## Common commands
 
 ```bash

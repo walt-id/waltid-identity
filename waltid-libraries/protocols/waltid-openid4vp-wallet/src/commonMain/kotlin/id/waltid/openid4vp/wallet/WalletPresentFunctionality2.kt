@@ -4,21 +4,17 @@ package id.waltid.openid4vp.wallet
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
-import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.ShaUtils.calculateSha256Base64Url
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.DcqlQuery
 import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
-import id.walt.openid4vp.clientidprefix.*
+import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.webdatafetching.WebDataFetcher
@@ -34,9 +30,8 @@ import id.waltid.openid4vp.wallet.presentation.SdJwtVcPresenter
 import id.waltid.openid4vp.wallet.presentation.SelfIssuedIdTokenBuilder
 import id.waltid.openid4vp.wallet.presentation.W3CPresenter
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.call.*
-import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
@@ -48,7 +43,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
-import kotlin.uuid.Uuid
 
 
 object WalletPresentFunctionality2 {
@@ -252,11 +246,6 @@ object WalletPresentFunctionality2 {
         }
     }
 
-    /**
-     * Generates a fresh wallet_nonce per OID4VP 1.0 §5.6.
-     */
-        private fun generateWalletNonce(): String = Uuid.random().toHexString()
-
     private fun buildErrorResponseParameters(
         authorizationRequest: AuthorizationRequest,
         error: String,
@@ -307,6 +296,44 @@ object WalletPresentFunctionality2 {
         appendLine("</html>")
     }
 
+    private suspend fun resolveAuthorizationRequest(
+        presentationRequestUrl: Url,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy,
+    ): ResolvedAuthorizationRequest =
+        AuthorizationRequestResolver.resolve(
+            requestUrl = presentationRequestUrl,
+            unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+            fetchRequestUri = { requestUri, requestUriMethod ->
+                AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                    webResolveAuthReq = webResolveAuthReq,
+                    requestUri = requestUri,
+                    requestUriMethod = requestUriMethod,
+                )
+            },
+        )
+
+    private suspend fun legacyFallbackResult(
+        presentationRequestUrl: Url,
+        legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)?,
+        error: AuthorizationRequestResolver.SignedAuthorizationRequestValidationException,
+    ): WalletPresentResult? {
+        if (error.clientIdError !is ClientIdError.PreRegisteredClientNotFound || legacyFallbackCallback == null) {
+            return null
+        }
+
+        val fallbackResponse = runCatching { legacyFallbackCallback(presentationRequestUrl) }
+            .getOrNull()
+            ?.getOrNull()
+
+        if (fallbackResponse != null) {
+            return WalletPresentResult(
+                transmissionSuccess = true,
+                verifierResponse = fallbackResponse,
+            )
+        }
+        return null
+    }
+
     suspend fun walletPresentHandling(
         holderKey: Key,
         holderDid: String?,
@@ -317,8 +344,7 @@ object WalletPresentFunctionality2 {
         holderPoliciesToRun: Flow<HolderPolicy>?,
         runPolicies: Boolean?,
 
-        // Added from Branch B
-        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
 
         // TODO: selected credentials
 
@@ -328,145 +354,25 @@ object WalletPresentFunctionality2 {
          */
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
 
-        // Added from Branch B
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+
+        resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
     ): Result<WalletPresentResult> {
         log.trace { "- Start of Wallet Present Handling -" }
 
         log.trace { "Wallet presentation will use key $holderKey, and did $holderDid" }
 
-        // Resolve AuthorizationRequest (Kept Branch A's inline processing to ensure wallet_nonce logic operates seamlessly):
-        val authorizationRequest: AuthorizationRequest = if (presentationRequestUrl.parameters.contains("request_uri")) {
-            val requestUri = presentationRequestUrl.parameters["request_uri"]!!
-            val requestUriMethod = presentationRequestUrl.parameters["request_uri_method"]
-
-            log.trace { "Resolving AuthorizationRequest from URI: $requestUri (method=${requestUriMethod ?: "get"})" }
-
-            // Per OID4VP 1.0 §5.1: if request_uri_method=post, send a POST with wallet_nonce
-            // to bind this request and prevent replay attacks.
-            val walletNonce: String? = if (requestUriMethod?.lowercase() == "post") {
-                // Generate a fresh, cryptographically random wallet_nonce (base64url, 128 bits)
-                generateWalletNonce()
-            } else null
-
-            val httpResponse = if (walletNonce != null) {
-                log.trace { "Sending POST to request URI with wallet_nonce (request_uri_method=post)" }
-                webResolveAuthReq.rawFetch(io.ktor.http.Url(requestUri)) {
-                    method = HttpMethod.Post
-                    headers.append(HttpHeaders.ContentType, ContentType.Application.FormUrlEncoded.toString())
-                    headers.append(HttpHeaders.Accept, "application/oauth-authz-req+jwt")
-                    setBody("wallet_nonce=${walletNonce.encodeURLQueryComponent()}")
+        val authorizationRequest = (
+            resolvedAuthorizationRequest
+                ?: try {
+                    resolveAuthorizationRequest(presentationRequestUrl, unsignedRequestObjectPolicy)
+                } catch (error: AuthorizationRequestResolver.SignedAuthorizationRequestValidationException) {
+                    legacyFallbackResult(presentationRequestUrl, legacyFallbackCallback, error)
+                        ?.let { return Result.success(it) }
+                    throw error
                 }
-            } else {
-                webResolveAuthReq.rawFetch(requestUri)
-            }
-
-            check(httpResponse.status.isSuccess()) { "AuthorizationRequest cannot be retrieved (${httpResponse.status}): from $requestUri - ${httpResponse.bodyAsText()}" }
-
-            val authorizationRequestContentType =
-                httpResponse.contentType()
-                    ?: throw IllegalArgumentException("AuthorizationRequest does not have HTTP ContentType header set: $requestUri")
-            log.trace { "Retrieved response has content type: $authorizationRequestContentType" }
-
-            val retrievedAuthorizationRequest = when {
-                authorizationRequestContentType.match("application/oauth-authz-req+jwt") -> {
-
-                    val authReqJwt = httpResponse.bodyAsText()
-                    require(authReqJwt.isJwt()) { "Response for AuthorizationRequest should be JWT, but is not a valid JWT" }
-                    val authReqJws = authReqJwt.decodeJws()
-                    val jwtAlg = authReqJws.header["alg"]?.jsonPrimitive?.content
-                    log.trace { "JWT AuthorizationRequest algorithm: $jwtAlg" }
-
-                    if (jwtAlg.equals("none", true)) {
-                        // Integrated Branch B's unsignedRequestObjectPolicy validation logic
-                        if (unsignedRequestObjectPolicy == AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED) {
-                            throw IllegalArgumentException(
-                                "Authorization request JWT uses alg=none — unsigned requests are not accepted for request_uri signed flows."
-                            )
-                        } else {
-                            Json.decodeFromJsonElement<AuthorizationRequest>(authReqJws.payload)
-                        }
-                    } else {
-                        val authReqBody = authReqJws.payload
-
-                        val clientId = authReqBody["client_id"]?.jsonPrimitive?.contentOrNull
-                        log.trace { "AuthorizationRequest is signed, authentication with client ID: $clientId" }
-                        require(clientId != null) { "Missing client_id for signed AuthorizationRequest authentication" }
-
-                        val clientIdPrefix = ClientIdPrefixParser.parse(clientId)
-                            .getOrElse { e -> throw IllegalArgumentException("Could not parse client id prefix: $clientId", e) }
-                        log.trace { "Parsed client id prefix: $clientIdPrefix" }
-
-                        val clientMetadata = authReqBody["client_metadata"]?.let {
-                            ClientMetadata.fromJson(it)
-                                .getOrElse { e -> throw IllegalArgumentException("Could not parse client metadata: $it", e) }
-                        }
-
-                        val redirectUri = authReqBody["redirect_uri"]?.jsonPrimitive?.contentOrNull
-                        val responseUri = authReqBody["response_uri"]?.jsonPrimitive?.contentOrNull
-
-                        val context = RequestContext(
-                            clientId = clientId,
-                            clientMetadata = clientMetadata,
-                            requestObjectJws = authReqJwt,
-                            redirectUri = redirectUri,
-                            responseUri = responseUri
-                        )
-
-                        val result = ClientIdPrefixAuthenticator.authenticate(clientIdPrefix, context)
-                        when (result) {
-                            is ClientValidationResult.Failure -> {
-                                // Preserved Branch A's direct handling to avoid unknown Exceptions from Branch B's resolver
-                                if (result.error is ClientIdError.PreRegisteredClientNotFound && legacyFallbackCallback != null) {
-                                    val fallbackResult = runCatching { legacyFallbackCallback(presentationRequestUrl) }
-                                    if (fallbackResult.isSuccess && fallbackResult.getOrThrow().isSuccess)
-                                        return Result.success(
-                                            WalletPresentResult(
-                                                transmissionSuccess = true,
-                                                verifierResponse = fallbackResult.getOrThrow().getOrThrow()
-                                            )
-                                        )
-                                }
-
-                                throw IllegalArgumentException("Could not verify signed AuthorizationRequest with client id prefix: ${result.error::class.simpleName} - ${result.error.message}")
-                            }
-
-                            is ClientValidationResult.Success -> {
-                                val decodedRequest = Json.decodeFromJsonElement<AuthorizationRequest>(authReqJws.payload)
-
-                                // Per OID4VP 1.0 §5.6: if wallet sent wallet_nonce, the request object
-                                // MUST contain the same value in a wallet_nonce claim.
-                                if (walletNonce != null) {
-                                    val receivedWalletNonce = authReqJws.payload["wallet_nonce"]?.jsonPrimitive?.contentOrNull
-                                    require(receivedWalletNonce == walletNonce) {
-                                        "wallet_nonce mismatch: sent '$walletNonce' but request object contains '$receivedWalletNonce'. " +
-                                                "Possible replay attack — terminating request processing."
-                                    }
-                                    log.trace { "wallet_nonce validated successfully" }
-                                }
-
-                                decodedRequest
-                            }
-                        }
-                    }
-                }
-
-                authorizationRequestContentType.match(ContentType.Application.Json) -> {
-                    runCatching { httpResponse.body<AuthorizationRequest>() }.recover {
-                        throw IllegalArgumentException("Error parsing AuthorizationRequest retrieved from: $presentationRequestUrl")
-                    }.getOrThrow()
-                }
-
-                else -> throw IllegalArgumentException("Invalid ContentType \"$authorizationRequestContentType\" for AuthorizationRequest retrieved from \"$presentationRequestUrl\", content is: ${runCatching { httpResponse.bodyAsText() }.getOrElse { "(could not read http response body)" }}")
-            }
-            retrievedAuthorizationRequest
-        } else {
-            val parsedParameters = JsonObject(presentationRequestUrl.parameters.flattenEntries().associate { (k, v) ->
-                k to Json.parseToJsonElement(v)
-            })
-            Json.decodeFromJsonElement<AuthorizationRequest>(parsedParameters)
-        }
+            ).authorizationRequest
 
         log.trace { "Wallet will try to present to AuthorizationRequest: $authorizationRequest" }
 

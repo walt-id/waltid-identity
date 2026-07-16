@@ -58,6 +58,15 @@ public actor Wallet {
         )
     }
 
+    /// Resolves a credential offer and reports whether a transaction code is required.
+    ///
+    /// - Parameter offer: OpenID4VCI credential offer URL received by the app.
+    /// - Returns: A requirement indicating whether the app must collect a transaction code.
+    /// - Throws: ``WalletError`` when the offer is invalid or issuer communication fails.
+    public func resolveOffer(offer: URL) async throws -> OfferResolution {
+        try await bridge.resolveOffer(offer: offer)
+    }
+
     /// Receives credentials from an OpenID4VCI credential offer URL.
     ///
     /// - Parameters:
@@ -92,6 +101,12 @@ public actor Wallet {
 
     /// Presents credentials for an OpenID4VP request URL.
     ///
+    /// This immediate submission API is intended for callers that already handled
+    /// request review and user consent. Apps that need to display verifier
+    /// details, credential choices, selective disclosures, or transaction data
+    /// should use ``previewPresentation(request:)`` followed by
+    /// ``submitPresentation(request:selectedCredentialOptions:selectedDisclosureOptions:did:runPolicies:)``.
+    ///
     /// - Parameters:
     ///   - request: OpenID4VP authorization request URL received by the app.
     ///   - did: Optional wallet DID to use for presentation. When omitted,
@@ -108,4 +123,43 @@ public actor Wallet {
     ) async throws -> PresentationResult {
         try await bridge.present(request: request, did: did, runPolicies: runPolicies)
     }
+
+    /// Resolves and previews an OpenID4VP presentation request without submitting credentials.
+    ///
+    /// - Parameter request: OpenID4VP authorization request URL received by the app.
+    /// - Returns: Verifier metadata and matching credential options.
+    /// - Throws: ``WalletError`` when the request cannot be resolved or matched.
+    public func previewPresentation(request: URL) async throws -> PresentationPreview {
+        try await bridge.previewPresentation(request: request)
+    }
+
+    /// Submits a presentation with user-selected credential options.
+    ///
+    /// - Parameters:
+    ///   - request: OpenID4VP authorization request URL received by the app.
+    ///   - selectedCredentialOptions: Credential options selected from
+    ///     ``previewPresentation(request:)``.
+    ///   - selectedDisclosureOptions: Optional selectively disclosable claims
+    ///     selected from ``previewPresentation(request:)``. Passing `nil`
+    ///     preserves the wallet core's default request-matched disclosure set.
+    ///   - did: Optional wallet DID to use for presentation.
+    ///   - runPolicies: Optional policy execution override for presentation.
+    /// - Returns: Presentation outcome.
+    /// - Throws: ``WalletError`` when selection, signing, or verifier communication fails.
+    public func submitPresentation(
+        request: URL,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]? = nil,
+        did: String? = nil,
+        runPolicies: Bool? = nil
+    ) async throws -> PresentationResult {
+        try await bridge.submitPresentation(
+            request: request,
+            selectedCredentialOptions: selectedCredentialOptions,
+            selectedDisclosureOptions: selectedDisclosureOptions,
+            did: did,
+            runPolicies: runPolicies
+        )
+    }
+
 }
