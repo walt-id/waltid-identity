@@ -56,11 +56,14 @@ class MetadataService(
         }
 
     fun getCredentialIssuerMetadata(): CredentialIssuerMetadata =
-        CredentialIssuerMetadata.fromBaseUrl(
-            baseUrl = baseUrl,
-            credentialConfigurationsSupported = credentialConfigurations,
-            display = issuerDisplay,
-        )
+        resolveCredentialRequestEncryptionMetadata().let { credentialRequestEncryption ->
+            CredentialIssuerMetadata.fromBaseUrl(
+                baseUrl = baseUrl,
+                credentialConfigurationsSupported = credentialConfigurations,
+                credentialRequestEncryption = credentialRequestEncryption,
+                display = issuerDisplay,
+            )
+        }
 
     fun getAuthorizationServerMetadata(): AuthorizationServerMetadata =
         AuthorizationServerMetadata.fromBaseUrl(
