@@ -6,6 +6,7 @@ import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.prooftypes.Proofs
 import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
+import id.walt.openid4vci.requests.credential.encryption.CredentialResponseEncryptionParameters
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
