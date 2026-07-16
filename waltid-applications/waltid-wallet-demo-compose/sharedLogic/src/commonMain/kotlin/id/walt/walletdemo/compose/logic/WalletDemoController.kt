@@ -195,10 +195,10 @@ class WalletDemoController(
         receiveJob = scope.launch(dispatcher) {
             try {
                 if (!transactionCodeRequired) {
-                    val resolution = wallet.resolveOffer(offerUrl)
+                    val requiresTransactionCode = wallet.resolveOffer(offerUrl)
                     currentCoroutineContext().ensureActive()
                     if (!isCurrent(request)) return@launch
-                    if (resolution.transactionCodeRequired) {
+                    if (requiresTransactionCode) {
                         updateIfCurrent(request) {
                             it.copy(
                                 requestDrafts = it.requestDrafts.copy(transactionCodeRequired = true),

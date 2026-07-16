@@ -31,7 +31,6 @@ import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
-import id.walt.walletdemo.compose.logic.WalletDemoOfferResolution
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialOption
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialRequirement
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
@@ -758,8 +757,7 @@ private class FakeDemoWallet(
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 
-    override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferResolution =
-        WalletDemoOfferResolution(transactionCodeRequired = false)
+    override suspend fun resolveOffer(offerUrl: String): Boolean = false
 
     override suspend fun receive(offerUrl: String, txCode: String?): List<String> {
         receivedOfferUrl = offerUrl
