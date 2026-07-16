@@ -2,6 +2,7 @@ package id.walt.walletdemo.compose.logic
 
 val WalletDemoUiState.isBusy: Boolean
     get() = session is WalletSessionState.Bootstrapping ||
+        operation is WalletOperationState.ResolvingOffer ||
         operation is WalletOperationState.Receiving ||
         operation is WalletOperationState.ResolvingPresentation ||
         operation is WalletOperationState.Presenting
@@ -19,7 +20,11 @@ val WalletDemoUiState.receiveUrlEntryEnabled: Boolean
 val WalletDemoUiState.receiveActionEnabled: Boolean
     get() = session is WalletSessionState.Ready &&
         requestDrafts.offerUrl.isNotBlank() &&
+        requestDrafts.hasValidTxCode &&
         receiveUrlEntryEnabled
+
+private val WalletRequestDrafts.hasValidTxCode: Boolean
+    get() = !transactionCodeRequired || txCode.isNotBlank()
 
 val WalletDemoUiState.presentationUrlEntryEnabled: Boolean
     get() = !isBusy && presentationPreview == null && !presentationCompleted
@@ -77,6 +82,7 @@ private fun WalletOperationState.statusTextFor(tab: WalletDemoTab): String? =
     } else {
         when (this) {
             WalletOperationState.Idle -> null
+            WalletOperationState.ResolvingOffer -> WalletDisplayText.ResolvingCredentialOffer
             WalletOperationState.Receiving -> WalletDisplayText.ReceivingCredential
             WalletOperationState.ResolvingPresentation -> WalletDisplayText.ResolvingPresentation
             WalletOperationState.Presenting -> WalletDisplayText.PresentingCredential
@@ -88,6 +94,7 @@ private fun WalletOperationState.statusTextFor(tab: WalletDemoTab): String? =
 private fun WalletOperationState.belongsTo(tab: WalletDemoTab): Boolean =
     when (this) {
         WalletOperationState.Idle -> false
+        WalletOperationState.ResolvingOffer,
         WalletOperationState.Receiving -> tab == WalletDemoTab.Receive
         WalletOperationState.ResolvingPresentation,
         WalletOperationState.Presenting,
@@ -98,6 +105,7 @@ private fun WalletOperationState.belongsTo(tab: WalletDemoTab): Boolean =
 
 private val WalletOperationState.isBusyOperation: Boolean
     get() = when (this) {
+        WalletOperationState.ResolvingOffer,
         WalletOperationState.Receiving,
         WalletOperationState.ResolvingPresentation,
         WalletOperationState.Presenting,

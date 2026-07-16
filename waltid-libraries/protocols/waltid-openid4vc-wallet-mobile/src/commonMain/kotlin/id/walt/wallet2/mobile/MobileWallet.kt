@@ -20,6 +20,7 @@ import id.walt.wallet2.handlers.PresentationCredentialSelection
 import id.walt.wallet2.handlers.PresentationDisclosureSelection
 import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
+import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
@@ -69,6 +70,15 @@ public data class MobileWalletCredential(
     public val label: String?,
     public val addedAt: String?,
     public val credentialDataJson: String,
+)
+
+/**
+ * Result of resolving an OpenID4VCI credential offer before issuance.
+ *
+ * @property transactionCodeRequired Whether the app must collect a transaction code from the user.
+ */
+public data class MobileWalletOfferResolution(
+    public val transactionCodeRequired: Boolean,
 )
 
 /**
@@ -197,6 +207,22 @@ public class MobileWallet internal constructor(
                 DidService.minimalInit()
                 DidService.registerByKey(didMethod, key)
             }
+        }
+
+    /**
+     * Resolves a credential offer and reports any transaction code the app must collect.
+     *
+     * Apps can use this before [receive] to decide whether to prompt the user for a code.
+     *
+     * @param offerUrl Credential offer URL, including `openid-credential-offer://` URLs.
+     */
+    public suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution =
+        WalletIssuanceHandler.resolveOffer(
+            ResolveOfferRequest(offerUrl = Url(offerUrl.trim())),
+        ).let { result ->
+            MobileWalletOfferResolution(
+                transactionCodeRequired = result.txCodeRequired,
+            )
         }
 
     /**

@@ -60,6 +60,7 @@ internal fun PresentTab(
             inputEnabled = state.presentationUrlEntryEnabled,
             inputTestTag = WalletUiTestTags.PresentationInput,
             buttonTestTag = WalletUiTestTags.PresentButton,
+            scanButtonTestTag = WalletUiTestTags.PresentationScanButton,
             onClick = onPreview,
         )
 

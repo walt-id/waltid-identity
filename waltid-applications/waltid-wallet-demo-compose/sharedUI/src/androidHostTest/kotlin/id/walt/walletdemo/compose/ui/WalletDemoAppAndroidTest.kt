@@ -31,6 +31,10 @@ class WalletDemoAppAndroidTest {
         scenarios.receiveTabDisablesUrlControlsWhileReceiving()
 
     @Test
+    fun receiveAndPresentTabsExposeQrScanActions() =
+        scenarios.receiveAndPresentTabsExposeQrScanActions()
+
+    @Test
     fun presentTabExplainsWhyPreviewIsUnavailableWithoutCredentials() =
         scenarios.presentTabExplainsWhyPreviewIsUnavailableWithoutCredentials()
 

@@ -45,6 +45,23 @@ kotlin {
             implementation(identityLibs.coil.compose)
         }
 
+        if (enableAndroidBuild || enableIosBuild) {
+            val mobileMain by creating {
+                dependsOn(commonMain.get())
+                dependencies {
+                    implementation(identityLibs.easyqrscan)
+                }
+            }
+
+            if (enableAndroidBuild) {
+                androidMain.get().dependsOn(mobileMain)
+            }
+
+            if (enableIosBuild) {
+                iosMain.get().dependsOn(mobileMain)
+            }
+        }
+
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
