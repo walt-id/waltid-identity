@@ -144,7 +144,7 @@ data class CredentialIssuerMetadata(
                 notificationEndpoint = notificationEndpointPath?.let { normalized + it },
                 nonceEndpoint = nonceEndpointPath?.let { normalized + it },
                 credentialRequestEncryption = credentialRequestEncryption,
-                credentialResponseEncryption = credentialResponseEncryption,
+                credentialResponseEncryption = resolvedCredentialResponseEncryption,
                 batchCredentialIssuance = batchCredentialIssuance,
                 display = display,
             )
