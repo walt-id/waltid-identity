@@ -188,15 +188,13 @@ object WalletPresentationHandler {
                 log.trace { "Selecting credentials for DCQL query: ${query.credentials.map { it.id }}" }
                 selectFromStores(wallet, query)
                     .also { matched ->
-                        beforeCredentialsUsed(
-                            matched.values.flatten().map { it.credential.id }.distinct().size,
-                        )
                         log.trace { "DCQL matched queryIds: ${matched.keys}" }
                         onEvent(WalletSessionEvent.presentation_credentials_selected)
                     }
             },
             holderPoliciesToRun = null,
-            runPolicies = request.runPolicies
+            runPolicies = request.runPolicies,
+            beforeCredentialsUsed = beforeCredentialsUsed,
         )
 
         if (result.isSuccess) {
@@ -217,6 +215,18 @@ object WalletPresentationHandler {
         wallet: Wallet,
         request: PresentCredentialIsolatedRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {}
+    ): WalletPresentResult = presentCredentialIsolated(
+        wallet = wallet,
+        request = request,
+        onEvent = onEvent,
+        beforeCredentialsUsed = {},
+    )
+
+    suspend fun presentCredentialIsolated(
+        wallet: Wallet,
+        request: PresentCredentialIsolatedRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        beforeCredentialsUsed: suspend (Int) -> Unit,
     ): WalletPresentResult {
         val key = resolveKey(wallet, request.keyId)
             ?: error("No key available for isolated presentation")
@@ -237,7 +247,8 @@ object WalletPresentationHandler {
                     .also { onEvent(WalletSessionEvent.presentation_credentials_selected) }
             },
             holderPoliciesToRun = null,
-            runPolicies = null
+            runPolicies = null,
+            beforeCredentialsUsed = beforeCredentialsUsed,
         )
 
         if (result.isSuccess) {
