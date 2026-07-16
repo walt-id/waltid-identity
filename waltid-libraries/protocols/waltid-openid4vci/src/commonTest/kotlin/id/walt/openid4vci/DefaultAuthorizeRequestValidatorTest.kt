@@ -139,6 +139,67 @@ class DefaultAuthorizeRequestValidatorTest {
     }
 
     @Test
+    fun `validate rejects hybrid response_type`() {
+        val result = validator.validate(
+            mapOf(
+                "client_id" to listOf("client-123"),
+                "response_type" to listOf("code id_token"),
+            ),
+        )
+
+        assertTrue(!result.isSuccess())
+        val error = (result as AuthorizationRequestResult.Failure).error
+        assertEquals("unsupported_response_type", error.error)
+    }
+
+    @Test
+    fun `validate rejects duplicate client_id parameters`() {
+        val result = validator.validate(
+            mapOf(
+                "client_id" to listOf("client-123", "client-456"),
+                "response_type" to listOf(ResponseType.CODE.value),
+            ),
+        )
+
+        assertTrue(!result.isSuccess())
+        val error = (result as AuthorizationRequestResult.Failure).error
+        assertEquals("invalid_request", error.error)
+        assertTrue(error.description?.contains("Multiple values for client_id") == true)
+    }
+
+    @Test
+    fun `validate rejects duplicate redirect_uri parameters`() {
+        val result = validator.validate(
+            mapOf(
+                "client_id" to listOf("client-123"),
+                "response_type" to listOf(ResponseType.CODE.value),
+                "redirect_uri" to listOf("https://wallet.example/callback", "https://attacker.example/callback"),
+            ),
+        )
+
+        assertTrue(!result.isSuccess())
+        val error = (result as AuthorizationRequestResult.Failure).error
+        assertEquals("invalid_request", error.error)
+        assertTrue(error.description?.contains("Multiple values for redirect_uri") == true)
+    }
+
+    @Test
+    fun `validate rejects duplicate forwarded parameters`() {
+        val result = validator.validate(
+            mapOf(
+                "client_id" to listOf("client-123"),
+                "response_type" to listOf(ResponseType.CODE.value),
+                "scope" to listOf("openid", "credential"),
+            ),
+        )
+
+        assertTrue(!result.isSuccess())
+        val error = (result as AuthorizationRequestResult.Failure).error
+        assertEquals("invalid_request", error.error)
+        assertTrue(error.description?.contains("Multiple values for scope") == true)
+    }
+
+    @Test
     fun `validate runs issuer_state hook`() {
         val hookValidator = DefaultAuthorizationRequestValidator { issuerState, _ ->
             if (issuerState == "blocked") {

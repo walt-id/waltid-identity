@@ -2,16 +2,19 @@ package id.walt.issuer2.service.openid4vci
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
+import id.walt.issuer2.config.CredentialEncryptionKeyConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
+import id.walt.openid4vci.metadata.issuer.CredentialRequestEncryption
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.IssuerDisplay
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
+import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.sdjwt.metadata.issuer.JWTVCIssuerMetadata
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import kotlinx.serialization.json.Json
@@ -37,6 +40,7 @@ class MetadataService(
 
     private val baseUrl = serviceConfig.openId4VciBaseUrl()
     private val tokenSigningKeyConfig = serviceConfig.ciTokenKey
+    private val credentialEncryptionKeyConfig = serviceConfig.credentialEncryptionKey
     private val enforcePushedAuthorizationRequests = serviceConfig.enforcePushedAuthorizationRequests
     private val supportsClientAttestation = serviceConfig.clientAttestationConfig() != null
 
@@ -52,11 +56,14 @@ class MetadataService(
         }
 
     fun getCredentialIssuerMetadata(): CredentialIssuerMetadata =
-        CredentialIssuerMetadata.fromBaseUrl(
-            baseUrl = baseUrl,
-            credentialConfigurationsSupported = credentialConfigurations,
-            display = issuerDisplay,
-        )
+        resolveCredentialRequestEncryptionMetadata().let { credentialRequestEncryption ->
+            CredentialIssuerMetadata.fromBaseUrl(
+                baseUrl = baseUrl,
+                credentialConfigurationsSupported = credentialConfigurations,
+                credentialRequestEncryption = credentialRequestEncryption,
+                display = issuerDisplay,
+            )
+        }
 
     fun getAuthorizationServerMetadata(): AuthorizationServerMetadata =
         AuthorizationServerMetadata.fromBaseUrl(
@@ -154,6 +161,19 @@ class MetadataService(
 
     private fun selfHostedVct(credentialType: String): String =
         "$baseUrl/$credentialType"
+
+    private fun resolveCredentialRequestEncryptionMetadata(): CredentialRequestEncryption? {
+        val serializedKey = credentialEncryptionKeyConfig ?: return null
+        val jwk = CredentialEncryptionKeyConfig.publicMetadataJwk(serializedKey)
+
+        return CredentialRequestEncryption(
+            jwks = buildJsonObject {
+                put("keys", buildJsonArray { add(jwk) })
+            },
+            encValuesSupported = CredentialEncryptionProfile.encValuesSupported,
+            encryptionRequired = false,
+        )
+    }
 
     companion object {
         private const val INTERNAL_VCT_BASE_URL = "vctBaseUrl"
