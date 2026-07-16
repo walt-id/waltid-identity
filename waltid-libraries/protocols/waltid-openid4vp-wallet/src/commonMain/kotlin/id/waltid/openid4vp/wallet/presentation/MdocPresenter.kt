@@ -12,6 +12,7 @@ import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.dcql.DcqlMatcher
+import id.walt.dcql.models.ClaimsQuery
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.DeviceSigned
@@ -138,24 +139,36 @@ object MdocPresenter {
         requireNotNull(dcqlQueryClaims) { "Missing claims for DCQL credential query: ${matchResult.originalQuery}" }
 
         //--- SD START
-        val selectedIssuerSignedItems = dcqlQueryClaims
-            // Group by the string content of the first path element (Namespace)
-            .groupBy {
-                (it.path.firstOrNull()
-                    ?: throw IllegalArgumentException("Empty path in ClaimsQuery")
-                        ).jsonPrimitive.content
+        // Helper to extract namespace and element identifier from ClaimsQuery
+        // Supports both: (1) namespace + claimName fields, (2) path-based format [namespace, elementId]
+        data class MdocClaimRef(val namespace: String, val elementIdentifier: String)
+        fun ClaimsQuery.toMdocClaimRef(): MdocClaimRef {
+            // Prefer explicit namespace/claimName if available
+            val ns = namespace
+            val cn = claimName
+            if (ns != null && cn != null) {
+                return MdocClaimRef(ns, cn)
             }
-            .mapValues { (sdNamespace2, claimQueries) ->
+            // Fall back to path-based format
+            val p = this.path
+                ?: throw IllegalArgumentException("ClaimsQuery has neither namespace/claimName nor path")
+            require(p.size >= 2) {
+                "Invalid state: Expected DCQL claim path to have at least two elements (namespace + elementIdentifier), but path was: $p"
+            }
+            return MdocClaimRef(
+                namespace = p[0].jsonPrimitive.content,
+                elementIdentifier = p[1].jsonPrimitive.content
+            )
+        }
+
+        val selectedIssuerSignedItems = dcqlQueryClaims
+            // Group by namespace
+            .groupBy { it.toMdocClaimRef().namespace }
+            .mapValues { (sdNamespace, claimQueries) ->
                 claimQueries.map { claimsQuery ->
-                    val path = claimsQuery.path
-                    // Allow >= 2 because DCQL might query deep inside an mdoc element (e.g., an array index)
-                    require(path.size >= 2) { "Invalid state: Expected DCQL claim path to have at least two elements (namespace + elementIdentifier), but path was: $path" }
+                    val claimRef = claimsQuery.toMdocClaimRef()
 
-                    // Extract the actual Strings from the JsonElements
-                    val sdNamespace: String = path[0].jsonPrimitive.content
-                    val sdElementIdentifier: String = path[1].jsonPrimitive.content
-
-                    check(sdNamespace == sdNamespace2) { "Namespace mismatch: $sdNamespace != $sdNamespace2" }
+                    check(claimRef.namespace == sdNamespace) { "Namespace mismatch: ${claimRef.namespace} != $sdNamespace" }
 
                     val issuerSignedNamespaces: Map<String, IssuerSignedList>? = issuerSigned.namespaces
                     requireNotNull(issuerSignedNamespaces) { "No issuer-signed namespaces to choose from for DCQL query claims!" }
@@ -164,8 +177,8 @@ object MdocPresenter {
                         ?: throw IllegalArgumentException("Namespace does not exist in issuer-signed namespaces for DCQL query claim: $sdNamespace")
 
                     val matchedIssuerSignedItem =
-                        selectedNamespace.entries.find { it.value.elementIdentifier == sdElementIdentifier }?.value
-                            ?: throw IllegalArgumentException("Could not find item for DCQL query: namespace = $sdNamespace, element = $sdElementIdentifier")
+                        selectedNamespace.entries.find { it.value.elementIdentifier == claimRef.elementIdentifier }?.value
+                            ?: throw IllegalArgumentException("Could not find item for DCQL query: namespace = $sdNamespace, element = ${claimRef.elementIdentifier}")
 
                     log.trace { "Mapped sd claim $claimsQuery to ${matchedIssuerSignedItem.elementIdentifier} of namespace $sdNamespace" }
 
