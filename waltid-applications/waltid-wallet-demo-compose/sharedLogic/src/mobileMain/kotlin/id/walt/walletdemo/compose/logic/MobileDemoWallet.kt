@@ -32,12 +32,8 @@ internal class MobileDemoWallet(
             )
         }
 
-    override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferResolution =
-        mobileWallet.resolveOffer(offerUrl).let { resolution ->
-            WalletDemoOfferResolution(
-                transactionCodeRequired = resolution.transactionCodeRequired,
-            )
-        }
+    override suspend fun resolveOffer(offerUrl: String): Boolean =
+        mobileWallet.resolveOffer(offerUrl).transactionCodeRequired
 
     override suspend fun receive(offerUrl: String, txCode: String?): List<String> =
         mobileWallet.receive(offerUrl, txCode = txCode)

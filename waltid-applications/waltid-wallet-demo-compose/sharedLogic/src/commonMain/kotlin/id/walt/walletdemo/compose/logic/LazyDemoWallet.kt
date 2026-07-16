@@ -20,7 +20,7 @@ internal class LazyDemoWallet(
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         wallet().listCredentials()
 
-    override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferResolution =
+    override suspend fun resolveOffer(offerUrl: String): Boolean =
         wallet().resolveOffer(offerUrl)
 
     override suspend fun receive(offerUrl: String, txCode: String?): List<String> =
