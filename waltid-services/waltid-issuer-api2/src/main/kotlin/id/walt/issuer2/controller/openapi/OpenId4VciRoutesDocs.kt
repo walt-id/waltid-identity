@@ -139,11 +139,24 @@ object OpenId4VciRoutesDocs {
 
     fun credential(): RouteConfig.() -> Unit = {
         summary = "Credential endpoint"
-        description = "The credential endpoint."
+        description = "The credential endpoint. Accepts plaintext JSON requests and encrypted JWT requests."
+        request {
+            body<JsonObject> {
+                description = "Credential request"
+                mediaTypes(ContentType.Application.Json)
+            }
+            body<String> {
+                description = "Encrypted Credential Request as compact JWE"
+                mediaTypes(ContentType.parse(CredentialEncryptionProfile.MEDIA_TYPE_JWT))
+            }
+        }
         response {
             HttpStatusCode.OK to {
                 description = "Credential response"
                 body<JsonObject>()
+                body<String> {
+                    mediaTypes(ContentType.parse(CredentialEncryptionProfile.MEDIA_TYPE_JWT))
+                }
             }
         }
     }
