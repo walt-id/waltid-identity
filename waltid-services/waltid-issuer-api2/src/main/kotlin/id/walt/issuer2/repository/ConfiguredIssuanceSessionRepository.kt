@@ -22,6 +22,8 @@ class ConfiguredIssuanceSessionRepository : IssuanceSessionRepository {
 
     override suspend fun get(sessionId: String): IssuanceSession? = sessions[sessionId]
 
+    override suspend fun take(sessionId: String): IssuanceSession? = sessions.getAndRemove(sessionId)
+
     override suspend fun list(): List<IssuanceSession> = sessions.getAll().toList()
 
     override suspend fun remove(sessionId: String) {
