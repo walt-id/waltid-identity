@@ -12,19 +12,19 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
         viewModel.selectedTab = .receive
         viewModel.offerUrl = "openid-credential-offer://issuer.example"
-        viewModel.receiveCredential()
-        viewModel.receiveCredential()
+        viewModel.previewOffer()
+        viewModel.previewOffer()
         try await waitUntil { viewModel.transactionCode != nil }
 
         let receiveCallsBeforeCode = await client.receiveCalls
         let resolveCalls = await client.resolveCalls
-        XCTAssertFalse(viewModel.receiveActionEnabled)
+        XCTAssertFalse(viewModel.acceptOfferEnabled)
         XCTAssertEqual(receiveCallsBeforeCode, 0)
         XCTAssertEqual(resolveCalls, 1)
 
         viewModel.txCode = " 123456 "
-        XCTAssertTrue(viewModel.receiveActionEnabled)
-        viewModel.receiveCredential()
+        XCTAssertTrue(viewModel.acceptOfferEnabled)
+        viewModel.acceptOffer()
         try await waitUntil { viewModel.receiveCompleted }
 
         let receiveCalls = await client.receiveCalls
@@ -40,7 +40,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         try await waitUntil { viewModel.isReady }
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example/first"
-        viewModel.receiveCredential()
+        viewModel.previewOffer()
         try await waitUntil { viewModel.transactionCode != nil }
         viewModel.txCode = "1234"
 
@@ -56,7 +56,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         try await waitUntil { viewModel.isReady }
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example/original"
-        viewModel.receiveCredential()
+        viewModel.previewOffer()
         viewModel.handleDeepLink(URL(string: "openid-credential-offer://issuer.example/replacement")!)
         try await Task.sleep(nanoseconds: 200_000_000)
 
@@ -110,7 +110,10 @@ private actor TransactionCodeWalletClient: WalletClient {
                 inputMode: .numeric,
                 length: 6,
                 description: "Enter the issuer code"
-            )
+            ),
+            transactionCodeRequired: true,
+            credentialIssuer: "https://issuer.example",
+            offeredCredentials: ["ExampleCredential"]
         )
     }
 

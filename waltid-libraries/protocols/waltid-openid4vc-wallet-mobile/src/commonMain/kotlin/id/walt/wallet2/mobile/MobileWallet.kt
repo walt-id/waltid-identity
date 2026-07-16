@@ -22,6 +22,7 @@ import id.walt.wallet2.handlers.PresentationDisclosureSelection
 import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
 import id.walt.wallet2.handlers.ResolveOfferRequest
+import id.walt.wallet2.handlers.ResolveOfferTxCodeInputMode
 import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
@@ -76,6 +77,21 @@ public data class MobileWalletCredential(
 )
 
 /**
+ * Accepted input modes for an issuer-provided transaction code.
+ */
+public enum class MobileWalletTxCodeInputMode {
+    numeric,
+    text,
+}
+
+/** Metadata for a transaction code that the wallet must collect from the user. */
+public data class MobileWalletTxCode(
+    public val inputMode: MobileWalletTxCodeInputMode,
+    public val length: Int?,
+    public val issuerDescription: String?,
+)
+
+/**
  * Result of resolving an OpenID4VCI credential offer before issuance.
  *
  * @property txCode Transaction-code metadata when the app must collect a code from the user.
@@ -84,6 +100,11 @@ public data class MobileWalletCredential(
 public data class MobileWalletOfferResolution(
     public val txCode: MobileWalletTxCode?,
     public val issuerMetadataJson: String? = null,
+    /** Issuer identifier (URL) from the credential offer. */
+    public val credentialIssuer: String = "",
+    /** Credential configuration IDs advertised in the offer. */
+    public val offeredCredentials: List<String> = emptyList(),
+    public val transactionCodeRequired: Boolean = txCode != null,
 )
 
 /**
@@ -237,6 +258,9 @@ public class MobileWallet internal constructor(
                 )
             },
             issuerMetadataJson = resolution.issuerMetadataJson,
+            credentialIssuer = resolution.credentialIssuer,
+            offeredCredentials = resolution.offeredCredentials,
+            transactionCodeRequired = resolution.txCode != null,
         )
     }
 

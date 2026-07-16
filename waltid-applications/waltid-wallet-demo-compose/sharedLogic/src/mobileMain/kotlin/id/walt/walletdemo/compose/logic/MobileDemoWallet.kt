@@ -4,6 +4,7 @@ import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationPreview
+import id.walt.wallet2.mobile.MobileWalletTxCodeInputMode
 import id.walt.wallet2.mobile.WalletAttestationConfig
 
 internal class MobileDemoWallet(
@@ -46,6 +47,9 @@ internal class MobileDemoWallet(
                     )
                 },
                 issuerMetadataJson = resolution.issuerMetadataJson,
+                credentialIssuer = resolution.credentialIssuer,
+                offeredCredentials = resolution.offeredCredentials,
+                transactionCodeRequired = resolution.transactionCodeRequired,
             )
         }
 

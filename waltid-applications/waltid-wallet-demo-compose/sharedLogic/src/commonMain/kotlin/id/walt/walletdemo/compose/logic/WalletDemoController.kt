@@ -60,6 +60,7 @@ class WalletDemoController(
                 auth = WalletAuthState.Login(),
                 operation = WalletOperationState.Idle,
                 requestDrafts = it.requestDrafts.copy(txCode = ""),
+                offerPreview = null,
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
             )
         }
@@ -78,6 +79,7 @@ class WalletDemoController(
                     txCode = "",
                     txCodeRequirement = null,
                 ),
+                offerPreview = null,
                 lastReceivedCredentialIds = emptyList(),
                 lastIssuerMetadataJson = null,
                 receiveCompleted = false,
@@ -116,6 +118,7 @@ class WalletDemoController(
                             txCode = "",
                             txCodeRequirement = null,
                         ),
+                        offerPreview = null,
                         lastReceivedCredentialIds = emptyList(),
                         lastIssuerMetadataJson = null,
                         receiveCompleted = false,
@@ -156,6 +159,7 @@ class WalletDemoController(
                     txCode = "",
                     txCodeRequirement = null,
                 ),
+                offerPreview = null,
                 lastReceivedCredentialIds = emptyList(),
                 lastIssuerMetadataJson = null,
                 receiveCompleted = false,
@@ -180,44 +184,33 @@ class WalletDemoController(
         }
     }
 
-    fun receive() {
+    fun previewOffer() {
         val current = _state.value
-        val ready = current.session as? WalletSessionState.Ready ?: return
         val offerUrl = current.requestDrafts.offerUrl.trim()
         if (!current.receiveActionEnabled || offerUrl.isBlank()) return
-        val txCode = current.requestDrafts.txCode.trim().ifBlank { null }
-        val transactionCode = current.requestDrafts.txCodeRequirement
         val request = ReceiveRequest(offerUrl, current.receiveNavigationResetKey)
-        val initialOperation = if (transactionCode == null) {
-            WalletOperationState.ResolvingOffer
-        } else {
-            WalletOperationState.Receiving
-        }
-        if (!_state.compareAndSet(current, current.copy(operation = initialOperation))) return
+        if (!_state.compareAndSet(current, current.copy(operation = WalletOperationState.ResolvingOffer))) return
 
         receiveJob = scope.launch(dispatcher) {
             try {
-                if (transactionCode == null) {
-                    val resolution = wallet.resolveOffer(offerUrl)
-                    currentCoroutineContext().ensureActive()
-                    if (!isCurrent(request)) return@launch
-                    if (resolution.txCode != null) {
-                        updateIfCurrent(request) {
-                            it.copy(
-                                requestDrafts = it.requestDrafts.copy(txCodeRequirement = resolution.txCode),
-                                lastIssuerMetadataJson = resolution.issuerMetadataJson,
-                                operation = WalletOperationState.Idle,
-                            )
-                        }
-                        return@launch
-                    }
-                    updateIfCurrent(request) {
-                        it.copy(lastIssuerMetadataJson = resolution.issuerMetadataJson)
-                    }
+                val resolution = wallet.resolveOffer(offerUrl)
+                currentCoroutineContext().ensureActive()
+                if (!isCurrent(request)) return@launch
+                updateIfCurrent(request) {
+                    it.copy(
+                        requestDrafts = it.requestDrafts.copy(
+                            txCodeRequirement = resolution.txCode,
+                        ),
+                        offerPreview = WalletDemoOfferPreview(
+                            credentialIssuer = resolution.credentialIssuer,
+                            offeredCredentials = resolution.offeredCredentials,
+                            transactionCodeRequired = resolution.transactionCodeRequired,
+                            issuerMetadataJson = resolution.issuerMetadataJson,
+                        ),
+                        lastIssuerMetadataJson = resolution.issuerMetadataJson,
+                        operation = WalletOperationState.OfferPreview,
+                    )
                 }
-
-                updateIfCurrent(request) { it.copy(operation = WalletOperationState.Receiving) }
-                receiveCredential(ready, request, txCode, _state.value.lastIssuerMetadataJson)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Throwable) {
@@ -230,6 +223,50 @@ class WalletDemoController(
                     )
                 }
             }
+        }
+    }
+
+    fun acceptOffer() {
+        val current = _state.value
+        val ready = current.session as? WalletSessionState.Ready ?: return
+        if (!current.acceptOfferEnabled) return
+        val offerUrl = current.requestDrafts.offerUrl.trim()
+        val txCode = current.requestDrafts.txCode.trim().ifBlank { null }
+        val request = ReceiveRequest(offerUrl, current.receiveNavigationResetKey)
+        if (!_state.compareAndSet(current, current.copy(operation = WalletOperationState.Receiving))) return
+
+        receiveJob = scope.launch(dispatcher) {
+            try {
+                receiveCredential(ready, request, txCode, current.offerPreview?.issuerMetadataJson)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                updateIfCurrent(request) {
+                    it.copy(
+                        operation = WalletOperationState.Failed(
+                            message = WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
+                            tab = WalletDemoTab.Receive,
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    fun declineOffer() {
+        _state.update {
+            it.copy(
+                offerPreview = null,
+                requestDrafts = it.requestDrafts.copy(
+                    txCode = "",
+                    txCodeRequirement = null,
+                ),
+                operation = WalletOperationState.Succeeded(
+                    message = WalletDisplayText.CredentialOfferDeclined,
+                    tab = WalletDemoTab.Receive,
+                ),
+                receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
+            )
         }
     }
 
@@ -265,6 +302,7 @@ class WalletDemoController(
                         ),
                         tab = WalletDemoTab.Receive,
                     ),
+                    offerPreview = null,
                     lastReceivedCredentialIds = emptyList(),
                     lastIssuerMetadataJson = issuerMetadataJson,
                     receiveCompleted = false,
@@ -276,6 +314,7 @@ class WalletDemoController(
         updateIfCurrent(request) {
             it.copy(
                 session = ready.copy(credentials = credentials),
+                offerPreview = null,
                 operation = WalletOperationState.Succeeded(
                     message = WalletDisplayText.receivedCredentials(displayableReceivedCredentialIds.size),
                     tab = WalletDemoTab.Receive,

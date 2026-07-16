@@ -63,7 +63,10 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         }
         return OfferResolution(
             transactionCode: transactionCode,
-            issuerMetadataJSON: value.issuerMetadataJson
+            issuerMetadataJSON: value.issuerMetadataJson,
+            transactionCodeRequired: value.transactionCodeRequired,
+            credentialIssuer: value.credentialIssuer,
+            offeredCredentials: swiftArray(value.offeredCredentials, of: String.self)
         )
     }
 

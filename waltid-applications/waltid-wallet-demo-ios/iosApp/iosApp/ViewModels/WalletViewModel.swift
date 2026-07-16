@@ -16,6 +16,8 @@ private enum WalletStatusText {
     static let startingWallet = "Starting wallet..."
     static let walletReady = "Wallet ready"
     static let resolvingCredentialOffer = "Resolving credential offer..."
+    static let reviewCredentialOffer = "Review credential offer"
+    static let credentialOfferDeclined = "Credential offer declined"
     static let receivingCredential = "Receiving credential..."
     static let transactionCodeRequired = "Transaction code required"
     static let resolvingPresentation = "Resolving presentation..."
@@ -63,6 +65,7 @@ class WalletViewModel: ObservableObject {
             txCode = ""
             transactionCode = nil
             lastIssuerMetadataJSON = nil
+            offerPreview = nil
         }
     }
     @Published var txCode = ""
@@ -72,6 +75,7 @@ class WalletViewModel: ObservableObject {
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
     @Published var selectedPresentationDisclosureOptions: Set<PresentationDisclosureSelection> = []
     @Published var selectedTab: WalletTab = .credentials
+    @Published var offerPreview: OfferPreview?
     @Published var lastReceivedCredentialIDs: [String] = []
     @Published var lastIssuerMetadataJSON: String?
     @Published var receiveCompleted = false
@@ -84,14 +88,21 @@ class WalletViewModel: ObservableObject {
     private var receiveTask: Task<Void, Never>?
 
     var receiveUrlEntryEnabled: Bool {
-        !isLoading && !receiveCompleted
+        !isLoading && offerPreview == nil && !receiveCompleted
     }
 
     var receiveActionEnabled: Bool {
         isReady &&
             !offerUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            hasValidTransactionCode &&
             receiveUrlEntryEnabled
+    }
+
+    var offerReviewEnabled: Bool {
+        !isLoading && offerPreview != nil && !receiveCompleted
+    }
+
+    var acceptOfferEnabled: Bool {
+        offerReviewEnabled && hasValidTransactionCode
     }
 
     private var hasValidTransactionCode: Bool {
@@ -275,6 +286,7 @@ class WalletViewModel: ObservableObject {
             receiveTask?.cancel()
             selectedTab = .receive
             offerUrl = url.absoluteString
+            offerPreview = nil
             lastReceivedCredentialIDs = []
             lastIssuerMetadataJSON = nil
             receiveCompleted = false
@@ -305,6 +317,7 @@ class WalletViewModel: ObservableObject {
         offerUrl = ""
         txCode = ""
         transactionCode = nil
+        offerPreview = nil
         lastReceivedCredentialIDs = []
         lastIssuerMetadataJSON = nil
         receiveCompleted = false
@@ -330,7 +343,7 @@ class WalletViewModel: ObservableObject {
         statusMessage = WalletStatusText.walletReady
     }
 
-    func receiveCredential() {
+    func previewOffer() {
         resetInputFocus()
         guard !isLoading else { return }
         let trimmedOfferUrl = offerUrl.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -338,38 +351,51 @@ class WalletViewModel: ObservableObject {
             setError(WalletStatusText.failure(WalletStatusText.receiveFailed, WalletStatusText.invalidOfferURL), tab: .receive)
             return
         }
-        let trimmedTxCode = txCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard hasValidTransactionCode else { return }
-        let previousCredentials = credentials
         let request = ReceiveRequest(offerURL: offer.absoluteString, navigationResetKey: receiveNavigationResetKey)
-        let requiresTransactionCode = transactionCode != nil
 
-        setLoading(
-            requiresTransactionCode ? WalletStatusText.receivingCredential : WalletStatusText.resolvingCredentialOffer,
-            tab: .receive
-        )
+        setLoading(WalletStatusText.resolvingCredentialOffer, tab: .receive)
         receiveTask = Task {
             do {
-                if !requiresTransactionCode {
-                    let resolution = try await walletClient.resolveOffer(offer: offer)
-                    try Task.checkCancellation()
-                    guard isCurrent(request) else { return }
-                    if let requirement = resolution.transactionCode {
-                        transactionCode = requirement
-                        lastIssuerMetadataJSON = resolution.issuerMetadataJSON
-                        isLoading = false
-                        isError = false
-                        statusTab = .receive
-                        statusMessage = WalletStatusText.transactionCodeRequired
-                        logE2E("STATUS \(statusMessage)")
-                        return
-                    }
-                    lastIssuerMetadataJSON = resolution.issuerMetadataJSON
+                let resolution = try await walletClient.resolveOffer(offer: offer)
+                try Task.checkCancellation()
+                guard isCurrent(request) else { return }
+                transactionCode = resolution.transactionCode
+                lastIssuerMetadataJSON = resolution.issuerMetadataJSON
+                offerPreview = OfferPreview(
+                    credentialIssuer: resolution.credentialIssuer,
+                    offeredCredentials: resolution.offeredCredentials,
+                    transactionCodeRequired: resolution.transactionCodeRequired,
+                    issuerMetadataJSON: resolution.issuerMetadataJSON
+                )
+                setSuccess(WalletStatusText.reviewCredentialOffer, tab: .receive)
+            } catch is CancellationError {
+                return
+            } catch {
+                if isCurrent(request) {
+                    setError(WalletStatusText.failure(WalletStatusText.receiveFailed, error), tab: .receive)
                 }
+            }
+        }
+    }
 
+    func acceptOffer() {
+        resetInputFocus()
+        guard !isLoading, offerPreview != nil else { return }
+        let trimmedOfferUrl = offerUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let offer = URL(string: trimmedOfferUrl) else {
+            setError(WalletStatusText.failure(WalletStatusText.receiveFailed, WalletStatusText.invalidOfferURL), tab: .receive)
+            return
+        }
+        let trimmedTxCode = txCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let previousCredentials = credentials
+        let request = ReceiveRequest(offerURL: offer.absoluteString, navigationResetKey: receiveNavigationResetKey)
+
+        setLoading(WalletStatusText.receivingCredential, tab: .receive)
+        receiveTask = Task {
+            do {
                 try await completeReceive(
                     offer: offer,
-                    txCode: requiresTransactionCode ? trimmedTxCode : nil,
+                    txCode: transactionCode == nil ? nil : trimmedTxCode,
                     previousCredentials: previousCredentials,
                     request: request,
                     issuerMetadataJSON: lastIssuerMetadataJSON
@@ -382,6 +408,15 @@ class WalletViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    func declineOffer() {
+        receiveTask?.cancel()
+        offerPreview = nil
+        txCode = ""
+        transactionCode = nil
+        receiveNavigationResetKey += 1
+        setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
     }
 
     private func completeReceive(
@@ -409,6 +444,7 @@ class WalletViewModel: ObservableObject {
         let displayableReceivedCredentialIDs = receivedCredentialIDs.filter { refreshedCredentialIDs.contains($0) }
         guard !displayableReceivedCredentialIDs.isEmpty else {
             credentials = refreshedCredentials
+            offerPreview = nil
             lastReceivedCredentialIDs = []
             lastIssuerMetadataJSON = issuerMetadataJSON
             receiveCompleted = false
@@ -423,6 +459,7 @@ class WalletViewModel: ObservableObject {
         }
 
         credentials = refreshedCredentials
+        offerPreview = nil
         lastReceivedCredentialIDs = displayableReceivedCredentialIDs
         lastIssuerMetadataJSON = issuerMetadataJSON
         receiveCompleted = true

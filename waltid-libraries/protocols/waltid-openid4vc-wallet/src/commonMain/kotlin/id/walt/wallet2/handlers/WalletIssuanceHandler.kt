@@ -150,12 +150,25 @@ data class ResolveOfferRequest(
 }
 
 @Serializable
+enum class ResolveOfferTxCodeInputMode {
+    numeric,
+    text,
+}
+
+@Serializable
+data class ResolveOfferTxCode(
+    val inputMode: ResolveOfferTxCodeInputMode,
+    val length: Int? = null,
+    val description: String? = null,
+)
+
+@Serializable
 data class ResolveOfferResult(
     val credentialIssuer: String,
     val credentialConfigurationIds: List<String>,
     val grantType: String?,
     val preAuthorizedCode: String? = null,
-    val txCodeRequired: Boolean,
+    val txCode: ResolveOfferTxCode? = null,
     val credentialEndpoint: Url,
     val offeredCredentials: List<String>,
     val tokenEndpoint: Url? = null,
@@ -521,19 +534,33 @@ object WalletIssuanceHandler {
         val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
         val asMetadata = metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
         val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
+        val txCode = offer.grants?.preAuthorizedCode?.txCode.toUserInputRequirement()
         return ResolveOfferResult(
             credentialIssuer = offer.credentialIssuer,
             credentialConfigurationIds = offer.credentialConfigurationIds,
             grantType = offer.grants?.preAuthorizedCode?.let { "pre-authorized_code" }
                 ?: offer.grants?.authorizationCode?.let { "authorization_code" },
             preAuthorizedCode = offer.grants?.preAuthorizedCode?.preAuthorizedCode,
-            txCodeRequired = offer.grants?.preAuthorizedCode?.txCode != null,
+            txCode = txCode,
             tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) },
             credentialEndpoint = Url(issuerMetadata.credentialEndpoint),
             offeredCredentials = offeredCredentials.map { it.credentialConfigurationId },
             issuerMetadataJson = Json.encodeToString(JsonElement.serializer(), Json.encodeToJsonElement(issuerMetadata)),
         )
     }
+
+    internal fun id.walt.openid4vci.offers.TxCode?.toUserInputRequirement(): ResolveOfferTxCode? =
+        this?.let {
+            ResolveOfferTxCode(
+                inputMode = when (it.inputMode ?: "numeric") {
+                    "numeric" -> ResolveOfferTxCodeInputMode.numeric
+                    "text" -> ResolveOfferTxCodeInputMode.text
+                    else -> error("Unsupported transaction code input mode: ${it.inputMode}")
+                },
+                length = it.length,
+                description = it.description,
+            )
+        }
 
     suspend fun requestToken(request: RequestTokenRequest): RequestTokenResult =
         requestToken(

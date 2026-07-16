@@ -14,6 +14,9 @@ data class WalletDemoTxCode(
 data class WalletDemoOfferResolution(
     val txCode: WalletDemoTxCode?,
     val issuerMetadataJson: String? = null,
+    val credentialIssuer: String = "",
+    val offeredCredentials: List<String> = emptyList(),
+    val transactionCodeRequired: Boolean = txCode != null,
 )
 
 interface DemoWallet {

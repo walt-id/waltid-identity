@@ -38,7 +38,13 @@ actor MockWalletClient: WalletClient {
 
     func resolveOffer(offer: URL) async throws -> OfferResolution {
         try await delayOperation()
-        return OfferResolution(transactionCode: nil)
+        return OfferResolution(
+            transactionCode: nil,
+            issuerMetadataJSON: nil,
+            transactionCodeRequired: false,
+            credentialIssuer: "Example Issuer",
+            offeredCredentials: ["ExampleCredential"]
+        )
     }
 
     func receive(offer: URL, txCode: String?) async throws -> [String] {

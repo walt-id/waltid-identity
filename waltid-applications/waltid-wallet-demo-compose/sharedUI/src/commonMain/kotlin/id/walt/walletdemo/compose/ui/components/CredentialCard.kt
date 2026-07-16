@@ -25,14 +25,18 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 internal fun CredentialCard(
     details: CredentialDetails,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)? = null,
 ) {
     val display = details.toCardDisplayData()
+    val cardModifier = modifier
+        .fillMaxWidth()
+        .testTag(WalletUiTestTags.credentialCard(display.id))
+        .let { base ->
+            if (onClick == null) base else base.clickable(onClick = onClick)
+        }
+
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag(WalletUiTestTags.credentialCard(display.id))
-            .clickable(onClick = onClick),
+        modifier = cardModifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Row(

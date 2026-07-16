@@ -488,9 +488,42 @@ public struct OfferResolution: Equatable, Sendable {
     /// Raw issuer metadata encoded as JSON for app-side parsing and display.
     public let issuerMetadataJSON: String?
 
-    public init(transactionCode: TransactionCode?, issuerMetadataJSON: String? = nil) {
+    /// Whether the offer requires the app to collect a transaction code.
+    public let transactionCodeRequired: Bool
+
+    /// Issuer identifier (URL) from the credential offer.
+    public let credentialIssuer: String
+
+    /// Credential configuration IDs advertised in the offer.
+    public let offeredCredentials: [String]
+
+    public init(
+        transactionCode: TransactionCode?,
+        issuerMetadataJSON: String? = nil,
+        transactionCodeRequired: Bool? = nil,
+        credentialIssuer: String = "",
+        offeredCredentials: [String] = []
+    ) {
         self.transactionCode = transactionCode
         self.issuerMetadataJSON = issuerMetadataJSON
+        self.transactionCodeRequired = transactionCodeRequired ?? (transactionCode != nil)
+        self.credentialIssuer = credentialIssuer
+        self.offeredCredentials = offeredCredentials
+    }
+
+    public init(
+        transactionCodeRequired: Bool,
+        credentialIssuer: String = "",
+        offeredCredentials: [String] = [],
+        issuerMetadataJSON: String? = nil
+    ) {
+        self.init(
+            transactionCode: nil,
+            issuerMetadataJSON: issuerMetadataJSON,
+            transactionCodeRequired: transactionCodeRequired,
+            credentialIssuer: credentialIssuer,
+            offeredCredentials: offeredCredentials
+        )
     }
 }
 

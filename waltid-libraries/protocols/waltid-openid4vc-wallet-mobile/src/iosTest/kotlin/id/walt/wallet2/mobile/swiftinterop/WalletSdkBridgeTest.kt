@@ -585,6 +585,9 @@ class WalletSdkBridgeTest {
                     length = 6,
                     issuerDescription = "Enter the issuer code",
                 ),
+                transactionCodeRequired = true,
+                credentialIssuer = "https://issuer.example",
+                offeredCredentials = listOf("ExampleCredential"),
             )
         }
 
