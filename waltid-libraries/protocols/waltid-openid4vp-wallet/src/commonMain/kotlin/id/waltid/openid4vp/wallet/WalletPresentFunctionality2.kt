@@ -331,6 +331,8 @@ object WalletPresentFunctionality2 {
         // Added from Branch B
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+
+        beforeCredentialsUsed: suspend (Int) -> Unit = {},
     ): Result<WalletPresentResult> {
         log.trace { "- Start of Wallet Present Handling -" }
 
@@ -536,7 +538,8 @@ object WalletPresentFunctionality2 {
             //-----
         }
 
-
+        val credentialCount = credentials.values.sumOf { it.size }
+        if (credentialCount > 0) beforeCredentialsUsed(credentialCount)
         val vpToken = generateVpTokenForRequest(authorizationRequest, credentials, holderKey, holderDid, transactionDataTypeRegistry)
 
         // For vp_token id_token (SIOPv2 combined flow per OID4VP §"Combining with SIOPv2"),
