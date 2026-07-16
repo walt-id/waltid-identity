@@ -13,6 +13,7 @@ import id.walt.wallet2.persistence.keys.PlatformKeyProvider
 import id.walt.wallet2.persistence.stores.PlatformKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 
 /**
  * Configuration for creating a [MobileWallet].
@@ -22,6 +23,7 @@ import id.walt.wallet2.persistence.stores.SqlDelightDidStore
  * @property attestationConfig Optional client-attestation configuration for issuer deployments that require it.
  * @property persistence Persistence mode used for wallet-local state.
  * @property onEvent Optional callback for observing wallet issuance and presentation session events.
+ * @property transactionDataProfiles Transaction data profiles this mobile wallet accepts in OpenID4VP requests.
  */
 public data class MobileWalletConfig(
     public val walletId: String = "default",
@@ -29,7 +31,28 @@ public data class MobileWalletConfig(
     public val attestationConfig: WalletAttestationConfig? = null,
     public val persistence: MobileWalletPersistence = MobileWalletPersistence(),
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
+    public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
 )
+
+/**
+ * Transaction data profile accepted by the mobile wallet.
+ *
+ * Wallet apps should keep this list aligned with the ecosystem or service they trust.
+ * Requests containing transaction data with a type outside this list are rejected before
+ * the user can submit a presentation.
+ *
+ * @property type Collision-resistant OpenID4VP `transaction_data.type` value.
+ * @property displayName Human-readable label for consent UI.
+ * @property fields Supported transaction type-specific fields.
+ */
+public data class MobileWalletTransactionDataProfile(
+    public val type: String,
+    public val displayName: String = type,
+    public val fields: List<String> = emptyList(),
+)
+
+internal fun List<MobileWalletTransactionDataProfile>.toTransactionDataTypeRegistry(): TransactionDataTypeRegistry =
+    TransactionDataTypeRegistry(map { it.type }.toSet())
 
 /**
  * Wallet-local persistence configuration.
@@ -162,6 +185,7 @@ private fun createSqlDelightMobileWallet(
         keyGenerator = keyGenerator,
         defaultKeyType = config.defaultKeyType,
         attestationConfig = config.attestationConfig,
+        transactionDataProfiles = config.transactionDataProfiles,
         onEvent = config.onEvent,
         deleteLocalPersistence = deleteLocalPersistence,
     )

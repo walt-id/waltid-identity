@@ -344,8 +344,7 @@ object WalletPresentFunctionality2 {
         holderPoliciesToRun: Flow<HolderPolicy>?,
         runPolicies: Boolean?,
 
-        // Added from Branch B
-        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
 
         // TODO: selected credentials
 
@@ -355,7 +354,6 @@ object WalletPresentFunctionality2 {
          */
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
 
-        // Added from Branch B
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
 

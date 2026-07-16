@@ -123,6 +123,63 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         }
     }
 
+    func testTransactionDataPreviewAgainstPublicDemoIssuer2Verifier2() async throws {
+        let scenario = DemoBackend.transactionDataPresentationScenario
+        let offer = try await backend.createOffer(scenario: scenario)
+
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: isolatedWalletEnvironment())
+
+        let readyStatus = ui.waitForStatus(
+            prefixes: ["Wallet ready", "Bootstrap failed"],
+            timeout: walletReadyTimeout
+        )
+        XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
+
+        ui.openDeepLink(offer.offerUrl)
+        let offerURLApplied = ui.waitForTextInputValue(
+            identifier: "wallet.offerInput",
+            fallbackLabel: "Credential offer URL",
+            value: offer.offerUrl,
+            timeout: 10
+        )
+        XCTAssertTrue(offerURLApplied, "Offer URL did not appear in UI after deep link")
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+
+        let receiveStatus = ui.waitForStatus(
+            prefixes: ["Received", "Receive failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed, status: \(receiveStatus ?? "nil")")
+
+        let session = try await backend.createTransactionDataVerifierSession(scenario: scenario)
+        ui.openDeepLink(session.authorizationRequestUri)
+        let presentationURLApplied = ui.waitForTextInputValue(
+            identifier: "wallet.presentationInput",
+            fallbackLabel: "OpenID4VP request URL",
+            value: session.authorizationRequestUri,
+            timeout: 10
+        )
+        XCTAssertTrue(presentationURLApplied, "Presentation request URL did not appear in UI after deep link")
+        ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
+
+        let previewStatus = ui.waitForStatus(
+            prefixes: ["Review presentation request", "Preview failed", "Present failed", "Receive failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        XCTAssertEqual(previewStatus, "Review presentation request", "Presentation preview did not load, status: \(previewStatus ?? "nil")")
+
+        XCTAssertTrue(app.staticTexts["PAYMENT AUTHORIZATION"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["42.00"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["EUR"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["ACME Corp"].waitForExistence(timeout: 10))
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "WAL-1077 Compose iOS transaction data preview"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     func testDemoCredentialPersistsAcrossAppRestart() async throws {
         let scenario = try publicDemoScenario()
         let offer = try await backend.createOffer(scenario: scenario)
@@ -172,6 +229,9 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     }
 
     private func isolatedWalletEnvironment() -> [String: String] {
-        ["WALLET_ID": "compose-ios-public-demo-\(UUID().uuidString)"]
+        [
+            "WALLET_ID": "compose-ios-public-demo-\(UUID().uuidString)",
+            "TRANSACTION_DATA_PROFILES_URL": DemoBackend.transactionDataProfilesURL.absoluteString,
+        ]
     }
 }

@@ -8,7 +8,9 @@ import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.VERIFIER_POLLING_TIMEOUT
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertClaimValueVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceTextEquals
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.latestStatus
@@ -18,6 +20,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class PublicDemoBackendE2ETest {
@@ -93,5 +96,88 @@ class PublicDemoBackendE2ETest {
         )
 
         DemoTestBackend.waitForVerifierSuccess(session.sessionId, timeoutMs = VERIFIER_POLLING_TIMEOUT)
+    }
+
+    @Test
+    fun transactionDataPreviewAgainstPublicDemoIssuer2Verifier2() = runBlocking {
+        val scenario = DemoTestBackend.transactionDataPresentationScenario
+        val offer = DemoTestBackend.createOffer(scenario)
+
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val device = UiDevice.getInstance(instrumentation)
+
+        launchAndUnlock(context, device)
+
+        sendDeepLink(context, offer.offerUrl)
+        assertResourceTextEquals(
+            device = device,
+            tag = "wallet.offerInput",
+            expected = offer.offerUrl,
+            timeoutMs = UI_ELEMENT_TIMEOUT,
+            message = "Offer URL did not appear in UI after deep link",
+        )
+
+        clickByTag(device, "wallet.receiveButton")
+        val receiveSuccess = waitForStatus(
+            device = device,
+            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
+            matcher = { it.startsWith("Received") },
+            failurePrefixes = listOf("Receive failed", "Bootstrap failed", "Present failed")
+        )
+        assertTrue("Receive did not complete successfully. Latest status: ${latestStatus(device)}", receiveSuccess)
+
+        val session = DemoTestBackend.createTransactionDataVerifierSession(scenario)
+        sendDeepLink(context, session.authorizationRequestUri)
+        assertResourceTextEquals(
+            device = device,
+            tag = "wallet.presentationInput",
+            expected = session.authorizationRequestUri,
+            timeoutMs = UI_ELEMENT_TIMEOUT,
+            message = "Presentation request URL did not appear in UI after deep link",
+        )
+
+        clickByTag(device, "wallet.presentButton")
+        val previewReady = waitForStatus(
+            device = device,
+            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
+            matcher = { it == "Review presentation request" },
+            failurePrefixes = listOf("Preview failed", "Present failed", "Receive failed", "Bootstrap failed")
+        )
+        assertTrue("Transaction-data preview did not load. Latest status: ${latestStatus(device)}", previewReady)
+
+        val screenshot = File("/sdcard/Download/wal1077-compose-android-transaction-data.png")
+        if (device.takeScreenshot(screenshot)) {
+            println("WAL1077_SCREENSHOT=${screenshot.absolutePath}")
+        } else {
+            println("WAL1077_SCREENSHOT_CAPTURE_FAILED=${screenshot.absolutePath}")
+        }
+
+        assertTextVisibleAfterScrolling(
+            device,
+            listOf("PAYMENT AUTHORIZATION", "Payment Authorization"),
+            "Payment profile title missing",
+        )
+        assertClaimValueVisibleAfterScrolling(
+            device = device,
+            path = "transactionData[0].details.amount",
+            label = "Amount",
+            expectedValues = listOf("42.00"),
+            message = "Payment amount missing",
+        )
+        assertClaimValueVisibleAfterScrolling(
+            device = device,
+            path = "transactionData[0].details.currency",
+            label = "Currency",
+            expectedValues = listOf("EUR"),
+            message = "Payment currency missing",
+        )
+        assertClaimValueVisibleAfterScrolling(
+            device = device,
+            path = "transactionData[0].details.payee",
+            label = "Payee",
+            expectedValues = listOf("ACME Corp"),
+            message = "Payment payee missing",
+        )
     }
 }

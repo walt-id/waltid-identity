@@ -32,6 +32,16 @@ Android and iOS demo targets use the default managed encrypted local persistence
 
 The UI stays focused on the production default. Non-default persistence options, including provided database keys and custom stores, are documented and tested at the SDK layer.
 
+## Public demo backend defaults
+
+Clean demo installs use the public walt.id demo profile endpoint for OpenID4VP transaction-data support:
+
+```text
+https://wallet.demo.walt.id/wallet-api/transaction-data-profiles
+```
+
+Android builds can override it with `-PtransactionDataProfiles.url=...`. Compose iOS can override it with the `TRANSACTION_DATA_PROFILES_URL` launch environment variable or `UserDefaults` key. Wallet attestation values remain explicit overrides through `attestation.*` Gradle properties on Android and `ATTESTATION_*` environment/UserDefaults values on iOS; no bearer token is defaulted.
+
 ## Target status
 
 - Android and iOS are the supported mobile demo targets for wallet SDK issuance, presentation, platform-backed keys, and persistence.

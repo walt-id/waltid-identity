@@ -41,6 +41,10 @@ struct PresentView: View {
                         isError: viewModel.statusIsError(for: .present)
                     )
 
+                    if let warning = viewModel.transactionDataProfilesWarning {
+                        WarningBannerView(message: warning)
+                    }
+
                     if viewModel.presentationCompleted {
                         Button("New presentation", action: viewModel.startNewPresentationFlow)
                             .buttonStyle(.bordered)
