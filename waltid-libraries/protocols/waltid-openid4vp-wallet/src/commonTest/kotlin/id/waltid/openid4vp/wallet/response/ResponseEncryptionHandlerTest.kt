@@ -239,7 +239,7 @@ class ResponseEncryptionHandlerTest {
         // provide a login keychain, and generated Signum keys otherwise fail while retrieving
         // their public key with errSecNotAvailable (-25291).
         val privateKey = JWKKey.importJWK(
-            """{"kty":"EC","crv":"P-256","d":"QN9Y3k_3Hy2OV0C5Pmez_ObEXJKcXonnMg3xTpcLOAg","x":"eTT2WdzlmOWBItdgSmsqB1_BP69wfuwOe1IYvaY1WdI","y":"wbOu3GP02JiOVIRQ_ufWLRNOmDB6seYAabCmsGBfr_4"}"""
+            """{"kty":"EC","crv":"P-256","kid":"round-trip-key","d":"QN9Y3k_3Hy2OV0C5Pmez_ObEXJKcXonnMg3xTpcLOAg","x":"eTT2WdzlmOWBItdgSmsqB1_BP69wfuwOe1IYvaY1WdI","y":"wbOu3GP02JiOVIRQ_ufWLRNOmDB6seYAabCmsGBfr_4"}"""
         ).getOrThrow()
         val publicJwk = Json.parseToJsonElement(
             """{"kty":"EC","crv":"P-256","x":"eTT2WdzlmOWBItdgSmsqB1_BP69wfuwOe1IYvaY1WdI","y":"wbOu3GP02JiOVIRQ_ufWLRNOmDB6seYAabCmsGBfr_4"}"""
