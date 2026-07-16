@@ -18,6 +18,7 @@ final class MockWalletUITests: XCTestCase {
         ui.tapTab(label: "Receive")
         let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
         XCTAssertTrue(offerInput.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["wallet.offerScanButton"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["wallet.status"].waitForExistence(timeout: 10))
         XCTAssertLessThan(
             offerInput.frame.minY,
@@ -28,6 +29,7 @@ final class MockWalletUITests: XCTestCase {
         ui.tapTab(label: "Present")
         let presentationInput = ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
         XCTAssertTrue(presentationInput.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["wallet.presentationScanButton"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["wallet.status"].waitForExistence(timeout: 10))
         XCTAssertLessThan(
             presentationInput.frame.minY,
@@ -400,6 +402,13 @@ final class MockWalletUITests: XCTestCase {
         )
         XCTAssertFalse(ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL").isEnabled)
         XCTAssertTrue(app.staticTexts["Example Verifier"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Payment Authorization"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Amount"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["129.90"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Currency"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["EUR"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Payee"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Example Merchant"].waitForExistence(timeout: 10))
         assertVerifierTechnicalDetailsCollapsedUntilRequested(app: app, ui: ui)
         ui.assertExists(identifierPrefix: "wallet.credentialCard.")
         assertPresentationActionsFollowReviewContent(app: app)

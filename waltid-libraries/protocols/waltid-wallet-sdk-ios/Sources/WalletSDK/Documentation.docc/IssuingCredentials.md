@@ -1,19 +1,29 @@
 # Issuing Credentials
 
-Use ``Wallet/receive(offer:txCode:clientID:)`` to process an OpenID4VCI
-credential offer and persist the issued credentials in the wallet.
+Resolve an OpenID4VCI credential offer, collect a transaction code when the
+issuer requires one, and use ``Wallet/receive(offer:txCode:clientID:)`` to
+persist the issued credentials in the wallet.
 
 ## Overview
 
 ### Receive an Offer
 
 Pass the offer URL from a QR scan, deep link, universal link, or another app
-handoff into the wallet actor.
+handoff into the wallet actor. Resolve it before issuance so the application
+can determine whether it must collect a separately delivered transaction code.
 
 ```swift
+let resolution = try await wallet.resolveOffer(offer: credentialOfferURL)
+let transactionCode: String?
+if resolution.transactionCodeRequired {
+    transactionCode = await collectTransactionCode()
+} else {
+    transactionCode = nil
+}
+
 let credentialIDs = try await wallet.receive(
     offer: credentialOfferURL,
-    txCode: userEnteredTransactionCode
+    txCode: transactionCode
 )
 ```
 

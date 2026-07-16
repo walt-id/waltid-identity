@@ -5,6 +5,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.dcql.models.DcqlQuery
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.ktor.http.Url
 import kotlinx.coroutines.test.runTest
@@ -34,6 +35,7 @@ class WalletPresentFunctionality2Test {
             selectCredentialsForQuery = { emptyMap() },
             holderPoliciesToRun = null,
             runPolicies = null,
+            transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
         ).getOrThrow()
 
         assertEquals("https://wallet.example/callback#vp_token=%7B%7D", result.getUrl)

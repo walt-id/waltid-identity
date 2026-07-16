@@ -58,6 +58,15 @@ public actor Wallet {
         )
     }
 
+    /// Resolves a credential offer and reports whether a transaction code is required.
+    ///
+    /// - Parameter offer: OpenID4VCI credential offer URL received by the app.
+    /// - Returns: A requirement indicating whether the app must collect a transaction code.
+    /// - Throws: ``WalletError`` when the offer is invalid or issuer communication fails.
+    public func resolveOffer(offer: URL) async throws -> OfferResolution {
+        try await bridge.resolveOffer(offer: offer)
+    }
+
     /// Receives credentials from an OpenID4VCI credential offer URL.
     ///
     /// - Parameters:
@@ -91,6 +100,12 @@ public actor Wallet {
     }
 
     /// Presents credentials for an OpenID4VP request URL.
+    ///
+    /// This immediate submission API is intended for callers that already handled
+    /// request review and user consent. Apps that need to display verifier
+    /// details, credential choices, selective disclosures, or transaction data
+    /// should use ``previewPresentation(request:)`` followed by
+    /// ``submitPresentation(request:selectedCredentialOptions:selectedDisclosureOptions:did:runPolicies:)``.
     ///
     /// - Parameters:
     ///   - request: OpenID4VP authorization request URL received by the app.
