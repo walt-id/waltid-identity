@@ -50,6 +50,8 @@ bin/
 secret*
 */*/data
 !.github/**/data/
+!waltid-applications/waltid-web-portal2/data/
+!waltid-applications/waltid-web-portal2/data/simplePidVerificationRequests.ts
 **/*.db
 /kotlin-js-store/
 .idea/misc.xml

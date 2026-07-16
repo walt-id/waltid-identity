@@ -245,14 +245,34 @@ class OpenId4VciProtocolService(
 
     suspend fun processCredentialRequest(accessToken: String, parameters: JsonObject): CredentialResponseHttp {
         val parameterMap = parameters.toParametersMap()
-        val credentialRequest = when (
-            val result = oauth2Provider.createCredentialRequest(
+        return processCredentialRequest(accessToken) {
+            oauth2Provider.createCredentialRequest(
                 parameters = parameterMap,
                 accessTokenContext = AccessTokenContext(
                     token = accessToken,
                     expectedIssuer = metadataService.issuerBaseUrl(),
                 ),
             )
+        }
+    }
+
+    suspend fun processCredentialRequest(accessToken: String, encryptedCredentialRequest: String): CredentialResponseHttp =
+        processCredentialRequest(accessToken) {
+            oauth2Provider.createCredentialRequest(
+                encryptedCredentialRequest = encryptedCredentialRequest,
+                accessTokenContext = AccessTokenContext(
+                    token = accessToken,
+                    expectedIssuer = metadataService.issuerBaseUrl(),
+                ),
+            )
+        }
+
+    private suspend fun processCredentialRequest(
+        accessToken: String,
+        createCredentialRequest: suspend () -> CredentialRequestResult,
+    ): CredentialResponseHttp {
+        val credentialRequest = when (
+            val result = createCredentialRequest()
         ) {
             is CredentialRequestResult.Success -> result.request
             is CredentialRequestResult.Failure -> return oauth2Provider.writeCredentialError(result.error)
