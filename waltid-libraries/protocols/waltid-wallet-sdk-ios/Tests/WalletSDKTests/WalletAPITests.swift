@@ -236,15 +236,20 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(bridge.bootstrapCalls.first?.keyType, .rsa4096)
     }
 
-    func testResolveOfferForwardsOfferAndReturnsRequirement() async throws {
+    func testResolveOfferForwardsOfferAndReturnsResolution() async throws {
         let offer = URL(string: "openid-credential-offer://issuer.example")!
         let bridge = FakeWalletCoreBridge()
-        bridge.offerResolutionResult = OfferResolution(transactionCodeRequired: true)
+        let resolution = OfferResolution(
+            transactionCodeRequired: true,
+            credentialIssuer: "https://issuer.example",
+            offeredCredentials: ["ExampleCredential"]
+        )
+        bridge.offerResolutionResult = resolution
         let wallet = Wallet(bridge: bridge)
 
         let result = try await wallet.resolveOffer(offer: offer)
 
-        XCTAssertEqual(result, OfferResolution(transactionCodeRequired: true))
+        XCTAssertEqual(result, resolution)
         XCTAssertEqual(bridge.resolvedOffers, [offer])
     }
 
@@ -549,7 +554,11 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     var events: AsyncStream<WalletEvent>
     var error: WalletError?
     var bootstrapResult = WalletBootstrapResult(keyID: "key", did: "did:key:wallet")
-    var offerResolutionResult = OfferResolution(transactionCodeRequired: false)
+    var offerResolutionResult = OfferResolution(
+        transactionCodeRequired: false,
+        credentialIssuer: "https://issuer.example",
+        offeredCredentials: ["ExampleCredential"]
+    )
     var receiveResult: [String] = []
     var credentialsResult: [Credential] = []
     var presentResult = PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)

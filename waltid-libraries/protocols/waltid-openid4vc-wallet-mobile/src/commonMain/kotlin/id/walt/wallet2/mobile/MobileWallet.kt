@@ -79,6 +79,10 @@ public data class MobileWalletCredential(
  */
 public data class MobileWalletOfferResolution(
     public val transactionCodeRequired: Boolean,
+    /** Issuer identifier (URL) from the credential offer. */
+    public val credentialIssuer: String,
+    /** Credential configuration IDs advertised in the offer. */
+    public val offeredCredentials: List<String>,
 )
 
 /**
@@ -212,21 +216,29 @@ public class MobileWallet internal constructor(
     /**
      * Resolves a credential offer and reports any transaction code the app must collect.
      *
-     * Apps can use this before [receive] to decide whether to prompt the user for a code.
+     * Apps can use this before [receive] to decide whether to prompt the user for a code. While the
+     * preview is retained, the matching [receive] call reuses this exact resolution.
      *
      * @param offerUrl Credential offer URL, including `openid-credential-offer://` URLs.
+     * @return Issuer, offered credential, and transaction-code metadata for app-side review.
      */
     public suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution =
-        WalletIssuanceHandler.resolveOffer(
-            ResolveOfferRequest(offerUrl = Url(offerUrl.trim())),
+        WalletIssuanceHandler.previewOffer(
+            wallet = wallet,
+            request = ResolveOfferRequest(offerUrl = Url(offerUrl.trim())),
         ).let { result ->
             MobileWalletOfferResolution(
                 transactionCodeRequired = result.txCodeRequired,
+                credentialIssuer = result.credentialIssuer,
+                offeredCredentials = result.offeredCredentials,
             )
         }
 
     /**
      * Receives credentials from an OpenID4VCI credential offer.
+     *
+     * A matching prior [resolveOffer] call binds issuance to the reviewed resolution. Without one,
+     * the offer is resolved as part of this call.
      *
      * @param offerUrl Credential offer URL, including `openid-credential-offer://` URLs.
      * @param txCode Optional transaction code for pre-authorized offers.

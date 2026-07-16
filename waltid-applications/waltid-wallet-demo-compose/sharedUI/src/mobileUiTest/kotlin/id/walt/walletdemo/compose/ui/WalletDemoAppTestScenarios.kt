@@ -31,6 +31,7 @@ import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
+import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialOption
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialRequirement
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
@@ -103,6 +104,8 @@ class WalletDemoAppTestScenarios {
         wallet.credentials = listOf(sampleCredential)
         onNodeWithTag("wallet.offerInput").performTextInput("openid-credential-offer://example")
         onNodeWithTag("wallet.receiveButton").performSemanticsAction(SemanticsActions.OnClick)
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
 
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
         onNodeWithTag("wallet.status").assertTextContains("Received 1 credential(s)")
@@ -133,6 +136,8 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.tab.receive").performClick()
         onNodeWithTag("wallet.offerInput").performTextInput("openid-credential-offer://example")
         onNodeWithTag("wallet.receiveButton").performSemanticsAction(SemanticsActions.OnClick)
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
 
         onNodeWithTag("wallet.offerInput").assertIsNotEnabled()
@@ -153,6 +158,8 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.tab.receive").performClick()
         onNodeWithTag("wallet.offerInput").performTextInput("openid-credential-offer://example")
         onNodeWithTag("wallet.receiveButton").performSemanticsAction(SemanticsActions.OnClick)
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
 
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().performClick()
@@ -183,13 +190,40 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.offerInput").performTextInput("openid-credential-offer://example")
         onNodeWithTag("wallet.receiveButton").performSemanticsAction(SemanticsActions.OnClick)
 
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+        onNodeWithTag(WalletUiTestTags.OfferReview).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsEnabled()
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
+
         waitUntil(timeoutMillis = 5_000) { controller.state.value.operation is WalletOperationState.Receiving }
-        onNodeWithTag("wallet.offerInput").assertIsNotEnabled()
-        onNodeWithTag("wallet.receiveButton").assertIsNotEnabled()
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsNotEnabled()
 
         receiveGate.complete(Unit)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
+    }
+
+    fun transactionCodeOfferCanBeDeclinedWithoutCode() = runComposeUiTest {
+        val wallet = FakeDemoWallet(transactionCodeRequired = true)
+        val controller = WalletDemoController(wallet)
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag(WalletUiTestTags.ReceiveTab).performClick()
+        onNodeWithTag(WalletUiTestTags.OfferInput).performTextInput("openid-credential-offer://example")
+        onNodeWithTag(WalletUiTestTags.ReceiveButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsNotEnabled()
+        onNodeWithTag(WalletUiTestTags.OfferDeclineButton)
+            .assertIsEnabled()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview == null }
+        onNodeWithTag("wallet.status").assertTextContains("Credential offer declined")
+        onNodeWithTag(WalletUiTestTags.ReceiveButton).assertIsEnabled()
+        assertEquals(null, wallet.receivedOfferUrl)
     }
 
     fun receiveAndPresentTabsExposeQrScanActions() = runComposeUiTest {
@@ -493,6 +527,8 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.offerInput").assertTextContains(offerUrl)
 
         onNodeWithTag("wallet.receiveButton").performSemanticsAction(SemanticsActions.OnClick)
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
         onNodeWithTag("wallet.status").assertTextContains("Received 1 credential(s)")
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
@@ -527,6 +563,8 @@ class WalletDemoAppTestScenarios {
 
         controller.handleDeepLink(offerUrl)
         onNodeWithTag("wallet.receiveButton").performSemanticsAction(SemanticsActions.OnClick)
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().performClick()
         onNodeWithTag("wallet.credentialDetailsScreen").assertIsDisplayed()
@@ -563,6 +601,8 @@ class WalletDemoAppTestScenarios {
 
         firstController.handleDeepLink("openid-credential-offer://example")
         onNodeWithTag("wallet.receiveButton").performSemanticsAction(SemanticsActions.OnClick)
+        waitUntil(timeoutMillis = 5_000) { firstController.state.value.offerPreview != null }
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { firstController.state.value.statusText.startsWith("Received") }
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
 
@@ -743,6 +783,7 @@ private class FakeDemoWallet(
     private val presentationPreview: WalletDemoPresentationPreview = WalletDemoAppTestScenarios.samplePresentationPreview,
     private val receiveGate: CompletableDeferred<Unit>? = null,
     private val previewGate: CompletableDeferred<Unit>? = null,
+    private val transactionCodeRequired: Boolean = false,
 ) : DemoWallet {
     var bootstrapCalls = 0
     var receivedOfferUrl: String? = null
@@ -757,7 +798,12 @@ private class FakeDemoWallet(
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 
-    override suspend fun resolveOffer(offerUrl: String): Boolean = false
+    override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview =
+        WalletDemoOfferPreview(
+            transactionCodeRequired = transactionCodeRequired,
+            credentialIssuer = "Example Issuer",
+            offeredCredentials = listOf("ExampleCredential"),
+        )
 
     override suspend fun receive(offerUrl: String, txCode: String?): List<String> {
         receivedOfferUrl = offerUrl
