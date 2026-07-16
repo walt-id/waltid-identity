@@ -43,7 +43,7 @@ class DefaultCredentialRequestValidator : CredentialRequestValidator {
                     if (!trimmed.startsWith("{")) {
                         throw IllegalArgumentException("credential_response_encryption must be a JSON object")
                     }
-                    Json.parseToJsonElement(trimmed).jsonObject
+                    CredentialResponseEncryptionParameters.fromJsonObject(Json.parseToJsonElement(trimmed).jsonObject)
                 }
 
             // OAuth2: client_id is not required at the credential endpoint (access token authenticates the client).
