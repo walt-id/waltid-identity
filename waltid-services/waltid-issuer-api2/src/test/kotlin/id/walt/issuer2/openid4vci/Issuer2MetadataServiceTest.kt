@@ -46,6 +46,23 @@ class Issuer2MetadataServiceTest {
     }
 
     @Test
+    fun `credential issuer metadata omits encryption metadata by default`() {
+        val metadata = metadataService().getCredentialIssuerMetadata()
+
+        assertNull(metadata.credentialRequestEncryption)
+        assertNull(metadata.credentialResponseEncryption)
+    }
+
+    @Test
+    fun `credential issuer metadata advertises configured credential encryption key`() {
+        val metadata = metadataService(
+            credentialEncryptionKey = CREDENTIAL_ENCRYPTION_KEY,
+        ).getCredentialIssuerMetadata()
+
+        assertCredentialEncryptionMetadata(metadata)
+    }
+
+    @Test
     fun `authorization server metadata uses pre-authorized anonymous access capability`() {
         val metadata = metadataService(preAuthorizedGrantAnonymousAccessSupported = false)
             .getAuthorizationServerMetadata()
