@@ -32,6 +32,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertEqual(receiveCalls, 1)
         XCTAssertEqual(receivedTxCodes, ["abc-123"])
         XCTAssertEqual(viewModel.receivedCredentials.map(\.id), ["credential-1"])
+        XCTAssertEqual(viewModel.txCode, "")
+        XCTAssertFalse(viewModel.transactionCodeRequired)
     }
 
     func testChangingOfferClearsTransactionCodeState() async throws {

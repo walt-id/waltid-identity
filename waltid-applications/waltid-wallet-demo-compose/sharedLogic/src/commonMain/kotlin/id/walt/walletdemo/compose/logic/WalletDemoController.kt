@@ -271,6 +271,10 @@ class WalletDemoController(
                     message = WalletDisplayText.receivedCredentials(displayableReceivedCredentialIds.size),
                     tab = WalletDemoTab.Receive,
                 ),
+                requestDrafts = it.requestDrafts.copy(
+                    txCode = "",
+                    transactionCodeRequired = false,
+                ),
                 lastReceivedCredentialIds = displayableReceivedCredentialIds,
                 receiveCompleted = true,
             )

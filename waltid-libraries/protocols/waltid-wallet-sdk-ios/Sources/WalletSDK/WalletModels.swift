@@ -485,6 +485,9 @@ public struct OfferResolution: Equatable, Sendable {
     /// Whether the app must collect a transaction code from the user.
     public let transactionCodeRequired: Bool
 
+    /// Creates a credential-offer resolution result.
+    ///
+    /// - Parameter transactionCodeRequired: Whether the app must collect a transaction code.
     public init(transactionCodeRequired: Bool) {
         self.transactionCodeRequired = transactionCodeRequired
     }

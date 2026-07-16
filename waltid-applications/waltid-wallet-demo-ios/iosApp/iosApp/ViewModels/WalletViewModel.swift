@@ -411,6 +411,8 @@ class WalletViewModel: ObservableObject {
 
         credentials = refreshedCredentials
         lastReceivedCredentialIDs = displayableReceivedCredentialIDs
+        self.txCode = ""
+        self.transactionCodeRequired = false
         receiveCompleted = true
         setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: .receive)
     }
