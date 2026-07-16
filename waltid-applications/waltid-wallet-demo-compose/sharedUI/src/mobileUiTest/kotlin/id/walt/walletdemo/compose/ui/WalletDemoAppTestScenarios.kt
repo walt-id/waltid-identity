@@ -203,6 +203,29 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
     }
 
+    fun transactionCodeOfferCanBeDeclinedWithoutCode() = runComposeUiTest {
+        val wallet = FakeDemoWallet(transactionCodeRequired = true)
+        val controller = WalletDemoController(wallet)
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag(WalletUiTestTags.ReceiveTab).performClick()
+        onNodeWithTag(WalletUiTestTags.OfferInput).performTextInput("openid-credential-offer://example")
+        onNodeWithTag(WalletUiTestTags.ReceiveButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsNotEnabled()
+        onNodeWithTag(WalletUiTestTags.OfferDeclineButton)
+            .assertIsEnabled()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview == null }
+        onNodeWithTag("wallet.status").assertTextContains("Credential offer declined")
+        onNodeWithTag(WalletUiTestTags.ReceiveButton).assertIsEnabled()
+        assertEquals(null, wallet.receivedOfferUrl)
+    }
+
     fun receiveAndPresentTabsExposeQrScanActions() = runComposeUiTest {
         val controller = WalletDemoController(FakeDemoWallet(credentials = listOf(sampleCredential)))
 
@@ -760,6 +783,7 @@ private class FakeDemoWallet(
     private val presentationPreview: WalletDemoPresentationPreview = WalletDemoAppTestScenarios.samplePresentationPreview,
     private val receiveGate: CompletableDeferred<Unit>? = null,
     private val previewGate: CompletableDeferred<Unit>? = null,
+    private val transactionCodeRequired: Boolean = false,
 ) : DemoWallet {
     var bootstrapCalls = 0
     var receivedOfferUrl: String? = null
@@ -776,7 +800,7 @@ private class FakeDemoWallet(
 
     override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview =
         WalletDemoOfferPreview(
-            transactionCodeRequired = false,
+            transactionCodeRequired = transactionCodeRequired,
             credentialIssuer = "Example Issuer",
             offeredCredentials = listOf("ExampleCredential"),
         )
