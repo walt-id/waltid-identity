@@ -162,6 +162,19 @@ class MetadataService(
     private fun selfHostedVct(credentialType: String): String =
         "$baseUrl/$credentialType"
 
+    private fun resolveCredentialRequestEncryptionMetadata(): CredentialRequestEncryption? {
+        val serializedKey = credentialEncryptionKeyConfig ?: return null
+        val jwk = CredentialEncryptionKeyConfig.publicMetadataJwk(serializedKey)
+
+        return CredentialRequestEncryption(
+            jwks = buildJsonObject {
+                put("keys", buildJsonArray { add(jwk) })
+            },
+            encValuesSupported = CredentialEncryptionProfile.encValuesSupported,
+            encryptionRequired = false,
+        )
+    }
+
     companion object {
         private const val INTERNAL_VCT_BASE_URL = "vctBaseUrl"
     }
