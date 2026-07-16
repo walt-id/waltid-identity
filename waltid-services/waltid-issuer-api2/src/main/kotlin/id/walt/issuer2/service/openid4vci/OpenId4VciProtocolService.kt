@@ -1,5 +1,6 @@
 package id.walt.issuer2.service.openid4vci
 
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -20,8 +21,10 @@ import id.walt.mdoc.dataelement.NumberElement
 import id.walt.mdoc.dataelement.StringElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.issuersigned.IssuerSigned
+import id.walt.mdoc.objects.mso.UniformResourceIdentifier
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.core.OAuth2Provider
@@ -40,11 +43,14 @@ import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.access.AccessTokenContext
+import id.walt.x509.CertificateDer
 import id.walt.mdoc.objects.mso.Status as MdocStatus
 import id.walt.mdoc.objects.mso.Status.StatusListInfo as MdocStatusListInfo
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.parseQueryString
 import io.ktor.server.plugins.NotFoundException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -62,12 +68,13 @@ import kotlin.time.Duration.Companion.minutes
 private const val INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER = "_issuer2_session_id"
 private val AUTHORIZATION_CODE_SESSION_LIFETIME = 5.minutes
 
-class OpenId4VciProtocolService(
+class OpenId4VciProtocolService @JvmOverloads constructor(
     private val oauth2Provider: OAuth2Provider,
     private val sessionService: IssuanceSessionService,
     private val profileService: CredentialProfileService,
     private val metadataService: MetadataService,
     private val notificationService: IssuanceNotificationService,
+    private val credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -282,7 +289,7 @@ class OpenId4VciProtocolService(
                 credentialRequest,
                 OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Access token has no session id"),
             )
-        val session = try {
+        val observedSession = try {
             sessionService.getSession(sessionId)
         } catch (e: CancellationException) {
             throw e
@@ -292,79 +299,130 @@ class OpenId4VciProtocolService(
                 e.toCredentialError(),
             )
         }
+        val observedRequestWithSession = credentialRequest
+            .withSession(DefaultSession(subject = sessionId))
+            .withIssuer(observedSession.issuerDid ?: metadataService.issuerBaseUrl())
+
+        if (observedSession.isClosed || observedSession.status != IssuanceSessionStatus.ACTIVE) {
+            return oauth2Provider.writeCredentialError(
+                observedRequestWithSession,
+                OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Issuance session is already closed"),
+            )
+        }
+
+        validateExpectedCredentialProofKey(observedRequestWithSession, observedSession)?.let { error ->
+            return oauth2Provider.writeCredentialError(observedRequestWithSession, error)
+        }
+
+        val session = sessionService.claimSession(sessionId)
+            ?: return oauth2Provider.writeCredentialError(
+                observedRequestWithSession,
+                OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Issuance session is already closed or being processed"),
+            )
         val issuerId = session.issuerDid ?: metadataService.issuerBaseUrl()
         val requestWithSession = credentialRequest
             .withSession(DefaultSession(subject = sessionId))
             .withIssuer(issuerId)
 
-        if (session.credentialConfigurationId != credentialConfigurationId) {
-            return failCredentialRequest(
+        if (session.isClosed || session.status != IssuanceSessionStatus.ACTIVE) {
+            restoreClaimedSession(session)
+            return oauth2Provider.writeCredentialError(
                 requestWithSession,
-                session,
-                OAuthError(
-                    OAuthErrorCodes.INVALID_REQUEST,
-                    "Credential request references $credentialConfigurationId, but session ${session.sessionId} is for ${session.credentialConfigurationId}",
-                ),
+                OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Issuance session is already closed"),
             )
         }
 
-        validateExpectedCredentialProofKey(requestWithSession, session)?.let { error ->
-            return failCredentialRequest(requestWithSession, session, error)
-        }
-
-        val configuration = metadataService.getCredentialConfiguration(credentialConfigurationId)
-            ?: return failCredentialRequest(
-                requestWithSession,
-                session,
-                OAuthError(
-                    OAuthErrorCodes.INVALID_REQUEST,
-                    "Unsupported credential_configuration_id: $credentialConfigurationId",
-                ),
-            )
-        val issuerKey = try {
-            KeyManager.resolveSerializedKey(session.issuerKey)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            return failCredentialRequest(requestWithSession, session, e.toCredentialError())
-        }
-        val x5Chain = try {
-            session.x5Chain?.map { id.walt.x509.CertificateDer.fromPEMEncodedString(it) }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            return failCredentialRequest(requestWithSession, session, e.toCredentialError())
-        }
-
-        // Prepare credential data with status injection for W3C/IETF formats
-        val credentialDataWithStatus = session.credentialStatus?.let { status ->
-            when (configuration.format) {
-                CredentialFormat.JWT_VC_JSON, CredentialFormat.JWT_VC, CredentialFormat.JWT_VC_JSON_LD -> {
-                    // Inject credentialStatus into credential data for W3C VCs
-                    JsonObject(session.credentialData.toMutableMap().apply {
-                        put("credentialStatus", status)
-                    })
-                }
-                CredentialFormat.SD_JWT_VC -> {
-                    // For SD-JWT VC, inject status at root level (as "status" claim)
-                    JsonObject(session.credentialData.toMutableMap().apply {
-                        put("status", status)
-                    })
-                }
-                else -> session.credentialData
+        var claimFinalized = false
+        try {
+            if (session.credentialConfigurationId != credentialConfigurationId) {
+                claimFinalized = true
+                return failCredentialRequest(
+                    requestWithSession,
+                    session,
+                    OAuthError(
+                        OAuthErrorCodes.INVALID_REQUEST,
+                        "Credential request references $credentialConfigurationId, but session ${session.sessionId} is for ${session.credentialConfigurationId}",
+                    ),
+                )
             }
-        } ?: session.credentialData
 
-        // Convert credentialStatus to Status object for mDoc
-        val mDocStatus = session.credentialStatus?.let { status ->
-            when (configuration.format) {
-                CredentialFormat.MSO_MDOC -> parseStatusFromJsonElement(status)
-                else -> null
+            val configuration = metadataService.getCredentialConfiguration(credentialConfigurationId)
+                ?: run {
+                    claimFinalized = true
+                    return failCredentialRequest(
+                        requestWithSession,
+                        session,
+                        OAuthError(
+                            OAuthErrorCodes.INVALID_REQUEST,
+                            "Unsupported credential_configuration_id: $credentialConfigurationId",
+                        ),
+                    )
+                }
+            val issuerKey = KeyManager.resolveSerializedKey(session.issuerKey)
+            val x5Chain = session.x5Chain?.map { CertificateDer.fromPEMEncodedString(it) }
+
+            credentialProofKeyAcceptance?.let { acceptance ->
+                val proofPublicKeyJwk = try {
+                    resolveCredentialProofKey(requestWithSession).getPublicKey().exportJWKObject()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    val response = retryCredentialRequest(
+                        requestWithSession,
+                        session,
+                        OAuthError("invalid_proof", "Credential proof key could not be resolved"),
+                    )
+                    claimFinalized = true
+                    return response
+                }
+                val accepted = try {
+                    acceptance.accept(session, proofPublicKeyJwk)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    val response = retryCredentialRequest(requestWithSession, session, e.toCredentialError())
+                    claimFinalized = true
+                    return response
+                }
+                if (!accepted) {
+                    val response = retryCredentialRequest(
+                        requestWithSession,
+                        session,
+                        OAuthError("invalid_proof", "Credential proof key was not accepted"),
+                    )
+                    claimFinalized = true
+                    return response
+                }
             }
-        }
 
-        val credentialResponse = try {
-            when (val result = oauth2Provider.createCredentialResponse(
+            // Prepare credential data with status injection for W3C/IETF formats
+            val credentialDataWithStatus = session.credentialStatus?.let { status ->
+                when (configuration.format) {
+                    CredentialFormat.JWT_VC_JSON, CredentialFormat.JWT_VC, CredentialFormat.JWT_VC_JSON_LD -> {
+                        // Inject credentialStatus into credential data for W3C VCs
+                        JsonObject(session.credentialData.toMutableMap().apply {
+                            put("credentialStatus", status)
+                        })
+                    }
+                    CredentialFormat.SD_JWT_VC -> {
+                        // For SD-JWT VC, inject status at root level (as "status" claim)
+                        JsonObject(session.credentialData.toMutableMap().apply {
+                            put("status", status)
+                        })
+                    }
+                    else -> session.credentialData
+                }
+            } ?: session.credentialData
+
+            // Convert credentialStatus to Status object for mDoc
+            val mDocStatus = session.credentialStatus?.let { status ->
+                when (configuration.format) {
+                    CredentialFormat.MSO_MDOC -> parseStatusFromJsonElement(status)
+                    else -> null
+                }
+            }
+
+            val credentialResponse = when (val result = oauth2Provider.createCredentialResponse(
                 request = requestWithSession,
                 configuration = configuration,
                 issuerKey = issuerKey,
@@ -378,37 +436,58 @@ class OpenId4VciProtocolService(
             )) {
                 is CredentialResponseResult.Success -> result.response
                 is CredentialResponseResult.Failure -> {
+                    if (result.error.isRetryableProofFailure()) {
+                        val response = retryCredentialRequest(requestWithSession, session, result.error)
+                        claimFinalized = true
+                        return response
+                    }
+                    claimFinalized = true
                     return failCredentialRequest(requestWithSession, session, result.error)
                 }
             }
+
+            claimFinalized = true
+            val updatedSession = withContext(NonCancellable) {
+                sessionService.saveSession(
+                    session.copy(
+                        status = IssuanceSessionStatus.SUCCESSFUL,
+                        statusReason = "Credential issued successfully",
+                        issuedCredentialFormat = configuration.format.value,
+                        isClosed = true,
+                    )
+                )
+            }
+
+            val issuedCredential = credentialResponse.credentials
+                ?.firstOrNull()
+                ?.credential
+                ?.jsonPrimitive
+                ?.contentOrNull
+            if (issuedCredential != null) {
+                emitCredentialIssuedEvent(
+                    session = updatedSession,
+                    format = configuration.format,
+                )
+            }
+            notificationService.emitIssuanceStatus(updatedSession)
+
+            return oauth2Provider.writeCredentialResponse(requestWithSession, credentialResponse)
         } catch (e: CancellationException) {
+            if (!claimFinalized) {
+                restoreClaimedSession(session)
+            }
             throw e
         } catch (e: Exception) {
-            return failCredentialRequest(requestWithSession, session, e.toCredentialError())
-        }
-
-        val issuedCredential = credentialResponse.credentials
-            ?.firstOrNull()
-            ?.credential
-            ?.jsonPrimitive
-            ?.contentOrNull
-        if (issuedCredential != null) {
-            emitCredentialIssuedEvent(
-                session = session,
-                format = configuration.format,
+            if (claimFinalized) {
+                throw e
+            }
+            claimFinalized = true
+            return failCredentialRequest(
+                requestWithSession,
+                session,
+                e.toCredentialError(),
             )
         }
-
-        val updatedSession = sessionService.updateStatus(
-            session.sessionId,
-            IssuanceSessionStatus.SUCCESSFUL,
-            "Credential issued successfully",
-            issuedCredentialFormat = configuration.format.value,
-            close = true,
-        )
-        notificationService.emitIssuanceStatus(updatedSession)
-
-        return oauth2Provider.writeCredentialResponse(requestWithSession, credentialResponse)
     }
 
     fun createNonceResponse(): Map<String, String> =
@@ -553,11 +632,26 @@ class OpenId4VciProtocolService(
     ): OAuthError? {
         val expectedJwk = session.expectedCredentialProofKeyJwk ?: return null
         return try {
-            val proof = requireNotNull(request.proofs?.jwt?.singleOrNull()) {
-                "A single JWT credential proof is required for this issuance session"
+            requireNotNull(request.proofs?.jwt?.singleOrNull())
+            val proofKey = resolveCredentialProofKey(request)
+            val expectedKey = JWKKey.importJWK(expectedJwk.toString()).getOrThrow()
+            require(proofKey.getThumbprint() == expectedKey.getThumbprint()) {
+                "Credential proof key does not match the expected key"
             }
-            val proofHeader = proof.decodeJws().header
-            val proofKey = when {
+            null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            OAuthError("invalid_proof", "Credential proof key does not match the issuance session")
+        }
+    }
+
+    private suspend fun resolveCredentialProofKey(request: CredentialRequest): Key {
+        val proof = requireNotNull(request.proofs?.jwt?.singleOrNull()) {
+            "A single JWT credential proof is required for this issuance session"
+        }
+        val key = proof.decodeJws().header.let { proofHeader ->
+            when {
                 proofHeader["jwk"] is JsonObject ->
                     JWKKey.importJWK(requireNotNull(proofHeader["jwk"]).toString()).getOrThrow()
 
@@ -569,17 +663,9 @@ class OpenId4VciProtocolService(
 
                 else -> error("Credential proof header must contain jwk or kid")
             }
-            val expectedKey = JWKKey.importJWK(expectedJwk.toString()).getOrThrow()
-            require(proofKey.getThumbprint() == expectedKey.getThumbprint()) {
-                "Credential proof key does not match the expected key"
-            }
-            expectedKey.verifyJws(proof).getOrThrow()
-            null
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            OAuthError("invalid_proof", "Credential proof key does not match the issuance session")
         }
+        key.verifyJws(proof).getOrThrow()
+        return key
     }
 
     private suspend fun failCredentialRequest(
@@ -587,15 +673,36 @@ class OpenId4VciProtocolService(
         session: IssuanceSession,
         error: OAuthError,
     ): CredentialResponseHttp {
-        val updatedSession = sessionService.updateStatus(
-            session.sessionId,
-            IssuanceSessionStatus.UNSUCCESSFUL,
-            error.description ?: error.error,
-            close = true,
-        )
+        val updatedSession = withContext(NonCancellable) {
+            sessionService.saveSession(
+                session.copy(
+                    status = IssuanceSessionStatus.UNSUCCESSFUL,
+                    statusReason = error.description ?: error.error,
+                    isClosed = true,
+                )
+            )
+        }
         notificationService.emitIssuanceStatus(updatedSession)
         return oauth2Provider.writeCredentialError(request, error)
     }
+
+    private suspend fun retryCredentialRequest(
+        request: CredentialRequest,
+        session: IssuanceSession,
+        error: OAuthError,
+    ): CredentialResponseHttp {
+        restoreClaimedSession(session)
+        return oauth2Provider.writeCredentialError(request, error)
+    }
+
+    private suspend fun restoreClaimedSession(session: IssuanceSession) {
+        withContext(NonCancellable) {
+            sessionService.saveSession(session)
+        }
+    }
+
+    private fun OAuthError.isRetryableProofFailure(): Boolean =
+        error == "invalid_proof" || error == CredentialErrorCodes.INVALID_OR_MISSING_PROOF
 
     private suspend fun emitCredentialIssuedEvent(
         session: IssuanceSession,
@@ -682,7 +789,7 @@ class OpenId4VciProtocolService(
             val uri = statusList["uri"]?.jsonPrimitive?.content
                 ?: return null
 
-            MdocStatus(statusList = MdocStatusListInfo(index = idx, uri = id.walt.mdoc.objects.mso.UniformResourceIdentifier(uri)))
+            MdocStatus(statusList = MdocStatusListInfo(index = idx, uri = UniformResourceIdentifier(uri)))
         } catch (e: Exception) {
             null
         }
