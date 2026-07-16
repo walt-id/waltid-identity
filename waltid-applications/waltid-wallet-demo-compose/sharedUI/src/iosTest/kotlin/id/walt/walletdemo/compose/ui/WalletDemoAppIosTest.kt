@@ -26,6 +26,10 @@ class WalletDemoAppIosTest {
         scenarios.receiveTabDisablesUrlControlsWhileReceiving()
 
     @Test
+    fun transactionCodeOfferCanBeDeclinedWithoutCode() =
+        scenarios.transactionCodeOfferCanBeDeclinedWithoutCode()
+
+    @Test
     fun receiveAndPresentTabsExposeQrScanActions() =
         scenarios.receiveAndPresentTabsExposeQrScanActions()
 
