@@ -876,7 +876,8 @@ object WalletIssuanceHandler {
         wallet: Wallet,
         request: PollDeferredRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = defaultHttpClient()
+        httpClient: HttpClient = defaultHttpClient(),
+        beforeCredentialsStored: suspend (Int) -> Unit = {},
     ): Flow<StoredCredential> = channelFlow {
         val response = httpClient.post(request.deferredCredentialEndpoint.toString()) {
             header(HttpHeaders.Authorization, "Bearer ${request.accessToken}")
@@ -899,6 +900,8 @@ object WalletIssuanceHandler {
         val credentialResponse = response.body<CredentialResponse>()
         val rawCredentials = credentialResponse.credentials
             ?: error("Deferred credential response contained no credentials")
+
+        if (rawCredentials.isNotEmpty()) beforeCredentialsStored(rawCredentials.size)
 
         for (issuedCredential in rawCredentials) {
             val rawString = issuedCredential.credential.let {
