@@ -92,6 +92,7 @@ class CredentialOfferService(
             authenticationMethod = request.authMethod,
             credentialConfigurationId = profile.credentialConfigurationId,
             issuerKey = issuerKey,
+            expectedCredentialProofKeyJwk = overrides?.expectedCredentialProofKeyJwk,
             credentialData = credentialData,
             mapping = overrides?.mapping ?: profile.mapping,
             selectiveDisclosure = overrides?.selectiveDisclosure ?: profile.selectiveDisclosure,
