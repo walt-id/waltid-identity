@@ -72,9 +72,11 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
+            implementation(identityLibs.ktor.client.mock)
         }
 
         jvmTest.dependencies {
+            implementation(kotlin("test-junit5"))
             implementation(identityLibs.slf4j.simple)
         }
     }
