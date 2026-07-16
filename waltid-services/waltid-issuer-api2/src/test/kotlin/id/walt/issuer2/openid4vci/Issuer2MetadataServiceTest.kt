@@ -159,10 +159,12 @@ class Issuer2MetadataServiceTest {
         enforcePushedAuthorizationRequests: Boolean = false,
         clientAuthenticationConfig: ClientAuthenticationConfig? = null,
         preAuthorizedGrantAnonymousAccessSupported: Boolean = false,
+        credentialEncryptionKey: String? = null,
     ): MetadataService {
         val metadataConfig = Issuer2MetadataConfig()
         val serviceConfig = Issuer2ServiceConfig(
             baseUrl = "http://localhost",
+            credentialEncryptionKey = credentialEncryptionKey,
             enforcePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
             clientAuthenticationConfig = clientAuthenticationConfig,
         )
