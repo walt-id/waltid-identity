@@ -1,7 +1,10 @@
 package id.walt.issuer2.service.openid4vci
 
 import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.did.dids.DidService
+import id.walt.did.dids.DidUtils
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionStatus
@@ -305,6 +308,10 @@ class OpenId4VciProtocolService(
             )
         }
 
+        validateExpectedCredentialProofKey(requestWithSession, session)?.let { error ->
+            return failCredentialRequest(requestWithSession, session, error)
+        }
+
         val configuration = metadataService.getCredentialConfiguration(credentialConfigurationId)
             ?: return failCredentialRequest(
                 requestWithSession,
@@ -539,6 +546,41 @@ class OpenId4VciProtocolService(
 
     private fun JsonObject.stringClaim(name: String): String? =
         this[name]?.jsonPrimitive?.contentOrNull
+
+    private suspend fun validateExpectedCredentialProofKey(
+        request: CredentialRequest,
+        session: IssuanceSession,
+    ): OAuthError? {
+        val expectedJwk = session.expectedCredentialProofKeyJwk ?: return null
+        return try {
+            val proof = requireNotNull(request.proofs?.jwt?.singleOrNull()) {
+                "A single JWT credential proof is required for this issuance session"
+            }
+            val proofHeader = proof.decodeJws().header
+            val proofKey = when {
+                proofHeader["jwk"] is JsonObject ->
+                    JWKKey.importJWK(requireNotNull(proofHeader["jwk"]).toString()).getOrThrow()
+
+                proofHeader["kid"] != null -> {
+                    val kid = requireNotNull(proofHeader["kid"]?.jsonPrimitive?.contentOrNull)
+                    require(DidUtils.isDidUrl(kid)) { "Credential proof kid must be a DID URL" }
+                    DidService.resolveToKey(kid.substringBefore("#")).getOrThrow()
+                }
+
+                else -> error("Credential proof header must contain jwk or kid")
+            }
+            val expectedKey = JWKKey.importJWK(expectedJwk.toString()).getOrThrow()
+            require(proofKey.getThumbprint() == expectedKey.getThumbprint()) {
+                "Credential proof key does not match the expected key"
+            }
+            expectedKey.verifyJws(proof).getOrThrow()
+            null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            OAuthError("invalid_proof", "Credential proof key does not match the issuance session")
+        }
+    }
 
     private suspend fun failCredentialRequest(
         request: CredentialRequest,
