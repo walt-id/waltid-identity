@@ -12,11 +12,12 @@ struct PresentView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    UrlEditor(
+                    ScannableUrlEditor(
                         title: "Present",
                         label: "OpenID4VP request URL",
                         text: $viewModel.presentationRequestUrl,
                         inputIdentifier: WalletAccessibilityID.presentationInput,
+                        scanButtonIdentifier: WalletAccessibilityID.presentationScanButton,
                         isEnabled: viewModel.presentationUrlEntryEnabled,
                         focusResetKey: viewModel.inputFocusResetKey
                     )
@@ -40,6 +41,10 @@ struct PresentView: View {
                         isLoading: viewModel.statusIsLoading(for: .present),
                         isError: viewModel.statusIsError(for: .present)
                     )
+
+                    if let warning = viewModel.transactionDataProfilesWarning {
+                        WarningBannerView(message: warning)
+                    }
 
                     if viewModel.presentationCompleted {
                         Button("New presentation", action: viewModel.startNewPresentationFlow)

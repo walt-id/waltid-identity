@@ -46,6 +46,11 @@ private data class NormalizedClaimKey(val value: String) {
 internal object CredentialDisplayVocabulary {
     const val GenericVerifiableCredentialType = "VerifiableCredential"
     const val RequestedDisclosuresTitle = "Requested disclosures"
+    const val TransactionDataTitle = "Transaction data"
+    const val TransactionDataTypeLabel = "Type"
+    const val TransactionDataCredentialQueriesLabel = "Credential queries"
+    const val TransactionDataDetailsLabel = "Details"
+    const val TransactionDataRequestDataLabel = "Request data"
 
     private const val GivenNameClaim = "given_name"
     private const val FamilyNameClaim = "family_name"
@@ -175,6 +180,14 @@ internal object CredentialDisplayVocabulary {
             ?.let(::humanizedClaimLabel)
             ?: ClaimPath.semanticLeaf(path)?.let(::humanizedClaimLabel)
             ?: path
+
+    fun transactionDataLabel(field: TransactionDataField): String =
+        when (field) {
+            TransactionDataField.Type -> TransactionDataTypeLabel
+            TransactionDataField.CredentialQueryIds -> TransactionDataCredentialQueriesLabel
+            TransactionDataField.Details -> TransactionDataDetailsLabel
+            TransactionDataField.Raw -> TransactionDataRequestDataLabel
+        }
 
     fun roles(path: ClaimPath): Set<ClaimRole> {
         val leaf = path.leaf

@@ -25,6 +25,7 @@ class MainActivity : ComponentActivity() {
                     attestationAttesterPath = BuildConfig.ATTESTATION_ATTESTER_PATH,
                     attestationBearerToken = BuildConfig.ATTESTATION_BEARER_TOKEN,
                     attestationHostHeader = BuildConfig.ATTESTATION_HOST_HEADER,
+                    transactionDataProfilesUrl = BuildConfig.TRANSACTION_DATA_PROFILES_URL,
                 )
             )
         )

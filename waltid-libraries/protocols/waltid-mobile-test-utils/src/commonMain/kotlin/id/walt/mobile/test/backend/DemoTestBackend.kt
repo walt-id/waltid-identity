@@ -10,9 +10,11 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -28,7 +30,10 @@ object DemoTestBackend {
 
     private const val ISSUER_BASE_URL = "https://issuer2.demo.walt.id"
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
+    const val TRANSACTION_DATA_PROFILES_URL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
     private const val EUDI_PID_SD_JWT_VCT = "$ISSUER_BASE_URL/openid4vci/urn:eudi:pid:1"
+    private const val PAYMENT_AUTHORIZATION_TYPE = "org.waltid.transaction-data.payment-authorization"
+    private val requiredPaymentAuthorizationFields = setOf("amount", "currency", "payee")
 
     val scenarios = listOf(
         CredentialScenario(
@@ -80,6 +85,8 @@ object DemoTestBackend {
         ),
     )
 
+    val transactionDataPresentationScenario = scenarios.first { it.id == "eudi-pid-sdjwt" }
+
     val persistenceScenario = scenarios.first { it.id == "eudi-pid-mdoc" }
 
     private val client by lazy {
@@ -105,10 +112,20 @@ object DemoTestBackend {
 
     data class VerifierSession(val sessionId: String, val authorizationRequestUri: String)
 
-    suspend fun createOffer(scenario: CredentialScenario): GeneratedOffer {
+    suspend fun createOffer(
+        scenario: CredentialScenario,
+        withGeneratedTransactionCode: Boolean = false,
+    ): GeneratedOffer {
         val payload = buildJsonObject {
             put("profileId", scenario.profileId)
             put("authMethod", "PRE_AUTHORIZED")
+            if (withGeneratedTransactionCode) {
+                putJsonObject("txCode") {
+                    put("input_mode", "numeric")
+                    put("length", 6)
+                    put("description", "Enter the transaction code shown by the issuer")
+                }
+            }
         }
 
         val response = requestJson(
@@ -117,7 +134,11 @@ object DemoTestBackend {
         )
         val offerUrl = response["credentialOffer"]?.jsonPrimitive?.contentOrNull
             ?: error("Missing credentialOffer in public demo issuer2 response: $response")
-        val txCode = response["txCode"]?.jsonPrimitive?.contentOrNull
+        val txCode = response["txCodeValue"]?.jsonPrimitive?.contentOrNull
+            ?: response["txCode"]?.jsonPrimitive?.contentOrNull
+        check(!withGeneratedTransactionCode || txCode != null) {
+            "Public demo issuer2 did not return the requested transaction code: $response"
+        }
 
         return GeneratedOffer(offerUrl = offerUrl, txCode = txCode)
     }
@@ -127,12 +148,62 @@ object DemoTestBackend {
     }
 
     suspend fun createVerifierSession(credentialQuery: JsonObject): VerifierSession {
+        return createVerifierSession(
+            credentialQuery = credentialQuery,
+            transactionData = emptyList(),
+        )
+    }
+
+    suspend fun createTransactionDataVerifierSession(
+        scenario: CredentialScenario = transactionDataPresentationScenario,
+    ): VerifierSession {
+        val paymentAuthorizationFields = transactionDataProfileFields(PAYMENT_AUTHORIZATION_TYPE)
+        check(paymentAuthorizationFields.containsAll(requiredPaymentAuthorizationFields)) {
+            "Public demo transaction data profile '$PAYMENT_AUTHORIZATION_TYPE' is missing required fields: " +
+                (requiredPaymentAuthorizationFields - paymentAuthorizationFields).joinToString()
+        }
+        return createVerifierSession(
+            credentialQuery = scenario.verifierCredentialQuery,
+            transactionData = listOf(paymentAuthorizationTransactionData("pid", paymentAuthorizationFields)),
+        )
+    }
+
+    suspend fun transactionDataProfileFields(type: String): Set<String> {
+        val response = client.get(TRANSACTION_DATA_PROFILES_URL) {
+            accept(ContentType.Application.Json)
+        }
+        val body = response.bodyAsText()
+        if (!response.status.isSuccess()) {
+            error("HTTP ${response.status.value} from public demo transaction data profiles endpoint: $body")
+        }
+        return json.parseToJsonElement(body)
+            .jsonArray
+            .firstOrNull { profile -> profile.jsonObject["type"]?.jsonPrimitive?.content == type }
+            ?.jsonObject
+            ?.get("fields")
+            ?.jsonArray
+            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+            ?.toSet()
+            ?: error("Missing public demo transaction data profile: $type")
+    }
+
+    private suspend fun createVerifierSession(
+        credentialQuery: JsonObject,
+        transactionData: List<JsonObject>,
+    ): VerifierSession {
         val payload = buildJsonObject {
             put("flow_type", "cross_device")
             putJsonObject("core_flow") {
                 putJsonObject("dcql_query") {
                     putJsonArray("credentials") {
                         add(credentialQuery)
+                    }
+                }
+            }
+            if (transactionData.isNotEmpty()) {
+                putJsonObject("openid") {
+                    putJsonArray("transactionData") {
+                        transactionData.forEach { add(it) }
                     }
                 }
             }
@@ -150,6 +221,23 @@ object DemoTestBackend {
             ?: error("Missing authorization request URL in public demo verifier2 response: $response")
 
         return VerifierSession(sessionId, authorizationRequestUri)
+    }
+
+    private fun paymentAuthorizationTransactionData(
+        credentialId: String,
+        fields: Set<String>,
+    ): JsonObject = buildJsonObject {
+        put("type", JsonPrimitive(PAYMENT_AUTHORIZATION_TYPE))
+        putJsonArray("credential_ids") {
+            add(JsonPrimitive(credentialId))
+        }
+        put("require_cryptographic_holder_binding", JsonPrimitive(true))
+        putJsonArray("transaction_data_hashes_alg") {
+            add(JsonPrimitive("sha-256"))
+        }
+        putProfileField(fields, "amount", "42.00")
+        putProfileField(fields, "currency", "EUR")
+        putProfileField(fields, "payee", "ACME Corp")
     }
 
     suspend fun verifierSessionInfo(sessionId: String): JsonObject {
@@ -289,6 +377,12 @@ object DemoTestBackend {
 
     private fun claimSet(vararg claimIds: String) = kotlinx.serialization.json.buildJsonArray {
         claimIds.forEach { add(JsonPrimitive(it)) }
+    }
+
+    private fun JsonObjectBuilder.putProfileField(fields: Set<String>, key: String, value: String) {
+        if (key in fields) {
+            put(key, JsonPrimitive(value))
+        }
     }
 
     private val json = kotlinx.serialization.json.Json {

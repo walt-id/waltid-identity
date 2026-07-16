@@ -19,6 +19,10 @@ struct CredentialsTabView: View {
                         isError: viewModel.statusIsError(for: .credentials)
                     )
 
+                    if let warning = viewModel.transactionDataProfilesWarning {
+                        WarningBannerView(message: warning)
+                    }
+
                     if details.isEmpty {
                         EmptyCredentialsView()
                     } else {

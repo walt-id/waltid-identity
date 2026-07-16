@@ -5,6 +5,10 @@ struct VerifierDetailsView: View {
     let request: PresentationRequestInfo
     @State private var technicalDetailsExpanded = false
 
+    private var transactionDataGroups: [ClaimGroup] {
+        CredentialDisplayNormalizer.transactionDataGroups(for: request)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Verifier")
@@ -16,6 +20,9 @@ struct VerifierDetailsView: View {
             ))
                 .font(.subheadline.weight(.medium))
             DetailLine(label: "Trust", value: CredentialDisplayText.unknown)
+            ForEach(transactionDataGroups) { group in
+                ClaimGroupView(group: group)
+            }
 
             Button(technicalDetailsExpanded ? "Hide technical details" : "Show technical details") {
                 technicalDetailsExpanded.toggle()

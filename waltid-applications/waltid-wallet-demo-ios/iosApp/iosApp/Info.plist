@@ -4,6 +4,8 @@
 <dict>
 	<key>CFBundleDisplayName</key>
 	<string>walt.id</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan credential offer and presentation request QR codes.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

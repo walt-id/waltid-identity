@@ -10,13 +10,16 @@ fun createAndroidDemoWallet(
 ): DemoWallet {
 
     return LazyDemoWallet {
+        val transactionDataProfiles = config.resolveDemoTransactionDataProfiles()
         MobileDemoWallet(
             MobileWalletFactory(context).create(
                 MobileWalletConfig(
                     walletId = config.walletId,
                     attestationConfig = config.toWalletAttestationConfig(),
+                    transactionDataProfiles = transactionDataProfiles.profiles,
                 )
-            )
+            ),
+            warning = transactionDataProfiles.warning,
         )
     }
 }

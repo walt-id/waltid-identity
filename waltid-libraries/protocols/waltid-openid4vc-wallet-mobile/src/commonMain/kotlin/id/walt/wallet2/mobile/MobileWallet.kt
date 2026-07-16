@@ -20,6 +20,7 @@ import id.walt.wallet2.handlers.PresentationCredentialSelection
 import id.walt.wallet2.handlers.PresentationDisclosureSelection
 import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
+import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
@@ -72,6 +73,15 @@ public data class MobileWalletCredential(
 )
 
 /**
+ * Result of resolving an OpenID4VCI credential offer before issuance.
+ *
+ * @property transactionCodeRequired Whether the app must collect a transaction code from the user.
+ */
+public data class MobileWalletOfferResolution(
+    public val transactionCodeRequired: Boolean,
+)
+
+/**
  * Result returned after attempting to answer an OpenID4VP presentation request.
  *
  * @property success `true` when the wallet transmitted the presentation successfully.
@@ -117,6 +127,7 @@ public class MobileWallet internal constructor(
     private val keyGenerator: suspend (KeyType) -> Key,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     attestationConfig: WalletAttestationConfig? = null,
+    private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {
@@ -199,6 +210,22 @@ public class MobileWallet internal constructor(
         }
 
     /**
+     * Resolves a credential offer and reports any transaction code the app must collect.
+     *
+     * Apps can use this before [receive] to decide whether to prompt the user for a code.
+     *
+     * @param offerUrl Credential offer URL, including `openid-credential-offer://` URLs.
+     */
+    public suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution =
+        WalletIssuanceHandler.resolveOffer(
+            ResolveOfferRequest(offerUrl = Url(offerUrl.trim())),
+        ).let { result ->
+            MobileWalletOfferResolution(
+                transactionCodeRequired = result.txCodeRequired,
+            )
+        }
+
+    /**
      * Receives credentials from an OpenID4VCI credential offer.
      *
      * @param offerUrl Credential offer URL, including `openid-credential-offer://` URLs.
@@ -244,6 +271,11 @@ public class MobileWallet internal constructor(
     /**
      * Presents matching wallet credentials to an OpenID4VP verifier request.
      *
+     * This immediate submission API is intended for callers that already handled
+     * request review and user consent. Apps that need to display verifier details,
+     * credential choices, selective disclosures, or transaction data should use
+     * [previewPresentation] followed by [submitPresentation].
+     *
      * @param requestUrl Authorization request URL received from the verifier.
      * @param did Optional DID override for selecting the wallet DID used in the presentation.
      * @param runPolicies Optional override for verifier policy execution in the core presentation handler.
@@ -261,6 +293,7 @@ public class MobileWallet internal constructor(
                 did = did,
                 runPolicies = runPolicies,
             ),
+            transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             onEvent = ::emitSessionEvent,
         )
 
@@ -282,9 +315,11 @@ public class MobileWallet internal constructor(
             request = PreviewPresentationRequest(
                 requestUrl = Url(requestUrl.trim()),
             ),
+            transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             onEvent = ::emitSessionEvent,
         )
 
+        val profilesByType = transactionDataProfiles.associateBy { it.type }
         return MobileWalletPresentationPreview(
             request = MobileWalletPresentationRequestInfo(
                 clientId = result.authorizationRequest.clientId,
@@ -292,6 +327,17 @@ public class MobileWallet internal constructor(
                 responseUri = result.authorizationRequest.responseUri,
                 state = result.authorizationRequest.state,
                 nonce = result.authorizationRequest.nonce,
+                transactionData = result.transactionData.map { item ->
+                    val profile = profilesByType[item.type]
+                    MobileWalletTransactionDataItem(
+                        type = item.type,
+                        displayName = profile?.displayName ?: item.type,
+                        credentialQueryIds = item.credentialQueryIds,
+                        supportedFields = profile?.fields.orEmpty(),
+                        rawJson = item.rawJson.encodeJsonObject(),
+                        detailsJson = item.details.encodeJsonObject(),
+                    )
+                },
             ),
             credentialOptions = result.credentialOptions.map { it.toMobileCredentialOption() },
             credentialRequirements = result.credentialRequirements.map { it.toMobileCredentialRequirement() },
@@ -328,6 +374,7 @@ public class MobileWallet internal constructor(
                 did = did,
                 runPolicies = runPolicies,
             ),
+            transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             onEvent = ::emitSessionEvent,
         ).toMobilePresentationResult()
 

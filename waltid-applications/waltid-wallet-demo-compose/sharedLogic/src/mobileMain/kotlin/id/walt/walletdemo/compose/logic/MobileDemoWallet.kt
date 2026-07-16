@@ -8,12 +8,14 @@ import id.walt.wallet2.mobile.WalletAttestationConfig
 
 internal class MobileDemoWallet(
     private val mobileWallet: MobileWallet,
+    private val warning: String? = null,
 ) : DemoWallet {
     override suspend fun bootstrap(): WalletDemoBootstrapResult =
         mobileWallet.bootstrap().let { result ->
             WalletDemoBootstrapResult(
                 keyId = result.keyId,
                 did = result.did,
+                warning = warning,
             )
         }
 
@@ -30,7 +32,11 @@ internal class MobileDemoWallet(
             )
         }
 
-    override suspend fun receive(offerUrl: String): List<String> = mobileWallet.receive(offerUrl)
+    override suspend fun resolveOffer(offerUrl: String): Boolean =
+        mobileWallet.resolveOffer(offerUrl).transactionCodeRequired
+
+    override suspend fun receive(offerUrl: String, txCode: String?): List<String> =
+        mobileWallet.receive(offerUrl, txCode = txCode)
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
         mobileWallet.present(requestUrl = requestUrl, did = did).let { result ->
@@ -93,6 +99,18 @@ private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentat
         responseUri = request.responseUri,
         state = request.state,
         nonce = request.nonce,
+        transactionData = CredentialDisplayNormalizer.transactionDataGroups(
+            request.transactionData.map { item ->
+                WalletDemoTransactionDataItem(
+                    type = item.type,
+                    displayName = item.displayName,
+                    credentialQueryIds = item.credentialQueryIds,
+                    supportedFields = item.supportedFields,
+                    rawJson = item.rawJson,
+                    detailsJson = item.detailsJson,
+                )
+            }
+        ),
         credentialOptions = credentialOptions.map { option ->
             WalletDemoPresentationCredentialOption(
                 queryId = option.queryId,
