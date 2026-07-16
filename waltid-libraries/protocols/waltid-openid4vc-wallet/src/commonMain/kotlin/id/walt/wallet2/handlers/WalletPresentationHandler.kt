@@ -163,7 +163,8 @@ object WalletPresentationHandler {
     suspend fun presentCredential(
         wallet: Wallet,
         request: PresentCredentialRequest,
-        onEvent: suspend (WalletSessionEvent) -> Unit = {}
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        beforeCredentialsUsed: suspend (Int) -> Unit = {},
     ): WalletPresentResult {
         val key = resolveKey(wallet, request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
@@ -181,6 +182,9 @@ object WalletPresentationHandler {
                 log.trace { "Selecting credentials for DCQL query: ${query.credentials.map { it.id }}" }
                 selectFromStores(wallet, query)
                     .also { matched ->
+                        beforeCredentialsUsed(
+                            matched.values.flatten().map { it.credential.id }.distinct().size,
+                        )
                         log.trace { "DCQL matched queryIds: ${matched.keys}" }
                         onEvent(WalletSessionEvent.presentation_credentials_selected)
                     }
