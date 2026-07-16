@@ -15,7 +15,9 @@ private enum WalletDeepLinkScheme: String {
 private enum WalletStatusText {
     static let startingWallet = "Starting wallet..."
     static let walletReady = "Wallet ready"
+    static let resolvingCredentialOffer = "Resolving credential offer..."
     static let receivingCredential = "Receiving credential..."
+    static let transactionCodeRequired = "Transaction code required"
     static let resolvingPresentation = "Resolving presentation..."
     static let presentingCredential = "Presenting credential..."
     static let bootstrappingWallet = "Bootstrapping wallet..."
@@ -54,7 +56,16 @@ class WalletViewModel: ObservableObject {
     @Published var statusMessage = WalletStatusText.startingWallet
     @Published var isLoading = false
     @Published var isError = false
-    @Published var offerUrl = ""
+    @Published var offerUrl = "" {
+        didSet {
+            guard offerUrl != oldValue else { return }
+            receiveTask?.cancel()
+            txCode = ""
+            transactionCodeRequired = false
+        }
+    }
+    @Published var txCode = ""
+    @Published var transactionCodeRequired = false
     @Published var presentationRequestUrl = ""
     @Published var presentationPreview: PresentationPreview?
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
@@ -68,6 +79,7 @@ class WalletViewModel: ObservableObject {
     @Published var inputFocusResetKey = 0
     @Published var transactionDataProfilesWarning: String?
     private var statusTab: WalletTab?
+    private var receiveTask: Task<Void, Never>?
 
     var receiveUrlEntryEnabled: Bool {
         !isLoading && !receiveCompleted
@@ -76,7 +88,12 @@ class WalletViewModel: ObservableObject {
     var receiveActionEnabled: Bool {
         isReady &&
             !offerUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            hasValidTransactionCode &&
             receiveUrlEntryEnabled
+    }
+
+    private var hasValidTransactionCode: Bool {
+        !transactionCodeRequired || !txCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var receivedCredentials: [Credential] {
@@ -249,6 +266,7 @@ class WalletViewModel: ObservableObject {
         logE2E("Deep link received: \(url.scheme ?? "unknown")")
         switch url.scheme.flatMap(WalletDeepLinkScheme.init(rawValue:)) {
         case .credentialOffer:
+            receiveTask?.cancel()
             selectedTab = .receive
             offerUrl = url.absoluteString
             lastReceivedCredentialIDs = []
@@ -260,6 +278,7 @@ class WalletViewModel: ObservableObject {
             presentationCompleted = false
             resetFlowStatusForIncomingURL()
         case .presentationRequest:
+            receiveTask?.cancel()
             selectedTab = .present
             presentationRequestUrl = url.absoluteString
             presentationPreview = nil
@@ -274,8 +293,11 @@ class WalletViewModel: ObservableObject {
     }
 
     func startNewReceiveFlow() {
+        receiveTask?.cancel()
         resetInputFocus()
         offerUrl = ""
+        txCode = ""
+        transactionCodeRequired = false
         lastReceivedCredentialIDs = []
         receiveCompleted = false
         receiveNavigationResetKey += 1
@@ -286,6 +308,7 @@ class WalletViewModel: ObservableObject {
     }
 
     func startNewPresentationFlow() {
+        receiveTask?.cancel()
         resetInputFocus()
         presentationRequestUrl = ""
         presentationPreview = nil
@@ -301,41 +324,111 @@ class WalletViewModel: ObservableObject {
 
     func receiveCredential() {
         resetInputFocus()
+        guard !isLoading else { return }
         let trimmedOfferUrl = offerUrl.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let offer = URL(string: trimmedOfferUrl) else {
             setError(WalletStatusText.failure(WalletStatusText.receiveFailed, WalletStatusText.invalidOfferURL), tab: .receive)
             return
         }
+        let trimmedTxCode = txCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard hasValidTransactionCode else { return }
         let previousCredentials = credentials
+        let request = ReceiveRequest(offerURL: offer.absoluteString, navigationResetKey: receiveNavigationResetKey)
+        let requiresTransactionCode = transactionCodeRequired
 
-        setLoading(WalletStatusText.receivingCredential, tab: .receive)
-        Task {
+        setLoading(
+            requiresTransactionCode ? WalletStatusText.receivingCredential : WalletStatusText.resolvingCredentialOffer,
+            tab: .receive
+        )
+        receiveTask = Task {
             do {
-                let credentialIDs = try await walletClient.receive(offer: offer)
-                let refreshedCredentials = try await walletClient.credentials()
-                let receivedCredentialIDs = Self.resolvedReceivedCredentialIDs(
-                    returnedCredentialIDs: credentialIDs,
-                    previousCredentials: previousCredentials,
-                    refreshedCredentials: refreshedCredentials
-                )
-                let refreshedCredentialIDs = Set(refreshedCredentials.map(\.id))
-                let displayableReceivedCredentialIDs = receivedCredentialIDs.filter { refreshedCredentialIDs.contains($0) }
-                guard !displayableReceivedCredentialIDs.isEmpty else {
-                    credentials = refreshedCredentials
-                    lastReceivedCredentialIDs = []
-                    receiveCompleted = false
-                    setError(WalletStatusText.failure(WalletStatusText.receiveFailed, WalletStatusText.receivedCredentialsUnavailable), tab: .receive)
-                    return
+                if !requiresTransactionCode {
+                    let resolution = try await walletClient.resolveOffer(offer: offer)
+                    try Task.checkCancellation()
+                    guard isCurrent(request) else { return }
+                    if resolution.transactionCodeRequired {
+                        transactionCodeRequired = true
+                        isLoading = false
+                        isError = false
+                        statusTab = .receive
+                        statusMessage = WalletStatusText.transactionCodeRequired
+                        logE2E("STATUS \(statusMessage)")
+                        return
+                    }
                 }
 
-                credentials = refreshedCredentials
-                lastReceivedCredentialIDs = displayableReceivedCredentialIDs
-                receiveCompleted = true
-                setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: .receive)
+                try await completeReceive(
+                    offer: offer,
+                    txCode: requiresTransactionCode ? trimmedTxCode : nil,
+                    previousCredentials: previousCredentials,
+                    request: request
+                )
+            } catch is CancellationError {
+                return
             } catch {
-                setError(WalletStatusText.failure(WalletStatusText.receiveFailed, error), tab: .receive)
+                if isCurrent(request) {
+                    setError(WalletStatusText.failure(WalletStatusText.receiveFailed, error), tab: .receive)
+                }
             }
         }
+    }
+
+    private func completeReceive(
+        offer: URL,
+        txCode: String?,
+        previousCredentials: [Credential],
+        request: ReceiveRequest
+    ) async throws {
+        try Task.checkCancellation()
+        guard isCurrent(request) else { return }
+        setLoading(WalletStatusText.receivingCredential, tab: .receive)
+        let credentialIDs = try await walletClient.receive(offer: offer, txCode: txCode)
+        try Task.checkCancellation()
+        guard isCurrent(request) else { return }
+        let refreshedCredentials = try await walletClient.credentials()
+        try Task.checkCancellation()
+        guard isCurrent(request) else { return }
+        let receivedCredentialIDs = Self.resolvedReceivedCredentialIDs(
+            returnedCredentialIDs: credentialIDs,
+            previousCredentials: previousCredentials,
+            refreshedCredentials: refreshedCredentials
+        )
+        let refreshedCredentialIDs = Set(refreshedCredentials.map(\.id))
+        let displayableReceivedCredentialIDs = receivedCredentialIDs.filter { refreshedCredentialIDs.contains($0) }
+        guard !displayableReceivedCredentialIDs.isEmpty else {
+            credentials = refreshedCredentials
+            lastReceivedCredentialIDs = []
+            receiveCompleted = false
+            setError(
+                WalletStatusText.failure(
+                    WalletStatusText.receiveFailed,
+                    WalletStatusText.receivedCredentialsUnavailable
+                ),
+                tab: .receive
+            )
+            return
+        }
+
+        credentials = refreshedCredentials
+        lastReceivedCredentialIDs = displayableReceivedCredentialIDs
+        self.txCode = ""
+        self.transactionCodeRequired = false
+        receiveCompleted = true
+        setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: .receive)
+    }
+
+    func updateTxCode(_ value: String) {
+        txCode = value
+    }
+
+    private func isCurrent(_ request: ReceiveRequest) -> Bool {
+        receiveNavigationResetKey == request.navigationResetKey &&
+            offerUrl.trimmingCharacters(in: .whitespacesAndNewlines) == request.offerURL
+    }
+
+    private struct ReceiveRequest {
+        let offerURL: String
+        let navigationResetKey: Int
     }
 
     func presentCredential() {

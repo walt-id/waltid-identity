@@ -192,6 +192,20 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
     }
 
+    fun receiveAndPresentTabsExposeQrScanActions() = runComposeUiTest {
+        val controller = WalletDemoController(FakeDemoWallet(credentials = listOf(sampleCredential)))
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag(WalletUiTestTags.ReceiveTab).performClick()
+        onNodeWithTag(WalletUiTestTags.OfferScanButton).assertIsDisplayed().assertIsEnabled()
+
+        onNodeWithTag(WalletUiTestTags.PresentTab).performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationScanButton).assertIsDisplayed().assertIsEnabled()
+    }
+
     fun presentTabExplainsWhyPreviewIsUnavailableWithoutCredentials() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentials = emptyList())
         val controller = WalletDemoController(wallet)
@@ -743,7 +757,9 @@ private class FakeDemoWallet(
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 
-    override suspend fun receive(offerUrl: String): List<String> {
+    override suspend fun resolveOffer(offerUrl: String): Boolean = false
+
+    override suspend fun receive(offerUrl: String, txCode: String?): List<String> {
         receivedOfferUrl = offerUrl
         receiveGate?.await()
         credentialsAfterReceive?.let { credentials = it }
