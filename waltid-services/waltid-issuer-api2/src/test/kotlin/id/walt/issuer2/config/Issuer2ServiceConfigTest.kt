@@ -46,6 +46,30 @@ class Issuer2ServiceConfigTest {
     }
 
     @Test
+    fun `service config decodes credential encryption key`() {
+        val config = loadServiceConfig(
+            """
+                baseUrl = "http://localhost:7002"
+                credentialEncryptionKey = ${hoconTripleQuoted(CREDENTIAL_ENCRYPTION_KEY)}
+            """.trimIndent(),
+        )
+
+        assertEquals(CREDENTIAL_ENCRYPTION_KEY, config.credentialEncryptionKey)
+    }
+
+    @Test
+    fun `service config rejects unsupported credential encryption key`() {
+        assertFails {
+            loadServiceConfig(
+                """
+                    baseUrl = "http://localhost:7002"
+                    credentialEncryptionKey = ${hoconTripleQuoted(ED25519_KEY)}
+                """.trimIndent(),
+            )
+        }
+    }
+
+    @Test
     fun `service config decodes static jwk client attestation from client authentication config`() {
         val config = loadServiceConfig(
             """
