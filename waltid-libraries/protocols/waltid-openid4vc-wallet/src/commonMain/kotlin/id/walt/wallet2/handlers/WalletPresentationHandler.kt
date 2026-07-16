@@ -164,7 +164,13 @@ object WalletPresentationHandler {
         wallet: Wallet,
         request: PresentCredentialRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        beforeCredentialsUsed: suspend (Int) -> Unit = {},
+    ): WalletPresentResult = presentCredential(wallet, request, onEvent, beforeCredentialsUsed = {})
+
+    suspend fun presentCredential(
+        wallet: Wallet,
+        request: PresentCredentialRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
+        beforeCredentialsUsed: suspend (Int) -> Unit,
     ): WalletPresentResult {
         val key = resolveKey(wallet, request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
