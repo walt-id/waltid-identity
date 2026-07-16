@@ -166,4 +166,15 @@ class Issuer2ServiceConfigTest {
 
         return ConfigManager.getConfig()
     }
+
+    private fun hoconTripleQuoted(value: String): String =
+        "\"\"\"$value\"\"\""
+
+    private companion object {
+        const val CREDENTIAL_ENCRYPTION_KEY =
+            """{"type":"jwk","jwk":{"kty":"EC","d":"ZSHgIcRvbwV9s224kHUaFqkEPShCAdwXocGl_w3M42Q","crv":"P-256","kid":"issuer2-credential-encryption-key","x":"GWKpdL3jPoPJ5wKgSA-jxS2jgp-ZUDE6sIQbeB86vF0","y":"F3xAwH96_xVciV7mFQslU_eRQgP-5pSZiNf8bjMoGfo"}}"""
+
+        const val ED25519_KEY =
+            """{"type":"jwk","jwk":{"kty":"OKP","crv":"Ed25519","d":"LjxmEnd5oC7hFabwjKQFyeIgMG0OVZ_EBZQ0ZTKBZQs","x":"UDiPRbt76NoaAye5AonMirL7jjTKppMSzAXH0ZwuenU"}}"""
+    }
 }
