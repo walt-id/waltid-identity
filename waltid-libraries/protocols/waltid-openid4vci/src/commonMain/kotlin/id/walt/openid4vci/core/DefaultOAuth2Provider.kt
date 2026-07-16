@@ -506,7 +506,7 @@ class DefaultOAuth2Provider(
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return CredentialResponseResult.Failure(
                 OAuthError(
-                    error = "unsupported_credential_configuration",
+                    error = CredentialErrorCodes.UNSUPPORTED_CREDENTIAL_CONFIGURATION,
                     description = "No handler for format ${configuration.format.value}"
                 )
             )
