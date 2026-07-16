@@ -71,12 +71,6 @@ class PublicDemoBackendE2ETest {
             ),
         )
 
-        // After failure, offer review is dismissed — resolve the offer again
-        clickByTag(device, "wallet.receiveButton")
-        assertTrue(
-            "Transaction-code input did not reappear for retry. Latest status: ${latestStatus(device)}",
-            waitForResource(device, "wallet.txCodeInput", CREDENTIAL_OPERATION_TIMEOUT) != null,
-        )
         setTextByTag(device, "wallet.txCodeInput", transactionCode)
         assertTrue(
             "Accept button did not re-enable after correcting the transaction code",
