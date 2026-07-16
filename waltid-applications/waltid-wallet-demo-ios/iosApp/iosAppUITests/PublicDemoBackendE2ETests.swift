@@ -194,23 +194,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             return
         }
 
-        // After failure, offer review is dismissed — resolve the offer again
-        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
-        let previewStatusRetry = ui.waitForStatus(
-            prefixes: ["Review credential offer", "Receive failed", "Bootstrap failed"],
-            timeout: credentialOperationTimeout
-        )
-        guard previewStatusRetry == "Review credential offer" else {
-            XCTFail("Offer preview did not reappear for retry, status: \(previewStatusRetry ?? "nil")")
-            return
-        }
-
-        let txCodeInputRetry = ui.textInput(identifier: "wallet.txCodeInput", fallbackLabel: "Transaction code")
-        guard txCodeInputRetry.waitForExistence(timeout: 20) else {
-            XCTFail("Transaction-code input did not reappear for retry")
-            return
-        }
-        ui.replaceText(in: txCodeInputRetry, value: transactionCode)
+        // The reviewed offer remains active so the corrected code can be retried directly.
+        ui.replaceText(in: txCodeInput, value: transactionCode)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         let receivedStatus = ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],

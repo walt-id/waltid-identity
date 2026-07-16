@@ -85,6 +85,43 @@ final class MockWalletUITests: XCTestCase {
         )
     }
 
+    func testTransactionCodeOfferCanBeDeclinedWithoutCode() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: [
+            "E2E_MOCK_WALLET": "1",
+            "E2E_MOCK_TX_CODE_REQUIRED": "1",
+        ])
+
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            "Wallet ready"
+        )
+
+        ui.tapTab(label: "Receive")
+        let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
+        ui.replaceText(in: offerInput, value: "openid-credential-offer://mock")
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+
+        let accept = app.buttons["Accept"]
+        let decline = app.buttons["Decline"]
+        XCTAssertTrue(accept.waitForExistence(timeout: 10))
+        XCTAssertFalse(accept.isEnabled)
+        XCTAssertTrue(decline.waitForExistence(timeout: 10))
+        XCTAssertTrue(decline.isEnabled)
+        decline.tap()
+
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Credential offer declined", "Receive failed"], timeout: 10),
+            "Credential offer declined"
+        )
+        XCTAssertTrue(app.buttons["wallet.receiveButton"].waitForExistence(timeout: 10))
+    }
+
     func testPresentTabExplainsWhyPreviewIsUnavailableWithoutCredentials() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
