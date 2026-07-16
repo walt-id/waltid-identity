@@ -19,5 +19,6 @@ object CredentialErrorCodes {
     const val UNSUPPORTED_CREDENTIAL_FORMAT = "unsupported_credential_format"
     const val UNSUPPORTED_CREDENTIAL_CONFIGURATION = "unsupported_credential_configuration"
     const val INVALID_OR_MISSING_PROOF = "invalid_or_missing_proof"
+    const val ENCRYPTION_NOT_SUPPORTED = "encryption_not_supported"
     const val SERVER_ERROR = "server_error"
 }
