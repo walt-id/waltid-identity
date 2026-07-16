@@ -21,6 +21,14 @@ internal data class ClaimPath(
         fun indexed(parent: ClaimPath, index: Int): ClaimPath =
             ClaimPath(itemPath = parent.itemPath.indexedChild(index), components = parent.components)
 
+        fun transactionData(index: Int, field: TransactionDataField): ClaimPath =
+            ClaimPath(
+                itemPath = ClaimItemPath.topLevel(ClaimPathRoot.TransactionData.id)
+                    .indexedChild(index)
+                    .child(field.id),
+                components = ClaimPathRoot.TransactionData.componentsWith(field.id),
+            )
+
         fun disclosure(index: Int, rawPath: String, label: String): ClaimPath {
             val semanticLeaf = semanticLeaf(rawPath)
                 ?: label.takeIf { it.isNotBlank() }
@@ -41,6 +49,7 @@ internal data class ClaimPath(
 internal enum class ClaimPathRoot(val id: String) {
     Root("$"),
     Disclosures("disclosures"),
+    TransactionData("transactionData"),
     ;
 
     val singularId: String
@@ -53,4 +62,11 @@ internal enum class ClaimPathRoot(val id: String) {
         listOf(id, child)
             .filter { it.isNotBlank() }
             .distinct()
+}
+
+internal enum class TransactionDataField(val id: String) {
+    Type("type"),
+    CredentialQueryIds("credentialQueryIds"),
+    Details("details"),
+    Raw("raw"),
 }

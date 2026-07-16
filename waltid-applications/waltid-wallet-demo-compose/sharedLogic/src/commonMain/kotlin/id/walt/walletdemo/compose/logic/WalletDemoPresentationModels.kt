@@ -6,6 +6,7 @@ data class WalletDemoPresentationPreview(
     val responseUri: String? = null,
     val state: String? = null,
     val nonce: String? = null,
+    val transactionData: List<ClaimGroup> = emptyList(),
     val credentialOptions: List<WalletDemoPresentationCredentialOption>,
     val credentialRequirements: List<WalletDemoPresentationCredentialRequirement> = emptyList(),
 )
@@ -16,6 +17,7 @@ data class VerifierDetails(
     val responseUri: String? = null,
     val state: String? = null,
     val nonce: String? = null,
+    val transactionData: List<ClaimGroup> = emptyList(),
     val trustStatus: String = CredentialDisplayText.Unknown,
 )
 
@@ -117,4 +119,13 @@ data class WalletDemoPresentationDisclosure(
     val selectivelyDisclosable: Boolean,
     val required: Boolean = !selectivelyDisclosable,
     val selectable: Boolean = selectivelyDisclosable && !required,
+)
+
+data class WalletDemoTransactionDataItem(
+    val type: String,
+    val displayName: String,
+    val credentialQueryIds: List<String>,
+    val supportedFields: List<String>,
+    val rawJson: String,
+    val detailsJson: String,
 )

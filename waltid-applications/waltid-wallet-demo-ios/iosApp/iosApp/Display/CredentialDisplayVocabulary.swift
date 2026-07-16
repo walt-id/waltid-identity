@@ -62,6 +62,11 @@ private struct NormalizedClaimKey: Hashable {
 enum CredentialDisplayVocabulary {
     static let genericVerifiableCredentialType = "VerifiableCredential"
     static let requestedDisclosuresTitle = "Requested disclosures"
+    static let transactionDataTitle = "Transaction data"
+    static let transactionDataTypeLabel = "Type"
+    static let transactionDataCredentialQueriesLabel = "Credential queries"
+    static let transactionDataDetailsLabel = "Details"
+    static let transactionDataRequestDataLabel = "Request data"
 
     private static let givenNameClaim = "given_name"
     private static let familyNameClaim = "family_name"
@@ -203,6 +208,15 @@ enum CredentialDisplayVocabulary {
             return humanizedLabel(leafKey)
         }
         return path
+    }
+
+    static func transactionDataLabel(_ field: DisplayTransactionDataField) -> String {
+        switch field {
+        case .type: return transactionDataTypeLabel
+        case .credentialQueryIDs: return transactionDataCredentialQueriesLabel
+        case .details: return transactionDataDetailsLabel
+        case .raw: return transactionDataRequestDataLabel
+        }
     }
 
     static func roles(for components: [String]) -> Set<ClaimRole> {

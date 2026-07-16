@@ -192,7 +192,18 @@ private extension WalletConfiguration {
             defaultKeyType: defaultKeyType.toKMPKeyType(),
             persistence: persistence.toKMPPersistence(),
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
-            attestation: attestation?.toKMPAttestationConfiguration()
+            attestation: attestation?.toKMPAttestationConfiguration(),
+            transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() }
+        )
+    }
+}
+
+private extension WalletTransactionDataProfile {
+    func toKMPTransactionDataProfile() -> MobileWalletTransactionDataProfile {
+        MobileWalletTransactionDataProfile(
+            type: type,
+            displayName: displayName,
+            fields: fields
         )
     }
 }
@@ -570,7 +581,9 @@ private extension MobileWalletPresentationRequestInfo {
             verifierName: verifierName,
             responseURI: responseUri.flatMap(URL.init(string:)),
             state: state,
-            nonce: nonce
+            nonce: nonce,
+            transactionData: swiftArray(transactionData, of: MobileWalletTransactionDataItem.self)
+                .map { $0.toSwiftTransactionData() }
         )
     }
 }
@@ -622,6 +635,19 @@ private extension MobileWalletPresentationDisclosure {
             selectivelyDisclosable: selectivelyDisclosable,
             required: required,
             selectable: selectable
+        )
+    }
+}
+
+private extension MobileWalletTransactionDataItem {
+    func toSwiftTransactionData() -> PresentationTransactionData {
+        PresentationTransactionData(
+            type: type,
+            displayName: displayName,
+            credentialQueryIDs: swiftArray(credentialQueryIds, of: String.self),
+            supportedFields: swiftArray(supportedFields, of: String.self),
+            rawJSON: rawJson,
+            detailsJSON: detailsJson
         )
     }
 }

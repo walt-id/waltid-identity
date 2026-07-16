@@ -82,7 +82,8 @@ actor MockWalletClient: WalletClient {
             verifierName: verifierName,
             responseURI: URL(string: "https://verifier.example/response"),
             state: "state-123",
-            nonce: "nonce-456"
+            nonce: "nonce-456",
+            transactionData: [Self.paymentAuthorizationTransactionData]
         )
     }
 
@@ -104,6 +105,30 @@ actor MockWalletClient: WalletClient {
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
     private static let x509SanDnsClientID = "x509_san_dns:verifier.example"
     private static let samplePortraitDisclosureValueJSON = "[-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]"
+
+    private static let paymentAuthorizationTransactionData = PresentationTransactionData(
+        type: "org.waltid.transaction-data.payment-authorization",
+        displayName: "Payment Authorization",
+        credentialQueryIDs: ["pid"],
+        supportedFields: ["amount", "currency", "payee"],
+        rawJSON: """
+        {
+          "type": "org.waltid.transaction-data.payment-authorization",
+          "credential_ids": ["pid"],
+          "transaction_data_hashes_alg": ["sha-256"],
+          "amount": "129.90",
+          "currency": "EUR",
+          "payee": "Example Merchant"
+        }
+        """,
+        detailsJSON: """
+        {
+          "amount": "129.90",
+          "currency": "EUR",
+          "payee": "Example Merchant"
+        }
+        """
+    )
 
     private static let defaultOption = PresentationCredentialOption(
         queryID: "pid",
