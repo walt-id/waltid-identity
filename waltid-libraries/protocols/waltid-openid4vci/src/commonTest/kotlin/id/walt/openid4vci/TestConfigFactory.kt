@@ -8,6 +8,7 @@ import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepo
 import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
 import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
+import id.walt.openid4vci.requests.credential.encryption.CredentialRequestDecryptor
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import id.walt.openid4vci.tokens.access.AccessTokenVerifier
 import id.walt.openid4vci.tokens.refresh.RefreshTokenClaims
