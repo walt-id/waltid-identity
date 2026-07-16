@@ -1,6 +1,7 @@
 package id.walt.issuer2.controller.openapi
 
 import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.ContentType
