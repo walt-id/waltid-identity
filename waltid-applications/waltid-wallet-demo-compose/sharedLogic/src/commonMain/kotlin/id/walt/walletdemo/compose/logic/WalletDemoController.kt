@@ -1,9 +1,13 @@
 package id.walt.walletdemo.compose.logic
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,6 +20,7 @@ class WalletDemoController(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private var configuredPin: String? = null
+    private var receiveJob: Job? = null
     private val _state = MutableStateFlow(WalletDemoUiState())
     val state: StateFlow<WalletDemoUiState> = _state.asStateFlow()
 
@@ -49,10 +54,13 @@ class WalletDemoController(
     }
 
     fun lock() {
+        receiveJob?.cancel()
         _state.update {
             it.copy(
                 auth = WalletAuthState.Login(),
                 operation = WalletOperationState.Idle,
+                requestDrafts = it.requestDrafts.copy(txCode = ""),
+                receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
             )
         }
     }
@@ -62,12 +70,24 @@ class WalletDemoController(
     }
 
     fun updateOfferUrl(value: String) {
+        receiveJob?.cancel()
         _state.update {
             it.copy(
-                requestDrafts = it.requestDrafts.copy(offerUrl = value),
+                requestDrafts = it.requestDrafts.copy(
+                    offerUrl = value,
+                    txCode = "",
+                    transactionCodeRequired = false,
+                ),
                 lastReceivedCredentialIds = emptyList(),
                 receiveCompleted = false,
+                operation = WalletOperationState.Idle,
             )
+        }
+    }
+
+    fun updateTxCode(value: String) {
+        _state.update {
+            it.copy(requestDrafts = it.requestDrafts.copy(txCode = value))
         }
     }
 
@@ -86,10 +106,15 @@ class WalletDemoController(
     fun handleDeepLink(url: String) {
         when (WalletDeepLinkScheme.parse(url)) {
             WalletDeepLinkScheme.CredentialOffer -> {
+                receiveJob?.cancel()
                 _state.update {
                     it.copy(
                         selectedTab = WalletDemoTab.Receive,
-                        requestDrafts = it.requestDrafts.copy(offerUrl = url),
+                        requestDrafts = it.requestDrafts.copy(
+                            offerUrl = url,
+                            txCode = "",
+                            transactionCodeRequired = false,
+                        ),
                         lastReceivedCredentialIds = emptyList(),
                         receiveCompleted = false,
                         receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
@@ -102,6 +127,7 @@ class WalletDemoController(
                 }
             }
             WalletDeepLinkScheme.PresentationRequest -> {
+                receiveJob?.cancel()
                 _state.update {
                     it.copy(
                         selectedTab = WalletDemoTab.Present,
@@ -120,9 +146,14 @@ class WalletDemoController(
     }
 
     fun startNewReceiveFlow() {
+        receiveJob?.cancel()
         _state.update {
             it.copy(
-                requestDrafts = it.requestDrafts.copy(offerUrl = ""),
+                requestDrafts = it.requestDrafts.copy(
+                    offerUrl = "",
+                    txCode = "",
+                    transactionCodeRequired = false,
+                ),
                 lastReceivedCredentialIds = emptyList(),
                 receiveCompleted = false,
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
@@ -132,6 +163,7 @@ class WalletDemoController(
     }
 
     fun startNewPresentationFlow() {
+        receiveJob?.cancel()
         _state.update {
             it.copy(
                 requestDrafts = it.requestDrafts.copy(presentationRequestUrl = ""),
@@ -149,56 +181,132 @@ class WalletDemoController(
         val current = _state.value
         val ready = current.session as? WalletSessionState.Ready ?: return
         val offerUrl = current.requestDrafts.offerUrl.trim()
-        if (offerUrl.isBlank()) return
+        if (!current.receiveActionEnabled || offerUrl.isBlank()) return
+        val txCode = current.requestDrafts.txCode.trim().ifBlank { null }
+        val transactionCodeRequired = current.requestDrafts.transactionCodeRequired
+        val request = ReceiveRequest(offerUrl, current.receiveNavigationResetKey)
+        val initialOperation = if (!transactionCodeRequired) {
+            WalletOperationState.ResolvingOffer
+        } else {
+            WalletOperationState.Receiving
+        }
+        if (!_state.compareAndSet(current, current.copy(operation = initialOperation))) return
 
-        scope.launch(dispatcher) {
-            _state.update { it.copy(operation = WalletOperationState.Receiving) }
-            runCatching {
-                val ids = wallet.receive(offerUrl)
-                val credentials = wallet.listCredentials()
-                ids to credentials
-            }.onSuccess { (ids, credentials) ->
-                val receivedCredentialIds = resolvedReceivedCredentialIds(
-                    returnedCredentialIds = ids,
-                    previousCredentials = ready.credentials,
-                    refreshedCredentials = credentials,
-                )
-                val displayableReceivedCredentialIds = receivedCredentialIds
-                    .filter { receivedCredentialId -> credentials.any { it.id == receivedCredentialId } }
-                if (displayableReceivedCredentialIds.isEmpty()) {
-                    _state.update {
-                        it.copy(
-                            session = ready.copy(credentials = credentials),
-                            operation = WalletOperationState.Failed(
-                                message = WalletDisplayText.failure(
-                                    WalletDisplayText.ReceiveFailed,
-                                    WalletDisplayText.ReceivedCredentialsUnavailable,
-                                ),
-                                tab = WalletDemoTab.Receive,
-                            ),
-                            lastReceivedCredentialIds = emptyList(),
-                            receiveCompleted = false,
-                        )
+        receiveJob = scope.launch(dispatcher) {
+            try {
+                if (!transactionCodeRequired) {
+                    val requiresTransactionCode = wallet.resolveOffer(offerUrl)
+                    currentCoroutineContext().ensureActive()
+                    if (!isCurrent(request)) return@launch
+                    if (requiresTransactionCode) {
+                        updateIfCurrent(request) {
+                            it.copy(
+                                requestDrafts = it.requestDrafts.copy(transactionCodeRequired = true),
+                                operation = WalletOperationState.Idle,
+                            )
+                        }
+                        return@launch
                     }
-                    return@onSuccess
                 }
 
-                _state.update {
+                updateIfCurrent(request) { it.copy(operation = WalletOperationState.Receiving) }
+                receiveCredential(ready, request, txCode)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                updateIfCurrent(request) {
                     it.copy(
-                        session = ready.copy(credentials = credentials),
-                        operation = WalletOperationState.Succeeded(
-                            message = WalletDisplayText.receivedCredentials(displayableReceivedCredentialIds.size),
+                        operation = WalletOperationState.Failed(
+                            message = WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
                             tab = WalletDemoTab.Receive,
-                        ),
-                        lastReceivedCredentialIds = displayableReceivedCredentialIds,
-                        receiveCompleted = true,
+                        )
                     )
                 }
-            }.onFailure { error ->
-                setOperationError(WalletDisplayText.ReceiveFailed, error, WalletDemoTab.Receive)
             }
         }
     }
+
+    private suspend fun receiveCredential(
+        ready: WalletSessionState.Ready,
+        request: ReceiveRequest,
+        txCode: String?,
+    ) {
+        currentCoroutineContext().ensureActive()
+        if (!isCurrent(request)) return
+        val ids = wallet.receive(request.offerUrl, txCode)
+        currentCoroutineContext().ensureActive()
+        if (!isCurrent(request)) return
+        val credentials = wallet.listCredentials()
+        currentCoroutineContext().ensureActive()
+        if (!isCurrent(request)) return
+        val receivedCredentialIds = resolvedReceivedCredentialIds(
+            returnedCredentialIds = ids,
+            previousCredentials = ready.credentials,
+            refreshedCredentials = credentials,
+        )
+        val displayableReceivedCredentialIds = receivedCredentialIds
+            .filter { receivedCredentialId -> credentials.any { it.id == receivedCredentialId } }
+        if (displayableReceivedCredentialIds.isEmpty()) {
+            updateIfCurrent(request) {
+                it.copy(
+                    session = ready.copy(credentials = credentials),
+                    operation = WalletOperationState.Failed(
+                        message = WalletDisplayText.failure(
+                            WalletDisplayText.ReceiveFailed,
+                            WalletDisplayText.ReceivedCredentialsUnavailable,
+                        ),
+                        tab = WalletDemoTab.Receive,
+                    ),
+                    lastReceivedCredentialIds = emptyList(),
+                    receiveCompleted = false,
+                )
+            }
+            return
+        }
+
+        updateIfCurrent(request) {
+            it.copy(
+                session = ready.copy(credentials = credentials),
+                operation = WalletOperationState.Succeeded(
+                    message = WalletDisplayText.receivedCredentials(displayableReceivedCredentialIds.size),
+                    tab = WalletDemoTab.Receive,
+                ),
+                requestDrafts = it.requestDrafts.copy(
+                    txCode = "",
+                    transactionCodeRequired = false,
+                ),
+                lastReceivedCredentialIds = displayableReceivedCredentialIds,
+                receiveCompleted = true,
+            )
+        }
+    }
+
+    private fun isCurrent(request: ReceiveRequest): Boolean =
+        _state.value.let {
+            it.receiveNavigationResetKey == request.navigationResetKey &&
+                it.requestDrafts.offerUrl.trim() == request.offerUrl
+        }
+
+    private inline fun updateIfCurrent(
+        request: ReceiveRequest,
+        transform: (WalletDemoUiState) -> WalletDemoUiState,
+    ) {
+        _state.update {
+            if (
+                it.receiveNavigationResetKey == request.navigationResetKey &&
+                it.requestDrafts.offerUrl.trim() == request.offerUrl
+            ) {
+                transform(it)
+            } else {
+                it
+            }
+        }
+    }
+
+    private data class ReceiveRequest(
+        val offerUrl: String,
+        val navigationResetKey: Int,
+    )
 
     fun present() {
         val current = _state.value

@@ -13,32 +13,13 @@ actor EudiTestBackend {
         self.offerFlow = EudiOfferFlow(client: client)
     }
 
-    struct GeneratedOffer {
-        let offerUrl: String
-        let txCode: String?
-    }
-
     struct VerifierTransaction {
         let transactionId: String
         let authorizationRequestUri: String
     }
 
-    func generateOffer(credentialId: String = "eu.europa.ec.eudi.pid_vc_sd_jwt") async throws -> GeneratedOffer {
-        let offerUrl = try await offerFlow.generate(credentialID: credentialId)
-        // Extract tx_code from the offer URL
-        guard let url = URL(string: offerUrl),
-              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let offerParam = components.queryItems?.first(where: { $0.name == "credential_offer" })?.value,
-              let offerData = offerParam.data(using: .utf8),
-              let offerJson = try? JSONSerialization.jsonObject(with: offerData) as? [String: Any],
-              let grants = offerJson["grants"] as? [String: Any],
-              let preAuth = grants["urn:ietf:params:oauth:grant-type:pre-authorized_code"] as? [String: Any],
-              let txCodeDict = preAuth["tx_code"] as? [String: Any],
-              let txCodeValue = txCodeDict["value"] as? String else {
-            return GeneratedOffer(offerUrl: offerUrl, txCode: nil)
-        }
-
-        return GeneratedOffer(offerUrl: offerUrl, txCode: txCodeValue)
+    func generateOffer(credentialId: String = "eu.europa.ec.eudi.pid_vc_sd_jwt") async throws -> EudiGeneratedOffer {
+        try await offerFlow.generate(credentialID: credentialId)
     }
 
     func extractCredentialIdFromOfferUrl(offerUrl: String) -> String {
