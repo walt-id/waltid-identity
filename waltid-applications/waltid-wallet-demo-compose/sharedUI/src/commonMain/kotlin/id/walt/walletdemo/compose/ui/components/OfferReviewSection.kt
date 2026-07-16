@@ -26,8 +26,8 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 @Composable
 internal fun OfferReviewSection(
     preview: WalletDemoOfferPreview,
-    enabled: Boolean,
-    txCodeEnabled: Boolean,
+    acceptEnabled: Boolean,
+    reviewEnabled: Boolean,
     txCode: String,
     onTxCodeChange: (String) -> Unit,
     onAccept: () -> Unit,
@@ -93,7 +93,7 @@ internal fun OfferReviewSection(
                 onValueChange = onTxCodeChange,
                 label = { Text("Transaction code") },
                 singleLine = true,
-                enabled = txCodeEnabled,
+                enabled = reviewEnabled,
                 keyboardOptions = KeyboardOptions(
                     autoCorrectEnabled = false,
                     keyboardType = KeyboardType.Password,
@@ -110,14 +110,14 @@ internal fun OfferReviewSection(
         ) {
             Button(
                 onClick = onAccept,
-                enabled = enabled,
+                enabled = acceptEnabled,
                 modifier = Modifier.testTag(WalletUiTestTags.OfferAcceptButton),
             ) {
                 Text("Accept")
             }
             TextButton(
                 onClick = onDecline,
-                enabled = enabled,
+                enabled = reviewEnabled,
                 modifier = Modifier.testTag(WalletUiTestTags.OfferDeclineButton),
             ) {
                 Text("Decline")

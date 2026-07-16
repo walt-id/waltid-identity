@@ -67,8 +67,8 @@ internal fun ReceiveTab(
         } else {
             OfferReviewSection(
                 preview = state.offerPreview!!,
-                enabled = state.acceptOfferEnabled,
-                txCodeEnabled = state.offerReviewEnabled,
+                acceptEnabled = state.acceptOfferEnabled,
+                reviewEnabled = state.offerReviewEnabled,
                 txCode = requestDrafts.txCode,
                 onTxCodeChange = onTxCodeChange,
                 onAccept = onAcceptOffer,
