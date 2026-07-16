@@ -18,7 +18,6 @@
   </p>
 </div>
 
-
 ## Overview
 
 This portal integrates two core walt.id services to provide an interactive credential lifecycle demo:
@@ -77,7 +76,12 @@ Create a `.env` file to connect to dependency services:
 NUXT_PUBLIC_ISSUER_BASE=http://localhost:7005
 NUXT_PUBLIC_VERIFIER_BASE=http://localhost:7004
 NUXT_PUBLIC_WALLET_URL=http://localhost:7101
+NUXT_PUBLIC_VERIFIER_KEY_JWK=
+NUXT_PUBLIC_VERIFIER_X5C=
+NUXT_PUBLIC_VERIFIER_CLIENT_ID=
 ```
+
+The optional verifier values pre-populate the advanced verification security section. `NUXT_PUBLIC_VERIFIER_KEY_JWK` accepts the verifier signing key as a raw JWK or as `{ "type": "jwk", "jwk": ... }`, `NUXT_PUBLIC_VERIFIER_X5C` accepts a JSON array, comma-separated list, or newline-separated list of base64 DER certificates, and `NUXT_PUBLIC_VERIFIER_CLIENT_ID` accepts any supported client ID such as `x509_hash:<hash>`, `x509_san_dns:<dns>`, `redirect_uri:<url>`, `decentralized_identifier:<did>`, `verifier_attestation:<value>`, or an unprefixed pre-registered ID.
 
 ### Development
 
@@ -118,10 +122,9 @@ docker run -p 3000:3000 -i -t waltid/portal2
 
 ## Join the community
 
-* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
-* Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
-* Find more in-depth documentation on our [docs site](https://docs.walt.id)
-
+- Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
+- Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
+- Find more in-depth documentation on our [docs site](https://docs.walt.id)
 
 ## License
 
