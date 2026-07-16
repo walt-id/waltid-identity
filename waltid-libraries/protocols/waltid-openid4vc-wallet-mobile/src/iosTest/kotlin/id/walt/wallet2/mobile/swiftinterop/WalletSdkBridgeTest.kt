@@ -11,6 +11,7 @@ import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletEventPhase
 import id.walt.wallet2.mobile.MobileWalletEventStatus
 import id.walt.wallet2.mobile.MobileWalletKeyType
+import id.walt.wallet2.mobile.MobileWalletOfferResolution
 import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
@@ -108,6 +109,18 @@ class WalletSdkBridgeTest {
         assertEquals("did:jwk:issuer", result.value.did)
         assertEquals(KeyType.secp256r1, operations.bootstrapKeyType)
         assertEquals("jwk", operations.bootstrapDidMethod)
+    }
+
+    @Test
+    fun bridgeResolvesCredentialOffers() = runTest {
+        val operations = FakeWalletSdkBridgeOperations()
+        val bridge = WalletSdkBridge.forOperations(operations)
+
+        val result = bridge.resolveOffer("openid-credential-offer://issuer.example")
+
+        assertIs<WalletBridgeResult.Success<MobileWalletOfferResolution>>(result)
+        assertEquals(true, result.value.transactionCodeRequired)
+        assertEquals("openid-credential-offer://issuer.example", operations.resolvedOfferUrl)
     }
 
     @Test
@@ -536,6 +549,8 @@ class WalletSdkBridgeTest {
             private set
         var bootstrapDidMethod: String? = null
             private set
+        var resolvedOfferUrl: String? = null
+            private set
         var presentationRequestUrl: String? = null
             private set
         var presentationDid: String? = null
@@ -565,6 +580,13 @@ class WalletSdkBridgeTest {
             return MobileWalletBootstrapResult(
                 keyId = "key-1",
                 did = "did:jwk:issuer",
+            )
+        }
+
+        override suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution {
+            resolvedOfferUrl = offerUrl
+            return MobileWalletOfferResolution(
+                transactionCodeRequired = true,
             )
         }
 

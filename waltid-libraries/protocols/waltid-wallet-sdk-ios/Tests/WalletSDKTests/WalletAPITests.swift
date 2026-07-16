@@ -236,6 +236,18 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(bridge.bootstrapCalls.first?.keyType, .rsa4096)
     }
 
+    func testResolveOfferForwardsOfferAndReturnsRequirement() async throws {
+        let offer = URL(string: "openid-credential-offer://issuer.example")!
+        let bridge = FakeWalletCoreBridge()
+        bridge.offerResolutionResult = OfferResolution(transactionCodeRequired: true)
+        let wallet = Wallet(bridge: bridge)
+
+        let result = try await wallet.resolveOffer(offer: offer)
+
+        XCTAssertEqual(result, OfferResolution(transactionCodeRequired: true))
+        XCTAssertEqual(bridge.resolvedOffers, [offer])
+    }
+
     func testReceiveForwardsOfferAndReturnsCredentialIDs() async throws {
         let offer = URL(string: "openid-credential-offer://issuer.example?credential_offer=abc")!
         let bridge = FakeWalletCoreBridge()
@@ -537,12 +549,14 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     var events: AsyncStream<WalletEvent>
     var error: WalletError?
     var bootstrapResult = WalletBootstrapResult(keyID: "key", did: "did:key:wallet")
+    var offerResolutionResult = OfferResolution(transactionCodeRequired: false)
     var receiveResult: [String] = []
     var credentialsResult: [Credential] = []
     var presentResult = PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
     var previewResult = PresentationPreview(request: .init(clientID: nil), credentialOptions: [])
     var submitResult = PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
     private(set) var bootstrapCalls: [BootstrapCall] = []
+    private(set) var resolvedOffers: [URL] = []
     private(set) var receiveCalls: [ReceiveCall] = []
     private(set) var credentialsCallCount = 0
     private(set) var deleteLocalDataCallCount = 0
@@ -566,6 +580,15 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
 
         bootstrapCalls.append(.init(keyType: keyType, didMethod: didMethod))
         return bootstrapResult
+    }
+
+    func resolveOffer(offer: URL) async throws -> OfferResolution {
+        if let error {
+            throw error
+        }
+
+        resolvedOffers.append(offer)
+        return offerResolutionResult
     }
 
     func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String] {

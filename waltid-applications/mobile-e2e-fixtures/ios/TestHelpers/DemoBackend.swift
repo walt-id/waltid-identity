@@ -11,6 +11,7 @@ public struct DemoCredentialScenario {
 
 public struct DemoOffer {
     public let offerUrl: String
+    public let txCode: String?
 }
 
 public struct DemoVerifierSession {
@@ -80,18 +81,29 @@ public final class DemoBackend {
         self.client = client
     }
 
-    public func createOffer(scenario: DemoCredentialScenario) async throws -> DemoOffer {
+    public func createOffer(
+        scenario: DemoCredentialScenario,
+        withGeneratedTransactionCode: Bool = false
+    ) async throws -> DemoOffer {
         let endpoint = Self.issuerBaseURL
             .appendingPathComponent("issuer2")
             .appendingPathComponent("credential-offers")
+        var payload: [String: Any] = [
+            "profileId": scenario.profileId,
+            "authMethod": "PRE_AUTHORIZED",
+        ]
+        if withGeneratedTransactionCode {
+            payload["txCode"] = [
+                "input_mode": "numeric",
+                "length": 6,
+                "description": "Enter the transaction code shown by the issuer",
+            ]
+        }
         let response = try await client.jsonRequest(
             url: endpoint,
             method: "POST",
             headers: ["Content-Type": "application/json"],
-            body: Data(try jsonString([
-                "profileId": scenario.profileId,
-                "authMethod": "PRE_AUTHORIZED",
-            ]).utf8),
+            body: Data(try jsonString(payload).utf8),
             retryTransientFailures: true
         )
 
@@ -103,7 +115,16 @@ public final class DemoBackend {
             )
         }
 
-        return DemoOffer(offerUrl: offerUrl)
+        let txCode = response["txCodeValue"] as? String ?? response["txCode"] as? String
+        guard !withGeneratedTransactionCode || txCode != nil else {
+            throw NSError(
+                domain: "WalletE2E",
+                code: 307,
+                userInfo: [NSLocalizedDescriptionKey: "Public demo issuer2 did not return the requested transaction code: \(response)"]
+            )
+        }
+
+        return DemoOffer(offerUrl: offerUrl, txCode: txCode)
     }
 
     public func createVerifierSession(scenario: DemoCredentialScenario) async throws -> DemoVerifierSession {
