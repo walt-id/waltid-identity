@@ -50,4 +50,28 @@ class EudiTestBackendTest {
             EudiTestBackend.generatedOfferFromFinalPayload(payload)
         }
     }
+
+    @Test
+    fun rejectsOfferWithoutTransactionCodeMetadata() {
+        val offerJson = """
+            {
+              "credential_issuer": "https://issuer.example",
+              "credential_configuration_ids": ["credential-id"],
+              "grants": {
+                "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+                  "pre-authorized_code": "pre-authorized-code"
+                }
+              }
+            }
+        """.trimIndent()
+        val offerUrl = "openid-credential-offer://credential_offer?credential_offer=${offerJson.encodeURLParameter()}"
+        val payload = buildJsonObject {
+            put("url_data", JsonPrimitive(offerUrl))
+            put("tx_code", JsonPrimitive("1234"))
+        }
+
+        assertFailsWith<IllegalStateException> {
+            EudiTestBackend.generatedOfferFromFinalPayload(payload)
+        }
+    }
 }

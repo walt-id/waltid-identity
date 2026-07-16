@@ -129,15 +129,13 @@ object EudiTestBackend {
         val credentialOffer = Url(offerUrl).parameters["credential_offer"]
             ?.let { Json.parseToJsonElement(it).jsonObject }
             ?: error("credential_offer query parameter missing from url_data")
-        val txCode = credentialOffer["grants"]
+        credentialOffer["grants"]
             ?.jsonObject
             ?.get("urn:ietf:params:oauth:grant-type:pre-authorized_code")
             ?.jsonObject
             ?.get("tx_code")
             ?.jsonObject
-        require(txCode == null || "value" !in txCode) {
-            "EUDI credential offer must not embed a transaction code value"
-        }
+            ?: error("credential offer missing tx_code metadata")
 
         return GeneratedOffer(offerUrl = offerUrl, txCode = txCodeValue)
     }

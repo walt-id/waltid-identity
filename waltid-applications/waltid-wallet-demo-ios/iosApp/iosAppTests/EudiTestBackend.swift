@@ -13,19 +13,13 @@ actor EudiTestBackend {
         self.offerFlow = EudiOfferFlow(client: client)
     }
 
-    struct GeneratedOffer {
-        let offerUrl: String
-        let txCode: String
-    }
-
     struct VerifierTransaction {
         let transactionId: String
         let authorizationRequestUri: String
     }
 
-    func generateOffer(credentialId: String = "eu.europa.ec.eudi.pid_vc_sd_jwt") async throws -> GeneratedOffer {
-        let offer = try await offerFlow.generate(credentialID: credentialId)
-        return GeneratedOffer(offerUrl: offer.offerUrl, txCode: offer.txCode)
+    func generateOffer(credentialId: String = "eu.europa.ec.eudi.pid_vc_sd_jwt") async throws -> EudiGeneratedOffer {
+        try await offerFlow.generate(credentialID: credentialId)
     }
 
     func extractCredentialIdFromOfferUrl(offerUrl: String) -> String {
