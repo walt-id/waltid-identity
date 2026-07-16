@@ -33,7 +33,7 @@ object EudiTestBackend {
         }
     }
 
-    data class GeneratedOffer(val offerUrl: String, val txCode: String?)
+    data class GeneratedOffer(val offerUrl: String, val txCode: String)
 
     data class VerifierTransaction(val transactionId: String, val authorizationRequestUri: String)
 
@@ -118,30 +118,26 @@ object EudiTestBackend {
 
         // Step 7: Extract final payload with tx_code and url_data
         val finalPayload = Json.parseToJsonElement(extractPayload(offerBody)).jsonObject
+        return generatedOfferFromFinalPayload(finalPayload)
+    }
+
+    internal fun generatedOfferFromFinalPayload(finalPayload: JsonObject): GeneratedOffer {
         val txCodeValue = finalPayload["tx_code"]?.jsonPrimitive?.content
-        val urlData = finalPayload["url_data"]?.jsonPrimitive?.content
+            ?: error("final payload missing tx_code")
+        val offerUrl = finalPayload["url_data"]?.jsonPrimitive?.content
             ?: error("final payload missing url_data")
-
-        // Step 8: Parse credential_offer, inject tx_code
-        val credentialOfferParam = Url(urlData).parameters["credential_offer"]
+        val credentialOffer = Url(offerUrl).parameters["credential_offer"]
+            ?.let { Json.parseToJsonElement(it).jsonObject }
             ?: error("credential_offer query parameter missing from url_data")
-        val offerJson = Json.parseToJsonElement(credentialOfferParam).jsonObject.toMutableMap()
+        credentialOffer["grants"]
+            ?.jsonObject
+            ?.get("urn:ietf:params:oauth:grant-type:pre-authorized_code")
+            ?.jsonObject
+            ?.get("tx_code")
+            ?.jsonObject
+            ?: error("credential offer missing tx_code metadata")
 
-        if (txCodeValue != null) {
-            val grants = offerJson["grants"]?.jsonObject?.toMutableMap() ?: mutableMapOf()
-            val preAuth = grants["urn:ietf:params:oauth:grant-type:pre-authorized_code"]
-                ?.jsonObject?.toMutableMap() ?: mutableMapOf()
-            val txCode = preAuth["tx_code"]?.jsonObject?.toMutableMap() ?: mutableMapOf()
-            txCode["value"] = JsonPrimitive(txCodeValue)
-            preAuth["tx_code"] = JsonObject(txCode)
-            grants["urn:ietf:params:oauth:grant-type:pre-authorized_code"] = JsonObject(preAuth)
-            offerJson["grants"] = JsonObject(grants)
-        }
-
-        val encodedOffer = JsonObject(offerJson).toString().encodeURLParameter()
-        val injectedOfferUrl = "openid-credential-offer://credential_offer?credential_offer=$encodedOffer"
-
-        return GeneratedOffer(offerUrl = injectedOfferUrl, txCode = txCodeValue)
+        return GeneratedOffer(offerUrl = offerUrl, txCode = txCodeValue)
     }
 
     suspend fun createVerifierTransaction(credentialId: String = "eu.europa.ec.eudi.pid_vc_sd_jwt"): VerifierTransaction {

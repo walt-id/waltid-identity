@@ -20,6 +20,11 @@ enum EudiOfferFlowError: LocalizedError {
     }
 }
 
+public struct EudiGeneratedOffer {
+    public let offerUrl: String
+    public let txCode: String
+}
+
 /// Generates credential offers from EUDI test backend.
 /// Handles multi-step form submission flow for pre-authorized offers.
 public final class EudiOfferFlow {
@@ -29,7 +34,7 @@ public final class EudiOfferFlow {
         self.client = client
     }
 
-    public func generate(credentialID: String = "eu.europa.ec.eudi.pid_vc_sd_jwt") async throws -> String {
+    public func generate(credentialID: String = "eu.europa.ec.eudi.pid_vc_sd_jwt") async throws -> EudiGeneratedOffer {
         let entrypoint = URL(string: "https://issuer.eudiw.dev/credential_offer")!
         let backendGenerate = URL(string: "https://backend.issuer.eudiw.dev/credential_offer")!
         let backendAuthorize = URL(string: "https://backend.issuer.eudiw.dev/form_authorize_generate")!
@@ -78,7 +83,7 @@ public final class EudiOfferFlow {
             "proceed": "Authorize",
         ])
 
-        // Step 7: Extract and inject tx_code into offer
+        // Step 7: Return the standard offer and separately delivered transaction code.
         let payloadRaw = try extractPayload(page: offerRedirect.body)
         guard let payloadData = payloadRaw.data(using: .utf8),
               let payloadJSON = try JSONSerialization.jsonObject(with: payloadData) as? [String: Any] else {
@@ -95,31 +100,18 @@ public final class EudiOfferFlow {
               let components = URLComponents(url: offerURI, resolvingAgainstBaseURL: false),
               let credentialOfferRaw = components.queryItems?.first(where: { $0.name == "credential_offer" })?.value,
               let credentialData = credentialOfferRaw.data(using: .utf8),
-              var offerJSON = try JSONSerialization.jsonObject(with: credentialData) as? [String: Any] else {
+              let offerJSON = try JSONSerialization.jsonObject(with: credentialData) as? [String: Any] else {
             throw NSError(domain: "WalletE2E", code: 211, userInfo: [NSLocalizedDescriptionKey: "Missing credential_offer payload"])
         }
 
-        guard var grants = offerJSON["grants"] as? [String: Any],
-              var preAuth = grants["urn:ietf:params:oauth:grant-type:pre-authorized_code"] as? [String: Any] else {
+        guard let grants = offerJSON["grants"] as? [String: Any],
+              let preAuth = grants["urn:ietf:params:oauth:grant-type:pre-authorized_code"] as? [String: Any] else {
             throw NSError(domain: "WalletE2E", code: 212, userInfo: [NSLocalizedDescriptionKey: "Missing pre-authorized grant"])
         }
-
-        var txCode = (preAuth["tx_code"] as? [String: Any]) ?? [:]
-        txCode["value"] = txCodeValue
-        preAuth["tx_code"] = txCode
-        grants["urn:ietf:params:oauth:grant-type:pre-authorized_code"] = preAuth
-        offerJSON["grants"] = grants
-
-        let updated = try jsonString(offerJSON)
-        var out = URLComponents()
-        out.scheme = offerURI.scheme ?? "openid-credential-offer"
-        out.host = "credential_offer"
-        out.queryItems = [URLQueryItem(name: "credential_offer", value: updated)]
-
-        guard let finalURL = out.url?.absoluteString else {
-            throw NSError(domain: "WalletE2E", code: 213, userInfo: [NSLocalizedDescriptionKey: "Failed to build offer URL"])
+        guard preAuth["tx_code"] is [String: Any] else {
+            throw NSError(domain: "WalletE2E", code: 213, userInfo: [NSLocalizedDescriptionKey: "Missing tx_code metadata"])
         }
-        return finalURL
+        return EudiGeneratedOffer(offerUrl: urlData, txCode: txCodeValue)
     }
 
     private func extractPayload(page: String) throws -> String {
@@ -145,11 +137,6 @@ public final class EudiOfferFlow {
             return v
         }
         throw EudiOfferFlowError.missingUserID
-    }
-
-    private func jsonString(_ object: Any) throws -> String {
-        let data = try JSONSerialization.data(withJSONObject: object, options: [])
-        return String(data: data, encoding: .utf8) ?? "{}"
     }
 
     private func unescapedHTML(_ value: String) -> String {
