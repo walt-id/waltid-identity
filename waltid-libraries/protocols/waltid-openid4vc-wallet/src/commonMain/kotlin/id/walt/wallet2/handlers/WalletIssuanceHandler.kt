@@ -5,7 +5,9 @@ import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
+import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
+import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
@@ -33,6 +35,8 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
@@ -161,6 +165,23 @@ data class ResolveOfferResult(
     val tokenEndpoint: Url? = null,
 )
 
+/**
+ * Complete credential-offer resolution retained between review and issuance.
+ *
+ * @property summary App-facing metadata derived from the resolution.
+ * @property offer Exact parsed credential offer, including its grants.
+ * @property issuerMetadata Credential issuer metadata used to validate the offered configurations.
+ * @property authorizationServerMetadata Authorization server metadata used for the token request.
+ * @property offeredCredentials Offered configurations resolved against [issuerMetadata].
+ */
+private class ResolvedIssuanceOffer(
+    val summary: ResolveOfferResult,
+    val offer: CredentialOffer,
+    val issuerMetadata: CredentialIssuerMetadata,
+    val authorizationServerMetadata: AuthorizationServerMetadata,
+    val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
+)
+
 @Serializable
 data class RequestTokenRequest(
     val tokenEndpoint: Url,
@@ -277,7 +298,10 @@ data class ExchangeCodeRequest(
  */
 object WalletIssuanceHandler {
 
+    private const val MAX_PREVIEWED_OFFERS = 16
     private val lenientJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
+    private val previewedOffers = LinkedHashMap<OfferPreviewCacheKey, ResolvedIssuanceOffer>()
+    private val previewedOffersMutex = Mutex()
 
     /**
      * Creates the [HttpClient] used for the issuance flow.
@@ -294,6 +318,10 @@ object WalletIssuanceHandler {
     /**
      * Full pre-authorized-code issuance flow, emitting each stored credential
      * as a [Flow] element as soon as it is received and stored.
+     *
+     * When a matching [previewOffer] resolution is retained for [wallet], this flow reuses that
+     * exact offer and metadata. Failed attempts retain the preview for retry; successful completion
+     * removes it. Calls without a retained preview resolve [request] normally.
      *
      * [onEvent] is called at each lifecycle step for progress reporting.
      */
@@ -318,36 +346,25 @@ object WalletIssuanceHandler {
             clientId = request.clientId,
             redirectUris = listOf(request.redirectUri.toString())
         )
-        val metadataResolver = IssuerMetadataResolver(httpClient)
         val tokenBuilder = TokenRequestBuilder(clientConfig, httpClient)
         val proofBuilder = JwtProofBuilder()
 
-        // 1. Parse and resolve offer
-        val offerString = request.getEffectiveOfferString()
-        log.trace { "Parsing offer string: ${offerString.take(120)}..." }
-        // When offerJson is provided it's already the raw JSON object — decode directly instead of
-        // parsing as a URL (which would fail since JSON is not a valid openid-credential-offer:// URL).
-        val offer = if (request.offerJson != null) {
-            val inlineOffer = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                .decodeFromString<id.walt.openid4vci.offers.CredentialOffer>(offerString)
-            CredentialOfferResolver(httpClient).resolveCredentialOffer(
-                credentialOffer = inlineOffer,
-                credentialOfferUri = null
-            )
-        } else {
-            val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(offerString)
-            CredentialOfferResolver(httpClient).resolveCredentialOffer(
-                credentialOffer = offerRequest.credentialOffer,
-                credentialOfferUri = offerRequest.credentialOfferUri
-            )
-        }
+        // 1. Resolve the offer source, or reuse the exact resolution shown during preview.
+        val cacheKey = offerPreviewCacheKey(wallet, request)
+        val previewedOffer = previewedOffersMutex.withLock { previewedOffers[cacheKey] }
+        val resolvedOffer = previewedOffer ?: resolveIssuanceOffer(
+            request.toResolveOfferRequest(),
+            httpClient,
+        )
+
+        // 2. Reuse issuer metadata and offered configurations from that resolution.
+        val offer = resolvedOffer.offer
+        val issuerMetadata = resolvedOffer.issuerMetadata
+        val offeredCredentials = resolvedOffer.offeredCredentials
+        val asMetadata = resolvedOffer.authorizationServerMetadata
         log.trace { "Resolved offer: issuer=${offer.credentialIssuer}, configIds=${offer.credentialConfigurationIds}" }
         onEvent(WalletSessionEvent.issuance_offer_resolved)
 
-        // 2. Fetch issuer metadata
-        log.trace { "Fetching issuer metadata from ${offer.credentialIssuer}" }
-        val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
-        val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
         log.debug { "Offer contains ${offeredCredentials.size} credential(s)" }
 
         // 3. Pre-authorized code grant only (auth-code handled by separate flow)
@@ -356,7 +373,6 @@ object WalletIssuanceHandler {
         log.trace { "Using pre-authorized code grant" }
 
         // 4. Request token
-        val asMetadata = metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
         val tokenEndpoint = asMetadata.tokenEndpoint
             ?: error("Authorization server metadata contains no token_endpoint")
         log.trace { "Requesting token from $tokenEndpoint" }
@@ -469,6 +485,13 @@ object WalletIssuanceHandler {
         }
 
         onEvent(WalletSessionEvent.issuance_completed)
+        if (previewedOffer != null) {
+            previewedOffersMutex.withLock {
+                if (previewedOffers[cacheKey] === previewedOffer) {
+                    previewedOffers.remove(cacheKey)
+                }
+            }
+        }
     }
 
     /**
@@ -495,16 +518,41 @@ object WalletIssuanceHandler {
         return ReceiveCredentialResult(credentialIds = ids, deferredTransactionIds = deferredIds)
     }
 
-    // ---------------------------------------------------------------------------
-    // Isolated step handlers
-    // ---------------------------------------------------------------------------
+    /**
+     * Resolves an offer for review and retains the complete resolution for [receiveCredential].
+     *
+     * The bounded preview cache is scoped by wallet ID and offer source. While retained, a matching
+     * receive reuses the exact parsed offer, issuer metadata, authorization server metadata, and
+     * offered configurations instead of fetching them again.
+     *
+     * @param wallet Wallet that will receive the reviewed offer.
+     * @param request Credential offer URL or inline offer JSON to resolve.
+     * @param httpClient HTTP client used for offer and metadata resolution.
+     * @return Review metadata derived from the retained resolution.
+     */
+    suspend fun previewOffer(
+        wallet: Wallet,
+        request: ResolveOfferRequest,
+        httpClient: HttpClient = defaultHttpClient(),
+    ): ResolveOfferResult {
+        val resolvedOffer = resolveIssuanceOffer(request, httpClient)
+        previewedOffersMutex.withLock {
+            if (previewedOffers.size >= MAX_PREVIEWED_OFFERS) {
+                previewedOffers.remove(previewedOffers.keys.first())
+            }
+            previewedOffers[offerPreviewCacheKey(wallet, request)] = resolvedOffer
+        }
+        return resolvedOffer.summary
+    }
 
-    suspend fun resolveOffer(request: ResolveOfferRequest): ResolveOfferResult {
-        val httpClient = defaultHttpClient()
+    /** Resolves an offer and all metadata needed by the issuance flow into one immutable snapshot. */
+    private suspend fun resolveIssuanceOffer(
+        request: ResolveOfferRequest,
+        httpClient: HttpClient = defaultHttpClient(),
+    ): ResolvedIssuanceOffer {
         val offerString = request.getEffectiveOfferString()
         val offer = if (request.offerJson != null) {
-            val inlineOffer = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                .decodeFromString<id.walt.openid4vci.offers.CredentialOffer>(offerString)
+            val inlineOffer = lenientJson.decodeFromString<CredentialOffer>(offerString)
             CredentialOfferResolver(httpClient).resolveCredentialOffer(
                 credentialOffer = inlineOffer,
                 credentialOfferUri = null
@@ -520,18 +568,53 @@ object WalletIssuanceHandler {
         val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
         val asMetadata = metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
         val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
-        return ResolveOfferResult(
-            credentialIssuer = offer.credentialIssuer,
-            credentialConfigurationIds = offer.credentialConfigurationIds,
-            grantType = offer.grants?.preAuthorizedCode?.let { "pre-authorized_code" }
-                ?: offer.grants?.authorizationCode?.let { "authorization_code" },
-            preAuthorizedCode = offer.grants?.preAuthorizedCode?.preAuthorizedCode,
-            txCodeRequired = offer.grants?.preAuthorizedCode?.txCode != null,
-            tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) },
-            credentialEndpoint = Url(issuerMetadata.credentialEndpoint),
-            offeredCredentials = offeredCredentials.map { it.credentialConfigurationId }
+        return ResolvedIssuanceOffer(
+            summary = ResolveOfferResult(
+                credentialIssuer = offer.credentialIssuer,
+                credentialConfigurationIds = offer.credentialConfigurationIds,
+                grantType = offer.grants?.preAuthorizedCode?.let { "pre-authorized_code" }
+                    ?: offer.grants?.authorizationCode?.let { "authorization_code" },
+                preAuthorizedCode = offer.grants?.preAuthorizedCode?.preAuthorizedCode,
+                txCodeRequired = offer.grants?.preAuthorizedCode?.txCode != null,
+                tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) },
+                credentialEndpoint = Url(issuerMetadata.credentialEndpoint),
+                offeredCredentials = offeredCredentials.map { it.credentialConfigurationId },
+            ),
+            offer = offer,
+            issuerMetadata = issuerMetadata,
+            authorizationServerMetadata = asMetadata,
+            offeredCredentials = offeredCredentials,
         )
     }
+
+    private data class OfferPreviewCacheKey(
+        val walletId: String,
+        val offerSource: String,
+    )
+
+    private fun offerPreviewCacheKey(wallet: Wallet, request: ResolveOfferRequest): OfferPreviewCacheKey =
+        OfferPreviewCacheKey(walletId = wallet.id, offerSource = request.getEffectiveOfferString())
+
+    private fun offerPreviewCacheKey(wallet: Wallet, request: ReceiveCredentialRequest): OfferPreviewCacheKey =
+        OfferPreviewCacheKey(walletId = wallet.id, offerSource = request.getEffectiveOfferString())
+
+    private fun ReceiveCredentialRequest.toResolveOfferRequest(): ResolveOfferRequest =
+        ResolveOfferRequest(offerUrl = offerUrl, offerJson = offerJson)
+
+    // ---------------------------------------------------------------------------
+    // Isolated step handlers
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Resolves offer metadata without retaining it for a later issuance call.
+     *
+     * Use [previewOffer] when user review and subsequent issuance must use the same resolution.
+     *
+     * @param request Credential offer URL or inline offer JSON to resolve.
+     * @return Resolved offer, issuer, endpoint, credential, and transaction-code metadata.
+     */
+    suspend fun resolveOffer(request: ResolveOfferRequest): ResolveOfferResult =
+        resolveIssuanceOffer(request).summary
 
     suspend fun requestToken(request: RequestTokenRequest): RequestTokenResult =
         requestToken(
