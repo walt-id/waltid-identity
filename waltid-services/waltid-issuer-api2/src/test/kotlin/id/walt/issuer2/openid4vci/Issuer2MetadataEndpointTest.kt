@@ -134,6 +134,7 @@ class Issuer2MetadataEndpointTest {
         assertJwtVcJsonConfiguration(credentialIssuerMetadata)
         assertMdocConfiguration(credentialIssuerMetadata)
         assertSdJwtVcConfiguration(credentialIssuerMetadata)
+        assertCredentialEncryptionMetadata(credentialIssuerMetadata)
         assertConfiguredCredentialScenariosAreAdvertised(credentialIssuerMetadata)
         assertSdJwtCatalogConfigurations(credentialIssuerMetadata)
         assertSelfHostedSdJwtVcTypeMetadata(client, credentialIssuerMetadata)
