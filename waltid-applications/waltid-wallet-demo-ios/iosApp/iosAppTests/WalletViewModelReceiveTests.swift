@@ -22,6 +22,11 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertEqual(receiveCallsBeforeCode, 0)
         XCTAssertEqual(resolveCalls, 1)
 
+        viewModel.acceptOffer()
+        await Task.yield()
+        let receiveCallsAfterRejectedAccept = await client.receiveCalls
+        XCTAssertEqual(receiveCallsAfterRejectedAccept, 0)
+
         viewModel.txCode = " abc-123 "
         XCTAssertTrue(viewModel.acceptOfferEnabled)
         viewModel.acceptOffer()

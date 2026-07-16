@@ -370,7 +370,7 @@ class WalletViewModel: ObservableObject {
 
     func acceptOffer() {
         resetInputFocus()
-        guard !isLoading, offerPreview != nil else { return }
+        guard acceptOfferEnabled else { return }
         let trimmedOfferUrl = offerUrl.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let offer = URL(string: trimmedOfferUrl) else {
             setError(WalletStatusText.failure(WalletStatusText.receiveFailed, WalletStatusText.invalidOfferURL), tab: .receive)
