@@ -1,7 +1,8 @@
 package id.walt.openid4vci.offers
 
-import kotlinx.serialization.json.Json
+import id.walt.openid4vci.GrantType
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -10,7 +11,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import id.walt.openid4vci.GrantType
 
 class CredentialOfferTest {
 
@@ -198,9 +198,11 @@ class CredentialOfferTest {
         assertEquals("numeric", txCode["input_mode"]?.jsonPrimitive?.content)
         assertEquals(6, txCode["length"]?.jsonPrimitive?.content?.toInt())
         assertEquals("Enter the code from your device", txCode["description"]?.jsonPrimitive?.content)
+        assertTrue("value" !in txCode)
     }
+
     @Test
-    fun `credential offer deserializes tx_code with embedded value`() {
+    fun `strict decoding rejects embedded transaction code value`() {
         val payload = """
         {
           "credential_issuer": "https://issuer.example",
@@ -211,7 +213,6 @@ class CredentialOfferTest {
               "tx_code": {
                 "input_mode": "numeric",
                 "length": 4,
-                "description": "Enter the PIN",
                 "value": "1234"
               }
             }
@@ -219,36 +220,8 @@ class CredentialOfferTest {
         }
         """.trimIndent()
 
-        val offer = json.decodeFromString(CredentialOffer.serializer(), payload)
-        val txCode = offer.grants?.preAuthorizedCode?.txCode
-        assertNotNull(txCode)
-        assertEquals("numeric", txCode.inputMode)
-        assertEquals(4, txCode.length)
-        assertEquals("1234", txCode.value?.content)
-    }
-
-    @Test
-    fun `credential offer deserializes tx_code with numeric value`() {
-        val payload = """
-        {
-          "credential_issuer": "https://issuer.example",
-          "credential_configuration_ids": ["cred-id-1"],
-          "grants": {
-            "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
-              "pre-authorized_code": "pre-auth-456",
-              "tx_code": {
-                "input_mode": "numeric",
-                "length": 4,
-                "value": 5678
-              }
-            }
-          }
+        assertFailsWith<SerializationException> {
+            json.decodeFromString(CredentialOffer.serializer(), payload)
         }
-        """.trimIndent()
-
-        val offer = json.decodeFromString(CredentialOffer.serializer(), payload)
-        val txCode = offer.grants?.preAuthorizedCode?.txCode
-        assertNotNull(txCode)
-        assertEquals("5678", txCode.value?.content)
     }
 }
