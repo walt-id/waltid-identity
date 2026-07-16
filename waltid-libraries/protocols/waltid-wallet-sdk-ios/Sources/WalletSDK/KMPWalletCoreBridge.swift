@@ -47,6 +47,16 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return .init(keyID: value.keyId, did: value.did)
     }
 
+    func resolveOffer(offer: URL) async throws -> OfferResolution {
+        let result = try await bridge.resolveOffer(offerUrl: offer.absoluteString)
+        let value = try Self.successValue(
+            result,
+            as: MobileWalletOfferResolution.self,
+            operation: "resolve credential offer"
+        )
+        return OfferResolution(transactionCodeRequired: value.transactionCodeRequired)
+    }
+
     func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String] {
         let result = try await bridge.receive(
             offerUrl: offer.absoluteString,
@@ -720,4 +730,5 @@ private extension WalletBridgeError {
         }
     }
 }
+
 #endif
