@@ -1,5 +1,6 @@
 package id.walt.openid4vci.metadata.issuer
 
+import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import io.ktor.http.Url
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KeepGeneratedSerializer
@@ -125,6 +126,15 @@ data class CredentialIssuerMetadata(
             display: List<IssuerDisplay>? = null,
         ): CredentialIssuerMetadata {
             val normalized = baseUrl.trimEnd('/')
+            val resolvedCredentialResponseEncryption = credentialResponseEncryption
+                ?: credentialRequestEncryption?.let {
+                    CredentialResponseEncryption(
+                        algValuesSupported = CredentialEncryptionProfile.responseAlgValuesSupported,
+                        encValuesSupported = it.encValuesSupported,
+                        zipValuesSupported = it.zipValuesSupported,
+                        encryptionRequired = it.encryptionRequired,
+                    )
+                }
             return CredentialIssuerMetadata(
                 credentialIssuer = normalized,
                 credentialEndpoint = normalized + credentialEndpointPath,
