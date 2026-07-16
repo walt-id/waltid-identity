@@ -17,12 +17,14 @@ import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.openid4vci.MetadataService
+import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 
-class Issuer2Module(
+class Issuer2Module @JvmOverloads constructor(
     serviceConfig: Issuer2ServiceConfig,
     metadataConfig: Issuer2MetadataConfig,
     profilesConfig: Issuer2ProfilesConfig,
+    credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null,
 ) {
     private val issuanceSessionRepository = ConfiguredIssuanceSessionRepository()
     private val authorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
@@ -71,6 +73,7 @@ class Issuer2Module(
         profileService = credentialProfileService,
         metadataService = metadataService,
         notificationService = notificationService,
+        credentialProofKeyAcceptance = credentialProofKeyAcceptance,
     )
 
     val managementController = Issuer2ManagementController(
@@ -86,11 +89,13 @@ class Issuer2Module(
     )
 
     companion object {
-        fun load(): Issuer2Module =
+        @JvmOverloads
+        fun load(credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null): Issuer2Module =
             Issuer2Module(
                 serviceConfig = ConfigManager.getConfig(),
                 metadataConfig = ConfigManager.getConfig(),
                 profilesConfig = ConfigManager.getConfig(),
+                credentialProofKeyAcceptance = credentialProofKeyAcceptance,
             )
     }
 }
