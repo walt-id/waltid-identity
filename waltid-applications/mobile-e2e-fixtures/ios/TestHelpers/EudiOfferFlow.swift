@@ -108,9 +108,8 @@ public final class EudiOfferFlow {
               let preAuth = grants["urn:ietf:params:oauth:grant-type:pre-authorized_code"] as? [String: Any] else {
             throw NSError(domain: "WalletE2E", code: 212, userInfo: [NSLocalizedDescriptionKey: "Missing pre-authorized grant"])
         }
-        let txCodeMetadata = preAuth["tx_code"] as? [String: Any]
-        guard txCodeMetadata?["value"] == nil else {
-            throw NSError(domain: "WalletE2E", code: 213, userInfo: [NSLocalizedDescriptionKey: "EUDI credential offer embedded a transaction code value"])
+        guard preAuth["tx_code"] is [String: Any] else {
+            throw NSError(domain: "WalletE2E", code: 213, userInfo: [NSLocalizedDescriptionKey: "Missing tx_code metadata"])
         }
         return EudiGeneratedOffer(offerUrl: urlData, txCode: txCodeValue)
     }
