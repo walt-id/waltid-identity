@@ -123,6 +123,12 @@ interface OAuth2Provider {
         accessTokenContext: AccessTokenContext? = null,
     ): CredentialRequestResult
 
+    suspend fun createCredentialRequest(
+        encryptedCredentialRequest: String,
+        session: Session? = null,
+        accessTokenContext: AccessTokenContext? = null,
+    ): CredentialRequestResult
+
     suspend fun createCredentialResponse(
         request: CredentialRequest,
         configuration: CredentialConfiguration,

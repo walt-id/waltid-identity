@@ -5,6 +5,7 @@ import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.did.dids.DidService
 import id.walt.wallet2.data.*
 import id.walt.wallet2.handlers.*
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.server.WalletResolver
 import id.walt.wallet2.server.openapi.Wallet2OpenApiDocs
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
@@ -673,7 +674,13 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<PresentCredentialRequest>()
-                        call.respond(WalletPresentationHandler.presentCredential(wallet, req))
+                        call.respond(
+                            WalletPresentationHandler.presentCredential(
+                                wallet = wallet,
+                                request = req,
+                                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                            )
+                        )
                     }
 
                     post("/isolated", {
@@ -683,7 +690,13 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<PresentCredentialIsolatedRequest>()
-                        call.respond(WalletPresentationHandler.presentCredentialIsolated(wallet, req))
+                        call.respond(
+                            WalletPresentationHandler.presentCredentialIsolated(
+                                wallet = wallet,
+                                request = req,
+                                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                            )
+                        )
                     }
 
                     post("/resolve-request", {

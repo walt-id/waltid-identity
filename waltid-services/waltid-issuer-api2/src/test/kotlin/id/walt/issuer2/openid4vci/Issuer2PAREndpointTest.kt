@@ -51,7 +51,7 @@ class Issuer2PAREndpointTest {
     fun `issuer module provider resolves request_uri and retrieves original parameters`() = runTest {
         val provider = issuerProvider()
         val parameters = validParameters(
-            scope = listOf("openid", "profile"),
+            scopes = listOf("openid", "profile"),
             state = "state456",
         )
 
@@ -195,14 +195,14 @@ class Issuer2PAREndpointTest {
 
     private fun validParameters(
         clientId: String = "test-client",
-        scope: List<String> = listOf("openid"),
+        scopes: List<String> = listOf("openid"),
         state: String = "state123",
     ): Map<String, List<String>> =
         mapOf(
             "client_id" to listOf(clientId),
             "response_type" to listOf(ResponseType.CODE.value),
             "redirect_uri" to listOf("https://example.com/callback"),
-            "scope" to scope,
+            "scope" to listOf(scopes.joinToString(" ")),
             "state" to listOf(state),
         )
 }

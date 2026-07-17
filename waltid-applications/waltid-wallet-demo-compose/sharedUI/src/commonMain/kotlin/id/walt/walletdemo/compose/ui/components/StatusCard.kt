@@ -12,20 +12,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
-import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.logic.isError
+import id.walt.walletdemo.compose.logic.isStatusBusy
 import id.walt.walletdemo.compose.logic.statusText
+import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
 internal fun StatusCard(state: WalletDemoUiState) {
     val containerColor = when {
         state.isError -> MaterialTheme.colorScheme.errorContainer
-        state.isBusy -> MaterialTheme.colorScheme.secondaryContainer
+        state.isStatusBusy -> MaterialTheme.colorScheme.secondaryContainer
         else -> Color(0xFFD8E2FF)
     }
     val contentColor = when {
         state.isError -> MaterialTheme.colorScheme.onErrorContainer
-        state.isBusy -> MaterialTheme.colorScheme.onSecondaryContainer
+        state.isStatusBusy -> MaterialTheme.colorScheme.onSecondaryContainer
         else -> Color(0xFF002E69)
     }
 
@@ -37,7 +38,7 @@ internal fun StatusCard(state: WalletDemoUiState) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp)
-                .testTag("wallet.status"),
+                .testTag(WalletUiTestTags.Status),
             style = MaterialTheme.typography.bodyMedium,
         )
     }

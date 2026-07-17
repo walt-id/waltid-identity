@@ -9,6 +9,7 @@ struct ClaimGroupView: View {
                 Text(group.title.uppercased())
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.tint)
+                    .accessibilityLabel(group.title)
                     .accessibilityIdentifier(WalletAccessibilityID.claimGroup(group.title))
 
                 VStack(alignment: .leading, spacing: 12) {
