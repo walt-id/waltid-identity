@@ -1,6 +1,23 @@
-# WalletSDK
+<div align="center">
+<h1>walt.id OpenID4VC Wallet Swift Facade</h1>
+ <span>by </span><a href="https://walt.id">walt.id</a>
+ <p>Swift facade for the walt.id mobile wallet SDK.</p>
 
-Swift Package facade for the walt.id mobile wallet SDK.
+<a href="https://walt.id/community">
+<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
+</a>
+<a href="https://www.linkedin.com/company/walt-id/">
+<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
+</a>
+
+  <h2>Status</h2>
+  <p align="center">
+    <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
+    <br/>
+    <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
+  </p>
+</div>
+
 
 This package is the WAL-1065 iOS consumer boundary. It exposes Swift-native
 types and a `Wallet` actor while keeping Kotlin Multiplatform, SKIE, and
@@ -239,3 +256,17 @@ shared Kotlin state, flows, sealed UI state, or suspend APIs.
 This package currently uses a local binary target path for the spike. A customer
 preview or release should switch the binary target to a URL plus checksum after
 the team chooses the private artifact host and release CI workflow.
+
+## Join the community
+
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
+* Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
+* Find more indepth documentation on our [docs site](https://docs.walt.id)
+
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
+
+<div align="center">
+<img src="../../../assets/walt-banner.png" alt="walt.id banner" />
+</div>

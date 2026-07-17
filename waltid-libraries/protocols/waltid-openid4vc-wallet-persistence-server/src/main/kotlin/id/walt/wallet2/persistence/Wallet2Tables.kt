@@ -22,6 +22,8 @@ object Wallet2Tables {
         val id = varchar("id", 128)
         val serializedStaticKey = text("static_key").nullable()
         val staticDid = varchar("static_did", 1024).nullable()
+        val defaultKeyId = varchar("default_key_id", 512).nullable()
+        val defaultDidId = varchar("default_did_id", 1024).nullable()
         override val primaryKey = PrimaryKey(id)
     }
 
