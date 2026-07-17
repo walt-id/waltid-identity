@@ -98,6 +98,8 @@ data class ServiceIdentity(
     val sourceId: String,
     val entityId: String,
     val serviceId: String? = null,
+    /** Base64-encoded DER certificate retained for PKIX path construction. */
+    val certificateDerBase64: String? = null,
     val certificateSha256Hex: String? = null,
     val subjectDn: String? = null,
     val issuerDn: String? = null,

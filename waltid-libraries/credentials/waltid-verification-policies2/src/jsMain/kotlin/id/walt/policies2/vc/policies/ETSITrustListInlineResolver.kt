@@ -18,7 +18,8 @@ actual object ETSITrustListInlineResolver {
         expectedServiceType: String?,
         allowStaleSource: Boolean,
         requireAuthenticated: Boolean,
-        validateSignatures: Boolean
+        validateSignatures: Boolean,
+        trustedSourceSignerCertificates: List<String>
     ): Result<JsonElement> {
         return Result.failure(
             UnsupportedOperationException(

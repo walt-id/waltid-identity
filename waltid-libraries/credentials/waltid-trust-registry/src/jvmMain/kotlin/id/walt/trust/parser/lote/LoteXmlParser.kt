@@ -5,6 +5,8 @@ import id.walt.trust.parser.SecureXmlParser
 import id.walt.trust.parser.getChildTextContent
 import id.walt.trust.parser.getChildrenByLocalName
 import id.walt.trust.parser.getFirstChildByLocalName
+import id.walt.trust.utils.HashUtils.computeCertificateSha256
+import id.walt.trust.utils.HashUtils.normalizeCertificateDerBase64
 import kotlin.time.Instant
 
 /**
@@ -119,6 +121,15 @@ object LoteXmlParser {
                 entityId = entityId,
                 serviceId = serviceId,
                 certificateSha256Hex = value.removePrefix("sha256:")
+            )
+
+            "CERTIFICATE_PEM", "CERTIFICATE_DER" -> ServiceIdentity(
+                identityId = identityId,
+                sourceId = sourceId,
+                entityId = entityId,
+                serviceId = serviceId,
+                certificateDerBase64 = normalizeCertificateDerBase64(value),
+                certificateSha256Hex = computeCertificateSha256(value)
             )
 
             "SUBJECT_DN" -> ServiceIdentity(

@@ -22,6 +22,7 @@ A Kotlin/JVM library for parsing and querying trust registries, enabling trust-l
 
 - **Multi-format parsing** — Parse EU Trusted Lists (TSL XML), LoTE JSON, and LoTE XML formats
 - **XMLDSig signature validation** — Validate enveloped XMLDSig signatures on TSL documents (JSR-105 API)
+- **Signed LoTE JSON** — Validate compact-JWS LoTE payloads against independently configured signer certificates
 - **Unified trust model** — Normalize diverse trust list formats into a consistent data model
 - **Certificate resolution** — Resolve trust status by certificate SHA-256, subject DN, or subject key identifier
 - **Provider ID lookup** — Query trust status by entity/provider identifier
@@ -268,15 +269,18 @@ This library powers the **`etsi-trust-list`** verification policy in [waltid-ver
 ```
 
 **How it works:**
-1. Extracts the certificate chain from the credential's `x5c` header (COSE for mDoc, JWT for SD-JWT/VC)
-2. Iterates through the chain (leaf → root) resolving trust for each certificate
-3. If any certificate is found trusted in the configured trust lists, verification passes
+1. Extracts the leaf-first certificate chain from credential `x5c` (COSE for mDoc, JWT for SD-JWT/VC)
+2. Sends the leaf and intermediates to the Trust Registry
+3. Builds an RFC 5280 path to full anchor certificates retained from loaded trust sources
+4. Returns the source/entity/service whose registry-owned anchor completed the path
+
+The credential does not need to carry the root. Profiles such as OpenID4VC HAIP require the trust anchor to be omitted from `x5c`.
 
 **Key options:**
 - `trustLists`: URLs or inline content of trust lists to load
 - `expectedEntityType`: Filter to specific entity type (e.g., `PID_PROVIDER`, `WALLET_PROVIDER`)
-- `requireAuthenticated`: If `true`, only accept trust lists with `VALIDATED` XMLDSig signatures
-- `validateSignatures`: Enable/disable XMLDSig validation when loading trust lists
+- `requireAuthenticated`: If `true`, only accept sources whose signature and signer trust are `VALIDATED`
+- `validateSignatures`: Enable/disable supported signature validation when loading trust lists
 
 See the [waltid-verification-policies2 README](../waltid-verification-policies2/README.md#etsi-trust-list) for full documentation.
 
@@ -315,11 +319,11 @@ These values are mapped from ETSI TS 119 612 `ServiceStatus` URIs. The original 
 
 ### Authenticity States
 
-These are library-defined values representing XMLDSig signature validation results:
+These are library-defined values representing trust-source signature validation results:
 
 | State | Description |
 |-------|-------------|
-| `VALIDATED` | XMLDSig signature verified successfully |
+| `VALIDATED` | Signature verified and the signer trust requirements were met |
 | `FAILED` | Signature validation failed or signature missing when required |
 | `SKIPPED_DEMO` | Signature validation was disabled (e.g., for testing/demo) |
 | `UNKNOWN` | Authenticity not yet determined |

@@ -11,6 +11,18 @@ import kotlin.time.Instant
 interface TrustRegistryService {
 
     /**
+     * Resolve a presented leaf-first certificate chain against certificates owned by
+     * the registry. The presented chain must omit the trust anchor when required by
+     * the applicable credential profile.
+     */
+    suspend fun resolveCertificateChain(
+        certificateChainPemOrDer: List<String>,
+        instant: Instant,
+        expectedEntityType: TrustedEntityType? = null,
+        expectedServiceType: String? = null
+    ): TrustDecision
+
+    /**
      * Resolve trust status for a certificate (by PEM or DER base64).
      */
     suspend fun resolveByCertificate(
@@ -76,12 +88,14 @@ interface TrustRegistryService {
      * @param content Raw trust list content (TSL XML, LoTE JSON/XML)
      * @param sourceUrl Optional URL to store for future refresh calls
      * @param validateSignature Whether to validate XMLDSig signatures (for TSL sources)
+     * @param trustedSignerCertificates PEM or Base64-DER certificates trusted to sign compact-JWS LoTE sources
      */
     suspend fun loadSourceFromContent(
         sourceId: String,
         content: String,
         sourceUrl: String? = null,
-        validateSignature: Boolean = true
+        validateSignature: Boolean = true,
+        trustedSignerCertificates: List<String> = emptyList()
     ): RefreshResult
 
     /**
@@ -91,10 +105,12 @@ interface TrustRegistryService {
      * @param sourceId Unique identifier for this trust source
      * @param url URL to fetch the trust list from
      * @param validateSignature Whether to validate XMLDSig signatures (for TSL sources)
+     * @param trustedSignerCertificates PEM or Base64-DER certificates trusted to sign compact-JWS LoTE sources
      */
     suspend fun loadSourceFromUrl(
         sourceId: String,
         url: String,
-        validateSignature: Boolean = true
+        validateSignature: Boolean = true,
+        trustedSignerCertificates: List<String> = emptyList()
     ): RefreshResult
 }

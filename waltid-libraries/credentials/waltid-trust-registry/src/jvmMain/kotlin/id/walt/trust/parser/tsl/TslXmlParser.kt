@@ -198,6 +198,7 @@ object TslXmlParser {
                             sourceId = sourceId,
                             entityId = entityId,
                             serviceId = serviceId,
+                            certificateDerBase64 = x509Cert?.replace("\\s".toRegex(), ""),
                             certificateSha256Hex = x509Cert?.let { computeCertSha256(it) },
                             subjectKeyIdentifierHex = x509Ski,
                             subjectDn = x509SubjectName,

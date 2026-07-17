@@ -2,6 +2,7 @@ package id.walt.trust.parser.lote
 
 import id.walt.trust.model.*
 import id.walt.trust.utils.HashUtils.computeCertificateSha256
+import id.walt.trust.utils.HashUtils.normalizeCertificateDerBase64
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.time.Instant
@@ -67,7 +68,13 @@ object LoteJsonParser {
     // Parse entry point
     // ---------------------------------------------------------------------------
 
-    fun parse(json: String, sourceId: String, sourceUrl: String? = null): ParsedLoteSource {
+    fun parse(
+        json: String,
+        sourceId: String,
+        sourceUrl: String? = null,
+        authenticityState: AuthenticityState = AuthenticityState.SKIPPED_DEMO,
+        validationMetadata: Map<String, String> = emptyMap()
+    ): ParsedLoteSource {
         val doc = Json { ignoreUnknownKeys = true }.decodeFromString<RawLoteDocument>(json)
         val meta = doc.listMetadata
 
@@ -80,10 +87,11 @@ object LoteJsonParser {
             issueDate = meta.issueDate?.let { runCatching { Instant.parse(it) }.getOrNull() },
             nextUpdate = meta.nextUpdate?.let { runCatching { Instant.parse(it) }.getOrNull() },
             sequenceNumber = meta.sequenceNumber,
-            authenticityState = AuthenticityState.SKIPPED_DEMO,
+            authenticityState = authenticityState,
             freshnessState = FreshnessState.UNKNOWN,
             metadata = buildMap {
                 meta.listType?.let { put("listType", it) }
+                putAll(validationMetadata)
             }
         )
 
@@ -162,6 +170,7 @@ object LoteJsonParser {
                     sourceId = sourceId,
                     entityId = entityId,
                     serviceId = serviceId,
+                    certificateDerBase64 = normalizeCertificateDerBase64(value),
                     certificateSha256Hex = sha256,
                     metadata = if (sha256 == null) mapOf("rawMatchType" to matchType, "rawValue" to value) else emptyMap()
                 )

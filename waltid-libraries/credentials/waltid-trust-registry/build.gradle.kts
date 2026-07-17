@@ -42,6 +42,8 @@ kotlin {
 
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)
+            implementation(identityLibs.bouncycastle.prov)
+            implementation(identityLibs.bouncycastle.pkix)
         }
     }
 }

@@ -35,6 +35,7 @@ interface TrustStore {
     suspend fun updateSourceAuthenticity(sourceId: String, authenticityState: AuthenticityState)
 
     suspend fun findIdentitiesByCertificateSha256(sha256Hex: String): Flow<ServiceIdentity>
+    suspend fun listCertificateIdentities(): Flow<ServiceIdentity>
     suspend fun findIdentitiesBySubjectDn(subjectDn: String): Flow<ServiceIdentity>
     suspend fun findIdentitiesBySkiHex(skiHex: String): Flow<ServiceIdentity>
     suspend fun findIdentitiesByIssuerAndSerial(issuerDn: String, serialNumber: String): Flow<ServiceIdentity>
