@@ -13,6 +13,7 @@ import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.ui.screens.PinScreen
+import id.walt.walletdemo.compose.ui.screens.PinStorageUnavailableScreen
 import id.walt.walletdemo.compose.ui.screens.WalletScreen
 
 @Composable
@@ -32,12 +33,14 @@ fun WalletDemoApp(controller: WalletDemoController) {
                     .safeDrawingPadding(),
             ) {
                 when (val auth = state.auth) {
-                    is WalletAuthState.Setup,
-                    is WalletAuthState.Login,
-                    -> PinScreen(
+                    is WalletAuthState.PinEntry -> PinScreen(
                         controller = controller,
                         auth = auth,
                         isBusy = state.isBusy,
+                    )
+                    is WalletAuthState.StorageUnavailable -> PinStorageUnavailableScreen(
+                        controller = controller,
+                        message = auth.message,
                     )
                     WalletAuthState.Unlocked -> WalletScreen(controller, state)
                 }

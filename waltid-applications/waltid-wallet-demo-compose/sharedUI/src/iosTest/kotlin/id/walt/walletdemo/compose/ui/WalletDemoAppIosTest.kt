@@ -6,6 +6,10 @@ class WalletDemoAppIosTest {
     private val scenarios = WalletDemoAppTestScenarios()
 
     @Test
+    fun pinStorageFailureStaysLockedUntilRetrySucceeds() =
+        scenarios.pinStorageFailureStaysLockedUntilRetrySucceeds()
+
+    @Test
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() =
         scenarios.credentialsTabShowsCompactCardsAndNavigatesToDetails()
 

@@ -16,12 +16,16 @@ import kotlinx.coroutines.launch
 
 class WalletDemoController(
     private val wallet: DemoWallet,
+    private val pinStore: DemoPinStore,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
-    private var configuredPin: String? = null
     private var receiveJob: Job? = null
-    private val _state = MutableStateFlow(WalletDemoUiState())
+    private val _state = MutableStateFlow(
+        WalletDemoUiState(
+            auth = readInitialAuthState(),
+        ),
+    )
     val state: StateFlow<WalletDemoUiState> = _state.asStateFlow()
 
     fun updatePin(value: String) {
@@ -29,6 +33,7 @@ class WalletDemoController(
             when (val auth = state.auth) {
                 is WalletAuthState.Setup -> state.copy(auth = auth.copy(pin = value, error = null))
                 is WalletAuthState.Login -> state.copy(auth = auth.copy(pin = value, error = null))
+                is WalletAuthState.StorageUnavailable,
                 WalletAuthState.Unlocked -> state
             }
         }
@@ -39,6 +44,7 @@ class WalletDemoController(
             when (val auth = state.auth) {
                 is WalletAuthState.Setup -> state.copy(auth = auth.copy(confirmation = value, error = null))
                 is WalletAuthState.Login,
+                is WalletAuthState.StorageUnavailable,
                 WalletAuthState.Unlocked,
                 -> state
             }
@@ -46,10 +52,22 @@ class WalletDemoController(
     }
 
     fun submitPin() {
+        if (_state.value.isAuthenticating) return
         when (val auth = _state.value.auth) {
             is WalletAuthState.Setup -> submitSetupPin(auth)
             is WalletAuthState.Login -> submitLoginPin(auth)
+            is WalletAuthState.StorageUnavailable,
             WalletAuthState.Unlocked -> Unit
+        }
+    }
+
+    fun retryPinStorage() {
+        _state.update { state ->
+            if (state.auth is WalletAuthState.StorageUnavailable) {
+                state.copy(auth = readInitialAuthState())
+            } else {
+                state
+            }
         }
     }
 
@@ -535,9 +553,22 @@ class WalletDemoController(
             return
         }
 
-        configuredPin = pin
-        _state.update { it.copy(auth = WalletAuthState.Unlocked) }
-        bootstrapIfNeeded()
+        _state.update { it.copy(isAuthenticating = true) }
+        scope.launch(dispatcher) {
+            runCatching { pinStore.setPin(pin) }
+                .onSuccess {
+                    _state.update {
+                        it.copy(
+                            auth = WalletAuthState.Unlocked,
+                            isAuthenticating = false,
+                        )
+                    }
+                    bootstrapIfNeeded()
+                }
+                .onFailure {
+                    setSetupPinError("PIN could not be saved")
+                }
+        }
     }
 
     private fun submitLoginPin(auth: WalletAuthState.Login) {
@@ -547,13 +578,26 @@ class WalletDemoController(
             return
         }
 
-        if (configuredPin != pin) {
-            setLoginPinError(WalletDisplayText.WrongPin)
-            return
+        _state.update { it.copy(isAuthenticating = true) }
+        scope.launch(dispatcher) {
+            runCatching { pinStore.verifyPin(pin) }
+                .onSuccess { matches ->
+                    if (!matches) {
+                        setLoginPinError(WalletDisplayText.WrongPin)
+                        return@onSuccess
+                    }
+                    _state.update {
+                        it.copy(
+                            auth = WalletAuthState.Unlocked,
+                            isAuthenticating = false,
+                        )
+                    }
+                    bootstrapIfNeeded()
+                }
+                .onFailure {
+                    setLoginPinError("PIN could not be verified")
+                }
         }
-
-        _state.update { it.copy(auth = WalletAuthState.Unlocked) }
-        bootstrapIfNeeded()
     }
 
     private fun bootstrapIfNeeded() {
@@ -599,14 +643,20 @@ class WalletDemoController(
     private fun setSetupPinError(message: String) {
         _state.update { state ->
             val auth = state.auth as? WalletAuthState.Setup ?: return@update state
-            state.copy(auth = auth.copy(error = message))
+            state.copy(
+                auth = auth.copy(error = message),
+                isAuthenticating = false,
+            )
         }
     }
 
     private fun setLoginPinError(message: String) {
         _state.update { state ->
             val auth = state.auth as? WalletAuthState.Login ?: return@update state
-            state.copy(auth = auth.copy(error = message))
+            state.copy(
+                auth = auth.copy(error = message),
+                isAuthenticating = false,
+            )
         }
     }
 
@@ -620,6 +670,13 @@ class WalletDemoController(
             )
         }
     }
+
+    private fun readInitialAuthState(): WalletAuthState =
+        runCatching {
+            if (pinStore.hasPin()) WalletAuthState.Login() else WalletAuthState.Setup()
+        }.getOrElse {
+            WalletAuthState.StorageUnavailable()
+        }
 
     private companion object {
         val pinPattern = Regex("\\d{4,8}")
