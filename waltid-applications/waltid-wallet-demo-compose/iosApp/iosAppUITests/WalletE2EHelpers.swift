@@ -22,6 +22,32 @@ final class WalletE2EUI {
         launch(environment: attestation)
     }
 
+    func launchExpectingLoginAndUnlock(
+        environment: [String: String],
+        walletReadyTimeout: TimeInterval = 60
+    ) {
+        for (key, value) in environment {
+            app.launchEnvironment[key] = value
+        }
+        app.launch()
+
+        let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
+        XCTAssertTrue(pinInput.waitForExistence(timeout: 10), "PIN input not found after relaunch")
+        let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
+        XCTAssertFalse(confirmation.waitForExistence(timeout: 2), "PIN setup was shown after relaunch")
+        unlockWallet()
+
+        let readyStatus = waitForStatus(
+            prefixes: ["Wallet ready", "Bootstrap failed"],
+            timeout: walletReadyTimeout
+        )
+        XCTAssertEqual(
+            readyStatus,
+            "Wallet ready",
+            "Persisted PIN did not unlock the wallet, status: \(readyStatus ?? "nil")"
+        )
+    }
+
     func textInput(identifier: String, fallbackLabel: String) -> XCUIElement {
         firstExisting([
             app.textFields[identifier],
@@ -31,6 +57,20 @@ final class WalletE2EUI {
             app.secureTextFields[fallbackLabel],
             app.textViews[fallbackLabel],
         ])
+    }
+
+    func waitForTextInput(
+        identifier: String,
+        fallbackLabel: String,
+        timeout: TimeInterval
+    ) -> XCUIElement? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let input = textInput(identifier: identifier, fallbackLabel: fallbackLabel)
+            if input.exists { return input }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        return nil
     }
 
     func button(identifier: String, fallbackLabel: String) -> XCUIElement {
@@ -90,15 +130,21 @@ final class WalletE2EUI {
         return false
     }
 
-    func tapButton(identifier: String, fallbackLabel: String) {
+    func tapButton(identifier: String, fallbackLabel: String, useCoordinateTap: Bool = false) {
         let targetButton = button(identifier: identifier, fallbackLabel: fallbackLabel)
         XCTAssertTrue(targetButton.waitForExistence(timeout: 20), "Button not found: \(identifier)")
+        dismissKeyboard()
         makeHittable(targetButton)
         XCTAssertTrue(targetButton.isHittable, "Button is not hittable: \(identifier)")
-        targetButton.tap()
+        XCTAssertTrue(targetButton.isEnabled, "Button is not enabled: \(identifier)")
+        if useCoordinateTap {
+            targetButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        } else {
+            targetButton.tap()
+        }
     }
 
-    private func replaceText(in element: XCUIElement, value: String) {
+    func replaceText(in element: XCUIElement, value: String) {
         XCTAssertTrue(element.waitForExistence(timeout: 20), "Input element not found")
         makeHittable(element)
         XCTAssertTrue(element.isHittable, "Input element is not hittable")
@@ -110,11 +156,12 @@ final class WalletE2EUI {
         if let currentValue = element.value as? String {
             let placeholder = element.placeholderValue ?? ""
             if !currentValue.isEmpty && currentValue != placeholder {
-                element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: currentValue.count))
+                element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: max(currentValue.count, 32)))
             }
         }
 
         element.typeText(value)
+        dismissKeyboard(focusedElement: element)
     }
 
     private func focusTextInput(_ element: XCUIElement, timeout: TimeInterval = 8) -> Bool {
@@ -182,6 +229,20 @@ final class WalletE2EUI {
             app.swipeUp()
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
+    }
+
+    private func dismissKeyboard(focusedElement: XCUIElement? = nil) {
+        guard app.keyboards.firstMatch.exists else { return }
+
+        let doneButton = app.toolbars.buttons["Done"]
+        if doneButton.exists && doneButton.isHittable {
+            doneButton.tap()
+        } else if let focusedElement {
+            focusedElement.typeText(XCUIKeyboardKey.return.rawValue)
+        } else {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.3))
     }
 
     private func unlockWallet() {

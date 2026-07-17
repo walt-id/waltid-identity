@@ -34,11 +34,28 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 - Present credentials using OpenID4VP.
 - Support mobile issuance flows using OAuth 2.0 client attestation.
 
+## Receiving credentials
+
+Resolve an offer before issuance so the application can collect a separately
+delivered transaction code when the issuer requires one:
+
+```kotlin
+val resolution = wallet.resolveOffer(offerUrl)
+val transactionCode = if (resolution.transactionCodeRequired) {
+    collectTransactionCode()
+} else {
+    null
+}
+val credentialIds = wallet.receive(offerUrl, txCode = transactionCode)
+```
+
 ## Persistence and encryption
 
 `MobileWalletConfig()` uses managed encrypted SQLDelight persistence by default on Android and iOS. Normal SDK users do not provide a database key: the SDK generates one per wallet database, stores it in platform-protected storage, and uses SQLCipher for the local wallet database.
 
 Managed keys are device-local by default. They protect data at rest on the current device, but they are not a cross-device recovery mechanism. Use `MobileWalletDatabaseKey.Provided` when an app needs enterprise/KMS ownership or recoverable database-key material. Store overrides are independent: `null` credential and DID overrides use the encrypted SQLDelight database opened by this persistence configuration, while a `null` key override keeps platform-backed signing-key persistence and generation. Supported mobile platforms intentionally do not fall back to plaintext wallet databases.
+
+`MobileWalletConfig()` does not accept any OpenID4VP `transaction_data` profiles by default. Wallet apps must pass the profile types they understand through `transactionDataProfiles`; requests containing unknown transaction data types are rejected before the user can submit a presentation. Profile fields are preserved for app UI and display metadata.
 
 The examples below build `MobileWalletConfig` values. Pass the selected config
 to `MobileWalletFactory(...).create(config)` from a coroutine to create the

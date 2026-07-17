@@ -28,6 +28,7 @@ import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.walletRejectHandli
 import id.waltid.openid4vp.wallet.presentation.*
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -535,6 +536,48 @@ object WalletPresentFunctionality2 {
         }
     }
 
+    private suspend fun resolveAuthorizationRequestObject(
+        presentationRequestUrl: Url,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy,
+    ): ResolvedAuthorizationRequest =
+        AuthorizationRequestResolver.resolve(
+            requestUrl = presentationRequestUrl,
+            unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+            fetchRequestUri = { requestUri, requestUriMethod ->
+                AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                    webResolveAuthReq = webResolveAuthReq,
+                    requestUri = requestUri,
+                    requestUriMethod = requestUriMethod,
+                    // Optional wallet metadata is omitted until the caller explicitly profiles
+                    // its values. Some Final-compliant verifier endpoints reject unsupported
+                    // capability members, while wallet_nonce remains mandatory for this flow.
+                    sendWalletMetadata = false,
+                )
+            },
+        )
+
+    private suspend fun legacyFallbackResult(
+        presentationRequestUrl: Url,
+        legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)?,
+        error: AuthorizationRequestResolver.SignedAuthorizationRequestValidationException,
+    ): WalletPresentResult? {
+        if (error.clientIdError !is ClientIdError.PreRegisteredClientNotFound || legacyFallbackCallback == null) {
+            return null
+        }
+
+        val fallbackResponse = runCatching { legacyFallbackCallback(presentationRequestUrl) }
+            .getOrNull()
+            ?.getOrNull()
+
+        if (fallbackResponse != null) {
+            return WalletPresentResult(
+                transmissionSuccess = true,
+                verifierResponse = fallbackResponse,
+            )
+        }
+        return null
+    }
+
     suspend fun walletPresentHandling(
         holderKey: Key,
         holderDid: String?,
@@ -545,8 +588,7 @@ object WalletPresentFunctionality2 {
         holderPoliciesToRun: Flow<HolderPolicy>?,
         runPolicies: Boolean?,
 
-        // Added from Branch B
-        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
 
         // TODO: selected credentials
 
@@ -556,19 +598,39 @@ object WalletPresentFunctionality2 {
          */
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
 
-        // Added from Branch B
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+
+        resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
     ): Result<WalletPresentResult> {
         log.trace { "- Start of Wallet Present Handling -" }
         log.trace { "Wallet presentation will use key $holderKey, and did $holderDid" }
 
         // Step 1: Resolve AuthorizationRequest.
-        val authorizationRequest: AuthorizationRequest = try {
-            resolveAuthorizationRequest(presentationRequestUrl, unsignedRequestObjectPolicy, legacyFallbackCallback)
-        } catch (e: LegacyFallbackException) {
-            return Result.success(WalletPresentResult(transmissionSuccess = true, verifierResponse = e.result))
-        }
+        val authorizationRequest: AuthorizationRequest = resolvedAuthorizationRequest
+            ?.authorizationRequest
+            ?: try {
+                resolveAuthorizationRequestObject(presentationRequestUrl, unsignedRequestObjectPolicy)
+                    .authorizationRequest
+                    .also(::validateAuthorizationRequest)
+            } catch (error: AuthorizationRequestResolver.SignedAuthorizationRequestValidationException) {
+                legacyFallbackResult(presentationRequestUrl, legacyFallbackCallback, error)
+                    ?.let { return Result.success(it) }
+                throw error
+            } catch (error: IllegalArgumentException) {
+                val fallbackResponse = runCatching { legacyFallbackCallback?.invoke(presentationRequestUrl) }
+                    .getOrNull()
+                    ?.getOrNull()
+                if (fallbackResponse != null) {
+                    return Result.success(
+                        WalletPresentResult(
+                            transmissionSuccess = true,
+                            verifierResponse = fallbackResponse,
+                        )
+                    )
+                }
+                throw error
+            }
 
         log.trace { "Wallet will try to present to AuthorizationRequest: $authorizationRequest" }
 

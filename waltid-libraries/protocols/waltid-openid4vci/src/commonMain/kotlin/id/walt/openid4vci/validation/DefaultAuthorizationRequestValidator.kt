@@ -14,6 +14,8 @@ class DefaultAuthorizationRequestValidator(
 
     override fun validate(parameters: Map<String, List<String>>): AuthorizationRequestResult {
         return try {
+            parameters.rejectDuplicateParameters()
+
             // RFC6749 §4.1.1: client_id and response_type are required and must be single-valued.
             val clientId = parameters.requireSingle("client_id")
             val responseTypeRaw = parameters.requireSingle("response_type")

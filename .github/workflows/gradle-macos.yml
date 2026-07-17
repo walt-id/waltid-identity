@@ -105,7 +105,7 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
 
       - name: Run Compose iOS demo tests
-        timeout-minutes: 25
+        timeout-minutes: 40
         uses: walt-id/waltid-identity/.github/actions/gradle-ios@c95b601fc5095d5668eb8c906af992d8e00ed513
         with:
           waltid-directory: 'waltid-identity'

@@ -50,6 +50,8 @@ bin/
 secret*
 */*/data
 !.github/**/data/
+!waltid-applications/waltid-web-portal2/data/
+!waltid-applications/waltid-web-portal2/data/simplePidVerificationRequests.ts
 **/*.db
 /kotlin-js-store/
 .idea/misc.xml
@@ -119,6 +121,7 @@ playground.xcworkspace
 # Xcode automatically generates this directory with a .xcworkspacedata file and xcuserdata
 # hence it is not needed unless you have added a package configuration file to your project
 # .swiftpm
+.swiftpm-locks/
 
 .build/
 

@@ -8,6 +8,7 @@ import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.openid4vci.requests.credential.CredentialRequest
@@ -46,7 +47,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
             if (configuration.format !in supportedFormats) {
                 return CredentialResponseResult.Failure(
                     OAuthError(
-                        "unsupported_credential_configuration",
+                        CredentialErrorCodes.UNSUPPORTED_CREDENTIAL_CONFIGURATION,
                         "Unsupported format ${configuration.format.value}"
                     )
                 )

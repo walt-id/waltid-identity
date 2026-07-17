@@ -1,26 +1,27 @@
 <script setup lang="ts">
-import QrcodeVue from 'qrcode.vue'
+import QrcodeVue from "qrcode.vue";
 
 const props = defineProps<{
-  value: string        // raw openid4vp:// or openid-credential-offer:// URL (for QR)
-  walletUrl: string    // web wallet base URL
-  walletPath: string   // e.g. 'api/siop/initiatePresentation' or 'api/siop/initiateIssuance'
-  label?: string
-}>()
+  value: string; // raw openid4vp:// or openid-credential-offer:// URL (for QR)
+  walletUrl: string; // web wallet base URL
+  walletPath: string; // e.g. 'api/siop/initiatePresentation' or 'api/siop/initiateIssuance'
+}>();
 
-const copied = ref(false)
+const copied = ref(false);
 
 // Mirrors sendToWebWallet from the old portal:
 // walletUrl/walletPath + query string from the raw value
 const webWalletHref = computed(() => {
-  const qs = props.value.substring(props.value.indexOf('?'))
-  return `${props.walletUrl}/${props.walletPath}${qs}`
-})
+  const qs = props.value.substring(props.value.indexOf("?"));
+  return `${props.walletUrl}/${props.walletPath}${qs}`;
+});
 
 async function copyToClipboard() {
-  await navigator.clipboard.writeText(props.value)
-  copied.value = true
-  setTimeout(() => { copied.value = false }, 2000)
+  await navigator.clipboard.writeText(props.value);
+  copied.value = true;
+  setTimeout(() => {
+    copied.value = false;
+  }, 2000);
 }
 </script>
 
@@ -31,16 +32,17 @@ async function copyToClipboard() {
     </div>
 
     <div class="flex gap-2">
-      <a :href="webWalletHref" class="hidden btn btn-primary" target="_blank" rel="noopener noreferrer">
+      <a
+        :href="webWalletHref"
+        class="hidden btn btn-primary"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
         Open in Wallet
       </a>
       <button class="btn btn-secondary" @click="copyToClipboard">
-        {{ copied ? 'Copied!' : 'Copy URL' }}
+        {{ copied ? "Copied!" : "Copy OpenID Link" }}
       </button>
     </div>
-
-    <p v-if="label" class="text-xs text-[--color-text-muted] text-center max-w-full break-all px-4">
-      {{ label }}
-    </p>
   </div>
 </template>

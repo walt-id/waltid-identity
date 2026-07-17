@@ -1,0 +1,160 @@
+name: Mobile eligibility
+
+on:
+  workflow_call:
+    inputs:
+      event-name:
+        description: "Caller event name"
+        required: true
+        type: string
+      ref:
+        description: "Caller git ref"
+        required: true
+        type: string
+      pr-number:
+        description: "Pull request number, if the caller is a PR event"
+        required: false
+        type: string
+        default: ""
+      pr-head-repo:
+        description: "Pull request head repository, if the caller is a PR event"
+        required: false
+        type: string
+        default: ""
+      pr-labels:
+        description: "JSON array of pull request label names"
+        required: false
+        type: string
+        default: "[]"
+      pr-draft:
+        description: "Whether the pull request is currently a draft"
+        required: false
+        type: boolean
+        default: false
+      platform-name:
+        description: "Human-readable platform name for log messages"
+        required: true
+        type: string
+      platform-label:
+        description: "Platform-specific opt-in label"
+        required: true
+        type: string
+      path-patterns:
+        description: "JSON array of platform-relevant path patterns"
+        required: true
+        type: string
+    outputs:
+      should-run:
+        description: "Whether platform jobs should run"
+        value: ${{ jobs.decide.outputs.should-run }}
+      reason:
+        description: "Human-readable decision reason"
+        value: ${{ jobs.decide.outputs.reason }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  decide:
+    runs-on: ubuntu-22.04
+    outputs:
+      should-run: ${{ steps.decide.outputs.should-run }}
+      reason: ${{ steps.decide.outputs.reason }}
+    steps:
+      - name: Decide whether mobile jobs should run
+        id: decide
+        env:
+          EVENT_NAME: ${{ inputs.event-name }}
+          GH_TOKEN: ${{ github.token }}
+          PATH_PATTERNS: ${{ inputs.path-patterns }}
+          PLATFORM_LABEL: ${{ inputs.platform-label }}
+          PLATFORM_NAME: ${{ inputs.platform-name }}
+          PR_DRAFT: ${{ inputs.pr-draft }}
+          PR_HEAD_REPO: ${{ inputs.pr-head-repo }}
+          PR_LABELS: ${{ inputs.pr-labels }}
+          PR_NUMBER: ${{ inputs.pr-number }}
+          REF: ${{ inputs.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          set_decision() {
+            echo "should-run=$1" >> "$GITHUB_OUTPUT"
+            echo "reason=$2" >> "$GITHUB_OUTPUT"
+          }
+
+          is_relevant_path() {
+            local path="$1"
+            local pattern
+
+            while IFS= read -r pattern; do
+              if [[ "$path" == $pattern ]]; then
+                return 0
+              fi
+            done < <(jq -r '.[]' <<< "$PATH_PATTERNS")
+
+            return 1
+          }
+
+          case "$EVENT_NAME" in
+            workflow_call)
+              set_decision true "workflow call"
+              exit 0
+              ;;
+            workflow_dispatch)
+              set_decision true "manual dispatch"
+              exit 0
+              ;;
+            push)
+              if [[ "$REF" == "refs/heads/main" ]]; then
+                set_decision true "main push"
+              else
+                set_decision false "non-main branch push"
+              fi
+              exit 0
+              ;;
+            pull_request)
+              if [[ "$PR_HEAD_REPO" != "$GITHUB_REPOSITORY" ]]; then
+                set_decision false "fork PR requires manual dispatch by maintainer"
+                exit 0
+              fi
+
+              label_match="$(
+                jq -er --arg platform_label "$PLATFORM_LABEL" '
+                  if index($platform_label) != null then "platform"
+                  elif index("ci:mobile") != null then "mobile"
+                  else "none"
+                  end
+                ' <<< "$PR_LABELS"
+              )"
+              case "$label_match" in
+                platform) set_decision true "$PLATFORM_LABEL label"; exit 0 ;;
+                mobile) set_decision true "ci:mobile label"; exit 0 ;;
+              esac
+
+              if [[ "$PR_DRAFT" == "true" ]]; then
+                set_decision false "draft PR without $PLATFORM_LABEL or ci:mobile label"
+                exit 0
+              fi
+
+              changed_files=()
+              while IFS= read -r changed_file; do
+                changed_files+=("$changed_file")
+              done < <(
+                gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename'
+              )
+
+              for file in "${changed_files[@]}"; do
+                if is_relevant_path "$file"; then
+                  set_decision true "matched ${PLATFORM_NAME}-relevant path: $file"
+                  exit 0
+                fi
+              done
+
+              set_decision false "no ${PLATFORM_NAME}-relevant path changes, $PLATFORM_LABEL label, or ci:mobile label"
+              exit 0
+              ;;
+          esac
+
+          set_decision false "unsupported event: $EVENT_NAME"

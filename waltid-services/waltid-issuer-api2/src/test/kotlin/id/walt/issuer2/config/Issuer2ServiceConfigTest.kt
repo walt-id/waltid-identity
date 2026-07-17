@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
@@ -42,6 +43,30 @@ class Issuer2ServiceConfigTest {
         assertNull(config.clientAttestationConfig())
         assertEquals(false, config.supportsPreAuthAnonymous())
         assertEquals("http://localhost:7002/openid4vci", config.openId4VciBaseUrl())
+    }
+
+    @Test
+    fun `service config decodes credential encryption key`() {
+        val config = loadServiceConfig(
+            """
+                baseUrl = "http://localhost:7002"
+                credentialEncryptionKey = ${hoconTripleQuoted(CREDENTIAL_ENCRYPTION_KEY)}
+            """.trimIndent(),
+        )
+
+        assertEquals(CREDENTIAL_ENCRYPTION_KEY, config.credentialEncryptionKey)
+    }
+
+    @Test
+    fun `service config rejects unsupported credential encryption key`() {
+        assertFails {
+            loadServiceConfig(
+                """
+                    baseUrl = "http://localhost:7002"
+                    credentialEncryptionKey = ${hoconTripleQuoted(ED25519_KEY)}
+                """.trimIndent(),
+            )
+        }
     }
 
     @Test
@@ -140,5 +165,16 @@ class Issuer2ServiceConfigTest {
         ConfigManager.loadConfigs()
 
         return ConfigManager.getConfig()
+    }
+
+    private fun hoconTripleQuoted(value: String): String =
+        "\"\"\"$value\"\"\""
+
+    private companion object {
+        const val CREDENTIAL_ENCRYPTION_KEY =
+            """{"type":"jwk","jwk":{"kty":"EC","d":"ZSHgIcRvbwV9s224kHUaFqkEPShCAdwXocGl_w3M42Q","crv":"P-256","kid":"issuer2-credential-encryption-key","x":"GWKpdL3jPoPJ5wKgSA-jxS2jgp-ZUDE6sIQbeB86vF0","y":"F3xAwH96_xVciV7mFQslU_eRQgP-5pSZiNf8bjMoGfo"}}"""
+
+        const val ED25519_KEY =
+            """{"type":"jwk","jwk":{"kty":"OKP","crv":"Ed25519","d":"LjxmEnd5oC7hFabwjKQFyeIgMG0OVZ_EBZQ0ZTKBZQs","x":"UDiPRbt76NoaAye5AonMirL7jjTKppMSzAXH0ZwuenU"}}"""
     }
 }
