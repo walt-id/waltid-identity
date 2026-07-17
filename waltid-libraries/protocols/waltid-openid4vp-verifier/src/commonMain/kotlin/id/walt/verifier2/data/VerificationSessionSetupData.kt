@@ -280,7 +280,7 @@ data class DcApiAnnexDFlowSetup(
 
                 key = DirectSerializedKey(KeyManager.resolveSerializedKeyBlocking("""{"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}"""))
             ),
-            expectedOrigins = listOf("https://digital-credentials.walt.id"),
+            expectedOrigins = listOf("https://portal2.demo.walt.id"),
             haip = false
         )
         val EXAMPLE_UNSIGNED_ENCRYPTED_MDL = EX_UNSIGNED_UNENCRYPTED_MDL.copy(
@@ -325,7 +325,7 @@ data class DcApiAnnexDFlowSetup(
                     )
                 )
             ),
-            expectedOrigins = listOf("https://digital-credentials.walt.id"),
+            expectedOrigins = listOf("https://portal2.demo.walt.id"),
             haip = false
         )
         val EXAMPLE_SIGNED_ENCRYPTED_MDL = EXAMPLE_SIGNED_MDL.copy(
@@ -484,7 +484,7 @@ data class DcApiAnnexCFlowSetup(
                     )
                 )
             ),
-            expectedOrigins = listOf("https://digital-credentials.walt.id")
+            expectedOrigins = listOf("https://portal2.demo.walt.id")
         )
 
         val EXTENDED_PHOTOID_EXAMPLE = DcApiAnnexCFlowSetup(
@@ -534,7 +534,7 @@ data class DcApiAnnexCFlowSetup(
                     )
                 )
             ),
-            expectedOrigins = listOf("https://digital-credentials.walt.id"),
+            expectedOrigins = listOf("https://portal2.demo.walt.id"),
         )
 
         val EXTENDED_PID_EXAMPLE = DcApiAnnexCFlowSetup(
@@ -561,7 +561,7 @@ data class DcApiAnnexCFlowSetup(
                     )
                 )
             ),
-            expectedOrigins = listOf("https://digital-credentials.walt.id"),
+            expectedOrigins = listOf("https://portal2.demo.walt.id"),
         )
 
         val MULTI_CREDENTIAL_EXAMPLE = DcApiAnnexCFlowSetup(
@@ -569,7 +569,7 @@ data class DcApiAnnexCFlowSetup(
                 requestedElements = EXTENDED_MDL_EXAMPLE.coreFlow.requestedElements!! +
                     EXTENDED_PHOTOID_EXAMPLE.coreFlow.requestedElements!!
             ),
-            expectedOrigins = listOf("https://digital-credentials.walt.id"),
+            expectedOrigins = listOf("https://portal2.demo.walt.id"),
         )
 
         val SIGNED_MDL_EXAMPLE = EXTENDED_MDL_EXAMPLE.copy(
