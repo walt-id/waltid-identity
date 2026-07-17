@@ -17,6 +17,29 @@ import kotlin.test.assertTrue
 class WalletDemoControllerTest {
 
     @Test
+    fun pinStorageReadFailureStaysLockedUntilRetrySucceeds() = runTest {
+        val pinStore = RecoverableDemoPinStore()
+        val wallet = FakeDemoWallet()
+        val controller = controllerWith(wallet, this, pinStore)
+
+        assertTrue(controller.state.value.auth is WalletAuthState.StorageUnavailable)
+
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.submitPin()
+        runCurrent()
+
+        assertTrue(controller.state.value.auth is WalletAuthState.StorageUnavailable)
+        assertEquals(0, pinStore.setPinCalls)
+        assertEquals(0, wallet.bootstrapCalls)
+
+        pinStore.isAvailable = true
+        controller.retryPinStorage()
+
+        assertTrue(controller.state.value.auth is WalletAuthState.Login)
+    }
+
+    @Test
     fun setupPinRejectsInvalidLengthAndNonDigits() = runTest {
         val controller = controllerWith(FakeDemoWallet(), this)
 
@@ -45,7 +68,8 @@ class WalletDemoControllerTest {
     @Test
     fun setupPinUnlocksAndBootstrapsWallet() = runTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
-        val controller = controllerWith(wallet, this)
+        val pinStore = InMemoryDemoPinStore()
+        val controller = controllerWith(wallet, this, pinStore)
 
         controller.updatePin("1234")
         controller.updatePinConfirmation("1234")
@@ -59,6 +83,44 @@ class WalletDemoControllerTest {
         assertEquals("did:key:test", session.did)
         assertEquals(listOf(sampleCredential), session.credentials)
         assertEquals(1, wallet.bootstrapCalls)
+        assertTrue(pinStore.hasPin())
+    }
+
+    @Test
+    fun configuredPinStartsRecreatedControllerInLoginAndUnlocksWithOriginalPin() = runTest {
+        val pinStore = InMemoryDemoPinStore()
+        val firstController = controllerWith(FakeDemoWallet(), this, pinStore)
+        firstController.updatePin("1234")
+        firstController.updatePinConfirmation("1234")
+        firstController.submitPin()
+        runCurrent()
+
+        val recreatedWallet = FakeDemoWallet()
+        val recreatedController = controllerWith(recreatedWallet, this, pinStore)
+
+        assertTrue(recreatedController.state.value.auth is WalletAuthState.Login)
+        recreatedController.updatePin("1234")
+        recreatedController.submitPin()
+        runCurrent()
+
+        assertTrue(recreatedController.state.value.auth is WalletAuthState.Unlocked)
+        assertTrue(recreatedController.state.value.session is WalletSessionState.Ready)
+        assertEquals(1, recreatedWallet.bootstrapCalls)
+    }
+
+    @Test
+    fun recreatedControllerRejectsWrongPin() = runTest {
+        val pinStore = InMemoryDemoPinStore().also { it.setPin("1234") }
+        val controller = controllerWith(FakeDemoWallet(), this, pinStore)
+
+        controller.updatePin("9999")
+        controller.submitPin()
+        runCurrent()
+
+        val auth = controller.state.value.auth as WalletAuthState.Login
+        assertEquals("Wrong PIN", auth.error)
+        assertFalse(controller.state.value.isAuthenticating)
+        assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
     }
 
     @Test
@@ -68,6 +130,7 @@ class WalletDemoControllerTest {
         controller.lock()
         controller.updatePin("9999")
         controller.submitPin()
+        runCurrent()
 
         val auth = controller.state.value.auth as WalletAuthState.Login
         assertEquals("Wrong PIN", auth.error)
@@ -1014,9 +1077,14 @@ class WalletDemoControllerTest {
         assertEquals("Wallet ready", controller.state.value.statusText)
     }
 
-    private fun controllerWith(wallet: DemoWallet, scope: TestScope): WalletDemoController =
+    private fun controllerWith(
+        wallet: DemoWallet,
+        scope: TestScope,
+        pinStore: DemoPinStore = InMemoryDemoPinStore(),
+    ): WalletDemoController =
         WalletDemoController(
             wallet = wallet,
+            pinStore = pinStore,
             scope = scope.backgroundScope,
             dispatcher = StandardTestDispatcher(scope.testScheduler),
         )
@@ -1041,6 +1109,22 @@ class WalletDemoControllerTest {
             credentialDataJson = WalletDemoSampleCredentialData.credentialDataJsonWithPortrait,
         )
     }
+}
+
+private class RecoverableDemoPinStore : DemoPinStore {
+    var isAvailable = false
+    var setPinCalls = 0
+
+    override fun hasPin(): Boolean {
+        check(isAvailable) { "PIN storage is unavailable" }
+        return true
+    }
+
+    override suspend fun setPin(pin: String) {
+        setPinCalls += 1
+    }
+
+    override suspend fun verifyPin(pin: String): Boolean = true
 }
 
 private class FakeDemoWallet(

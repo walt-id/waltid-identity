@@ -1,7 +1,8 @@
 package id.walt.walletdemo.compose.logic
 
 val WalletDemoUiState.isBusy: Boolean
-    get() = session is WalletSessionState.Bootstrapping ||
+    get() = isAuthenticating ||
+        session is WalletSessionState.Bootstrapping ||
         operation is WalletOperationState.ResolvingOffer ||
         operation is WalletOperationState.Receiving ||
         operation is WalletOperationState.ResolvingPresentation ||
@@ -74,6 +75,7 @@ private fun WalletSessionState.statusText(auth: WalletAuthState): String =
         WalletSessionState.NotBootstrapped -> when (auth) {
             is WalletAuthState.Setup -> WalletDisplayText.SetupPin
             is WalletAuthState.Login -> WalletDisplayText.UnlockPin
+            is WalletAuthState.StorageUnavailable -> auth.message
             WalletAuthState.Unlocked -> WalletDisplayText.WalletNotReady
         }
         WalletSessionState.Bootstrapping -> WalletDisplayText.BootstrappingWallet
