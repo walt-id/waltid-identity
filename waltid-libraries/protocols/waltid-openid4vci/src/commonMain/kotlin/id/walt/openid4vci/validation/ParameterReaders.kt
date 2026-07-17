@@ -9,6 +9,13 @@ private val authorizationDetailsJson = Json {
     ignoreUnknownKeys = true
 }
 
+internal fun Map<String, List<String>>.rejectDuplicateParameters() {
+    val duplicateParameter = entries.firstOrNull { (_, values) -> values.size > 1 }?.key
+    if (duplicateParameter != null) {
+        throw SerializationException("Multiple values for $duplicateParameter not allowed")
+    }
+}
+
 internal fun Map<String, List<String>>.requireSingle(name: String): String {
     val values = this[name].orEmpty().filter { it.isNotBlank() }
     if (values.isEmpty()) throw SerializationException("Missing $name")

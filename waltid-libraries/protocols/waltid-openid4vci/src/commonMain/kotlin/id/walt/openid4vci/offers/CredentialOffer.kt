@@ -4,7 +4,6 @@ import id.walt.openid4vci.GrantType
 import io.ktor.http.Url
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
 data class CredentialOffer(
@@ -129,7 +128,6 @@ data class TxCode(
     val inputMode: String? = null,
     val length: Int? = null,
     val description: String? = null,
-    val value: JsonPrimitive? = null,
 )
 
 private const val GRANT_TYPE_AUTHORIZATION_CODE = "authorization_code"

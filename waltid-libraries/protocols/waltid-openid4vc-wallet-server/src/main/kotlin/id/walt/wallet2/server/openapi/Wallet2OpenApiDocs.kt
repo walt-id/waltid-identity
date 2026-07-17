@@ -1,10 +1,10 @@
 package id.walt.wallet2.server.openapi
 
+import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.server.handlers.CreateDidRequest
 import id.walt.wallet2.server.handlers.CreateWalletRequest
-import id.walt.wallet2.server.handlers.GenerateKeyRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.HttpStatusCode
@@ -14,6 +14,7 @@ import kotlinx.serialization.json.put
 object Wallet2OpenApiDocs {
 
     fun createWallet(): RouteConfig.() -> Unit = {
+        tags = listOf("Wallet Management")
         summary = "Create a new wallet"
         description = """
             Creates a wallet with optional named stores or inline key/DID material.
@@ -53,8 +54,8 @@ object Wallet2OpenApiDocs {
         description = """
             Generates a key in the wallet's first attached key store and returns its ID.
 
-            Supported `keyType` values: `Ed25519` (default), `secp256r1` (NIST P-256),
-            `secp256k1`, `secp384r1`, `secp521r1`, `RSA`, `RSA3072`, `RSA4096`.
+            Supported `keyType` values: `secp256r1` (NIST P-256, default example),
+            `Ed25519`, `secp256k1`, `secp384r1`, `secp521r1`, `RSA`, `RSA3072`, `RSA4096`.
 
             Wallets with only a `staticKey` and no key stores will not be able to generate keys.
         """.trimIndent()
@@ -63,14 +64,14 @@ object Wallet2OpenApiDocs {
                 description = "Wallet ID returned by POST /wallet"
                 example("Wallet ID") { value = "9bbbc42d-8f3a-4b1c-9e2d-1a2b3c4d5e6f" }
             }
-            body<GenerateKeyRequest> {
-                example("Ed25519 (default)") {
-                    value = Wallet2RequestExamples.GENERATE_KEY_ED25519
-                }
-                example("secp256r1 / NIST P-256") {
+            body<TypedKeyGenerationRequest> {
+                example("secp256r1 / NIST P-256 (JWK)") {
                     value = Wallet2RequestExamples.GENERATE_KEY_SECP256R1
                 }
-                example("secp256k1") {
+                example("Ed25519 (JWK)") {
+                    value = Wallet2RequestExamples.GENERATE_KEY_ED25519
+                }
+                example("secp256k1 (JWK)") {
                     value = Wallet2RequestExamples.GENERATE_KEY_SECP256K1
                 }
             }
@@ -79,11 +80,11 @@ object Wallet2OpenApiDocs {
             HttpStatusCode.Created to {
                 description = "Key generated"
                 body<WalletKeyInfo> {
-                    example("Ed25519 key") {
-                        value = WalletKeyInfo(keyId = "v_CW0xEd25519ExampleKeyId", keyType = "Ed25519")
-                    }
                     example("secp256r1 key") {
                         value = WalletKeyInfo(keyId = "v_CW0xP256ExampleKeyId", keyType = "secp256r1")
+                    }
+                    example("Ed25519 key") {
+                        value = WalletKeyInfo(keyId = "v_CW0xEd25519ExampleKeyId", keyType = "Ed25519")
                     }
                 }
             }

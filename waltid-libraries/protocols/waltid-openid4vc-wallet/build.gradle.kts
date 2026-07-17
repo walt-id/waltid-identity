@@ -78,6 +78,7 @@ kotlin {
         jvmTest.dependencies {
             implementation(kotlin("test-junit5"))
             implementation(identityLibs.slf4j.simple)
+            implementation(identityLibs.ktor.client.mock)
         }
     }
 }

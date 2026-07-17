@@ -55,6 +55,7 @@ class OpenId4VpPresentationService(
         AuthorizationRequestResolver.resolve(
             requestUrl = Url(request),
             unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+            enforceFinalRequestObject = false,
         ) { requestUri, requestUriMethod ->
             AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
                 webResolveAuthReq = webResolveAuthReq,

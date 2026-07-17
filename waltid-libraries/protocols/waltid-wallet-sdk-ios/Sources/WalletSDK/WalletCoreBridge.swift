@@ -5,10 +5,19 @@ protocol WalletCoreBridge: Sendable {
     var events: AsyncStream<WalletEvent> { get }
 
     func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult
+    func resolveOffer(offer: URL) async throws -> OfferResolution
     func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String]
     func credentials() async throws -> [Credential]
     func deleteLocalData() async throws
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
+    func previewPresentation(request: URL) async throws -> PresentationPreview
+    func submitPresentation(
+        request: URL,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?,
+        runPolicies: Bool?
+    ) async throws -> PresentationResult
 }
 
 @available(macOS 10.15, *)
@@ -34,6 +43,10 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         throw unavailableError()
     }
 
+    func resolveOffer(offer: URL) async throws -> OfferResolution {
+        throw unavailableError()
+    }
+
     func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String] {
         throw unavailableError()
     }
@@ -47,6 +60,20 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     }
 
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult {
+        throw unavailableError()
+    }
+
+    func previewPresentation(request: URL) async throws -> PresentationPreview {
+        throw unavailableError()
+    }
+
+    func submitPresentation(
+        request: URL,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?,
+        runPolicies: Bool?
+    ) async throws -> PresentationResult {
         throw unavailableError()
     }
 

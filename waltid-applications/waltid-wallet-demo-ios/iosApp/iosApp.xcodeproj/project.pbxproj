@@ -11,13 +11,26 @@
 		2185E0068DD9855D00602730 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 519D794773D1421EEC9493DE /* WalletSDK */; };
 		71E100012FDAE00000000001 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 519D794773D1421EEC9493DE /* WalletSDK */; };
 		71E100022FDAE00000000002 /* TestHelpers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; };
+		A1000500AAAA000100000050 /* CodeScanner in Frameworks */ = {isa = PBXBuildFile; productRef = A1000501AAAA000000000051 /* CodeScanner */; };
 		A1000001AAAA000100000001 /* WalletViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001AAAA000000000001 /* WalletViewModel.swift */; };
+		A1000420AAAA000100000020 /* WalletClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000420AAAA000000000020 /* WalletClient.swift */; };
+		A1000421AAAA000100000021 /* MockWalletClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000421AAAA000000000021 /* MockWalletClient.swift */; };
 		A1000002AAAA000100000002 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002AAAA000000000002 /* HomeView.swift */; };
 		A1000003AAAA000100000003 /* ReceiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000003AAAA000000000003 /* ReceiveView.swift */; };
 		A1000004AAAA000100000004 /* PresentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000004AAAA000000000004 /* PresentView.swift */; };
+		A1000422AAAA000100000022 /* CredentialsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000422AAAA000000000022 /* CredentialsTabView.swift */; };
+		A1000423AAAA000100000023 /* CredentialDetailsDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000423AAAA000000000023 /* CredentialDetailsDestination.swift */; };
 		A1000006AAAA000100000006 /* StatusBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006AAAA000000000006 /* StatusBannerView.swift */; };
 		A1000007AAAA000100000007 /* CredentialCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000007AAAA000000000007 /* CredentialCardView.swift */; };
 		A1000008AAAA000100000008 /* WalletColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000008AAAA000000000008 /* WalletColors.swift */; };
+		A1000424AAAA000100000024 /* EmptyCredentialsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000424AAAA000000000024 /* EmptyCredentialsView.swift */; };
+		A1000425AAAA000100000025 /* UrlEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000425AAAA000000000025 /* UrlEditor.swift */; };
+		A1000426AAAA000100000026 /* VerifierDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000426AAAA000000000026 /* VerifierDetailsView.swift */; };
+		A1000427AAAA000100000027 /* PresentationReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000427AAAA000000000027 /* PresentationReviewView.swift */; };
+		A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000430AAAA000000000030 /* OfferReviewView.swift */; };
+		A1000428AAAA000100000028 /* ClaimPathExpression.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000428AAAA000000000028 /* ClaimPathExpression.swift */; };
+		A1000429AAAA000100000029 /* VerifierClientIdentifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000429AAAA000000000029 /* VerifierClientIdentifier.swift */; };
+		A100042AAAAA00010000002A /* VerifierDisplayName.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100042AAAAA00000000002A /* VerifierDisplayName.swift */; };
 		A1000301AAAA000100000001 /* ClaimGroupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000301AAAA000000000001 /* ClaimGroupView.swift */; };
 		A1000302AAAA000100000002 /* ClaimValueRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000302AAAA000000000002 /* ClaimValueRow.swift */; };
 		A1000303AAAA000100000003 /* CredentialDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000303AAAA000000000003 /* CredentialDetailsView.swift */; };
@@ -37,6 +50,7 @@
 		D69044582FDAA6DB009AB1FB /* TestHelpers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; };
 		E2E00002AAAA000100000002 /* PublicDemoBackendE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00002AAAA000000000002 /* PublicDemoBackendE2ETests.swift */; };
 		E2E00003AAAA000100000003 /* WalletE2EHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00003AAAA000000000003 /* WalletE2EHelpers.swift */; };
+		E2E00014AAAA000100000014 /* MockWalletUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00014AAAA000000000014 /* MockWalletUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -65,12 +79,24 @@
 
 /* Begin PBXFileReference section */
 		A1000001AAAA000000000001 /* WalletViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletViewModel.swift; sourceTree = "<group>"; };
+		A1000420AAAA000000000020 /* WalletClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletClient.swift; sourceTree = "<group>"; };
+		A1000421AAAA000000000021 /* MockWalletClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockWalletClient.swift; sourceTree = "<group>"; };
 		A1000002AAAA000000000002 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		A1000003AAAA000000000003 /* ReceiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiveView.swift; sourceTree = "<group>"; };
 		A1000004AAAA000000000004 /* PresentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentView.swift; sourceTree = "<group>"; };
+		A1000422AAAA000000000022 /* CredentialsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialsTabView.swift; sourceTree = "<group>"; };
+		A1000423AAAA000000000023 /* CredentialDetailsDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDetailsDestination.swift; sourceTree = "<group>"; };
 		A1000006AAAA000000000006 /* StatusBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBannerView.swift; sourceTree = "<group>"; };
 		A1000007AAAA000000000007 /* CredentialCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialCardView.swift; sourceTree = "<group>"; };
 		A1000008AAAA000000000008 /* WalletColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletColors.swift; sourceTree = "<group>"; };
+		A1000424AAAA000000000024 /* EmptyCredentialsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyCredentialsView.swift; sourceTree = "<group>"; };
+		A1000425AAAA000000000025 /* UrlEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UrlEditor.swift; sourceTree = "<group>"; };
+		A1000426AAAA000000000026 /* VerifierDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifierDetailsView.swift; sourceTree = "<group>"; };
+		A1000427AAAA000000000027 /* PresentationReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationReviewView.swift; sourceTree = "<group>"; };
+		A1000430AAAA000000000030 /* OfferReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfferReviewView.swift; sourceTree = "<group>"; };
+		A1000428AAAA000000000028 /* ClaimPathExpression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaimPathExpression.swift; sourceTree = "<group>"; };
+		A1000429AAAA000000000029 /* VerifierClientIdentifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifierClientIdentifier.swift; sourceTree = "<group>"; };
+		A100042AAAAA00000000002A /* VerifierDisplayName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifierDisplayName.swift; sourceTree = "<group>"; };
 		A1000301AAAA000000000001 /* ClaimGroupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaimGroupView.swift; sourceTree = "<group>"; };
 		A1000302AAAA000000000002 /* ClaimValueRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaimValueRow.swift; sourceTree = "<group>"; };
 		A1000303AAAA000000000003 /* CredentialDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDetailsView.swift; sourceTree = "<group>"; };
@@ -93,6 +119,7 @@
 		D6B7A34A2FD94CC3009C69E7 /* iosAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E2E00002AAAA000000000002 /* PublicDemoBackendE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicDemoBackendE2ETests.swift; sourceTree = "<group>"; };
 		E2E00003AAAA000000000003 /* WalletE2EHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletE2EHelpers.swift; sourceTree = "<group>"; };
+		E2E00014AAAA000000000014 /* MockWalletUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockWalletUITests.swift; sourceTree = "<group>"; };
 		E2E00004AAAA000000000004 /* iosAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -138,6 +165,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0221E8E7784E493B08CF5888 /* WalletSDK in Frameworks */,
+				A1000500AAAA000100000050 /* CodeScanner in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -188,6 +216,8 @@
 			isa = PBXGroup;
 			children = (
 				A1000001AAAA000000000001 /* WalletViewModel.swift */,
+				A1000420AAAA000000000020 /* WalletClient.swift */,
+				A1000421AAAA000000000021 /* MockWalletClient.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -196,9 +226,11 @@
 			isa = PBXGroup;
 			children = (
 				A1000002AAAA000000000002 /* HomeView.swift */,
+				A1000422AAAA000000000022 /* CredentialsTabView.swift */,
 				A1000003AAAA000000000003 /* ReceiveView.swift */,
 				A1000004AAAA000000000004 /* PresentView.swift */,
 				A1000310AAAA000000000010 /* CredentialDetailsScreen.swift */,
+				A1000423AAAA000000000023 /* CredentialDetailsDestination.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -207,10 +239,15 @@
 			isa = PBXGroup;
 			children = (
 				A1000006AAAA000000000006 /* StatusBannerView.swift */,
+				A1000425AAAA000000000025 /* UrlEditor.swift */,
 				A1000007AAAA000000000007 /* CredentialCardView.swift */,
+				A1000424AAAA000000000024 /* EmptyCredentialsView.swift */,
 				A1000301AAAA000000000001 /* ClaimGroupView.swift */,
 				A1000302AAAA000000000002 /* ClaimValueRow.swift */,
 				A1000303AAAA000000000003 /* CredentialDetailsView.swift */,
+				A1000426AAAA000000000026 /* VerifierDetailsView.swift */,
+				A1000427AAAA000000000027 /* PresentationReviewView.swift */,
+				A1000430AAAA000000000030 /* OfferReviewView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -228,11 +265,14 @@
 			children = (
 				A1000309AAAA000000000009 /* CredentialCardSummary.swift */,
 				A1000304AAAA000000000004 /* CredentialDisplayModels.swift */,
+				A1000428AAAA000000000028 /* ClaimPathExpression.swift */,
 				A1000305AAAA000000000005 /* CredentialDisplayNormalizer.swift */,
 				A1000306AAAA000000000006 /* CredentialDisplayValueDecoder.swift */,
 				A1000307AAAA000000000007 /* CredentialDisplayVocabulary.swift */,
 				A1000308AAAA000000000008 /* CredentialTypeIdentifier.swift */,
 				A1000312AAAA000000000012 /* CredentialSystemInfo.swift */,
+				A1000429AAAA000000000029 /* VerifierClientIdentifier.swift */,
+				A100042AAAAA00000000002A /* VerifierDisplayName.swift */,
 			);
 			path = Display;
 			sourceTree = "<group>";
@@ -283,6 +323,7 @@
 			isa = PBXGroup;
 			children = (
 				E2E00002AAAA000000000002 /* PublicDemoBackendE2ETests.swift */,
+				E2E00014AAAA000000000014 /* MockWalletUITests.swift */,
 				E2E00003AAAA000000000003 /* WalletE2EHelpers.swift */,
 			);
 			path = iosAppUITests;
@@ -316,6 +357,7 @@
 			name = iosApp;
 			packageProductDependencies = (
 				256D4E3F703216DC04F0C650 /* WalletSDK */,
+				A1000501AAAA000000000051 /* CodeScanner */,
 			);
 			productName = iosApp;
 			productReference = B33B17E62C2C394F001A32F7 /* iosApp.app */;
@@ -448,6 +490,7 @@
 			mainGroup = B33B17DD2C2C394F001A32F7;
 			packageReferences = (
 				8A81DD79791BBF3F1CFF90A1 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */,
+				A1000502AAAA000000000052 /* XCRemoteSwiftPackageReference "CodeScanner" */,
 			);
 			productRefGroup = B33B17E72C2C394F001A32F7 /* Products */;
 			projectDirPath = "";
@@ -502,21 +545,33 @@
 				B33B17EC2C2C394F001A32F7 /* ContentView.swift in Sources */,
 				B33B17EA2C2C394F001A32F7 /* WalletDemoApp.swift in Sources */,
 				A1000001AAAA000100000001 /* WalletViewModel.swift in Sources */,
+				A1000420AAAA000100000020 /* WalletClient.swift in Sources */,
+				A1000421AAAA000100000021 /* MockWalletClient.swift in Sources */,
 				A1000002AAAA000100000002 /* HomeView.swift in Sources */,
+				A1000422AAAA000100000022 /* CredentialsTabView.swift in Sources */,
 				A1000003AAAA000100000003 /* ReceiveView.swift in Sources */,
 				A1000004AAAA000100000004 /* PresentView.swift in Sources */,
+				A1000423AAAA000100000023 /* CredentialDetailsDestination.swift in Sources */,
 				A1000006AAAA000100000006 /* StatusBannerView.swift in Sources */,
+				A1000425AAAA000100000025 /* UrlEditor.swift in Sources */,
 				A1000007AAAA000100000007 /* CredentialCardView.swift in Sources */,
+				A1000424AAAA000100000024 /* EmptyCredentialsView.swift in Sources */,
 				A1000008AAAA000100000008 /* WalletColors.swift in Sources */,
+				A1000428AAAA000100000028 /* ClaimPathExpression.swift in Sources */,
 				A1000301AAAA000100000001 /* ClaimGroupView.swift in Sources */,
 				A1000302AAAA000100000002 /* ClaimValueRow.swift in Sources */,
 				A1000303AAAA000100000003 /* CredentialDetailsView.swift in Sources */,
+				A1000426AAAA000100000026 /* VerifierDetailsView.swift in Sources */,
+				A1000427AAAA000100000027 /* PresentationReviewView.swift in Sources */,
+				A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */,
 				A1000304AAAA000100000004 /* CredentialDisplayModels.swift in Sources */,
 				A1000305AAAA000100000005 /* CredentialDisplayNormalizer.swift in Sources */,
 				A1000306AAAA000100000006 /* CredentialDisplayValueDecoder.swift in Sources */,
 				A1000307AAAA000100000007 /* CredentialDisplayVocabulary.swift in Sources */,
 				A1000308AAAA000100000008 /* CredentialTypeIdentifier.swift in Sources */,
 				A1000309AAAA000100000009 /* CredentialCardSummary.swift in Sources */,
+				A1000429AAAA000100000029 /* VerifierClientIdentifier.swift in Sources */,
+				A100042AAAAA00010000002A /* VerifierDisplayName.swift in Sources */,
 				A1000310AAAA000100000010 /* CredentialDetailsScreen.swift in Sources */,
 				A1000311AAAA000100000011 /* WalletAccessibilityID.swift in Sources */,
 				A1000312AAAA000100000012 /* CredentialSystemInfo.swift in Sources */,
@@ -549,6 +604,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E2E00002AAAA000100000002 /* PublicDemoBackendE2ETests.swift in Sources */,
+				E2E00014AAAA000100000014 /* MockWalletUITests.swift in Sources */,
 				E2E00003AAAA000100000003 /* WalletE2EHelpers.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1039,7 +1095,23 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		A1000502AAAA000000000052 /* XCRemoteSwiftPackageReference "CodeScanner" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/twostraws/CodeScanner.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
+		A1000501AAAA000000000051 /* CodeScanner */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1000502AAAA000000000052 /* XCRemoteSwiftPackageReference "CodeScanner" */;
+			productName = CodeScanner;
+		};
 		256D4E3F703216DC04F0C650 /* WalletSDK */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 8A81DD79791BBF3F1CFF90A1 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */;

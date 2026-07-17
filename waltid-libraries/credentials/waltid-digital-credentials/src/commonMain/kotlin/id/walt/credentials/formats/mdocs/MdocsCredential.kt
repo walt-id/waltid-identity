@@ -4,6 +4,7 @@ import id.walt.cose.toCoseVerifier
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.CredentialSignature
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.resolver.local.DidJwkResolver
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
@@ -60,6 +61,9 @@ data class MdocsCredential(
         return signature.signerKey.key
     }
 
+    override suspend fun getHolderKey(): Key =
+        JWKKey.importJWK(documentMso.deviceKeyInfo.deviceKey.toJWK().toString()).getOrThrow()
+
     companion object {
         private val log = KotlinLogging.logger { }
         private val issuerDidResolver = DidJwkResolver()
@@ -80,7 +84,9 @@ data class MdocsCredential(
     }
 
     val document by lazy { parseToDocument() }
-    val documentMso by lazy { document.issuerSigned.decodeMobileSecurityObject() }
+    val documentMso by lazy {
+        msoExtractionTestHook?.invoke(this) ?: document.issuerSigned.decodeMobileSecurityObject()
+    }
 
     private fun parseToDocument(): Document {
         requireNotNull(signed) { "No signed in Mdocs credential" }

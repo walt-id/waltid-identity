@@ -19,6 +19,7 @@ import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vc.policies.JsonSchemaPolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
 import id.walt.verifier2.data.CrossDeviceFlowSetup
@@ -315,7 +316,8 @@ class Verifier2RemoteSchemaTest {
                     presentationRequestUrl = bootstrapUrl!!,
                     selectCredentialsForQuery = selectCallback,
                     holderPoliciesToRun = null,
-                    runPolicies = null
+                    runPolicies = null,
+                    transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
                 )
             }
 

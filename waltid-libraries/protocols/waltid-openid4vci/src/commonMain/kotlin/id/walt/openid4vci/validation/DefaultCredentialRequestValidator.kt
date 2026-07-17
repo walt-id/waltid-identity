@@ -6,6 +6,7 @@ import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.prooftypes.Proofs
 import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
+import id.walt.openid4vci.requests.credential.encryption.CredentialResponseEncryptionParameters
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -42,7 +43,7 @@ class DefaultCredentialRequestValidator : CredentialRequestValidator {
                     if (!trimmed.startsWith("{")) {
                         throw IllegalArgumentException("credential_response_encryption must be a JSON object")
                     }
-                    Json.parseToJsonElement(trimmed).jsonObject
+                    CredentialResponseEncryptionParameters.fromJsonObject(Json.parseToJsonElement(trimmed).jsonObject)
                 }
 
             // OAuth2: client_id is not required at the credential endpoint (access token authenticates the client).
