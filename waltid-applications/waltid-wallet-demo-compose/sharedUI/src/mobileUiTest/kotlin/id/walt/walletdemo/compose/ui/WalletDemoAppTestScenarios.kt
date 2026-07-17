@@ -224,7 +224,7 @@ class WalletDemoAppTestScenarios {
 
     fun transactionCodeOfferCanBeDeclinedWithoutCode() = runComposeUiTest {
         val wallet = FakeDemoWallet(transactionCodeRequired = true)
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
