@@ -73,7 +73,8 @@ object Issuer2ManagementRoutesDocs {
             credentialData is applied as a partial object patch over the configured profile data:
             nested objects are merged, while primitive, array, and null values replace the configured value.
             Authorization-code offers include issuer_state by default. Set issuerStateMode to OMIT only
-            for profile-based offers without runtime overrides.
+            for profile-based offers without runtime overrides. AUTHORIZED offers with runtimeOverrides and
+            issuerStateMode OMIT are rejected with Bad Request.
             Offer/session expiry is configured with expiresInSeconds. The default is 5 minutes.
             Use -1 for no expiry.
         """.trimIndent()

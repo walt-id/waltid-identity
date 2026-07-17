@@ -12,11 +12,14 @@ import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.PARRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
+import id.walt.openid4vci.requests.credential.encryption.CredentialRequestDecryptor
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import id.walt.openid4vci.tokens.access.AccessTokenVerifier
 import id.walt.openid4vci.tokens.refresh.RefreshTokenIssuer
 import id.walt.openid4vci.tokens.refresh.RefreshTokenVerifier
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
+import id.walt.openid4vci.responses.credential.encryption.CredentialResponseEncryptor
+import id.walt.openid4vci.responses.credential.encryption.JweCredentialResponseEncryptor
 import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.CredentialRequestValidator
@@ -65,7 +68,9 @@ data class OAuth2ProviderConfig(
     val preAuthorizedCodeIssuer: PreAuthorizedCodeIssuer,
 
     val credentialRequestValidator: CredentialRequestValidator,
+    val credentialRequestDecryptor: CredentialRequestDecryptor? = null,
     val credentialEndpointHandlers: CredentialEndpointHandlers,
+    val credentialResponseEncryptor: CredentialResponseEncryptor = JweCredentialResponseEncryptor,
 )
 
 data class PushedAuthorizationConfig(

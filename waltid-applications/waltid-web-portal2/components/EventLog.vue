@@ -7,6 +7,10 @@ const props = defineProps<{
   isTerminal: boolean;
 }>();
 
+const emit = defineEmits<{
+  clear: [];
+}>();
+
 const container = ref<HTMLElement | null>(null);
 
 watch(
@@ -49,19 +53,22 @@ function eventColor(ev: SseEvent): string {
   <div class="grid gap-2">
     <div class="flex items-center justify-between">
       <span class="form-label !mb-0">Result Log</span>
-      <span
-        v-if="status"
-        class="text-xs font-semibold"
-        :class="
-          status === 'SUCCESSFUL'
-            ? 'text-green-600'
-            : isTerminal
-              ? 'text-red-600'
-              : 'text-blue-600'
-        "
-      >
-        {{ status }}
-      </span>
+      <div class="flex items-center gap-3">
+        <span
+          v-if="status"
+          class="text-xs font-semibold"
+          :class="status === 'SUCCESSFUL' ? 'text-green-600' : 'text-red-600'"
+        >
+          {{ status }}
+        </span>
+        <button
+          type="button"
+          class="btn btn-secondary !px-3 !py-1.5 !text-xs"
+          @click="emit('clear')"
+        >
+          Clear
+        </button>
+      </div>
     </div>
 
     <div ref="container" class="log-box min-h-[160px] max-h-[320px]">

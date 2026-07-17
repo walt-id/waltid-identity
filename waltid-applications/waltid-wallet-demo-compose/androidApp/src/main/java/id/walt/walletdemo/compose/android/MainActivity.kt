@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import id.walt.walletdemo.compose.logic.DemoWalletConfig
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.createAndroidDemoWallet
+import id.walt.walletdemo.compose.logic.createAndroidDemoPinStore
 import id.walt.walletdemo.compose.ui.WalletDemoApp
 
 class MainActivity : ComponentActivity() {
@@ -17,16 +18,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        val config = DemoWalletConfig(
+            attestationBaseUrl = BuildConfig.ATTESTATION_BASE_URL,
+            attestationAttesterPath = BuildConfig.ATTESTATION_ATTESTER_PATH,
+            attestationBearerToken = BuildConfig.ATTESTATION_BEARER_TOKEN,
+            attestationHostHeader = BuildConfig.ATTESTATION_HOST_HEADER,
+            transactionDataProfilesUrl = BuildConfig.TRANSACTION_DATA_PROFILES_URL,
+        )
         controller = WalletDemoController(
-            createAndroidDemoWallet(
+            wallet = createAndroidDemoWallet(
                 context = applicationContext,
-                config = DemoWalletConfig(
-                    attestationBaseUrl = BuildConfig.ATTESTATION_BASE_URL,
-                    attestationAttesterPath = BuildConfig.ATTESTATION_ATTESTER_PATH,
-                    attestationBearerToken = BuildConfig.ATTESTATION_BEARER_TOKEN,
-                    attestationHostHeader = BuildConfig.ATTESTATION_HOST_HEADER,
-                )
-            )
+                config = config,
+            ),
+            pinStore = createAndroidDemoPinStore(applicationContext, config.walletId),
         )
         handleIntent(intent)
 

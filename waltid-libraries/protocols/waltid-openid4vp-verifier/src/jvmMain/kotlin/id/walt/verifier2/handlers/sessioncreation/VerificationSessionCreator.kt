@@ -233,12 +233,15 @@ object VerificationSessionCreator {
             .mapNotNull { credentialId -> credentialQueriesById?.get(credentialId)?.format }
             .toSet()
 
+        val effectiveClientId = if ((isDcApi && !isSignedRequest) || isAnnexC) null else clientId
+
         val authorizationRequest = AuthorizationRequest(
             responseType = if (!isAnnexC) OpenID4VPResponseType.VP_TOKEN else null,
 
             // For Unsigned DC API, client_id MUST be omitted.
             // For Signed DC API, it MUST be present.
-            clientId = if ((isDcApi && !isSignedRequest) || isAnnexC) null else clientId,
+            clientId = effectiveClientId,
+            issuer = effectiveClientId.takeIf { isSignedRequest },
             redirectUri = null, // For Same-Device flow (fragment/query/after code exchange etc)
             // TODO: url building (handle host alias)
             responseUri = when {

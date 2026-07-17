@@ -168,7 +168,14 @@ export function useVerifierSession(verifierBase: string) {
     );
   }
 
-  return { result, loading, error, createSession, createDcApiSession, sse };
+  function clear() {
+    result.value = null;
+    error.value = null;
+    loading.value = false;
+    sse.reset();
+  }
+
+  return { result, loading, error, createSession, createDcApiSession, clear, sse };
 }
 
 async function invokeDigitalCredentialsApi(

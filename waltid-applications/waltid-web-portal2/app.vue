@@ -212,6 +212,11 @@ const hasResult = computed(() =>
         :events="activeSession.sse.events.value"
         :status="activeSession.sse.status.value"
         :is-terminal="activeSession.sse.isTerminal.value"
+        @clear="activeSession.clear()"
+      />
+      <PolicyResults
+        v-if="activeTab === 'verify'"
+        :events="verifierSession.sse.events.value"
       />
     </div>
   </main>

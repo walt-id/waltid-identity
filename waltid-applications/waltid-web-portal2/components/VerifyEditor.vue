@@ -96,6 +96,13 @@ const clientIdType = ref<ClientIdType>("x509_hash");
 const clientIdInput = ref("");
 const x509HashClientIdPreset = ref("");
 const isWritingJson = ref(false);
+const transactionDataProfiles = useTransactionDataProfiles(
+  config.public.verifierBase as string,
+);
+const transactionDataEnabled = ref(false);
+const transactionDataTouched = ref(false);
+const selectedTransactionProfileType = ref("");
+const transactionDataFieldValues = ref<Record<string, string>>({});
 
 const clientIdOptions = [
   {
@@ -153,11 +160,27 @@ const canSubmit = computed(() => {
 const missingRequiredClientId = computed(
   () => clientIdNeedsInput.value && !clientIdInput.value.trim(),
 );
+const selectedTransactionProfile = computed(
+  () =>
+    transactionDataProfiles.profiles.value.find(
+      (profile) => profile.type === selectedTransactionProfileType.value,
+    ) ??
+    transactionDataProfiles.profiles.value[0] ??
+    null,
+);
+const transactionDataUnavailable = computed(
+  () =>
+    transactionDataEnabled.value &&
+    (transactionDataProfiles.loading.value ||
+      !!transactionDataProfiles.error.value ||
+      !selectedTransactionProfile.value),
+);
 const submitDisabled = computed(
   () =>
     !canSubmit.value ||
     !!optionsError.value ||
     missingRequiredClientId.value ||
+    transactionDataUnavailable.value ||
     props.session.loading.value,
 );
 
@@ -179,6 +202,18 @@ function getCoreFlowObject(
 
   payload.core_flow = {};
   return payload.core_flow as Record<string, unknown>;
+}
+
+function getOpenIdObject(
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
+  const openid = payload.openid;
+  if (openid && typeof openid === "object" && !Array.isArray(openid)) {
+    return openid as Record<string, unknown>;
+  }
+
+  payload.openid = {};
+  return payload.openid as Record<string, unknown>;
 }
 
 function addX5cInput() {
@@ -231,6 +266,91 @@ function applyClientIdPreset(clientId: string) {
 
 applyClientIdPreset(verifierClientIdPreset);
 
+function getDcqlCredentialObjects(
+  coreFlow: Record<string, unknown>,
+): Array<Record<string, unknown>> {
+  const dcqlQuery = coreFlow.dcql_query;
+  if (!dcqlQuery || typeof dcqlQuery !== "object" || Array.isArray(dcqlQuery)) {
+    return [];
+  }
+
+  const credentials = (dcqlQuery as Record<string, unknown>).credentials;
+  return Array.isArray(credentials) ? credentials.filter(isRecord) : [];
+}
+
+function getDcqlCredentialIds(coreFlow: Record<string, unknown>): string[] {
+  return getDcqlCredentialObjects(coreFlow)
+    .map((credential) => credential.id)
+    .filter(
+      (id): id is string => typeof id === "string" && id.trim().length > 0,
+    );
+}
+
+function formatTransactionFieldLabel(field: string) {
+  return field
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function handleTransactionDataToggle() {
+  transactionDataTouched.value = true;
+}
+
+function applyTransactionDataOverrides(
+  payload: Record<string, unknown>,
+  coreFlow: Record<string, unknown>,
+) {
+  if (!transactionDataEnabled.value) {
+    if (transactionDataTouched.value) {
+      const openid = payload.openid;
+      if (openid && typeof openid === "object" && !Array.isArray(openid)) {
+        delete (openid as Record<string, unknown>).transactionData;
+        if (Object.keys(openid as Record<string, unknown>).length === 0) {
+          delete payload.openid;
+        }
+      }
+    }
+    return true;
+  }
+
+  const selectedProfile = selectedTransactionProfile.value;
+  if (!selectedProfile) {
+    optionsError.value = "Select a transaction data profile.";
+    return false;
+  }
+
+  const credentialIds = getDcqlCredentialIds(coreFlow);
+  if (credentialIds.length === 0) {
+    optionsError.value =
+      "Transaction data requires at least one DCQL credential with an id.";
+    return false;
+  }
+
+  getDcqlCredentialObjects(coreFlow)
+    .filter((credential) => credentialIds.includes(String(credential.id)))
+    .forEach((credential) => {
+      credential.require_cryptographic_holder_binding = true;
+    });
+
+  const openid = getOpenIdObject(payload);
+  openid.transactionData = [
+    {
+      type: selectedProfile.type,
+      credential_ids: credentialIds,
+      transaction_data_hashes_alg: ["sha-256"],
+      require_cryptographic_holder_binding: true,
+      ...Object.fromEntries(
+        selectedProfile.fields.map((field) => [
+          field,
+          transactionDataFieldValues.value[field] ?? "",
+        ]),
+      ),
+    },
+  ];
+
+  return true;
+}
+
 async function applySecurityOverridesToJson() {
   optionsError.value = null;
 
@@ -278,6 +398,10 @@ async function applySecurityOverridesToJson() {
     return null;
   }
 
+  if (!applyTransactionDataOverrides(payload, coreFlow)) {
+    return null;
+  }
+
   isWritingJson.value = true;
   json.value = JSON.stringify(payload, null, 2);
   return payload;
@@ -291,6 +415,9 @@ watch(
     encryptedResponse,
     clientIdType,
     clientIdInput,
+    transactionDataEnabled,
+    selectedTransactionProfileType,
+    transactionDataFieldValues,
   ],
   () => {
     void applySecurityOverridesToJson();
@@ -313,6 +440,34 @@ watch(json, () => {
   nextTick(() => {
     void applySecurityOverridesToJson();
   });
+});
+
+watch(
+  transactionDataProfiles.profiles,
+  (profiles) => {
+    if (!selectedTransactionProfileType.value && profiles[0]) {
+      selectedTransactionProfileType.value = profiles[0].type;
+    }
+  },
+  { immediate: true },
+);
+
+watch(selectedTransactionProfile, (profile) => {
+  if (!profile) {
+    transactionDataFieldValues.value = {};
+    return;
+  }
+
+  transactionDataFieldValues.value = Object.fromEntries(
+    profile.fields.map((field) => [
+      field,
+      transactionDataFieldValues.value[field] ?? "",
+    ]),
+  );
+});
+
+onMounted(() => {
+  void transactionDataProfiles.load();
 });
 
 async function submit() {
@@ -341,6 +496,123 @@ async function submit() {
       :error="swagger.error.value"
       @reload="swagger.load()"
     />
+
+    <a
+      href="https://dcql.walt.id"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="-mt-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
+    >
+      Learn more about DCQL
+    </a>
+
+    <details class="group rounded-xl border border-[--color-border] bg-white">
+      <summary class="cursor-pointer list-none p-4">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <span class="text-base font-semibold">Transaction data</span>
+            <span class="block text-sm text-[--color-text-muted] mt-1">
+              Add OpenID4VP transaction data to the request and bind it to the
+              DCQL credential ids in the payload.
+            </span>
+          </div>
+          <div
+            class="inline-flex items-center gap-2 text-sm font-medium text-[--color-text-muted]"
+          >
+            <span class="group-open:hidden">Expand</span>
+            <span class="hidden group-open:inline">Collapse</span>
+            <svg
+              class="h-4 w-4 transition-transform group-open:rotate-180"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </div>
+        </div>
+      </summary>
+
+      <div class="grid gap-4 px-4 pb-4">
+        <label class="inline-flex items-center gap-2 text-sm font-medium">
+          <input
+            v-model="transactionDataEnabled"
+            type="checkbox"
+            @change="handleTransactionDataToggle"
+          />
+          Enable transaction data
+        </label>
+
+        <div
+          v-if="transactionDataEnabled"
+          class="grid gap-4 rounded-lg border border-[--color-border] bg-slate-50 p-3"
+        >
+          <div
+            v-if="transactionDataProfiles.loading.value"
+            class="text-sm text-[--color-text-muted]"
+          >
+            Loading transaction data profiles...
+          </div>
+          <p
+            v-else-if="transactionDataProfiles.error.value"
+            class="text-sm text-red-600"
+          >
+            {{ transactionDataProfiles.error.value }}
+          </p>
+          <p
+            v-else-if="transactionDataProfiles.profiles.value.length === 0"
+            class="text-sm text-[--color-text-muted]"
+          >
+            No transaction data profiles are configured on the verifier.
+          </p>
+
+          <template v-else>
+            <div>
+              <label class="form-label">Profile</label>
+              <select
+                v-model="selectedTransactionProfileType"
+                class="form-select"
+              >
+                <option
+                  v-for="profile in transactionDataProfiles.profiles.value"
+                  :key="profile.type"
+                  :value="profile.type"
+                >
+                  {{ profile.displayName }}
+                </option>
+              </select>
+              <p class="mt-1 text-xs text-[--color-text-muted]">
+                The generated <code>credential_ids</code> are taken from
+                <code>core_flow.dcql_query.credentials[].id</code>.
+              </p>
+            </div>
+
+            <div
+              v-if="selectedTransactionProfile"
+              class="grid sm:grid-cols-2 gap-3"
+            >
+              <label
+                v-for="field in selectedTransactionProfile.fields"
+                :key="field"
+                class="grid gap-1"
+              >
+                <span class="form-label !mb-0">
+                  {{ formatTransactionFieldLabel(field) }}
+                </span>
+                <input
+                  v-model="transactionDataFieldValues[field]"
+                  class="form-input"
+                  :name="`transaction-${field}`"
+                />
+              </label>
+            </div>
+          </template>
+        </div>
+      </div>
+    </details>
 
     <details class="group rounded-xl border border-[--color-border] bg-white">
       <summary class="cursor-pointer list-none p-4">
