@@ -653,9 +653,7 @@ async function submit() {
         >
           <p class="font-medium">Digital Credentials API flow</p>
           <p class="mt-1">
-            This example will create a verifier session, fetch the browser API
-            request, call <code>navigator.credentials.get</code>, post the
-            wallet response, and poll the verifier result.
+             May be required for iOS compatibility with 18013-7 flows
           </p>
           <label class="mt-3 inline-flex items-center gap-2 font-medium">
             <input v-model="dcApiMediationRequired" type="checkbox" />
