@@ -1,11 +1,14 @@
 package id.walt.openid4vci
 
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.openid4vci.core.OAuth2ProviderConfig
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
 import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
+import id.walt.openid4vci.requests.credential.encryption.CredentialRequestDecryptor
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import id.walt.openid4vci.tokens.access.AccessTokenVerifier
 import id.walt.openid4vci.tokens.refresh.RefreshTokenClaims
@@ -23,7 +26,6 @@ import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 import id.walt.openid4vci.validation.CredentialRequestValidator
 import id.walt.openid4vci.validation.DefaultCredentialRequestValidator
 import id.walt.openid4vci.validation.IssuerStateValidator
-import kotlin.io.encoding.Base64
 import kotlin.random.Random
 import kotlin.time.Clock
 
@@ -37,6 +39,7 @@ internal fun createTestConfig(
     refreshTokenVerifier: RefreshTokenVerifier = refreshTokenIssuer as? RefreshTokenVerifier ?: TestRefreshTokenIssuer(),
     refreshTokenRepository: RefreshTokenRepository = InMemoryRefreshTokenRepository(),
     issuerStateValidator: IssuerStateValidator? = null,
+    credentialRequestDecryptor: CredentialRequestDecryptor? = null,
 ): OAuth2ProviderConfig {
     val authorizationCodeRepository = InMemoryAuthorizationCodeRepository()
     val preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository()
@@ -55,6 +58,7 @@ internal fun createTestConfig(
         refreshTokenVerifier = refreshTokenVerifier,
         refreshTokenRepository = refreshTokenRepository,
         credentialRequestValidator = credentialRequestValidator,
+        credentialRequestDecryptor = credentialRequestDecryptor,
         credentialEndpointHandlers = CredentialEndpointHandlers(),
     )
 }
@@ -79,8 +83,8 @@ internal class TestRefreshTokenIssuer : RefreshTokenIssuer, RefreshTokenVerifier
             request.sessionId.orEmpty(),
             request.scopes.joinToString(" "),
         ).joinToString("|")
-        val encodedPayload = Base64.UrlSafe.encode(payload.encodeToByteArray())
-        val signature = Base64.UrlSafe.encode(Random.nextBytes(32))
+        val encodedPayload = payload.encodeToByteArray().encodeToBase64Url()
+        val signature = Random.nextBytes(32).encodeToBase64Url()
         return "test-refresh.$encodedPayload.$signature"
     }
 
@@ -113,7 +117,7 @@ internal class TestRefreshTokenIssuer : RefreshTokenIssuer, RefreshTokenVerifier
     private fun decodeClaims(token: String): RefreshTokenClaims {
         val parts = token.split('.')
         require(parts.size == 3) { "Invalid refresh token" }
-        val values = Base64.UrlSafe.decode(parts[1]).decodeToString().split('|')
+        val values = parts[1].decodeFromBase64Url().decodeToString().split('|')
         require(values.size == 7) { "Invalid refresh token payload" }
         val scopes = values[6].splitToSequence(' ')
             .filter { it.isNotBlank() }

@@ -1,5 +1,5 @@
 plugins {
-    id("waltid.multiplatform.library")
+    id("waltid.full.library")
     id("waltid.publish.maven")
     id("waltid.publish.npm")
 }
@@ -76,6 +76,7 @@ kotlin {
 
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)
+            implementation(identityLibs.ktor.client.mock)
         }
     }
 }

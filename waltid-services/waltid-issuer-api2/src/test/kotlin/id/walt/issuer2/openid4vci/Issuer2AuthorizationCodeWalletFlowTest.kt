@@ -19,6 +19,9 @@ import id.walt.issuer2.testsupport.listSessions
 import id.walt.issuer2.testsupport.browser.Issuer2KeycloakAuthorizationDriver
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.IssuerStateMode
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
+import id.waltid.openid4vci.wallet.attestation.GenericHttpWalletAttestationProvider
+import id.waltid.openid4vci.wallet.attestation.PUBLIC_JWK_PLACEHOLDER
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
@@ -28,6 +31,8 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -54,10 +59,14 @@ class Issuer2AuthorizationCodeWalletFlowTest {
             try {
                 val scenario = Issuer2CredentialScenarios.openBadgeCredential
                 val walletClientConfig = ClientConfiguration(
-                    clientId = "issuer2-keycloak-browser-test",
+                    clientId = EUDI_WALLET_CLIENT_ID,
                     redirectUris = listOf(WALLET_REDIRECT_URI),
                 )
-                val walletFlow = Issuer2WalletFlowDriver(client, walletClientConfig)
+                val walletFlow = Issuer2WalletFlowDriver(
+                    client = client,
+                    walletClientConfig = walletClientConfig,
+                    attestationAssembler = eudiAttestationAssembler(),
+                )
 
                 val createdOffer =
                     client.createCredentialOffer(Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE)
@@ -117,10 +126,14 @@ class Issuer2AuthorizationCodeWalletFlowTest {
             try {
                 val scenario = Issuer2CredentialScenarios.identitySdJwt
                 val walletClientConfig = ClientConfiguration(
-                    clientId = "issuer2-keycloak-browser-test",
+                    clientId = EUDI_WALLET_CLIENT_ID,
                     redirectUris = listOf(WALLET_REDIRECT_URI),
                 )
-                val walletFlow = Issuer2WalletFlowDriver(client, walletClientConfig)
+                val walletFlow = Issuer2WalletFlowDriver(
+                    client = client,
+                    walletClientConfig = walletClientConfig,
+                    attestationAssembler = eudiAttestationAssembler(),
+                )
 
                 val createdOffer = client.createWalletFlowCredentialOffer(
                     scenario = scenario,
@@ -184,10 +197,14 @@ class Issuer2AuthorizationCodeWalletFlowTest {
             try {
                 val scenario = Issuer2CredentialScenarios.isoMdl
                 val walletClientConfig = ClientConfiguration(
-                    clientId = "issuer2-keycloak-browser-test",
+                    clientId = EUDI_WALLET_CLIENT_ID,
                     redirectUris = listOf(WALLET_REDIRECT_URI),
                 )
-                val walletFlow = Issuer2WalletFlowDriver(client, walletClientConfig)
+                val walletFlow = Issuer2WalletFlowDriver(
+                    client = client,
+                    walletClientConfig = walletClientConfig,
+                    attestationAssembler = eudiAttestationAssembler(),
+                )
 
                 val createdOffer = client.createWalletFlowCredentialOffer(
                     scenario = scenario,
@@ -363,5 +380,17 @@ class Issuer2AuthorizationCodeWalletFlowTest {
 
     private companion object {
         const val WALLET_REDIRECT_URI = "http://127.0.0.1:65535/callback"
+        const val EUDI_WALLET_CLIENT_ID = "eudiw-abca"
+        const val AVAILABLE_WALLET_ATTESTER_URL = "https://wallet-provider.eudiw.dev/wallet-instance-attestation/jwk"
+
+        fun eudiAttestationAssembler(): ClientAttestationAssembler =
+            ClientAttestationAssembler(
+                GenericHttpWalletAttestationProvider(
+                    attesterUrl = AVAILABLE_WALLET_ATTESTER_URL,
+                    requestBodyTemplate = buildJsonObject {
+                        put("jwk", PUBLIC_JWK_PLACEHOLDER)
+                    },
+                ),
+            )
     }
 }

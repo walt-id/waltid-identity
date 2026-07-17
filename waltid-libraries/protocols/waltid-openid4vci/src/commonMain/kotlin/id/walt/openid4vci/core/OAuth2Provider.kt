@@ -67,7 +67,13 @@ interface OAuth2Provider {
     ): AuthorizationResponseHttp
 
     // OAuth2.0 - Pushed Authorization Request Endpoint
-    suspend fun createPushedAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult
+    suspend fun createPushedAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult =
+        createPushedAuthorizationRequest(parameters, emptyMap())
+
+    suspend fun createPushedAuthorizationRequest(
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>>,
+    ): AuthorizationRequestResult
 
     suspend fun createPushedAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
@@ -87,9 +93,16 @@ interface OAuth2Provider {
     ): PushedAuthorizationResponseHttp
 
     // OAuth2.0 - Token Endpoint
-    fun createAccessTokenRequest(
+    suspend fun createAccessTokenRequest(
         parameters: Map<String, List<String>>,
         session: Session? = null
+    ): AccessTokenRequestResult =
+        createAccessTokenRequest(parameters, emptyMap(), session)
+
+    suspend fun createAccessTokenRequest(
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>>,
+        session: Session? = null,
     ): AccessTokenRequestResult
 
     suspend fun createAccessTokenResponse(
@@ -106,6 +119,12 @@ interface OAuth2Provider {
     // Issuer API - Credential Endpoint
     suspend fun createCredentialRequest(
         parameters: Map<String, List<String>>,
+        session: Session? = null,
+        accessTokenContext: AccessTokenContext? = null,
+    ): CredentialRequestResult
+
+    suspend fun createCredentialRequest(
+        encryptedCredentialRequest: String,
         session: Session? = null,
         accessTokenContext: AccessTokenContext? = null,
     ): CredentialRequestResult

@@ -139,6 +139,7 @@ class IssuanceNotificationRouteTest {
             tokenEndpoint = "/openid4vci/token",
             preAuthorizedCode = preAuthorizedCode,
             txCode = null,
+            anonymous = true,
         )
         assertBearerAccessToken(tokenResponse)
 

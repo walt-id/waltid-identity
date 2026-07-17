@@ -1,0 +1,151 @@
+name: Fix release on manual push
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Fix release version (e.g. 0.20.1)'
+        required: true
+
+jobs:
+  version:
+    uses: walt-id/waltid-identity/.github/workflows/version.yml@main
+    with:
+      preferred: ${{ inputs.release_version }}
+  gradle:
+    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@main
+    secrets: inherit
+    needs: version
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      enable-android-build: true
+      publish: true
+      report-check-name: 'gradle / gradle (ubuntu-22.04)'
+  docker-matrix:
+    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
+    with:
+      jsonpath: ".github/workflows/data/docker-matrix.json"
+  docker:
+    uses: walt-id/waltid-identity/.github/workflows/docker.yml@main
+    secrets: inherit
+    needs: [ version, docker-matrix ]
+    with:
+      images: ${{ needs.docker-matrix.outputs.json }}
+      version: ${{ needs.version.outputs.release_version }}
+      publish: true
+  api-docker-matrix:
+    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
+    with:
+      jsonpath: ".github/workflows/data/api-docker-matrix.json"
+  api-docker:
+    uses: walt-id/waltid-identity/.github/workflows/api-docker.yml@main
+    secrets: inherit
+    needs: [ version, api-docker-matrix ]
+    with:
+      images: ${{ needs.api-docker-matrix.outputs.json }}
+      version: ${{ needs.version.outputs.release_version }}
+      publish: true
+  tag:
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
+    secrets: inherit
+    needs: [ version, gradle, docker, api-docker ]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      ref: ${{ github.ref_name }}
+  enterprise-tag:
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
+    secrets: inherit
+    needs: [ version, gradle, docker, api-docker ]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      repository: walt-id/waltid-identity-enterprise
+      ref: ${{ github.ref_name }}
+  docs-tag:
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
+    secrets: inherit
+    needs: [ version, gradle, docker, api-docker ]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      repository: walt-id/waltid-docs
+      ref: ${{ github.ref_name }}
+  quickstart-tag:
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
+    secrets: inherit
+    needs: [ version, gradle, docker, api-docker ]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      repository: walt-id/waltid-enterprise-quickstart
+      ref: ${{ github.ref_name }}
+  unified-build-tag:
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
+    secrets: inherit
+    needs: [ version, gradle, docker, api-docker ]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      repository: walt-id/waltid-unified-build
+      ref: ${{ github.ref_name }}
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [ tag ]
+    steps:
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.tag.outputs.tag }}
+          prerelease: ${{ contains(needs.tag.outputs.tag, 'PRE-RELEASE') }}
+          make_latest: false
+  enterprise-release:
+    name: Create Enterprise Release
+    runs-on: ubuntu-latest
+    needs: [ enterprise-tag ]
+    steps:
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          repository: walt-id/waltid-identity-enterprise
+          tag_name: ${{ needs.enterprise-tag.outputs.tag }}
+          prerelease: ${{ contains(needs.enterprise-tag.outputs.tag, 'PRE-RELEASE') }}
+          make_latest: false
+  docs-release:
+    name: Create Docs Release
+    runs-on: ubuntu-latest
+    needs: [ docs-tag ]
+    steps:
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          repository: walt-id/waltid-docs
+          tag_name: ${{ needs.docs-tag.outputs.tag }}
+          prerelease: ${{ contains(needs.docs-tag.outputs.tag, 'PRE-RELEASE') }}
+          make_latest: false
+  quickstart-release:
+    name: Create Quickstart Release
+    runs-on: ubuntu-latest
+    needs: [ quickstart-tag ]
+    steps:
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          repository: walt-id/waltid-enterprise-quickstart
+          tag_name: ${{ needs.quickstart-tag.outputs.tag }}
+          prerelease: ${{ contains(needs.quickstart-tag.outputs.tag, 'PRE-RELEASE') }}
+          make_latest: false
+  unified-build-release:
+    name: Create Unified Build Release
+    runs-on: ubuntu-latest
+    needs: [ unified-build-tag ]
+    steps:
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          repository: walt-id/waltid-unified-build
+          tag_name: ${{ needs.unified-build-tag.outputs.tag }}
+          prerelease: ${{ contains(needs.unified-build-tag.outputs.tag, 'PRE-RELEASE') }}
+          make_latest: false

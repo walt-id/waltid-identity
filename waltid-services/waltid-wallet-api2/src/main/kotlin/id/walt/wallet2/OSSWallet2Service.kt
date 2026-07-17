@@ -3,15 +3,19 @@ package id.walt.wallet2
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
-import id.walt.wallet2.auth.OSSWallet2AccountStore
-import id.walt.wallet2.OSSWallet2Service.walletStore
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.server.StoreFactory
 import id.walt.wallet2.server.WalletResolver
 import id.walt.wallet2.server.handlers.Wallet2RouteHandler.registerWallet2Routes
 import id.walt.wallet2.stores.WalletStore
+import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
+import id.walt.wallet2.stores.inmemory.InMemoryDidStore
+import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
+import id.waltid.openid4vci.wallet.attestation.GenericHttpWalletAttestationProvider
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
@@ -21,26 +25,33 @@ import kotlinx.coroutines.flow.asFlow
 /**
  * OSS [WalletResolver] and route registration.
  *
- * Uses [InMemoryWalletStore] by default. To add persistence, replace
- * [walletStore] with your own [WalletStore] implementation before the
- * service starts — no other changes needed.
+ * Uses [InMemoryWalletStore] and in-memory store factories by default.
  *
- * All route-handler logic lives in [Wallet2RouteHandler] inside
- * waltid-openid4vc-wallet-server. The Enterprise service provides its own
- * [WalletResolver] backed by the MongoDB resource tree without changing any
- * handler logic.
+ * When the `wallet2-persistence` feature is enabled, [main] swaps in:
+ * - [walletStore] = [id.walt.wallet2.persistence.ExposedWalletStore]
+ * - [keyStoreFactory] / [credentialStoreFactory] / [didStoreFactory] = Exposed-backed factories
+ *
+ * This ensures that keys, credentials, and DIDs are persisted to the same database as the
+ * wallet descriptors, and survive restarts.
+ *
+ * The three named-store caches ([namedKeyStores] etc.) act as an in-process cache on top of
+ * whatever the factories produce, avoiding redundant object creation per request.
  */
 object OSSWallet2Service {
 
-    /**
-     * Pluggable wallet lifecycle store.
-     *
-     * Replace this with a persistent [WalletStore] implementation to survive
-     * restarts — e.g. an Exposed/SQLite or Exposed/Postgres backed store.
-     * The swap is a single assignment; no other code needs to change.
-     */
     var walletStore: WalletStore = InMemoryWalletStore()
 
+    // Store factories - swapped at startup when persistence is enabled.
+    // The route handler uses these (via the resolver) to create new stores for auto-created
+    // and named stores, so the right store type is created regardless of whether the store ID
+    // was supplied by the user or generated automatically.
+    var keyStoreFactory: StoreFactory<WalletKeyStore> = { InMemoryKeyStore() }
+    var credentialStoreFactory: StoreFactory<WalletCredentialStore> = { InMemoryCredentialStore() }
+    var didStoreFactory: StoreFactory<WalletDidStore> = { InMemoryDidStore() }
+
+    // In-process cache: storeId -> store instance.
+    // computeIfAbsent ensures that on restart, a store for any ID known to the DB is
+    // created on first access without requiring a separate init call.
     private val namedKeyStores = ConcurrentHashMap<String, WalletKeyStore>()
     private val namedCredentialStores = ConcurrentHashMap<String, WalletCredentialStore>()
     private val namedDidStores = ConcurrentHashMap<String, WalletDidStore>()
@@ -48,75 +59,99 @@ object OSSWallet2Service {
     val resolver: WalletResolver = object : WalletResolver {
 
         override val publicBaseUrl: Url
-            get() = runCatching {
-                ConfigManager.getConfig<OSSWallet2ServiceConfig>().publicBaseUrl
-            }.getOrElse { Url("http://localhost:4000") }
+            get() = ConfigManager.getConfig<OSSWallet2ServiceConfig>().publicBaseUrl
 
         override val walletStore: WalletStore
             get() = OSSWallet2Service.walletStore
 
-        override suspend fun resolveKeyStore(storeId: String) = namedKeyStores[storeId]
-        override suspend fun storeKeyStore(storeId: String, store: WalletKeyStore) { namedKeyStores[storeId] = store }
-        override fun listKeyStoreIds() = namedKeyStores.keys.asFlow()
+        override val keyStoreFactory: StoreFactory<WalletKeyStore>
+            get() = OSSWallet2Service.keyStoreFactory
 
-        override suspend fun resolveCredentialStore(storeId: String) = namedCredentialStores[storeId]
-        override suspend fun storeCredentialStore(storeId: String, store: WalletCredentialStore) { namedCredentialStores[storeId] = store }
-        override fun listCredentialStoreIds() = namedCredentialStores.keys.asFlow()
+        override val credentialStoreFactory: StoreFactory<WalletCredentialStore>
+            get() = OSSWallet2Service.credentialStoreFactory
 
-        override suspend fun resolveDidStore(storeId: String) = namedDidStores[storeId]
-        override suspend fun storeDidStore(storeId: String, store: WalletDidStore) { namedDidStores[storeId] = store }
-        override fun listDidStoreIds() = namedDidStores.keys.asFlow()
+        override val didStoreFactory: StoreFactory<WalletDidStore>
+            get() = OSSWallet2Service.didStoreFactory
 
-        /**
-         * Reverse lookup: maps a registered store instance back to its store ID.
-         *
-         * Required so [storeWallet] can serialize a [Wallet] into a [WalletDescriptor] that
-         * actually records its attached stores. Without this override (the default returns null),
-         * persisted wallets would have no attached stores. Matches by reference identity since
-         * store instances are registered (named or auto-created) via the store* methods above.
-         */
+        // Named store resolution via computeIfAbsent: if the store is not yet cached,
+        // create it using the factory (which may be Exposed-backed for persistence).
+        // This handles wallets created in previous process runs whose store IDs exist in
+        // the DB but are not yet in the in-process cache.
+        override suspend fun resolveKeyStore(storeId: String): WalletKeyStore =
+            namedKeyStores.computeIfAbsent(storeId) { keyStoreFactory(storeId) }
+
+        override suspend fun storeKeyStore(storeId: String, store: WalletKeyStore) {
+            namedKeyStores[storeId] = store
+        }
+
+        override fun listKeyStoreIds() = namedKeyStores.keys.toList().asFlow()
+
+        override suspend fun resolveCredentialStore(storeId: String): WalletCredentialStore =
+            namedCredentialStores.computeIfAbsent(storeId) { credentialStoreFactory(storeId) }
+
+        override suspend fun storeCredentialStore(storeId: String, store: WalletCredentialStore) {
+            namedCredentialStores[storeId] = store
+        }
+
+        override fun listCredentialStoreIds() = namedCredentialStores.keys.toList().asFlow()
+
+        override suspend fun resolveDidStore(storeId: String): WalletDidStore =
+            namedDidStores.computeIfAbsent(storeId) { didStoreFactory(storeId) }
+
+        override suspend fun storeDidStore(storeId: String, store: WalletDidStore) {
+            namedDidStores[storeId] = store
+        }
+
+        override fun listDidStoreIds() = namedDidStores.keys.toList().asFlow()
+
         override suspend fun resolveStoreId(store: Any): String? =
             namedKeyStores.entries.firstOrNull { it.value === store }?.key
                 ?: namedCredentialStores.entries.firstOrNull { it.value === store }?.key
                 ?: namedDidStores.entries.firstOrNull { it.value === store }?.key
 
-        // When auth is enabled, account↔wallet mappings are owned by OSSWallet2AccountStore
-        // so that GET /auth/account/wallets and wallet ownership enforcement stay in sync.
-        override suspend fun linkWalletToAccount(accountId: String, walletId: String) {
-            if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)) {
-                OSSWallet2AccountStore.linkWalletToAccount(accountId, walletId)
-            } else {
-                walletStore.linkWalletToAccount(accountId, walletId)
-            }
-        }
+        // Account-wallet ownership always lives in walletStore (InMemoryWalletStore or
+        // ExposedWalletStore). When auth is enabled, OSSWallet2AccountStore handles user
+        // credentials; wallet ownership is a separate concern that belongs to the wallet store.
+        override suspend fun linkWalletToAccount(accountId: String, walletId: String) =
+            walletStore.linkWalletToAccount(accountId, walletId)
 
-        override suspend fun getWalletIdsForAccount(accountId: String): List<String>? {
-            return if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)) {
-                // Return the list (possibly empty) so the route handler enforces ownership.
-                // Returning null would disable ownership enforcement for accounts with no wallets.
-                OSSWallet2AccountStore.getWalletsForAccount(accountId)
-            } else {
-                walletStore.getWalletIdsForAccount(accountId)
-            }
-        }
+        override suspend fun getWalletIdsForAccount(accountId: String): List<String>? =
+            walletStore.getWalletIdsForAccount(accountId)
     }
 
     fun Route.registerRoutes() {
+        val attestationAssembler = createAttestationAssembler()
         val authEnabled = runCatching {
             FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)
         }.getOrElse { false }
 
         if (authEnabled) {
-            // Wallet routes are protected when auth is enabled:
-            // - A valid token is required to access any wallet route
-            // - Account ownership is enforced via getAccountId
             authenticate("ktor-authnz") {
                 val getAccountId: suspend RoutingCall.() -> String? =
                     { runCatching { this.getAuthenticatedAccount() }.getOrNull() }
-                registerWallet2Routes(resolver, getAccountId)
+                registerWallet2Routes(
+                    resolver = resolver,
+                    getAccountId = getAccountId,
+                    attestationAssembler = attestationAssembler,
+                )
             }
         } else {
-            registerWallet2Routes(resolver, getAccountId = null)
+            registerWallet2Routes(
+                resolver = resolver,
+                getAccountId = null,
+                attestationAssembler = attestationAssembler,
+            )
         }
+    }
+
+    private fun createAttestationAssembler(): ClientAttestationAssembler? {
+        val config = ConfigManager.getConfig<OSSWallet2ServiceConfig>().attestationConfig ?: return null
+
+        return ClientAttestationAssembler(
+            GenericHttpWalletAttestationProvider(
+                attesterUrl = config.attesterUrl,
+                requestBodyTemplate = config.requestBody,
+            )
+        )
     }
 }

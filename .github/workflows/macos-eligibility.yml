@@ -1,0 +1,90 @@
+name: macOS eligibility
+
+on:
+  workflow_call:
+    inputs:
+      event-name:
+        description: "Caller event name"
+        required: true
+        type: string
+      ref:
+        description: "Caller git ref"
+        required: true
+        type: string
+      pr-number:
+        description: "Pull request number, if the caller is a PR event"
+        required: false
+        type: string
+        default: ""
+      pr-head-repo:
+        description: "Pull request head repository, if the caller is a PR event"
+        required: false
+        type: string
+        default: ""
+      pr-labels:
+        description: "JSON array of pull request label names"
+        required: false
+        type: string
+        default: "[]"
+      pr-draft:
+        description: "Whether the pull request is currently a draft"
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      should-run:
+        description: "Whether macOS jobs should run"
+        value: ${{ jobs.decide.outputs.should-run }}
+      reason:
+        description: "Human-readable decision reason"
+        value: ${{ jobs.decide.outputs.reason }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  decide:
+    uses: ./.github/workflows/mobile-eligibility.yml
+    with:
+      event-name: ${{ inputs.event-name }}
+      ref: ${{ inputs.ref }}
+      pr-number: ${{ inputs.pr-number }}
+      pr-head-repo: ${{ inputs.pr-head-repo }}
+      pr-labels: ${{ inputs.pr-labels }}
+      pr-draft: ${{ inputs.pr-draft }}
+      platform-name: iOS
+      platform-label: ci:macos
+      path-patterns: |
+        [
+          ".github/workflows/gradle-macos.yml",
+          ".github/workflows/mobile-sdk-docs.yml",
+          ".github/workflows/macos-eligibility.yml",
+          ".github/workflows/mobile-eligibility.yml",
+          ".github/actions/checkout-repos/*",
+          ".github/actions/gradle-ios/*",
+          ".github/actions/gradle-mobile-sdk-docs/*",
+          ".github/actions/gradle-setup-action/*",
+          ".github/actions/ios-build-setup/*",
+          ".github/actions/set-properties/*",
+          "scripts/check-mobile-swift-parity-decision.sh",
+          "build-logic/*",
+          "build.gradle.kts",
+          "gradle/*",
+          "gradle.properties",
+          "gradlew",
+          "settings.gradle.kts",
+          "gradle/libs.versions.toml",
+          "*/Package.swift",
+          "*/src/commonMain/*",
+          "*/src/commonTest/*",
+          "*/src/iosMain/*",
+          "*/src/iosTest/*",
+          "waltid-applications/waltid-wallet-demo-compose/*",
+          "waltid-applications/waltid-wallet-demo-ios/*",
+          "waltid-libraries/*/build.gradle.kts",
+          "waltid-libraries/*/*/build.gradle.kts",
+          "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
+          "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
+          "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"
+        ]

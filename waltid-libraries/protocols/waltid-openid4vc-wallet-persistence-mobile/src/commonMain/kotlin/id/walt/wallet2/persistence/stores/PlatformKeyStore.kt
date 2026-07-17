@@ -19,7 +19,7 @@ import kotlin.time.Clock
  * @param keyProvider Platform key provider used to load, export, and delete keys.
  * @param queries SQLDelight queries for wallet persistence tables.
  */
-class PlatformKeyStore(
+public class PlatformKeyStore(
     private val keyProvider: PlatformKeyProvider,
     private val queries: WalletPersistenceQueries,
 ) : WalletKeyStore {

@@ -2,26 +2,108 @@ import SwiftUI
 
 struct PresentView: View {
     @ObservedObject var viewModel: WalletViewModel
+    @Binding var selectedDetailsID: String?
+
+    private var presentationDetails: [CredentialDetails] {
+        viewModel.presentationPreview?.credentialOptions.map(CredentialDisplayNormalizer.details(for:)) ?? []
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Present")
-                .font(.headline)
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    ScannableUrlEditor(
+                        title: "Present",
+                        label: "OpenID4VP request URL",
+                        text: $viewModel.presentationRequestUrl,
+                        inputIdentifier: WalletAccessibilityID.presentationInput,
+                        scanButtonIdentifier: WalletAccessibilityID.presentationScanButton,
+                        isEnabled: viewModel.presentationUrlEntryEnabled,
+                        focusResetKey: viewModel.inputFocusResetKey
+                    )
 
-            TextField("OpenID4VP request URL", text: $viewModel.presentationRequestUrl, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
-                .disableAutocorrection(true)
-                .lineLimit(3)
-                .accessibilityIdentifier("wallet.presentationInput")
+                    Button("Preview") {
+                        viewModel.previewPresentation()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.waltBlue)
+                    .disabled(!viewModel.presentationPreviewActionEnabled)
+                    .accessibilityIdentifier(WalletAccessibilityID.presentButton)
 
-            Button("Present") {
-                viewModel.presentCredential()
+                    if viewModel.credentials.isEmpty {
+                        Text("No credentials available")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    StatusBannerView(
+                        message: viewModel.statusMessage(for: .present),
+                        isLoading: viewModel.statusIsLoading(for: .present),
+                        isError: viewModel.statusIsError(for: .present)
+                    )
+
+                    if let warning = viewModel.transactionDataProfilesWarning {
+                        WarningBannerView(message: warning)
+                    }
+
+                    if viewModel.presentationCompleted {
+                        Button("New presentation", action: viewModel.startNewPresentationFlow)
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier(WalletAccessibilityID.presentationNewButton)
+                    }
+
+                    if let preview = viewModel.presentationPreview {
+                        PresentationReviewView(
+                            preview: preview,
+                            selectedCredentialOptions: viewModel.selectedPresentationCredentialOptions,
+                            selectedDisclosureOptions: viewModel.selectedPresentationDisclosureOptions,
+                            selectionComplete: viewModel.presentationCredentialSelectionComplete,
+                            isLoading: !viewModel.presentationReviewEnabled,
+                            isReadOnly: viewModel.presentationCompleted,
+                            onToggleCredential: viewModel.togglePresentationCredential,
+                            onToggleDisclosure: viewModel.togglePresentationDisclosure,
+                            onCredentialSelected: { detailsID in selectedDetailsID = detailsID },
+                            onSubmit: viewModel.submitPresentation,
+                            onCancel: viewModel.cancelPresentationReview
+                        )
+                    }
+                }
+                .padding()
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.waltBlue)
-            .disabled(!viewModel.isReady || viewModel.presentationRequestUrl.isEmpty || viewModel.credentials.isEmpty || viewModel.isLoading)
-            .accessibilityIdentifier("wallet.presentButton")
+            .navigationTitle("Present")
+            .background(detailsNavigationLink)
+            .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
+        }
+        .navigationViewStyle(.stack)
+    }
+
+    private var detailsNavigationLink: some View {
+        NavigationLink(
+            destination: detailsDestination,
+            isActive: Binding(
+                get: { selectedDetailsID != nil },
+                set: { isActive in
+                    if !isActive {
+                        selectedDetailsID = nil
+                    }
+                }
+            )
+        ) {
+            EmptyView()
+        }
+        .hidden()
+    }
+
+    private var detailsDestination: some View {
+        Group {
+            if let detailsID = selectedDetailsID {
+                CredentialDetailsDestination(
+                    detailsID: detailsID,
+                    details: presentationDetails
+                )
+            } else {
+                EmptyView()
+            }
         }
     }
 }

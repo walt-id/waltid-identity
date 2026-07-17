@@ -5,7 +5,11 @@ import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
 import id.walt.openid4vci.ResponseType
+import id.walt.openid4vci.clientauth.ClientAuthenticationConfig
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethodConfig
 import id.walt.openid4vci.core.OAuth2Provider
+import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationMethod
+import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
 import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
@@ -17,6 +21,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import kotlin.test.assertFailsWith
 
 class Issuer2PAREndpointTest {
 
@@ -46,7 +51,7 @@ class Issuer2PAREndpointTest {
     fun `issuer module provider resolves request_uri and retrieves original parameters`() = runTest {
         val provider = issuerProvider()
         val parameters = validParameters(
-            scope = listOf("openid", "profile"),
+            scopes = listOf("openid", "profile"),
             state = "state456",
         )
 
@@ -137,11 +142,35 @@ class Issuer2PAREndpointTest {
         assertEquals("abc123xyz", requestId)
     }
 
-    private fun issuerProvider(enforcePushedAuthorizationRequests: Boolean = false): OAuth2Provider =
+    @Test
+    fun `issuer module rejects key reference client attestation without resolver`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            issuerProvider(
+                clientAttestation = ClientAttestationVerifierConfig(
+                    verificationMethod = ClientAttestationVerificationMethod.KeyReference("test-key-reference"),
+                ),
+            )
+        }
+
+        assertEquals(
+            "key-reference client attestation verification requires a key reference resolver",
+            error.message,
+        )
+    }
+
+    private fun issuerProvider(
+        enforcePushedAuthorizationRequests: Boolean = false,
+        clientAttestation: ClientAttestationVerifierConfig? = null,
+    ): OAuth2Provider =
         OpenId4VciModule.create(
             config = Issuer2ServiceConfig(
                 baseUrl = "http://localhost",
                 enforcePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
+                clientAuthenticationConfig = clientAttestation?.let {
+                    ClientAuthenticationConfig(
+                        supportedMethods = listOf(ClientAuthenticationMethodConfig.ClientAttestation(it)),
+                    )
+                },
             ),
             authorizationCodeRepository = ConfiguredAuthorizationCodeRepository(),
             preAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository(),
@@ -166,14 +195,14 @@ class Issuer2PAREndpointTest {
 
     private fun validParameters(
         clientId: String = "test-client",
-        scope: List<String> = listOf("openid"),
+        scopes: List<String> = listOf("openid"),
         state: String = "state123",
     ): Map<String, List<String>> =
         mapOf(
             "client_id" to listOf(clientId),
             "response_type" to listOf(ResponseType.CODE.value),
             "redirect_uri" to listOf("https://example.com/callback"),
-            "scope" to scope,
+            "scope" to listOf(scopes.joinToString(" ")),
             "state" to listOf(state),
         )
 }

@@ -8,6 +8,17 @@ actual fun validateCertificateChain(
     enableSystemTrustAnchors: Boolean,
     enableRevocation: Boolean
 ) {
-    // TODO: Implement with Web APIs or a JS PKI lib (no native PKIX path builder in WebCrypto).
-    throw X509ValidationException("Not implemented on JS yet.")
+    if (enableSystemTrustAnchors) {
+        throw X509ValidationException("System trust anchors are not supported for JS certificate validation.")
+    }
+    if (enableRevocation) {
+        throw X509ValidationException("Revocation checking is not supported for JS certificate validation.")
+    }
+
+    validateCertificateChainWithExplicitTrust(
+        leaf = leaf,
+        chain = chain,
+        trustAnchors = trustAnchors,
+        enableTrustedChainRoot = enableTrustedChainRoot,
+    )
 }

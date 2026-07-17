@@ -30,11 +30,14 @@ data class AttestationObtainResponse(
     val storedAt: String? = null,
 )
 
+/**
+ * Enterprise wallet attester provider.
+ */
 class HttpWalletAttestationProvider(
-    private val enterpriseBaseUrl: String,
+    private val baseUrl: String,
     private val attesterPath: String,
     private val bearerToken: String = "",
-    private val enterpriseHostHeader: String = "",
+    private val hostHeader: String = "",
     private val httpClient: HttpClient = HttpClient {
         install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
     },
@@ -45,7 +48,7 @@ class HttpWalletAttestationProvider(
     private var cachedExpiresAt: Long = 0
 
     private val endpoint: String
-        get() = "${enterpriseBaseUrl.trimEnd('/')}/v1/${attesterPath.trim()}/client-attester-api/attest"
+        get() = "${baseUrl.trimEnd('/')}/v1/${attesterPath.trim()}/client-attester-api/attest"
 
     override suspend fun getAttestationJwt(instanceKey: Key, clientId: String): String {
         mutex.withLock {
@@ -71,7 +74,7 @@ class HttpWalletAttestationProvider(
                 bearerToken.trim().takeIf { it.isNotEmpty() }?.let {
                     header(HttpHeaders.Authorization, "Bearer $it")
                 }
-                enterpriseHostHeader.trim().takeIf { it.isNotEmpty() }?.let {
+                hostHeader.trim().takeIf { it.isNotEmpty() }?.let {
                     header(HttpHeaders.Host, it)
                 }
             }

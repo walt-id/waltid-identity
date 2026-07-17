@@ -22,7 +22,27 @@
 
 Compose Multiplatform demo app for the mobile wallet SDK. It demonstrates OpenID4VCI credential issuance, OpenID4VP credential presentation, platform-backed keys, and SQLDelight-backed wallet persistence on Android and iOS.
 
-For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
+For setup, IDE guidance, and mobile integration test commands, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
+
+The Compose iOS demo uses Kotlin direct Xcode integration and a local SwiftPM linkage package for native iOS linkage.
+
+## Local wallet data
+
+Android and iOS demo targets use the default managed encrypted local persistence. Wallet database files are SQLCipher-encrypted, and managed database keys live in platform-protected storage. During local development, reset wallet state through `MobileWallet.deleteWallet()`, by uninstalling the app, or by deleting the app's local data.
+
+The demo unlock PIN is stored separately as a salted PBKDF2-SHA256 verifier in app-private preferences. The PIN itself is never persisted. Clearing app data or uninstalling the app resets the PIN setup flow together with the local wallet data.
+
+The UI stays focused on the production default. Non-default persistence options, including provided database keys and custom stores, are documented and tested at the SDK layer.
+
+## Public demo backend defaults
+
+Clean demo installs use the public walt.id demo profile endpoint for OpenID4VP transaction-data support:
+
+```text
+https://wallet.demo.walt.id/wallet-api/transaction-data-profiles
+```
+
+Android builds can override it with `-PtransactionDataProfiles.url=...`. Compose iOS can override it with the `TRANSACTION_DATA_PROFILES_URL` launch environment variable or `UserDefaults` key. Wallet attestation values remain explicit overrides through `attestation.*` Gradle properties on Android and `ATTESTATION_*` environment/UserDefaults values on iOS; no bearer token is defaulted.
 
 ## Target status
 
@@ -32,6 +52,8 @@ For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Dev
 
 ## Common commands
 
+Android and shared UI:
+
 ```bash
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:installDebug
@@ -39,14 +61,18 @@ For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Dev
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:webApp:wasmJsBrowserDevelopmentRun -PenableWalletDemoComposeWeb=true
 ```
 
-Android E2E scripts live in [androidApp/scripts](androidApp/scripts/README.md).
-Compose iOS E2E scripts live in [iosApp/scripts](iosApp/scripts/README.md).
+iOS:
+
+```bash
+cd waltid-applications/waltid-wallet-demo-compose/iosApp
+open iosApp.xcodeproj
+```
 
 Backend E2E fixtures are intentionally shared:
 
-- Android tests use `waltid-mobile-test-utils` for public EUDI and local Enterprise backend operations.
+- Android tests use `waltid-mobile-test-utils` for public EUDI, public demo, and Enterprise fixture backend operations.
 - iOS UI tests use the shared Swift `TestHelpers` backend fixtures from `../mobile-e2e-fixtures/ios/TestHelpers`.
-- Android and iOS local Enterprise scripts source the common setup helpers in [mobile-e2e-fixtures](../mobile-e2e-fixtures/).
+- Public demo UI tests run through the normal Android instrumentation and XCTest runners.
 
 ## Related modules
 

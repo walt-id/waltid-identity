@@ -73,7 +73,6 @@ class ProviderCombinedFlowTest {
         // Pre-authorized code flow
         val issuedCode = config.preAuthorizedCodeIssuer.issue(
             PreAuthorizedCodeIssueRequest(
-                clientId = "pre-client",
                 scopes = setOf("openid"),
                 audience = setOf("aud:issuer"),
                 session = DefaultSession(subject = "pre-subject"),
