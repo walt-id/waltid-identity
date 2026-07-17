@@ -58,9 +58,11 @@ class ExposedDidStore(
 
     private fun rowToEntry(row: ResultRow): WalletDidEntry? =
         runCatching {
+            val did = row[Wallet2Tables.Dids.did]
             WalletDidEntry(
-                did = row[Wallet2Tables.Dids.did],
-                document = Json.parseToJsonElement(row[Wallet2Tables.Dids.document]) as JsonObject
+                did = did,
+                document = Json.parseToJsonElement(row[Wallet2Tables.Dids.document]) as? JsonObject
+                    ?: error("DID document for '$did' is not a JSON object")
             )
         }.getOrNull()
 }

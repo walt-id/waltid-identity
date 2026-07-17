@@ -85,7 +85,15 @@ Some popular libraries you may want to look at are:
 
 ## Architecture
 
-TO DO
+<img src="./assets/OSS-Architecture.png" alt="walt.id architecture" />
+
+
+## Product Editions
+
+<img src="./assets/Product-Editions.png" alt="walt.id product editions" />
+
+If you want to learn more about the enterprise stack, reach out to us via our [contact form](https://walt.id/contact)
+
 
 ## Join the community
 
