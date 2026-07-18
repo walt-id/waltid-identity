@@ -378,6 +378,7 @@ object WalletIssuanceHandler {
         onEvent = onEvent,
         httpClient = httpClient,
         onDeferredTransactionId = onDeferredTransactionId,
+        beforeCredentialsStored = {},
         onCredentialStored = {},
     )
 
@@ -388,6 +389,27 @@ object WalletIssuanceHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         httpClient: HttpClient = defaultHttpClient(),
         onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit = { _, _ -> },
+        onCredentialStored: suspend (StoredCredential) -> Unit,
+    ): Flow<StoredCredential> = receiveCredentialFlow(
+        wallet = wallet,
+        request = request,
+        attestationAssembler = attestationAssembler,
+        onEvent = onEvent,
+        httpClient = httpClient,
+        onDeferredTransactionId = onDeferredTransactionId,
+        beforeCredentialsStored = {},
+        onCredentialStored = onCredentialStored,
+    )
+
+    fun receiveCredentialFlow(
+        wallet: Wallet,
+        request: ReceiveCredentialRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        httpClient: HttpClient = defaultHttpClient(),
+        onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit = { _, _ -> },
+        /** Called with the exact response batch size before any credential in that batch is persisted. */
+        beforeCredentialsStored: suspend (Int) -> Unit,
         onCredentialStored: suspend (StoredCredential) -> Unit,
     ): Flow<StoredCredential> = channelFlow {
         val key = wallet.resolveKey(request.key, request.keyId)
@@ -520,6 +542,7 @@ object WalletIssuanceHandler {
                 continue
             }
 
+            if (rawCredentials.isNotEmpty()) beforeCredentialsStored(rawCredentials.size)
             for (issuedCredential in rawCredentials) {
                 val entry = wallet.parseAndStore(issuedCredential, label = offeredCredential.configuration.credentialMetadata?.display?.firstOrNull()?.name)
                 onCredentialStored(entry)
@@ -554,6 +577,7 @@ object WalletIssuanceHandler {
         attestationAssembler = attestationAssembler,
         onEvent = onEvent,
         httpClient = httpClient,
+        beforeCredentialsStored = {},
         onCredentialStored = {},
     )
 
@@ -563,6 +587,25 @@ object WalletIssuanceHandler {
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         httpClient: HttpClient = defaultHttpClient(),
+        onCredentialStored: suspend (StoredCredential) -> Unit,
+    ): ReceiveCredentialResult = receiveCredential(
+        wallet = wallet,
+        request = request,
+        attestationAssembler = attestationAssembler,
+        onEvent = onEvent,
+        httpClient = httpClient,
+        beforeCredentialsStored = {},
+        onCredentialStored = onCredentialStored,
+    )
+
+    suspend fun receiveCredential(
+        wallet: Wallet,
+        request: ReceiveCredentialRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        httpClient: HttpClient = defaultHttpClient(),
+        /** Called with the exact response batch size before any credential in that batch is persisted. */
+        beforeCredentialsStored: suspend (Int) -> Unit,
         onCredentialStored: suspend (StoredCredential) -> Unit,
     ): ReceiveCredentialResult {
         val ids = mutableListOf<String>()
@@ -574,6 +617,7 @@ object WalletIssuanceHandler {
             onEvent,
             httpClient,
             onDeferredTransactionId = { configId, txId -> deferredIds[configId] = txId },
+            beforeCredentialsStored = beforeCredentialsStored,
             onCredentialStored = onCredentialStored,
         ).collect { ids += it.id }
         return ReceiveCredentialResult(credentialIds = ids, deferredTransactionIds = deferredIds)
@@ -1138,6 +1182,7 @@ object WalletIssuanceHandler {
         attestationAssembler = attestationAssembler,
         onEvent = onEvent,
         httpClient = httpClient,
+        beforeCredentialsStored = {},
         onCredentialStored = {},
     )
 
@@ -1156,6 +1201,43 @@ object WalletIssuanceHandler {
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         httpClient: HttpClient = defaultHttpClient(),
+        onCredentialStored: suspend (StoredCredential) -> Unit,
+    ): Flow<StoredCredential> = receiveCredentialAuthCodeFlow(
+        wallet = wallet,
+        code = code,
+        codeVerifier = codeVerifier,
+        credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+        credentialEndpoint = credentialEndpoint,
+        credentialConfigurationId = credentialConfigurationId,
+        nonceEndpoint = nonceEndpoint,
+        clientId = clientId,
+        redirectUri = redirectUri,
+        inlineKey = inlineKey,
+        inlineDid = inlineDid,
+        attestationAssembler = attestationAssembler,
+        onEvent = onEvent,
+        httpClient = httpClient,
+        beforeCredentialsStored = {},
+        onCredentialStored = onCredentialStored,
+    )
+
+    fun receiveCredentialAuthCodeFlow(
+        wallet: Wallet,
+        code: String,
+        codeVerifier: String?,
+        credentialIssuerBaseUrl: String,
+        credentialEndpoint: Url,
+        credentialConfigurationId: String,
+        nonceEndpoint: String? = null,
+        clientId: String = DEFAULT_CLIENT_ID,
+        redirectUri: Url = Url("openid://"),
+        inlineKey: DirectSerializedKey? = null,
+        inlineDid: String? = null,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        httpClient: HttpClient = defaultHttpClient(),
+        /** Called with the exact response batch size before any credential in that batch is persisted. */
+        beforeCredentialsStored: suspend (Int) -> Unit,
         onCredentialStored: suspend (StoredCredential) -> Unit,
     ): Flow<StoredCredential> = channelFlow {
         val key = wallet.resolveKey(inlineKey)
@@ -1199,6 +1281,7 @@ object WalletIssuanceHandler {
         )
         onEvent(WalletSessionEvent.issuance_credential_received)
 
+        if (fetchResult.rawCredentials.isNotEmpty()) beforeCredentialsStored(fetchResult.rawCredentials.size)
         for (rawString in fetchResult.rawCredentials) {
             val (_, parsed) = CredentialParser.detectAndParse(rawString)
             val entry = StoredCredential(
