@@ -2,7 +2,9 @@ package id.walt.wallet2.handlers
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.WalletCredentialStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -12,13 +14,73 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertTrue
 
 class WalletIssuanceHandlerPreviewTest {
+
+    @Test
+    fun legacyCallbackOverloadsRemainBinaryVisible() {
+        val methods = WalletIssuanceHandler::class.java.methods
+
+        assertTrue(methods.any { it.name == "receiveCredentialFlow" && it.parameterCount == 7 })
+        assertTrue(methods.any { it.name == "receiveCredential" && it.parameterCount == 7 })
+        assertTrue(methods.any { it.name == "receiveCredentialAuthCodeFlow" && it.parameterCount == 15 })
+    }
+
+    @Test
+    fun credentialCountCallbackRunsBeforeBatchPersistence() = runTest {
+        val events = mutableListOf<String>()
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    when (request.url.toString()) {
+                        "$ISSUER/.well-known/openid-credential-issuer" -> respondJson(ISSUER_METADATA)
+                        "$ISSUER/.well-known/oauth-authorization-server" -> respondJson(AUTHORIZATION_SERVER_METADATA)
+                        "$ISSUER/token" -> respondJson("""{"access_token":"token","token_type":"bearer"}""")
+                        "$ISSUER/credential" -> respondJson(
+                            """{"credentials":[{"credential":$CREDENTIAL},{"credential":$CREDENTIAL}]}"""
+                        )
+                        else -> error("Unexpected request: ${request.method.value} ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true })
+            }
+        }
+        val store = RecordingCredentialStore(events)
+        val wallet = Wallet(
+            id = "pre-persistence-callback-test",
+            staticKey = JWKKey.generate(KeyType.Ed25519),
+            credentialStores = listOf(store),
+        )
+
+        val result = WalletIssuanceHandler.receiveCredential(
+            wallet = wallet,
+            request = ReceiveCredentialRequest(
+                offerJson = Json.parseToJsonElement(CREDENTIAL_OFFER).jsonObject,
+                txCode = "1234",
+            ),
+            httpClient = client,
+            beforeCredentialsStored = { events += "reserve:$it" },
+            onCredentialStored = { events += "stored:${it.id}" },
+        )
+
+        assertEquals(2, result.credentialIds.size)
+        assertEquals("reserve:2", events.first())
+        assertEquals(
+            listOf("reserve", "persist", "stored", "persist", "stored"),
+            events.map { it.substringBefore(':') },
+        )
+    }
 
     @Test
     fun previewedOfferIsReusedForRetriesWhileDirectReceiveStillResolves() = runTest {
@@ -138,6 +200,29 @@ class WalletIssuanceHandlerPreviewTest {
               "response_types_supported": ["code"]
             }
         """
+        const val CREDENTIAL = """
+            {
+              "@context": ["https://www.w3.org/2018/credentials/v1"],
+              "type": ["VerifiableCredential"],
+              "issuer": "did:example:issuer",
+              "credentialSubject": {"id": "did:example:holder"}
+            }
+        """
+    }
+
+    private class RecordingCredentialStore(private val events: MutableList<String>) : WalletCredentialStore {
+        private val credentials = mutableListOf<StoredCredential>()
+
+        override suspend fun getCredential(id: String): StoredCredential? = credentials.find { it.id == id }
+
+        override suspend fun listCredentials(): Flow<StoredCredential> = credentials.asFlow()
+
+        override suspend fun addCredential(entry: StoredCredential) {
+            events += "persist:${entry.id}"
+            credentials += entry
+        }
+
+        override suspend fun removeCredential(id: String): Boolean = credentials.removeAll { it.id == id }
     }
 }
 
