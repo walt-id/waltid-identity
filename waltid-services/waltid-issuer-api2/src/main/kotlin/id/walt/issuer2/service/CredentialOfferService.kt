@@ -136,6 +136,10 @@ class CredentialOfferService(
         return credentialOffer
     }
 
+    suspend fun getIssuanceSession(sessionId: String): IssuanceSession? = sessionService.getSessionOrNull(sessionId)
+
+    suspend fun removeIssuanceSession(sessionId: String) = sessionService.removeSession(sessionId)
+
     private fun issuerBaseUrl(): String = config.openId4VciBaseUrl()
 
     private fun expirationTimestamp(expiresInSeconds: Long): Instant =
