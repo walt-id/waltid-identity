@@ -9,11 +9,11 @@ on:
 
 jobs:
   version:
-    uses: walt-id/waltid-identity/.github/workflows/version.yml@main
+    uses: walt-id/waltid-identity/.github/workflows/version.yml@6bb27c98fb66d9525dcc5ed8b0e703ff07a18c4a
     with:
       preferred: ${{ inputs.release_version }}
   gradle:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@main
+    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@6bb27c98fb66d9525dcc5ed8b0e703ff07a18c4a
     secrets: inherit
     needs: version
     with:
@@ -22,11 +22,11 @@ jobs:
       publish: true
       report-check-name: 'gradle / gradle (ubuntu-22.04)'
   docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
+    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@6bb27c98fb66d9525dcc5ed8b0e703ff07a18c4a
     with:
       jsonpath: ".github/workflows/data/docker-matrix.json"
   docker:
-    uses: walt-id/waltid-identity/.github/workflows/docker.yml@main
+    uses: walt-id/waltid-identity/.github/workflows/docker.yml@6bb27c98fb66d9525dcc5ed8b0e703ff07a18c4a
     secrets: inherit
     needs: [ version, docker-matrix ]
     with:
@@ -34,11 +34,11 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       publish: true
   api-docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
+    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@6bb27c98fb66d9525dcc5ed8b0e703ff07a18c4a
     with:
       jsonpath: ".github/workflows/data/api-docker-matrix.json"
   api-docker:
-    uses: walt-id/waltid-identity/.github/workflows/api-docker.yml@main
+    uses: walt-id/waltid-identity/.github/workflows/api-docker.yml@6bb27c98fb66d9525dcc5ed8b0e703ff07a18c4a
     secrets: inherit
     needs: [ version, api-docker-matrix ]
     with:
@@ -46,14 +46,14 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       publish: true
   tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@6bb27c98fb66d9525dcc5ed8b0e703ff07a18c4a
     secrets: inherit
     needs: [ version, gradle, docker, api-docker ]
     with:
       version: ${{ needs.version.outputs.release_version }}
       ref: ${{ github.ref_name }}
   enterprise-tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@6bb27c98fb66d9525dcc5ed8b0e703ff07a18c4a
     secrets: inherit
     needs: [ version, gradle, docker, api-docker ]
     with:
@@ -61,7 +61,7 @@ jobs:
       repository: walt-id/waltid-identity-enterprise
       ref: ${{ github.ref_name }}
   docs-tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@6bb27c98fb66d9525dcc5ed8b0e703ff07a18c4a
     secrets: inherit
     needs: [ version, gradle, docker, api-docker ]
     with:
@@ -69,7 +69,7 @@ jobs:
       repository: walt-id/waltid-docs
       ref: ${{ github.ref_name }}
   quickstart-tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@6bb27c98fb66d9525dcc5ed8b0e703ff07a18c4a
     secrets: inherit
     needs: [ version, gradle, docker, api-docker ]
     with:
@@ -77,7 +77,7 @@ jobs:
       repository: walt-id/waltid-enterprise-quickstart
       ref: ${{ github.ref_name }}
   unified-build-tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@6bb27c98fb66d9525dcc5ed8b0e703ff07a18c4a
     secrets: inherit
     needs: [ version, gradle, docker, api-docker ]
     with:
@@ -85,7 +85,7 @@ jobs:
       repository: walt-id/waltid-unified-build
       ref: ${{ github.ref_name }}
   release:
-    uses: walt-id/waltid-identity/.github/workflows/create-release.yml@main
+    uses: walt-id/waltid-identity/.github/workflows/create-release.yml@6bb27c98fb66d9525dcc5ed8b0e703ff07a18c4a
     secrets: inherit
     needs: [ version, tag ]
     with:
