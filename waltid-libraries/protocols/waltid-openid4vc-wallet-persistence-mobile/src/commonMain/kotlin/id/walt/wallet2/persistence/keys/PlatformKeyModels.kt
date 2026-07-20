@@ -14,7 +14,13 @@ public enum class PlatformKeyPlatform {
     Custom,
 }
 
-/** Explicit request for creating one mobile wallet signing key. */
+/**
+ * Explicit request for creating one mobile wallet signing key.
+ *
+ * @property keyType Type of signing key to create.
+ * @property keyId Optional platform key identifier. The provider assigns one when omitted.
+ * @property keyUseAuthorizationPolicy Immutable authorization policy enforced by the created key.
+ */
 public data class PlatformKeyGenerationRequest(
     public val keyType: KeyType,
     public val keyId: String? = null,
@@ -26,6 +32,16 @@ public data class PlatformKeyGenerationRequest(
  *
  * [effectiveHardwareBacking] is populated only when reliable platform key information is available.
  * In particular, an Android preference for StrongBox is never reported as effective StrongBox backing.
+ *
+ * @property platform Mobile platform that evaluated the request.
+ * @property keyType Requested signing-key type.
+ * @property keyUseAuthorizationPolicy Requested immutable key-use authorization policy.
+ * @property supported Whether the provider can enforce this exact request without fallback.
+ * @property platformBackingAvailable Whether platform-backed key storage is available.
+ * @property secureHardwareRequired Whether this request requires secure hardware backing.
+ * @property secureHardwareAvailable Whether required secure hardware availability is known on this device.
+ * @property effectiveHardwareBacking Effective backing when it can be determined from platform key information.
+ * @property failure Stable reason the request is unsupported, or `null` when supported.
  */
 public data class PlatformKeyCapability(
     public val platform: PlatformKeyPlatform,
