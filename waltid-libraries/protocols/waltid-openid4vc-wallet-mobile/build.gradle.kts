@@ -67,6 +67,7 @@ kotlin {
         }
         if (enableAndroidBuild) {
             androidMain.dependencies {
+                implementation(identityLibs.androidx.biometric)
                 implementation(identityLibs.ktor.client.android)
             }
         }

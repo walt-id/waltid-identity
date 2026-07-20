@@ -11,16 +11,45 @@ import id.walt.crypto.keys.KeyUseAuthorizationException
 import id.walt.crypto.keys.KeyUseAuthorizationFailure
 import id.walt.crypto.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto.keys.KeyUseAuthorizationPrompt
+import java.lang.ref.WeakReference
 import kotlin.uuid.Uuid
 
 /**
  * [PlatformKeyProvider] implementation backed by Android KeyStore.
  */
-public class AndroidPlatformKeyProvider(
-    private val context: Context? = null,
+public class AndroidPlatformKeyProvider private constructor(
+    private val applicationContext: Context?,
     private val authorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
+    private val interactionContextProvider: () -> FragmentActivity?,
 ) : PlatformKeyProvider {
-    private val interactionContext: FragmentActivity? = context as? FragmentActivity
+    /**
+     * Creates a provider scoped to [context]. A supplied activity is weakly referenced and becomes
+     * unavailable after destruction; use the provider-based constructor for wallets retained across recreation.
+     */
+    public constructor(
+        context: Context? = null,
+        authorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
+    ) : this(
+        applicationContext = context?.applicationContext,
+        authorizationPrompt = authorizationPrompt,
+        interactionContextProvider = weakInteractionContextProvider(context as? FragmentActivity),
+    )
+
+    /**
+     * Creates a provider that resolves the current prompt-hosting activity for every protected key operation.
+     */
+    public constructor(
+        context: Context,
+        interactionContextProvider: () -> FragmentActivity?,
+        authorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
+    ) : this(
+        applicationContext = context.applicationContext,
+        authorizationPrompt = authorizationPrompt,
+        interactionContextProvider = interactionContextProvider,
+    )
+
+    private val interactionContext: FragmentActivity?
+        get() = interactionContextProvider().takeIf { it.canHostBiometricPrompt() }
 
     /**
      * Android platform-backed key types supported by this provider.
@@ -50,7 +79,7 @@ public class AndroidPlatformKeyProvider(
             keyType = request.keyType,
             keyUseAuthorizationPolicy = request.keyUseAuthorizationPolicy,
             authorizationPrompt = authorizationPrompt,
-            interactionContext = interactionContext,
+            interactionContext = interactionContextProvider,
         )
         return if (isPlatformBacked(request.keyType)) {
             AndroidKey.Platform.create(options)
@@ -75,7 +104,7 @@ public class AndroidPlatformKeyProvider(
             keyType = keyType,
             keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
             authorizationPrompt = authorizationPrompt,
-            interactionContext = interactionContext,
+            interactionContext = interactionContextProvider,
         )
         return if (keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.None) {
             runCatching { AndroidKey.Platform.load(options) }.getOrNull()
@@ -106,8 +135,8 @@ public class AndroidPlatformKeyProvider(
         val failure = when {
             keyType != KeyType.secp256r1 -> KeyUseAuthorizationFailure.UnsupportedCombination
             interactionContext == null -> KeyUseAuthorizationFailure.InteractionContextUnavailable
-            context == null -> KeyUseAuthorizationFailure.BiometricUnavailable
-            else -> when (BiometricManager.from(context).canAuthenticate(BIOMETRIC_STRONG)) {
+            applicationContext == null -> KeyUseAuthorizationFailure.BiometricUnavailable
+            else -> when (BiometricManager.from(applicationContext).canAuthenticate(BIOMETRIC_STRONG)) {
                 BiometricManager.BIOMETRIC_SUCCESS -> null
                 BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> KeyUseAuthorizationFailure.BiometricNotEnrolled
                 else -> KeyUseAuthorizationFailure.BiometricUnavailable
@@ -150,3 +179,11 @@ public class AndroidPlatformKeyProvider(
         }
     }.isSuccess
 }
+
+private fun weakInteractionContextProvider(activity: FragmentActivity?): () -> FragmentActivity? {
+    val reference = activity?.let(::WeakReference)
+    return { reference?.get() }
+}
+
+private fun FragmentActivity?.canHostBiometricPrompt(): Boolean =
+    this != null && !isFinishing && !isDestroyed && !isChangingConfigurations

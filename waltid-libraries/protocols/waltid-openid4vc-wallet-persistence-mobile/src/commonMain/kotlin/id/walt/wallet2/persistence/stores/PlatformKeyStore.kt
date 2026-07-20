@@ -4,6 +4,8 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyHardwareBacking
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.KeyUseAuthorizationAware
+import id.walt.crypto.keys.KeyUseAuthorizationException
+import id.walt.crypto.keys.KeyUseAuthorizationFailure
 import id.walt.crypto.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import id.walt.wallet2.persistence.keys.PlatformKeyProvider
@@ -27,6 +29,8 @@ public class PlatformKeyStore(
     private val queries: WalletPersistenceQueries,
 ) : WalletKeyStore {
 
+    override val supportsKeyUseAuthorizationMetadata: Boolean = true
+
     /**
      * Loads a wallet key by its wallet-local key identifier.
      */
@@ -34,13 +38,38 @@ public class PlatformKeyStore(
         val ref = queries.selectByKeyId(keyId).executeAsOneOrNull() ?: return null
         val keyType = KeyType.valueOf(ref.key_type)
         val authorizationPolicy = KeyUseAuthorizationPolicy.valueOf(ref.effective_authorization_policy)
-        return if (ref.is_platform_backed == 1L) {
+        if (
+            authorizationPolicy != KeyUseAuthorizationPolicy.None &&
+            ref.is_platform_backed != 1L
+        ) {
+            throw invalidProtectedKey(keyId, "is not marked as platform-backed")
+        }
+
+        val key = if (ref.is_platform_backed == 1L) {
             keyProvider.loadKey(keyId, keyType, authorizationPolicy)
         } else {
             val material = ref.key_material?.encodeToByteArray()
                 ?: error("Software key '$keyId' has no stored key material")
             keyProvider.loadSoftwareKey(keyId, keyType, material)
         }
+
+        if (authorizationPolicy == KeyUseAuthorizationPolicy.None) return key
+        if (key == null) {
+            throw KeyUseAuthorizationException(
+                failure = KeyUseAuthorizationFailure.ProtectedKeyMissing,
+                message = "The protected key '$keyId' is missing from the platform key store",
+            )
+        }
+        val authorizationAware = key as? KeyUseAuthorizationAware
+        if (
+            key.keyType != keyType ||
+            authorizationAware == null ||
+            authorizationAware.keyUseAuthorizationPolicy != authorizationPolicy ||
+            !authorizationAware.isPlatformBacked
+        ) {
+            throw invalidProtectedKey(keyId, "does not enforce its persisted authorization policy")
+        }
+        return key
     }
 
     /**
@@ -88,6 +117,22 @@ public class PlatformKeyStore(
         val isPlatformBacked = authorizationAware?.isPlatformBacked
             ?: keyInfo?.isPlatformBacked
             ?: keyProvider.isPlatformBacked(key.keyType)
+        val hasProtectedPolicy =
+            requestedAuthorizationPolicy != KeyUseAuthorizationPolicy.None ||
+                effectiveAuthorizationPolicy != KeyUseAuthorizationPolicy.None
+        if (
+            hasProtectedPolicy &&
+            (
+                authorizationAware == null ||
+                    !isPlatformBacked ||
+                    keyInfo?.effectiveKeyUseAuthorizationPolicy?.let { it != effectiveAuthorizationPolicy } == true
+            )
+        ) {
+            throw KeyUseAuthorizationException(
+                failure = KeyUseAuthorizationFailure.UnsupportedCombination,
+                message = "Protected key metadata must match a platform-backed authorization-aware key",
+            )
+        }
         val effectiveHardwareBacking = authorizationAware?.effectiveHardwareBacking()
             ?: keyInfo?.effectiveHardwareBacking
         val material = if (!isPlatformBacked) keyProvider.exportSoftwareKeyMaterial(key) else null
@@ -115,4 +160,10 @@ public class PlatformKeyStore(
         queries.deleteByKeyId(keyId)
         return true
     }
+
+    private fun invalidProtectedKey(keyId: String, reason: String): KeyUseAuthorizationException =
+        KeyUseAuthorizationException(
+            failure = KeyUseAuthorizationFailure.ProtectedKeyInvalidated,
+            message = "The protected key '$keyId' $reason",
+        )
 }

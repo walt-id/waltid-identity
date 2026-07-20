@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name="id.walt.wallet2.persistence.keys.PlatformKeyProviderTestActivity"
+            android:exported="false" />
+    </application>
+</manifest>
