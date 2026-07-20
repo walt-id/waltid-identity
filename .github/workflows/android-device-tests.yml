@@ -105,6 +105,7 @@ jobs:
         with:
           api-level: 34
           arch: x86_64
+          disk-size: 4G
           emulator-options: ${{ steps.android-device-phase.outputs.emulator_options }}
           disable-animations: true
           script: ${{ steps.android-device-phase.outputs.script }}
