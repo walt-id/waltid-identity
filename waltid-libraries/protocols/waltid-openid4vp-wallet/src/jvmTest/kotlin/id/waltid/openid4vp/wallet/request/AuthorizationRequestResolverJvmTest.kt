@@ -178,6 +178,23 @@ class AuthorizationRequestResolverJvmTest {
     }
 
     @Test
+    fun `request object rejects invalid temporal claims`() {
+        val cases = listOf(
+            "expired" to validPayload(expiration = 0),
+            "not yet valid" to validPayload(notBefore = 4_102_444_800),
+            "invalid expiration" to validPayload(extraClaims = listOf("\"exp\":\"tomorrow\"")),
+            "invalid not-before" to validPayload(extraClaims = listOf("\"nbf\":true")),
+        )
+
+        cases.forEach { (description, payload) ->
+            val failure = assertFailsWith<IllegalArgumentException>(description) {
+                resolveAllowUnsigned(unsignedJwt(payload), outerClientId = "verifier2")
+            }
+            assertTrue(failure.message.orEmpty().contains("exp") || failure.message.orEmpty().contains("nbf"))
+        }
+    }
+
+    @Test
     fun `request object requires matching outer and inner client ids`() {
         val missingOuter = assertFailsWith<IllegalArgumentException> {
             resolveAllowUnsigned(unsignedJwt(validPayload()), outerClientId = null)
@@ -338,10 +355,16 @@ class AuthorizationRequestResolverJvmTest {
         clientId: String? = "verifier2",
         audience: String? = "https://self-issued.me/v2",
         walletNonce: String? = null,
+        expiration: Long? = null,
+        notBefore: Long? = null,
+        extraClaims: List<String> = emptyList(),
     ): String = buildList {
         clientId?.let { add("\"client_id\":\"$it\"") }
         audience?.let { add("\"aud\":\"$it\"") }
         walletNonce?.let { add("\"wallet_nonce\":\"$it\"") }
+        expiration?.let { add("\"exp\":$it") }
+        notBefore?.let { add("\"nbf\":$it") }
+        addAll(extraClaims)
         add("\"nonce\":\"nonce-123\"")
     }.joinToString(prefix = "{", postfix = "}")
 

@@ -9,7 +9,7 @@ import kotlinx.serialization.json.*
 /**
  * Handles JWE encryption for OpenID4VP authorization responses.
  *
- * Per OID4VP 1.0 §6, when `response_mode` is `direct_post.jwt` or `dc_api.jwt`,
+ * Per OID4VP 1.0 §8.3, when `response_mode` is `direct_post.jwt` or `dc_api.jwt`,
  * the wallet MUST encrypt the authorization response using the verifier's
  * public key from `client_metadata.jwks`.
  */

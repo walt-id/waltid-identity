@@ -342,10 +342,7 @@ object WalletPresentFunctionality2 {
                         webResolveAuthReq = webResolveAuthReq,
                         requestUri = requestUri,
                         requestUriMethod = requestUriMethod,
-                        // Optional wallet metadata is omitted until the caller explicitly profiles
-                        // its values. Some Final-compliant verifier endpoints reject unsupported
-                        // capability members, while wallet_nonce remains mandatory for this flow.
-                        sendWalletMetadata = false,
+                        sendWalletMetadata = true,
                     )
                 },
             ).authorizationRequest.also(::validateAuthorizationRequest)
@@ -576,7 +573,7 @@ object WalletPresentFunctionality2 {
                     // Optional wallet metadata is omitted until the caller explicitly profiles
                     // its values. Some Final-compliant verifier endpoints reject unsupported
                     // capability members, while wallet_nonce remains mandatory for this flow.
-                    sendWalletMetadata = false,
+                    sendWalletMetadata = true,
                 )
             },
         )
@@ -738,7 +735,7 @@ object WalletPresentFunctionality2 {
     /**
      * Creates a Key Binding JWT for SD-JWT presentations.
      *
-     * Per OID4VP 1.0 §5.5.1, when the authorization request includes `transaction_data`,
+     * Per OID4VP 1.0 §5.1, when the authorization request includes `transaction_data`,
      * the wallet MUST include `transaction_data_hashes` in the KB-JWT. Each entry is the
      * base64url-encoded SHA-256 hash of the corresponding base64url-encoded transaction data
      * item as it appeared in the request. The algorithm is SHA-256 by default.

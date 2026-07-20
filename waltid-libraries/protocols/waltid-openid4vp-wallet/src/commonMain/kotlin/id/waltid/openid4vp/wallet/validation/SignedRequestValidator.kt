@@ -12,8 +12,11 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
+import kotlin.time.Clock
 
 /**
  * Validates signed authorization request objects per OID4VP 1.0 §5.
@@ -24,6 +27,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * 3. Mandatory, identical outer and inner client_id values (RFC 9101 §6.3)
  * 4. JWT signature verification via client_id prefix authentication
  * 5. wallet_nonce validation for request_uri_method=post (§5.6)
+ * 6. Optional exp and nbf temporal claim validation (RFC 7519 §4.1.4, §4.1.5)
  */
 object SignedRequestValidator {
 
@@ -38,6 +42,8 @@ object SignedRequestValidator {
      * Required JOSE typ header value for signed authorization requests per OID4VP 1.0 §5.3.
      */
     private const val REQUIRED_TYP = "oauth-authz-req+jwt"
+
+    private const val DEFAULT_CLOCK_SKEW_SECONDS = 60L
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -155,6 +161,10 @@ object SignedRequestValidator {
             )
         }
 
+        validateTemporalClaims(decodedJws.payload)?.let { message ->
+            return ValidationResult.Failure(error = null, message = message)
+        }
+
         // 5. RFC 9101 §6.3 requires outer and Request Object client_id values to match.
         val clientId = decodedJws.payload["client_id"]?.jsonPrimitive?.contentOrNull
             ?: return ValidationResult.Failure(
@@ -240,5 +250,29 @@ object SignedRequestValidator {
                 )
             }
         }
+    }
+
+    private fun validateTemporalClaims(
+        payload: kotlinx.serialization.json.JsonObject,
+    ): String? {
+        val now = Clock.System.now().epochSeconds
+
+        payload["exp"]?.let { claim ->
+            val expiration = (claim as? JsonPrimitive)?.longOrNull
+                ?: return "Invalid exp claim: expected a NumericDate"
+            if (expiration < now - DEFAULT_CLOCK_SKEW_SECONDS) {
+                return "Authorization request object is expired: exp=$expiration, now=$now"
+            }
+        }
+
+        payload["nbf"]?.let { claim ->
+            val notBefore = (claim as? JsonPrimitive)?.longOrNull
+                ?: return "Invalid nbf claim: expected a NumericDate"
+            if (notBefore > now + DEFAULT_CLOCK_SKEW_SECONDS) {
+                return "Authorization request object is not yet valid: nbf=$notBefore, now=$now"
+            }
+        }
+
+        return null
     }
 }

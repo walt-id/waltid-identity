@@ -3,7 +3,7 @@ package id.walt.verifier.openid.transactiondata
 /**
  * Registry of known/supported transaction_data types.
  *
- * Per OID4VP 1.0 §5.5.1, wallets MUST reject authorization requests containing
+ * Per OID4VP 1.0 §5.1 and §8.5, wallets MUST reject authorization requests containing
  * transaction_data with an unknown type. This registry defines the known types.
  *
  * @param types The set of allowed transaction_data types.

@@ -33,6 +33,8 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -134,7 +136,7 @@ data class MatchCredentialsResult(
 /**
  * Result of inspecting encryption requirements for a VP request.
  *
- * Per OID4VP 1.0 §6, encrypted responses are required when response_mode
+ * Per OID4VP 1.0 §8.3, encrypted responses are required when response_mode
  * is `direct_post.jwt` or `dc_api.jwt`. This result allows mobile UIs to
  * show encryption status in consent screens before presenting.
  */
@@ -468,7 +470,9 @@ object WalletPresentationHandler {
             clientId = authRequest.clientId,
             responseUri = authRequest.responseUri?.let { Url(it) },
             hasRequestUri = request.requestUrl.parameters.contains("request_uri"),
-            responseMode = authRequest.responseMode?.name,
+            responseMode = authRequest.responseMode?.let {
+                Json.encodeToString(OpenID4VPResponseMode.serializer(), it).trim('"')
+            },
             requiresEncryptedResponse = authRequest.responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES,
             dcqlQuery = authRequest.dcqlQuery,
         )
@@ -509,7 +513,7 @@ object WalletPresentationHandler {
     /**
      * Inspects a resolved authorization request to determine encryption requirements.
      *
-     * Per OID4VP 1.0 §6, when response_mode is `direct_post.jwt` or `dc_api.jwt`,
+     * Per OID4VP 1.0 §8.3, when response_mode is `direct_post.jwt` or `dc_api.jwt`,
      * the wallet must encrypt the authorization response. This method extracts
      * and validates the encryption parameters from the request's client_metadata.
      *

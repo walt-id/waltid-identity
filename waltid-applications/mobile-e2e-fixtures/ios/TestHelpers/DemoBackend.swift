@@ -207,12 +207,11 @@ public final class DemoBackend {
         // Request Object endpoint and must not serve the unsigned JSON response.
         let requestURL = response["fullAuthorizationRequestUrl"] as? String
             ?? response["authorizationRequestUrl"] as? String
-            ?? response["bootstrapAuthorizationRequestUrl"] as? String
         guard let requestURL, !requestURL.isEmpty else {
             throw NSError(
                 domain: "WalletE2E",
                 code: 302,
-                userInfo: [NSLocalizedDescriptionKey: "Missing authorization request URL in public demo verifier2 response: \(response)"]
+                userInfo: [NSLocalizedDescriptionKey: "Missing inline authorization request URL in public demo verifier2 response: \(response)"]
             )
         }
 

@@ -542,9 +542,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
                 val bootstrapUrl = verifierSession.fullAuthorizationRequestUrl
                     ?: Url("$walletBase/verification-session/$sessionId/request")
 
-                // 5. Wallet presents to verifier using the full unsigned Authorization Request URL
-                // (which contains request_uri=... so WalletPresentFunctionality2 fetches the
-                // full AuthorizationRequest including dcql_query from the server)
+                // 5. Wallet presents to the verifier using the returned authorization request URL.
                 testAndReturn("[$tag] Wallet presents credential (OID4VP 1.0)") {
                     http.post("/wallet/$walletId/credentials/present") {
                         setBody(PresentCredentialRequest(requestUrl = bootstrapUrl, did = holderDid))

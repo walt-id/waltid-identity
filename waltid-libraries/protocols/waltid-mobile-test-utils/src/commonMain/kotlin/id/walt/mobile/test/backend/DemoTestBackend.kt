@@ -220,8 +220,7 @@ object DemoTestBackend {
         // public demo's unsigned application/json response as though it were a JAR JWT.
         val authorizationRequestUri = response["fullAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
             ?: response["authorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
-            ?: response["bootstrapAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
-            ?: error("Missing authorization request URL in public demo verifier2 response: $response")
+            ?: error("Missing inline authorization request URL in public demo verifier2 response: $response")
 
         return VerifierSession(sessionId, authorizationRequestUri)
     }
