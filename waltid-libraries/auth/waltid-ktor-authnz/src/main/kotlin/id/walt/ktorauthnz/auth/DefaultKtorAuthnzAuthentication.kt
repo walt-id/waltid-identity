@@ -43,9 +43,19 @@ class DefaultKtorAuthnzAuthentication internal constructor(
             return
         }
 
-        val principal = if (KtorAuthnzManager.tokenHandler.validateToken(effectiveToken))
+        if (!KtorAuthnzManager.tokenHandler.validateToken(effectiveToken)) {
+            log.debug { "Invalid token (signature/expiration) for request" }
+            fail(context, AuthenticationFailedCause.InvalidCredentials)
+            return
+        }
+
+        val principal = try {
+            KtorAuthnzManager.tokenHandler.resolveTokenToSession(effectiveToken)
             UserIdPrincipal(effectiveToken)
-        else null
+        } catch (e: Exception) {
+            log.debug { "Session not found or invalid for token: ${e.message}" }
+            null
+        }
 
         if (principal != null) {
             context.principal(name, principal)
