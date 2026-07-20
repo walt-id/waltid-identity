@@ -589,8 +589,8 @@ final class WalletAPITests: XCTestCase {
     func testPresentationModelValidationRejectsInvalidStates() {
         XCTAssertFalse(PresentationCredentialRequirement.hasValidOptions([]))
         XCTAssertFalse(PresentationCredentialRequirement.hasValidOptions([[]]))
-        XCTAssertFalse(PresentationCredentialRequirement.hasValidOptions([["invalid query"]]))
-        XCTAssertTrue(PresentationCredentialRequirement.hasValidOptions([["pid_1", "age-credential"]]))
+        XCTAssertFalse(PresentationCredentialRequirement.hasValidOptions([[" "]]))
+        XCTAssertTrue(PresentationCredentialRequirement.hasValidOptions([["pid 1", "age.credential"]]))
 
         XCTAssertFalse(PresentationRequestInfo.hasRequiredFields(clientID: "", nonce: "nonce"))
         XCTAssertFalse(PresentationRequestInfo.hasRequiredFields(clientID: "client", nonce: " "))

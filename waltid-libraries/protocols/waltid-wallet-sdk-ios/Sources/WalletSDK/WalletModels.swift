@@ -1139,14 +1139,14 @@ public struct PresentationCredentialRequirement: Equatable, Sendable {
     public init(options: [[String]]) {
         precondition(
             Self.hasValidOptions(options),
-            "A presentation credential requirement must contain non-empty options with valid DCQL query IDs."
+            "A presentation credential requirement must contain non-empty options with non-blank query IDs."
         )
         self.options = options
     }
 
     static func hasValidOptions(_ options: [[String]]) -> Bool {
         !options.isEmpty && options.allSatisfy { option in
-            !option.isEmpty && option.allSatisfy(isValidDCQLIdentifier)
+            !option.isEmpty && option.allSatisfy(isNonBlank)
         }
     }
 }
@@ -1360,8 +1360,8 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
         disclosures: [PresentationDisclosure] = []
     ) {
         precondition(
-            isValidDCQLIdentifier(queryID),
-            "A presentation credential option must contain a valid DCQL query ID."
+            isNonBlank(queryID),
+            "A presentation credential option must contain a non-blank query ID."
         )
         self.queryID = queryID
         self.credentialID = credentialID
@@ -1540,8 +1540,8 @@ public struct PresentationTransactionData: Equatable, Sendable {
             "Transaction data must reference at least one credential query ID."
         )
         precondition(
-            credentialQueryIDs.allSatisfy(isValidDCQLIdentifier),
-            "Transaction data must contain valid DCQL query IDs."
+            credentialQueryIDs.allSatisfy(isNonBlank),
+            "Transaction data must contain non-blank credential query IDs."
         )
         self.type = type
         self.displayName = displayName
@@ -1723,13 +1723,6 @@ public enum WalletEventStatus: Equatable, Sendable {
     case failed
 }
 
-private func isValidDCQLIdentifier(_ value: String) -> Bool {
-    !value.isEmpty && value.unicodeScalars.allSatisfy { scalar in
-        switch scalar.value {
-        case 48...57, 65...90, 95, 97...122, 45:
-            return true
-        default:
-            return false
-        }
-    }
+private func isNonBlank(_ value: String) -> Bool {
+    !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 }
