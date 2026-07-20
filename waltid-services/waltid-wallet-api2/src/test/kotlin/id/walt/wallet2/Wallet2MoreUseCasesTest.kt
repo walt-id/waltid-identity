@@ -393,7 +393,7 @@ class Wallet2MoreUseCasesTest {
                 }
 
                 testAndReturn("Verification session SUCCESSFUL after multi-format wallet present") {
-                    val info = http.get("/verification-session/${verifierSession.sessionId}/info").body<Verification2Session>()
+                    val info = http.awaitVerificationSession(verifierSession.sessionId)
                     assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, info.status)
                 }
             }
@@ -725,7 +725,7 @@ class Wallet2MoreUseCasesTest {
                 }
 
                 testAndReturn("Verification session SUCCESSFUL after isolated VP") {
-                    val info = http.get("/verification-session/${verifierSession.sessionId}/info").body<Verification2Session>()
+                    val info = http.awaitVerificationSession(verifierSession.sessionId)
                     assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, info.status,
                         "Session status: ${info.status} (${info.statusReason})")
                     assertTrue(info.presentedCredentials?.isNotEmpty() == true)
