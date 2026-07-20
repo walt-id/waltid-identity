@@ -38,8 +38,8 @@ public struct WalletConfiguration: Sendable {
     ///   - persistence: Local persistence configuration for wallet-owned state.
     ///   - requestObjectTrustAnchorPEMCertificates: Wallet-controlled PEM trust
     ///     anchors used to validate signed OID4VP Request Objects.
-    ///   - requestObjectEnableSystemTrustAnchors: Whether platform trust anchors
-    ///     are also accepted when validating signed Request Objects.
+    ///   - requestObjectEnableSystemTrustAnchors: Retained for compatibility. Passing `true`
+    ///     is rejected because iOS Request Object PKIX validation is not yet supported.
     ///   - requestObjectAudience: Expected audience of signed OID4VP Request Objects.
     ///   - transactionDataProfiles: OpenID4VP transaction data profiles this
     ///     wallet accepts before previewing or submitting a presentation.

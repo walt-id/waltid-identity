@@ -13,7 +13,14 @@ public data class MobileWalletPresentationPreview(
     public val credentialOptions: List<MobileWalletPresentationCredentialOption>,
     public val credentialRequirements: List<MobileWalletPresentationCredentialRequirement> = emptyList(),
     public val encryption: MobileWalletEncryptionInfo = MobileWalletEncryptionInfo.NotRequired,
-)
+) {
+    /** Binary/source compatibility constructor matching the pre-encryption API. */
+    public constructor(
+        request: MobileWalletPresentationRequestInfo,
+        credentialOptions: List<MobileWalletPresentationCredentialOption>,
+        credentialRequirements: List<MobileWalletPresentationCredentialRequirement>,
+    ) : this(request, credentialOptions, credentialRequirements, MobileWalletEncryptionInfo.NotRequired)
+}
 
 /** Authenticated encryption requirements for an OpenID4VP response (OID4VP 1.0 §8.3). */
 public sealed interface MobileWalletEncryptionInfo {
@@ -64,8 +71,8 @@ public data class MobileWalletPresentationCredentialRequirement(
  * @property responseUri Verifier response URI to which the wallet will submit the presentation, when provided.
  * @property state OpenID4VP state value supplied by the verifier, when provided.
  * @property nonce OpenID4VP nonce value supplied by the verifier, when provided.
- * @property responseMode Serialized OpenID4VP response mode requested by the verifier.
  * @property transactionData Decoded transaction data items requested by the verifier.
+ * @property responseMode Serialized OpenID4VP response mode requested by the verifier.
  */
 public data class MobileWalletPresentationRequestInfo(
     val clientId: String?,
@@ -73,9 +80,19 @@ public data class MobileWalletPresentationRequestInfo(
     val responseUri: String?,
     val state: String?,
     val nonce: String?,
-    val responseMode: String? = null,
     val transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
-)
+    val responseMode: String? = null,
+) {
+    /** Binary/source compatibility constructor matching the pre-response-mode API. */
+    public constructor(
+        clientId: String?,
+        verifierName: String?,
+        responseUri: String?,
+        state: String?,
+        nonce: String?,
+        transactionData: List<MobileWalletTransactionDataItem>,
+    ) : this(clientId, verifierName, responseUri, state, nonce, transactionData, null)
+}
 
 /**
  * A wallet credential that satisfies one DCQL credential query in the presentation request.
