@@ -116,7 +116,7 @@ object WalletPresentationFormatRegistry {
      */
     private val SupportedFormat.holderAlgorithmFields: Set<String>
         get() = when (this) {
-            SupportedFormat.JWT_VC_JSON -> emptySet()
+            SupportedFormat.JWT_VC_JSON -> setOf("alg_values")
             SupportedFormat.DC_SD_JWT -> setOf("kb-jwt_alg_values")
             SupportedFormat.MSO_MDOC -> setOf("deviceauth_alg_values")
         }

@@ -101,6 +101,45 @@ class PresentationRequestValidatorTest {
     }
 
     @Test
+    fun incompatibleJwtVpHolderAlgorithmReturnsProtocolError() {
+        val result = validate(
+            request(
+                dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery(CredentialFormat.JWT_VC_JSON))),
+                clientMetadata = ClientMetadata(
+                    vpFormatsSupported = mapOf(
+                        "jwt_vc_json" to buildJsonObject {
+                            put("alg_values", JsonArray(listOf(JsonPrimitive("EdDSA"))))
+                        },
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(
+            WalletPresentFunctionality2.OID4VPErrorCode.VP_FORMATS_NOT_SUPPORTED,
+            assertIs<PresentationRequestValidationResult.Invalid>(result).error.code,
+        )
+    }
+
+    @Test
+    fun compatibleJwtVpHolderAlgorithmIsAccepted() {
+        val result = validate(
+            request(
+                dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery(CredentialFormat.JWT_VC_JSON))),
+                clientMetadata = ClientMetadata(
+                    vpFormatsSupported = mapOf(
+                        "jwt_vc_json" to buildJsonObject {
+                            put("alg_values", JsonArray(listOf(JsonPrimitive("ES256"))))
+                        },
+                    ),
+                ),
+            ),
+        )
+
+        assertIs<PresentationRequestValidationResult.Valid>(result)
+    }
+
+    @Test
     fun mdocEdDsaHolderAlgorithmIsAcceptedWhenAdvertisedByVerifier() {
         val request = request(
             dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery(CredentialFormat.MSO_MDOC))),
