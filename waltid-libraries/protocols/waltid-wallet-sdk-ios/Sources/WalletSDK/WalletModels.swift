@@ -8,6 +8,12 @@ public struct WalletConfiguration: Sendable {
     /// Default key type used when bootstrapping a new wallet DID.
     public var defaultKeyType: WalletKeyType
 
+    /// Authorization policy applied only when creating new signing keys.
+    public var defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+
+    /// Localized text for the operating-system-owned key authorization prompt.
+    public var keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt
+
     /// Optional enterprise attestation configuration.
     public var attestation: WalletAttestationConfiguration?
 
@@ -22,8 +28,10 @@ public struct WalletConfiguration: Sendable {
     /// - Parameters:
     ///   - walletID: Stable local wallet identifier used for database naming
     ///     and persisted wallet state.
-    ///   - defaultKeyType: Key type used by ``Wallet/bootstrap(keyType:didMethod:)``
+    ///   - defaultKeyType: Key type used by ``Wallet/bootstrap(keyType:keyUseAuthorizationPolicy:didMethod:)``
     ///     when no operation-specific override is supplied.
+    ///   - defaultKeyUseAuthorizationPolicy: Immutable policy used only when a new key is created.
+    ///   - keyUseAuthorizationPrompt: Localized operating-system authorization prompt text.
     ///   - attestation: Optional wallet attestation configuration for issuers
     ///     that require client attestation.
     ///   - persistence: Local persistence configuration for wallet-owned state.
@@ -32,12 +40,16 @@ public struct WalletConfiguration: Sendable {
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
+        defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .none,
+        keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt = .init(),
         attestation: WalletAttestationConfiguration? = nil,
         persistence: WalletPersistence = WalletPersistence(),
         transactionDataProfiles: [WalletTransactionDataProfile] = []
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
+        self.defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy
+        self.keyUseAuthorizationPrompt = keyUseAuthorizationPrompt
         self.attestation = attestation
         self.persistence = persistence
         self.transactionDataProfiles = transactionDataProfiles
@@ -294,6 +306,132 @@ public protocol WalletDidStore: Sendable {
     func removeDid(id: String) async throws -> Bool
 }
 
+/// Immutable authorization policy enforced for private-key signing operations.
+public enum WalletKeyUseAuthorizationPolicy: Equatable, Sendable {
+    /// Existing non-interactive key-use behavior.
+    case none
+
+    /// Require a currently enrolled biometric for every signing operation.
+    ///
+    /// Device passcodes are not accepted, and biometric enrollment changes make
+    /// the key unusable.
+    case biometricCurrentSet
+}
+
+/// Localized operating-system authorization prompt text.
+public struct WalletKeyUseAuthorizationPrompt: Equatable, Sendable {
+    /// Reason shown when authorizing a private-key signing operation.
+    public var message: String
+
+    /// Cancellation action text where the operating system supports it.
+    public var cancelText: String
+
+    /// Creates key-use authorization prompt text.
+    ///
+    /// - Parameters:
+    ///   - message: Reason shown when authorizing a private-key signing operation.
+    ///   - cancelText: Cancellation action text where the operating system supports it.
+    public init(
+        message: String = "Please authorize cryptographic signature",
+        cancelText: String = "Cancel"
+    ) {
+        self.message = message
+        self.cancelText = cancelText
+    }
+}
+
+/// Stable protected-key failure reasons.
+public enum KeyUseAuthorizationFailure: Equatable, Sendable {
+    /// The key type and policy cannot be enforced together.
+    case unsupportedCombination
+    /// The device cannot perform the required biometric authentication.
+    case biometricUnavailable
+    /// No qualifying biometric is enrolled.
+    case biometricNotEnrolled
+    /// The host did not supply the interaction context required for the prompt.
+    case interactionContextUnavailable
+    /// The operating-system authorization attempt did not succeed.
+    case authorizationFailed
+    /// The protected key no longer satisfies its immutable authorization policy.
+    case protectedKeyInvalidated
+    /// The protected key is no longer present in platform storage.
+    case protectedKeyMissing
+}
+
+/// Effective private-key backing reported by the platform.
+public enum WalletKeyHardwareBacking: Equatable, Sendable {
+    /// Exportable software key material.
+    case software
+    /// Platform-managed key storage without a more specific reliable classification.
+    case platform
+    /// Secure hardware without a more specific reliable classification.
+    case secureHardware
+    /// Android trusted execution environment.
+    case trustedEnvironment
+    /// Android StrongBox, confirmed from effective key information.
+    case strongBox
+    /// Apple Secure Enclave.
+    case secureEnclave
+    /// The platform could not classify effective backing reliably.
+    case unknown
+}
+
+/// Result of preflighting a key type and immutable authorization policy.
+public struct WalletKeyAuthorizationCapability: Equatable, Sendable {
+    /// Platform that evaluated the request.
+    public let platform: String
+    /// Requested key type.
+    public let keyType: WalletKeyType
+    /// Requested immutable key-use policy.
+    public let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+    /// Whether the active device and provider can enforce the request.
+    public let supported: Bool
+    /// Whether platform-managed key storage is available for the combination.
+    public let platformBackingAvailable: Bool
+    /// Whether the combination requires secure hardware.
+    public let secureHardwareRequired: Bool
+    /// Secure-hardware availability when it can be determined before creation.
+    public let secureHardwareAvailable: Bool?
+    /// Effective backing when reliable key information is already available.
+    public let effectiveHardwareBacking: WalletKeyHardwareBacking?
+    /// Stable reason the request is unsupported, when applicable.
+    public let failure: KeyUseAuthorizationFailure?
+
+    /// Creates a capability result.
+    ///
+    /// - Parameters:
+    ///   - platform: Platform that evaluated the request.
+    ///   - keyType: Requested key type.
+    ///   - keyUseAuthorizationPolicy: Requested immutable key-use policy.
+    ///   - supported: Whether the request can be enforced.
+    ///   - platformBackingAvailable: Whether platform-managed storage is available.
+    ///   - secureHardwareRequired: Whether secure hardware is required.
+    ///   - secureHardwareAvailable: Secure-hardware availability when known.
+    ///   - effectiveHardwareBacking: Reliable effective backing when known.
+    ///   - failure: Stable reason an unsupported request failed preflight.
+    public init(
+        platform: String,
+        keyType: WalletKeyType,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy,
+        supported: Bool,
+        platformBackingAvailable: Bool,
+        secureHardwareRequired: Bool,
+        secureHardwareAvailable: Bool?,
+        effectiveHardwareBacking: WalletKeyHardwareBacking? = nil,
+        failure: KeyUseAuthorizationFailure? = nil
+    ) {
+        self.platform = platform
+        self.keyType = keyType
+        self.keyUseAuthorizationPolicy = keyUseAuthorizationPolicy
+        self.supported = supported
+        self.platformBackingAvailable = platformBackingAvailable
+        self.secureHardwareRequired = secureHardwareRequired
+        self.secureHardwareAvailable = secureHardwareAvailable
+        self.effectiveHardwareBacking = effectiveHardwareBacking
+        self.failure = failure
+    }
+}
+
 /// Key algorithms supported by the wallet bridge.
 public enum WalletKeyType: Equatable, Sendable {
     /// Ed25519 elliptic curve key.
@@ -332,6 +470,18 @@ public struct WalletKeyInfo: Equatable, Identifiable, Sendable {
     /// Optional signing algorithm label, such as `EdDSA` or `ES256`.
     public let algorithm: String?
 
+    /// Authorization policy requested when the key was created.
+    public let requestedKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+
+    /// Authorization policy effectively enforced by the stored key.
+    public let effectiveKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+
+    /// Whether private-key material is held by a platform key store.
+    public let isPlatformBacked: Bool
+
+    /// Effective hardware backing when it can be determined reliably.
+    public let effectiveHardwareBacking: WalletKeyHardwareBacking?
+
     /// Stable identifier for SwiftUI and collection APIs.
     public var id: String { keyID }
 
@@ -341,10 +491,26 @@ public struct WalletKeyInfo: Equatable, Identifiable, Sendable {
     ///   - keyID: Stable wallet-local key identifier.
     ///   - keyType: Signing-key type.
     ///   - algorithm: Optional signing algorithm label.
-    public init(keyID: String, keyType: WalletKeyType, algorithm: String? = nil) {
+    ///   - requestedKeyUseAuthorizationPolicy: Policy requested when the key was created.
+    ///   - effectiveKeyUseAuthorizationPolicy: Policy enforced by the persisted key.
+    ///   - isPlatformBacked: Whether private material remains in a platform key store.
+    ///   - effectiveHardwareBacking: Reliable effective backing when known.
+    public init(
+        keyID: String,
+        keyType: WalletKeyType,
+        algorithm: String? = nil,
+        requestedKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .none,
+        effectiveKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .none,
+        isPlatformBacked: Bool = false,
+        effectiveHardwareBacking: WalletKeyHardwareBacking? = nil
+    ) {
         self.keyID = keyID
         self.keyType = keyType
         self.algorithm = algorithm
+        self.requestedKeyUseAuthorizationPolicy = requestedKeyUseAuthorizationPolicy
+        self.effectiveKeyUseAuthorizationPolicy = effectiveKeyUseAuthorizationPolicy
+        self.isPlatformBacked = isPlatformBacked
+        self.effectiveHardwareBacking = effectiveHardwareBacking
     }
 }
 

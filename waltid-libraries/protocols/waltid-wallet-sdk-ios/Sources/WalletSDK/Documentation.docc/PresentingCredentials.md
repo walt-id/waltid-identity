@@ -10,7 +10,7 @@ the local wallet.
 ### Review and Present to a Verifier
 
 Pass the verifier request URL and, when needed, the DID returned by
-``Wallet/bootstrap(keyType:didMethod:)``.
+``Wallet/bootstrap(keyType:keyUseAuthorizationPolicy:didMethod:)``.
 
 ```swift
 let previewResult = try await wallet.previewPresentation(request: authorizationRequestURL)

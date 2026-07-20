@@ -4,7 +4,16 @@ import Foundation
 protocol WalletCoreBridge: Sendable {
     var events: AsyncStream<WalletEvent> { get }
 
-    func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult
+    func bootstrap(
+        keyType: WalletKeyType,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy,
+        didMethod: String
+    ) async throws -> WalletBootstrapResult
+    func keys() async throws -> [WalletKeyInfo]
+    func keyUseAuthorizationCapability(
+        keyType: WalletKeyType,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+    ) async throws -> WalletKeyAuthorizationCapability
     func resolveOffer(offer: URL) async throws -> OfferResolution
     func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String]
     func credentials() async throws -> [Credential]
@@ -44,7 +53,22 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         }
     }
 
-    func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult {
+    func bootstrap(
+        keyType: WalletKeyType,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy,
+        didMethod: String
+    ) async throws -> WalletBootstrapResult {
+        throw unavailableError()
+    }
+
+    func keys() async throws -> [WalletKeyInfo] {
+        throw unavailableError()
+    }
+
+    func keyUseAuthorizationCapability(
+        keyType: WalletKeyType,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+    ) async throws -> WalletKeyAuthorizationCapability {
         throw unavailableError()
     }
 

@@ -8,7 +8,8 @@ import id.walt.wallet2.persistence.stores.DriverFactory
 /**
  * Android [MobileWallet] factory backed by Android KeyStore and an app-private SQLDelight database.
  *
- * @param context Android context used to open the wallet database.
+ * @param context Android context used to open the wallet database. Protected key use requires this
+ * context to be an interactive [androidx.fragment.app.FragmentActivity].
  */
 public actual class MobileWalletFactory(private val context: Context) {
     /**
@@ -22,7 +23,10 @@ public actual class MobileWalletFactory(private val context: Context) {
         return createEncryptedSqlDelightMobileWallet(
             config = config,
             managedDatabaseKeyProvider = AndroidDatabaseEncryptionKeyProvider(context),
-            platformKeyProvider = AndroidPlatformKeyProvider(),
+            platformKeyProvider = AndroidPlatformKeyProvider(
+                context = context,
+                authorizationPrompt = config.keyUseAuthorizationPrompt,
+            ),
             openEncryptedDriver = driverFactory::createEncryptedDriver,
             deleteDatabase = driverFactory::deleteDatabase,
         )

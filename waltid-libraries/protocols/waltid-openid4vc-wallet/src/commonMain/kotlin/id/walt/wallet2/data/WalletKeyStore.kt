@@ -21,6 +21,13 @@ interface WalletKeyStore {
      */
     suspend fun addKey(key: Key): String
 
+    /**
+     * Persists [key] with non-secret metadata known by the creation caller.
+     *
+     * Existing stores keep their historical behavior through the default implementation.
+     */
+    suspend fun addKey(key: Key, keyInfo: WalletKeyInfo): String = addKey(key)
+
     /** Removes the key with the given keyId. Returns true if it existed. */
     suspend fun removeKey(keyId: String): Boolean
 

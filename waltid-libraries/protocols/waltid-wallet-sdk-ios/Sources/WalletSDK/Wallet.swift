@@ -43,6 +43,7 @@ public actor Wallet {
     /// - Parameters:
     ///   - keyType: Optional key type override. When omitted, the wallet uses
     ///     ``WalletConfiguration/defaultKeyType``.
+    ///   - keyUseAuthorizationPolicy: Optional immutable policy override used only for a newly created key.
     ///   - didMethod: DID method to create for the bootstrapped wallet DID.
     /// - Returns: Persisted key and DID information for subsequent wallet
     ///   operations.
@@ -50,11 +51,37 @@ public actor Wallet {
     ///   or bridge communication fails.
     public func bootstrap(
         keyType: WalletKeyType? = nil,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy? = nil,
         didMethod: String = "key"
     ) async throws -> WalletBootstrapResult {
         try await bridge.bootstrap(
             keyType: keyType ?? configuration.defaultKeyType,
+            keyUseAuthorizationPolicy: keyUseAuthorizationPolicy
+                ?? configuration.defaultKeyUseAuthorizationPolicy,
             didMethod: didMethod
+        )
+    }
+
+    /// Lists non-secret metadata for persisted wallet signing keys.
+    public func keys() async throws -> [WalletKeyInfo] {
+        try await bridge.keys()
+    }
+
+    /// Preflights whether a key type and immutable authorization policy can be enforced.
+    ///
+    /// - Parameters:
+    ///   - keyType: Optional key type override.
+    ///   - keyUseAuthorizationPolicy: Optional policy override.
+    /// - Returns: Platform capability and stable failure metadata.
+    /// - Throws: ``WalletError`` when the capability cannot be evaluated.
+    public func keyUseAuthorizationCapability(
+        keyType: WalletKeyType? = nil,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy? = nil
+    ) async throws -> WalletKeyAuthorizationCapability {
+        try await bridge.keyUseAuthorizationCapability(
+            keyType: keyType ?? configuration.defaultKeyType,
+            keyUseAuthorizationPolicy: keyUseAuthorizationPolicy
+                ?? configuration.defaultKeyUseAuthorizationPolicy
         )
     }
 

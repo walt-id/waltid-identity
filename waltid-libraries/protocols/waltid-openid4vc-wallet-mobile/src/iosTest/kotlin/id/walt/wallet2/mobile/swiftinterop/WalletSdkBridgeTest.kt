@@ -3,7 +3,10 @@ package id.walt.wallet2.mobile.swiftinterop
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
 import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeyHardwareBacking
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyUseAuthorizationFailure
+import id.walt.crypto.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletKeyInfo
@@ -28,6 +31,8 @@ import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
+import id.walt.wallet2.persistence.keys.PlatformKeyCapability
+import id.walt.wallet2.persistence.keys.PlatformKeyPlatform
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.mobile.toKeyType
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -70,6 +75,23 @@ class WalletSdkBridgeTest {
     }
 
     @Test
+    fun mapsProtectedKeyFailureWithoutDiscardingStableReason() = runTest {
+        val result = walletBridgeCall<String> {
+            throw id.walt.crypto.keys.KeyUseAuthorizationException(
+                failure = KeyUseAuthorizationFailure.BiometricNotEnrolled,
+                message = "No biometric enrolled",
+            )
+        }
+
+        assertIs<WalletBridgeResult.Failure>(result)
+        assertEquals(WalletBridgeErrorCategory.crypto, result.error.category)
+        assertEquals(
+            WalletBridgeKeyUseAuthorizationFailure.BiometricNotEnrolled,
+            result.error.keyUseAuthorizationFailure,
+        )
+    }
+
+    @Test
     fun preservesStructuredCoroutineCancellation() = runTest {
         val cancellation = assertFailsWith<CancellationException> {
             walletBridgeCall<String> {
@@ -104,13 +126,45 @@ class WalletSdkBridgeTest {
         val result = bridge.bootstrap(
             keyType = MobileWalletKeyType.secp256r1,
             didMethod = "jwk",
+            keyUseAuthorizationPolicy = WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet,
         )
 
         assertIs<WalletBridgeResult.Success<MobileWalletBootstrapResult>>(result)
         assertEquals("key-1", result.value.keyId)
         assertEquals("did:jwk:issuer", result.value.did)
         assertEquals(KeyType.secp256r1, operations.bootstrapKeyType)
+        assertEquals(KeyUseAuthorizationPolicy.BiometricCurrentSet, operations.bootstrapPolicy)
         assertEquals("jwk", operations.bootstrapDidMethod)
+    }
+
+    @Test
+    fun bridgeMapsPersistedKeyAuthorizationMetadata() = runTest {
+        val operations = FakeWalletSdkBridgeOperations()
+        val bridge = WalletSdkBridge.forOperations(operations)
+
+        val result = bridge.keys()
+
+        assertIs<WalletBridgeResult.Success<List<WalletBridgeKeyInfo>>>(result)
+        assertEquals(WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet, result.value.single().effectiveKeyUseAuthorizationPolicy)
+        assertEquals("SecureEnclave", result.value.single().effectiveHardwareBacking)
+        assertEquals(true, result.value.single().isPlatformBacked)
+    }
+
+    @Test
+    fun bridgeMapsAuthorizationCapabilityAndFailure() = runTest {
+        val operations = FakeWalletSdkBridgeOperations()
+        val bridge = WalletSdkBridge.forOperations(operations)
+
+        val result = bridge.keyUseAuthorizationCapability(
+            keyType = MobileWalletKeyType.secp256r1,
+            keyUseAuthorizationPolicy = WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet,
+        )
+
+        assertIs<WalletBridgeResult.Success<WalletBridgeKeyCapability>>(result)
+        assertEquals(false, result.value.supported)
+        assertEquals(WalletBridgeKeyUseAuthorizationFailure.BiometricNotEnrolled, result.value.failure)
+        assertEquals(KeyType.secp256r1, operations.capabilityKeyType)
+        assertEquals(KeyUseAuthorizationPolicy.BiometricCurrentSet, operations.capabilityPolicy)
     }
 
     @Test
@@ -287,6 +341,12 @@ class WalletSdkBridgeTest {
             WalletBridgeConfiguration(
                 walletId = "consumer-wallet",
                 defaultKeyType = MobileWalletKeyType.Ed25519,
+                defaultKeyUseAuthorizationPolicy =
+                    WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet,
+                keyUseAuthorizationPrompt = WalletBridgeKeyUseAuthorizationPrompt(
+                    message = "Authorize wallet signature",
+                    cancelText = "Not now",
+                ),
                 persistence = WalletBridgePersistence(
                     databaseKey = WalletBridgeDatabaseKeyConfiguration.Managed,
                 ),
@@ -309,6 +369,12 @@ class WalletSdkBridgeTest {
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
         assertEquals("consumer-wallet", capturedConfig?.walletId)
         assertEquals(MobileWalletKeyType.Ed25519, capturedConfig?.defaultKeyType)
+        assertEquals(
+            KeyUseAuthorizationPolicy.BiometricCurrentSet,
+            capturedConfig?.defaultKeyUseAuthorizationPolicy,
+        )
+        assertEquals("Authorize wallet signature", capturedConfig?.keyUseAuthorizationPrompt?.message)
+        assertEquals("Not now", capturedConfig?.keyUseAuthorizationPrompt?.cancelText)
         assertEquals(
             MobileWalletPersistence(),
             capturedConfig?.persistence,
@@ -553,6 +619,9 @@ class WalletSdkBridgeTest {
 
         assertEquals("default", config.walletId)
         assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
+        assertEquals(KeyUseAuthorizationPolicy.None, config.defaultKeyUseAuthorizationPolicy)
+        assertEquals("Please authorize cryptographic signature", config.keyUseAuthorizationPrompt.message)
+        assertEquals("Cancel", config.keyUseAuthorizationPrompt.cancelText)
         assertEquals(null, config.attestationConfig)
         assertEquals(MobileWalletPersistence(), config.persistence)
         assertEquals(emptyList(), config.transactionDataProfiles)
@@ -601,6 +670,12 @@ class WalletSdkBridgeTest {
             private set
         var bootstrapDidMethod: String? = null
             private set
+        var bootstrapPolicy: KeyUseAuthorizationPolicy? = null
+            private set
+        var capabilityKeyType: KeyType? = null
+            private set
+        var capabilityPolicy: KeyUseAuthorizationPolicy? = null
+            private set
         var resolvedOfferUrl: String? = null
             private set
         var presentationRequestUrl: String? = null
@@ -633,12 +708,45 @@ class WalletSdkBridgeTest {
         override suspend fun bootstrap(
             keyType: MobileWalletKeyType?,
             didMethod: String,
+            keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy?,
         ): MobileWalletBootstrapResult {
             bootstrapKeyType = keyType?.toKeyType()
             bootstrapDidMethod = didMethod
+            bootstrapPolicy = keyUseAuthorizationPolicy
             return MobileWalletBootstrapResult(
                 keyId = "key-1",
                 did = "did:jwk:issuer",
+            )
+        }
+
+        override suspend fun keys(): List<WalletKeyInfo> = listOf(
+            WalletKeyInfo(
+                keyId = "key-1",
+                keyType = KeyType.secp256r1.name,
+                algorithm = "ES256",
+                requestedKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                effectiveKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                isPlatformBacked = true,
+                effectiveHardwareBacking = KeyHardwareBacking.SecureEnclave,
+            )
+        )
+
+        override suspend fun keyUseAuthorizationCapability(
+            keyType: MobileWalletKeyType,
+            keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy,
+        ): PlatformKeyCapability {
+            capabilityKeyType = keyType.toKeyType()
+            capabilityPolicy = keyUseAuthorizationPolicy
+            return PlatformKeyCapability(
+                platform = PlatformKeyPlatform.iOS,
+                keyType = keyType.toKeyType(),
+                keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
+                supported = false,
+                platformBackingAvailable = true,
+                secureHardwareRequired = true,
+                secureHardwareAvailable = true,
+                effectiveHardwareBacking = KeyHardwareBacking.SecureEnclave,
+                failure = KeyUseAuthorizationFailure.BiometricNotEnrolled,
             )
         }
 
