@@ -174,8 +174,8 @@ object VerificationSessionCreator {
                     "dc+sd-jwt" to JsonObject(mapOf()),
                     "mso_mdoc" to JsonObject(
                         mapOf(
-                            "issuerauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, Cose.Algorithm.EdDSA, -9, -50).map { it.toJsonElement() }),
-                            "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, Cose.Algorithm.EdDSA, -9, -50).map { it.toJsonElement() })
+                            "issuerauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() }),
+                            "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() })
                         )
                     )
                 )
