@@ -108,6 +108,64 @@ public actor Wallet {
         try await bridge.discardIssuancePreview(previewHandle)
     }
 
+    /// Starts a typed pre-authorized or authorization-code issuance session.
+    ///
+    /// - Parameter request: Offer, callback, client, and holder-binding configuration.
+    /// - Returns: A validated session with a typed offer preview and optional browser authorization data.
+    /// - Throws: ``WalletError`` when offer resolution, metadata validation, PAR, or key selection fails.
+    public func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
+        try await bridge.startIssuance(request: request)
+    }
+
+    /// Continues a reviewed pre-authorized issuance session.
+    ///
+    /// - Parameters:
+    ///   - sessionID: Opaque identifier returned by ``startIssuance(_:)``.
+    ///   - transactionCode: Separately delivered transaction code when required by the offer.
+    /// - Returns: A typed stored, deferred, cancelled, or failed outcome.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
+    public func continuePreAuthorizedIssuance(
+        sessionID: String,
+        transactionCode: String? = nil
+    ) async throws -> IssuanceOutcome {
+        try await bridge.continuePreAuthorizedIssuance(
+            sessionID: sessionID,
+            transactionCode: transactionCode
+        )
+    }
+
+    /// Strictly validates and consumes a browser authorization callback.
+    ///
+    /// - Parameters:
+    ///   - sessionID: Opaque identifier returned by ``startIssuance(_:)``.
+    ///   - callbackURI: Complete callback URI received from the browser session.
+    /// - Returns: A typed stored, deferred, cancelled, or failed outcome.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
+    public func continueAuthorizationIssuance(
+        sessionID: String,
+        callbackURI: URL
+    ) async throws -> IssuanceOutcome {
+        try await bridge.continueAuthorizationIssuance(sessionID: sessionID, callbackURI: callbackURI)
+    }
+
+    /// Cancels an active issuance session and removes its deferred continuations.
+    ///
+    /// - Parameter sessionID: Opaque identifier of the session to cancel.
+    /// - Returns: A cancelled outcome, or a typed failure for an invalid session.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
+    public func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
+        try await bridge.cancelIssuance(sessionID: sessionID)
+    }
+
+    /// Polls a deferred credential operation without exposing its access material.
+    ///
+    /// - Parameter deferredCredentialID: Opaque identifier returned in a deferred outcome.
+    /// - Returns: A stored, still-deferred, or failed outcome.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
+    public func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
+        try await bridge.resumeDeferredIssuance(deferredCredentialID: deferredCredentialID)
+    }
+
     /// Lists credentials currently known to the wallet.
     ///
     /// - Returns: Credential metadata currently stored by the wallet.
