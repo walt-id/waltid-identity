@@ -127,10 +127,14 @@ public final class DemoBackend {
         return DemoOffer(offerUrl: offerUrl, txCode: txCode)
     }
 
-    public func createVerifierSession(scenario: DemoCredentialScenario) async throws -> DemoVerifierSession {
+    public func createVerifierSession(
+        scenario: DemoCredentialScenario,
+        encryptedResponse: Bool = false
+    ) async throws -> DemoVerifierSession {
         try await createVerifierSession(
             scenario: scenario,
-            transactionData: []
+            transactionData: [],
+            encryptedResponse: encryptedResponse
         )
     }
 
@@ -148,7 +152,8 @@ public final class DemoBackend {
         }
         return try await createVerifierSession(
             scenario: scenario,
-            transactionData: [Self.paymentAuthorizationTransactionData(credentialID: "pid", fields: fields)]
+            transactionData: [Self.paymentAuthorizationTransactionData(credentialID: "pid", fields: fields)],
+            encryptedResponse: false
         )
     }
 
@@ -172,18 +177,30 @@ public final class DemoBackend {
 
     private func createVerifierSession(
         scenario: DemoCredentialScenario,
-        transactionData: [[String: Any]]
+        transactionData: [[String: Any]],
+        encryptedResponse: Bool
     ) async throws -> DemoVerifierSession {
         let endpoint = Self.verifierBaseURL
             .appendingPathComponent("verification-session")
             .appendingPathComponent("create")
+        let sessionID = UUID().uuidString
+        let responseURL = Self.verifierBaseURL
+            .appendingPathComponent("verification-session")
+            .appendingPathComponent(sessionID)
+            .appendingPathComponent("response")
+        var coreFlow: [String: Any] = [
+            "sessionId": sessionID,
+            "clientId": "redirect_uri:\(responseURL.absoluteString)",
+            "dcql_query": [
+                "credentials": [scenario.verifierCredentialQuery],
+            ],
+        ]
+        if encryptedResponse {
+            coreFlow["encrypted_response"] = true
+        }
         var payload: [String: Any] = [
             "flow_type": "cross_device",
-            "core_flow": [
-                "dcql_query": [
-                    "credentials": [scenario.verifierCredentialQuery],
-                ],
-            ],
+            "core_flow": coreFlow,
         ]
         if !transactionData.isEmpty {
             payload["openid"] = ["transactionData": transactionData]
@@ -196,11 +213,18 @@ public final class DemoBackend {
             retryTransientFailures: true
         )
 
-        guard let sessionID = response["sessionId"] as? String, !sessionID.isEmpty else {
+        guard let responseSessionID = response["sessionId"] as? String, !responseSessionID.isEmpty else {
             throw NSError(
                 domain: "WalletE2E",
                 code: 301,
                 userInfo: [NSLocalizedDescriptionKey: "Missing sessionId in public demo verifier2 response: \(response)"]
+            )
+        }
+        guard responseSessionID == sessionID else {
+            throw NSError(
+                domain: "WalletE2E",
+                code: 308,
+                userInfo: [NSLocalizedDescriptionKey: "Public demo verifier2 changed the requested session ID: requested=\(sessionID), response=\(responseSessionID)"]
             )
         }
         // This fixture creates an unsigned session. The request_uri endpoint is a
@@ -215,7 +239,7 @@ public final class DemoBackend {
             )
         }
 
-        return DemoVerifierSession(sessionID: sessionID, authorizationRequestUri: requestURL)
+        return DemoVerifierSession(sessionID: responseSessionID, authorizationRequestUri: requestURL)
     }
 
     public func waitForVerifierSuccess(sessionID: String, timeoutSeconds: TimeInterval) async throws {
