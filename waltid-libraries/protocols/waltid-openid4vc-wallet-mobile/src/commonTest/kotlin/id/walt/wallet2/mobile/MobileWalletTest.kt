@@ -119,6 +119,46 @@ class MobileWalletTest {
     }
 
     @Test
+    fun protectedBootstrapFailsPreflightWhenCustomStoreCannotPreservePolicy() = runTest {
+        val keyStore = EmptyKeyStore()
+        var generationCalls = 0
+        val wallet = MobileWallet(
+            walletId = "custom-store-wallet",
+            keyStore = keyStore,
+            didStore = EmptyDidStore(),
+            credentialStore = RecordingCredentialStore(),
+            keyGenerator = { _: PlatformKeyGenerationRequest ->
+                generationCalls++
+                error("Unsupported persistence must be rejected before key generation")
+            },
+            keyCapability = { keyType, policy ->
+                PlatformKeyCapability(
+                    platform = PlatformKeyPlatform.Custom,
+                    keyType = keyType,
+                    keyUseAuthorizationPolicy = policy,
+                    supported = true,
+                    platformBackingAvailable = true,
+                    secureHardwareRequired = false,
+                    secureHardwareAvailable = null,
+                )
+            },
+        )
+
+        val capability = wallet.keyUseAuthorizationCapability(
+            keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+        )
+        val failure = assertFailsWith<KeyUseAuthorizationException> {
+            wallet.bootstrap(keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet)
+        }
+
+        assertFalse(capability.supported)
+        assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, capability.failure)
+        assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, failure.failure)
+        assertEquals(0, generationCalls)
+        assertEquals(0, keyStore.addKeyCalls)
+    }
+
+    @Test
     fun changingDefaultDoesNotReclassifyOrReplaceExistingKey() = runTest {
         val existing = WalletKeyInfo(
             keyId = "existing-key",

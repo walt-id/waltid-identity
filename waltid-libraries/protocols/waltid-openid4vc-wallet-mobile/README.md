@@ -63,6 +63,10 @@ Android Keystore key restricted to strong biometrics; the factory must receive a
 current Face ID or Touch ID enrollment set and therefore requires a qualifying physical device.
 Protected non-P-256 requests fail without software fallback.
 
+`MobileWalletFactory(activity)` weakly references that activity. If the wallet outlives one activity
+instance, use `MobileWalletFactory(applicationContext) { activityTracker.currentFragmentActivity }`
+so protected operations resolve the current prompt host after configuration changes.
+
 This setting applies only when a key is created. It does not reclassify, replace, or rotate an existing
 key. Inspect `wallet.keys()` for each key's requested and effective policy and effective hardware
 backing when the platform can report it reliably. Changing the default affects future keys only.
@@ -156,7 +160,13 @@ val config = MobileWalletConfig(
 ```
 <!-- doc-snippet:end kotlin-custom-credential-store -->
 
-KMP consumers can override all wallet stores. Key storage and key generation are configured together so platform-managed signing keys cannot be accidentally mixed with app-owned key persistence. The legacy `(KeyType) -> Key` generator supports `None` only; protected requests require an authorization-aware request generator and capability implementation and are never inferred from the legacy callback:
+KMP consumers can override all wallet stores. Key storage and key generation are configured together
+so platform-managed signing keys cannot be accidentally mixed with app-owned key persistence. The
+legacy `(KeyType) -> Key` generator supports `None` only; protected requests require an
+authorization-aware request generator and capability implementation and are never inferred from the
+legacy callback. A custom key store must also override `supportsKeyUseAuthorizationMetadata` and the
+metadata-aware `addKey` overload only after it preserves and enforces the requested policy; otherwise
+protected bootstrap fails before generating a key:
 
 <!-- doc-snippet:start kotlin-full-store-overrides -->
 ```kotlin

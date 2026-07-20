@@ -265,6 +265,9 @@ final class id.walt.wallet2.persistence.stores/DriverFactory { // id.walt.wallet
 final class id.walt.wallet2.persistence.stores/PlatformKeyStore : id.walt.wallet2.data/WalletKeyStore { // id.walt.wallet2.persistence.stores/PlatformKeyStore|null[0]
     constructor <init>(id.walt.wallet2.persistence.keys/PlatformKeyProvider, id.walt.wallet2.persistence.db/WalletPersistenceQueries) // id.walt.wallet2.persistence.stores/PlatformKeyStore.<init>|<init>(id.walt.wallet2.persistence.keys.PlatformKeyProvider;id.walt.wallet2.persistence.db.WalletPersistenceQueries){}[0]
 
+    final val supportsKeyUseAuthorizationMetadata // id.walt.wallet2.persistence.stores/PlatformKeyStore.supportsKeyUseAuthorizationMetadata|{}supportsKeyUseAuthorizationMetadata[0]
+        final fun <get-supportsKeyUseAuthorizationMetadata>(): kotlin/Boolean // id.walt.wallet2.persistence.stores/PlatformKeyStore.supportsKeyUseAuthorizationMetadata.<get-supportsKeyUseAuthorizationMetadata>|<get-supportsKeyUseAuthorizationMetadata>(){}[0]
+
     final suspend fun addKey(id.walt.crypto.keys/Key): kotlin/String // id.walt.wallet2.persistence.stores/PlatformKeyStore.addKey|addKey(id.walt.crypto.keys.Key){}[0]
     final suspend fun addKey(id.walt.crypto.keys/Key, id.walt.wallet2.data/WalletKeyInfo): kotlin/String // id.walt.wallet2.persistence.stores/PlatformKeyStore.addKey|addKey(id.walt.crypto.keys.Key;id.walt.wallet2.data.WalletKeyInfo){}[0]
     final suspend fun getKey(kotlin/String): id.walt.crypto.keys/Key? // id.walt.wallet2.persistence.stores/PlatformKeyStore.getKey|getKey(kotlin.String){}[0]

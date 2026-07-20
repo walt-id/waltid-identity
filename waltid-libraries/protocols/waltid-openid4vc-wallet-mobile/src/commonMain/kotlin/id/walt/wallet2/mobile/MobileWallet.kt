@@ -278,7 +278,7 @@ public class MobileWallet internal constructor(
 
         val effectiveKeyType = keyType ?: defaultKeyType
         val effectiveAuthorizationPolicy = keyUseAuthorizationPolicy ?: defaultKeyUseAuthorizationPolicy
-        val capability = keyCapability(effectiveKeyType.toKeyType(), effectiveAuthorizationPolicy)
+        val capability = keyUseAuthorizationCapability(effectiveKeyType, effectiveAuthorizationPolicy)
         if (!capability.supported) {
             throw KeyUseAuthorizationException(
                 failure = capability.failure ?: KeyUseAuthorizationFailure.UnsupportedCombination,
@@ -341,7 +341,21 @@ public class MobileWallet internal constructor(
     public suspend fun keyUseAuthorizationCapability(
         keyType: MobileWalletKeyType = defaultKeyType,
         keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy,
-    ): PlatformKeyCapability = keyCapability(keyType.toKeyType(), keyUseAuthorizationPolicy)
+    ): PlatformKeyCapability {
+        val capability = keyCapability(keyType.toKeyType(), keyUseAuthorizationPolicy)
+        return if (
+            keyUseAuthorizationPolicy != KeyUseAuthorizationPolicy.None &&
+            capability.supported &&
+            !keyStore.supportsKeyUseAuthorizationMetadata
+        ) {
+            capability.copy(
+                supported = false,
+                failure = KeyUseAuthorizationFailure.UnsupportedCombination,
+            )
+        } else {
+            capability
+        }
+    }
 
     private suspend fun registerDidByKey(didMethod: String, key: Key) =
         when (didMethod.lowercase()) {

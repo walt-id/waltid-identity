@@ -28,6 +28,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import org.bouncycastle.jce.provider.BouncyCastleProvider
+import java.lang.ref.WeakReference
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration
 import kotlin.uuid.Uuid
@@ -41,7 +42,22 @@ sealed class AndroidKey : Key() {
         val authorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
         interactionContext: Any? = null,
     ) {
-        internal val interactionContext: FragmentActivity? = interactionContext as? FragmentActivity
+        private val interactionContextProvider: () -> FragmentActivity? = when (interactionContext) {
+            is FragmentActivity -> {
+                val reference = WeakReference(interactionContext)
+                val provider: () -> FragmentActivity? = { reference.get() }
+                provider
+            }
+            is Function0<*> -> {
+                { interactionContext.invoke() as? FragmentActivity }
+            }
+            else -> {
+                { null }
+            }
+        }
+
+        internal val interactionContext: FragmentActivity?
+            get() = interactionContextProvider().takeIf { it.canHostBiometricPrompt() }
     }
 
     class Platform internal constructor(
@@ -252,6 +268,9 @@ private fun at.asitplus.signum.supreme.os.AndroidSigningKeyConfiguration.configu
         }
     }
 }
+
+private fun FragmentActivity?.canHostBiometricPrompt(): Boolean =
+    this != null && !isFinishing && !isDestroyed && !isChangingConfigurations
 
 private suspend fun AndroidKey.Options.loadSigner(): AndroidKeystoreSigner {
     val signer = AndroidKeyStoreProvider.getSignerForKey(kid) {
