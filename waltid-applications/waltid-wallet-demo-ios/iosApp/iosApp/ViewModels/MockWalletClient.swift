@@ -46,9 +46,34 @@ actor MockWalletClient: WalletClient {
     func resolveOffer(offer: URL) async throws -> OfferResolution {
         try await delayOperation()
         return OfferResolution(
-            transactionCodeRequired: transactionCodeRequired,
-            credentialIssuer: "Example Issuer",
-            offeredCredentials: ["ExampleCredential"]
+            issuer: IssuerMetadata(
+                credentialIssuer: "https://issuer.example",
+                display: MetadataDisplay(
+                    name: "Example Issuer",
+                    locale: "en",
+                    logoURI: nil,
+                    logoAltText: nil
+                )
+            ),
+            offeredCredentials: [
+                OfferedCredentialMetadata(
+                    configurationID: "ExampleCredential",
+                    format: "jwt_vc_json",
+                    scope: nil,
+                    vct: nil,
+                    doctype: nil,
+                    display: MetadataDisplay(
+                        name: "Example credential",
+                        locale: "en",
+                        logoURI: nil,
+                        logoAltText: nil
+                    ),
+                    claims: []
+                )
+            ],
+            transactionCode: transactionCodeRequired
+                ? TransactionCodeRequirement(inputMode: .numeric, length: 6, description: "Enter the six-digit code")
+                : nil
         )
     }
 
@@ -103,10 +128,30 @@ actor MockWalletClient: WalletClient {
     private var previewRequestInfo: PresentationRequestInfo {
         PresentationRequestInfo(
             clientID: verifierClientID,
-            verifierName: verifierName,
+            verifierMetadata: verifierName.map {
+                VerifierMetadata(
+                    display: MetadataDisplay(
+                        name: $0,
+                        locale: "en",
+                        logoURI: nil,
+                        logoAltText: nil
+                    ),
+                    clientURI: "https://verifier.example",
+                    policyURI: nil,
+                    termsOfServiceURI: nil
+                )
+            },
             responseURI: URL(string: "https://verifier.example/response"),
             state: "state-123",
             nonce: "nonce-456",
+            responseEncryption: .required(
+                ResponseEncryptionDetails(
+                    keyManagementAlgorithm: "ECDH-ES",
+                    contentEncryptionAlgorithm: "A256GCM",
+                    verifierKeyID: "verifier-key-1",
+                    verifierKeyThumbprint: "thumbprint-1"
+                )
+            ),
             transactionData: [Self.paymentAuthorizationTransactionData]
         )
     }

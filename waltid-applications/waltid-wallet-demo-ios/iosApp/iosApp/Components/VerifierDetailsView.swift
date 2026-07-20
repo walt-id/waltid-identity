@@ -13,13 +13,20 @@ struct VerifierDetailsView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Verifier")
                 .font(.subheadline.weight(.semibold))
-            Text(VerifierDisplayName.value(
-                verifierName: request.verifierName,
-                clientID: request.clientID,
-                responseURI: request.responseURI
-            ))
-                .font(.subheadline.weight(.medium))
-            DetailLine(label: "Trust", value: CredentialDisplayText.unknown)
+            MetadataIdentityView(
+                display: request.verifierMetadata?.display,
+                fallbackName: VerifierDisplayName.value(
+                    verifierName: request.verifierMetadata?.display?.name,
+                    clientID: request.clientID,
+                    responseURI: request.responseURI
+                ),
+                supportingText: "Verifier-provided identity"
+            )
+            MetadataDetailLine(label: "Trust", value: CredentialDisplayText.unknown)
+            MetadataDetailLine(
+                label: "Response encryption",
+                value: responseEncryptionStatus
+            )
             ForEach(transactionDataGroups) { group in
                 ClaimGroupView(group: group)
             }
@@ -32,31 +39,30 @@ struct VerifierDetailsView: View {
 
             if technicalDetailsExpanded {
                 VStack(alignment: .leading, spacing: 6) {
-                    DetailLine(label: "Client ID", value: request.clientID)
-                    DetailLine(label: "Response URI", value: request.responseURI?.absoluteString)
-                    DetailLine(label: "State", value: request.state)
-                    DetailLine(label: "Nonce", value: request.nonce)
+                    MetadataDetailLine(label: "Client ID", value: request.clientID)
+                    MetadataDetailLine(label: "Response URI", value: request.responseURI?.absoluteString)
+                    MetadataDetailLine(label: "Client URI", value: request.verifierMetadata?.clientURI)
+                    MetadataDetailLine(label: "Privacy policy", value: request.verifierMetadata?.policyURI)
+                    MetadataDetailLine(label: "Terms of service", value: request.verifierMetadata?.termsOfServiceURI)
+                    MetadataDetailLine(label: "State", value: request.state)
+                    MetadataDetailLine(label: "Nonce", value: request.nonce)
+                    if case let .required(details) = request.responseEncryption {
+                        MetadataDetailLine(label: "JWE algorithm", value: details.keyManagementAlgorithm)
+                        MetadataDetailLine(label: "Content encryption", value: details.contentEncryptionAlgorithm)
+                        MetadataDetailLine(label: "Verifier key ID", value: details.verifierKeyID)
+                        MetadataDetailLine(label: "Verifier key thumbprint", value: details.verifierKeyThumbprint)
+                    }
                 }
                 .accessibilityIdentifier(WalletAccessibilityID.verifierTechnicalDetails)
             }
         }
         .accessibilityIdentifier(WalletAccessibilityID.presentationVerifier)
     }
-}
 
-private struct DetailLine: View {
-    let label: String
-    let value: String?
-
-    var body: some View {
-        if let value, !value.isEmpty {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(label)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Text(value)
-                    .font(.caption)
-            }
+    private var responseEncryptionStatus: String {
+        switch request.responseEncryption {
+        case .notRequired: "Not encrypted"
+        case .required: "Encrypted"
         }
     }
 }

@@ -19,7 +19,6 @@ private enum WalletStatusText {
     static let reviewCredentialOffer = "Review credential offer"
     static let credentialOfferDeclined = "Credential offer declined"
     static let receivingCredential = "Receiving credential..."
-    static let transactionCodeRequired = "Transaction code required"
     static let resolvingPresentation = "Resolving presentation..."
     static let presentingCredential = "Presenting credential..."
     static let decliningPresentation = "Declining presentation..."
@@ -69,12 +68,10 @@ class WalletViewModel: ObservableObject {
             guard offerUrl != oldValue else { return }
             receiveTask?.cancel()
             txCode = ""
-            transactionCodeRequired = false
             offerPreview = nil
         }
     }
     @Published var txCode = ""
-    @Published var transactionCodeRequired = false
     @Published var presentationRequestUrl = ""
     @Published private(set) var presentationReview: PresentationPreviewResult?
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
@@ -123,7 +120,7 @@ class WalletViewModel: ObservableObject {
     }
 
     private var hasValidTransactionCode: Bool {
-        !transactionCodeRequired || !txCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        offerPreview?.transactionCode?.accepts(txCode) ?? true
     }
 
     var receivedCredentials: [Credential] {
@@ -329,7 +326,6 @@ class WalletViewModel: ObservableObject {
         resetInputFocus()
         offerUrl = ""
         txCode = ""
-        transactionCodeRequired = false
         offerPreview = nil
         lastReceivedCredentialIDs = []
         receiveCompleted = false
@@ -372,11 +368,10 @@ class WalletViewModel: ObservableObject {
                 let resolution = try await walletClient.resolveOffer(offer: offer)
                 try Task.checkCancellation()
                 guard isCurrent(request) else { return }
-                transactionCodeRequired = resolution.transactionCodeRequired
                 offerPreview = OfferPreview(
-                    credentialIssuer: resolution.credentialIssuer,
+                    issuer: resolution.issuer,
                     offeredCredentials: resolution.offeredCredentials,
-                    transactionCodeRequired: resolution.transactionCodeRequired
+                    transactionCode: resolution.transactionCode
                 )
                 setSuccess(WalletStatusText.reviewCredentialOffer, tab: .receive)
             } catch is CancellationError {
@@ -406,7 +401,7 @@ class WalletViewModel: ObservableObject {
             do {
                 try await completeReceive(
                     offer: offer,
-                    txCode: transactionCodeRequired ? trimmedTxCode : nil,
+                    txCode: offerPreview?.transactionCode == nil ? nil : trimmedTxCode,
                     previousCredentials: previousCredentials,
                     request: request
                 )
@@ -424,7 +419,6 @@ class WalletViewModel: ObservableObject {
         receiveTask?.cancel()
         offerPreview = nil
         txCode = ""
-        transactionCodeRequired = false
         receiveNavigationResetKey += 1
         setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
     }
@@ -470,13 +464,12 @@ class WalletViewModel: ObservableObject {
         offerPreview = nil
         lastReceivedCredentialIDs = displayableReceivedCredentialIDs
         self.txCode = ""
-        self.transactionCodeRequired = false
         receiveCompleted = true
         setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: .receive)
     }
 
     func updateTxCode(_ value: String) {
-        txCode = value
+        txCode = offerPreview?.transactionCode?.normalizeInput(value) ?? value
     }
 
     private func isCurrent(_ request: ReceiveRequest) -> Bool {
@@ -912,6 +905,26 @@ private extension Set where Element == PresentationDisclosureSelection {
                 $0.queryID == disclosure.queryID && $0.credentialID == disclosure.credentialID
             }
         }
+    }
+}
+
+private extension TransactionCodeRequirement {
+    func normalizeInput(_ value: String) -> String {
+        let normalized: String
+        switch inputMode {
+        case .numeric:
+            normalized = value.filter { $0.isASCII && $0.isNumber }
+        case .text:
+            normalized = value
+        }
+        return length.map { String(normalized.prefix($0)) } ?? normalized
+    }
+
+    func accepts(_ value: String) -> Bool {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return false }
+        if let length, normalized.count != length { return false }
+        return inputMode != .numeric || normalized.allSatisfy { $0.isASCII && $0.isNumber }
     }
 }
 

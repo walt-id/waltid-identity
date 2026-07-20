@@ -14,7 +14,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         viewModel.offerUrl = "openid-credential-offer://issuer.example"
         viewModel.previewOffer()
         viewModel.previewOffer()
-        try await waitUntil { viewModel.transactionCodeRequired }
+        try await waitUntil { viewModel.offerPreview?.transactionCode != nil }
 
         let receiveCallsBeforeCode = await client.receiveCalls
         let resolveCalls = await client.resolveCalls
@@ -38,7 +38,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertEqual(receivedTxCodes, ["abc-123"])
         XCTAssertEqual(viewModel.receivedCredentials.map(\.id), ["credential-1"])
         XCTAssertEqual(viewModel.txCode, "")
-        XCTAssertFalse(viewModel.transactionCodeRequired)
+        XCTAssertNil(viewModel.offerPreview?.transactionCode)
     }
 
     func testChangingOfferClearsTransactionCodeState() async throws {
@@ -48,13 +48,34 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example/first"
         viewModel.previewOffer()
-        try await waitUntil { viewModel.transactionCodeRequired }
+        try await waitUntil { viewModel.offerPreview?.transactionCode != nil }
         viewModel.txCode = "1234"
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example/second"
 
-        XCTAssertFalse(viewModel.transactionCodeRequired)
+        XCTAssertNil(viewModel.offerPreview?.transactionCode)
         XCTAssertEqual(viewModel.txCode, "")
+    }
+
+    func testNumericTransactionCodeIsFilteredCappedAndValidated() async throws {
+        let client = TransactionCodeWalletClient(
+            transactionCode: TransactionCodeRequirement(inputMode: .numeric, length: 6, description: nil)
+        )
+        let viewModel = WalletViewModel(walletClient: client)
+        try await waitUntil { viewModel.isReady }
+
+        viewModel.offerUrl = "openid-credential-offer://issuer.example"
+        viewModel.previewOffer()
+        try await waitUntil { viewModel.offerPreview?.transactionCode != nil }
+        viewModel.updateTxCode("12a34")
+
+        XCTAssertEqual(viewModel.txCode, "1234")
+        XCTAssertFalse(viewModel.acceptOfferEnabled)
+
+        viewModel.updateTxCode("12a345678")
+
+        XCTAssertEqual(viewModel.txCode, "123456")
+        XCTAssertTrue(viewModel.acceptOfferEnabled)
     }
 
     func testStaleOfferResolutionCannotOverwriteIncomingDeepLink() async throws {
@@ -68,7 +89,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         try await Task.sleep(nanoseconds: 200_000_000)
 
         XCTAssertEqual(viewModel.offerUrl, "openid-credential-offer://issuer.example/replacement")
-        XCTAssertFalse(viewModel.transactionCodeRequired)
+        XCTAssertNil(viewModel.offerPreview?.transactionCode)
         XCTAssertFalse(viewModel.isLoading)
         XCTAssertFalse(viewModel.isError)
     }
@@ -94,9 +115,18 @@ private actor TransactionCodeWalletClient: WalletClient {
     private(set) var receivedTxCodes: [String] = []
     private var credentialIssued = false
     private let resolveDelayNanoseconds: UInt64
+    private let transactionCode: TransactionCodeRequirement
 
-    init(resolveDelayNanoseconds: UInt64 = 0) {
+    init(
+        resolveDelayNanoseconds: UInt64 = 0,
+        transactionCode: TransactionCodeRequirement = TransactionCodeRequirement(
+            inputMode: .text,
+            length: nil,
+            description: "Enter the code from the issuer"
+        )
+    ) {
         self.resolveDelayNanoseconds = resolveDelayNanoseconds
+        self.transactionCode = transactionCode
     }
 
     func bootstrap() async throws -> WalletBootstrapResult {
@@ -113,9 +143,27 @@ private actor TransactionCodeWalletClient: WalletClient {
             try? await Task.sleep(nanoseconds: resolveDelayNanoseconds)
         }
         return OfferResolution(
-            transactionCodeRequired: true,
-            credentialIssuer: "https://issuer.example",
-            offeredCredentials: ["ExampleCredential"]
+            issuer: IssuerMetadata(
+                credentialIssuer: "https://issuer.example",
+                display: MetadataDisplay(
+                    name: "Example Issuer",
+                    locale: "en",
+                    logoURI: nil,
+                    logoAltText: nil
+                )
+            ),
+            offeredCredentials: [
+                OfferedCredentialMetadata(
+                    configurationID: "ExampleCredential",
+                    format: "vc+sd-jwt",
+                    scope: nil,
+                    vct: "ExampleCredential",
+                    doctype: nil,
+                    display: nil,
+                    claims: []
+                )
+            ],
+            transactionCode: transactionCode
         )
     }
 
@@ -131,7 +179,12 @@ private actor TransactionCodeWalletClient: WalletClient {
     }
 
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
-        .ready(PresentationPreview(request: PresentationRequestInfo(clientID: nil), credentialOptions: []))
+        .ready(
+            PresentationPreview(
+                request: PresentationRequestInfo(clientID: nil, responseEncryption: .notRequired),
+                credentialOptions: []
+            )
+        )
     }
 
     func submitPresentation(

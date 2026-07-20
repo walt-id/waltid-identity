@@ -695,6 +695,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
     func testTransactionDataGroupsRenderProfileAndDetailsReadably() throws {
         let request = PresentationRequestInfo(
+            responseEncryption: .notRequired,
             transactionData: [
                 PresentationTransactionData(
                     type: "org.waltid.transaction-data.payment-authorization",

@@ -65,6 +65,9 @@ final class MockWalletUITests: XCTestCase {
             ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
             "Review credential offer"
         )
+        XCTAssertTrue(app.staticTexts["Example Issuer"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Example credential"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["jwt_vc_json"].waitForExistence(timeout: 10))
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
@@ -525,6 +528,7 @@ final class MockWalletUITests: XCTestCase {
         )
         XCTAssertFalse(ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL").isEnabled)
         XCTAssertTrue(app.staticTexts["Example Verifier"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Encrypted"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Payment Authorization"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Amount"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["129.90"].waitForExistence(timeout: 10))
@@ -835,6 +839,9 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["https://verifier.example/response"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["state-123"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["nonce-456"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["ECDH-ES"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["A256GCM"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["thumbprint-1"].waitForExistence(timeout: 10))
     }
 
     private func assertPresentationNewActionPrecedesReadOnlyReview(app: XCUIApplication) {

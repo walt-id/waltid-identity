@@ -11,7 +11,6 @@ enum WalletAccessibilityID {
     static let receiveButton = identifier("receiveButton")
     static let receiveNewButton = identifier("receiveNewButton")
     static let receiveTabContent = identifier("receiveTabContent")
-    static let offerReview = identifier("offerReview")
     static let offerAcceptButton = identifier("offerAcceptButton")
     static let offerDeclineButton = identifier("offerDeclineButton")
     static let presentationInput = identifier("presentationInput")
