@@ -1,10 +1,10 @@
 package id.walt.trust
 
-import id.walt.trust.model.AuthenticityState
-import id.walt.trust.model.TrustDecisionCode
+import id.walt.trust.model.*
 import id.walt.trust.service.DefaultTrustRegistryService
 import id.walt.trust.store.InMemoryTrustStore
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -26,7 +26,11 @@ class Wal1186TrustRegistryTest {
     fun `resolves leaf to registry root when root is omitted from presented chain`() = runTest {
         val chain = TestCertificates.createChain()
         val service = DefaultTrustRegistryService(InMemoryTrustStore())
-        assertTrue(service.loadSourceFromContent("root", lote(chain.root)).success)
+        assertTrue(service.loadSourceFromContent(
+            "root",
+            lote(chain.root),
+            options = SourceLoadOptions(SourceAcceptancePolicy.ALLOW_UNSIGNED)
+        ).success)
 
         val decision = service.resolveCertificateChain(
             certificateChainPemOrDer = listOf(TestCertificates.pem(chain.leaf)),
@@ -42,7 +46,11 @@ class Wal1186TrustRegistryTest {
         val credentialChain = TestCertificates.createChain("Credential")
         val unrelated = TestCertificates.createChain("Unrelated")
         val service = DefaultTrustRegistryService(InMemoryTrustStore())
-        assertTrue(service.loadSourceFromContent("root", lote(unrelated.root)).success)
+        assertTrue(service.loadSourceFromContent(
+            "root",
+            lote(unrelated.root),
+            options = SourceLoadOptions(SourceAcceptancePolicy.ALLOW_UNSIGNED)
+        ).success)
 
         val decision = service.resolveCertificateChain(
             certificateChainPemOrDer = listOf(TestCertificates.pem(credentialChain.leaf)),
@@ -61,13 +69,16 @@ class Wal1186TrustRegistryTest {
         val result = service.loadSourceFromContent(
             sourceId = "signed-lote",
             content = signedLote,
-            validateSignature = true,
-            trustedSignerCertificates = listOf(TestCertificates.derBase64(signer.root))
+            options = SourceLoadOptions(
+                acceptancePolicy = SourceAcceptancePolicy.REQUIRE_AUTHENTICATED,
+                trustedSignerCertificates = listOf(TestCertificates.derBase64(signer.root))
+            )
         )
 
         assertTrue(result.success, result.error)
         val source = service.listSources().first()
-        assertEquals(AuthenticityState.VALIDATED, source.authenticityState)
+        assertEquals(AuthenticityState.AUTHENTICATED, source.assurance.authenticityState)
+        assertTrue(source.assurance.accepted)
         assertEquals("JWS_COMPACT", source.metadata["signatureFormat"])
         assertNotNull(source.metadata["signerCertificateSha256"])
     }
@@ -80,11 +91,114 @@ class Wal1186TrustRegistryTest {
         val result = service.loadSourceFromContent(
             sourceId = "signed-lote",
             content = compactJws(lote(signer.root), signer.root, signer.rootKeyPair.private),
-            validateSignature = true
+            options = SourceLoadOptions()
         )
 
         assertEquals(false, result.success)
         assertTrue(result.error.orEmpty().contains("trusted signer certificate"))
+    }
+
+    @Test
+    fun `valid signature policy verifies compact JWS without claiming signer trust`() = runTest {
+        val signer = TestCertificates.createChain("Integrity Signer")
+        val service = DefaultTrustRegistryService(InMemoryTrustStore())
+
+        val result = service.loadSourceFromContent(
+            sourceId = "integrity-only",
+            content = compactJws(lote(signer.root), signer.root, signer.rootKeyPair.private),
+            options = SourceLoadOptions(SourceAcceptancePolicy.REQUIRE_VALID_SIGNATURE)
+        )
+
+        assertTrue(result.success, result.error)
+        assertEquals(AuthenticityState.INTEGRITY_VERIFIED, result.assurance?.authenticityState)
+        assertEquals(SignerTrust.NOT_EVALUATED, result.assurance?.signerTrust)
+        assertEquals(true, result.assurance?.accepted)
+    }
+
+    @Test
+    fun `reports parsing failure separately from valid compact JWS integrity`() = runTest {
+        val signer = TestCertificates.createChain("Malformed Payload Signer")
+        val service = DefaultTrustRegistryService(InMemoryTrustStore())
+
+        val result = service.loadSourceFromContent(
+            sourceId = "malformed-payload",
+            content = compactJws("{not-json}", signer.root, signer.rootKeyPair.private),
+            options = SourceLoadOptions(SourceAcceptancePolicy.REQUIRE_VALID_SIGNATURE)
+        )
+
+        assertEquals(false, result.success)
+        assertEquals(SourceLoadErrorCode.PARSE_FAILED, result.errorCode)
+        assertEquals(SignatureStatus.VALID, result.assurance?.signatureStatus)
+        assertEquals(AuthenticityState.INTEGRITY_VERIFIED, result.assurance?.authenticityState)
+        assertEquals(false, result.assurance?.accepted)
+    }
+
+    @Test
+    fun `fail closed policy rejects unsigned source without activating it`() = runTest {
+        val chain = TestCertificates.createChain("Unsigned")
+        val service = DefaultTrustRegistryService(InMemoryTrustStore())
+
+        val result = service.loadSourceFromContent(
+            sourceId = "unsigned",
+            content = lote(chain.root),
+            options = SourceLoadOptions()
+        )
+
+        assertEquals(false, result.success)
+        assertEquals(SourceLoadErrorCode.SOURCE_NOT_ACCEPTED, result.errorCode)
+        assertEquals(SignatureStatus.NOT_PRESENT, result.assurance?.signatureStatus)
+        assertEquals(false, result.assurance?.accepted)
+        assertEquals(null, service.listSources().firstOrNull())
+    }
+
+    @Test
+    fun `explicit unsigned policy admits source and permits resolution`() = runTest {
+        val chain = TestCertificates.createChain("Explicit Unsigned")
+        val service = DefaultTrustRegistryService(InMemoryTrustStore())
+
+        val result = service.loadSourceFromContent(
+            sourceId = "unsigned",
+            content = lote(chain.root),
+            options = SourceLoadOptions(SourceAcceptancePolicy.ALLOW_UNSIGNED)
+        )
+        val decision = service.resolveByProviderId("wal-1186-root", Clock.System.now())
+
+        assertTrue(result.success, result.error)
+        assertEquals(AuthenticityState.UNVERIFIED, result.assurance?.authenticityState)
+        assertEquals(true, result.assurance?.accepted)
+        assertEquals(TrustDecisionCode.TRUSTED, decision.decision)
+        assertEquals(true, decision.sourceAssurance.accepted)
+    }
+
+    @Test
+    fun `resolution rejects persisted data from a source that was not admitted`() = runTest {
+        val store = InMemoryTrustStore()
+        store.upsertSource(
+            TrustSource(
+                sourceId = "unaccepted",
+                sourceFamily = SourceFamily.LOTE,
+                displayName = "Unaccepted source",
+                assurance = SourceAssurance(
+                    signatureStatus = SignatureStatus.NOT_PRESENT,
+                    signerTrust = SignerTrust.NOT_APPLICABLE,
+                    authenticityState = AuthenticityState.UNVERIFIED,
+                    acceptancePolicy = SourceAcceptancePolicy.REQUIRE_AUTHENTICATED,
+                    accepted = false
+                )
+            )
+        )
+        store.upsertEntities(
+            listOf(TrustedEntity("provider", "unaccepted", TrustedEntityType.PID_PROVIDER, "Provider"))
+        )
+        store.upsertServices(
+            listOf(TrustedService("provider::service", "unaccepted", "provider", "PID_PROVIDER", TrustStatus.GRANTED))
+        )
+
+        val decision = DefaultTrustRegistryService(store)
+            .resolveByProviderId("provider", Clock.System.now())
+
+        assertEquals(TrustDecisionCode.NOT_TRUSTED, decision.decision)
+        assertTrue(decision.evidence.any { it.type == "SOURCE_NOT_ACCEPTED" })
     }
 
     private fun lote(root: X509Certificate): String = buildJsonObject {

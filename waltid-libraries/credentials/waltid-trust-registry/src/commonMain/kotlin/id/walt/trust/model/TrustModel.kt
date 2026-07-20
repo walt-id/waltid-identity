@@ -11,11 +11,60 @@ import kotlin.time.Instant
 enum class SourceFamily { TSL, LOTE, PILOT }
 
 // ---------------------------------------------------------------------------
-// Authenticity / freshness state
+// Source assurance / freshness state
 // ---------------------------------------------------------------------------
 
 @Serializable
-enum class AuthenticityState { VALIDATED, FAILED, SKIPPED_DEMO, UNKNOWN }
+enum class AuthenticityState {
+    /** Signature is valid and the signer chains to an independently trusted certificate. */
+    AUTHENTICATED,
+
+    /** Signature integrity is valid, but signer authorization was not established. */
+    INTEGRITY_VERIFIED,
+
+    /** Source is unsigned or signature verification was explicitly disabled. */
+    UNVERIFIED,
+
+    /** Signature, signer trust, or source verification failed. */
+    FAILED,
+
+    UNKNOWN
+}
+
+@Serializable
+enum class SignatureStatus { NOT_PRESENT, NOT_CHECKED, VALID, INVALID, UNSUPPORTED }
+
+@Serializable
+enum class SignerTrust { NOT_APPLICABLE, NOT_EVALUATED, TRUSTED, UNTRUSTED }
+
+/**
+ * Controls which sources may become active in the registry.
+ * Invalid signatures are rejected whenever verification is enabled.
+ */
+@Serializable
+enum class SourceAcceptancePolicy {
+    REQUIRE_AUTHENTICATED,
+    REQUIRE_VALID_SIGNATURE,
+    ALLOW_UNSIGNED,
+    ALLOW_UNVERIFIED
+}
+
+@Serializable
+data class SourceAssurance(
+    val signatureStatus: SignatureStatus = SignatureStatus.NOT_CHECKED,
+    val signerTrust: SignerTrust = SignerTrust.NOT_EVALUATED,
+    val authenticityState: AuthenticityState = AuthenticityState.UNKNOWN,
+    val acceptancePolicy: SourceAcceptancePolicy = SourceAcceptancePolicy.REQUIRE_AUTHENTICATED,
+    val accepted: Boolean = false,
+    val details: String? = null
+)
+
+@Serializable
+data class SourceLoadOptions(
+    val acceptancePolicy: SourceAcceptancePolicy = SourceAcceptancePolicy.REQUIRE_AUTHENTICATED,
+    /** PEM or Base64-DER certificates authorized to sign the source. */
+    val trustedSignerCertificates: List<String> = emptyList()
+)
 
 @Serializable
 enum class FreshnessState { FRESH, STALE, EXPIRED, UNKNOWN }
@@ -34,7 +83,7 @@ data class TrustSource(
     val issueDate: Instant? = null,
     val nextUpdate: Instant? = null,
     val sequenceNumber: String? = null,
-    val authenticityState: AuthenticityState = AuthenticityState.UNKNOWN,
+    val assurance: SourceAssurance = SourceAssurance(),
     val freshnessState: FreshnessState = FreshnessState.UNKNOWN,
     val rawArtifactRef: String? = null,
     val metadata: Map<String, String> = emptyMap()
@@ -130,13 +179,16 @@ data class TrustEvidence(
 data class TrustDecision(
     val decision: TrustDecisionCode,
     val sourceFreshness: FreshnessState = FreshnessState.UNKNOWN,
-    val authenticity: AuthenticityState = AuthenticityState.UNKNOWN,
+    val sourceAssurance: SourceAssurance = SourceAssurance(),
     val matchedSource: TrustSource? = null,
     val matchedEntity: TrustedEntity? = null,
     val matchedService: TrustedService? = null,
     val evidence: List<TrustEvidence> = emptyList(),
     val warnings: List<String> = emptyList()
-)
+) {
+    /** Compatibility projection; prefer [sourceAssurance]. */
+    val authenticity: AuthenticityState get() = sourceAssurance.authenticityState
+}
 
 // ---------------------------------------------------------------------------
 // Query filters
@@ -160,7 +212,7 @@ data class TrustSourceHealth(
     val displayName: String,
     val sourceFamily: SourceFamily,
     val freshnessState: FreshnessState,
-    val authenticityState: AuthenticityState,
+    val assurance: SourceAssurance,
     val nextUpdate: Instant? = null,
     val entityCount: Int = 0,
     val serviceCount: Int = 0
@@ -177,5 +229,16 @@ data class RefreshResult(
     val entitiesLoaded: Int = 0,
     val servicesLoaded: Int = 0,
     val identitiesLoaded: Int = 0,
-    val error: String? = null
+    val error: String? = null,
+    val errorCode: SourceLoadErrorCode? = null,
+    val assurance: SourceAssurance? = null
 )
+
+@Serializable
+enum class SourceLoadErrorCode {
+    FETCH_FAILED,
+    UNKNOWN_FORMAT,
+    SOURCE_NOT_ACCEPTED,
+    SIGNATURE_VALIDATION_FAILED,
+    PARSE_FAILED
+}

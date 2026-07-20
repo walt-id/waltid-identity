@@ -50,9 +50,10 @@ object CompactJwsValidator {
 
     fun validate(
         jws: String,
-        trustedSignerCertificates: List<String>
+        trustedSignerCertificates: List<String>,
+        requireTrustedSigner: Boolean = true
     ): CompactJwsValidationResult {
-        require(trustedSignerCertificates.isNotEmpty()) {
+        require(!requireTrustedSigner || trustedSignerCertificates.isNotEmpty()) {
             "Signed LoTE validation requires at least one trusted signer certificate"
         }
 
@@ -91,9 +92,11 @@ object CompactJwsValidator {
             )) { "JWS x5t#S256 does not match x5c[0]" }
         }
 
-        val trustedAnchors = trustedSignerCertificates.map(::parseCertificate)
-        require(isSignerTrusted(signer, chain.drop(1), trustedAnchors)) {
-            "JWS signer certificate is not trusted by the configured source signer certificates"
+        if (requireTrustedSigner) {
+            val trustedAnchors = trustedSignerCertificates.map(::parseCertificate)
+            require(isSignerTrusted(signer, chain.drop(1), trustedAnchors)) {
+                "JWS signer certificate is not trusted by the configured source signer certificates"
+            }
         }
 
         val rawSignature = Base64.getUrlDecoder().decode(parts[2])
@@ -119,6 +122,7 @@ object CompactJwsValidator {
                 put("signerSubjectDN", signer.subjectX500Principal.name)
                 put("signerIssuerDN", signer.issuerX500Principal.name)
                 put("signerCertificateSha256", signerThumbprint)
+                put("signerTrustEvaluated", requireTrustedSigner.toString())
                 header["iat"]?.jsonPrimitive?.content?.let { put("signatureIat", it) }
             }
         )

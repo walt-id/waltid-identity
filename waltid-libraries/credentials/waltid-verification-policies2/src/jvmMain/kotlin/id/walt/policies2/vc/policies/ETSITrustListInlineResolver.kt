@@ -1,7 +1,6 @@
 package id.walt.policies2.vc.policies
 
-import id.walt.trust.model.TrustDecision
-import id.walt.trust.model.TrustedEntityType
+import id.walt.trust.model.*
 import id.walt.trust.service.DefaultTrustRegistryService
 import id.walt.trust.store.InMemoryTrustStore
 import id.walt.x509.CertificateDer
@@ -34,6 +33,14 @@ actual object ETSITrustListInlineResolver {
         // Create an ephemeral trust registry for this verification request
         val trustStore = InMemoryTrustStore()
         val trustService = DefaultTrustRegistryService(trustStore)
+        val loadOptions = SourceLoadOptions(
+            acceptancePolicy = when {
+                !validateSignatures -> SourceAcceptancePolicy.ALLOW_UNVERIFIED
+                trustedSourceSignerCertificates.isNotEmpty() -> SourceAcceptancePolicy.REQUIRE_AUTHENTICATED
+                else -> SourceAcceptancePolicy.ALLOW_UNSIGNED
+            },
+            trustedSignerCertificates = trustedSourceSignerCertificates
+        )
         
         // Load all trust lists, counting how many succeed
         var loadedCount = 0
@@ -46,8 +53,7 @@ actual object ETSITrustListInlineResolver {
                     trustService.loadSourceFromUrl(
                         sourceId = sourceId,
                         url = source,
-                        validateSignature = validateSignatures,
-                        trustedSignerCertificates = trustedSourceSignerCertificates
+                        options = loadOptions
                     )
                 } else {
                     log.debug { "Loading trust list from inline content (${source.length} chars)" }
@@ -55,8 +61,7 @@ actual object ETSITrustListInlineResolver {
                         sourceId = sourceId,
                         content = source,
                         sourceUrl = null,
-                        validateSignature = validateSignatures,
-                        trustedSignerCertificates = trustedSourceSignerCertificates
+                        options = loadOptions
                     )
                 }
 
@@ -111,7 +116,7 @@ actual object ETSITrustListInlineResolver {
         if (authenticity == "FAILED") {
             return Result.failure(ETSITrustListPolicyException("Trust source authenticity validation failed"))
         }
-        if (requireAuthenticated && authenticity != "VALIDATED") {
+        if (requireAuthenticated && authenticity != "AUTHENTICATED") {
             return Result.failure(ETSITrustListPolicyException(
                 "Trust source authenticity not validated (got: $authenticity)"
             ))

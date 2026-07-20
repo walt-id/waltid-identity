@@ -100,12 +100,30 @@ class ETSITrustListPolicyTest {
             ETSITrustListPolicy.TrustDecisionResponse(
                 decision = "STALE_SOURCE",
                 sourceFreshness = "EXPIRED",
-                authenticity = "SKIPPED_DEMO"
+                authenticity = "UNVERIFIED"
             )
         )
 
         assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull()!!.message!!.contains("authenticity not validated"))
+        assertTrue(result.exceptionOrNull()!!.message!!.contains("not authenticated"))
+    }
+
+    @Test
+    fun `structured source assurance is accepted from new service responses`() {
+        val result = ETSITrustListPolicy(requireAuthenticated = true).evaluateDecision(
+            ETSITrustListPolicy.TrustDecisionResponse(
+                decision = "TRUSTED",
+                sourceFreshness = "FRESH",
+                sourceAssurance = ETSITrustListPolicy.SourceAssuranceDto(
+                    signatureStatus = "VALID",
+                    signerTrust = "TRUSTED",
+                    authenticityState = "AUTHENTICATED",
+                    accepted = true
+                )
+            )
+        )
+
+        assertTrue(result.isSuccess)
     }
 
     @Test

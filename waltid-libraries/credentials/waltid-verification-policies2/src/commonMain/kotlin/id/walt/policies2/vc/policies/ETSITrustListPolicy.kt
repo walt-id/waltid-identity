@@ -59,7 +59,7 @@ private val log = KotlinLogging.logger { }
  *   will still be considered trusted with a warning. Default: `false`.
  *
  * @property requireAuthenticated If `true`, the trust source must have
- *   `authenticityState = VALIDATED`. Default: `false` (SKIPPED_DEMO also accepted).
+ *   `authenticityState = AUTHENTICATED`. Default: `false`.
  *
  * @property validateSignatures If `true`, XMLDSig or supported signed-source envelopes
  *   are validated when loading trust lists in inline mode. Default: `true`.
@@ -321,14 +321,17 @@ data class ETSITrustListPolicy(
     // ---------------------------------------------------------------------------
 
     internal fun evaluateDecision(decision: TrustDecisionResponse): Result<JsonElement> {
-        log.debug { "Trust decision: ${decision.decision}, freshness: ${decision.sourceFreshness}, authenticity: ${decision.authenticity}" }
+        val authenticity = decision.sourceAssurance?.authenticityState
+            ?: decision.authenticity
+            ?: "UNKNOWN"
+        log.debug { "Trust decision: ${decision.decision}, freshness: ${decision.sourceFreshness}, authenticity: $authenticity" }
 
-        if (decision.authenticity == "FAILED") {
+        if (authenticity == "FAILED") {
             return Result.failure(ETSITrustListPolicyException("Trust source authenticity validation failed"))
         }
-        if (requireAuthenticated && decision.authenticity != "VALIDATED") {
+        if (requireAuthenticated && authenticity != "AUTHENTICATED") {
             return Result.failure(ETSITrustListPolicyException(
-                "Trust source authenticity not validated (got: ${decision.authenticity})"
+                "Trust source is not authenticated (got: $authenticity)"
             ))
         }
         
@@ -412,7 +415,11 @@ data class ETSITrustListPolicy(
                 })
             }
             put("sourceFreshness", JsonPrimitive(decision.sourceFreshness))
-            put("authenticity", JsonPrimitive(decision.authenticity))
+            put("authenticity", JsonPrimitive(
+                decision.sourceAssurance?.authenticityState
+                    ?: decision.authenticity
+                    ?: "UNKNOWN"
+            ))
             if (decision.warnings.isNotEmpty() || warning != null) {
                 put("warnings", buildJsonArray {
                     warning?.let { add(JsonPrimitive(it)) }
@@ -456,12 +463,24 @@ data class ETSITrustListPolicy(
     data class TrustDecisionResponse(
         val decision: String,
         val sourceFreshness: String = "UNKNOWN",
-        val authenticity: String = "UNKNOWN",
+        /** Legacy flat field returned by older trust-registry services. */
+        val authenticity: String? = null,
+        val sourceAssurance: SourceAssuranceDto? = null,
         val matchedSource: MatchedSourceDto? = null,
         val matchedEntity: MatchedEntityDto? = null,
         val matchedService: MatchedServiceDto? = null,
         val evidence: List<TrustEvidenceDto> = emptyList(),
         val warnings: List<String> = emptyList()
+    )
+
+    @Serializable
+    data class SourceAssuranceDto(
+        val signatureStatus: String = "NOT_CHECKED",
+        val signerTrust: String = "NOT_EVALUATED",
+        val authenticityState: String = "UNKNOWN",
+        val acceptancePolicy: String = "REQUIRE_AUTHENTICATED",
+        val accepted: Boolean = false,
+        val details: String? = null
     )
 
     @Serializable

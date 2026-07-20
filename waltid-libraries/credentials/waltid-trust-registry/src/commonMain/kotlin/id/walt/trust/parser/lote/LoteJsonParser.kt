@@ -13,10 +13,12 @@ import kotlin.time.Instant
  * Input format matches the synthetic sample at:
  * waltid-architecture/enterprise/trust-lists/samples/sample-lote-wallet-providers.synthetic.json
  *
- * Note: this parser handles the MVP JSON shape. It is intentionally lenient —
- * unknown fields are ignored. The format is provisional pending TS 119 605 stabilisation.
+ * This parser handles the currently supported provisional JSON shape and ignores
+ * unknown fields for forward compatibility pending TS 119 605 stabilisation.
  */
 object LoteJsonParser {
+
+    private val jsonFormat = Json { ignoreUnknownKeys = true }
 
     // ---------------------------------------------------------------------------
     // Raw JSON shape (internal deserialization models)
@@ -72,10 +74,15 @@ object LoteJsonParser {
         json: String,
         sourceId: String,
         sourceUrl: String? = null,
-        authenticityState: AuthenticityState = AuthenticityState.SKIPPED_DEMO,
+        assurance: SourceAssurance = SourceAssurance(
+            signatureStatus = SignatureStatus.NOT_PRESENT,
+            signerTrust = SignerTrust.NOT_APPLICABLE,
+            authenticityState = AuthenticityState.UNVERIFIED,
+            details = "Unsigned LoTE JSON"
+        ),
         validationMetadata: Map<String, String> = emptyMap()
     ): ParsedLoteSource {
-        val doc = Json { ignoreUnknownKeys = true }.decodeFromString<RawLoteDocument>(json)
+        val doc = jsonFormat.decodeFromString<RawLoteDocument>(json)
         val meta = doc.listMetadata
 
         val source = TrustSource(
@@ -87,7 +94,7 @@ object LoteJsonParser {
             issueDate = meta.issueDate?.let { runCatching { Instant.parse(it) }.getOrNull() },
             nextUpdate = meta.nextUpdate?.let { runCatching { Instant.parse(it) }.getOrNull() },
             sequenceNumber = meta.sequenceNumber,
-            authenticityState = authenticityState,
+            assurance = assurance,
             freshnessState = FreshnessState.UNKNOWN,
             metadata = buildMap {
                 meta.listType?.let { put("listType", it) }

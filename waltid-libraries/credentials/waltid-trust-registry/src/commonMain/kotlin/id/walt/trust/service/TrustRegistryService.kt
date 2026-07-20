@@ -82,7 +82,25 @@ interface TrustRegistryService {
     suspend fun refreshSource(sourceId: String): RefreshResult
 
     /**
-     * Load a source from raw content (for bootstrapping / demo).
+     * Load and admit a source using an explicit verification and acceptance policy.
+     * The default [SourceLoadOptions] policy requires an authenticated signer.
+     */
+    suspend fun loadSourceFromContent(
+        sourceId: String,
+        content: String,
+        sourceUrl: String? = null,
+        options: SourceLoadOptions
+    ): RefreshResult
+
+    /** Load a remote source using an explicit verification and acceptance policy. */
+    suspend fun loadSourceFromUrl(
+        sourceId: String,
+        url: String,
+        options: SourceLoadOptions
+    ): RefreshResult
+
+    /**
+     * Load a source from raw content through the deprecated compatibility API.
      *
      * @param sourceId Unique identifier for this trust source
      * @param content Raw trust list content (TSL XML, LoTE JSON/XML)
@@ -90,6 +108,7 @@ interface TrustRegistryService {
      * @param validateSignature Whether to validate XMLDSig signatures (for TSL sources)
      * @param trustedSignerCertificates PEM or Base64-DER certificates trusted to sign compact-JWS LoTE sources
      */
+    @Deprecated("Use the SourceLoadOptions overload with an explicit acceptance policy")
     suspend fun loadSourceFromContent(
         sourceId: String,
         content: String,
@@ -107,6 +126,7 @@ interface TrustRegistryService {
      * @param validateSignature Whether to validate XMLDSig signatures (for TSL sources)
      * @param trustedSignerCertificates PEM or Base64-DER certificates trusted to sign compact-JWS LoTE sources
      */
+    @Deprecated("Use the SourceLoadOptions overload with an explicit acceptance policy")
     suspend fun loadSourceFromUrl(
         sourceId: String,
         url: String,

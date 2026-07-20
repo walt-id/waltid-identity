@@ -22,7 +22,7 @@ private val logger = KotlinLogging.logger {}
 data class TslParseConfig(
     /**
      * Validate XMLDSig signature on the TSL.
-     * If false, signature is not checked and authenticityState = SKIPPED_DEMO.
+     * If false, signature is not checked and the source remains unverified.
      */
     val validateSignature: Boolean = true,
 
@@ -42,7 +42,7 @@ data class TslParseConfig(
 
     /**
      * If true, require that the TSL has a signature.
-     * If false, unsigned TSLs are accepted with authenticityState = SKIPPED_DEMO.
+     * If false, unsigned TSLs are parsed as unverified.
      * Only applies when validateSignature = true.
      */
     val requireSignature: Boolean = true
@@ -95,13 +95,31 @@ object TslXmlParser {
             null
         }
 
-        // Determine authenticity state
-        val isUnsigned = signatureResult?.details?.contains("No Signature element") == true
-        val authenticityState = when {
-            signatureResult == null -> AuthenticityState.SKIPPED_DEMO
-            signatureResult.state == AuthenticityState.VALIDATED -> AuthenticityState.VALIDATED
-            isUnsigned && !config.requireSignature -> AuthenticityState.SKIPPED_DEMO
-            else -> AuthenticityState.FAILED
+        val assurance = when {
+            signatureResult == null -> SourceAssurance(
+                signatureStatus = SignatureStatus.NOT_CHECKED,
+                signerTrust = SignerTrust.NOT_EVALUATED,
+                authenticityState = AuthenticityState.UNVERIFIED,
+                details = "XML signature verification was disabled"
+            )
+            signatureResult.signatureStatus == SignatureStatus.NOT_PRESENT && !config.requireSignature -> SourceAssurance(
+                signatureStatus = SignatureStatus.NOT_PRESENT,
+                signerTrust = SignerTrust.NOT_APPLICABLE,
+                authenticityState = AuthenticityState.UNVERIFIED,
+                details = signatureResult.details
+            )
+            signatureResult.signatureStatus == SignatureStatus.NOT_PRESENT -> SourceAssurance(
+                signatureStatus = SignatureStatus.NOT_PRESENT,
+                signerTrust = SignerTrust.NOT_APPLICABLE,
+                authenticityState = AuthenticityState.FAILED,
+                details = "A signature is required but the TSL is unsigned"
+            )
+            else -> SourceAssurance(
+                signatureStatus = signatureResult.signatureStatus,
+                signerTrust = signatureResult.signerTrust,
+                authenticityState = signatureResult.state,
+                details = signatureResult.details
+            )
         }
 
         // Log validation result
@@ -116,7 +134,7 @@ object TslXmlParser {
         }
 
         // If strict validation is enabled and signature is invalid, throw
-        if (config.strictSignatureValidation && authenticityState == AuthenticityState.FAILED) {
+        if (config.strictSignatureValidation && assurance.authenticityState == AuthenticityState.FAILED) {
             throw TslSignatureValidationException(
                 "TSL signature validation failed: ${signatureResult?.details}",
                 signatureResult
@@ -132,7 +150,7 @@ object TslXmlParser {
             issueDate = issueDate,
             nextUpdate = nextUpdate,
             sequenceNumber = sequenceNumber,
-            authenticityState = authenticityState,
+            assurance = assurance,
             freshnessState = FreshnessState.UNKNOWN,
             metadata = buildMap {
                 versionId?.let { put("tslVersion", it) }

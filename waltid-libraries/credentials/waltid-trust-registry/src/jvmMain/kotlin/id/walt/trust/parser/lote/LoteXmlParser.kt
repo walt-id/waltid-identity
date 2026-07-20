@@ -39,7 +39,12 @@ object LoteXmlParser {
             issueDate = issueDate,
             nextUpdate = nextUpdate,
             sequenceNumber = sequenceNumber,
-            authenticityState = AuthenticityState.SKIPPED_DEMO,
+            assurance = SourceAssurance(
+                signatureStatus = SignatureStatus.NOT_PRESENT,
+                signerTrust = SignerTrust.NOT_APPLICABLE,
+                authenticityState = AuthenticityState.UNVERIFIED,
+                details = "Unsigned LoTE XML"
+            ),
             freshnessState = FreshnessState.UNKNOWN,
             metadata = buildMap {
                 listType?.let { put("listType", it) }
