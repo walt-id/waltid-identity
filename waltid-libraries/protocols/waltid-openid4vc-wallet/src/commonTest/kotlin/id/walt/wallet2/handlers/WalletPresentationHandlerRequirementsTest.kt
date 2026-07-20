@@ -174,7 +174,7 @@ class WalletPresentationHandlerRequirementsTest {
     fun invalidTransactionDataCanBeReturnedAfterPreviewInteraction() = runTest {
         val wallet = Wallet(
             id = "wallet-invalid-transaction-data",
-            staticKey = JWKKey.generate(KeyType.secp256r1),
+            staticKey = JWKKey.generate(KeyType.Ed25519),
         )
         val requestUrl = AuthorizationRequest(
             clientId = "redirect_uri:https://verifier.example/callback",
@@ -238,7 +238,7 @@ class WalletPresentationHandlerRequirementsTest {
     fun unavailableTransactionCredentialCanBeReturnedAfterPreviewInteraction() = runTest {
         val wallet = Wallet(
             id = "wallet-unavailable-transaction-credential",
-            staticKey = JWKKey.generate(KeyType.secp256r1),
+            staticKey = JWKKey.generate(KeyType.Ed25519),
             credentialStores = listOf(InMemoryCredentialStore()),
         )
         val requestUrl = AuthorizationRequest(
@@ -280,7 +280,7 @@ class WalletPresentationHandlerRequirementsTest {
     fun unavailableRequestedCredentialCanBeReturnedAfterPreviewInteraction() = runTest {
         val wallet = Wallet(
             id = "wallet-unavailable-presentation-credential",
-            staticKey = JWKKey.generate(KeyType.secp256r1),
+            staticKey = JWKKey.generate(KeyType.Ed25519),
             credentialStores = listOf(InMemoryCredentialStore()),
         )
         val requestUrl = AuthorizationRequest(
