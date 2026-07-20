@@ -15,6 +15,9 @@ import id.walt.wallet2.mobile.MobileWalletOfferResolution
 import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
+import id.walt.wallet2.mobile.MobileWalletIssuerMetadata
+import id.walt.wallet2.mobile.MobileWalletMetadataDisplay
+import id.walt.wallet2.mobile.MobileWalletOfferedCredentialMetadata
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialOption
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialRequirement
@@ -25,8 +28,12 @@ import id.walt.wallet2.mobile.MobileWalletPresentationPreview
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationRequestInfo
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
+import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
+import id.walt.wallet2.mobile.MobileWalletTransactionCodeInputMode
+import id.walt.wallet2.mobile.MobileWalletTransactionCodeRequirement
+import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.mobile.toKeyType
@@ -121,7 +128,7 @@ class WalletSdkBridgeTest {
         val result = bridge.resolveOffer("openid-credential-offer://issuer.example")
 
         assertIs<WalletBridgeResult.Success<MobileWalletOfferResolution>>(result)
-        assertEquals(true, result.value.transactionCodeRequired)
+        assertEquals(MobileWalletTransactionCodeInputMode.numeric, result.value.transactionCode?.inputMode)
         assertEquals("openid-credential-offer://issuer.example", operations.resolvedOfferUrl)
     }
 
@@ -183,6 +190,15 @@ class WalletSdkBridgeTest {
         assertIs<WalletBridgeResult.Success<MobileWalletPresentationPreviewResult>>(result)
         val preview = assertIs<MobileWalletPresentationPreviewResult.Ready>(result.value).preview
         assertEquals("https://verifier.example", preview.request.clientId)
+        assertEquals(
+            MobileWalletResponseEncryption.Required(
+                keyManagementAlgorithm = "ECDH-ES",
+                contentEncryptionAlgorithm = "A256GCM",
+                verifierKeyId = "verifier-key-1",
+                verifierKeyThumbprint = "thumbprint-1",
+            ),
+            preview.request.responseEncryption,
+        )
         assertEquals("credential-1", preview.credentialOptions.single().credentialId)
         assertEquals(true, preview.credentialOptions.single().multiple)
         assertEquals(listOf(listOf("pid")), preview.credentialRequirements.single().options)
@@ -194,10 +210,21 @@ class WalletSdkBridgeTest {
         val expected = MobileWalletPresentationPreviewResult.Invalid(
             request = MobileWalletPresentationRequestInfo(
                 clientId = "https://verifier.example",
-                verifierName = "Example Verifier",
+                verifierMetadata = MobileWalletVerifierMetadata(
+                    display = MobileWalletMetadataDisplay(
+                        name = "Example Verifier",
+                        locale = "en",
+                        logoUri = null,
+                        logoAltText = null,
+                    ),
+                    clientUri = null,
+                    policyUri = null,
+                    termsOfServiceUri = null,
+                ),
                 responseUri = "https://verifier.example/direct-post",
                 state = "state-1",
                 nonce = "nonce-1",
+                responseEncryption = MobileWalletResponseEncryption.NotRequired,
             ),
             errorCode = MobileWalletPresentationErrorCode.invalidTransactionData,
             message = "Unsupported transaction data type",
@@ -296,6 +323,7 @@ class WalletSdkBridgeTest {
                     bearerToken = "token",
                     hostHeader = "attestation.example",
                 ),
+                preferredLocales = listOf("de-AT", "en"),
                 transactionDataProfiles = listOf(
                     MobileWalletTransactionDataProfile(
                         type = "example.transaction",
@@ -317,6 +345,7 @@ class WalletSdkBridgeTest {
         assertEquals("/wallet-attestation", capturedConfig?.attestationConfig?.attesterPath)
         assertEquals("token", capturedConfig?.attestationConfig?.bearerToken)
         assertEquals("attestation.example", capturedConfig?.attestationConfig?.hostHeader)
+        assertEquals(listOf("de-AT", "en"), capturedConfig?.preferredLocales)
         assertEquals(
             listOf(
                 MobileWalletTransactionDataProfile(
@@ -555,6 +584,7 @@ class WalletSdkBridgeTest {
         assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
         assertEquals(null, config.attestationConfig)
         assertEquals(MobileWalletPersistence(), config.persistence)
+        assertEquals(emptyList(), config.preferredLocales)
         assertEquals(emptyList(), config.transactionDataProfiles)
     }
 
@@ -645,9 +675,26 @@ class WalletSdkBridgeTest {
         override suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution {
             resolvedOfferUrl = offerUrl
             return MobileWalletOfferResolution(
-                transactionCodeRequired = true,
-                credentialIssuer = "https://issuer.example",
-                offeredCredentials = listOf("ExampleCredential"),
+                issuer = MobileWalletIssuerMetadata(
+                    credentialIssuer = "https://issuer.example",
+                    display = null,
+                ),
+                offeredCredentials = listOf(
+                    MobileWalletOfferedCredentialMetadata(
+                        configurationId = "ExampleCredential",
+                        format = "vc+sd-jwt",
+                        scope = null,
+                        vct = "ExampleCredential",
+                        doctype = null,
+                        display = null,
+                        claims = emptyList(),
+                    )
+                ),
+                transactionCode = MobileWalletTransactionCodeRequirement(
+                    inputMode = MobileWalletTransactionCodeInputMode.numeric,
+                    length = 6,
+                    description = "Enter the six-digit code",
+                ),
             )
         }
 
@@ -696,10 +743,26 @@ class WalletSdkBridgeTest {
             return previewResult ?: MobileWalletPresentationPreviewResult.Ready(MobileWalletPresentationPreview(
                 request = MobileWalletPresentationRequestInfo(
                     clientId = "https://verifier.example",
-                    verifierName = "Example Verifier",
+                    verifierMetadata = MobileWalletVerifierMetadata(
+                        display = MobileWalletMetadataDisplay(
+                            name = "Example Verifier",
+                            locale = "en",
+                            logoUri = null,
+                            logoAltText = null,
+                        ),
+                        clientUri = "https://verifier.example",
+                        policyUri = null,
+                        termsOfServiceUri = null,
+                    ),
                     responseUri = "https://verifier.example/direct-post",
                     state = "state-1",
                     nonce = "nonce-1",
+                    responseEncryption = MobileWalletResponseEncryption.Required(
+                        keyManagementAlgorithm = "ECDH-ES",
+                        contentEncryptionAlgorithm = "A256GCM",
+                        verifierKeyId = "verifier-key-1",
+                        verifierKeyThumbprint = "thumbprint-1",
+                    ),
                 ),
                 credentialOptions = listOf(
                     MobileWalletPresentationCredentialOption(

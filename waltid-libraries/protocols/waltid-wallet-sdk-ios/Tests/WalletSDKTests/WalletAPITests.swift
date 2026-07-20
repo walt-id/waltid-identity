@@ -14,6 +14,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertNil(configuration.persistence.stores.keys)
         XCTAssertNil(configuration.attestation)
         XCTAssertTrue(configuration.transactionDataProfiles.isEmpty)
+        XCTAssertEqual(configuration.preferredLocales, Locale.preferredLanguages)
     }
 
     func testPublicPersistenceConfigurationUsesEncryptedDefault() {
@@ -163,10 +164,11 @@ final class WalletAPITests: XCTestCase {
         let preview = PresentationPreview(
             request: .init(
                 clientID: "https://verifier.example",
-                verifierName: "Example Verifier",
+                verifierMetadata: testVerifierMetadata,
                 responseURI: URL(string: "https://verifier.example/direct-post"),
                 state: "state-1",
-                nonce: "nonce-1"
+                nonce: "nonce-1",
+                responseEncryption: .notRequired
             ),
             credentialOptions: [
                 .init(
@@ -195,6 +197,7 @@ final class WalletAPITests: XCTestCase {
         )
 
         acceptsSendable(preview)
+        XCTAssertEqual(preview.request.responseEncryption, .notRequired)
         XCTAssertEqual(preview.credentialOptions.single?.credentialID, "credential-1")
         XCTAssertEqual(preview.credentialOptions.single?.multiple, true)
         XCTAssertEqual(preview.credentialOptions.single?.selection, PresentationCredentialSelection(queryID: "pid", credentialID: "credential-1"))
@@ -239,11 +242,7 @@ final class WalletAPITests: XCTestCase {
     func testResolveOfferForwardsOfferAndReturnsResolution() async throws {
         let offer = URL(string: "openid-credential-offer://issuer.example")!
         let bridge = FakeWalletCoreBridge()
-        let resolution = OfferResolution(
-            transactionCodeRequired: true,
-            credentialIssuer: "https://issuer.example",
-            offeredCredentials: ["ExampleCredential"]
-        )
+        let resolution = testOfferResolution(transactionCodeRequired: true)
         bridge.offerResolutionResult = resolution
         let wallet = Wallet(bridge: bridge)
 
@@ -341,10 +340,18 @@ final class WalletAPITests: XCTestCase {
             .init(
                 request: .init(
                     clientID: "https://verifier.example",
-                    verifierName: "Example Verifier",
+                    verifierMetadata: testVerifierMetadata,
                     responseURI: nil,
                     state: nil,
-                    nonce: "nonce-1"
+                    nonce: "nonce-1",
+                    responseEncryption: .required(
+                        ResponseEncryptionDetails(
+                            keyManagementAlgorithm: "ECDH-ES",
+                            contentEncryptionAlgorithm: "A256GCM",
+                            verifierKeyID: "verifier-key-1",
+                            verifierKeyThumbprint: "thumbprint-1"
+                        )
+                    )
                 ),
                 credentialOptions: [
                     .init(
@@ -369,6 +376,17 @@ final class WalletAPITests: XCTestCase {
             return XCTFail("Expected a ready preview")
         }
         XCTAssertEqual(preview.request.clientID, "https://verifier.example")
+        XCTAssertEqual(
+            preview.request.responseEncryption,
+            .required(
+                ResponseEncryptionDetails(
+                    keyManagementAlgorithm: "ECDH-ES",
+                    contentEncryptionAlgorithm: "A256GCM",
+                    verifierKeyID: "verifier-key-1",
+                    verifierKeyThumbprint: "thumbprint-1"
+                )
+            )
+        )
         XCTAssertEqual(preview.credentialOptions.single?.credentialID, "credential-1")
         XCTAssertEqual(preview.credentialOptions.single?.multiple, true)
         XCTAssertEqual(bridge.previewCalls, [request])
@@ -378,7 +396,8 @@ final class WalletAPITests: XCTestCase {
         let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
         let requestInfo = PresentationRequestInfo(
             clientID: "https://verifier.example",
-            verifierName: "Example Verifier"
+            verifierMetadata: testVerifierMetadata,
+            responseEncryption: .notRequired
         )
         let bridge = FakeWalletCoreBridge()
         bridge.previewResult = .invalid(
@@ -655,16 +674,15 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     var events: AsyncStream<WalletEvent>
     var error: WalletError?
     var bootstrapResult = WalletBootstrapResult(keyID: "key", did: "did:key:wallet")
-    var offerResolutionResult = OfferResolution(
-        transactionCodeRequired: false,
-        credentialIssuer: "https://issuer.example",
-        offeredCredentials: ["ExampleCredential"]
-    )
+    var offerResolutionResult = testOfferResolution(transactionCodeRequired: false)
     var receiveResult: [String] = []
     var credentialsResult: [Credential] = []
     var presentResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
     var previewResult = PresentationPreviewResult.ready(
-        PresentationPreview(request: .init(clientID: nil), credentialOptions: [])
+        PresentationPreview(
+            request: .init(clientID: nil, responseEncryption: .notRequired),
+            credentialOptions: []
+        )
     )
     var submitResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
     var rejectResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
@@ -790,4 +808,48 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         )
         return rejectResult
     }
+}
+
+private let testVerifierMetadata = VerifierMetadata(
+    display: MetadataDisplay(
+        name: "Example Verifier",
+        locale: "en",
+        logoURI: nil,
+        logoAltText: nil
+    ),
+    clientURI: "https://verifier.example",
+    policyURI: "https://verifier.example/privacy",
+    termsOfServiceURI: "https://verifier.example/terms"
+)
+
+private func testOfferResolution(transactionCodeRequired: Bool) -> OfferResolution {
+    OfferResolution(
+        issuer: IssuerMetadata(
+            credentialIssuer: "https://issuer.example",
+            display: MetadataDisplay(
+                name: "Example Issuer",
+                locale: "en",
+                logoURI: nil,
+                logoAltText: nil
+            )
+        ),
+        offeredCredentials: [
+            OfferedCredentialMetadata(
+                configurationID: "ExampleCredential",
+                format: "vc+sd-jwt",
+                scope: nil,
+                vct: "ExampleCredential",
+                doctype: nil,
+                display: nil,
+                claims: []
+            )
+        ],
+        transactionCode: transactionCodeRequired
+            ? TransactionCodeRequirement(
+                inputMode: .numeric,
+                length: 6,
+                description: "Enter the six-digit code"
+            )
+            : nil
+    )
 }

@@ -42,6 +42,7 @@ import kotlin.time.Instant
  * @property databaseKeyProvider Swift-owned database key provider used when [persistence] uses
  * [WalletBridgeDatabaseKeyConfiguration.Provided].
  * @property attestation Optional client-attestation configuration for issuers that require it.
+ * @property preferredLocales Ordered BCP 47 locale preferences used to select display metadata.
  * @property transactionDataProfiles Transaction data profiles this wallet accepts.
  */
 public data class WalletBridgeConfiguration(
@@ -50,6 +51,7 @@ public data class WalletBridgeConfiguration(
     public val persistence: WalletBridgePersistence = WalletBridgePersistence(),
     public val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
     public val attestation: WalletAttestationConfig? = null,
+    public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
 )
 
@@ -58,6 +60,7 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConf
     defaultKeyType = defaultKeyType,
     attestationConfig = attestation,
     persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
+    preferredLocales = preferredLocales,
     transactionDataProfiles = transactionDataProfiles,
 )
 

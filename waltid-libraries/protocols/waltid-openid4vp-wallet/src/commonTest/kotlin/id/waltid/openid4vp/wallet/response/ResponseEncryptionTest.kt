@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.waltid.openid4vp.wallet.response
 
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
@@ -9,6 +11,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class ResponseEncryptionTest {
     private val publicKey = Json.parseToJsonElement(
@@ -27,7 +30,18 @@ class ResponseEncryptionTest {
     fun `selects final compliant encryption metadata`() = runTest {
         val config = ResponseEncryption.resolve(request(publicKey))
 
-        assertEquals("A256GCM", config?.encryptionMethod)
+        val metadata = config?.metadata()
+        assertEquals("ECDH-ES", metadata?.keyManagementAlgorithm)
+        assertEquals("A256GCM", metadata?.contentEncryptionAlgorithm)
+        assertEquals("enc-key", metadata?.verifierKeyId)
+        assertEquals("ds5PaVMO_C5Ig-uE8M4pwTsYdA9LLbT2D8mHERDXudE", metadata?.verifierKeyThumbprint)
+    }
+
+    @Test
+    fun `returns no encryption metadata for an unencrypted response`() = runTest {
+        val request = request(publicKey).copy(responseMode = OpenID4VPResponseMode.DIRECT_POST)
+
+        assertNull(ResponseEncryption.resolve(request))
     }
 
     @Test

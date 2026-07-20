@@ -8,6 +8,7 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
+import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
@@ -169,6 +170,23 @@ data class ResolveOfferResult(
     val credentialEndpoint: Url,
     val offeredCredentials: List<String>,
     val tokenEndpoint: Url? = null,
+)
+
+/**
+ * Typed metadata for an offer retained between review and issuance.
+ *
+ * Unlike [ResolveOfferResult], this preview-only result is not serialized as a shared REST response.
+ * It exposes the protocol models already resolved for the retained issuance snapshot so mobile
+ * consumers can project them into platform-safe API models without parsing raw JSON or refetching.
+ *
+ * @property issuerMetadata Credential issuer metadata used by the retained issuance snapshot.
+ * @property offeredCredentials Offered credential configurations resolved against [issuerMetadata].
+ * @property transactionCode Canonical OpenID4VCI transaction-code metadata, when required.
+ */
+data class WalletOfferPreviewResult(
+    val issuerMetadata: CredentialIssuerMetadata,
+    val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
+    val transactionCode: TxCode?,
 )
 
 /**
@@ -559,7 +577,7 @@ object WalletIssuanceHandler {
         wallet: Wallet,
         request: ResolveOfferRequest,
         httpClient: HttpClient = defaultHttpClient(),
-    ): ResolveOfferResult {
+    ): WalletOfferPreviewResult {
         val resolvedOffer = resolveIssuanceOffer(request, httpClient)
         previewedOffersMutex.withLock {
             if (previewedOffers.size >= MAX_PREVIEWED_OFFERS) {
@@ -567,7 +585,11 @@ object WalletIssuanceHandler {
             }
             previewedOffers[offerPreviewCacheKey(wallet, request)] = resolvedOffer
         }
-        return resolvedOffer.summary
+        return WalletOfferPreviewResult(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            offeredCredentials = resolvedOffer.offeredCredentials,
+            transactionCode = resolvedOffer.offer.grants?.preAuthorizedCode?.txCode,
+        )
     }
 
     private suspend fun resolveIssuanceOffer(

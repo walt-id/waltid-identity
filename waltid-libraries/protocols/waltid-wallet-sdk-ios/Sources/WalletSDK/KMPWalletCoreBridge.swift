@@ -55,9 +55,12 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             operation: "resolve credential offer"
         )
         return OfferResolution(
-            transactionCodeRequired: value.transactionCodeRequired,
-            credentialIssuer: value.credentialIssuer,
-            offeredCredentials: swiftArray(value.offeredCredentials, of: String.self)
+            issuer: value.issuer.toSwiftIssuerMetadata(),
+            offeredCredentials: swiftArray(
+                value.offeredCredentials,
+                of: MobileWalletOfferedCredentialMetadata.self
+            ).map { $0.toSwiftOfferedCredentialMetadata() },
+            transactionCode: value.transactionCode?.toSwiftTransactionCodeRequirement()
         )
     }
 
@@ -218,6 +221,7 @@ private extension WalletConfiguration {
             persistence: persistence.toKMPPersistence(),
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
             attestation: attestation?.toKMPAttestationConfiguration(),
+            preferredLocales: preferredLocales,
             transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() }
         )
     }
@@ -622,12 +626,102 @@ private extension MobileWalletPresentationRequestInfo {
     func toSwiftRequestInfo() -> PresentationRequestInfo {
         PresentationRequestInfo(
             clientID: clientId,
-            verifierName: verifierName,
+            verifierMetadata: verifierMetadata?.toSwiftVerifierMetadata(),
             responseURI: responseUri.flatMap(URL.init(string:)),
             state: state,
             nonce: nonce,
+            responseEncryption: responseEncryption.toSwiftResponseEncryption(),
             transactionData: swiftArray(transactionData, of: MobileWalletTransactionDataItem.self)
                 .map { $0.toSwiftTransactionData() }
+        )
+    }
+}
+
+private extension MobileWalletResponseEncryption {
+    func toSwiftResponseEncryption() -> PresentationResponseEncryption {
+        guard isRequired else { return .notRequired }
+        guard let keyManagementAlgorithm,
+              let contentEncryptionAlgorithm,
+              let verifierKeyThumbprint else {
+            preconditionFailure("Required response encryption is missing selected metadata")
+        }
+        return .required(
+            ResponseEncryptionDetails(
+                keyManagementAlgorithm: keyManagementAlgorithm,
+                contentEncryptionAlgorithm: contentEncryptionAlgorithm,
+                verifierKeyID: verifierKeyId,
+                verifierKeyThumbprint: verifierKeyThumbprint
+            )
+        )
+    }
+}
+
+private extension MobileWalletMetadataDisplay {
+    func toSwiftMetadataDisplay() -> MetadataDisplay {
+        MetadataDisplay(
+            name: name,
+            locale: locale,
+            logoURI: logoUri,
+            logoAltText: logoAltText,
+            description: descriptionText,
+            backgroundColor: backgroundColor,
+            backgroundImageURI: backgroundImageUri,
+            textColor: textColor
+        )
+    }
+}
+
+private extension MobileWalletIssuerMetadata {
+    func toSwiftIssuerMetadata() -> IssuerMetadata {
+        IssuerMetadata(
+            credentialIssuer: credentialIssuer,
+            display: display?.toSwiftMetadataDisplay()
+        )
+    }
+}
+
+private extension MobileWalletCredentialClaimMetadata {
+    func toSwiftCredentialClaimMetadata() -> CredentialClaimMetadata {
+        CredentialClaimMetadata(
+            path: swiftArray(path, of: String.self),
+            mandatory: mandatory?.boolValue,
+            displayName: displayName
+        )
+    }
+}
+
+private extension MobileWalletOfferedCredentialMetadata {
+    func toSwiftOfferedCredentialMetadata() -> OfferedCredentialMetadata {
+        OfferedCredentialMetadata(
+            configurationID: configurationId,
+            format: format,
+            scope: scope,
+            vct: vct,
+            doctype: doctype,
+            display: display?.toSwiftMetadataDisplay(),
+            claims: swiftArray(claims, of: MobileWalletCredentialClaimMetadata.self)
+                .map { $0.toSwiftCredentialClaimMetadata() }
+        )
+    }
+}
+
+private extension MobileWalletTransactionCodeRequirement {
+    func toSwiftTransactionCodeRequirement() -> TransactionCodeRequirement {
+        TransactionCodeRequirement(
+            inputMode: inputMode == .numeric ? .numeric : .text,
+            length: length?.intValue,
+            description: descriptionText
+        )
+    }
+}
+
+private extension MobileWalletVerifierMetadata {
+    func toSwiftVerifierMetadata() -> VerifierMetadata {
+        VerifierMetadata(
+            display: display?.toSwiftMetadataDisplay(),
+            clientURI: clientUri,
+            policyURI: policyUri,
+            termsOfServiceURI: termsOfServiceUri
         )
     }
 }

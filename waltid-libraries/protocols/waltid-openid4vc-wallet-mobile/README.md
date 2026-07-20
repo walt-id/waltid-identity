@@ -41,13 +41,41 @@ delivered transaction code when the issuer requires one:
 
 ```kotlin
 val resolution = wallet.resolveOffer(offerUrl)
-val transactionCode = if (resolution.transactionCodeRequired) {
-    collectTransactionCode()
-} else {
-    null
+val transactionCode = resolution.transactionCode?.let { requirement ->
+    collectTransactionCode(
+        inputMode = requirement.inputMode,
+        expectedLength = requirement.length,
+        description = requirement.description,
+    )
 }
 val credentialIds = wallet.receive(offerUrl, txCode = transactionCode)
 ```
+
+The resolution also contains localized, typed issuer and credential-configuration
+metadata for review UI. Set `MobileWalletConfig.preferredLocales` to the app's
+ordered BCP 47 language preferences; platform demos pass their platform locale preferences.
+
+## Presenting credentials
+
+Preview a presentation request before submission. The request information includes
+typed verifier metadata and the response-encryption state selected by the protocol
+implementation:
+
+```kotlin
+val preview = wallet.previewPresentation(requestUrl)
+when (val encryption = preview.request.responseEncryption) {
+    MobileWalletResponseEncryption.NotRequired -> showPlainResponseNotice()
+    is MobileWalletResponseEncryption.Required -> showEncryptedResponseNotice(
+        algorithm = encryption.keyManagementAlgorithm,
+        contentEncryption = encryption.contentEncryptionAlgorithm,
+        verifierKeyId = encryption.verifierKeyId,
+        verifierKeyThumbprint = encryption.verifierKeyThumbprint,
+    )
+}
+```
+
+Response-encryption metadata describes protection of the authorization response. It
+does not establish verifier trust and does not expose verifier key material.
 
 ## Persistence and encryption
 
