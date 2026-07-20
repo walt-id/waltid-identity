@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -93,6 +94,11 @@ internal fun VerifierReviewSections(preview: WalletDemoPresentationPreview, modi
         ReviewMetadataSection(
             title = "Technical request details",
             modifier = Modifier.testTag(WalletUiTestTags.PresentationTechnicalDetailsSection),
+            contentPadding = if (technicalDetailsExpanded) {
+                PaddingValues(16.dp)
+            } else {
+                PaddingValues(horizontal = 16.dp, vertical = 2.dp)
+            },
         ) {
             Row(
                 modifier = Modifier

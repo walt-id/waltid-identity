@@ -3,10 +3,16 @@ import WalletSDK
 
 struct ReviewMetadataSection<Content: View>: View {
     let title: String
+    let contentInsets: EdgeInsets
     let content: Content
 
-    init(title: String, @ViewBuilder content: () -> Content) {
+    init(
+        title: String,
+        contentInsets: EdgeInsets = EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16),
+        @ViewBuilder content: () -> Content
+    ) {
         self.title = title
+        self.contentInsets = contentInsets
         self.content = content()
     }
 
@@ -19,7 +25,7 @@ struct ReviewMetadataSection<Content: View>: View {
             VStack(alignment: .leading, spacing: 8) {
                 content
             }
-            .padding()
+            .padding(contentInsets)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(.systemGray6))
             .clipShape(RoundedRectangle(cornerRadius: 8))

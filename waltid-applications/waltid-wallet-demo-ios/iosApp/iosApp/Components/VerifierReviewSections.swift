@@ -38,7 +38,12 @@ struct VerifierReviewSections: View {
             }
             .accessibilityIdentifier(WalletAccessibilityID.presentationResponseProtectionSection)
 
-            ReviewMetadataSection(title: "Technical request details") {
+            ReviewMetadataSection(
+                title: "Technical request details",
+                contentInsets: technicalDetailsExpanded
+                    ? EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
+                    : EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16)
+            ) {
                 Button {
                     technicalDetailsExpanded.toggle()
                 } label: {

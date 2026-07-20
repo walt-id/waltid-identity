@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +32,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 internal fun ReviewMetadataSection(
     title: String,
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(16.dp),
     content: @Composable () -> Unit,
 ) {
     Column(
@@ -49,7 +51,7 @@ internal fun ReviewMetadataSection(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(contentPadding),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 content()
