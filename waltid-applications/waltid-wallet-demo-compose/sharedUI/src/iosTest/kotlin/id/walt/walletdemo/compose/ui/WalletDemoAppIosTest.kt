@@ -6,6 +6,10 @@ class WalletDemoAppIosTest {
     private val scenarios = WalletDemoAppTestScenarios()
 
     @Test
+    fun pinStorageFailureStaysLockedUntilRetrySucceeds() =
+        scenarios.pinStorageFailureStaysLockedUntilRetrySucceeds()
+
+    @Test
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() =
         scenarios.credentialsTabShowsCompactCardsAndNavigatesToDetails()
 
@@ -24,6 +28,10 @@ class WalletDemoAppIosTest {
     @Test
     fun receiveTabDisablesUrlControlsWhileReceiving() =
         scenarios.receiveTabDisablesUrlControlsWhileReceiving()
+
+    @Test
+    fun transactionCodeOfferCanBeDeclinedWithoutCode() =
+        scenarios.transactionCodeOfferCanBeDeclinedWithoutCode()
 
     @Test
     fun receiveAndPresentTabsExposeQrScanActions() =

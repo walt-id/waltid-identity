@@ -76,7 +76,9 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
                             requestDrafts = state.requestDrafts,
                             onOfferUrlChange = controller::updateOfferUrl,
                             onTxCodeChange = controller::updateTxCode,
-                            onReceive = controller::receive,
+                            onPreviewOffer = controller::previewOffer,
+                            onAcceptOffer = controller::acceptOffer,
+                            onDeclineOffer = controller::declineOffer,
                             onStartNew = controller::startNewReceiveFlow,
                             onCredentialClick = { detailsId -> receiveBackStack.pushDetails(detailsId) },
                         )

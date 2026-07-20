@@ -16,12 +16,16 @@ import kotlinx.coroutines.launch
 
 class WalletDemoController(
     private val wallet: DemoWallet,
+    private val pinStore: DemoPinStore,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
-    private var configuredPin: String? = null
     private var receiveJob: Job? = null
-    private val _state = MutableStateFlow(WalletDemoUiState())
+    private val _state = MutableStateFlow(
+        WalletDemoUiState(
+            auth = readInitialAuthState(),
+        ),
+    )
     val state: StateFlow<WalletDemoUiState> = _state.asStateFlow()
 
     fun updatePin(value: String) {
@@ -29,6 +33,7 @@ class WalletDemoController(
             when (val auth = state.auth) {
                 is WalletAuthState.Setup -> state.copy(auth = auth.copy(pin = value, error = null))
                 is WalletAuthState.Login -> state.copy(auth = auth.copy(pin = value, error = null))
+                is WalletAuthState.StorageUnavailable,
                 WalletAuthState.Unlocked -> state
             }
         }
@@ -39,6 +44,7 @@ class WalletDemoController(
             when (val auth = state.auth) {
                 is WalletAuthState.Setup -> state.copy(auth = auth.copy(confirmation = value, error = null))
                 is WalletAuthState.Login,
+                is WalletAuthState.StorageUnavailable,
                 WalletAuthState.Unlocked,
                 -> state
             }
@@ -46,10 +52,22 @@ class WalletDemoController(
     }
 
     fun submitPin() {
+        if (_state.value.isAuthenticating) return
         when (val auth = _state.value.auth) {
             is WalletAuthState.Setup -> submitSetupPin(auth)
             is WalletAuthState.Login -> submitLoginPin(auth)
+            is WalletAuthState.StorageUnavailable,
             WalletAuthState.Unlocked -> Unit
+        }
+    }
+
+    fun retryPinStorage() {
+        _state.update { state ->
+            if (state.auth is WalletAuthState.StorageUnavailable) {
+                state.copy(auth = readInitialAuthState())
+            } else {
+                state
+            }
         }
     }
 
@@ -60,6 +78,7 @@ class WalletDemoController(
                 auth = WalletAuthState.Login(),
                 operation = WalletOperationState.Idle,
                 requestDrafts = it.requestDrafts.copy(txCode = ""),
+                offerPreview = null,
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
             )
         }
@@ -78,6 +97,7 @@ class WalletDemoController(
                     txCode = "",
                     transactionCodeRequired = false,
                 ),
+                offerPreview = null,
                 lastReceivedCredentialIds = emptyList(),
                 receiveCompleted = false,
                 operation = WalletOperationState.Idle,
@@ -115,6 +135,7 @@ class WalletDemoController(
                             txCode = "",
                             transactionCodeRequired = false,
                         ),
+                        offerPreview = null,
                         lastReceivedCredentialIds = emptyList(),
                         receiveCompleted = false,
                         receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
@@ -154,6 +175,7 @@ class WalletDemoController(
                     txCode = "",
                     transactionCodeRequired = false,
                 ),
+                offerPreview = null,
                 lastReceivedCredentialIds = emptyList(),
                 receiveCompleted = false,
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
@@ -177,39 +199,53 @@ class WalletDemoController(
         }
     }
 
-    fun receive() {
+    fun previewOffer() {
         val current = _state.value
-        val ready = current.session as? WalletSessionState.Ready ?: return
         val offerUrl = current.requestDrafts.offerUrl.trim()
         if (!current.receiveActionEnabled || offerUrl.isBlank()) return
-        val txCode = current.requestDrafts.txCode.trim().ifBlank { null }
-        val transactionCodeRequired = current.requestDrafts.transactionCodeRequired
         val request = ReceiveRequest(offerUrl, current.receiveNavigationResetKey)
-        val initialOperation = if (!transactionCodeRequired) {
-            WalletOperationState.ResolvingOffer
-        } else {
-            WalletOperationState.Receiving
-        }
-        if (!_state.compareAndSet(current, current.copy(operation = initialOperation))) return
+        if (!_state.compareAndSet(current, current.copy(operation = WalletOperationState.ResolvingOffer))) return
 
         receiveJob = scope.launch(dispatcher) {
             try {
-                if (!transactionCodeRequired) {
-                    val requiresTransactionCode = wallet.resolveOffer(offerUrl)
-                    currentCoroutineContext().ensureActive()
-                    if (!isCurrent(request)) return@launch
-                    if (requiresTransactionCode) {
-                        updateIfCurrent(request) {
-                            it.copy(
-                                requestDrafts = it.requestDrafts.copy(transactionCodeRequired = true),
-                                operation = WalletOperationState.Idle,
-                            )
-                        }
-                        return@launch
-                    }
+                val resolution = wallet.resolveOffer(offerUrl)
+                currentCoroutineContext().ensureActive()
+                if (!isCurrent(request)) return@launch
+                updateIfCurrent(request) {
+                    it.copy(
+                        requestDrafts = it.requestDrafts.copy(
+                            transactionCodeRequired = resolution.transactionCodeRequired,
+                        ),
+                        offerPreview = resolution,
+                        operation = WalletOperationState.OfferPreview,
+                    )
                 }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                updateIfCurrent(request) {
+                    it.copy(
+                        operation = WalletOperationState.Failed(
+                            message = WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
+                            tab = WalletDemoTab.Receive,
+                        )
+                    )
+                }
+            }
+        }
+    }
 
-                updateIfCurrent(request) { it.copy(operation = WalletOperationState.Receiving) }
+    fun acceptOffer() {
+        val current = _state.value
+        val ready = current.session as? WalletSessionState.Ready ?: return
+        if (!current.acceptOfferEnabled) return
+        val offerUrl = current.requestDrafts.offerUrl.trim()
+        val txCode = current.requestDrafts.txCode.trim().ifBlank { null }
+        val request = ReceiveRequest(offerUrl, current.receiveNavigationResetKey)
+        if (!_state.compareAndSet(current, current.copy(operation = WalletOperationState.Receiving))) return
+
+        receiveJob = scope.launch(dispatcher) {
+            try {
                 receiveCredential(ready, request, txCode)
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -223,6 +259,23 @@ class WalletDemoController(
                     )
                 }
             }
+        }
+    }
+
+    fun declineOffer() {
+        _state.update {
+            it.copy(
+                offerPreview = null,
+                requestDrafts = it.requestDrafts.copy(
+                    txCode = "",
+                    transactionCodeRequired = false,
+                ),
+                operation = WalletOperationState.Succeeded(
+                    message = WalletDisplayText.CredentialOfferDeclined,
+                    tab = WalletDemoTab.Receive,
+                ),
+                receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
+            )
         }
     }
 
@@ -257,6 +310,7 @@ class WalletDemoController(
                         ),
                         tab = WalletDemoTab.Receive,
                     ),
+                    offerPreview = null,
                     lastReceivedCredentialIds = emptyList(),
                     receiveCompleted = false,
                 )
@@ -267,6 +321,7 @@ class WalletDemoController(
         updateIfCurrent(request) {
             it.copy(
                 session = ready.copy(credentials = credentials),
+                offerPreview = null,
                 operation = WalletOperationState.Succeeded(
                     message = WalletDisplayText.receivedCredentials(displayableReceivedCredentialIds.size),
                     tab = WalletDemoTab.Receive,
@@ -498,9 +553,22 @@ class WalletDemoController(
             return
         }
 
-        configuredPin = pin
-        _state.update { it.copy(auth = WalletAuthState.Unlocked) }
-        bootstrapIfNeeded()
+        _state.update { it.copy(isAuthenticating = true) }
+        scope.launch(dispatcher) {
+            runCatching { pinStore.setPin(pin) }
+                .onSuccess {
+                    _state.update {
+                        it.copy(
+                            auth = WalletAuthState.Unlocked,
+                            isAuthenticating = false,
+                        )
+                    }
+                    bootstrapIfNeeded()
+                }
+                .onFailure {
+                    setSetupPinError("PIN could not be saved")
+                }
+        }
     }
 
     private fun submitLoginPin(auth: WalletAuthState.Login) {
@@ -510,13 +578,26 @@ class WalletDemoController(
             return
         }
 
-        if (configuredPin != pin) {
-            setLoginPinError(WalletDisplayText.WrongPin)
-            return
+        _state.update { it.copy(isAuthenticating = true) }
+        scope.launch(dispatcher) {
+            runCatching { pinStore.verifyPin(pin) }
+                .onSuccess { matches ->
+                    if (!matches) {
+                        setLoginPinError(WalletDisplayText.WrongPin)
+                        return@onSuccess
+                    }
+                    _state.update {
+                        it.copy(
+                            auth = WalletAuthState.Unlocked,
+                            isAuthenticating = false,
+                        )
+                    }
+                    bootstrapIfNeeded()
+                }
+                .onFailure {
+                    setLoginPinError("PIN could not be verified")
+                }
         }
-
-        _state.update { it.copy(auth = WalletAuthState.Unlocked) }
-        bootstrapIfNeeded()
     }
 
     private fun bootstrapIfNeeded() {
@@ -562,14 +643,20 @@ class WalletDemoController(
     private fun setSetupPinError(message: String) {
         _state.update { state ->
             val auth = state.auth as? WalletAuthState.Setup ?: return@update state
-            state.copy(auth = auth.copy(error = message))
+            state.copy(
+                auth = auth.copy(error = message),
+                isAuthenticating = false,
+            )
         }
     }
 
     private fun setLoginPinError(message: String) {
         _state.update { state ->
             val auth = state.auth as? WalletAuthState.Login ?: return@update state
-            state.copy(auth = auth.copy(error = message))
+            state.copy(
+                auth = auth.copy(error = message),
+                isAuthenticating = false,
+            )
         }
     }
 
@@ -583,6 +670,13 @@ class WalletDemoController(
             )
         }
     }
+
+    private fun readInitialAuthState(): WalletAuthState =
+        runCatching {
+            if (pinStore.hasPin()) WalletAuthState.Login() else WalletAuthState.Setup()
+        }.getOrElse {
+            WalletAuthState.StorageUnavailable()
+        }
 
     private companion object {
         val pinPattern = Regex("\\d{4,8}")

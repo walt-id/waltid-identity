@@ -10,9 +10,13 @@ import id.walt.did.dids.DidService
 import id.walt.wallet2.auth.configureWallet2Auth
 import id.walt.wallet2.auth.registerWallet2AuthRoutes
 import id.walt.wallet2.config.UrlHopliteDecoder
+import id.walt.wallet2.persistence.ExposedCredentialStore
+import id.walt.wallet2.persistence.ExposedDidStore
+import id.walt.wallet2.persistence.ExposedKeyStore
 import id.walt.wallet2.persistence.ExposedWalletStore
 import id.walt.wallet2.persistence.Wallet2PersistenceConfig
 import id.walt.wallet2.persistence.initWallet2Database
+import id.walt.wallet2.server.StoreFactory
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.callid.*
@@ -39,21 +43,33 @@ suspend fun main(args: Array<String>) {
                     val config = ConfigManager.getConfig<Wallet2PersistenceConfig>()
                     val db = initWallet2Database(config)
                     OSSWallet2Service.walletStore = ExposedWalletStore(db)
+                    // Wire Exposed-backed store factories so all auto-created and named stores
+                    // are backed by the same database. The resolver's computeIfAbsent cache
+                    // ensures that store IDs from previous runs are resolved on first access.
+                    OSSWallet2Service.keyStoreFactory = { id -> ExposedKeyStore(id, db) }
+                    OSSWallet2Service.credentialStoreFactory = { id -> ExposedCredentialStore(id, db) }
+                    OSSWallet2Service.didStoreFactory = { id -> ExposedDidStore(id, db) }
                 }
             },
-            run = WebService(Application::wallet2Module).run()
+            run = WebService {
+                val authConfig = if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)) {
+                    configureWallet2Auth()
+                } else null
+                wallet2Module(withPlugins = true, authConfig = authConfig)
+            }.run()
         )
     ).main(args)
 }
 
-fun Application.wallet2Module(withPlugins: Boolean = true) {
+/**
+ * Ktor Application module. [authConfig] is pre-resolved by the caller (Main or test)
+ * so this function can remain non-suspend and compatible with [E2ETest.testBlock].
+ */
+fun Application.wallet2Module(withPlugins: Boolean = true, authConfig: OSSWallet2AuthConfig? = null) {
     if (withPlugins) {
         configurePlugins()
     }
-    if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)) {
-        configureWallet2Auth()
-    }
-    wallet2Api()
+    wallet2Api(authConfig)
 }
 
 fun Application.configurePlugins() {
@@ -86,10 +102,14 @@ fun Application.configureMonitoring() {
     }
 }
 
-fun Application.wallet2Api() {
+fun Application.wallet2Api(authConfig: OSSWallet2AuthConfig? = null) {
     routing {
         if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)) {
-            registerWallet2AuthRoutes()
+            requireNotNull(authConfig) { "No auth config is provided for auth feature!" }
+            registerWallet2AuthRoutes(
+                tokenExpiry = authConfig.tokenExpiry,
+                walletResolver = OSSWallet2Service.resolver,
+            )
         }
         OSSWallet2Service.run { registerRoutes() }
     }
