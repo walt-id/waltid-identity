@@ -1,7 +1,11 @@
 package id.walt.walletdemo.compose.logic
 
 val VerifierDetails.displayName: String
-    get() = humanReadableVerifierName(name = name, clientId = clientId, responseUri = responseUri)
+    get() = humanReadableVerifierName(
+        name = metadata?.display?.name,
+        clientId = clientId,
+        responseUri = responseUri,
+    )
 
 fun humanReadableVerifierName(name: String?, clientId: String?, responseUri: String? = null): String {
     name?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }

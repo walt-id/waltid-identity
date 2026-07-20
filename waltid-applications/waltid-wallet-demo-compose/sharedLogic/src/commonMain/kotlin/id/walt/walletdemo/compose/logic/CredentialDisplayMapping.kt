@@ -5,11 +5,12 @@ fun CredentialSummary.toCredentialDetails(): CredentialDetails =
 
 fun WalletDemoPresentationPreview.toVerifierDetails(): VerifierDetails =
     VerifierDetails(
-        name = verifierName,
+        metadata = verifierMetadata,
         clientId = clientId,
         responseUri = responseUri,
         state = state,
         nonce = nonce,
+        responseEncryption = responseEncryption,
         transactionData = transactionData,
     )
 

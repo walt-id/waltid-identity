@@ -12,25 +12,38 @@ data class WalletDemoPresentationError(
 )
 
 data class WalletDemoPresentationPreview(
-    val verifierName: String?,
+    val verifierMetadata: WalletDemoVerifierMetadata?,
     val clientId: String?,
     val responseUri: String? = null,
     val state: String? = null,
     val nonce: String? = null,
+    val responseEncryption: WalletDemoResponseEncryption = WalletDemoResponseEncryption.NotRequired,
     val transactionData: List<ClaimGroup> = emptyList(),
     val credentialOptions: List<WalletDemoPresentationCredentialOption>,
     val credentialRequirements: List<WalletDemoPresentationCredentialRequirement> = emptyList(),
 )
 
 data class VerifierDetails(
-    val name: String?,
+    val metadata: WalletDemoVerifierMetadata?,
     val clientId: String?,
     val responseUri: String? = null,
     val state: String? = null,
     val nonce: String? = null,
+    val responseEncryption: WalletDemoResponseEncryption,
     val transactionData: List<ClaimGroup> = emptyList(),
     val trustStatus: String = CredentialDisplayText.Unknown,
 )
+
+sealed interface WalletDemoResponseEncryption {
+    data object NotRequired : WalletDemoResponseEncryption
+
+    data class Required(
+        val keyManagementAlgorithm: String,
+        val contentEncryptionAlgorithm: String,
+        val verifierKeyId: String?,
+        val verifierKeyThumbprint: String,
+    ) : WalletDemoResponseEncryption
+}
 
 data class WalletDemoPresentationCredentialRequirement(
     val options: List<List<String>>,

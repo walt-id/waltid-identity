@@ -15,9 +15,29 @@ private class MockDemoWallet : DemoWallet {
 
     override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview =
         WalletDemoOfferPreview(
-            transactionCodeRequired = false,
-            credentialIssuer = "walt.id demo issuer",
-            offeredCredentials = listOf("MockCredential"),
+            issuer = WalletDemoIssuerMetadata(
+                credentialIssuer = "https://issuer.example",
+                display = WalletDemoMetadataDisplay(
+                    name = "walt.id demo issuer",
+                    logoUri = null,
+                    logoAltText = null,
+                ),
+            ),
+            offeredCredentials = listOf(
+                WalletDemoOfferedCredentialMetadata(
+                    configurationId = "MockCredential",
+                    format = "jwt_vc_json",
+                    vct = null,
+                    doctype = null,
+                    display = WalletDemoMetadataDisplay(
+                        name = "Mock credential",
+                        logoUri = null,
+                        logoAltText = null,
+                    ),
+                    claims = emptyList(),
+                )
+            ),
+            transactionCode = null,
         )
 
     override suspend fun receive(offerUrl: String, txCode: String?): List<String> {
@@ -41,7 +61,16 @@ private class MockDemoWallet : DemoWallet {
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult =
         WalletDemoPresentationPreviewResult.Ready(
             WalletDemoPresentationPreview(
-                verifierName = "Mock verifier",
+                verifierMetadata = WalletDemoVerifierMetadata(
+                    display = WalletDemoMetadataDisplay(
+                        name = "Mock verifier",
+                        logoUri = null,
+                        logoAltText = null,
+                    ),
+                    clientUri = null,
+                    policyUri = null,
+                    termsOfServiceUri = null,
+                ),
                 clientId = "mock-verifier",
                 credentialOptions = emptyList(),
             )

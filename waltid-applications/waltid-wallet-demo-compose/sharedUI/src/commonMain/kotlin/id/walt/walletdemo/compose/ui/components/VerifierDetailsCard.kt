@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.VerifierDetails
+import id.walt.walletdemo.compose.logic.WalletDemoResponseEncryption
 import id.walt.walletdemo.compose.logic.displayName
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
@@ -30,12 +31,19 @@ internal fun VerifierDetailsCard(verifier: VerifierDetails, modifier: Modifier =
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text("Verifier", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Text(
-            verifier.displayName,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
+        MetadataIdentityRow(
+            display = verifier.metadata?.display,
+            fallbackName = verifier.displayName,
+            supportingText = "Verifier-provided identity",
         )
-        DetailLine("Trust", verifier.trustStatus)
+        MetadataDetailLine("Trust", verifier.trustStatus)
+        MetadataDetailLine(
+            "Response encryption",
+            when (verifier.responseEncryption) {
+                WalletDemoResponseEncryption.NotRequired -> "Not encrypted"
+                is WalletDemoResponseEncryption.Required -> "Encrypted"
+            },
+        )
         verifier.transactionData.forEach { group ->
             ClaimGroupSection(group)
         }
@@ -52,25 +60,21 @@ internal fun VerifierDetailsCard(verifier: VerifierDetails, modifier: Modifier =
                 modifier = Modifier.testTag(WalletUiTestTags.VerifierTechnicalDetails),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                DetailLine("Client ID", verifier.clientId)
-                DetailLine("Response URI", verifier.responseUri)
-                DetailLine("State", verifier.state)
-                DetailLine("Nonce", verifier.nonce)
+                MetadataDetailLine("Client ID", verifier.clientId)
+                MetadataDetailLine("Response URI", verifier.responseUri)
+                MetadataDetailLine("Client URI", verifier.metadata?.clientUri)
+                MetadataDetailLine("Privacy policy", verifier.metadata?.policyUri)
+                MetadataDetailLine("Terms of service", verifier.metadata?.termsOfServiceUri)
+                MetadataDetailLine("State", verifier.state)
+                MetadataDetailLine("Nonce", verifier.nonce)
+                val encryption = verifier.responseEncryption
+                if (encryption is WalletDemoResponseEncryption.Required) {
+                    MetadataDetailLine("JWE algorithm", encryption.keyManagementAlgorithm)
+                    MetadataDetailLine("Content encryption", encryption.contentEncryptionAlgorithm)
+                    MetadataDetailLine("Verifier key ID", encryption.verifierKeyId)
+                    MetadataDetailLine("Verifier key thumbprint", encryption.verifierKeyThumbprint)
+                }
             }
         }
-    }
-}
-
-@Composable
-private fun DetailLine(label: String, value: String?) {
-    if (value.isNullOrBlank()) return
-
-    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(value, style = MaterialTheme.typography.bodySmall)
     }
 }
