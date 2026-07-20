@@ -17,6 +17,7 @@ public data class MobileWalletPresentationPreview(
 public sealed interface MobileWalletPresentationPreviewResult {
     /** The request is valid and can be reviewed, submitted, or declined. */
     public data class Ready(
+        /** Presentation request metadata and matching wallet credentials available for review. */
         public val preview: MobileWalletPresentationPreview,
     ) : MobileWalletPresentationPreviewResult
 
@@ -24,6 +25,7 @@ public sealed interface MobileWalletPresentationPreviewResult {
     public data class Invalid(
         /** Validated response destination and request context to show before returning the error. */
         public val request: MobileWalletPresentationRequestInfo,
+        /** Standard OpenID4VP error detected by the wallet. */
         public val errorCode: MobileWalletPresentationErrorCode,
         /** Local diagnostic intended for wallet UI; it is not sent to the verifier automatically. */
         public val message: String,
