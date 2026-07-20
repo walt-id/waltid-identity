@@ -197,47 +197,17 @@ class MobileWalletTest {
     }
 
     @Test
-    fun walletSessionEventsMapToMobileWalletEventsInCommonCode() {
-        val progress = WalletSessionEvent.issuance_offer_resolved.toMobileWalletEvent()
-        val prepared = WalletSessionEvent.presentation_response_prepared.toMobileWalletEvent()
-        val completed = WalletSessionEvent.presentation_completed.toMobileWalletEvent()
-        val failed = WalletSessionEvent.issuance_failed.toMobileWalletEvent()
-
-        assertEquals(MobileWalletEventPhase.issuance, progress.phase)
-        assertEquals(MobileWalletEventStatus.progress, progress.status)
-        assertEquals("issuance_offer_resolved", progress.name)
-
-        assertEquals(MobileWalletEventPhase.presentation, prepared.phase)
-        assertEquals(MobileWalletEventStatus.progress, prepared.status)
-        assertEquals("presentation_response_prepared", prepared.name)
-
-        assertEquals(MobileWalletEventPhase.presentation, completed.phase)
-        assertEquals(MobileWalletEventStatus.completed, completed.status)
-        assertEquals("presentation_completed", completed.name)
-
-        assertEquals(MobileWalletEventPhase.issuance, failed.phase)
-        assertEquals(MobileWalletEventStatus.failed, failed.status)
-        assertEquals("issuance_failed", failed.name)
-    }
-
-    @Test
-    fun mobileWalletEventsDerivePhaseAndStatusFromTheirName() {
-        val completed = MobileWalletEvent("issuance_completed")
-        val failed = MobileWalletEvent("presentation_failed")
-        val progress = MobileWalletEvent("presentation_request_resolved")
-
-        assertEquals(MobileWalletEventPhase.issuance, completed.phase)
-        assertEquals(MobileWalletEventStatus.completed, completed.status)
-        assertEquals(MobileWalletEventPhase.presentation, failed.phase)
-        assertEquals(MobileWalletEventStatus.failed, failed.status)
-        assertEquals(MobileWalletEventStatus.progress, progress.status)
-    }
-
-    @Test
-    fun mobileWalletEventsRejectNamesWithoutAKnownPhase() {
-        assertFailsWith<IllegalArgumentException> {
-            MobileWalletEvent("wallet_completed")
+    fun walletSessionEventsMapExhaustivelyToMobileWalletEvents() {
+        assertEquals(WalletSessionEvent.entries.size, MobileWalletEvent.entries.size)
+        WalletSessionEvent.entries.forEach { event ->
+            assertEquals(event.name, event.toMobileWalletEvent().name)
         }
+
+        assertEquals(MobileWalletEventPhase.issuance, MobileWalletEvent.issuance_offer_resolved.phase)
+        assertEquals(MobileWalletEventStatus.progress, MobileWalletEvent.issuance_offer_resolved.status)
+        assertEquals(MobileWalletEventPhase.presentation, MobileWalletEvent.presentation_completed.phase)
+        assertEquals(MobileWalletEventStatus.completed, MobileWalletEvent.presentation_completed.status)
+        assertEquals(MobileWalletEventStatus.failed, MobileWalletEvent.issuance_failed.status)
     }
 
     @Test
@@ -247,6 +217,40 @@ class MobileWalletTest {
         }
         assertFailsWith<IllegalArgumentException> {
             MobileWalletPresentationCredentialRequirement(listOf(emptyList()))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationCredentialRequirement(listOf(listOf("invalid query")))
+        }
+    }
+
+    @Test
+    fun presentationOutputModelsRejectInvalidCredentialQueryIds() {
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationCredentialOption(
+                queryId = "invalid query",
+                credentialId = "credential-1",
+                format = "vc+sd-jwt",
+                issuer = null,
+                subject = null,
+                label = null,
+                credentialDataJson = "{}",
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            presentationTransactionData(credentialQueryIds = emptyList())
+        }
+        assertFailsWith<IllegalArgumentException> {
+            presentationTransactionData(credentialQueryIds = listOf("invalid query"))
+        }
+    }
+
+    @Test
+    fun presentationRequestInfoRequiresClientIdAndNonce() {
+        assertFailsWith<IllegalArgumentException> {
+            presentationRequestInfo(clientId = " ")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            presentationRequestInfo(nonce = " ")
         }
     }
 
@@ -442,7 +446,7 @@ class MobileWalletTest {
         runCurrent()
 
         repeat(100) { index ->
-            val emitted = stream.tryEmit(progressEvent("issuance_progress_$index"))
+            val emitted = stream.tryEmit(MobileWalletEvent.issuance_offer_resolved)
 
             assertTrue(emitted, "Progress event $index should not suspend or fail when the buffer is full")
         }
@@ -450,7 +454,38 @@ class MobileWalletTest {
         collector.cancel()
     }
 
-    private fun progressEvent(name: String) = MobileWalletEvent(name)
+    private fun presentationRequestInfo(
+        clientId: String = "https://verifier.example",
+        nonce: String = "nonce-1",
+    ) = MobileWalletPresentationRequestInfo(
+        clientId = clientId,
+        verifierMetadata = MobileWalletVerifierMetadata(
+            display = MobileWalletMetadataDisplay(
+                name = "Example Verifier",
+                locale = "en",
+                logoUri = null,
+                logoAltText = null,
+            ),
+            clientUri = null,
+            policyUri = null,
+            termsOfServiceUri = null,
+        ),
+        responseUri = "https://verifier.example/direct-post",
+        state = null,
+        nonce = nonce,
+        responseEncryption = MobileWalletResponseEncryption.NotRequired,
+    )
+
+    private fun presentationTransactionData(
+        credentialQueryIds: List<String>,
+    ) = MobileWalletTransactionDataItem(
+        type = "example",
+        displayName = "Example",
+        credentialQueryIds = credentialQueryIds,
+        supportedFields = emptyList(),
+        rawJson = "{}",
+        detailsJson = "{}",
+    )
 
     private fun presentationDisclosure(
         selectivelyDisclosable: Boolean,

@@ -772,7 +772,7 @@ private extension MobileWalletPresentationPreviewResult {
             return .invalid(
                 PresentationPreviewError(
                     previewHandle: PresentationPreviewHandle(value: result.previewHandle.value),
-                    request: result.request.toSwiftRequestInfo(),
+                    request: result.request.toSwiftRequestContext(),
                     code: result.errorCode.toSwiftErrorCode(),
                     message: result.message
                 )
@@ -792,6 +792,19 @@ private extension MobileWalletPresentationPreview {
                 .map { $0.toSwiftCredentialOption() },
             credentialRequirements: swiftArray(credentialRequirements, of: MobileWalletPresentationCredentialRequirement.self)
                 .map { $0.toSwiftCredentialRequirement() }
+        )
+    }
+}
+
+private extension MobileWalletPresentationRequestContext {
+    func toSwiftRequestContext() -> PresentationRequestContext {
+        PresentationRequestContext(
+            clientID: clientId,
+            verifierMetadata: verifierMetadata?.toSwiftVerifierMetadata(),
+            responseURI: responseUri.flatMap(URL.init(string:)),
+            state: state,
+            nonce: nonce,
+            responseEncryption: responseEncryption.toSwiftResponseEncryption()
         )
     }
 }
@@ -1028,7 +1041,24 @@ private func swiftArray<T>(_ value: Any, of type: T.Type) -> [T] {
 
 private extension MobileWalletEvent {
     func toSwiftEvent() -> WalletEvent {
-        WalletEvent(name: name)
+        switch self {
+        case .issuanceOfferResolved: return .issuanceOfferResolved
+        case .issuanceAttestationObtained: return .issuanceAttestationObtained
+        case .issuanceTokenObtained: return .issuanceTokenObtained
+        case .issuanceProofSigned: return .issuanceProofSigned
+        case .issuanceCredentialReceived: return .issuanceCredentialReceived
+        case .issuanceDeferred: return .issuanceDeferred
+        case .issuanceCredentialStored: return .issuanceCredentialStored
+        case .issuanceCompleted: return .issuanceCompleted
+        case .issuanceFailed: return .issuanceFailed
+        case .presentationRequestParsed: return .presentationRequestParsed
+        case .presentationCredentialsSelected: return .presentationCredentialsSelected
+        case .presentationSigned: return .presentationSigned
+        case .presentationResponsePrepared: return .presentationResponsePrepared
+        case .presentationSubmitted: return .presentationSubmitted
+        case .presentationCompleted: return .presentationCompleted
+        case .presentationFailed: return .presentationFailed
+        }
     }
 }
 

@@ -342,8 +342,9 @@ private actor TransactionCodeWalletClient: WalletClient {
             PresentationPreview(
                 previewHandle: PresentationPreviewHandle(value: "transaction-code-presentation-preview"),
                 request: PresentationRequestInfo(
-                    clientID: nil,
-                    responseEncryption: .notRequired
+                    clientID: "https://verifier.example",
+                    nonce: "nonce-1",
+                    responseEncryption: .notRequired,
                 ),
                 credentialOptions: [
                     PresentationCredentialOption(

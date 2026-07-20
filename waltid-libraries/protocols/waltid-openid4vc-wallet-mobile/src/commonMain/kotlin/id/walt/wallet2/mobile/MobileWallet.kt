@@ -502,7 +502,7 @@ public class MobileWallet internal constructor(
             is PreviewPresentationResult.Invalid ->
                 MobileWalletPresentationPreviewResult.Invalid(
                     previewHandle = MobileWalletPresentationPreviewHandle(result.handle.value),
-                    request = result.authorizationRequest.toMobileRequestInfo(preferredLocales),
+                    request = result.authorizationRequest.toMobileRequestContext(preferredLocales),
                     errorCode = result.error.code.toMobileErrorCode(),
                     message = result.error.message,
                 )
@@ -716,15 +716,31 @@ private fun AuthorizationRequest.toMobileRequestInfo(
     transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
 ): MobileWalletPresentationRequestInfo {
     return MobileWalletPresentationRequestInfo(
+        clientId = requireNotNull(clientId) {
+            "A validated presentation request must contain client_id."
+        },
+        verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
+        responseUri = responseUri,
+        state = state,
+        nonce = requireNotNull(nonce) {
+            "A validated presentation request must contain nonce."
+        },
+        responseEncryption = responseEncryption.toMobileResponseEncryption(),
+        transactionData = transactionData,
+    )
+}
+
+private fun AuthorizationRequest.toMobileRequestContext(
+    preferredLocales: List<String>,
+): MobileWalletPresentationRequestContext =
+    MobileWalletPresentationRequestContext(
         clientId = clientId,
         verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
         responseUri = responseUri,
         state = state,
         nonce = nonce,
-        responseEncryption = responseEncryption.toMobileResponseEncryption(),
-        transactionData = transactionData,
+        responseEncryption = null.toMobileResponseEncryption(),
     )
-}
 
 private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {
     WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED -> MobileWalletPresentationErrorCode.accessDenied
