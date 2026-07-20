@@ -7,3 +7,13 @@ import kotlinx.serialization.json.JsonObject
 fun interface CredentialProofKeyAcceptance {
     suspend fun accept(session: IssuanceSession, proofPublicKeyJwk: JsonObject): Boolean
 }
+
+/** Commits proof-key side effects only after credential construction succeeds. */
+fun interface CredentialProofKeyCommitment {
+    suspend fun commit(session: IssuanceSession, proofPublicKeyJwk: JsonObject): Boolean
+}
+
+class CredentialProofKeyAcceptanceException(
+    message: String,
+    val retryable: Boolean,
+) : IllegalArgumentException(message)
