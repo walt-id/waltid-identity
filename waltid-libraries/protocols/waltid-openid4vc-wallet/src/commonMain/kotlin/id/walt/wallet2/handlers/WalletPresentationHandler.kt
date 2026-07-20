@@ -5,6 +5,7 @@ package id.walt.wallet2.handlers
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.dcql.DcqlDisclosure
+import id.walt.dcql.DcqlMatchException
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.ClaimsQuery
@@ -512,7 +513,10 @@ object WalletPresentationHandler {
         val rawCredentials = request.credentials.mapIndexed { idx, stored ->
             stored.credential.toRawDcqlCredential(idx.toString())
         }
-        val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrThrow()
+        val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrElse { error ->
+            if (error is DcqlMatchException) return MatchCredentialsResult(emptyList(), 0, emptyMap())
+            throw error
+        }
         return buildMatchResult(matched, idByIndex)
     }
 
@@ -604,7 +608,10 @@ object WalletPresentationHandler {
             idx++
         }
         if (rawCredentials.isEmpty()) return MatchCredentialsResult(emptyList(), 0, emptyMap())
-        val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrThrow()
+        val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrElse { error ->
+            if (error is DcqlMatchException) return MatchCredentialsResult(emptyList(), 0, emptyMap())
+            throw error
+        }
         return buildMatchResult(matched, idByIndex)
     }
 
