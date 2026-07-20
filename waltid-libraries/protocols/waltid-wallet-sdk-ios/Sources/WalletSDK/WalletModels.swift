@@ -20,6 +20,9 @@ public struct WalletConfiguration: Sendable {
     /// Ordered BCP 47 locale preferences used to select protocol display metadata.
     public var preferredLocales: [String]
 
+    /// Test/dev-only opt-in for local issuer nonce endpoints that cannot use HTTPS.
+    public var allowInsecureHttpForTests: Bool
+
     /// Creates wallet configuration.
     ///
     /// - Parameters:
@@ -34,13 +37,16 @@ public struct WalletConfiguration: Sendable {
     ///     wallet accepts before previewing or submitting a presentation.
     ///   - preferredLocales: Ordered BCP 47 locale preferences used for issuer,
     ///     credential, and verifier display metadata.
+    ///   - allowInsecureHttpForTests: Test/dev-only opt-in for local issuer
+    ///     nonce endpoints that cannot use HTTPS. Defaults to `false`.
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
         attestation: WalletAttestationConfiguration? = nil,
         persistence: WalletPersistence = WalletPersistence(),
         transactionDataProfiles: [WalletTransactionDataProfile] = [],
-        preferredLocales: [String] = Locale.preferredLanguages
+        preferredLocales: [String] = Locale.preferredLanguages,
+        allowInsecureHttpForTests: Bool = false
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
@@ -48,6 +54,7 @@ public struct WalletConfiguration: Sendable {
         self.persistence = persistence
         self.transactionDataProfiles = transactionDataProfiles
         self.preferredLocales = preferredLocales
+        self.allowInsecureHttpForTests = allowInsecureHttpForTests
     }
 }
 
