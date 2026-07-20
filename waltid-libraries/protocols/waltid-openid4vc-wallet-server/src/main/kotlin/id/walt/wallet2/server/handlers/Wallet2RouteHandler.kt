@@ -585,6 +585,17 @@ object Wallet2RouteHandler {
                         )
                     }
 
+                    post("/request-nonce", {
+                        summary = "Isolated: obtain a fresh credential proof nonce"
+                        request { pathParameter<String>("walletId"); body<RequestNonceRequest>() }
+                        response { HttpStatusCode.OK to { body<RequestNonceResult>() } }
+                    }) {
+                        val req = call.receive<RequestNonceRequest>()
+                        call.respond(
+                            WalletIssuanceHandler.requestNonce(request = req)
+                        )
+                    }
+
                     post("/sign-proof", {
                         summary = "Isolated: sign a proof-of-possession JWT"
                         request { pathParameter<String>("walletId"); body<SignProofRequest>() }

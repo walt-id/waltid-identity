@@ -126,16 +126,22 @@ if (preAuthGrant != null) {
         txCode = null // or user-provided PIN
     )
 
-    // 7. Generate proof of possession
+    // 7. Obtain a fresh proof nonce from the issuer-advertised Nonce Endpoint
+    val nonceEndpoint = requireNotNull(issuerMetadata.nonceEndpoint) {
+        "A nonce_endpoint is required when the credential configuration requires proof"
+    }
+    val nonce = NonceRequestBuilder(httpClient).requestNonce(nonceEndpoint)
+
+    // 8. Generate proof of possession
     val key = KeyManager.loadKey("my-key-id")
     val proofBuilder = JwtProofBuilder()
     val proof = proofBuilder.buildProof(
         key = key,
         audience = offer.credentialIssuer,
-        nonce = tokenResponse.c_nonce!!
+        nonce = nonce.cNonce
     )
 
-    // 8. Request credential (Implementation coming soon)
+    // 9. Request credential (Implementation coming soon)
     // ...
 }
 ```
@@ -145,6 +151,7 @@ if (preAuthGrant != null) {
 - `oauth/` - OAuth 2.0 client components (PKCE, State management)
 - `offer/` - Credential offer parsing and resolution
 - `metadata/` - Issuer and authorization server metadata discovery
+- `nonce/` - OpenID4VCI 1.0 Nonce Endpoint requests
 - `authorization/` - Authorization request building and response parsing
 - `token/` - Token exchange logic for both grant types
 - `proof/` - Proof of possession building (JWT-based)
