@@ -101,11 +101,13 @@ public sealed interface MobileWalletPresentationResult {
     public sealed interface Prepared : MobileWalletPresentationResult {
         /** The host app must open [url] to deliver the protocol response. */
         public data class OpenUrl(
+            /** URL the host app must open to deliver the protocol response. */
             public val url: String,
         ) : Prepared
 
         /** The host app must render [html] so its self-submitting form can deliver the protocol response. */
         public data class SubmitForm(
+            /** HTML document the host app must render to deliver the protocol response. */
             public val html: String,
         ) : Prepared
     }
