@@ -27,6 +27,7 @@ import kotlin.test.assertIs
 @OptIn(ExperimentalSerializationApi::class)
 class PresentationRequestValidatorTest {
     private val p256Capabilities = WalletPresentationFormatRegistry.capabilitiesFromKeyTypes(setOf(KeyType.secp256r1))
+    private val ed25519Capabilities = WalletPresentationFormatRegistry.capabilitiesFromKeyTypes(setOf(KeyType.Ed25519))
 
     @Test
     fun validRequestReturnsDecodedTransactionData() {
@@ -97,6 +98,31 @@ class PresentationRequestValidatorTest {
             WalletPresentFunctionality2.OID4VPErrorCode.VP_FORMATS_NOT_SUPPORTED,
             assertIs<PresentationRequestValidationResult.Invalid>(result).error.code,
         )
+    }
+
+    @Test
+    fun mdocEdDsaHolderAlgorithmIsAcceptedWhenAdvertisedByVerifier() {
+        val request = request(
+            dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery(CredentialFormat.MSO_MDOC))),
+            clientMetadata = ClientMetadata(
+                vpFormatsSupported = mapOf(
+                    "mso_mdoc" to buildJsonObject {
+                        put("deviceauth_alg_values", JsonArray(listOf(JsonPrimitive(-8))))
+                    },
+                ),
+            ),
+        )
+
+        val result = PresentationRequestValidator.validate(
+            resolvedRequest = ResolvedAuthorizationRequest.WithRequestObject(
+                authorizationRequest = request,
+                requestObject = "authenticated.request.object",
+            ),
+            transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+            formatCapabilities = ed25519Capabilities,
+        )
+
+        assertIs<PresentationRequestValidationResult.Valid>(result)
     }
 
     @Test
