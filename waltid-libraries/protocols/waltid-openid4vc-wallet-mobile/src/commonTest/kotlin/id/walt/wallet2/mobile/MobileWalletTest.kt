@@ -219,15 +219,15 @@ class MobileWalletTest {
             MobileWalletPresentationCredentialRequirement(listOf(emptyList()))
         }
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletPresentationCredentialRequirement(listOf(listOf("invalid query")))
+            MobileWalletPresentationCredentialRequirement(listOf(listOf(" ")))
         }
     }
 
     @Test
-    fun presentationOutputModelsRejectInvalidCredentialQueryIds() {
+    fun presentationOutputModelsRejectMissingCredentialQueryIds() {
         assertFailsWith<IllegalArgumentException> {
             MobileWalletPresentationCredentialOption(
-                queryId = "invalid query",
+                queryId = " ",
                 credentialId = "credential-1",
                 format = "vc+sd-jwt",
                 issuer = null,
@@ -240,7 +240,7 @@ class MobileWalletTest {
             presentationTransactionData(credentialQueryIds = emptyList())
         }
         assertFailsWith<IllegalArgumentException> {
-            presentationTransactionData(credentialQueryIds = listOf("invalid query"))
+            presentationTransactionData(credentialQueryIds = listOf(" "))
         }
     }
 

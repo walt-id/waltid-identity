@@ -83,8 +83,8 @@ public data class MobileWalletPresentationCredentialRequirement(
         require(options.all { it.isNotEmpty() }) {
             "Each presentation credential requirement option must contain at least one query ID."
         }
-        require(options.flatten().all(::isValidDcqlIdentifier)) {
-            "Presentation credential requirement query IDs may contain only letters, digits, underscores, and hyphens."
+        require(options.flatten().all(String::isNotBlank)) {
+            "Presentation credential requirement query IDs must not be blank."
         }
     }
 }
@@ -140,8 +140,8 @@ public data class MobileWalletPresentationCredentialOption(
     val disclosures: List<MobileWalletPresentationDisclosure> = emptyList(),
 ) {
     init {
-        require(isValidDcqlIdentifier(queryId)) {
-            "A presentation credential option query ID may contain only letters, digits, underscores, and hyphens."
+        require(queryId.isNotBlank()) {
+            "A presentation credential option query ID must not be blank."
         }
     }
 }
@@ -223,16 +223,11 @@ public data class MobileWalletTransactionDataItem(
         require(credentialQueryIds.isNotEmpty()) {
             "Transaction data must reference at least one credential query ID."
         }
-        require(credentialQueryIds.all(::isValidDcqlIdentifier)) {
-            "Transaction data credential query IDs may contain only letters, digits, underscores, and hyphens."
+        require(credentialQueryIds.all(String::isNotBlank)) {
+            "Transaction data credential query IDs must not be blank."
         }
     }
 }
-
-private val dcqlIdentifierPattern = Regex("[A-Za-z0-9_-]+")
-
-private fun isValidDcqlIdentifier(value: String): Boolean = dcqlIdentifierPattern.matches(value)
-
 /**
  * OAuth 2.0 and OpenID4VP 1.0 authorization error codes supported by the wallet.
  *
