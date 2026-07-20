@@ -112,6 +112,10 @@ object VerificationSessionCreator {
         val isDcApiHaip = isDcApi && (setup is DcApiAnnexDFlowSetup && setup.haip)
         val origins =
             if (setup is DcApiAnnexDFlowSetup) setup.expectedOrigins else if (setup is DcApiAnnexCFlowSetup) listOf(setup.origin) else null
+        val crossDeviceResponseUri = if (isCrossDevice) "$urlPrefix/$sessionId/response" else null
+        val authenticatedClientId = clientId ?: crossDeviceResponseUri
+            ?.takeIf { !isSignedRequest }
+            ?.let { "redirect_uri:$it" }
 
         var ephemeralKey: JWKKey? = null
 
@@ -210,7 +214,7 @@ object VerificationSessionCreator {
             // request_uri_method=post so wallets can send wallet_nonce to prevent replay.
             requestUriMethod = if (isSignedRequest) RequestUriHttpMethod.POST else null,
 
-            clientId = clientId,
+            clientId = authenticatedClientId,
 
             nonce = null, // not required in the initial request yet
             responseType = null
@@ -233,7 +237,7 @@ object VerificationSessionCreator {
             .mapNotNull { credentialId -> credentialQueriesById?.get(credentialId)?.format }
             .toSet()
 
-        val effectiveClientId = if ((isDcApi && !isSignedRequest) || isAnnexC) null else clientId
+        val effectiveClientId = if ((isDcApi && !isSignedRequest) || isAnnexC) null else authenticatedClientId
 
         val authorizationRequest = AuthorizationRequest(
             responseType = if (!isAnnexC) OpenID4VPResponseType.VP_TOKEN else null,
@@ -246,7 +250,7 @@ object VerificationSessionCreator {
             // TODO: url building (handle host alias)
             responseUri = when {
                 isDcApi || isAnnexC -> null
-                isCrossDevice -> "$urlPrefix/$sessionId/response" // For Cross-Device flow (direct_post, direct_post.jwt)
+                isCrossDevice -> crossDeviceResponseUri // For Cross-Device flow (direct_post, direct_post.jwt)
                 else -> throw IllegalStateException("No flow is selected")
             },
             scope = null,//OPTIONAL. OAuth 2.0 Scope value. Can be used for pre-defined DCQL queries or OpenID Connect scopes (e.g., "openid").
@@ -317,7 +321,7 @@ object VerificationSessionCreator {
             val headers = hashMapOf<String, JsonElement>(
                 "typ" to JsonPrimitive("oauth-authz-req+jwt"),
                 "iat" to JsonPrimitive(now.epochSeconds),
-                "kid" to JsonPrimitive(getKid(clientId, key))
+                "kid" to JsonPrimitive(getKid(authenticatedClientId, key))
             )
             if (x5c != null) headers["x5c"] = JsonArray(x5c.map { JsonPrimitive(it) })
             if (expiration != null) headers["exp"] = JsonPrimitive(expiration.epochSeconds)

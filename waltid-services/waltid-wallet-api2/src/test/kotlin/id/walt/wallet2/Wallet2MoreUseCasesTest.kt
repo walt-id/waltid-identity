@@ -291,7 +291,7 @@ class Wallet2MoreUseCasesTest {
                 features = listOf(OSSWallet2FeatureCatalog, OSSVerifier2FeatureCatalog),
                 preload = {
                     ConfigManager.preloadConfig("wallet-service", OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$walletPort")))
-                    ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(clientId = "multi-format-verifier", clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Multi-format Test Verifier"), urlPrefix = "http://$host:$walletPort/verification-session", urlHost = "openid4vp://authorize"))
+                    ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(clientId = null, clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Multi-format Test Verifier"), urlPrefix = "http://$host:$walletPort/verification-session", urlHost = "openid4vp://authorize"))
                 },
                 init = { DidService.minimalInit() },
                 module = { multiFormatModule() }
@@ -674,7 +674,7 @@ class Wallet2MoreUseCasesTest {
                 features = listOf(OSSWallet2FeatureCatalog, OSSVerifier2FeatureCatalog),
                 preload = {
                     ConfigManager.preloadConfig("wallet-service", OSSWallet2ServiceConfig(publicBaseUrl = Url(walletBase)))
-                    ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(clientId = "isolated-vp-verifier", clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Isolated VP Verifier"), urlPrefix = "$walletBase/verification-session", urlHost = "openid4vp://authorize"))
+                    ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(clientId = null, clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Isolated VP Verifier"), urlPrefix = "$walletBase/verification-session", urlHost = "openid4vp://authorize"))
                 },
                 init = { DidService.minimalInit() },
                 module = { multiFormatModule() }

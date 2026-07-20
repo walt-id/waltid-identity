@@ -81,6 +81,7 @@ class OpenId4VpPresentationServiceTest {
 
     private val json = Json { encodeDefaults = false }
     private val supportedTransactionDataType = SUPPORTED_TX_DATA_TYPE
+    private val redirectClientMetadata = ClientMetadata(vpFormatsSupported = emptyMap())
 
     private val query = DcqlQuery(
         credentials = listOf(
@@ -115,17 +116,18 @@ class OpenId4VpPresentationServiceTest {
             unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         )
         val request = AuthorizationRequest(
-            clientId = "verifier2",
+            clientId = "redirect_uri:https://verifier.example/response",
             responseMode = OpenID4VPResponseMode.DIRECT_POST,
             responseUri = "https://verifier.example/response",
             nonce = "nonce-123",
             dcqlQuery = query,
+            clientMetadata = redirectClientMetadata,
         ).toHttpUrl().toString()
 
         val resolvedRequest = runBlocking { resolveNormalizedRequestUrl(service, request) }
         val resolvedUrl = Url(resolvedRequest)
 
-        assertEquals("verifier2", resolvedUrl.parameters["client_id"])
+        assertEquals("redirect_uri:https://verifier.example/response", resolvedUrl.parameters["client_id"])
         assertEquals("https://verifier.example/response", resolvedUrl.parameters["response_uri"])
         assertEquals(resolvedUrl.parameters["dcql_query"]?.contains("UniversityDegreeCredential"), true)
     }
@@ -137,12 +139,13 @@ class OpenId4VpPresentationServiceTest {
             unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         )
         val request = AuthorizationRequest(
-            clientId = "verifier2",
+            clientId = "redirect_uri:https://verifier.example/response",
             responseMode = OpenID4VPResponseMode.DIRECT_POST,
             responseUri = "https://verifier.example/response",
             nonce = "12345",
             state = "true",
             dcqlQuery = query,
+            clientMetadata = redirectClientMetadata,
         ).toHttpUrl().toString()
 
         val resolvedRequest = runBlocking { resolveNormalizedRequestUrl(service, request) }
@@ -620,7 +623,7 @@ class OpenId4VpPresentationServiceTest {
             """.trimIndent(),
         )
 
-        val error = assertFailsWith<IllegalArgumentException> {
+        val error = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
             runBlocking {
                 resolveNormalizedRequestUrl(
                     service,
@@ -629,7 +632,11 @@ class OpenId4VpPresentationServiceTest {
             }
         }
 
-        assertEquals(error.message?.contains("Client authentication failed"), true)
+        assertEquals(
+            "Could not verify signed AuthorizationRequest with client id prefix: " +
+                "DoesNotSupportSignature - This client id prefix does not support signatures.",
+            error.message,
+        )
     }
 
     @Test
@@ -834,12 +841,13 @@ class OpenId4VpPresentationServiceTest {
         transactionData: List<String>? = null,
         includeDcqlQuery: Boolean = true,
     ): String = AuthorizationRequest(
-        clientId = "verifier2",
+        clientId = "redirect_uri:https://verifier.example/response",
         responseMode = OpenID4VPResponseMode.DIRECT_POST,
         responseUri = "https://verifier.example/response",
         nonce = "nonce-123",
         dcqlQuery = dcqlQuery.takeIf { includeDcqlQuery },
         transactionData = transactionData,
+        clientMetadata = redirectClientMetadata,
     ).toHttpUrl().toString()
 
     private fun transactionDataItem(

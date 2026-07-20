@@ -463,7 +463,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
                     ConfigManager.preloadConfig(
                         "verifier-service",
                         OSSVerifier2ServiceConfig(
-                            clientId = "test-verifier-$tag",
+                            clientId = null,
                             clientMetadata = ClientMetadata(clientName = "Test Verifier"),
                             urlPrefix = "$walletBase/verification-session",
                             urlHost = "openid4vp://authorize"

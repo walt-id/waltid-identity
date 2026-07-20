@@ -222,7 +222,7 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
             preload = {
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(
-                        clientId = "verifier2",
+                        clientId = null,
                         clientMetadata = ClientMetadata(
                             clientName = "Verifier2",
                             logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
