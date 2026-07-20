@@ -19,6 +19,7 @@ import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorit
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.SigningAlgId
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
+import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.sdjwt.metadata.issuer.JWTVCIssuerMetadata
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import io.ktor.client.HttpClient
@@ -33,6 +34,9 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
@@ -130,6 +134,7 @@ class Issuer2MetadataEndpointTest {
         assertJwtVcJsonConfiguration(credentialIssuerMetadata)
         assertMdocConfiguration(credentialIssuerMetadata)
         assertSdJwtVcConfiguration(credentialIssuerMetadata)
+        assertCredentialEncryptionMetadata(credentialIssuerMetadata)
         assertConfiguredCredentialScenariosAreAdvertised(credentialIssuerMetadata)
         assertSdJwtCatalogConfigurations(credentialIssuerMetadata)
         assertSelfHostedSdJwtVcTypeMetadata(client, credentialIssuerMetadata)
@@ -164,6 +169,31 @@ class Issuer2MetadataEndpointTest {
             )
             assertEquals(scenario.format, configuration.format.value)
         }
+    }
+
+    private fun assertCredentialEncryptionMetadata(
+        credentialIssuerMetadata: CredentialIssuerMetadata,
+    ) {
+        val requestEncryption = assertNotNull(credentialIssuerMetadata.credentialRequestEncryption)
+        assertEquals(CredentialEncryptionProfile.encValuesSupported, requestEncryption.encValuesSupported)
+        assertFalse(requestEncryption.encryptionRequired)
+        assertNull(requestEncryption.zipValuesSupported)
+
+        val key = assertNotNull(requestEncryption.jwks["keys"]?.jsonArray?.singleOrNull()).jsonObject
+        assertEquals(CredentialEncryptionProfile.KEY_TYPE_EC, key["kty"]?.jsonPrimitive?.content)
+        assertEquals(CredentialEncryptionProfile.CURVE_P256, key["crv"]?.jsonPrimitive?.content)
+        assertEquals(CredentialEncryptionProfile.ALG_ECDH_ES, key["alg"]?.jsonPrimitive?.content)
+        assertEquals(CredentialEncryptionProfile.KEY_USE_ENC, key["use"]?.jsonPrimitive?.content)
+        assertNotNull(key["kid"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() })
+        assertNotNull(key["x"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() })
+        assertNotNull(key["y"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() })
+        assertNull(key["d"])
+
+        val responseEncryption = assertNotNull(credentialIssuerMetadata.credentialResponseEncryption)
+        assertEquals(CredentialEncryptionProfile.responseAlgValuesSupported, responseEncryption.algValuesSupported)
+        assertEquals(CredentialEncryptionProfile.encValuesSupported, responseEncryption.encValuesSupported)
+        assertFalse(responseEncryption.encryptionRequired)
+        assertNull(responseEncryption.zipValuesSupported)
     }
 
     private suspend fun assertSelfHostedSdJwtVcTypeMetadata(

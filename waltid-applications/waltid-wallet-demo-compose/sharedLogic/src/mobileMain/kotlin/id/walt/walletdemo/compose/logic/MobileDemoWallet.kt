@@ -32,7 +32,17 @@ internal class MobileDemoWallet(
             )
         }
 
-    override suspend fun receive(offerUrl: String): List<String> = mobileWallet.receive(offerUrl)
+    override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview =
+        mobileWallet.resolveOffer(offerUrl).let { resolution ->
+            WalletDemoOfferPreview(
+                transactionCodeRequired = resolution.transactionCodeRequired,
+                credentialIssuer = resolution.credentialIssuer,
+                offeredCredentials = resolution.offeredCredentials,
+            )
+        }
+
+    override suspend fun receive(offerUrl: String, txCode: String?): List<String> =
+        mobileWallet.receive(offerUrl, txCode = txCode)
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
         mobileWallet.present(requestUrl = requestUrl, did = did).let { result ->

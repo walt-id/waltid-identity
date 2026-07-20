@@ -15,6 +15,9 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.latestStatus
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.sendDeepLink
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.setTextByTag
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResourceEnabled
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
@@ -24,6 +27,67 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class PublicDemoBackendE2ETest {
+
+    @Test
+    fun transactionCodePromptRejectsWrongCodeAndRetriesAgainstPublicDemoIssuer2() = runBlocking {
+        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "eudi-pid-mdoc" }
+        val offer = DemoTestBackend.createOffer(scenario, withGeneratedTransactionCode = true)
+        val transactionCode = requireNotNull(offer.txCode) {
+            "Public demo issuer2 did not return a transaction code"
+        }
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val device = UiDevice.getInstance(instrumentation)
+
+        launchAndUnlock(context, device)
+        sendDeepLink(context, offer.offerUrl)
+        assertResourceTextEquals(
+            device = device,
+            tag = "wallet.offerInput",
+            expected = offer.offerUrl,
+            timeoutMs = UI_ELEMENT_TIMEOUT,
+            message = "Offer URL did not appear in UI after deep link",
+        )
+
+        clickByTag(device, "wallet.receiveButton")
+        assertTrue(
+            "Transaction-code input did not appear in offer review. Latest status: ${latestStatus(device)}",
+            waitForResource(device, "wallet.txCodeInput", CREDENTIAL_OPERATION_TIMEOUT) != null,
+        )
+
+        setTextByTag(device, "wallet.txCodeInput", incorrectCodeFor(transactionCode))
+        assertTrue(
+            "Accept button did not enable after entering a transaction code",
+            waitForResourceEnabled(device, "wallet.offerAcceptButton", UI_ELEMENT_TIMEOUT),
+        )
+        clickByTag(device, "wallet.offerAcceptButton")
+        assertTrue(
+            "Incorrect transaction code was not rejected. Latest status: ${latestStatus(device)}",
+            waitForStatus(
+                device = device,
+                timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
+                matcher = { it.startsWith("Receive failed") },
+                failurePrefixes = emptyList(),
+            ),
+        )
+
+        // The reviewed offer remains active so the corrected code can be retried directly.
+        setTextByTag(device, "wallet.txCodeInput", transactionCode)
+        assertTrue(
+            "Accept button did not re-enable after correcting the transaction code",
+            waitForResourceEnabled(device, "wallet.offerAcceptButton", UI_ELEMENT_TIMEOUT),
+        )
+        clickByTag(device, "wallet.offerAcceptButton")
+        assertTrue(
+            "Receive did not succeed after correcting the transaction code. Latest status: ${latestStatus(device)}",
+            waitForStatus(
+                device = device,
+                timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
+                matcher = { it.startsWith("Received") },
+                failurePrefixes = listOf("Receive failed", "Bootstrap failed"),
+            ),
+        )
+    }
 
     @Test
     fun receiveAndPresentAgainstPublicDemoIssuer2Verifier2() = runBlocking {
@@ -46,6 +110,14 @@ class PublicDemoBackendE2ETest {
         )
 
         clickByTag(device, "wallet.receiveButton")
+        val offerPreviewReady = waitForStatus(
+            device = device,
+            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
+            matcher = { it.startsWith("Review credential offer") },
+            failurePrefixes = listOf("Receive failed", "Bootstrap failed", "Present failed")
+        )
+        assertTrue("Offer preview did not appear. Latest status: ${latestStatus(device)}", offerPreviewReady)
+        clickByTag(device, "wallet.offerAcceptButton")
         val receiveSuccess = waitForStatus(
             device = device,
             timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
@@ -119,6 +191,14 @@ class PublicDemoBackendE2ETest {
         )
 
         clickByTag(device, "wallet.receiveButton")
+        val offerPreviewReady2 = waitForStatus(
+            device = device,
+            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
+            matcher = { it.startsWith("Review credential offer") },
+            failurePrefixes = listOf("Receive failed", "Bootstrap failed", "Present failed")
+        )
+        assertTrue("Offer preview did not appear. Latest status: ${latestStatus(device)}", offerPreviewReady2)
+        clickByTag(device, "wallet.offerAcceptButton")
         val receiveSuccess = waitForStatus(
             device = device,
             timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
@@ -179,5 +259,11 @@ class PublicDemoBackendE2ETest {
             expectedValues = listOf("ACME Corp"),
             message = "Payment payee missing",
         )
+    }
+
+    private fun incorrectCodeFor(code: String): String {
+        require(code.isNotEmpty()) { "Transaction code must not be empty" }
+        val replacement = if (code.last() == '0') '1' else '0'
+        return code.dropLast(1) + replacement
     }
 }

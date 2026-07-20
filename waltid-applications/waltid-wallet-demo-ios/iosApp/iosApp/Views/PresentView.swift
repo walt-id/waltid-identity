@@ -12,11 +12,12 @@ struct PresentView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    UrlEditor(
+                    ScannableUrlEditor(
                         title: "Present",
                         label: "OpenID4VP request URL",
                         text: $viewModel.presentationRequestUrl,
                         inputIdentifier: WalletAccessibilityID.presentationInput,
+                        scanButtonIdentifier: WalletAccessibilityID.presentationScanButton,
                         isEnabled: viewModel.presentationUrlEntryEnabled,
                         focusResetKey: viewModel.inputFocusResetKey
                     )

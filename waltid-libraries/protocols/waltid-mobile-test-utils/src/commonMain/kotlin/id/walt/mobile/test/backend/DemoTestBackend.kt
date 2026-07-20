@@ -112,10 +112,20 @@ object DemoTestBackend {
 
     data class VerifierSession(val sessionId: String, val authorizationRequestUri: String)
 
-    suspend fun createOffer(scenario: CredentialScenario): GeneratedOffer {
+    suspend fun createOffer(
+        scenario: CredentialScenario,
+        withGeneratedTransactionCode: Boolean = false,
+    ): GeneratedOffer {
         val payload = buildJsonObject {
             put("profileId", scenario.profileId)
             put("authMethod", "PRE_AUTHORIZED")
+            if (withGeneratedTransactionCode) {
+                putJsonObject("txCode") {
+                    put("input_mode", "numeric")
+                    put("length", 6)
+                    put("description", "Enter the transaction code shown by the issuer")
+                }
+            }
         }
 
         val response = requestJson(
@@ -124,7 +134,11 @@ object DemoTestBackend {
         )
         val offerUrl = response["credentialOffer"]?.jsonPrimitive?.contentOrNull
             ?: error("Missing credentialOffer in public demo issuer2 response: $response")
-        val txCode = response["txCode"]?.jsonPrimitive?.contentOrNull
+        val txCode = response["txCodeValue"]?.jsonPrimitive?.contentOrNull
+            ?: response["txCode"]?.jsonPrimitive?.contentOrNull
+        check(!withGeneratedTransactionCode || txCode != null) {
+            "Public demo issuer2 did not return the requested transaction code: $response"
+        }
 
         return GeneratedOffer(offerUrl = offerUrl, txCode = txCode)
     }

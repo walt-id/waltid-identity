@@ -10,6 +10,7 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationResult
 import id.walt.openid4vci.clientauth.ClientAuthenticationService
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolution
 import id.walt.openid4vci.clientauth.isAnonymousPreAuthorizedCodeTokenRequest
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.platform.urlEncode
@@ -18,6 +19,7 @@ import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequest
+import id.walt.openid4vci.requests.credential.encryption.CredentialRequestEncryptionNotSupported
 import id.walt.openid4vci.responses.authorization.AuthorizationResponse
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
@@ -30,8 +32,10 @@ import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.token.TokenResponseOptions
 import id.walt.openid4vci.responses.token.withOptions
 import id.walt.openid4vci.responses.credential.CredentialResponse
+import id.walt.openid4vci.responses.credential.CredentialResponseBody
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
+import id.walt.openid4vci.responses.credential.toJsonObject
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
@@ -440,20 +444,45 @@ class DefaultOAuth2Provider(
         session: Session?,
         accessTokenContext: AccessTokenContext?
     ): CredentialRequestResult {
-        if (accessTokenContext != null) {
-            val verifier = config.accessTokenVerifier
-                ?: return CredentialRequestResult.Failure(
-                    OAuthError("invalid_request", "access token verifier not configured")
+        verifyCredentialAccessToken(accessTokenContext)?.let { return it }
+        return when (val result = config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())) {
+            is CredentialRequestResult.Success ->
+                if (result.request.credentialResponseEncryption != null) {
+                    CredentialRequestResult.Failure(
+                        OAuthError(
+                            "invalid_request",
+                            "credential_response_encryption requires an encrypted Credential Request",
+                        )
+                    )
+                } else {
+                    result
+                }
+
+            is CredentialRequestResult.Failure -> result
+        }
+    }
+
+    override suspend fun createCredentialRequest(
+        encryptedCredentialRequest: String,
+        session: Session?,
+        accessTokenContext: AccessTokenContext?
+    ): CredentialRequestResult {
+        verifyCredentialAccessToken(accessTokenContext)?.let { return it }
+        val decryptor = config.credentialRequestDecryptor
+            ?: return CredentialRequestResult.Failure(
+                OAuthError(
+                    CredentialErrorCodes.ENCRYPTION_NOT_SUPPORTED,
+                    "credential request encryption is not supported",
                 )
-            try {
-                verifier.verify(
-                    token = accessTokenContext.token,
-                    expectedIssuer = accessTokenContext.expectedIssuer,
-                    expectedAudience = accessTokenContext.expectedAudience,
-                )
-            } catch (e: Exception) {
-                return CredentialRequestResult.Failure(OAuthError("invalid_request", e.message))
-            }
+            )
+        val parameters = try {
+            decryptor.decrypt(encryptedCredentialRequest).toParametersMap()
+        } catch (e: CredentialRequestEncryptionNotSupported) {
+            return CredentialRequestResult.Failure(
+                OAuthError(CredentialErrorCodes.ENCRYPTION_NOT_SUPPORTED, e.message)
+            )
+        } catch (e: Exception) {
+            return CredentialRequestResult.Failure(OAuthError("invalid_request", e.message))
         }
         return config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())
     }
@@ -477,7 +506,7 @@ class DefaultOAuth2Provider(
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return CredentialResponseResult.Failure(
                 OAuthError(
-                    error = "unsupported_credential_configuration",
+                    error = CredentialErrorCodes.UNSUPPORTED_CREDENTIAL_CONFIGURATION,
                     description = "No handler for format ${configuration.format.value}"
                 )
             )
@@ -514,29 +543,52 @@ class DefaultOAuth2Provider(
     override fun writeCredentialResponse(
         request: CredentialRequest,
         response: CredentialResponse
-    ): CredentialResponseHttp =
-        CredentialResponseHttp(
+    ): CredentialResponseHttp {
+        val payload = response.toJsonObject()
+        val encryption = request.credentialResponseEncryption
+            ?: return CredentialResponseHttp(status = 200, payload = payload)
+
+        val encrypted = try {
+            config.credentialResponseEncryptor.encrypt(payload, encryption)
+        } catch (e: Exception) {
+            return writeCredentialError(
+                request,
+                OAuthError("invalid_request", e.message ?: "Credential response encryption failed"),
+            )
+        }
+        return CredentialResponseHttp(
             status = 200,
-            payload = buildMap {
-                response.credentials?.let { issued ->
-                    put(
-                        "credentials",
-                        buildJsonArray {
-                            issued.forEach { credentialEntry ->
-                                add(
-                                    JsonObject(
-                                        mapOf("credential" to credentialEntry.credential)
-                                    )
-                                )
-                            }
-                        }
-                    )
-                }
-                response.transactionId?.let { put("transaction_id", JsonPrimitive(it)) }
-                response.interval?.let { put("interval", JsonPrimitive(it)) }
-                response.notificationId?.let { put("notification_id", JsonPrimitive(it)) }
-            }
+            body = CredentialResponseBody.EncryptedJwt(encrypted),
         )
+    }
+
+    private suspend fun verifyCredentialAccessToken(accessTokenContext: AccessTokenContext?): CredentialRequestResult.Failure? {
+        if (accessTokenContext == null) return null
+        val verifier = config.accessTokenVerifier
+            ?: return CredentialRequestResult.Failure(
+                OAuthError("invalid_request", "access token verifier not configured")
+            )
+        return try {
+            verifier.verify(
+                token = accessTokenContext.token,
+                expectedIssuer = accessTokenContext.expectedIssuer,
+                expectedAudience = accessTokenContext.expectedAudience,
+            )
+            null
+        } catch (e: Exception) {
+            CredentialRequestResult.Failure(OAuthError("invalid_request", e.message))
+        }
+    }
+
+    private fun JsonObject.toParametersMap(): Map<String, List<String>> =
+        entries.associate { (key, value) ->
+            val encoded = if (value is JsonPrimitive && value.isString) {
+                value.content
+            } else {
+                value.toString()
+            }
+            key to listOf(encoded)
+        }
 
     private fun appendParams(base: String, parameters: Map<String, String>): String {
         if (parameters.isEmpty()) return base

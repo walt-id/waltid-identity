@@ -17,6 +17,9 @@ internal enum class WalletDeepLinkScheme(val scheme: String) {
 internal object WalletDisplayText {
     const val ReviewPresentationRequest = "Review presentation request"
     const val StartingWallet = "Starting wallet..."
+    const val ResolvingCredentialOffer = "Resolving credential offer..."
+    const val ReviewCredentialOffer = "Review credential offer"
+    const val CredentialOfferDeclined = "Credential offer declined"
     const val ReceivingCredential = "Receiving credential..."
     const val ResolvingPresentation = "Resolving presentation..."
     const val PresentingCredential = "Presenting credential..."

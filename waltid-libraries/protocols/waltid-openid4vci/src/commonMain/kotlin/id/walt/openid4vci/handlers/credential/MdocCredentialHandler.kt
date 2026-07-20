@@ -4,6 +4,7 @@ import id.walt.cose.CoseCertificate
 import id.walt.crypto.keys.Key
 import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
@@ -47,6 +48,15 @@ class MdocCredentialHandler : CredentialEndpointHandler {
         validUntil: Instant?,
     ): CredentialResponseResult {
         return try {
+            if (configuration.format != CredentialFormat.MSO_MDOC) {
+                return CredentialResponseResult.Failure(
+                    OAuthError(
+                        CredentialErrorCodes.UNSUPPORTED_CREDENTIAL_CONFIGURATION,
+                        "Unsupported format ${configuration.format.value}"
+                    )
+                )
+            }
+
             computeCredentialResult(
                 request = request,
                 configuration = configuration,
@@ -75,10 +85,6 @@ class MdocCredentialHandler : CredentialEndpointHandler {
         validFrom: Instant?,
         validUntil: Instant?,
     ): CredentialResponseResult.Success {
-        if (configuration.format != CredentialFormat.MSO_MDOC) {
-            throw IllegalArgumentException("Unsupported format ${configuration.format.value}")
-        }
-
         val docType = configuration.doctype
             ?: throw IllegalArgumentException("Missing doctype for mDoc credential configuration")
 

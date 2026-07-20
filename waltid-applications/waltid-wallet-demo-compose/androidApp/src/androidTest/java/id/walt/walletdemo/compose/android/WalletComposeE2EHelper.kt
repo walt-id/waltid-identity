@@ -8,6 +8,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import org.junit.Assert.fail
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 
 internal object WalletComposeE2EHelper {
@@ -37,11 +38,37 @@ internal object WalletComposeE2EHelper {
     )
 
     fun launchAndUnlock(context: Context, device: UiDevice) {
+        launch(context)
+        unlock(device)
+    }
+
+    fun launchExpectingSetupAndUnlock(context: Context, device: UiDevice) {
+        launch(context)
+
+        assertNotNull("PIN input not found on initial launch", waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT))
+        assertNotNull(
+            "PIN setup was not shown on initial launch",
+            waitForResource(device, "wallet.pinConfirmationInput", UI_ELEMENT_TIMEOUT),
+        )
+        unlock(device)
+    }
+
+    fun relaunchAndUnlock(context: Context, device: UiDevice) {
+        launch(context)
+
+        assertNotNull("PIN input not found after relaunch", waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT))
+        assertNull(
+            "PIN setup was shown after relaunch",
+            waitForResource(device, "wallet.pinConfirmationInput", 2_000L),
+        )
+        unlock(device)
+    }
+
+    private fun launch(context: Context) {
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             ?.apply { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) }
             ?: error("Cannot resolve launch intent for ${context.packageName}")
         context.startActivity(launchIntent)
-        unlock(device)
     }
 
     fun unlock(device: UiDevice) {
@@ -115,6 +142,18 @@ internal object WalletComposeE2EHelper {
         device.waitForIdle()
     }
 
+    fun setTextByTag(device: UiDevice, tag: String, value: String) {
+        val node = waitForResource(device, tag, CLICK_VISIBLE_TIMEOUT)
+            ?: findVisibleResource(device, tag)
+            ?: findResourceAfterScrolling(device, tag)
+        if (node == null) {
+            fail("$tag not found.\n${visibleUiSnapshot(device)}")
+        }
+        assertTrue("$tag is disabled", node!!.isEnabled)
+        node.setText(value)
+        device.waitForIdle()
+    }
+
     fun assertTextVisibleAfterScrolling(
         device: UiDevice,
         texts: List<String>,
@@ -165,6 +204,16 @@ internal object WalletComposeE2EHelper {
             Thread.sleep(500)
         }
         return null
+    }
+
+    fun waitForResourceEnabled(device: UiDevice, tag: String, timeoutMs: Long): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            val node = device.findObject(By.res(tag)) ?: findVisibleResource(device, tag)
+            if (node?.isEnabled == true) return true
+            Thread.sleep(200)
+        }
+        return false
     }
 
     private fun findTextAfterScrolling(device: UiDevice, texts: List<String>): UiObject2? {

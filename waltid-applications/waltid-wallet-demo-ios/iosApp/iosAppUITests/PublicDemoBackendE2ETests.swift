@@ -33,6 +33,12 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
         ui.replaceText(in: offerInput, value: offer.offerUrl)
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        let offerReadyStatus = ui.waitForStatus(
+            prefixes: ["Review credential offer", "Receive failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        XCTAssertEqual(offerReadyStatus, "Review credential offer", "Offer preview did not appear, status: \(offerReadyStatus ?? "nil")")
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
         let receiveStatus = ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
@@ -96,6 +102,12 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
         ui.replaceText(in: offerInput, value: offer.offerUrl)
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        let offerReadyStatus2 = ui.waitForStatus(
+            prefixes: ["Review credential offer", "Receive failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        XCTAssertEqual(offerReadyStatus2, "Review credential offer", "Offer preview did not appear, status: \(offerReadyStatus2 ?? "nil")")
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
         let receiveStatus = ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
@@ -124,12 +136,89 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         add(screenshot)
     }
 
+    func testTransactionCodePromptRejectsWrongCodeAndRetriesAgainstPublicDemoIssuer2() async throws {
+        let scenario = try publicDemoScenario()
+        let offer = try await backend.createOffer(
+            scenario: scenario,
+            withGeneratedTransactionCode: true
+        )
+        let transactionCode = try XCTUnwrap(offer.txCode)
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: publicDemoEnvironment())
+
+        let readyStatus = ui.waitForStatus(
+            prefixes: ["Wallet ready", "Bootstrap failed"],
+            timeout: walletReadyTimeout
+        )
+        guard readyStatus == "Wallet ready" else {
+            XCTFail("Wallet did not become ready, status: \(readyStatus ?? "nil")")
+            return
+        }
+
+        ui.openDeepLink(offer.offerUrl)
+        guard ui.waitForTextInputValue(
+            identifier: "wallet.offerInput",
+            fallbackLabel: "Credential offer URL",
+            value: offer.offerUrl,
+            timeout: 20
+        ) else {
+            XCTFail("Offer URL did not appear after opening the deep link")
+            return
+        }
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+
+        let previewStatus = ui.waitForStatus(
+            prefixes: ["Review credential offer", "Receive failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        guard previewStatus == "Review credential offer" else {
+            XCTFail("Offer preview did not appear, status: \(previewStatus ?? "nil")")
+            return
+        }
+
+        let txCodeInput = ui.textInput(identifier: "wallet.txCodeInput", fallbackLabel: "Transaction code")
+        guard txCodeInput.waitForExistence(timeout: 20) else {
+            XCTFail("Transaction-code input did not appear in offer review")
+            return
+        }
+
+        ui.replaceText(in: txCodeInput, value: incorrectCode(for: transactionCode))
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        let rejectedStatus = ui.waitForStatus(
+            prefixes: ["Receive failed"],
+            timeout: credentialOperationTimeout
+        )
+        guard rejectedStatus?.starts(with: "Receive failed") == true else {
+            XCTFail("Incorrect transaction code was not rejected, status: \(rejectedStatus ?? "nil")")
+            return
+        }
+
+        // The reviewed offer remains active so the corrected code can be retried directly.
+        ui.replaceText(in: txCodeInput, value: transactionCode)
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        let receivedStatus = ui.waitForStatus(
+            prefixes: ["Received", "Receive failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        XCTAssertTrue(
+            receivedStatus?.starts(with: "Received") == true,
+            "Receive did not succeed after correcting the transaction code, status: \(receivedStatus ?? "nil")"
+        )
+    }
+
     private func publicDemoScenario() throws -> DemoCredentialScenario {
         try XCTUnwrap(DemoBackend.presentationScenarios.first { $0.id == "eudi-pid-mdoc" })
     }
 
     private func publicDemoEnvironment() -> [String: String] {
         ["TRANSACTION_DATA_PROFILES_URL": DemoBackend.transactionDataProfilesURL.absoluteString]
+    }
+
+    private func incorrectCode(for code: String) -> String {
+        precondition(!code.isEmpty, "Transaction code must not be empty")
+        let replacement = code.last == "0" ? "1" : "0"
+        return String(code.dropLast()) + replacement
     }
 }
 
@@ -153,6 +242,11 @@ final class MockCredentialDisplayUITests: XCTestCase {
             value: "openid-credential-offer://mock"
         )
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"

@@ -1,0 +1,93 @@
+package id.walt.mobile.test.backend
+
+import io.ktor.http.encodeURLParameter
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+
+class EudiTestBackendTest {
+    @Test
+    fun buildsEhicSdJwtVerifierQuery() {
+        val query = EudiTestBackend.buildDcqlQuery("eu.europa.ec.eudi.ehic_sd_jwt_vc").jsonObject
+        val credentialQuery = query.getValue("credentials").jsonArray.single().jsonObject
+
+        assertEquals("dc+sd-jwt", credentialQuery.getValue("format").jsonPrimitive.content)
+        assertEquals(
+            listOf("urn:eudi:ehic:1"),
+            credentialQuery.getValue("meta").jsonObject.getValue("vct_values").jsonArray
+                .map { it.jsonPrimitive.content },
+        )
+    }
+
+    @Test
+    fun preservesStandardOfferAndReturnsTransactionCodeSeparately() {
+        val offerJson = """
+            {
+              "credential_issuer": "https://issuer.example",
+              "credential_configuration_ids": ["credential-id"],
+              "grants": {
+                "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+                  "pre-authorized_code": "pre-authorized-code",
+                  "tx_code": {
+                    "input_mode": "numeric",
+                    "length": 4,
+                    "description": "Enter the separately delivered code"
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+        val offerUrl = "openid-credential-offer://credential_offer?credential_offer=${offerJson.encodeURLParameter()}"
+        val payload = buildJsonObject {
+            put("url_data", JsonPrimitive(offerUrl))
+            put("tx_code", JsonPrimitive("1234"))
+        }
+
+        val generated = EudiTestBackend.generatedOfferFromFinalPayload(payload)
+
+        assertEquals(offerUrl, generated.offerUrl)
+        assertEquals("1234", generated.txCode)
+    }
+
+    @Test
+    fun rejectsPayloadWithoutSeparatelyDeliveredTransactionCode() {
+        val offerUrl = "openid-credential-offer://credential_offer?credential_offer={}".encodeURLParameter()
+        val payload = buildJsonObject {
+            put("url_data", JsonPrimitive(offerUrl))
+        }
+
+        assertFailsWith<IllegalStateException> {
+            EudiTestBackend.generatedOfferFromFinalPayload(payload)
+        }
+    }
+
+    @Test
+    fun rejectsOfferWithoutTransactionCodeMetadata() {
+        val offerJson = """
+            {
+              "credential_issuer": "https://issuer.example",
+              "credential_configuration_ids": ["credential-id"],
+              "grants": {
+                "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+                  "pre-authorized_code": "pre-authorized-code"
+                }
+              }
+            }
+        """.trimIndent()
+        val offerUrl = "openid-credential-offer://credential_offer?credential_offer=${offerJson.encodeURLParameter()}"
+        val payload = buildJsonObject {
+            put("url_data", JsonPrimitive(offerUrl))
+            put("tx_code", JsonPrimitive("1234"))
+        }
+
+        assertFailsWith<IllegalStateException> {
+            EudiTestBackend.generatedOfferFromFinalPayload(payload)
+        }
+    }
+}

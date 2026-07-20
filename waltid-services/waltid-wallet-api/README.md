@@ -12,13 +12,13 @@
   
   <h2>Status</h2>
   <p align="center">
-    <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
-    <br/>
-    <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
+    <img src="https://img.shields.io/badge/🟠%20Planned%20Deprecation-orange?style=for-the-badge&logo=clock" alt="Status: Planned Deprecation" />
+  <br/>
+  <em>This project is still supported by the development team at walt.id, but is planned for deprecation sometime in Q2 2026.<br />We encourage users to migrate to using alternative libraries listed below.</em>
   </p>
-
-
 </div>
+
+This api only supports OpenID4VCI draft 13 & 14 and OpenID4VP draft 14, draft 20 and V1.0. For full OpenID4VCI + OpenID4VP 1.0 support, use [waltid-wallet-api2](../waltid-wallet-api2).
 
 Watch the [Intro Video](https://www.youtube.com/watch?v=ILaSAxjoHbw&t=1s) to learn about features and see a demo.
 The [documentation](https://docs.walt.id/community-stack/wallet/getting-started) explains how to create and manage identity

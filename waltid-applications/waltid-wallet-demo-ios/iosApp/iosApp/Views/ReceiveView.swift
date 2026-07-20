@@ -12,22 +12,35 @@ struct ReceiveView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    UrlEditor(
-                        title: "Receive",
-                        label: "Credential offer URL",
-                        text: $viewModel.offerUrl,
-                        inputIdentifier: WalletAccessibilityID.offerInput,
-                        isEnabled: viewModel.receiveUrlEntryEnabled,
-                        focusResetKey: viewModel.inputFocusResetKey
-                    )
+                    if viewModel.offerPreview == nil {
+                        ScannableUrlEditor(
+                            title: "Receive",
+                            label: "Credential offer URL",
+                            text: $viewModel.offerUrl,
+                            inputIdentifier: WalletAccessibilityID.offerInput,
+                            scanButtonIdentifier: WalletAccessibilityID.offerScanButton,
+                            isEnabled: viewModel.receiveUrlEntryEnabled,
+                            focusResetKey: viewModel.inputFocusResetKey
+                        )
 
-                    Button("Receive") {
-                        viewModel.receiveCredential()
+                        Button("Receive") {
+                            viewModel.previewOffer()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.waltBlue)
+                        .disabled(!viewModel.receiveActionEnabled)
+                        .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
+                    } else if let preview = viewModel.offerPreview {
+                        OfferReviewView(
+                            preview: preview,
+                            isAcceptEnabled: viewModel.acceptOfferEnabled,
+                            isReviewEnabled: viewModel.offerReviewEnabled,
+                            txCode: viewModel.txCode,
+                            onTxCodeChange: viewModel.updateTxCode,
+                            onAccept: viewModel.acceptOffer,
+                            onDecline: viewModel.declineOffer
+                        )
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.waltBlue)
-                    .disabled(!viewModel.receiveActionEnabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
 
                     StatusBannerView(
                         message: viewModel.statusMessage(for: .receive),

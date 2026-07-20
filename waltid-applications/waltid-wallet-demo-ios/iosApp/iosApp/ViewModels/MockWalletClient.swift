@@ -12,6 +12,7 @@ actor MockWalletClient: WalletClient {
     private let operationDelayNanoseconds: UInt64
     private let verifierStyle: VerifierStyle
     private let duplicatePresentationOptions: Bool
+    private let transactionCodeRequired: Bool
     private let presentationPreviewOverride: PresentationPreview?
 
     init(
@@ -19,12 +20,14 @@ actor MockWalletClient: WalletClient {
         operationDelayMilliseconds: UInt64 = 0,
         verifierStyle: VerifierStyle = .named,
         duplicatePresentationOptions: Bool = false,
+        transactionCodeRequired: Bool = false,
         presentationPreview: PresentationPreview? = nil
     ) {
         self.storedCredentials = storedCredentials
         self.operationDelayNanoseconds = operationDelayMilliseconds * 1_000_000
         self.verifierStyle = verifierStyle
         self.duplicatePresentationOptions = duplicatePresentationOptions
+        self.transactionCodeRequired = transactionCodeRequired
         self.presentationPreviewOverride = presentationPreview
     }
 
@@ -36,7 +39,16 @@ actor MockWalletClient: WalletClient {
         storedCredentials
     }
 
-    func receive(offer: URL) async throws -> [String] {
+    func resolveOffer(offer: URL) async throws -> OfferResolution {
+        try await delayOperation()
+        return OfferResolution(
+            transactionCodeRequired: transactionCodeRequired,
+            credentialIssuer: "Example Issuer",
+            offeredCredentials: ["ExampleCredential"]
+        )
+    }
+
+    func receive(offer: URL, txCode: String?) async throws -> [String] {
         try await delayOperation()
         storedCredentials = [Self.sampleCredential]
         return storedCredentials.map(\.id)
