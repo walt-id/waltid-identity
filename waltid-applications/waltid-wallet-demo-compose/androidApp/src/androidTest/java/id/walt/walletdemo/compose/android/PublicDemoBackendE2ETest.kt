@@ -16,7 +16,6 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.latestStatus
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.sendDeepLink
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.setTextByTag
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
@@ -50,8 +49,13 @@ class PublicDemoBackendE2ETest {
 
         clickByTag(device, "wallet.receiveButton")
         assertTrue(
-            "Transaction-code input did not appear in offer review. Latest status: ${latestStatus(device)}",
-            waitForResource(device, "wallet.txCodeInput", CREDENTIAL_OPERATION_TIMEOUT) != null,
+            "Offer preview did not appear. Latest status: ${latestStatus(device)}",
+            waitForStatus(
+                device = device,
+                timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
+                matcher = { it.startsWith("Review credential offer") },
+                failurePrefixes = listOf("Receive failed", "Bootstrap failed"),
+            ),
         )
 
         setTextByTag(device, "wallet.txCodeInput", incorrectCodeFor(transactionCode))
