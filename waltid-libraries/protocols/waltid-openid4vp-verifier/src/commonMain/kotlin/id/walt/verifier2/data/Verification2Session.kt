@@ -137,6 +137,10 @@ data class Verification2Session(
     @SerialName("failure")
     var failure: SessionFailure? = null,
 ) {
+    fun persistenceExpirationDate(): Instant =
+        if (attempted || status in setOf(VerificationSessionStatus.SUCCESSFUL, VerificationSessionStatus.FAILED)) retentionDate
+        else expirationDate ?: creationDate.plus(10, DateTimeUnit.MINUTE, TimeZone.UTC)
+
 
     fun deletePII() {
         presentedRawData = null
