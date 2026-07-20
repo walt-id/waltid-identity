@@ -210,10 +210,18 @@ final class MobileWalletIntegrationTests: XCTestCase {
     }
 
     func testReceiveAndPresentEudiPidSdJwtAgainstEudi() async throws {
+        try XCTSkipIf(
+            true,
+            "Upstream issue: https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/172"
+        )
         try await receiveAndPresentEudiCredential(credentialID: Self.eudiPidSdJwtCredentialID)
     }
 
     func testPreviewAndSubmitEudiPidSdJwtAgainstEudi() async throws {
+        try XCTSkipIf(
+            true,
+            "Upstream issue: https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/172"
+        )
         try await previewAndSubmitEudiCredential(credentialID: Self.eudiPidSdJwtCredentialID)
     }
 

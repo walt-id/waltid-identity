@@ -19,6 +19,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.Ignore
 import org.junit.Test
 import java.util.Base64
 import java.util.UUID
@@ -114,11 +115,13 @@ class MobileWalletIntegrationTest {
         previewAndSubmitEudiCredential(EUDI_EHIC_SD_JWT_CREDENTIAL_ID)
     }
 
+    @Ignore("Upstream issue: https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/172")
     @Test
     fun receiveAndPresentEudiPidSdJwtAgainstEudi() = runBlocking {
         receiveAndPresentEudiCredential(EUDI_PID_SD_JWT_CREDENTIAL_ID)
     }
 
+    @Ignore("Upstream issue: https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/172")
     @Test
     fun previewAndSubmitEudiPidSdJwtAgainstEudi() = runBlocking {
         previewAndSubmitEudiCredential(EUDI_PID_SD_JWT_CREDENTIAL_ID)
