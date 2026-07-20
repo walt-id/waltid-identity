@@ -671,7 +671,15 @@ public struct PresentationPreview: Equatable, Sendable {
 
 /// Authenticated encryption requirements for an OpenID4VP response.
 public enum PresentationEncryptionInfo: Equatable, Sendable {
+    /// The authorization response does not require JWE encryption.
     case notRequired
+
+    /// The authorization response must be encrypted for the verifier.
+    ///
+    /// - Parameters:
+    ///   - contentEncryptionAlgorithm: Negotiated JWE content-encryption algorithm.
+    ///   - keyManagementAlgorithm: Negotiated JWE key-management algorithm.
+    ///   - verifierKeyThumbprint: RFC 7638 thumbprint of the selected verifier key.
     case required(
         contentEncryptionAlgorithm: String,
         keyManagementAlgorithm: String,
