@@ -66,7 +66,7 @@ class VpWalletMdlX509SanDnsRequestUriSignedDirectPost(
                             "d": "AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA",
                             "x": "G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0",
                             "y": "VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4",
-                            "x5c": ["${TestKeyMaterial.VERIFIER_LEAF_CERT}", "${TestKeyMaterial.VERIFIER_CA_CERT}"]
+                            "x5c": ["${TestKeyMaterial.VERIFIER_LEAF_CERT}"]
                         }
                     ]
                 },

@@ -8,15 +8,15 @@ import kotlinx.serialization.json.JsonObject
  * HAIP-Compliant VP Wallet Test Plan: mDL (ISO 18013-5) + x509_hash + request_uri_signed + direct_post.jwt
  * 
  * Tests wallet's ability to handle STRICT HAIP compliance with ISO mDL credentials:
- * - **x509_hash client identification** — HAIP §5 P-02 (MANDATORY)
- * - Authenticate signed authorization requests (JAR) — HAIP §5.1 W-27
- * - Generate encrypted VP responses with mdoc (direct_post.jwt) — HAIP §5.1 W-28
- * - Include DeviceAuth holder binding (MSO + DeviceSignature) — HAIP §6.1.2
+ * - **x509_hash client identification** — conformance requirement P-02
+ * - Authenticate signed authorization requests (JAR) — conformance test W-27
+ * - Generate encrypted VP responses with mdoc (direct_post.jwt) — conformance test W-28
+ * - Include DeviceAuth holder binding (MSO + DeviceSignature)
  * - Validate session transcript per ISO 18013-7 Annex C
- * - Use P-256 keys and SHA-256 hashing — HAIP §7-8 CF-02, CF-03
+ * - Use P-256 keys and SHA-256 hashing — conformance requirements CF-02 and CF-03
  * 
  * CRITICAL HAIP REQUIREMENTS:
- * - MUST use x509_hash (NOT x509_san_dns) per HAIP §5 requirement P-02
+ * - MUST use x509_hash (NOT x509_san_dns), exercised by conformance requirement P-02
  * - MUST validate x509_hash matches SHA-256 hash of DER-encoded leaf certificate
  * - MUST validate certificate chain (no trust anchor, not self-signed)
  * - MUST encrypt response using ECDH-ES with P-256
@@ -75,7 +75,7 @@ class VpWalletMdlX509HashRequestUriSignedDirectPostHaip(
                             "d": "AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA",
                             "x": "G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0",
                             "y": "VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4",
-                            "x5c": ["${TestKeyMaterial.VERIFIER_LEAF_CERT}", "${TestKeyMaterial.VERIFIER_CA_CERT}"]
+                            "x5c": ["${TestKeyMaterial.VERIFIER_LEAF_CERT}"]
                         }
                     ]
                 },

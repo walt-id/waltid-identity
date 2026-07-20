@@ -51,7 +51,7 @@ This document covers **Verifier** conformance testing — validating that our ve
 - **Client ID**: SHA-256 hash of leaf certificate (`x509_hash:<base64url-hash>`)
 - **Request**: Signed (JAR)
 - **Response**: Encrypted `direct_post.jwt`
-- **Validates**: x509_hash client_id derivation, KB-JWT audience matching hash, HAIP §5 P-02 compliance
+- **Validates**: x509_hash client_id derivation, KB-JWT audience binding, and conformance requirement P-02
 
 #### MdlX509HashRequestUriSignedDirectPostHaip (HAIP + mDL + x509_hash)
 - **Purpose**: Full HAIP compliance for mDL with certificate hash client ID

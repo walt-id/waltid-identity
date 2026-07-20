@@ -295,7 +295,7 @@ The following validations were implemented to pass the negative tests:
 
 ### 1. redirect_uri with direct_post (Test 9)
 
-**Spec requirement (OID4VP §5.5):** When using `response_mode=direct_post` or `direct_post.jwt`, the wallet MUST NOT accept a `redirect_uri` parameter. These modes use `response_uri` exclusively.
+**Spec requirement (OID4VP §8.2):** When using `response_mode=direct_post` or `direct_post.jwt`, the wallet MUST NOT accept a `redirect_uri` parameter. These modes use `response_uri` exclusively.
 
 **Implementation:** Added validation in `WalletPresentFunctionality2.kt` that throws `IllegalArgumentException` when:
 - Both `redirect_uri` and `response_uri` are present (mutually exclusive)

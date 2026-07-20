@@ -7,6 +7,20 @@ set -e
 WALLET_API="http://127.0.0.1:7005"
 ISSUER_API="http://127.0.0.1:7002"
 
+# Wallet-controlled verifier trust anchor. The verifier's Request Object x5c
+# contains only its leaf certificate; this root is provisioned out of band.
+VERIFIER_CA_PEM='-----BEGIN CERTIFICATE-----
+MIIBlzCCAT2gAwIBAgIUUffF2b0tyOxgDu7q+kMpwY3pfNUwCgYIKoZIzj0EAwIw
+MDEcMBoGA1UEAwwTd2FsdC5pZCBWZXJpZmllciBDQTEQMA4GA1UECgwHd2FsdC5p
+ZDAeFw0yNjA1MTkwNDA4MTZaFw0zNjA1MTYwNDA4MTZaMDAxHDAaBgNVBAMME3dh
+bHQuaWQgVmVyaWZpZXIgQ0ExEDAOBgNVBAoMB3dhbHQuaWQwWTATBgcqhkjOPQIB
+BggqhkjOPQMBBwNCAAQnFYwN1ypusrveHnOwC2ZFBT6PosWX5l1caoRPoziV8jn8
+EJx0uKD5RHC0p1CbYGHBqE74YUw7xlydTT1jXfCsozUwMzASBgNVHRMBAf8ECDAG
+AQH/AgEAMB0GA1UdDgQWBBRdho/7KlGi74YmeLFqLMfbH6cSkzAKBggqhkjOPQQD
+AgNIADBFAiEAudxJV83uP0g5zLXI85ExlkRMKZI52mkBkk074ST2KPACIEsFnJDr
+xtEgGXjHNMaUj7FOpC4tJyGlg2DSpXSOlCkl
+-----END CERTIFICATE-----'
+
 echo "=== VP Wallet Conformance Test Setup ==="
 echo ""
 
@@ -36,9 +50,18 @@ fi
 
 # Create wallet with credential store
 echo "Creating wallet..."
+WALLET_CONFIG=$(jq -n --arg verifierCa "$VERIFIER_CA_PEM" '{
+  credentialStoreIds: ["conformance-store"],
+  requestObjectX509Trust: {
+    trustAnchorPemCertificates: [$verifierCa],
+    allowedRequestObjectAlgorithms: ["ES256"],
+    requireTrustAnchorOmittedFromX5c: true,
+    rejectLeafTrustAnchor: true
+  }
+}')
 WALLET_ID=$(curl -sf -X POST "$WALLET_API/wallet" \
     -H "Content-Type: application/json" \
-    -d '{"credentialStoreIds": ["conformance-store"]}' | jq -r '.walletId')
+    -d "$WALLET_CONFIG" | jq -r '.walletId')
 echo "✓ Created wallet: $WALLET_ID"
 
 # Generate key for the wallet
