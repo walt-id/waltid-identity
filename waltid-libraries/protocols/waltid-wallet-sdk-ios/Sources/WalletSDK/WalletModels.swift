@@ -654,6 +654,8 @@ public struct PresentationPreview: Equatable, Sendable {
     ///     requested credential queries.
     ///   - credentialRequirements: Required DCQL credential query combinations
     ///     that must be satisfied before submission.
+    ///   - encryption: Authenticated response-encryption requirements for the
+    ///     retained request.
     public init(
         request: PresentationRequestInfo,
         credentialOptions: [PresentationCredentialOption],
@@ -726,6 +728,8 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     ///   - responseURI: Direct-post response URI when available.
     ///   - state: OpenID state value from the request.
     ///   - nonce: OpenID nonce value from the request.
+    ///   - responseMode: Serialized OpenID4VP response mode requested by the
+    ///     verifier.
     ///   - transactionData: Decoded transaction data attached to the request.
     public init(
         clientID: String? = nil,
