@@ -4,6 +4,7 @@ import id.walt.issuer2.controller.openapi.OpenId4VciRoutesDocs
 import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
+import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.openid4vci.responses.credential.CredentialResponseBody
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
@@ -13,6 +14,7 @@ import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.parseAndSortContentTypeHeader
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.auth.OAuthAccessTokenResponse
@@ -37,7 +39,16 @@ class OpenId4VciController(
 ) {
     fun register(route: Route) {
         route.get(".well-known/openid-credential-issuer/openid4vci", OpenId4VciRoutesDocs.credentialIssuerMetadata()) {
-            call.respond(metadataService.getCredentialIssuerMetadata())
+            call.response.headers.append(HttpHeaders.Vary, HttpHeaders.Accept)
+            val signedContentType = call.requestedSignedCredentialIssuerMetadataContentType()
+            if (signedContentType == null) {
+                call.respond(metadataService.getCredentialIssuerMetadata())
+            } else {
+                call.respondText(
+                    text = metadataService.getSignedCredentialIssuerMetadata(),
+                    contentType = signedContentType,
+                )
+            }
         }
 
         route.get(".well-known/oauth-authorization-server/openid4vci", OpenId4VciRoutesDocs.authorizationServerMetadata()) {
@@ -168,6 +179,27 @@ class OpenId4VciController(
             ?.substringBefore(';')
             ?.trim()
             ?.equals(CredentialEncryptionProfile.MEDIA_TYPE_JWT, ignoreCase = true) == true
+
+    private fun ApplicationCall.requestedSignedCredentialIssuerMetadataContentType(): ContentType? {
+        val selectedMediaType = parseAndSortContentTypeHeader(request.headers[HttpHeaders.Accept])
+            .asSequence()
+            .filter { it.quality > 0.0 }
+            .map { it.value.lowercase() }
+            .firstOrNull { mediaType ->
+                mediaType == CredentialIssuerMetadataJwt.MEDIA_TYPE ||
+                    mediaType == CredentialIssuerMetadataJwt.TYPED_MEDIA_TYPE ||
+                    mediaType == ContentType.Application.Json.toString() ||
+                    mediaType == "application/*" ||
+                    mediaType == "*/*"
+            }
+
+        return when (selectedMediaType) {
+            CredentialIssuerMetadataJwt.MEDIA_TYPE,
+            CredentialIssuerMetadataJwt.TYPED_MEDIA_TYPE -> ContentType.parse(selectedMediaType)
+
+            else -> null
+        }
+    }
 
     private suspend fun ApplicationCall.respondCredentialResponse(response: CredentialResponseHttp) {
         response.headers.forEach { (name, value) -> this.response.headers.append(name, value) }
