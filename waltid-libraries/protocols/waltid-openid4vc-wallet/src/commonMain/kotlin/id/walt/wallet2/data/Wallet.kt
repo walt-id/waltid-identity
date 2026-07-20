@@ -1,5 +1,6 @@
 package id.walt.wallet2.data
 
+import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.merge
@@ -54,18 +55,52 @@ data class Wallet(
      * Mirrors WalletServiceConfiguration.staticDid in the Enterprise.
      */
     val staticDid: String? = null,
+
+    /**
+     * ID of the preferred default key. When non-null, [defaultKey] returns this key
+     * instead of the first key across the stores.
+     */
+    val defaultKeyId: String? = null,
+
+    /**
+     * Preferred default DID. When non-null, [defaultDid] returns this DID
+     * instead of the first DID in the store.
+     */
+    val defaultDidId: String? = null,
 ) {
     // ---------------------------------------------------------------------------
-    // Aggregate helpers — hide multi-store complexity from handler code
+    // Aggregate helpers
     // ---------------------------------------------------------------------------
 
     /** Finds a key by ID across all key stores; returns the first match. */
     suspend fun findKey(keyId: String): Key? =
         keyStores.firstNotNullOfOrNull { it.getKey(keyId) }
 
-    /** Returns the default key: first key across all stores, or staticKey. */
+    /**
+     * Resolves the key to use for signing, following this priority:
+     * 1. [inlineKey] - supplied directly by the caller (takes precedence over everything)
+     * 2. [keyId] - looked up in all key stores
+     * 3. [defaultKey] - the wallet's configured default key
+     *
+     * Returns null only when no key is available at all. Extracted here to eliminate the
+     * identical `resolveKey` private functions that existed in both [WalletIssuanceHandler]
+     * and [WalletPresentationHandler].
+     */
+    suspend fun resolveKey(inlineKey: DirectSerializedKey? = null, keyId: String? = null): Key? = when {
+        inlineKey != null -> inlineKey.key
+        keyId != null -> findKey(keyId) ?: error("Key '$keyId' not found in any wallet key store")
+        else -> defaultKey()
+    }
+
+    /**
+     * Returns the default key.
+     * If [defaultKeyId] is set, that key is returned (looked up across all stores).
+     * Falls back to the first key across all stores, then to [staticKey].
+     */
     suspend fun defaultKey(): Key? =
-        keyStores.firstNotNullOfOrNull { it.getDefaultKey() } ?: staticKey
+        defaultKeyId?.let { findKey(it) }
+            ?: keyStores.firstNotNullOfOrNull { it.getDefaultKey() }
+            ?: staticKey
 
     /** Lists all keys across all key stores, in store order. */
     suspend fun listAllKeys(): List<WalletKeyInfo> {
@@ -98,7 +133,13 @@ data class Wallet(
         store.addCredential(entry)
     }
 
-    /** Returns the default DID from the DID store, or staticDid. */
+    /**
+     * Returns the default DID.
+     * If [defaultDidId] is set, that DID is returned.
+     * Falls back to the first DID in the store, then to [staticDid].
+     */
     suspend fun defaultDid(): String? =
-        didStore?.getDefaultDid() ?: staticDid
+        defaultDidId
+            ?: didStore?.getDefaultDid()
+            ?: staticDid
 }

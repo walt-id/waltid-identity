@@ -17,6 +17,29 @@ import kotlin.test.assertTrue
 class WalletDemoControllerTest {
 
     @Test
+    fun pinStorageReadFailureStaysLockedUntilRetrySucceeds() = runTest {
+        val pinStore = RecoverableDemoPinStore()
+        val wallet = FakeDemoWallet()
+        val controller = controllerWith(wallet, this, pinStore)
+
+        assertTrue(controller.state.value.auth is WalletAuthState.StorageUnavailable)
+
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.submitPin()
+        runCurrent()
+
+        assertTrue(controller.state.value.auth is WalletAuthState.StorageUnavailable)
+        assertEquals(0, pinStore.setPinCalls)
+        assertEquals(0, wallet.bootstrapCalls)
+
+        pinStore.isAvailable = true
+        controller.retryPinStorage()
+
+        assertTrue(controller.state.value.auth is WalletAuthState.Login)
+    }
+
+    @Test
     fun setupPinRejectsInvalidLengthAndNonDigits() = runTest {
         val controller = controllerWith(FakeDemoWallet(), this)
 
@@ -45,7 +68,8 @@ class WalletDemoControllerTest {
     @Test
     fun setupPinUnlocksAndBootstrapsWallet() = runTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
-        val controller = controllerWith(wallet, this)
+        val pinStore = InMemoryDemoPinStore()
+        val controller = controllerWith(wallet, this, pinStore)
 
         controller.updatePin("1234")
         controller.updatePinConfirmation("1234")
@@ -59,6 +83,44 @@ class WalletDemoControllerTest {
         assertEquals("did:key:test", session.did)
         assertEquals(listOf(sampleCredential), session.credentials)
         assertEquals(1, wallet.bootstrapCalls)
+        assertTrue(pinStore.hasPin())
+    }
+
+    @Test
+    fun configuredPinStartsRecreatedControllerInLoginAndUnlocksWithOriginalPin() = runTest {
+        val pinStore = InMemoryDemoPinStore()
+        val firstController = controllerWith(FakeDemoWallet(), this, pinStore)
+        firstController.updatePin("1234")
+        firstController.updatePinConfirmation("1234")
+        firstController.submitPin()
+        runCurrent()
+
+        val recreatedWallet = FakeDemoWallet()
+        val recreatedController = controllerWith(recreatedWallet, this, pinStore)
+
+        assertTrue(recreatedController.state.value.auth is WalletAuthState.Login)
+        recreatedController.updatePin("1234")
+        recreatedController.submitPin()
+        runCurrent()
+
+        assertTrue(recreatedController.state.value.auth is WalletAuthState.Unlocked)
+        assertTrue(recreatedController.state.value.session is WalletSessionState.Ready)
+        assertEquals(1, recreatedWallet.bootstrapCalls)
+    }
+
+    @Test
+    fun recreatedControllerRejectsWrongPin() = runTest {
+        val pinStore = InMemoryDemoPinStore().also { it.setPin("1234") }
+        val controller = controllerWith(FakeDemoWallet(), this, pinStore)
+
+        controller.updatePin("9999")
+        controller.submitPin()
+        runCurrent()
+
+        val auth = controller.state.value.auth as WalletAuthState.Login
+        assertEquals("Wrong PIN", auth.error)
+        assertFalse(controller.state.value.isAuthenticating)
+        assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
     }
 
     @Test
@@ -68,6 +130,7 @@ class WalletDemoControllerTest {
         controller.lock()
         controller.updatePin("9999")
         controller.submitPin()
+        runCurrent()
 
         val auth = controller.state.value.auth as WalletAuthState.Login
         assertEquals("Wrong PIN", auth.error)
@@ -98,7 +161,9 @@ class WalletDemoControllerTest {
         wallet.credentials = listOf(sampleCredential)
         controller.selectTab(WalletDemoTab.Receive)
         controller.updateOfferUrl("openid-credential-offer://example")
-        controller.receive()
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
         runCurrent()
 
         assertEquals("openid-credential-offer://example", wallet.resolvedOfferUrl)
@@ -120,7 +185,7 @@ class WalletDemoControllerTest {
         val controller = unlockedControllerWith(wallet, this)
 
         controller.updateOfferUrl("   ")
-        controller.receive()
+        controller.previewOffer()
         runCurrent()
 
         assertEquals(null, wallet.receivedOfferUrl)
@@ -130,7 +195,7 @@ class WalletDemoControllerTest {
     @Test
     fun receiveRequiresNonBlankTransactionCodeAndIssuesOnce() = runTest {
         val wallet = FakeDemoWallet(
-            offerResolution = true,
+            offerResolution = WalletDemoOfferPreview(transactionCodeRequired = true, credentialIssuer = "https://issuer.example", offeredCredentials = listOf("ExampleCredential")),
             receivedCredentialIds = listOf("cred-1"),
         )
         val controller = unlockedControllerWith(wallet, this)
@@ -138,23 +203,23 @@ class WalletDemoControllerTest {
 
         controller.selectTab(WalletDemoTab.Receive)
         controller.updateOfferUrl(offerUrl)
-        controller.receive()
+        controller.previewOffer()
         runCurrent()
 
         assertEquals(offerUrl, wallet.resolvedOfferUrl)
         assertEquals(0, wallet.receiveCalls)
         assertTrue(controller.state.value.requestDrafts.transactionCodeRequired)
-        assertFalse(controller.state.value.receiveActionEnabled)
-        assertEquals(WalletOperationState.Idle, controller.state.value.operation)
+        assertFalse(controller.state.value.acceptOfferEnabled)
+        assertEquals(WalletOperationState.OfferPreview, controller.state.value.operation)
 
-        controller.receive()
+        controller.acceptOffer()
         runCurrent()
         assertEquals(0, wallet.receiveCalls)
 
         controller.updateTxCode(" abc-123 ")
-        assertTrue(controller.state.value.receiveActionEnabled)
+        assertTrue(controller.state.value.acceptOfferEnabled)
         wallet.credentials = listOf(sampleCredential)
-        controller.receive()
+        controller.acceptOffer()
         runCurrent()
 
         assertEquals(1, wallet.receiveCalls)
@@ -167,11 +232,11 @@ class WalletDemoControllerTest {
 
     @Test
     fun changingOfferResetsTransactionCodeState() = runTest {
-        val wallet = FakeDemoWallet(offerResolution = true)
+        val wallet = FakeDemoWallet(offerResolution = WalletDemoOfferPreview(transactionCodeRequired = true, credentialIssuer = "https://issuer.example", offeredCredentials = listOf("ExampleCredential")))
         val controller = unlockedControllerWith(wallet, this)
 
         controller.updateOfferUrl("openid-credential-offer://first")
-        controller.receive()
+        controller.previewOffer()
         runCurrent()
         controller.updateTxCode("1234")
 
@@ -188,8 +253,8 @@ class WalletDemoControllerTest {
         val controller = unlockedControllerWith(wallet, this)
 
         controller.updateOfferUrl("openid-credential-offer://example")
-        controller.receive()
-        controller.receive()
+        controller.previewOffer()
+        controller.previewOffer()
         runCurrent()
 
         assertEquals(1, wallet.resolveOfferCalls)
@@ -197,6 +262,8 @@ class WalletDemoControllerTest {
 
         wallet.credentials = listOf(sampleCredential)
         resolutionGate.complete(Unit)
+        runCurrent()
+        controller.acceptOffer()
         runCurrent()
 
         assertEquals(1, wallet.receiveCalls)
@@ -207,7 +274,7 @@ class WalletDemoControllerTest {
     fun staleOfferResolutionCannotOverwriteIncomingDeepLink() = runTest {
         val resolutionGate = CompletableDeferred<Unit>()
         val wallet = FakeDemoWallet(
-            offerResolution = true,
+            offerResolution = WalletDemoOfferPreview(transactionCodeRequired = true, credentialIssuer = "https://issuer.example", offeredCredentials = listOf("ExampleCredential")),
             resolveOfferGate = resolutionGate,
             ignoreResolveCancellation = true,
         )
@@ -215,7 +282,7 @@ class WalletDemoControllerTest {
         val replacementOffer = "openid-credential-offer://replacement"
 
         controller.updateOfferUrl("openid-credential-offer://original")
-        controller.receive()
+        controller.previewOffer()
         runCurrent()
         controller.handleDeepLink(replacementOffer)
         resolutionGate.complete(Unit)
@@ -240,7 +307,7 @@ class WalletDemoControllerTest {
         val replacementOffer = "openid-credential-offer://replacement"
 
         controller.updateOfferUrl("openid-credential-offer://original")
-        controller.receive()
+        controller.previewOffer()
         runCurrent()
         controller.handleDeepLink(replacementOffer)
         resolutionGate.complete(Unit)
@@ -262,7 +329,7 @@ class WalletDemoControllerTest {
         val controller = unlockedControllerWith(wallet, this)
 
         controller.updateOfferUrl("openid-credential-offer://example")
-        controller.receive()
+        controller.previewOffer()
         runCurrent()
         val resetKeyBeforeLock = controller.state.value.receiveNavigationResetKey
 
@@ -282,17 +349,17 @@ class WalletDemoControllerTest {
     fun lockCancelsIssuanceAndClearsTransactionCode() = runTest {
         val receiveGate = CompletableDeferred<Unit>()
         val wallet = FakeDemoWallet(
-            offerResolution = true,
+            offerResolution = WalletDemoOfferPreview(transactionCodeRequired = true, credentialIssuer = "https://issuer.example", offeredCredentials = listOf("ExampleCredential")),
             receiveGate = receiveGate,
             ignoreReceiveCancellation = true,
         )
         val controller = unlockedControllerWith(wallet, this)
 
         controller.updateOfferUrl("openid-credential-offer://example")
-        controller.receive()
+        controller.previewOffer()
         runCurrent()
         controller.updateTxCode("123456")
-        controller.receive()
+        controller.acceptOffer()
         runCurrent()
         assertEquals(1, wallet.receiveCalls)
 
@@ -821,7 +888,9 @@ class WalletDemoControllerTest {
         val controller = unlockedControllerWith(wallet, this)
 
         controller.updateOfferUrl(offerUrl)
-        controller.receive()
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
         runCurrent()
         assertTrue(controller.state.value.receiveCompleted)
 
@@ -877,7 +946,9 @@ class WalletDemoControllerTest {
         assertTrue(controller.state.value.receiveActionEnabled)
 
         wallet.credentials = listOf(sampleCredential)
-        controller.receive()
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
         runCurrent()
 
         assertTrue(controller.state.value.receiveCompleted)
@@ -909,7 +980,9 @@ class WalletDemoControllerTest {
         wallet.credentials = listOf(existingCredential, newCredential)
         controller.selectTab(WalletDemoTab.Receive)
         controller.updateOfferUrl("openid-credential-offer://example")
-        controller.receive()
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
         runCurrent()
 
         assertTrue(controller.state.value.receiveCompleted)
@@ -925,7 +998,9 @@ class WalletDemoControllerTest {
 
         controller.selectTab(WalletDemoTab.Receive)
         controller.updateOfferUrl("openid-credential-offer://example")
-        controller.receive()
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
         runCurrent()
 
         assertFalse(controller.state.value.receiveCompleted)
@@ -1002,9 +1077,14 @@ class WalletDemoControllerTest {
         assertEquals("Wallet ready", controller.state.value.statusText)
     }
 
-    private fun controllerWith(wallet: DemoWallet, scope: TestScope): WalletDemoController =
+    private fun controllerWith(
+        wallet: DemoWallet,
+        scope: TestScope,
+        pinStore: DemoPinStore = InMemoryDemoPinStore(),
+    ): WalletDemoController =
         WalletDemoController(
             wallet = wallet,
+            pinStore = pinStore,
             scope = scope.backgroundScope,
             dispatcher = StandardTestDispatcher(scope.testScheduler),
         )
@@ -1031,10 +1111,26 @@ class WalletDemoControllerTest {
     }
 }
 
+private class RecoverableDemoPinStore : DemoPinStore {
+    var isAvailable = false
+    var setPinCalls = 0
+
+    override fun hasPin(): Boolean {
+        check(isAvailable) { "PIN storage is unavailable" }
+        return true
+    }
+
+    override suspend fun setPin(pin: String) {
+        setPinCalls += 1
+    }
+
+    override suspend fun verifyPin(pin: String): Boolean = true
+}
+
 private class FakeDemoWallet(
     var credentials: List<WalletDemoCredential> = emptyList(),
     private val receivedCredentialIds: List<String> = listOf("cred-1"),
-    private val offerResolution: Boolean = false,
+    private val offerResolution: WalletDemoOfferPreview = WalletDemoOfferPreview(transactionCodeRequired = false, credentialIssuer = "https://issuer.example", offeredCredentials = listOf("ExampleCredential")),
     private val resolveOfferGate: CompletableDeferred<Unit>? = null,
     private val ignoreResolveCancellation: Boolean = false,
     private val resolveOfferError: Throwable? = null,
@@ -1066,7 +1162,7 @@ private class FakeDemoWallet(
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 
-    override suspend fun resolveOffer(offerUrl: String): Boolean {
+    override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview {
         resolveOfferCalls += 1
         resolvedOfferUrl = offerUrl
         if (ignoreResolveCancellation) {

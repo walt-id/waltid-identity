@@ -47,30 +47,35 @@ This directory contains production-ready services built on top of the walt.id li
 
 ### Core Services
 
-### [🟠 waltid-issuer-api](./waltid-issuer-api)
-Credential Issuer API service (legacy, planned for deprecation). Provides a complete REST API for issuing verifiable credentials in multiple formats (W3C, SD-JWT, mdoc). Supports OpenID4VCI draft flows, credential templates, and issuer metadata management.
-
-**Use when:** You need compatibility with existing draft-based issuer integrations. For new OpenID4VCI 1.0 integrations, use [waltid-issuer-api2](./waltid-issuer-api2).
-
 ### [🟢 waltid-issuer-api2](./waltid-issuer-api2)
 Issuer API 2 service (OpenID4VCI 1.0). Modern issuer service for profile-based credential offers, OpenID4VCI metadata, authorization and token flows, credential issuance, nonce handling, session inspection, and SSE session updates.
 
 **Use when:** You need a production-ready issuer service for OpenID4VCI 1.0 credential issuance workflows.
-
-### [🟠 waltid-verifier-api](./waltid-verifier-api)
-Verifier API service (legacy). Provides a REST API for requesting and verifying verifiable presentations using OpenID4VP draft implementations (draft 14, draft 20) with Presentation Definition support.
-
-**Use when:** You need a verifier service that supports OpenID4VP draft specifications or requires Presentation Definition-based verification.
 
 ### [🟢 waltid-verifier-api2](./waltid-verifier-api2)
 Verifier API 2 service (OpenID4VP 1.0). Modern verifier service implementing OpenID4VP 1.0 with DCQL (Digital Credentials Query Language) support. Provides session management, SSE/webhook notifications, and comprehensive verification policy support.
 
 **Use when:** You need a production-ready verifier service that supports OpenID4VP 1.0, DCQL queries, and modern verification workflows.
 
-### [🟢 waltid-wallet-api](./waltid-wallet-api)
+### [🟢 waltid-wallet-api2](./waltid-wallet-api2)
 Wallet API service. Complete wallet backend service providing credential storage, presentation management, OpenID4VCI/OpenID4VP flows, and wallet management APIs. Supports multiple credential formats and provides comprehensive wallet functionality.
 
 **Use when:** You need a production-ready wallet backend service for storing credentials, handling issuance/presentation flows, and managing wallet operations.
+
+### [🟠 waltid-issuer-api](./waltid-issuer-api)
+Credential Issuer API service (legacy, planned for deprecation). Provides a complete REST API for issuing verifiable credentials in multiple formats (W3C, SD-JWT, mdoc). Supports OpenID4VCI draft flows, credential templates, and issuer metadata management.
+
+**Use when:** You need compatibility with existing draft-based issuer integrations. For new OpenID4VCI 1.0 integrations, use [waltid-issuer-api2](./waltid-issuer-api2).
+
+### [🟠 waltid-verifier-api](./waltid-verifier-api)
+Verifier API service (legacy). Provides a REST API for requesting and verifying verifiable presentations using OpenID4VP draft implementations (draft 14, draft 20) with Presentation Definition support.
+
+**Use when:** You need a verifier service that supports OpenID4VP draft specifications or requires Presentation Definition-based verification.
+
+### [🟠 waltid-wallet-api](./waltid-wallet-api)
+Wallet API service. Complete wallet backend service providing credential storage, presentation management, OpenID4VCI/OpenID4VP flows, and wallet management APIs. Supports multiple credential formats and provides comprehensive wallet functionality.
+
+**Use when:** You need compatibility with draft-based wallet integrations. For new OpenID4VCI/OpenID4VP 1.0 integrations, use [waltid-wallet-api2](./waltid-wallet-api2).
 
 ### [🟡 waltid-web3login-microservice](./waltid-web3login-microservice)
 Web3 login microservice. Provides authentication services using Web3 wallet signatures for decentralized identity applications.

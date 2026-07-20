@@ -38,6 +38,8 @@ kotlin {
                     implementation(identityLibs.ktor.client.core)
                     implementation(identityLibs.ktor.client.content.negotiation)
                     implementation(identityLibs.ktor.serialization.kotlinx.json)
+                    implementation(identityLibs.cryptography.core)
+                    implementation(identityLibs.whyoleg.cryptography.random)
                 }
             }
 
@@ -48,6 +50,13 @@ kotlin {
 
                 androidMain.dependencies {
                     implementation(identityLibs.ktor.client.android)
+                }
+
+                getByName("androidDeviceTest").dependencies {
+                    implementation(kotlin("test"))
+                    implementation(identityLibs.kotlinx.coroutines.test)
+                    implementation(identityLibs.androidx.test.ext.junit)
+                    implementation(identityLibs.androidx.test.runner)
                 }
             }
 

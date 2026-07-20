@@ -2,6 +2,7 @@ package id.walt.openid4vci.handlers.credential
 
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
@@ -50,7 +51,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler {
             if (configuration.format !in supportedFormats) {
                 return CredentialResponseResult.Failure(
                     OAuthError(
-                        "unsupported_credential_configuration",
+                        CredentialErrorCodes.UNSUPPORTED_CREDENTIAL_CONFIGURATION,
                         "Unsupported format ${configuration.format.value}"
                     )
                 )
