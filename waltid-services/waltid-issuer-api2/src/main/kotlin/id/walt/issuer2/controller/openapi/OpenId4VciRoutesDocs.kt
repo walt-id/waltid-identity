@@ -1,6 +1,7 @@
 package id.walt.issuer2.controller.openapi
 
 import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
 import io.github.smiley4.ktoropenapi.config.RouteConfig
@@ -14,10 +15,25 @@ object OpenId4VciRoutesDocs {
     fun credentialIssuerMetadata(): RouteConfig.() -> Unit = {
         tags = listOf(OPENID4VCI_TAG)
         summary = "Get Credential Issuer metadata"
+        request {
+            headerParameter<String>("Accept") {
+                required = false
+                description =
+                    "Use application/jwt or application/openidvci-issuer-metadata+jwt for signed metadata; defaults to application/json."
+            }
+        }
         response {
             HttpStatusCode.OK to {
-                description = "OpenID4VCI Credential Issuer metadata"
-                body<JsonObject>()
+                description = "Unsigned JSON or signed OpenID4VCI Credential Issuer metadata"
+                body<JsonObject> {
+                    mediaTypes(ContentType.Application.Json)
+                }
+                body<String> {
+                    mediaTypes(
+                        ContentType.parse(CredentialIssuerMetadataJwt.MEDIA_TYPE),
+                        ContentType.parse(CredentialIssuerMetadataJwt.TYPED_MEDIA_TYPE),
+                    )
+                }
             }
         }
     }
