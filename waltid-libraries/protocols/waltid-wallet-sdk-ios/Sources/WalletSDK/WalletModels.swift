@@ -811,12 +811,29 @@ public struct WalletBootstrapResult: Equatable, Sendable {
 
 /// Input used to start either OpenID4VCI issuance grant.
 public struct IssuanceRequest: Equatable, Sendable, CustomStringConvertible {
+    /// Credential-offer URL to resolve.
     public let offer: URL
+
+    /// OAuth client identifier used for the issuance session.
     public let clientID: String
+
+    /// Exact callback URI registered for authorization-code issuance.
     public let redirectURI: URL
+
+    /// Optional identifier of the holder key used for DPoP and credential proofs.
     public let keyID: String?
+
+    /// Optional holder DID URL used when the credential requires DID binding.
     public let did: String?
 
+    /// Creates an issuance request.
+    ///
+    /// - Parameters:
+    ///   - offer: Credential-offer URL to resolve.
+    ///   - clientID: OAuth client identifier used for the issuance session.
+    ///   - redirectURI: Exact registered callback URI.
+    ///   - keyID: Optional identifier of the selected holder key.
+    ///   - did: Optional holder DID URL identifying the selected key.
     public init(
         offer: URL,
         clientID: String = "eudiw-abca",
@@ -831,21 +848,38 @@ public struct IssuanceRequest: Equatable, Sendable, CustomStringConvertible {
         self.did = did
     }
 
+    /// A diagnostic description that redacts the offer and holder identifiers.
     public var description: String {
         "IssuanceRequest(offer: <redacted>, clientID: \(clientID), redirectURI: \(redirectURI), keyID: \(keyID == nil ? "nil" : "<redacted>"), did: \(did == nil ? "nil" : "<redacted>"))"
     }
 }
 
+/// OAuth grant selected by the resolved credential offer.
 public enum IssuanceGrant: Equatable, Sendable {
+    /// Issuance using a pre-authorized code and optional transaction code.
     case preAuthorizedCode
+
+    /// Issuance using browser authorization and an authorization code.
     case authorizationCode
 }
 
+/// Transaction-code input requested by a pre-authorized credential offer.
 public struct IssuanceTransactionCode: Equatable, Sendable {
+    /// Expected input mode, such as numeric or text.
     public let inputMode: String?
+
+    /// Expected number of characters when specified by the issuer.
     public let length: Int?
+
+    /// Optional user-facing instructions supplied by the issuer.
     public let descriptionText: String?
 
+    /// Creates a transaction-code requirement.
+    ///
+    /// - Parameters:
+    ///   - inputMode: Expected input mode.
+    ///   - length: Expected number of characters.
+    ///   - descriptionText: Optional user-facing instructions.
     public init(inputMode: String?, length: Int?, descriptionText: String?) {
         self.inputMode = inputMode
         self.length = length
@@ -853,13 +887,31 @@ public struct IssuanceTransactionCode: Equatable, Sendable {
     }
 }
 
+/// Display-safe issuer information resolved from credential issuer metadata.
 public struct IssuanceIssuerPreview: Equatable, Sendable {
+    /// Credential issuer identifier.
     public let identifier: String
+
+    /// Localized issuer name when advertised.
     public let name: String?
+
+    /// Locale associated with the selected display entry.
     public let locale: String?
+
+    /// Issuer logo URL when advertised.
     public let logoURI: URL?
+
+    /// Alternative text for the issuer logo.
     public let logoAltText: String?
 
+    /// Creates an issuer preview.
+    ///
+    /// - Parameters:
+    ///   - identifier: Credential issuer identifier.
+    ///   - name: Localized issuer name.
+    ///   - locale: Locale associated with the display entry.
+    ///   - logoURI: Issuer logo URL.
+    ///   - logoAltText: Alternative text for the issuer logo.
     public init(identifier: String, name: String?, locale: String?, logoURI: URL?, logoAltText: String?) {
         self.identifier = identifier
         self.name = name
@@ -869,13 +921,31 @@ public struct IssuanceIssuerPreview: Equatable, Sendable {
     }
 }
 
+/// Display-safe credential configuration offered by an issuer.
 public struct IssuanceCredentialPreview: Equatable, Sendable {
+    /// Issuer-defined credential configuration identifier.
     public let configurationID: String
+
+    /// OpenID4VCI credential format identifier.
     public let format: String
+
+    /// Localized credential name when advertised.
     public let name: String?
+
+    /// Localized credential description when advertised.
     public let descriptionText: String?
+
+    /// Credential logo URL when advertised.
     public let logoURI: URL?
 
+    /// Creates a credential preview.
+    ///
+    /// - Parameters:
+    ///   - configurationID: Issuer-defined credential configuration identifier.
+    ///   - format: OpenID4VCI credential format identifier.
+    ///   - name: Localized credential name.
+    ///   - descriptionText: Localized credential description.
+    ///   - logoURI: Credential logo URL.
     public init(configurationID: String, format: String, name: String?, descriptionText: String?, logoURI: URL?) {
         self.configurationID = configurationID
         self.format = format
@@ -885,12 +955,27 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     }
 }
 
+/// Typed preview of a resolved OpenID4VCI credential offer.
 public struct IssuanceOfferPreview: Equatable, Sendable {
+    /// OAuth grant selected by the offer.
     public let grant: IssuanceGrant
+
+    /// Issuer information suitable for review UI.
     public let issuer: IssuanceIssuerPreview
+
+    /// Credential configurations included in the offer.
     public let credentials: [IssuanceCredentialPreview]
+
+    /// Transaction-code requirement for pre-authorized issuance, if any.
     public let transactionCode: IssuanceTransactionCode?
 
+    /// Creates an offer preview.
+    ///
+    /// - Parameters:
+    ///   - grant: OAuth grant selected by the offer.
+    ///   - issuer: Issuer information suitable for review UI.
+    ///   - credentials: Credential configurations included in the offer.
+    ///   - transactionCode: Optional transaction-code requirement.
     public init(
         grant: IssuanceGrant,
         issuer: IssuanceIssuerPreview,
@@ -906,16 +991,28 @@ public struct IssuanceOfferPreview: Equatable, Sendable {
 
 /// PKCE continuation material. Its textual representation always redacts the verifier.
 public struct IssuancePKCEState: Equatable, Sendable, CustomStringConvertible {
+    /// High-entropy verifier retained for the authorization-code exchange.
     public let codeVerifier: String
+
+    /// S256 challenge sent in the authorization request.
     public let codeChallenge: String
+
+    /// PKCE challenge method, normally `S256`.
     public let codeChallengeMethod: String
 
+    /// Creates PKCE continuation material.
+    ///
+    /// - Parameters:
+    ///   - codeVerifier: High-entropy verifier retained for token exchange.
+    ///   - codeChallenge: Challenge sent in the authorization request.
+    ///   - codeChallengeMethod: PKCE challenge method.
     public init(codeVerifier: String, codeChallenge: String, codeChallengeMethod: String) {
         self.codeVerifier = codeVerifier
         self.codeChallenge = codeChallenge
         self.codeChallengeMethod = codeChallengeMethod
     }
 
+    /// A diagnostic description that redacts PKCE secret material.
     public var description: String {
         "IssuancePKCEState(codeVerifier: <redacted>, codeChallenge: <redacted>, codeChallengeMethod: \(codeChallengeMethod))"
     }
@@ -923,12 +1020,29 @@ public struct IssuancePKCEState: Equatable, Sendable, CustomStringConvertible {
 
 /// Browser authorization request and callback binding for an issuance session.
 public struct IssuanceAuthorization: Equatable, Sendable, CustomStringConvertible {
+    /// Authorization URL to open in the system browser.
     public let url: URL
+
+    /// OAuth state value bound to this issuance session.
     public let state: String
+
+    /// Exact redirect URI expected for the callback.
     public let redirectURI: URL
+
+    /// PKCE material bound to the authorization request.
     public let pkce: IssuancePKCEState
+
+    /// Indicates whether the request was submitted through PAR.
     public let pushedAuthorizationRequestUsed: Bool
 
+    /// Creates browser authorization continuation data.
+    ///
+    /// - Parameters:
+    ///   - url: Authorization URL to open in the system browser.
+    ///   - state: OAuth state value bound to the session.
+    ///   - redirectURI: Exact redirect URI expected for the callback.
+    ///   - pkce: PKCE material bound to the request.
+    ///   - pushedAuthorizationRequestUsed: Whether PAR was used.
     public init(
         url: URL,
         state: String,
@@ -943,16 +1057,29 @@ public struct IssuanceAuthorization: Equatable, Sendable, CustomStringConvertibl
         self.pushedAuthorizationRequestUsed = pushedAuthorizationRequestUsed
     }
 
+    /// A diagnostic description that redacts authorization and PKCE values.
     public var description: String {
         "IssuanceAuthorization(url: <redacted>, state: <redacted>, redirectURI: \(redirectURI), pkce: \(pkce), pushedAuthorizationRequestUsed: \(pushedAuthorizationRequestUsed))"
     }
 }
 
+/// Durable issuance session returned after resolving and validating an offer.
 public struct IssuanceSession: Equatable, Sendable {
+    /// Opaque identifier used to continue or cancel this session.
     public let id: String
+
+    /// Typed offer preview for application review UI.
     public let offer: IssuanceOfferPreview
+
+    /// Browser authorization data for authorization-code issuance.
     public let authorization: IssuanceAuthorization?
 
+    /// Creates an issuance session.
+    ///
+    /// - Parameters:
+    ///   - id: Opaque session identifier.
+    ///   - offer: Typed offer preview.
+    ///   - authorization: Browser authorization data when required.
     public init(id: String, offer: IssuanceOfferPreview, authorization: IssuanceAuthorization?) {
         self.id = id
         self.offer = offer
@@ -960,11 +1087,23 @@ public struct IssuanceSession: Equatable, Sendable {
     }
 }
 
+/// Credential issuance operation that must be resumed after issuer processing.
 public struct DeferredCredential: Equatable, Sendable {
+    /// Opaque identifier used to resume this deferred operation.
     public let id: String
+
+    /// Credential configuration associated with the operation.
     public let credentialConfigurationID: String
+
+    /// Issuer-recommended minimum polling interval in seconds.
     public let intervalSeconds: Int64?
 
+    /// Creates a deferred credential continuation.
+    ///
+    /// - Parameters:
+    ///   - id: Opaque deferred operation identifier.
+    ///   - credentialConfigurationID: Credential configuration being issued.
+    ///   - intervalSeconds: Issuer-recommended polling interval.
     public init(id: String, credentialConfigurationID: String, intervalSeconds: Int64?) {
         self.id = id
         self.credentialConfigurationID = credentialConfigurationID
@@ -972,23 +1111,52 @@ public struct DeferredCredential: Equatable, Sendable {
     }
 }
 
+/// Stable category for a sanitized issuance failure.
 public enum IssuanceErrorCode: Equatable, Sendable {
+    /// The session identifier is unknown, expired, or already consumed.
     case invalidSession
+
+    /// The authorization callback failed session or redirect validation.
     case invalidCallback
+
+    /// Required application input is missing or invalid.
     case invalidInput
+
+    /// The authorization server returned an OAuth authorization error.
     case authorizationFailed
+
+    /// Issuer or authorization server metadata is invalid or unsupported.
     case issuerMetadata
+
+    /// The issuer or authorization server rejected a protocol request.
     case issuerResponse
+
+    /// A transport failure prevented issuer communication.
     case network
+
+    /// Key selection, signing, or proof generation failed.
     case crypto
+
+    /// Credential parsing or local persistence failed.
     case storage
+
+    /// A protocol response was structurally invalid or inconsistent.
     case `protocol`
 }
 
+/// Sanitized error returned by a typed issuance transition.
 public struct IssuanceFailure: Equatable, Sendable {
+    /// Stable error category suitable for application control flow.
     public let code: IssuanceErrorCode
+
+    /// Public error description that excludes protocol secrets.
     public let message: String
 
+    /// Creates a sanitized issuance failure.
+    ///
+    /// - Parameters:
+    ///   - code: Stable error category.
+    ///   - message: Public error description.
     public init(code: IssuanceErrorCode, message: String) {
         self.code = code
         self.message = message
@@ -997,9 +1165,16 @@ public struct IssuanceFailure: Equatable, Sendable {
 
 /// Immediate, deferred, cancelled, or failed result of one issuance transition.
 public enum IssuanceOutcome: Equatable, Sendable {
+    /// All returned credentials were stored successfully.
     case stored(sessionID: String, credentialIDs: [String])
+
+    /// At least one credential is awaiting issuer processing.
     case deferred(sessionID: String, storedCredentialIDs: [String], credentials: [DeferredCredential])
+
+    /// The user or authorization server cancelled the issuance session.
     case cancelled(sessionID: String)
+
+    /// The transition failed with a sanitized error and any credentials stored before the failure.
     case failed(sessionID: String, error: IssuanceFailure, storedCredentialIDs: [String])
 }
 
