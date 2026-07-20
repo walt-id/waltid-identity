@@ -58,6 +58,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import java.util.UUID
@@ -75,6 +76,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     private val metadataService: MetadataService,
     private val notificationService: IssuanceNotificationService,
     private val credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null,
+    private val credentialProofKeyCommitment: CredentialProofKeyCommitment? = null,
 ) {
     private var injectedCredentialNonceService: CredentialNonceService? = null
     private val credentialNonceService by lazy { injectedCredentialNonceService ?: CredentialNonceService() }
@@ -94,6 +96,27 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         metadataService = metadataService,
         notificationService = notificationService,
         credentialProofKeyAcceptance = credentialProofKeyAcceptance,
+        credentialProofKeyCommitment = null,
+        credentialNonceService = credentialNonceService,
+    )
+
+    constructor(
+        oauth2Provider: OAuth2Provider,
+        sessionService: IssuanceSessionService,
+        profileService: CredentialProfileService,
+        metadataService: MetadataService,
+        notificationService: IssuanceNotificationService,
+        credentialProofKeyAcceptance: CredentialProofKeyAcceptance?,
+        credentialProofKeyCommitment: CredentialProofKeyCommitment?,
+        credentialNonceService: CredentialNonceService,
+    ) : this(
+        oauth2Provider = oauth2Provider,
+        sessionService = sessionService,
+        profileService = profileService,
+        metadataService = metadataService,
+        notificationService = notificationService,
+        credentialProofKeyAcceptance = credentialProofKeyAcceptance,
+        credentialProofKeyCommitment = credentialProofKeyCommitment,
     ) {
         injectedCredentialNonceService = credentialNonceService
     }
@@ -386,6 +409,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         }
 
         var claimFinalized = false
+        var committedProofKeyJwk: JsonObject? = null
         try {
             if (session.credentialConfigurationId != credentialConfigurationId) {
                 claimFinalized = true
@@ -414,8 +438,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             val issuerKey = KeyManager.resolveSerializedKey(session.issuerKey)
             val x5Chain = session.x5Chain?.map { CertificateDer.fromPEMEncodedString(it) }
 
-            credentialProofKeyAcceptance?.let { acceptance ->
-                val proofPublicKeyJwk = try {
+            val proofPublicKeyJwk = if (credentialProofKeyAcceptance != null || credentialProofKeyCommitment != null) {
+                try {
                     credentialProofKey.getPublicKey().exportJWKObject()
                 } catch (e: CancellationException) {
                     throw e
@@ -428,10 +452,22 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     claimFinalized = true
                     return response
                 }
+            } else {
+                null
+            }
+            credentialProofKeyAcceptance?.let { acceptance ->
                 val accepted = try {
-                    acceptance.accept(session, proofPublicKeyJwk)
+                    acceptance.accept(session, requireNotNull(proofPublicKeyJwk))
                 } catch (e: CancellationException) {
                     throw e
+                } catch (e: CredentialProofKeyAcceptanceException) {
+                    val response = if (e.retryable) {
+                        retryCredentialRequest(requestWithSession, session, e.toCredentialError())
+                    } else {
+                        failCredentialRequest(requestWithSession, session, e.toCredentialError())
+                    }
+                    claimFinalized = true
+                    return response
                 } catch (e: Exception) {
                     val response = retryCredentialRequest(requestWithSession, session, e.toCredentialError())
                     claimFinalized = true
@@ -499,17 +535,63 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 }
             }
 
-            claimFinalized = true
-            val updatedSession = withContext(NonCancellable) {
-                sessionService.saveSession(
-                    session.copy(
-                        status = IssuanceSessionStatus.SUCCESSFUL,
-                        statusReason = "Credential issued successfully",
-                        issuedCredentialFormat = configuration.format.value,
-                        isClosed = true,
+            credentialProofKeyCommitment?.let { commitment ->
+                val committed = try {
+                    commitment.commit(session, requireNotNull(proofPublicKeyJwk))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: CredentialProofKeyAcceptanceException) {
+                    val response = if (e.retryable) {
+                        retryCredentialRequest(requestWithSession, session, e.toCredentialError())
+                    } else {
+                        failCredentialRequest(requestWithSession, session, e.toCredentialError())
+                    }
+                    claimFinalized = true
+                    return response
+                } catch (e: Exception) {
+                    val response = retryCredentialRequest(requestWithSession, session, e.toCredentialError())
+                    claimFinalized = true
+                    return response
+                }
+                if (!committed) {
+                    claimFinalized = true
+                    return failCredentialRequest(
+                        requestWithSession,
+                        session,
+                        OAuthError("invalid_proof", "Credential proof key could not be committed"),
                     )
+                }
+                committedProofKeyJwk = proofPublicKeyJwk
+            }
+
+            val updatedSession = try {
+                withContext(NonCancellable) {
+                    sessionService.saveSession(
+                        session.copy(
+                            status = IssuanceSessionStatus.SUCCESSFUL,
+                            statusReason = "Credential issued successfully",
+                            issuedCredentialFormat = configuration.format.value,
+                            isClosed = true,
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                val retrySession = session.copy(
+                    expectedCredentialProofKeyJwk = session.expectedCredentialProofKeyJwk ?: proofPublicKeyJwk,
+                )
+                try {
+                    restoreClaimedSession(retrySession)
+                } catch (restoreException: Exception) {
+                    e.addSuppressed(restoreException)
+                    throw e
+                }
+                claimFinalized = true
+                return oauth2Provider.writeCredentialError(
+                    requestWithSession,
+                    OAuthError(OAuthErrorCodes.SERVER_ERROR, "Credential finalization failed; retry the request"),
                 )
             }
+            claimFinalized = true
 
             val issuedCredential = credentialResponse.credentials
                 ?.firstOrNull()
@@ -527,7 +609,11 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             return oauth2Provider.writeCredentialResponse(requestWithSession, credentialResponse)
         } catch (e: CancellationException) {
             if (!claimFinalized) {
-                restoreClaimedSession(session)
+                restoreClaimedSession(
+                    session.copy(
+                        expectedCredentialProofKeyJwk = session.expectedCredentialProofKeyJwk ?: committedProofKeyJwk,
+                    )
+                )
             }
             throw e
         } catch (e: Exception) {
@@ -703,17 +789,23 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         }
         val decodedProof = proof.decodeJws()
         val key = decodedProof.header.let { proofHeader ->
+            val hasJwk = "jwk" in proofHeader
+            val hasKid = "kid" in proofHeader
+            require(hasJwk xor hasKid) {
+                "Credential proof header must contain exactly one of jwk or kid"
+            }
+            val jwk = proofHeader["jwk"] as? JsonObject
+            val kid = proofHeader["kid"]?.jsonPrimitive?.contentOrNull
             when {
-                proofHeader["jwk"] is JsonObject ->
-                    JWKKey.importJWK(requireNotNull(proofHeader["jwk"]).toString()).getOrThrow()
+                hasJwk -> JWKKey.importJWK(requireNotNull(jwk) { "Credential proof jwk must be an object" }.toString()).getOrThrow()
 
-                proofHeader["kid"] != null -> {
-                    val kid = requireNotNull(proofHeader["kid"]?.jsonPrimitive?.contentOrNull)
+                hasKid -> {
+                    requireNotNull(kid) { "Credential proof kid must be a string" }
                     require(DidUtils.isDidUrl(kid)) { "Credential proof kid must be a DID URL" }
-                    DidService.resolveToKey(kid.substringBefore("#")).getOrThrow()
+                    resolveCredentialProofKid(kid)
                 }
 
-                else -> error("Credential proof header must contain jwk or kid")
+                else -> error("Credential proof key identifier is missing")
             }
         }
         key.verifyJws(proof).getOrThrow()
@@ -742,6 +834,18 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         }
         require(credentialNonceService.consumeNonce(nonce)) { "Credential proof nonce is invalid or already used" }
         return key
+    }
+
+    private suspend fun resolveCredentialProofKid(kid: String): Key {
+        val did = kid.substringBefore("#")
+        val document = DidService.resolve(did).getOrThrow()
+        val method = document["verificationMethod"]?.jsonArray
+            ?.map(JsonElement::jsonObject)
+            ?.firstOrNull { it["id"]?.jsonPrimitive?.contentOrNull == kid }
+            ?: throw IllegalArgumentException("Credential proof kid does not identify a DID verification method")
+        val jwk = method["publicKeyJwk"] as? JsonObject
+            ?: throw IllegalArgumentException("Credential proof verification method has no publicKeyJwk")
+        return JWKKey.importJWK(jwk.toString()).getOrThrow()
     }
 
     private suspend fun failCredentialRequest(
