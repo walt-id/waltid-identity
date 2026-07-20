@@ -33,7 +33,6 @@ internal object WalletUiTestTags {
     val PresentationVerifier = tag("presentationVerifier")
     val PresentationCancelButton = tag("presentationCancelButton")
     val PresentationVerifierSection = tag("presentationVerifierSection")
-    val PresentationVerifierInformationSection = tag("presentationVerifierInformationSection")
     val PresentationResponseProtectionSection = tag("presentationResponseProtectionSection")
     val PresentationTechnicalDetailsSection = tag("presentationTechnicalDetailsSection")
     val VerifierTechnicalDetailsToggle = tag("verifierTechnicalDetailsToggle")

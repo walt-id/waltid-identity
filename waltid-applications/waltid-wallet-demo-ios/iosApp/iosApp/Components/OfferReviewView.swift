@@ -53,6 +53,10 @@ struct OfferReviewView: View {
                     .disableAutocorrection(true)
                     .padding(8)
                     .frame(minHeight: 52)
+                    .background(
+                        isReviewEnabled ? Color(.systemBackground) : Color(.secondarySystemFill),
+                        in: RoundedRectangle(cornerRadius: 8)
+                    )
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(.separator), lineWidth: 1))
                     .disabled(!isReviewEnabled)
                     .accessibilityIdentifier(WalletAccessibilityID.txCodeInput)
@@ -96,12 +100,22 @@ private struct OfferedCredentialView: View {
                 fallbackName: title,
                 supportingText: credential.display?.description
             )
-            MetadataDetailLine(label: "Format", value: credential.format)
-            MetadataDetailLine(label: "Type", value: credential.vct ?? credential.doctype)
+            let details = [
+                MetadataDetailItem(label: "Format", value: credential.format),
+                MetadataDetailItem(label: "Type", value: credential.vct ?? credential.doctype),
+            ].filter(\.isVisible)
+            if !details.isEmpty {
+                Divider()
+                MetadataDetailList(items: details)
+            }
             if !credential.claims.isEmpty {
+                Divider()
                 Text("Claims")
                     .font(.caption.weight(.medium))
-                ForEach(Array(credential.claims.enumerated()), id: \.offset) { _, claim in
+                ForEach(Array(credential.claims.enumerated()), id: \.offset) { index, claim in
+                    if index > 0 {
+                        Divider()
+                    }
                     let fallback = claim.path.joined(separator: ".")
                     let trimmedName = claim.displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
                     let name = trimmedName.flatMap { value in value.isEmpty ? nil : value } ?? fallback

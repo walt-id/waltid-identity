@@ -29,7 +29,6 @@ enum WalletAccessibilityID {
     static let presentationVerifier = identifier("presentationVerifier")
     static let presentationCancelButton = identifier("presentationCancelButton")
     static let presentationVerifierSection = identifier("presentationVerifierSection")
-    static let presentationVerifierInformationSection = identifier("presentationVerifierInformationSection")
     static let presentationResponseProtectionSection = identifier("presentationResponseProtectionSection")
     static let presentationTechnicalDetailsSection = identifier("presentationTechnicalDetailsSection")
     static let verifierTechnicalDetailsToggle = identifier("verifierTechnicalDetailsToggle")
@@ -61,10 +60,6 @@ enum WalletAccessibilityID {
 
     static func presentationCredential(_ id: String) -> String {
         identifier("presentationCredential", id)
-    }
-
-    static func presentationDisclosure(_ id: String) -> String {
-        identifier("presentationDisclosure", id)
     }
 
     static func presentationDisclosureToggle(_ id: String) -> String {

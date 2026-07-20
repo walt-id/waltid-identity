@@ -9,6 +9,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -104,6 +105,10 @@ internal fun OfferReviewSection(
                         },
                     ),
                     visualTransformation = PasswordVisualTransformation(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag(WalletUiTestTags.TxCodeInput),
@@ -143,11 +148,21 @@ private fun OfferedCredentialContent(credential: WalletDemoOfferedCredentialMeta
             fallbackName = title,
             supportingText = credential.display?.description,
         )
-        MetadataDetailLine("Format", credential.format)
-        MetadataDetailLine("Type", credential.vct ?: credential.doctype)
+        val details = listOf(
+            MetadataDetailItem("Format", credential.format),
+            MetadataDetailItem("Type", credential.vct ?: credential.doctype),
+        ).filter { !it.value.isNullOrBlank() }
+        if (details.isNotEmpty()) {
+            MetadataRowDivider()
+            MetadataDetailList(details)
+        }
         if (credential.claims.isNotEmpty()) {
+            MetadataRowDivider()
             Text("Claims", style = MaterialTheme.typography.labelMedium)
-            credential.claims.forEach { claim -> CredentialClaimLine(claim) }
+            credential.claims.forEachIndexed { index, claim ->
+                if (index > 0) MetadataRowDivider()
+                CredentialClaimLine(claim)
+            }
         }
     }
 }

@@ -98,15 +98,65 @@ private struct MetadataLogoFallback: View {
     }
 }
 
-struct MetadataDetailLine: View {
+struct MetadataDetailItem {
     let label: String
     let value: String?
+    let linkURI: String?
+
+    init(label: String, value: String?, linkURI: String? = nil) {
+        self.label = label
+        self.value = value
+        self.linkURI = linkURI
+    }
+
+    var isVisible: Bool {
+        guard let value else { return false }
+        return !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+struct MetadataDetailList: View {
+    let items: [MetadataDetailItem]
+
+    private var visibleItems: [MetadataDetailItem] {
+        items.filter(\.isVisible)
+    }
 
     var body: some View {
-        if let value, !value.isEmpty {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(visibleItems.enumerated()), id: \.offset) { index, item in
+                if index > 0 {
+                    Divider()
+                }
+                MetadataDetailLine(item: item)
+            }
+        }
+    }
+}
+
+private struct MetadataDetailLine: View {
+    let item: MetadataDetailItem
+
+    private var linkURL: URL? {
+        guard let linkURI = item.linkURI,
+              let url = URL(string: linkURI),
+              url.scheme?.lowercased() == "https" else {
+            return nil
+        }
+        return url
+    }
+
+    var body: some View {
+        if let value = item.value, !value.isEmpty {
             VStack(alignment: .leading, spacing: 1) {
-                Text(label).font(.caption2).foregroundStyle(.secondary)
-                Text(value).font(.caption)
+                Text(item.label).font(.caption2).foregroundStyle(.secondary)
+                if let linkURL {
+                    Link(value, destination: linkURL)
+                        .font(.caption)
+                        .accessibilityIdentifier(value)
+                } else {
+                    Text(value).font(.caption)
+                }
             }
         }
     }

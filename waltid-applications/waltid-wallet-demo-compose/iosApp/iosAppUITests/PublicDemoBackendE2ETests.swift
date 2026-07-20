@@ -262,7 +262,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         )
         XCTAssertEqual(previewStatus, "Review presentation request", "Presentation preview did not load, status: \(previewStatus ?? "nil")")
 
-        XCTAssertTrue(app.staticTexts["PAYMENT AUTHORIZATION"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Payment Authorization"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["42.00"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["EUR"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["ACME Corp"].waitForExistence(timeout: 10))

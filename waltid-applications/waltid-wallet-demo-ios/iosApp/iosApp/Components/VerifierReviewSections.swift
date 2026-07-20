@@ -11,26 +11,22 @@ struct VerifierReviewSections: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if let display = request.verifierMetadata?.display,
-               let name = display.name?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !name.isEmpty {
+            if let verifierMetadata = request.verifierMetadata,
+               verifierDisplayName != nil || !verifierDetails.isEmpty {
                 ReviewMetadataSection(title: "Verifier") {
-                    MetadataIdentityView(
-                        display: display,
-                        fallbackName: name,
-                        supportingText: nil
-                    )
+                    if let verifierDisplayName {
+                        MetadataIdentityView(
+                            display: verifierMetadata.display,
+                            fallbackName: verifierDisplayName,
+                            supportingText: nil
+                        )
+                        if !verifierDetails.isEmpty {
+                            Divider()
+                        }
+                    }
+                    MetadataDetailList(items: verifierDetails)
                 }
                 .accessibilityIdentifier(WalletAccessibilityID.presentationVerifierSection)
-            }
-
-            if let verifierMetadata = request.verifierMetadata, verifierMetadata.hasUserFacingInformation {
-                ReviewMetadataSection(title: "Verifier information") {
-                    MetadataDetailLine(label: "Client URI", value: verifierMetadata.clientURI)
-                    MetadataDetailLine(label: "Privacy policy", value: verifierMetadata.policyURI)
-                    MetadataDetailLine(label: "Terms of service", value: verifierMetadata.termsOfServiceURI)
-                }
-                .accessibilityIdentifier(WalletAccessibilityID.presentationVerifierInformationSection)
             }
 
             ForEach(transactionDataGroups) { group in
@@ -38,33 +34,28 @@ struct VerifierReviewSections: View {
             }
 
             ReviewMetadataSection(title: "Response protection") {
-                MetadataDetailLine(
-                    label: "Message-level encryption",
-                    value: responseEncryptionStatus
-                )
-                if case let .required(details) = request.responseEncryption {
-                    MetadataDetailLine(label: "Key management algorithm", value: details.keyManagementAlgorithm)
-                    MetadataDetailLine(label: "Content encryption algorithm", value: details.contentEncryptionAlgorithm)
-                    MetadataDetailLine(label: "Verifier key ID", value: details.verifierKeyID)
-                    MetadataDetailLine(label: "Verifier key thumbprint", value: details.verifierKeyThumbprint)
-                }
+                MetadataDetailList(items: responseProtectionDetails)
             }
             .accessibilityIdentifier(WalletAccessibilityID.presentationResponseProtectionSection)
 
             ReviewMetadataSection(title: "Technical request details") {
-                Button(technicalDetailsExpanded ? "Hide details" : "Show details") {
+                Button {
                     technicalDetailsExpanded.toggle()
+                } label: {
+                    HStack {
+                        Text(technicalDetailsExpanded ? "Hide details" : "Show details")
+                        Spacer()
+                        Image(systemName: technicalDetailsExpanded ? "chevron.up" : "chevron.down")
+                    }
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
                 .accessibilityIdentifier(WalletAccessibilityID.verifierTechnicalDetailsToggle)
 
                 if technicalDetailsExpanded {
-                    VStack(alignment: .leading, spacing: 6) {
-                        MetadataDetailLine(label: "Client ID", value: request.clientID)
-                        MetadataDetailLine(label: "Response URI", value: request.responseURI?.absoluteString)
-                        MetadataDetailLine(label: "State", value: request.state)
-                        MetadataDetailLine(label: "Nonce", value: request.nonce)
-                    }
+                    Divider()
+                    MetadataDetailList(items: technicalDetails)
                     .accessibilityIdentifier(WalletAccessibilityID.verifierTechnicalDetails)
                 }
             }
@@ -78,13 +69,43 @@ struct VerifierReviewSections: View {
         case .required: "Required"
         }
     }
-}
 
-private extension VerifierMetadata {
-    var hasUserFacingInformation: Bool {
-        [clientURI, policyURI, termsOfServiceURI].contains { value in
-            guard let value else { return false }
-            return !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    private var verifierDisplayName: String? {
+        guard let name = request.verifierMetadata?.display?.name?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !name.isEmpty else {
+            return nil
         }
+        return name
+    }
+
+    private var verifierDetails: [MetadataDetailItem] {
+        guard let metadata = request.verifierMetadata else { return [] }
+        return [
+            MetadataDetailItem(label: "Client URI", value: metadata.clientURI, linkURI: metadata.clientURI),
+            MetadataDetailItem(label: "Privacy policy", value: metadata.policyURI, linkURI: metadata.policyURI),
+            MetadataDetailItem(label: "Terms of service", value: metadata.termsOfServiceURI, linkURI: metadata.termsOfServiceURI),
+        ].filter(\.isVisible)
+    }
+
+    private var responseProtectionDetails: [MetadataDetailItem] {
+        var items = [MetadataDetailItem(label: "Message-level encryption", value: responseEncryptionStatus)]
+        if case let .required(details) = request.responseEncryption {
+            items += [
+                MetadataDetailItem(label: "Key management algorithm", value: details.keyManagementAlgorithm),
+                MetadataDetailItem(label: "Content encryption algorithm", value: details.contentEncryptionAlgorithm),
+                MetadataDetailItem(label: "Verifier key ID", value: details.verifierKeyID),
+                MetadataDetailItem(label: "Verifier key thumbprint", value: details.verifierKeyThumbprint),
+            ]
+        }
+        return items
+    }
+
+    private var technicalDetails: [MetadataDetailItem] {
+        [
+            MetadataDetailItem(label: "Client ID", value: request.clientID),
+            MetadataDetailItem(label: "Response URI", value: request.responseURI?.absoluteString),
+            MetadataDetailItem(label: "State", value: request.state),
+            MetadataDetailItem(label: "Nonce", value: request.nonce),
+        ]
     }
 }
