@@ -554,7 +554,7 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testEventsReturnsBridgeEventStream() async {
-        let event = WalletEvent(name: "receive", phase: .issuance, status: .progress)
+        let event = WalletEvent(name: "issuance_offer_resolved")
         let bridge = FakeWalletCoreBridge(events: [event])
         let wallet = Wallet(bridge: bridge)
 
@@ -565,7 +565,19 @@ final class WalletAPITests: XCTestCase {
         let second = await iterator.next()
 
         XCTAssertEqual(first, event)
+        XCTAssertEqual(first?.phase, .issuance)
+        XCTAssertEqual(first?.status, .progress)
         XCTAssertNil(second)
+    }
+
+    func testWalletEventsDerivePhaseAndStatusFromName() {
+        let completed = WalletEvent(name: "issuance_completed")
+        let failed = WalletEvent(name: "presentation_failed")
+
+        XCTAssertEqual(completed.phase, .issuance)
+        XCTAssertEqual(completed.status, .completed)
+        XCTAssertEqual(failed.phase, .presentation)
+        XCTAssertEqual(failed.status, .failed)
     }
 
     private func acceptsSendable<T: Sendable>(_ value: T) {

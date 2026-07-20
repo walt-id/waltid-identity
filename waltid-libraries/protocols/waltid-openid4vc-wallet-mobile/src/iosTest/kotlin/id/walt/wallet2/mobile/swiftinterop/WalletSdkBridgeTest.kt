@@ -632,8 +632,6 @@ class WalletSdkBridgeTest {
         events.emit(
             MobileWalletEvent(
                 name = "presentation_completed",
-                phase = MobileWalletEventPhase.presentation,
-                status = MobileWalletEventStatus.completed,
             )
         )
         val event = bridge.events.first()

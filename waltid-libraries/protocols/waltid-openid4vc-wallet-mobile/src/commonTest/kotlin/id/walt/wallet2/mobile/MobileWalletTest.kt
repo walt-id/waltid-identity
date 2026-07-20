@@ -221,6 +221,46 @@ class MobileWalletTest {
     }
 
     @Test
+    fun mobileWalletEventsDerivePhaseAndStatusFromTheirName() {
+        val completed = MobileWalletEvent("issuance_completed")
+        val failed = MobileWalletEvent("presentation_failed")
+        val progress = MobileWalletEvent("presentation_request_resolved")
+
+        assertEquals(MobileWalletEventPhase.issuance, completed.phase)
+        assertEquals(MobileWalletEventStatus.completed, completed.status)
+        assertEquals(MobileWalletEventPhase.presentation, failed.phase)
+        assertEquals(MobileWalletEventStatus.failed, failed.status)
+        assertEquals(MobileWalletEventStatus.progress, progress.status)
+    }
+
+    @Test
+    fun mobileWalletEventsRejectNamesWithoutAKnownPhase() {
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletEvent("wallet_completed")
+        }
+    }
+
+    @Test
+    fun presentationCredentialRequirementsRejectEmptyCombinations() {
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationCredentialRequirement(emptyList())
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationCredentialRequirement(listOf(emptyList()))
+        }
+    }
+
+    @Test
+    fun presentationDisclosuresRejectImpossibleSelectableStates() {
+        assertFailsWith<IllegalArgumentException> {
+            presentationDisclosure(selectivelyDisclosable = false, required = false, selectable = true)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            presentationDisclosure(selectivelyDisclosable = true, required = true, selectable = true)
+        }
+    }
+
+    @Test
     fun presentationResultCarriesVerifierResponseAsJsonString() {
         val result = MobileWalletPresentationResult.Transmitted.Succeeded(
             verifierResponseJson = """{"accepted":true}""",
@@ -410,10 +450,20 @@ class MobileWalletTest {
         collector.cancel()
     }
 
-    private fun progressEvent(name: String) = MobileWalletEvent(
-        name = name,
-        phase = MobileWalletEventPhase.issuance,
-        status = MobileWalletEventStatus.progress,
+    private fun progressEvent(name: String) = MobileWalletEvent(name)
+
+    private fun presentationDisclosure(
+        selectivelyDisclosable: Boolean,
+        required: Boolean,
+        selectable: Boolean,
+    ) = MobileWalletPresentationDisclosure(
+        path = "$.claim",
+        name = "claim",
+        valueJson = "true",
+        displayValue = "true",
+        selectivelyDisclosable = selectivelyDisclosable,
+        required = required,
+        selectable = selectable,
     )
 
     private val displayJson = kotlinx.serialization.json.Json {

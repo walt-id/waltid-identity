@@ -1028,35 +1028,7 @@ private func swiftArray<T>(_ value: Any, of type: T.Type) -> [T] {
 
 private extension MobileWalletEvent {
     func toSwiftEvent() -> WalletEvent {
-        WalletEvent(
-            name: name,
-            phase: phase.toSwiftPhase(),
-            status: status.toSwiftStatus()
-        )
-    }
-}
-
-private extension MobileWalletEventPhase {
-    func toSwiftPhase() -> WalletEventPhase {
-        switch self {
-        case .presentation:
-            return .presentation
-        case .issuance:
-            return .issuance
-        }
-    }
-}
-
-private extension MobileWalletEventStatus {
-    func toSwiftStatus() -> WalletEventStatus {
-        switch self {
-        case .completed:
-            return .completed
-        case .failed:
-            return .failed
-        case .progress:
-            return .progress
-        }
+        WalletEvent(name: name)
     }
 }
 
