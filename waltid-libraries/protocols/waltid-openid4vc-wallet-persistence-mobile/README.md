@@ -29,6 +29,7 @@ Use this library when you need persistent wallet storage inside a mobile wallet 
 - **SQLDelight** — Kotlin Multiplatform database layer for Android and iOS
 - **Encrypted local databases** — SQLCipher-backed Android and iOS drivers
 - **Platform key stores** — Android KeyStore and iOS Keychain / Secure Enclave integration
+- **Immutable key-use metadata** — Requested/effective authorization policy and reliable effective hardware backing
 - **Credential persistence** — SQL-backed credential storage with metadata
 - **DID persistence** — SQL-backed DID document storage
 - **Shared schema** — Common mobile schema across supported platforms
@@ -78,6 +79,12 @@ val didStore = SqlDelightDidStore(queries)
 ```
 
 The higher-level `waltid-openid4vc-wallet-mobile` facade performs this wiring automatically. Use this module directly only when assembling custom platform persistence.
+
+`PlatformKeyProvider.capability(keyType, policy)` must be checked before protected key creation.
+P-256 plus `BiometricCurrentSet` is the portable Android/iOS path; unsupported combinations fail
+without software fallback. `PlatformKeyStore` persists the requested and effective policy per key, and
+schema migration classifies pre-existing rows as `None`. A later configuration default is never inferred
+for an existing row.
 
 ## Encryption and cleanup
 

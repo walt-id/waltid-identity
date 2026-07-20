@@ -4,9 +4,14 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyHardwareBacking
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyUseAuthorizationException
+import id.walt.crypto.keys.KeyUseAuthorizationFailure
+import id.walt.crypto.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -25,6 +30,7 @@ import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
+import id.walt.wallet2.persistence.keys.PlatformKeyCapability
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
@@ -39,6 +45,8 @@ import kotlin.time.Instant
  *
  * @property walletId Stable wallet identifier used for database naming and persisted wallet state.
  * @property defaultKeyType Key type used by wallet bootstrap when no key type override is supplied.
+ * @property defaultKeyUseAuthorizationPolicy Authorization policy applied only to newly created keys.
+ * @property keyUseAuthorizationPrompt Localized operating-system prompt text for protected signing.
  * @property persistence Wallet-local persistence configuration.
  * @property databaseKeyProvider Swift-owned database key provider used when [persistence] uses
  * [WalletBridgeDatabaseKeyConfiguration.Provided].
@@ -54,16 +62,51 @@ public data class WalletBridgeConfiguration(
     public val attestation: WalletAttestationConfig? = null,
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    public val defaultKeyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy =
+        WalletBridgeKeyUseAuthorizationPolicy.None,
+    public val keyUseAuthorizationPrompt: WalletBridgeKeyUseAuthorizationPrompt =
+        WalletBridgeKeyUseAuthorizationPrompt(),
 )
 
 internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConfig(
     walletId = walletId,
     defaultKeyType = defaultKeyType,
+    defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy.toKeyUseAuthorizationPolicy(),
+    keyUseAuthorizationPrompt = keyUseAuthorizationPrompt.toKeyUseAuthorizationPrompt(),
     attestationConfig = attestation,
     persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
     preferredLocales = preferredLocales,
     transactionDataProfiles = transactionDataProfiles,
 )
+
+/** Swift-facing immutable private-key authorization policies. */
+public enum class WalletBridgeKeyUseAuthorizationPolicy {
+    None,
+    BiometricCurrentSet,
+}
+
+/** Swift-facing localized operating-system authorization prompt text. */
+public data class WalletBridgeKeyUseAuthorizationPrompt(
+    public val message: String = "Please authorize cryptographic signature",
+    public val cancelText: String = "Cancel",
+)
+
+internal fun WalletBridgeKeyUseAuthorizationPolicy.toKeyUseAuthorizationPolicy(): KeyUseAuthorizationPolicy =
+    when (this) {
+        WalletBridgeKeyUseAuthorizationPolicy.None -> KeyUseAuthorizationPolicy.None
+        WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet ->
+            KeyUseAuthorizationPolicy.BiometricCurrentSet
+    }
+
+internal fun KeyUseAuthorizationPolicy.toBridgeKeyUseAuthorizationPolicy(): WalletBridgeKeyUseAuthorizationPolicy =
+    when (this) {
+        KeyUseAuthorizationPolicy.None -> WalletBridgeKeyUseAuthorizationPolicy.None
+        KeyUseAuthorizationPolicy.BiometricCurrentSet ->
+            WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet
+    }
+
+private fun WalletBridgeKeyUseAuthorizationPrompt.toKeyUseAuthorizationPrompt(): KeyUseAuthorizationPrompt =
+    KeyUseAuthorizationPrompt(message = message, cancelText = cancelText)
 
 /**
  * Persistence configuration exposed to the Swift wallet bridge.
@@ -219,6 +262,12 @@ public data class WalletBridgeKeyInfo(
     public val keyId: String,
     public val keyType: String,
     public val algorithm: String? = null,
+    public val requestedKeyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy =
+        WalletBridgeKeyUseAuthorizationPolicy.None,
+    public val effectiveKeyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy =
+        WalletBridgeKeyUseAuthorizationPolicy.None,
+    public val isPlatformBacked: Boolean = false,
+    public val effectiveHardwareBacking: String? = null,
 )
 
 /**
@@ -293,6 +342,30 @@ public interface WalletBridgeKeyGenerator {
      * Generates a serialized signing key for [keyType].
      */
     public suspend fun generateKey(keyType: MobileWalletKeyType): WalletBridgeStoredKey
+}
+
+/** Swift-facing platform key capability result. */
+public data class WalletBridgeKeyCapability(
+    public val platform: String,
+    public val keyType: MobileWalletKeyType,
+    public val keyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy,
+    public val supported: Boolean,
+    public val platformBackingAvailable: Boolean,
+    public val secureHardwareRequired: Boolean,
+    public val secureHardwareAvailable: Boolean?,
+    public val effectiveHardwareBacking: String? = null,
+    public val failure: WalletBridgeKeyUseAuthorizationFailure? = null,
+)
+
+/** Stable Swift-facing protected-key failure reasons. */
+public enum class WalletBridgeKeyUseAuthorizationFailure {
+    UnsupportedCombination,
+    BiometricUnavailable,
+    BiometricNotEnrolled,
+    InteractionContextUnavailable,
+    AuthorizationFailed,
+    ProtectedKeyInvalidated,
+    ProtectedKeyMissing,
 }
 
 private fun WalletBridgePersistence.toMobileWalletPersistence(
@@ -383,6 +456,9 @@ private class BridgeKeyStore(
     override suspend fun addKey(key: Key): String =
         bridgeStore.addKey(key.toBridgeStoredKey())
 
+    override suspend fun addKey(key: Key, keyInfo: WalletKeyInfo): String =
+        bridgeStore.addKey(key.toBridgeStoredKey(keyInfo))
+
     override suspend fun removeKey(keyId: String): Boolean =
         bridgeStore.removeKey(keyId)
 }
@@ -390,6 +466,18 @@ private class BridgeKeyStore(
 private fun WalletBridgeKeys.toMobileWalletKeys() = MobileWalletKeys(
     store = BridgeKeyStore(store),
     generate = { keyType -> generate.generateKey(keyType.toMobileWalletKeyType()).toKey() },
+)
+
+internal fun PlatformKeyCapability.toBridgeKeyCapability() = WalletBridgeKeyCapability(
+    platform = platform.name,
+    keyType = keyType.toMobileWalletKeyType(),
+    keyUseAuthorizationPolicy = keyUseAuthorizationPolicy.toBridgeKeyUseAuthorizationPolicy(),
+    supported = supported,
+    platformBackingAvailable = platformBackingAvailable,
+    secureHardwareRequired = secureHardwareRequired,
+    secureHardwareAvailable = secureHardwareAvailable,
+    effectiveHardwareBacking = effectiveHardwareBacking?.name,
+    failure = failure?.toBridgeKeyUseAuthorizationFailure(),
 )
 
 private suspend fun WalletBridgeStoredCredential.toStoredCredential(): StoredCredential {
@@ -429,15 +517,30 @@ private fun WalletBridgeKeyInfo.toWalletKeyInfo() = WalletKeyInfo(
     keyId = keyId,
     keyType = keyType,
     algorithm = algorithm,
+    // Swift custom stores exchange serialized JWK material and therefore retain the legacy policy.
+    requestedKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+    effectiveKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+    isPlatformBacked = false,
+    effectiveHardwareBacking = null,
+)
+
+internal fun WalletKeyInfo.toBridgeKeyInfo() = WalletBridgeKeyInfo(
+    keyId = keyId,
+    keyType = keyType,
+    algorithm = algorithm,
+    requestedKeyUseAuthorizationPolicy = requestedKeyUseAuthorizationPolicy.toBridgeKeyUseAuthorizationPolicy(),
+    effectiveKeyUseAuthorizationPolicy = effectiveKeyUseAuthorizationPolicy.toBridgeKeyUseAuthorizationPolicy(),
+    isPlatformBacked = isPlatformBacked,
+    effectiveHardwareBacking = effectiveHardwareBacking?.name,
 )
 
 private suspend fun WalletBridgeStoredKey.toKey(): Key =
     KeyManager.resolveSerializedKey(serializedKeyJson)
 
-private suspend fun Key.toBridgeStoredKey() = WalletBridgeStoredKey(
+private suspend fun Key.toBridgeStoredKey(keyInfo: WalletKeyInfo? = null) = WalletBridgeStoredKey(
     keyId = getKeyId(),
     keyType = keyType.name,
-    algorithm = null,
+    algorithm = keyInfo?.algorithm,
     serializedKeyJson = KeySerialization.serializeKey(this),
 )
 
@@ -451,6 +554,23 @@ private fun KeyType.toMobileWalletKeyType(): MobileWalletKeyType = when (this) {
     KeyType.RSA3072 -> MobileWalletKeyType.RSA3072
     KeyType.RSA4096 -> MobileWalletKeyType.RSA4096
 }
+
+private fun MobileWalletKeyType.toKeyType(): KeyType = when (this) {
+    MobileWalletKeyType.Ed25519 -> KeyType.Ed25519
+    MobileWalletKeyType.secp256k1 -> KeyType.secp256k1
+    MobileWalletKeyType.secp256r1 -> KeyType.secp256r1
+    MobileWalletKeyType.secp384r1 -> KeyType.secp384r1
+    MobileWalletKeyType.secp521r1 -> KeyType.secp521r1
+    MobileWalletKeyType.RSA -> KeyType.RSA
+    MobileWalletKeyType.RSA3072 -> KeyType.RSA3072
+    MobileWalletKeyType.RSA4096 -> KeyType.RSA4096
+}
+
+private fun WalletBridgeKeyUseAuthorizationFailure.toKeyUseAuthorizationFailure(): KeyUseAuthorizationFailure =
+    KeyUseAuthorizationFailure.valueOf(name)
+
+internal fun KeyUseAuthorizationFailure.toBridgeKeyUseAuthorizationFailure():
+    WalletBridgeKeyUseAuthorizationFailure = WalletBridgeKeyUseAuthorizationFailure.valueOf(name)
 
 /**
  * Coarse error category for Swift bridge failures.
@@ -497,11 +617,13 @@ public data class WalletBridgeError(
     val category: WalletBridgeErrorCategory,
     val message: String,
     val causeClass: String? = null,
+    val keyUseAuthorizationFailure: WalletBridgeKeyUseAuthorizationFailure? = null,
 ) {
     internal companion object {
         fun fromThrowable(throwable: Throwable): WalletBridgeError {
             val category = when (throwable) {
                 is CancellationException -> WalletBridgeErrorCategory.cancelled
+                is KeyUseAuthorizationException -> WalletBridgeErrorCategory.crypto
                 is IllegalArgumentException -> WalletBridgeErrorCategory.invalidInput
                 is PreviewSessionException -> WalletBridgeErrorCategory.invalidInput
                 is WalletPersistenceException -> WalletBridgeErrorCategory.storage
@@ -512,6 +634,9 @@ public data class WalletBridgeError(
                 category = category,
                 message = throwable.message ?: throwable::class.simpleName ?: "Unknown wallet error",
                 causeClass = throwable::class.simpleName,
+                keyUseAuthorizationFailure = (throwable as? KeyUseAuthorizationException)
+                    ?.failure
+                    ?.toBridgeKeyUseAuthorizationFailure(),
             )
         }
     }

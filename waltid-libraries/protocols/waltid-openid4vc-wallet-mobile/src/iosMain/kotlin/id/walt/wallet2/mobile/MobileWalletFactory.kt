@@ -16,7 +16,9 @@ public actual class MobileWalletFactory {
         return createEncryptedSqlDelightMobileWallet(
             config = config,
             managedDatabaseKeyProvider = IosDatabaseEncryptionKeyProvider(),
-            platformKeyProvider = IosPlatformKeyProvider(),
+            platformKeyProvider = IosPlatformKeyProvider(
+                authorizationPrompt = config.keyUseAuthorizationPrompt,
+            ),
             openEncryptedDriver = driverFactory::createEncryptedDriver,
             deleteDatabase = driverFactory::deleteDatabase,
         )

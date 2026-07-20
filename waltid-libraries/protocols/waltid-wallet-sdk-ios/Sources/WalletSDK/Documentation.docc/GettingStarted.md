@@ -27,6 +27,21 @@ Apps that own database-key recovery can pass ``WalletPersistence`` with
 ``WalletDatabaseKeyConfiguration/provided(_:)`` and a
 ``WalletDatabaseKeyProvider`` implementation.
 
+To require Face ID or Touch ID for every use of a newly created P-256 signing
+key, set
+``WalletConfiguration/defaultKeyUseAuthorizationPolicy`` to
+``WalletKeyUseAuthorizationPolicy/biometricCurrentSet`` and provide localized
+``WalletConfiguration/keyUseAuthorizationPrompt`` text. Call
+``Wallet/keyUseAuthorizationCapability(keyType:keyUseAuthorizationPolicy:)``
+before bootstrap, especially because Secure Enclave biometric enforcement is
+unavailable in the simulator. This immutable policy applies only to new keys;
+changing the default does not protect or rotate existing keys. Use
+``Wallet/keys()`` to inspect persisted requested and effective policy.
+
+> Important: Key-use authorization is not wallet/app unlock. Platform
+> biometrics and Secure Enclave usage do not by themselves establish a
+> certification or assurance level.
+
 Apps can also pass ``WalletStores`` when they own credential, DID, or signing-key
 durability. Omitted credential and DID stores use the encrypted local database,
 while an omitted key store uses platform signing-key persistence and generation.
@@ -65,7 +80,7 @@ material. Keep those entries in app-owned secure storage.
 
 ### Bootstrap DID State
 
-Call ``Wallet/bootstrap(keyType:didMethod:)`` before issuance or presentation
+Call ``Wallet/bootstrap(keyType:keyUseAuthorizationPolicy:didMethod:)`` before issuance or presentation
 flows that need wallet key material.
 
 ```swift

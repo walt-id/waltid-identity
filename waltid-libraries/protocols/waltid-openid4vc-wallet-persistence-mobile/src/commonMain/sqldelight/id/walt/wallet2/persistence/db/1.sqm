@@ -1,0 +1,8 @@
+ALTER TABLE key_references
+ADD COLUMN requested_authorization_policy TEXT NOT NULL DEFAULT 'None';
+
+ALTER TABLE key_references
+ADD COLUMN effective_authorization_policy TEXT NOT NULL DEFAULT 'None';
+
+ALTER TABLE key_references
+ADD COLUMN effective_hardware_backing TEXT;
