@@ -203,6 +203,79 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
+    fun proofRequiredWithoutNonceEndpointOmitsNonceAndIgnoresTokenNonce() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        var credentialCalls = 0
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = true, nonceEndpoint = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse(
+                    """{"access_token":"must-not-be-a-proof-nonce","token_type":"Bearer","c_nonce":"legacy-token-nonce"}"""
+                )
+                CREDENTIAL_ENDPOINT -> {
+                    credentialCalls += 1
+                    val body = Json.parseToJsonElement(request.bodyText()).jsonObject
+                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proofPayload = jwtPart(proof, 1)
+                    assertEquals(null, proofPayload["nonce"])
+                    assertEquals(ISSUER, proofPayload["aud"]?.jsonPrimitive?.content)
+                    jsonResponse(
+                        """{"transaction_id":"transaction-1","interval":7}""",
+                        HttpStatusCode.Accepted,
+                    )
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(Wallet("test", staticKey = key), httpClient = client)
+
+        val session = service.start(preAuthorizedRequest())
+        assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
+        assertEquals(1, credentialCalls)
+    }
+
+    @Test
+    fun insecureNonceEndpointRequiresExplicitTestOptIn() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val insecureNonceEndpoint = "http://127.0.0.1/nonce"
+        var nonceCalls = 0
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(
+                    issuerMetadata(proofRequired = true).replace(NONCE_ENDPOINT, insecureNonceEndpoint)
+                )
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access-token","token_type":"Bearer"}""")
+                insecureNonceEndpoint -> {
+                    nonceCalls += 1
+                    jsonResponse("""{"c_nonce":"local-test-nonce"}""")
+                }
+                CREDENTIAL_ENDPOINT -> {
+                    val body = Json.parseToJsonElement(request.bodyText()).jsonObject
+                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    assertEquals("local-test-nonce", jwtPart(proof, 1)["nonce"]?.jsonPrimitive?.content)
+                    jsonResponse("""{"transaction_id":"transaction-1"}""", HttpStatusCode.Accepted)
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+
+        val strictService = WalletIssuanceSessionService(Wallet("strict", staticKey = key), httpClient = client)
+        assertFailsWith<IllegalArgumentException> { strictService.start(preAuthorizedRequest()) }
+        assertEquals(0, nonceCalls)
+
+        val testService = WalletIssuanceSessionService(
+            wallet = Wallet("test-opt-in", staticKey = key),
+            allowInsecureHttpForTests = true,
+            httpClient = client,
+        )
+        val testSession = testService.start(preAuthorizedRequest())
+        assertIs<WalletIssuanceOutcome.Deferred>(testService.continuePreAuthorized(testSession.id))
+        assertEquals(1, nonceCalls)
+    }
+
+    @Test
     fun immediateCredentialIsParsedStoredAndReturned() = runTest {
         val key = JWKKey.generate(KeyType.secp256r1)
         val credential = key.signJws(
@@ -480,11 +553,11 @@ class WalletIssuanceSessionServiceTest {
     private fun callback(session: WalletIssuanceSession, code: String) =
         "$REDIRECT_URI?code=$code&state=${session.authorization!!.state}"
 
-    private fun issuerMetadata(proofRequired: Boolean) = """
+    private fun issuerMetadata(proofRequired: Boolean, nonceEndpoint: Boolean = true) = """
         {
           "credential_issuer":"$ISSUER",
           "credential_endpoint":"$CREDENTIAL_ENDPOINT",
-          "nonce_endpoint":"$NONCE_ENDPOINT",
+          ${if (nonceEndpoint) "\"nonce_endpoint\":\"$NONCE_ENDPOINT\"," else ""}
           "deferred_credential_endpoint":"$DEFERRED_ENDPOINT",
           "credential_configurations_supported":{
             "test-credential":{
