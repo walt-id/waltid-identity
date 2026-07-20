@@ -263,7 +263,8 @@ private extension WalletConfiguration {
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
             attestation: attestation?.toKMPAttestationConfiguration(),
             preferredLocales: preferredLocales,
-            transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() }
+            transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
+            allowInsecureHttpForTests: allowInsecureHttpForTests
         )
     }
 }

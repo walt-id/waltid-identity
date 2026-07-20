@@ -247,6 +247,7 @@ class WalletIssuanceSessionService(
     private val wallet: Wallet,
     private val attestationAssembler: ClientAttestationAssembler? = null,
     private val onEvent: suspend (WalletSessionEvent) -> Unit = {},
+    private val allowInsecureHttpForTests: Boolean = false,
     private val httpClient: HttpClient = WebDataFetcher(
         WebDataFetcherId.WALLET2_ISSUANCE_HANDLER,
         WebDataFetchingConfiguration(logging = LoggingConfiguration(enable = false)),
@@ -458,7 +459,7 @@ class WalletIssuanceSessionService(
             val nonceResult = if (proof.required) fetchNonce(active.resolved.issuerMetadata) else null
             val proofJwt = if (proof.required) {
                 try {
-                    buildCredentialProof(active, offered.configuration, nonceResult!!.cNonce)
+                    buildCredentialProof(active, offered.configuration, nonceResult?.cNonce)
                 } catch (error: Exception) {
                     throw IssuanceStageException(WalletIssuanceErrorCode.CRYPTO, error)
                 }
@@ -710,7 +711,7 @@ class WalletIssuanceSessionService(
             "Credential issuer metadata identifier does not match the offer"
         }
         requireSecureProtocolUrl(issuerMetadata.credentialEndpoint, "credential_endpoint")
-        issuerMetadata.nonceEndpoint?.let { requireSecureProtocolUrl(it, "nonce_endpoint") }
+        issuerMetadata.nonceEndpoint?.let(::requireNonceEndpointUrl)
         issuerMetadata.deferredCredentialEndpoint?.let {
             requireSecureProtocolUrl(it, "deferred_credential_endpoint")
         }
@@ -734,12 +735,20 @@ class WalletIssuanceSessionService(
         }
         val offered = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
         require(offered.isNotEmpty()) { "Credential offer resolved no supported credentials" }
-        if (offered.any { it.configuration.proofTypesSupported != null }) {
-            require(issuerMetadata.nonceEndpoint != null) {
-                "Credential issuer requires key proof but does not advertise nonce_endpoint"
-            }
-        }
         return ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offered)
+    }
+
+    private fun requireHttpsUrl(value: String, fieldName: String) {
+        require(Url(value).protocol.name.equals("https", ignoreCase = true)) {
+            "$fieldName must use HTTPS"
+        }
+    }
+
+    private fun requireNonceEndpointUrl(value: String) {
+        val protocol = Url(value).protocol.name
+        val isHttps = protocol.equals("https", ignoreCase = true)
+        val isExplicitTestHttp = allowInsecureHttpForTests && protocol.equals("http", ignoreCase = true)
+        require(isHttps || isExplicitTestHttp) { "nonce_endpoint must use HTTPS" }
     }
 
     private fun requireSecureProtocolUrl(value: String, fieldName: String) {
@@ -812,7 +821,7 @@ class WalletIssuanceSessionService(
     private suspend fun buildCredentialProof(
         active: ActiveSession,
         configuration: CredentialConfiguration,
-        nonce: String,
+        nonce: String?,
     ): String {
         val methods = requireNotNull(configuration.cryptographicBindingMethodsSupported)
         val builder = JwtProofBuilder()
@@ -842,16 +851,18 @@ class WalletIssuanceSessionService(
 
     private suspend fun fetchNonce(metadata: CredentialIssuerMetadata): NonceResult {
         val endpoint = metadata.nonceEndpoint
-            ?: throw IssuanceStageException(WalletIssuanceErrorCode.ISSUER_METADATA)
+            ?: return NonceResult(cNonce = null, dpopNonce = null)
         val nonce = try {
-            NonceRequestBuilder(httpClient).requestNonce(endpoint).cNonce
+            NonceRequestBuilder(
+                httpClient = httpClient,
+                allowInsecureHttpForTests = allowInsecureHttpForTests,
+            ).requestNonce(endpoint).cNonce
         } catch (error: NonceRequestException) {
             val code = when (error.error) {
                 NonceRequestError.INVALID_ENDPOINT -> WalletIssuanceErrorCode.ISSUER_METADATA
                 NonceRequestError.NETWORK -> WalletIssuanceErrorCode.NETWORK
                 NonceRequestError.ISSUER_RESPONSE -> WalletIssuanceErrorCode.ISSUER_RESPONSE
-                NonceRequestError.INVALID_RESPONSE,
-                NonceRequestError.UNSAFE_REDIRECT -> WalletIssuanceErrorCode.PROTOCOL
+                NonceRequestError.INVALID_RESPONSE -> WalletIssuanceErrorCode.PROTOCOL
             }
             throw IssuanceStageException(code, error)
         }
@@ -1063,7 +1074,7 @@ class WalletIssuanceSessionService(
         val label: String?,
     )
 
-    private data class NonceResult(val cNonce: String, val dpopNonce: String?)
+    private data class NonceResult(val cNonce: String?, val dpopNonce: String?)
     private data class ProtectedResponse(val response: HttpResponse, val dpopNonce: String?)
 
     private class IssuanceStageException(
