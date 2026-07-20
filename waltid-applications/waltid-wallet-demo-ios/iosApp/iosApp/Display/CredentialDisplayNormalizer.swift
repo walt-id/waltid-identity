@@ -55,7 +55,11 @@ enum CredentialDisplayNormalizer {
     }
 
     static func transactionDataGroups(for request: PresentationRequestInfo) -> [ClaimGroup] {
-        let baseTitles = request.transactionData.map { item in
+        transactionDataGroups(for: request.transactionData)
+    }
+
+    static func transactionDataGroups(for transactionData: [PresentationTransactionData]) -> [ClaimGroup] {
+        let baseTitles = transactionData.map { item in
             item.displayName.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
                 ?? CredentialDisplayVocabulary.transactionDataTitle
         }
@@ -64,7 +68,7 @@ enum CredentialDisplayNormalizer {
         }
         var seenTitles: [String: Int] = [:]
 
-        return request.transactionData.enumerated().map { index, item in
+        return transactionData.enumerated().map { index, item in
             let baseTitle = baseTitles[index]
             seenTitles[baseTitle, default: 0] += 1
             let title = titleCounts[baseTitle, default: 0] > 1
