@@ -45,6 +45,7 @@ import kotlin.time.Instant
  * @property attestation Optional client-attestation configuration for issuers that require it.
  * @property preferredLocales Ordered BCP 47 locale preferences used to select display metadata.
  * @property transactionDataProfiles Transaction data profiles this wallet accepts.
+ * @property allowInsecureHttpForTests Test/dev-only opt-in for local issuer nonce endpoints that cannot use HTTPS.
  */
 public data class WalletBridgeConfiguration(
     public val walletId: String = "default",
@@ -54,6 +55,7 @@ public data class WalletBridgeConfiguration(
     public val attestation: WalletAttestationConfig? = null,
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    public val allowInsecureHttpForTests: Boolean = false,
 )
 
 internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConfig(
@@ -63,6 +65,7 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConf
     persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
     preferredLocales = preferredLocales,
     transactionDataProfiles = transactionDataProfiles,
+    allowInsecureHttpForTests = allowInsecureHttpForTests,
 )
 
 /**

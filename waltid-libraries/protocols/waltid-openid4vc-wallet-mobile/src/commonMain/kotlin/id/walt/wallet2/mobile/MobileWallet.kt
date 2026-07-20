@@ -174,6 +174,7 @@ public class MobileWallet internal constructor(
     attestationConfig: WalletAttestationConfig? = null,
     private val preferredLocales: List<String> = emptyList(),
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    private val allowInsecureHttpForTests: Boolean = false,
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {
@@ -206,6 +207,7 @@ public class MobileWallet internal constructor(
         wallet = wallet,
         attestationAssembler = attestationAssembler,
         onEvent = ::emitSessionEvent,
+        allowInsecureHttpForTests = allowInsecureHttpForTests,
     )
 
     /**
