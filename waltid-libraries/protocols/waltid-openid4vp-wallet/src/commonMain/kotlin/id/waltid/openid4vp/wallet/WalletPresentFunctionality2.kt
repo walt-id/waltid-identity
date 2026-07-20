@@ -651,16 +651,15 @@ object WalletPresentFunctionality2 {
         val query = requireNotNull(authorizationRequest.dcqlQuery)
         val credentials = selectCredentialsForQuery(query)
         log.trace { "Auto-selected credential count: ${credentials.mapValues { it.value.count() }}" }
-        PresentationRequestValidator.validateTransactionDataCredentialAvailability(
+        val availabilityError = PresentationRequestValidator.validateTransactionDataCredentialAvailability(
             transactionData = validatedTransactionData,
             availableCredentialQueryIds = credentials.filterValues { it.isNotEmpty() }.keys,
-        )?.let { error ->
-            return walletRejectHandling(authorizationRequest, error.code)
-        }
-        PresentationRequestValidator.validateCredentialAvailability(
+        ) ?: PresentationRequestValidator.validateCredentialAvailability(
             query = query,
             availableCredentialQueryIds = credentials.filterValues { it.isNotEmpty() }.keys,
-        )?.let { error ->
+        )
+        availabilityError?.let { error ->
+            PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedRequest)
             return walletRejectHandling(authorizationRequest, error.code)
         }
 
