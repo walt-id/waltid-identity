@@ -66,6 +66,7 @@ object JwtHeaderParams {
     const val TYPE = "typ"
     const val ALGORITHM = "alg"
     const val KEY_ID = "kid"
+    const val JSON_WEB_KEY = "jwk"
 }
 
 /**
