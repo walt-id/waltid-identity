@@ -1,0 +1,95 @@
+name: Create release with APK asset (reusable workflow)
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "release version (used to name the APK asset)"
+        required: true
+        type: string
+      tag:
+        description: "release tag to create and attach the APK to"
+        required: true
+        type: string
+      make_latest:
+        description: "Whether to mark this release as latest"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create release
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+
+      - name: Detect compose app module
+        id: detect
+        run: |
+          set -euo pipefail
+          module_dir="waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp"
+          if [ -d "$module_dir" ]; then
+            echo "Compose app module found, APK will be built."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Compose app module not present in this version; skipping APK build."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure gradle
+        if: ${{ steps.detect.outputs.exists == 'true' }}
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+
+      - name: Enable Android build in identity repo
+        if: ${{ steps.detect.outputs.exists == 'true' }}
+        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        with:
+          file: 'waltid-identity/gradle.properties'
+          properties: 'enableAndroidBuild=true'
+
+      - name: Enable Android build in unified-build root
+        if: ${{ steps.detect.outputs.exists == 'true' }}
+        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        with:
+          file: 'gradle.properties'
+          properties: 'enableAndroidBuild=true'
+
+      - name: Build debug APK
+        if: ${{ steps.detect.outputs.exists == 'true' }}
+        run: ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug --no-daemon --console=plain --warning-mode=summary
+        env:
+          CI: "true"
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+
+      - name: Locate and rename APK
+        id: apk
+        if: ${{ steps.detect.outputs.exists == 'true' }}
+        run: |
+          set -euo pipefail
+          apk=$(find waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/apk/debug -name '*.apk' | head -n 1)
+          if [ -z "$apk" ]; then
+            echo "::error::No APK found"
+            exit 1
+          fi
+          dest="waltid-wallet-demo-compose-${{ inputs.version }}.apk"
+          cp "$apk" "$dest"
+          echo "path=$dest" >> "$GITHUB_OUTPUT"
+
+      - name: Create release and attach APK if present
+        uses: softprops/action-gh-release@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ inputs.tag }}
+          files: ${{ steps.apk.outputs.path }}
+          fail_on_unmatched_files: false
+          prerelease: ${{ contains(inputs.tag, 'PRE-RELEASE') }}
+          make_latest: ${{ inputs.make_latest }}

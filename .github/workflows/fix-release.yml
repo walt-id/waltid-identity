@@ -85,18 +85,13 @@ jobs:
       repository: walt-id/waltid-unified-build
       ref: ${{ github.ref_name }}
   release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: [ tag ]
-    steps:
-      - name: Create Release
-        uses: softprops/action-gh-release@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ needs.tag.outputs.tag }}
-          prerelease: ${{ contains(needs.tag.outputs.tag, 'PRE-RELEASE') }}
-          make_latest: false
+    uses: walt-id/waltid-identity/.github/workflows/create-release.yml@main
+    secrets: inherit
+    needs: [ version, tag ]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      tag: ${{ needs.tag.outputs.tag }}
+      make_latest: false
   enterprise-release:
     name: Create Enterprise Release
     runs-on: ubuntu-latest

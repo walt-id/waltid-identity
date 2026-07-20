@@ -138,10 +138,11 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-unified-build
   release:
-    uses: walt-id/waltid-identity/.github/workflows/changelog.yml@main
+    uses: walt-id/waltid-identity/.github/workflows/create-release.yml@main
     secrets: inherit
-    needs: [ tag ]
+    needs: [ version, tag ]
     with:
+      version: ${{ needs.version.outputs.release_version }}
       tag: ${{ needs.tag.outputs.tag }}
   enterprise-release:
     name: Create Enterprise Release
