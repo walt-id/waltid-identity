@@ -24,6 +24,15 @@ struct VerifierReviewSections: View {
                 .accessibilityIdentifier(WalletAccessibilityID.presentationVerifierSection)
             }
 
+            if let verifierMetadata = request.verifierMetadata, verifierMetadata.hasUserFacingInformation {
+                ReviewMetadataSection(title: "Verifier information") {
+                    MetadataDetailLine(label: "Client URI", value: verifierMetadata.clientURI)
+                    MetadataDetailLine(label: "Privacy policy", value: verifierMetadata.policyURI)
+                    MetadataDetailLine(label: "Terms of service", value: verifierMetadata.termsOfServiceURI)
+                }
+                .accessibilityIdentifier(WalletAccessibilityID.presentationVerifierInformationSection)
+            }
+
             ForEach(transactionDataGroups) { group in
                 ClaimGroupView(group: group)
             }
@@ -53,9 +62,6 @@ struct VerifierReviewSections: View {
                     VStack(alignment: .leading, spacing: 6) {
                         MetadataDetailLine(label: "Client ID", value: request.clientID)
                         MetadataDetailLine(label: "Response URI", value: request.responseURI?.absoluteString)
-                        MetadataDetailLine(label: "Client URI", value: request.verifierMetadata?.clientURI)
-                        MetadataDetailLine(label: "Privacy policy", value: request.verifierMetadata?.policyURI)
-                        MetadataDetailLine(label: "Terms of service", value: request.verifierMetadata?.termsOfServiceURI)
                         MetadataDetailLine(label: "State", value: request.state)
                         MetadataDetailLine(label: "Nonce", value: request.nonce)
                     }
@@ -70,6 +76,15 @@ struct VerifierReviewSections: View {
         switch request.responseEncryption {
         case .notRequired: "Not requested"
         case .required: "Required"
+        }
+    }
+}
+
+private extension VerifierMetadata {
+    var hasUserFacingInformation: Bool {
+        [clientURI, policyURI, termsOfServiceURI].contains { value in
+            guard let value else { return false }
+            return !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
 }

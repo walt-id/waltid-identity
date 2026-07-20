@@ -139,8 +139,8 @@ actor MockWalletClient: WalletClient {
                         logoAltText: nil
                     ),
                     clientURI: "https://verifier.example",
-                    policyURI: nil,
-                    termsOfServiceURI: nil
+                    policyURI: "https://verifier.example/privacy",
+                    termsOfServiceURI: "https://verifier.example/terms"
                 )
             },
             responseURI: URL(string: "https://verifier.example/response"),

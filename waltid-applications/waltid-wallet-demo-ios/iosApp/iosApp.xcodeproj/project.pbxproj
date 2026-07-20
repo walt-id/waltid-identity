@@ -28,6 +28,7 @@
 		A1000426AAAA000100000026 /* VerifierReviewSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000426AAAA000000000026 /* VerifierReviewSections.swift */; };
 		A1000427AAAA000100000027 /* PresentationReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000427AAAA000000000027 /* PresentationReviewView.swift */; };
 		A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000430AAAA000000000030 /* OfferReviewView.swift */; };
+		A1000431AAAA000100000031 /* ReviewMetadataComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000431AAAA000000000031 /* ReviewMetadataComponents.swift */; };
 		A1000428AAAA000100000028 /* ClaimPathExpression.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000428AAAA000000000028 /* ClaimPathExpression.swift */; };
 		A1000301AAAA000100000001 /* ClaimGroupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000301AAAA000000000001 /* ClaimGroupView.swift */; };
 		A1000302AAAA000100000002 /* ClaimValueRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000302AAAA000000000002 /* ClaimValueRow.swift */; };
@@ -92,6 +93,7 @@
 		A1000426AAAA000000000026 /* VerifierReviewSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifierReviewSections.swift; sourceTree = "<group>"; };
 		A1000427AAAA000000000027 /* PresentationReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationReviewView.swift; sourceTree = "<group>"; };
 		A1000430AAAA000000000030 /* OfferReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfferReviewView.swift; sourceTree = "<group>"; };
+		A1000431AAAA000000000031 /* ReviewMetadataComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewMetadataComponents.swift; sourceTree = "<group>"; };
 		A1000428AAAA000000000028 /* ClaimPathExpression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaimPathExpression.swift; sourceTree = "<group>"; };
 		A1000301AAAA000000000001 /* ClaimGroupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaimGroupView.swift; sourceTree = "<group>"; };
 		A1000302AAAA000000000002 /* ClaimValueRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaimValueRow.swift; sourceTree = "<group>"; };
@@ -244,6 +246,7 @@
 				A1000426AAAA000000000026 /* VerifierReviewSections.swift */,
 				A1000427AAAA000000000027 /* PresentationReviewView.swift */,
 				A1000430AAAA000000000030 /* OfferReviewView.swift */,
+				A1000431AAAA000000000031 /* ReviewMetadataComponents.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -558,6 +561,7 @@
 				A1000426AAAA000100000026 /* VerifierReviewSections.swift in Sources */,
 				A1000427AAAA000100000027 /* PresentationReviewView.swift in Sources */,
 				A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */,
+				A1000431AAAA000100000031 /* ReviewMetadataComponents.swift in Sources */,
 				A1000304AAAA000100000004 /* CredentialDisplayModels.swift in Sources */,
 				A1000305AAAA000100000005 /* CredentialDisplayNormalizer.swift in Sources */,
 				A1000306AAAA000100000006 /* CredentialDisplayValueDecoder.swift in Sources */,

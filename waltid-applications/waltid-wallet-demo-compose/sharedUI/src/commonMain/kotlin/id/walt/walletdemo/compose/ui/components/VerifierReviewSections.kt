@@ -16,17 +16,19 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreview
 import id.walt.walletdemo.compose.logic.WalletDemoResponseEncryption
+import id.walt.walletdemo.compose.logic.WalletDemoVerifierMetadata
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
 internal fun VerifierReviewSections(preview: WalletDemoPresentationPreview, modifier: Modifier = Modifier) {
     var technicalDetailsExpanded by rememberSaveable { mutableStateOf(false) }
+    val verifierMetadata = preview.verifierMetadata
 
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        preview.verifierMetadata?.display?.let { display ->
+        verifierMetadata?.display?.let { display ->
             display.name?.trim()?.takeIf { it.isNotEmpty() }?.let { name ->
                 ReviewMetadataSection(
                     title = "Verifier",
@@ -38,6 +40,17 @@ internal fun VerifierReviewSections(preview: WalletDemoPresentationPreview, modi
                         supportingText = null,
                     )
                 }
+            }
+        }
+
+        if (verifierMetadata?.hasUserFacingInformation == true) {
+            ReviewMetadataSection(
+                title = "Verifier information",
+                modifier = Modifier.testTag(WalletUiTestTags.PresentationVerifierInformationSection),
+            ) {
+                MetadataDetailLine("Client URI", verifierMetadata.clientUri)
+                MetadataDetailLine("Privacy policy", verifierMetadata.policyUri)
+                MetadataDetailLine("Terms of service", verifierMetadata.termsOfServiceUri)
             }
         }
 
@@ -83,9 +96,6 @@ internal fun VerifierReviewSections(preview: WalletDemoPresentationPreview, modi
                 ) {
                     MetadataDetailLine("Client ID", preview.clientId)
                     MetadataDetailLine("Response URI", preview.responseUri)
-                    MetadataDetailLine("Client URI", preview.verifierMetadata?.clientUri)
-                    MetadataDetailLine("Privacy policy", preview.verifierMetadata?.policyUri)
-                    MetadataDetailLine("Terms of service", preview.verifierMetadata?.termsOfServiceUri)
                     MetadataDetailLine("State", preview.state)
                     MetadataDetailLine("Nonce", preview.nonce)
                 }
@@ -93,3 +103,6 @@ internal fun VerifierReviewSections(preview: WalletDemoPresentationPreview, modi
         }
     }
 }
+
+private val WalletDemoVerifierMetadata.hasUserFacingInformation: Boolean
+    get() = !clientUri.isNullOrBlank() || !policyUri.isNullOrBlank() || !termsOfServiceUri.isNullOrBlank()

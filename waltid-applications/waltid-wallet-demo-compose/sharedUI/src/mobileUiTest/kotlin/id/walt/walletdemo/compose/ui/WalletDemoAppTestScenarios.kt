@@ -366,6 +366,10 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.presentationSubmitButton").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationVerifierSection).performScrollTo().assertIsDisplayed()
         onNodeWithText("Example Verifier").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationVerifierInformationSection).performScrollTo().assertIsDisplayed()
+        onNodeWithText("https://verifier.example").performScrollTo().assertIsDisplayed()
+        onNodeWithText("https://verifier.example/privacy").performScrollTo().assertIsDisplayed()
+        onNodeWithText("https://verifier.example/terms").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationResponseProtectionSection).performScrollTo().assertIsDisplayed()
         onNodeWithText("Required").performScrollTo().assertIsDisplayed()
         onNodeWithText("ECDH-ES").performScrollTo().assertIsDisplayed()
@@ -497,6 +501,7 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
         onAllNodesWithTag(WalletUiTestTags.PresentationVerifierSection).assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.PresentationVerifierInformationSection).assertCountEquals(0)
         onAllNodesWithText(sampleDidClientId).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.VerifierTechnicalDetailsToggle).performScrollTo().performClick()
         onNodeWithText(sampleDidClientId).performScrollTo().assertIsDisplayed()
@@ -756,6 +761,7 @@ class WalletDemoAppTestScenarios {
         val reviewLandmarkTags = onAllNodes(
             matcher = hasAnyAncestor(hasTestTag("wallet.presentationReview")) and (
                 hasTestTag(WalletUiTestTags.PresentationVerifierSection) or
+                    hasTestTag(WalletUiTestTags.PresentationVerifierInformationSection) or
                     hasTestTag(WalletUiTestTags.PresentationResponseProtectionSection) or
                     hasTestTag(WalletUiTestTags.PresentationTechnicalDetailsSection) or
                     hasTestTag(expectedCredentialTag) or
@@ -767,19 +773,23 @@ class WalletDemoAppTestScenarios {
             .mapNotNull { it.config.getOrElseNullable(SemanticsProperties.TestTag) { null } }
 
         val verifierIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationVerifierSection)
+        val verifierInformationIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationVerifierInformationSection)
         val responseProtectionIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationResponseProtectionSection)
         val technicalDetailsIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationTechnicalDetailsSection)
         val credentialIndex = reviewLandmarkTags.indexOf(expectedCredentialTag)
         val actionsIndex = reviewLandmarkTags.indexOf("wallet.presentationActions")
 
         assertTrue(verifierIndex >= 0, "Verifier details are missing from presentation review: $reviewLandmarkTags")
+        assertTrue(verifierInformationIndex >= 0, "Verifier information is missing from presentation review: $reviewLandmarkTags")
         assertTrue(responseProtectionIndex >= 0, "Response protection is missing from presentation review: $reviewLandmarkTags")
         assertTrue(technicalDetailsIndex >= 0, "Technical request details are missing from presentation review: $reviewLandmarkTags")
         assertTrue(credentialIndex >= 0, "Shared credential is missing from presentation review: $reviewLandmarkTags")
         assertTrue(actionsIndex >= 0, "Share actions are missing from presentation review: $reviewLandmarkTags")
         assertTrue(
-            verifierIndex < responseProtectionIndex && responseProtectionIndex < technicalDetailsIndex,
-            "Verifier, response-protection, and technical sections are out of order: $reviewLandmarkTags",
+            verifierIndex < verifierInformationIndex &&
+                verifierInformationIndex < responseProtectionIndex &&
+                responseProtectionIndex < technicalDetailsIndex,
+            "Verifier metadata, response-protection, and technical sections are out of order: $reviewLandmarkTags",
         )
         assertTrue(
             technicalDetailsIndex < credentialIndex,
