@@ -248,11 +248,27 @@ object WalletPresentFunctionality2 {
         authorizationRequest: AuthorizationRequest,
         error: String,
         errorDescription: String?,
-    ): Parameters = ParametersBuilder().apply {
-        append("error", error)
-        errorDescription?.let { append("error_description", it) }
-        authorizationRequest.state?.let { append("state", it) }
-    }.build()
+    ): Parameters {
+        requireOAuthErrorValue("error", error)
+        errorDescription?.let { requireOAuthErrorValue("error_description", it) }
+
+        return ParametersBuilder().apply {
+            append("error", error)
+            errorDescription?.let { append("error_description", it) }
+            authorizationRequest.state?.let { append("state", it) }
+        }.build()
+    }
+
+    private fun requireOAuthErrorValue(parameter: String, value: String) {
+        require(value.isNotEmpty() && value.all(::isOAuthErrorCharacter)) {
+            "$parameter must contain only RFC 6749 error-response characters"
+        }
+    }
+
+    private fun isOAuthErrorCharacter(character: Char): Boolean =
+        character.code in 0x20..0x21 ||
+            character.code in 0x23..0x5B ||
+            character.code in 0x5D..0x7E
 
     private suspend fun postFormResponse(
         responseUri: String,
