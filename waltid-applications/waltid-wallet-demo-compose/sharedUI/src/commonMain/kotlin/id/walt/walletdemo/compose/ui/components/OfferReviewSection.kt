@@ -4,11 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -48,28 +46,36 @@ internal fun OfferReviewSection(
     ) {
         Text("Credential offer", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
 
-        Text("Issuer", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        MetadataIdentityRow(
-            display = preview.issuer.display,
-            fallbackName = preview.issuer.credentialIssuer.ifBlank { "Unknown issuer" },
-            supportingText = preview.issuer.credentialIssuer.takeIf {
-                it.isNotBlank() && it != preview.issuer.display?.name
-            },
-        )
+        ReviewMetadataSection(
+            title = "Issuer",
+            modifier = Modifier.testTag(WalletUiTestTags.OfferIssuerSection),
+        ) {
+            MetadataIdentityRow(
+                display = preview.issuer.display,
+                fallbackName = preview.issuer.credentialIssuer.ifBlank { "Unknown issuer" },
+                supportingText = preview.issuer.credentialIssuer.takeIf {
+                    it.isNotBlank() && it != preview.issuer.display?.name
+                },
+            )
+        }
 
         if (preview.offeredCredentials.isNotEmpty()) {
-            Text(
-                "Offered credentials",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            preview.offeredCredentials.forEach { credential ->
-                OfferedCredentialCard(credential)
+            ReviewMetadataSection(
+                title = "Offered credentials",
+                modifier = Modifier.testTag(WalletUiTestTags.OfferCredentialsSection),
+            ) {
+                preview.offeredCredentials.forEachIndexed { index, credential ->
+                    if (index > 0) HorizontalDivider()
+                    OfferedCredentialContent(credential)
+                }
             }
         }
 
         preview.transactionCode?.let { requirement ->
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            ReviewMetadataSection(
+                title = "Transaction code",
+                modifier = Modifier.testTag(WalletUiTestTags.OfferTransactionCodeSection),
+            ) {
                 Text(
                     text = requirement.description ?: "Enter the transaction code provided by the issuer.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -84,7 +90,7 @@ internal fun OfferReviewSection(
                             focusManager.clearFocus()
                         }
                     },
-                    label = { Text("Transaction code") },
+                    label = { Text("Code") },
                     supportingText = requirement.length?.let { length ->
                         { Text("$length characters") }
                     },
@@ -125,31 +131,23 @@ internal fun OfferReviewSection(
 }
 
 @Composable
-private fun OfferedCredentialCard(credential: WalletDemoOfferedCredentialMetadata) {
+private fun OfferedCredentialContent(credential: WalletDemoOfferedCredentialMetadata) {
     val title = credential.display?.name
         ?: credential.vct
         ?: credential.doctype
         ?: credential.configurationId
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            MetadataIdentityRow(
-                display = credential.display,
-                fallbackName = title,
-                supportingText = credential.display?.description,
-            )
-            MetadataDetailLine("Format", credential.format)
-            MetadataDetailLine("Type", credential.vct ?: credential.doctype)
-            if (credential.claims.isNotEmpty()) {
-                Text("Claims", style = MaterialTheme.typography.labelMedium)
-                credential.claims.forEach { claim -> CredentialClaimLine(claim) }
-            }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        MetadataIdentityRow(
+            display = credential.display,
+            fallbackName = title,
+            supportingText = credential.display?.description,
+        )
+        MetadataDetailLine("Format", credential.format)
+        MetadataDetailLine("Type", credential.vct ?: credential.doctype)
+        if (credential.claims.isNotEmpty()) {
+            Text("Claims", style = MaterialTheme.typography.labelMedium)
+            credential.claims.forEach { claim -> CredentialClaimLine(claim) }
         }
     }
 }

@@ -128,7 +128,7 @@ class WalletSdkBridgeTest {
         val result = bridge.resolveOffer("openid-credential-offer://issuer.example")
 
         assertIs<WalletBridgeResult.Success<MobileWalletOfferResolution>>(result)
-        assertEquals(MobileWalletTransactionCodeInputMode.numeric, result.value.transactionCode?.inputMode)
+        assertEquals(MobileWalletTransactionCodeInputMode.Numeric, result.value.transactionCode?.inputMode)
         assertEquals("openid-credential-offer://issuer.example", operations.resolvedOfferUrl)
     }
 
@@ -190,6 +190,7 @@ class WalletSdkBridgeTest {
         assertIs<WalletBridgeResult.Success<MobileWalletPresentationPreviewResult>>(result)
         val preview = assertIs<MobileWalletPresentationPreviewResult.Ready>(result.value).preview
         assertEquals("https://verifier.example", preview.request.clientId)
+        assertEquals("Example Verifier", preview.request.verifierDisplayName)
         assertEquals(
             MobileWalletResponseEncryption.Required(
                 keyManagementAlgorithm = "ECDH-ES",
@@ -691,7 +692,7 @@ class WalletSdkBridgeTest {
                     )
                 ),
                 transactionCode = MobileWalletTransactionCodeRequirement(
-                    inputMode = MobileWalletTransactionCodeInputMode.numeric,
+                    inputMode = MobileWalletTransactionCodeInputMode.Numeric,
                     length = 6,
                     description = "Enter the six-digit code",
                 ),
@@ -754,6 +755,7 @@ class WalletSdkBridgeTest {
                         policyUri = null,
                         termsOfServiceUri = null,
                     ),
+                    verifierDisplayName = "Example Verifier",
                     responseUri = "https://verifier.example/direct-post",
                     state = "state-1",
                     nonce = "nonce-1",

@@ -18,6 +18,7 @@ let previewResult = try await wallet.previewPresentation(request: authorizationR
 let result: PresentationResult
 switch previewResult {
 case .ready(let preview):
+    showVerifierName(preview.request.verifierDisplayName)
     switch preview.request.responseEncryption {
     case .notRequired:
         showPlainResponseNotice()

@@ -1,0 +1,92 @@
+package id.walt.walletdemo.compose.ui.components
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
+import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreview
+import id.walt.walletdemo.compose.logic.WalletDemoResponseEncryption
+import id.walt.walletdemo.compose.ui.WalletUiTestTags
+
+@Composable
+internal fun VerifierReviewSections(preview: WalletDemoPresentationPreview, modifier: Modifier = Modifier) {
+    var technicalDetailsExpanded by rememberSaveable { mutableStateOf(false) }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        ReviewMetadataSection(
+            title = "Verifier",
+            modifier = Modifier.testTag(WalletUiTestTags.PresentationVerifierSection),
+        ) {
+            MetadataIdentityRow(
+                display = preview.verifierMetadata?.display,
+                fallbackName = preview.verifierDisplayName,
+                supportingText = null,
+            )
+            MetadataDetailLine("Trust", "Unknown")
+        }
+
+        preview.transactionData.forEach { group ->
+            ClaimGroupSection(group)
+        }
+
+        ReviewMetadataSection(
+            title = "Response protection",
+            modifier = Modifier.testTag(WalletUiTestTags.PresentationResponseProtectionSection),
+        ) {
+            val encryption = preview.responseEncryption
+            MetadataDetailLine(
+                "Message-level encryption",
+                when (encryption) {
+                    WalletDemoResponseEncryption.NotRequired -> "Not requested"
+                    is WalletDemoResponseEncryption.Required -> "Required"
+                },
+            )
+            if (encryption is WalletDemoResponseEncryption.Required) {
+                MetadataDetailLine("Key management algorithm", encryption.keyManagementAlgorithm)
+                MetadataDetailLine("Content encryption algorithm", encryption.contentEncryptionAlgorithm)
+                MetadataDetailLine("Verifier key ID", encryption.verifierKeyId)
+                MetadataDetailLine("Verifier key thumbprint", encryption.verifierKeyThumbprint)
+            }
+        }
+
+        ReviewMetadataSection(
+            title = "Technical request details",
+            modifier = Modifier.testTag(WalletUiTestTags.PresentationTechnicalDetailsSection),
+        ) {
+            TextButton(
+                onClick = { technicalDetailsExpanded = !technicalDetailsExpanded },
+                modifier = Modifier.testTag(WalletUiTestTags.VerifierTechnicalDetailsToggle),
+            ) {
+                Text(if (technicalDetailsExpanded) "Hide details" else "Show details")
+            }
+
+            if (technicalDetailsExpanded) {
+                Column(
+                    modifier = Modifier.testTag(WalletUiTestTags.VerifierTechnicalDetails),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    MetadataDetailLine("Client ID", preview.clientId)
+                    MetadataDetailLine("Response URI", preview.responseUri)
+                    MetadataDetailLine("Client URI", preview.verifierMetadata?.clientUri)
+                    MetadataDetailLine("Privacy policy", preview.verifierMetadata?.policyUri)
+                    MetadataDetailLine("Terms of service", preview.verifierMetadata?.termsOfServiceUri)
+                    MetadataDetailLine("State", preview.state)
+                    MetadataDetailLine("Nonce", preview.nonce)
+                }
+            }
+        }
+    }
+}

@@ -59,6 +59,10 @@ class WalletDemoAppAndroidTest {
         scenarios.presentTabDeclineSendsProtocolRejection()
 
     @Test
+    fun presentTabShowsUnencryptedResponseState() =
+        scenarios.presentTabShowsUnencryptedResponseState()
+
+    @Test
     fun presentationDisclosureImagesRenderAsImages() =
         scenarios.presentationDisclosureImagesRenderAsImages()
 

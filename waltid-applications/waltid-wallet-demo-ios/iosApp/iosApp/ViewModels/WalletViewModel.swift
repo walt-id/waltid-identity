@@ -77,7 +77,7 @@ class WalletViewModel: ObservableObject {
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
     @Published var selectedPresentationDisclosureOptions: Set<PresentationDisclosureSelection> = []
     @Published var selectedTab: WalletTab = .credentials
-    @Published var offerPreview: OfferPreview?
+    @Published var offerPreview: OfferResolution?
     @Published var lastReceivedCredentialIDs: [String] = []
     @Published var receiveCompleted = false
     @Published var presentationCompleted = false
@@ -368,11 +368,7 @@ class WalletViewModel: ObservableObject {
                 let resolution = try await walletClient.resolveOffer(offer: offer)
                 try Task.checkCancellation()
                 guard isCurrent(request) else { return }
-                offerPreview = OfferPreview(
-                    issuer: resolution.issuer,
-                    offeredCredentials: resolution.offeredCredentials,
-                    transactionCode: resolution.transactionCode
-                )
+                offerPreview = resolution
                 setSuccess(WalletStatusText.reviewCredentialOffer, tab: .receive)
             } catch is CancellationError {
                 return

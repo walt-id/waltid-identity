@@ -364,9 +364,13 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.presentationInput").assertIsDisplayed()
         onNodeWithTag("wallet.presentationInput").assertIsNotEnabled()
         onNodeWithTag("wallet.presentationSubmitButton").performScrollTo().assertIsDisplayed()
-        onNodeWithTag("wallet.presentationVerifier").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationVerifierSection).performScrollTo().assertIsDisplayed()
         onNodeWithText("Example Verifier").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Encrypted").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationResponseProtectionSection).performScrollTo().assertIsDisplayed()
+        onNodeWithText("Required").performScrollTo().assertIsDisplayed()
+        onNodeWithText("ECDH-ES").performScrollTo().assertIsDisplayed()
+        onNodeWithText("A256GCM").performScrollTo().assertIsDisplayed()
+        onNodeWithText("thumbprint-1").performScrollTo().assertIsDisplayed()
         assertVerifierTechnicalDetailsCollapsedUntilRequested()
         onNodeWithTag(WalletUiTestTags.credentialCard(samplePresentationCredentialOption.selection.id)).performScrollTo().assertIsDisplayed()
 
@@ -420,6 +424,29 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.PresentationNewButton).assertIsDisplayed()
     }
 
+    fun presentTabShowsUnencryptedResponseState() = runComposeUiTest {
+        val wallet = FakeDemoWallet(
+            credentials = listOf(sampleCredential),
+            presentationPreview = samplePresentationPreview.copy(
+                responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            ),
+        )
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+        onNodeWithTag(WalletUiTestTags.PresentTab).performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationInput).performTextInput("openid4vp://example")
+        onNodeWithTag(WalletUiTestTags.PresentButton).performSemanticsAction(SemanticsActions.OnClick)
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+
+        onNodeWithTag(WalletUiTestTags.PresentationResponseProtectionSection).performScrollTo().assertIsDisplayed()
+        onNodeWithText("Not requested").assertIsDisplayed()
+        onAllNodesWithText("Key management algorithm").assertCountEquals(0)
+        onAllNodesWithText("Verifier key thumbprint").assertCountEquals(0)
+    }
+
     fun presentationDisclosureImagesRenderAsImages() = runComposeUiTest {
         val wallet = FakeDemoWallet(
             credentials = listOf(sampleCredential),
@@ -455,6 +482,7 @@ class WalletDemoAppTestScenarios {
             credentials = listOf(sampleCredential),
             presentationPreview = samplePresentationPreview.copy(
                 verifierMetadata = null,
+                verifierDisplayName = "DID verifier",
                 clientId = sampleDidClientId,
             ),
         )
@@ -480,6 +508,7 @@ class WalletDemoAppTestScenarios {
             credentials = listOf(sampleCredential),
             presentationPreview = samplePresentationPreview.copy(
                 verifierMetadata = null,
+                verifierDisplayName = "verifier.example",
                 clientId = sampleX509SanDnsClientId,
             ),
         )
@@ -753,7 +782,9 @@ class WalletDemoAppTestScenarios {
         )
         val reviewLandmarkTags = onAllNodes(
             matcher = hasAnyAncestor(hasTestTag("wallet.presentationReview")) and (
-                hasTestTag("wallet.presentationVerifier") or
+                hasTestTag(WalletUiTestTags.PresentationVerifierSection) or
+                    hasTestTag(WalletUiTestTags.PresentationResponseProtectionSection) or
+                    hasTestTag(WalletUiTestTags.PresentationTechnicalDetailsSection) or
                     hasTestTag(expectedCredentialTag) or
                     hasTestTag("wallet.presentationActions")
                 ),
@@ -762,16 +793,24 @@ class WalletDemoAppTestScenarios {
             .fetchSemanticsNodes()
             .mapNotNull { it.config.getOrElseNullable(SemanticsProperties.TestTag) { null } }
 
-        val verifierIndex = reviewLandmarkTags.indexOf("wallet.presentationVerifier")
+        val verifierIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationVerifierSection)
+        val responseProtectionIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationResponseProtectionSection)
+        val technicalDetailsIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationTechnicalDetailsSection)
         val credentialIndex = reviewLandmarkTags.indexOf(expectedCredentialTag)
         val actionsIndex = reviewLandmarkTags.indexOf("wallet.presentationActions")
 
         assertTrue(verifierIndex >= 0, "Verifier details are missing from presentation review: $reviewLandmarkTags")
+        assertTrue(responseProtectionIndex >= 0, "Response protection is missing from presentation review: $reviewLandmarkTags")
+        assertTrue(technicalDetailsIndex >= 0, "Technical request details are missing from presentation review: $reviewLandmarkTags")
         assertTrue(credentialIndex >= 0, "Shared credential is missing from presentation review: $reviewLandmarkTags")
         assertTrue(actionsIndex >= 0, "Share actions are missing from presentation review: $reviewLandmarkTags")
         assertTrue(
-            verifierIndex < actionsIndex,
-            "Share action should follow verifier details so the verifier is reviewed before consent: $reviewLandmarkTags",
+            verifierIndex < responseProtectionIndex && responseProtectionIndex < technicalDetailsIndex,
+            "Verifier, response-protection, and technical sections are out of order: $reviewLandmarkTags",
+        )
+        assertTrue(
+            technicalDetailsIndex < credentialIndex,
+            "Credential selection should follow request metadata: $reviewLandmarkTags",
         )
         assertTrue(
             credentialIndex < actionsIndex,
@@ -787,9 +826,6 @@ class WalletDemoAppTestScenarios {
         onNodeWithText("https://verifier.example/response").performScrollTo().assertIsDisplayed()
         onNodeWithText("state-123").performScrollTo().assertIsDisplayed()
         onNodeWithText("nonce-456").performScrollTo().assertIsDisplayed()
-        onNodeWithText("ECDH-ES").performScrollTo().assertIsDisplayed()
-        onNodeWithText("A256GCM").performScrollTo().assertIsDisplayed()
-        onNodeWithText("thumbprint-1").performScrollTo().assertIsDisplayed()
     }
 
     private fun ComposeUiTest.assertPresentationNewActionPrecedesReadOnlyReview() {
@@ -839,6 +875,7 @@ class WalletDemoAppTestScenarios {
         )
 
         val samplePresentationPreview = WalletDemoPresentationPreview(
+            verifierDisplayName = "Example Verifier",
             verifierMetadata = WalletDemoVerifierMetadata(
                 display = WalletDemoMetadataDisplay(
                     name = "Example Verifier",

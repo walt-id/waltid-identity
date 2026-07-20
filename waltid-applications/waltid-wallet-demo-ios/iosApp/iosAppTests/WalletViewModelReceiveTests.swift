@@ -181,7 +181,11 @@ private actor TransactionCodeWalletClient: WalletClient {
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         .ready(
             PresentationPreview(
-                request: PresentationRequestInfo(clientID: nil, responseEncryption: .notRequired),
+                request: PresentationRequestInfo(
+                    clientID: nil,
+                    verifierDisplayName: "Unknown verifier",
+                    responseEncryption: .notRequired
+                ),
                 credentialOptions: []
             )
         )

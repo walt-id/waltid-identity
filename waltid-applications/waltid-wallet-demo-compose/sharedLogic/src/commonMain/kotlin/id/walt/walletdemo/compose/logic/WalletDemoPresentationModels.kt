@@ -13,25 +13,15 @@ data class WalletDemoPresentationError(
 
 data class WalletDemoPresentationPreview(
     val verifierMetadata: WalletDemoVerifierMetadata?,
-    val clientId: String?,
-    val responseUri: String? = null,
-    val state: String? = null,
-    val nonce: String? = null,
-    val responseEncryption: WalletDemoResponseEncryption = WalletDemoResponseEncryption.NotRequired,
-    val transactionData: List<ClaimGroup> = emptyList(),
-    val credentialOptions: List<WalletDemoPresentationCredentialOption>,
-    val credentialRequirements: List<WalletDemoPresentationCredentialRequirement> = emptyList(),
-)
-
-data class VerifierDetails(
-    val metadata: WalletDemoVerifierMetadata?,
+    val verifierDisplayName: String,
     val clientId: String?,
     val responseUri: String? = null,
     val state: String? = null,
     val nonce: String? = null,
     val responseEncryption: WalletDemoResponseEncryption,
     val transactionData: List<ClaimGroup> = emptyList(),
-    val trustStatus: String = CredentialDisplayText.Unknown,
+    val credentialOptions: List<WalletDemoPresentationCredentialOption>,
+    val credentialRequirements: List<WalletDemoPresentationCredentialRequirement> = emptyList(),
 )
 
 sealed interface WalletDemoResponseEncryption {

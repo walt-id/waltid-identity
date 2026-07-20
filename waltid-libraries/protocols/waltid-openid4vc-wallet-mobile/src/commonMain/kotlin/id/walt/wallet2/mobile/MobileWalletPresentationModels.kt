@@ -49,6 +49,7 @@ public data class MobileWalletPresentationCredentialRequirement(
  *
  * @property clientId Raw OpenID4VP `client_id` value, when available.
  * @property verifierMetadata Typed verifier metadata supplied by the OpenID4VP client, when available.
+ * @property verifierDisplayName Human-readable verifier label derived from request metadata and identifiers.
  * @property responseUri Verifier response URI to which the wallet will submit the presentation, when provided.
  * @property state OpenID4VP state value supplied by the verifier, when provided.
  * @property nonce OpenID4VP nonce value supplied by the verifier, when provided.
@@ -58,6 +59,7 @@ public data class MobileWalletPresentationCredentialRequirement(
 public data class MobileWalletPresentationRequestInfo(
     val clientId: String?,
     val verifierMetadata: MobileWalletVerifierMetadata?,
+    val verifierDisplayName: String,
     val responseUri: String?,
     val state: String?,
     val nonce: String?,

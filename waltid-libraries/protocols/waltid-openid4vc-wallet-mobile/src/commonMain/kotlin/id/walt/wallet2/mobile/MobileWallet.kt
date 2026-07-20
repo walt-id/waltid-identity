@@ -551,15 +551,23 @@ private fun AuthorizationRequest.toMobileRequestInfo(
     preferredLocales: List<String>,
     responseEncryption: ResponseEncryption.Metadata? = null,
     transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
-): MobileWalletPresentationRequestInfo = MobileWalletPresentationRequestInfo(
-    clientId = clientId,
-    verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
-    responseUri = responseUri,
-    state = state,
-    nonce = nonce,
-    responseEncryption = responseEncryption.toMobileResponseEncryption(),
-    transactionData = transactionData,
-)
+): MobileWalletPresentationRequestInfo {
+    val verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales)
+    return MobileWalletPresentationRequestInfo(
+        clientId = clientId,
+        verifierMetadata = verifierMetadata,
+        verifierDisplayName = deriveVerifierDisplayName(
+            clientId = clientId,
+            responseUri = responseUri,
+            metadata = verifierMetadata,
+        ),
+        responseUri = responseUri,
+        state = state,
+        nonce = nonce,
+        responseEncryption = responseEncryption.toMobileResponseEncryption(),
+        transactionData = transactionData,
+    )
+}
 
 private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {
     WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED -> MobileWalletPresentationErrorCode.accessDenied

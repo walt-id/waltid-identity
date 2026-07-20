@@ -67,7 +67,35 @@ class MobileWalletMetadataModelsTest {
         assertEquals("Government-issued identity credential", result.offeredCredentials.single().display?.description)
         assertEquals("Given name", result.offeredCredentials.single().claims.single().displayName)
         assertEquals("urn:example:pid", result.offeredCredentials.single().vct)
-        assertEquals(MobileWalletTransactionCodeInputMode.text, result.transactionCode?.inputMode)
+        assertEquals(MobileWalletTransactionCodeInputMode.Text, result.transactionCode?.inputMode)
+    }
+
+    @Test
+    fun localeLookupPreservesScriptAndRemovesExtensionsProgressively() {
+        val issuer = CredentialIssuerMetadata(
+            credentialIssuer = "https://issuer.example",
+            credentialEndpoint = "https://issuer.example/credential",
+            display = listOf(
+                IssuerDisplay(name = "Simplified Chinese", locale = "zh-Hans"),
+                IssuerDisplay(name = "Traditional Chinese", locale = "zh-Hant"),
+                IssuerDisplay(name = "German", locale = "de-DE"),
+            ),
+            credentialConfigurationsSupported = emptyMap(),
+        )
+        val preview = WalletOfferPreviewResult(
+            issuerMetadata = issuer,
+            offeredCredentials = emptyList(),
+            transactionCode = null,
+        )
+
+        assertEquals(
+            "Traditional Chinese",
+            preview.toMobileOfferResolution(listOf("zh-Hant-TW")).issuer.display?.name,
+        )
+        assertEquals(
+            "German",
+            preview.toMobileOfferResolution(listOf("de-DE-u-co-phonebk")).issuer.display?.name,
+        )
     }
 
     @Test
@@ -78,7 +106,7 @@ class MobileWalletMetadataModelsTest {
             description = "Enter the code from your issuer",
         ).toMobileRequirement()
 
-        assertEquals(MobileWalletTransactionCodeInputMode.numeric, result.inputMode)
+        assertEquals(MobileWalletTransactionCodeInputMode.Numeric, result.inputMode)
         assertEquals(6, result.length)
         assertEquals("Enter the code from your issuer", result.description)
     }
@@ -112,6 +140,43 @@ class MobileWalletMetadataModelsTest {
         assertEquals("https://verifier.example/de", result.clientUri)
         assertEquals("https://verifier.example/de/privacy", result.policyUri)
         assertEquals("https://verifier.example/de/terms", result.termsOfServiceUri)
+    }
+
+    @Test
+    fun verifierDisplayNameUsesMetadataThenCanonicalClientIdentityFallbacks() {
+        val metadata = MobileWalletVerifierMetadata(
+            display = MobileWalletMetadataDisplay(
+                name = "Named verifier",
+                locale = "en",
+                logoUri = null,
+                logoAltText = null,
+            ),
+            clientUri = null,
+            policyUri = null,
+            termsOfServiceUri = null,
+        )
+
+        assertEquals(
+            "Named verifier",
+            deriveVerifierDisplayName("x509_san_dns:verifier.example", null, metadata),
+        )
+        assertEquals(
+            "verifier.example",
+            deriveVerifierDisplayName("x509_san_dns:verifier.example", null, null),
+        )
+        assertEquals(
+            "DID verifier",
+            deriveVerifierDisplayName("decentralized_identifier:did:example:123", null, null),
+        )
+        assertEquals(
+            "verifier.example",
+            deriveVerifierDisplayName("https://verifier.example/client", null, null),
+        )
+        assertEquals(
+            "response.example",
+            deriveVerifierDisplayName(null, "https://response.example/direct-post", null),
+        )
+        assertEquals("Unknown verifier", deriveVerifierDisplayName(null, null, null))
     }
 
     @Test

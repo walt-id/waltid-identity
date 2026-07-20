@@ -16,6 +16,7 @@ actor MockWalletClient: WalletClient {
     private let presentationPreviewResultOverride: PresentationPreviewResult?
     private let rejectionResult: PresentationResult
     private(set) var rejectedRequestURLs: [URL] = []
+    private let responseEncryptionRequired: Bool
 
     init(
         storedCredentials: [Credential] = [],
@@ -24,7 +25,8 @@ actor MockWalletClient: WalletClient {
         duplicatePresentationOptions: Bool = false,
         transactionCodeRequired: Bool = false,
         presentationPreviewResult: PresentationPreviewResult? = nil,
-        rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}"))
+        rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}")),
+        responseEncryptionRequired: Bool = true,
     ) {
         self.storedCredentials = storedCredentials
         self.operationDelayNanoseconds = operationDelayMilliseconds * 1_000_000
@@ -33,6 +35,7 @@ actor MockWalletClient: WalletClient {
         self.transactionCodeRequired = transactionCodeRequired
         self.presentationPreviewResultOverride = presentationPreviewResult
         self.rejectionResult = rejectionResult
+        self.responseEncryptionRequired = responseEncryptionRequired
     }
 
     func bootstrap() async throws -> WalletBootstrapResult {
@@ -141,17 +144,11 @@ actor MockWalletClient: WalletClient {
                     termsOfServiceURI: nil
                 )
             },
+            verifierDisplayName: verifierDisplayName,
             responseURI: URL(string: "https://verifier.example/response"),
             state: "state-123",
             nonce: "nonce-456",
-            responseEncryption: .required(
-                ResponseEncryptionDetails(
-                    keyManagementAlgorithm: "ECDH-ES",
-                    contentEncryptionAlgorithm: "A256GCM",
-                    verifierKeyID: "verifier-key-1",
-                    verifierKeyThumbprint: "thumbprint-1"
-                )
-            ),
+            responseEncryption: responseEncryption,
             transactionData: [Self.paymentAuthorizationTransactionData]
         )
     }
@@ -164,10 +161,30 @@ actor MockWalletClient: WalletClient {
         }
     }
 
+    private var responseEncryption: PresentationResponseEncryption {
+        guard responseEncryptionRequired else { return .notRequired }
+        return .required(
+            ResponseEncryptionDetails(
+                keyManagementAlgorithm: "ECDH-ES",
+                contentEncryptionAlgorithm: "A256GCM",
+                verifierKeyID: "verifier-key-1",
+                verifierKeyThumbprint: "thumbprint-1"
+            )
+        )
+    }
+
     private var verifierName: String? {
         switch verifierStyle {
         case .named: return "Example Verifier"
         case .did, .x509SanDns: return nil
+        }
+    }
+
+    private var verifierDisplayName: String {
+        switch verifierStyle {
+        case .named: return "Example Verifier"
+        case .did: return "DID verifier"
+        case .x509SanDns: return "verifier.example"
         }
     }
 

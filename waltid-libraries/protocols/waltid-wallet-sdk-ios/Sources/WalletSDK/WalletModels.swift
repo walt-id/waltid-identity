@@ -952,6 +952,9 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     /// Typed metadata supplied by the OpenID4VP verifier when available.
     public let verifierMetadata: VerifierMetadata?
 
+    /// Human-readable verifier label derived from request metadata and identifiers.
+    public let verifierDisplayName: String
+
     /// Response URI used for direct-post responses when available.
     public let responseURI: URL?
 
@@ -972,6 +975,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     /// - Parameters:
     ///   - clientID: OpenID4VP client identifier from the request.
     ///   - verifierMetadata: Typed metadata supplied by the verifier.
+    ///   - verifierDisplayName: Human-readable verifier label derived from request metadata and identifiers.
     ///   - responseURI: Direct-post response URI when available.
     ///   - state: OpenID state value from the request.
     ///   - nonce: OpenID nonce value from the request.
@@ -980,6 +984,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     public init(
         clientID: String? = nil,
         verifierMetadata: VerifierMetadata? = nil,
+        verifierDisplayName: String,
         responseURI: URL? = nil,
         state: String? = nil,
         nonce: String? = nil,
@@ -988,6 +993,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     ) {
         self.clientID = clientID
         self.verifierMetadata = verifierMetadata
+        self.verifierDisplayName = verifierDisplayName
         self.responseURI = responseURI
         self.state = state
         self.nonce = nonce

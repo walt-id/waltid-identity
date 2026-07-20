@@ -695,6 +695,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
     func testTransactionDataGroupsRenderProfileAndDetailsReadably() throws {
         let request = PresentationRequestInfo(
+            verifierDisplayName: "Verifier",
             responseEncryption: .notRequired,
             transactionData: [
                 PresentationTransactionData(

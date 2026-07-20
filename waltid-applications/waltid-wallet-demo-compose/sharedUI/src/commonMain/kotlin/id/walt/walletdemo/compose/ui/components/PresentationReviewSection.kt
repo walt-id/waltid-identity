@@ -23,7 +23,6 @@ import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelectio
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreview
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.logic.toRequestedDisclosureGroup
-import id.walt.walletdemo.compose.logic.toVerifierDetails
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
@@ -47,7 +46,7 @@ internal fun PresentationReviewSection(
             .testTag(WalletUiTestTags.PresentationReview),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        VerifierDetailsCard(preview.toVerifierDetails())
+        VerifierReviewSections(preview)
 
         Text(
             "Select credentials to share",

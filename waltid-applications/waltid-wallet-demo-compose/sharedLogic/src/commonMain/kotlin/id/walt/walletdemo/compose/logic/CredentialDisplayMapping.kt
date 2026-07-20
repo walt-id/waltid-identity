@@ -3,17 +3,6 @@ package id.walt.walletdemo.compose.logic
 fun CredentialSummary.toCredentialDetails(): CredentialDetails =
     CredentialDisplayNormalizer.toDetails(this)
 
-fun WalletDemoPresentationPreview.toVerifierDetails(): VerifierDetails =
-    VerifierDetails(
-        metadata = verifierMetadata,
-        clientId = clientId,
-        responseUri = responseUri,
-        state = state,
-        nonce = nonce,
-        responseEncryption = responseEncryption,
-        transactionData = transactionData,
-    )
-
 fun WalletDemoPresentationCredentialOption.toCredentialDetails(): CredentialDetails {
     val summary = CredentialSummary(
         id = selection.id,

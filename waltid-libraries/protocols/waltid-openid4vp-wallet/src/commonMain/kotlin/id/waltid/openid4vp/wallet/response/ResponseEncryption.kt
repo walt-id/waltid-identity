@@ -40,7 +40,7 @@ object ResponseEncryption {
             keyManagementAlgorithm = SUPPORTED_ALGORITHM,
             contentEncryptionAlgorithm = encryptionMethod,
             verifierKeyId = key.exportJWKObject()["kid"]?.jsonPrimitive?.contentOrNull,
-            verifierKeyThumbprint = key.getPublicKey().getThumbprint(),
+            verifierKeyThumbprint = key.getPublicKey().getThumbprint().substringAfterLast(':'),
         )
 
         suspend fun thumbprintBytes(): ByteArray = key.getPublicKey().getThumbprint().decodeFromBase64Url()

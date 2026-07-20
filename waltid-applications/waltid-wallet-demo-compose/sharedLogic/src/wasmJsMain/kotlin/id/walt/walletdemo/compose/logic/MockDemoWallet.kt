@@ -61,6 +61,8 @@ private class MockDemoWallet : DemoWallet {
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult =
         WalletDemoPresentationPreviewResult.Ready(
             WalletDemoPresentationPreview(
+                verifierDisplayName = "Verifier",
+                responseEncryption = WalletDemoResponseEncryption.NotRequired,
                 verifierMetadata = WalletDemoVerifierMetadata(
                     display = WalletDemoMetadataDisplay(
                         name = "Mock verifier",
@@ -73,7 +75,7 @@ private class MockDemoWallet : DemoWallet {
                 ),
                 clientId = "mock-verifier",
                 credentialOptions = emptyList(),
-            )
+            ),
         )
 
     override suspend fun submitPresentation(

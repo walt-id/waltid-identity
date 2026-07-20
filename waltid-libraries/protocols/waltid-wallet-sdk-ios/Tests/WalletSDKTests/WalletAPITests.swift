@@ -165,6 +165,7 @@ final class WalletAPITests: XCTestCase {
             request: .init(
                 clientID: "https://verifier.example",
                 verifierMetadata: testVerifierMetadata,
+                verifierDisplayName: "Example Verifier",
                 responseURI: URL(string: "https://verifier.example/direct-post"),
                 state: "state-1",
                 nonce: "nonce-1",
@@ -197,6 +198,7 @@ final class WalletAPITests: XCTestCase {
         )
 
         acceptsSendable(preview)
+        XCTAssertEqual(preview.request.verifierDisplayName, "Example Verifier")
         XCTAssertEqual(preview.request.responseEncryption, .notRequired)
         XCTAssertEqual(preview.credentialOptions.single?.credentialID, "credential-1")
         XCTAssertEqual(preview.credentialOptions.single?.multiple, true)
@@ -341,6 +343,7 @@ final class WalletAPITests: XCTestCase {
                 request: .init(
                     clientID: "https://verifier.example",
                     verifierMetadata: testVerifierMetadata,
+                    verifierDisplayName: "Example Verifier",
                     responseURI: nil,
                     state: nil,
                     nonce: "nonce-1",
@@ -376,6 +379,7 @@ final class WalletAPITests: XCTestCase {
             return XCTFail("Expected a ready preview")
         }
         XCTAssertEqual(preview.request.clientID, "https://verifier.example")
+        XCTAssertEqual(preview.request.verifierDisplayName, "Example Verifier")
         XCTAssertEqual(
             preview.request.responseEncryption,
             .required(
@@ -680,7 +684,11 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     var presentResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
     var previewResult = PresentationPreviewResult.ready(
         PresentationPreview(
-            request: .init(clientID: nil, responseEncryption: .notRequired),
+            request: .init(
+                clientID: nil,
+                verifierDisplayName: "Unknown verifier",
+                responseEncryption: .notRequired
+            ),
             credentialOptions: []
         )
     )

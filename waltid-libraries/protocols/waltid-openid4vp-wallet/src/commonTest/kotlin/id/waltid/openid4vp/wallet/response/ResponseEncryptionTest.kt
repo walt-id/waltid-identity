@@ -27,7 +27,7 @@ class ResponseEncryptionTest {
     ).jsonObject
 
     @Test
-    fun `selects final compliant encryption metadata`() = runTest {
+    fun `selects response encryption metadata`() = runTest {
         val config = ResponseEncryption.resolve(request(publicKey))
 
         val metadata = config?.metadata()

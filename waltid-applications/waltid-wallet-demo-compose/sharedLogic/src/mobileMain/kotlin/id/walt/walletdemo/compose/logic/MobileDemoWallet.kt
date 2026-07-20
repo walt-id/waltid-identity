@@ -150,6 +150,7 @@ internal fun DemoWalletConfig.toWalletAttestationConfig(): WalletAttestationConf
 private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentationPreview =
     WalletDemoPresentationPreview(
         verifierMetadata = request.verifierMetadata?.toDemoMetadata(),
+        verifierDisplayName = request.verifierDisplayName,
         clientId = request.clientId,
         responseUri = request.responseUri,
         state = request.state,
@@ -248,8 +249,8 @@ private fun MobileWalletCredentialClaimMetadata.toDemoMetadata(): WalletDemoCred
 private fun MobileWalletTransactionCodeRequirement.toDemoRequirement(): WalletDemoTransactionCodeRequirement =
     WalletDemoTransactionCodeRequirement(
         inputMode = when (inputMode) {
-            MobileWalletTransactionCodeInputMode.numeric -> WalletDemoTransactionCodeInputMode.Numeric
-            MobileWalletTransactionCodeInputMode.text -> WalletDemoTransactionCodeInputMode.Text
+            MobileWalletTransactionCodeInputMode.Numeric -> WalletDemoTransactionCodeInputMode.Numeric
+            MobileWalletTransactionCodeInputMode.Text -> WalletDemoTransactionCodeInputMode.Text
         },
         length = length,
         description = description,

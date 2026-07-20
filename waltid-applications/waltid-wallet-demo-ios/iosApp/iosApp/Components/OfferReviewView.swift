@@ -1,14 +1,8 @@
 import SwiftUI
 import WalletSDK
 
-struct OfferPreview {
-    let issuer: IssuerMetadata
-    let offeredCredentials: [OfferedCredentialMetadata]
-    let transactionCode: TransactionCodeRequirement?
-}
-
 struct OfferReviewView: View {
-    let preview: OfferPreview
+    let preview: OfferResolution
     let isAcceptEnabled: Bool
     let isReviewEnabled: Bool
     let txCode: String
@@ -21,35 +15,38 @@ struct OfferReviewView: View {
             Text("Credential offer")
                 .font(.headline)
 
-            Text("Issuer")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            MetadataIdentityView(
-                display: preview.issuer.display,
-                fallbackName: preview.issuer.credentialIssuer.isEmpty
-                    ? "Unknown issuer"
-                    : preview.issuer.credentialIssuer,
-                supportingText: preview.issuer.display?.name == preview.issuer.credentialIssuer
-                    ? nil
-                    : preview.issuer.credentialIssuer
-            )
+            ReviewMetadataSection(title: "Issuer") {
+                MetadataIdentityView(
+                    display: preview.issuer.display,
+                    fallbackName: preview.issuer.credentialIssuer.isEmpty
+                        ? "Unknown issuer"
+                        : preview.issuer.credentialIssuer,
+                    supportingText: preview.issuer.display?.name == preview.issuer.credentialIssuer
+                        ? nil
+                        : preview.issuer.credentialIssuer
+                )
+            }
+            .accessibilityIdentifier(WalletAccessibilityID.offerIssuerSection)
 
             if !preview.offeredCredentials.isEmpty {
-                Text("Offered credentials")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                ForEach(Array(preview.offeredCredentials.enumerated()), id: \.offset) { _, credential in
-                    OfferedCredentialView(credential: credential)
+                ReviewMetadataSection(title: "Offered credentials") {
+                    ForEach(Array(preview.offeredCredentials.enumerated()), id: \.offset) { index, credential in
+                        if index > 0 {
+                            Divider()
+                        }
+                        OfferedCredentialView(credential: credential)
+                    }
                 }
+                .accessibilityIdentifier(WalletAccessibilityID.offerCredentialsSection)
             }
 
             if let requirement = preview.transactionCode {
-                VStack(alignment: .leading, spacing: 6) {
+                ReviewMetadataSection(title: "Transaction code") {
                     Text(requirement.description ?? "Enter the transaction code provided by the issuer.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     SecureField(
-                        "Transaction code",
+                        "Code",
                         text: Binding(get: { txCode }, set: onTxCodeChange)
                     )
                     .textContentType(.oneTimeCode)
@@ -68,6 +65,7 @@ struct OfferReviewView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .accessibilityIdentifier(WalletAccessibilityID.offerTransactionCodeSection)
             }
 
             HStack(spacing: 8) {
@@ -82,6 +80,32 @@ struct OfferReviewView: View {
                     .disabled(!isReviewEnabled)
                     .accessibilityIdentifier(WalletAccessibilityID.offerDeclineButton)
             }
+        }
+    }
+}
+
+struct ReviewMetadataSection<Content: View>: View {
+    let title: String
+    let content: Content
+
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tint)
+
+            VStack(alignment: .leading, spacing: 8) {
+                content
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }
 }
@@ -199,9 +223,5 @@ private struct OfferedCredentialView: View {
                 }
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
