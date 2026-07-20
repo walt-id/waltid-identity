@@ -642,6 +642,9 @@ public struct PresentationPreview: Equatable, Sendable {
     /// Required DCQL credential query combinations that must be satisfied before submission.
     public let credentialRequirements: [PresentationCredentialRequirement]
 
+    /// Authenticated response-encryption requirements for the retained request.
+    public let encryption: PresentationEncryptionInfo
+
     /// Creates a presentation preview.
     ///
     /// - Parameters:
@@ -654,12 +657,24 @@ public struct PresentationPreview: Equatable, Sendable {
     public init(
         request: PresentationRequestInfo,
         credentialOptions: [PresentationCredentialOption],
-        credentialRequirements: [PresentationCredentialRequirement] = []
+        credentialRequirements: [PresentationCredentialRequirement] = [],
+        encryption: PresentationEncryptionInfo = .notRequired
     ) {
         self.request = request
         self.credentialOptions = credentialOptions
         self.credentialRequirements = credentialRequirements
+        self.encryption = encryption
     }
+}
+
+/// Authenticated encryption requirements for an OpenID4VP response.
+public enum PresentationEncryptionInfo: Equatable, Sendable {
+    case notRequired
+    case required(
+        contentEncryptionAlgorithm: String,
+        keyManagementAlgorithm: String,
+        verifierKeyThumbprint: String
+    )
 }
 
 /// A required presentation credential-query combination.
@@ -696,6 +711,9 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     /// OpenID nonce value.
     public let nonce: String?
 
+    /// Serialized OpenID4VP response mode requested by the verifier.
+    public let responseMode: String?
+
     /// Decoded transaction data attached to the request.
     public let transactionData: [PresentationTransactionData]
 
@@ -715,6 +733,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
         responseURI: URL? = nil,
         state: String? = nil,
         nonce: String? = nil,
+        responseMode: String? = nil,
         transactionData: [PresentationTransactionData] = []
     ) {
         self.clientID = clientID
@@ -722,6 +741,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
         self.responseURI = responseURI
         self.state = state
         self.nonce = nonce
+        self.responseMode = responseMode
         self.transactionData = transactionData
     }
 }

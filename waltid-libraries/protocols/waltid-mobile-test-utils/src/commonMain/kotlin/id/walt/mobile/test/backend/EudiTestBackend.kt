@@ -167,13 +167,16 @@ object EudiTestBackend {
         return GeneratedOffer(offerUrl = offerUrl, txCode = txCodeValue)
     }
 
-    suspend fun createVerifierTransaction(credentialId: String = "eu.europa.ec.eudi.pid_vc_sd_jwt"): VerifierTransaction {
+    suspend fun createVerifierTransaction(
+        credentialId: String = "eu.europa.ec.eudi.pid_vc_sd_jwt",
+        encryptedResponse: Boolean = false,
+    ): VerifierTransaction {
         val dcqlQuery = buildDcqlQuery(credentialId)
         val payload = buildJsonObject {
             put("dcql_query", dcqlQuery)
             put("nonce", JsonPrimitive(Uuid.random().toString()))
-            // verifier-backend.eudiw.dev currently supports JAR retrieval via the default GET
-            // method, but returns HTTP 400 when request_uri_method=post is requested.
+            put("request_uri_method", JsonPrimitive("post"))
+            if (encryptedResponse) put("encrypted_response", JsonPrimitive(true))
             put("profile", JsonPrimitive("openid4vp"))
             put("authorization_request_uri", JsonPrimitive("openid4vp://"))
         }

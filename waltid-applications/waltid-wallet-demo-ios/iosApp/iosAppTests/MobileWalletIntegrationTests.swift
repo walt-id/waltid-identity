@@ -272,6 +272,40 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await TestHelpers.waitForVerifierSuccess(transactionID: transaction.transactionId, timeoutSeconds: verifierPollingTimeout)
     }
 
+    func testPreviewAndSubmitEncryptedEudiPidMdocAgainstEudi() async throws {
+        let credentialConfigurationID = "eu.europa.ec.eudi.pid_mso_mdoc"
+        let wallet = try await makeWallet(walletId: "ios-eudi-encrypted-mdoc-\(UUID().uuidString)")
+        let bootstrapResult = try await wallet.bootstrap()
+        let offer = try await EudiTestBackend.shared.generateOffer(credentialId: credentialConfigurationID)
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+        let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
+        XCTAssertFalse(credentialIDs.isEmpty, "Should receive an EUDI PID mdoc")
+
+        let transaction = try await EudiTestBackend.shared.createVerifierTransaction(
+            credentialId: credentialConfigurationID,
+            encryptedResponse: true
+        )
+        let presentationURL = try XCTUnwrap(URL(string: transaction.authorizationRequestUri))
+        let preview = try await wallet.previewPresentation(request: presentationURL)
+        XCTAssertEqual(preview.request.responseMode, "direct_post.jwt")
+        guard case .required = preview.encryption else {
+            return XCTFail("Expected encrypted response metadata: \(preview.encryption)")
+        }
+        XCTAssertFalse(preview.credentialOptions.isEmpty)
+        XCTAssertTrue(preview.credentialOptions.allSatisfy { $0.format == "mso_mdoc" })
+
+        let result = try await wallet.submitPresentation(
+            request: presentationURL,
+            selectedCredentialOptions: preview.credentialOptions.map(\.selection),
+            did: bootstrapResult.did
+        )
+        XCTAssertTrue(result.success, "Encrypted EUDI PID mdoc presentation should succeed: \(result)")
+        try await TestHelpers.waitForVerifierSuccess(
+            transactionID: transaction.transactionId,
+            timeoutSeconds: verifierPollingTimeout
+        )
+    }
+
     func testReceiveAndPresentEudiPidSdJwtAgainstDemoIssuer2AndVerifier2() async throws {
         try await receiveAndPresentDemoCredential(scenarioID: "eudi-pid-sdjwt")
     }

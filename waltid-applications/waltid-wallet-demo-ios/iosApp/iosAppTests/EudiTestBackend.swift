@@ -57,15 +57,20 @@ actor EudiTestBackend {
         return firstId
     }
 
-    func createVerifierTransaction(credentialId: String = "eu.europa.ec.eudi.pid_vc_sd_jwt") async throws -> VerifierTransaction {
-        let payload: [String: Any] = [
+    func createVerifierTransaction(
+        credentialId: String = "eu.europa.ec.eudi.pid_vc_sd_jwt",
+        encryptedResponse: Bool = false
+    ) async throws -> VerifierTransaction {
+        var payload: [String: Any] = [
             "dcql_query": TestHelpers.buildDcqlQuery(credentialID: credentialId),
             "nonce": UUID().uuidString,
-            // The EUDI verifier currently returns HTTP 400 for POST request-object
-            // retrieval, so use the default GET transport it supports.
+            "request_uri_method": "post",
             "profile": "openid4vp",
             "authorization_request_uri": "openid4vp://"
         ]
+        if encryptedResponse {
+            payload["encrypted_response"] = true
+        }
 
         let response = try await client.jsonRequest(
             url: URL(string: "https://verifier-backend.eudiw.dev/ui/presentations/v2")!,

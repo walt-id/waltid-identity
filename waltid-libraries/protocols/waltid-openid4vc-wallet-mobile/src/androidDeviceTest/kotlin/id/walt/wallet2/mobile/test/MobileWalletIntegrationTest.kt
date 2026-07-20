@@ -7,6 +7,7 @@ import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
+import id.walt.wallet2.mobile.MobileWalletEncryptionInfo
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
@@ -24,6 +25,7 @@ import org.junit.Test
 import java.util.Base64
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -170,6 +172,39 @@ class MobileWalletIntegrationTest {
             "EUDI stepwise presentation should succeed: preview=$preview, result=$result",
         )
 
+        EudiTestBackend.waitForVerifierSuccess(transaction.transactionId)
+    }
+
+    @Test
+    fun previewAndSubmitEncryptedEudiPidMdocAgainstEudi() = runBlocking {
+        val credentialConfigurationId = "eu.europa.ec.eudi.pid_mso_mdoc"
+        val client = MobileWalletFactory(context).create(
+            walletConfig(
+                prefix = "eudi-encrypted-mdoc",
+                requestObjectX509Trust = eudiVerifierTrust,
+            )
+        )
+        val bootstrapResult = client.bootstrap()
+        val offer = EudiTestBackend.generateOffer(credentialConfigurationId)
+        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        assertTrue(credentialIds.isNotEmpty(), "Should receive an EUDI PID mdoc")
+
+        val transaction = EudiTestBackend.createVerifierTransaction(
+            credentialId = credentialConfigurationId,
+            encryptedResponse = true,
+        )
+        val preview = client.previewPresentation(transaction.authorizationRequestUri)
+        assertEquals("direct_post.jwt", preview.request.responseMode)
+        assertIs<MobileWalletEncryptionInfo.Required>(preview.encryption)
+        assertTrue(preview.credentialOptions.isNotEmpty())
+        assertTrue(preview.credentialOptions.all { it.format == "mso_mdoc" })
+
+        val result = client.submitPresentation(
+            requestUrl = transaction.authorizationRequestUri,
+            selectedCredentialOptions = preview.credentialOptions.map { it.selection },
+            did = bootstrapResult.did,
+        )
+        assertTrue(result.success, "Encrypted EUDI PID mdoc presentation should succeed: $result")
         EudiTestBackend.waitForVerifierSuccess(transaction.transactionId)
     }
 

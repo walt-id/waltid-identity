@@ -25,6 +25,7 @@ import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
@@ -97,40 +98,6 @@ public data class MobileWalletPresentationResult(
     public val success: Boolean,
     public val redirectTo: String?,
     public val verifierResponseJson: String? = null,
-)
-
-/**
- * Encryption details for a VP authorization request.
- *
- * Per OID4VP 1.0 §6, when the verifier requires `response_mode=direct_post.jwt`,
- * the wallet must encrypt its response. This result provides details for
- * consent screen UI display.
- *
- * @property isEncryptionRequired True if the verifier requires encrypted responses.
- * @property encAlgorithm Content encryption algorithm (e.g., "A128GCM"), null if not applicable.
- * @property algAlgorithm Key agreement algorithm (e.g., "ECDH-ES"), null if not applicable.
- * @property verifierKeyThumbprint SHA-256 thumbprint of verifier's encryption key for audit display.
- */
-public data class MobileWalletEncryptionInfo(
-    public val isEncryptionRequired: Boolean,
-    public val encAlgorithm: String?,
-    public val algAlgorithm: String?,
-    public val verifierKeyThumbprint: String?,
-)
-
-/**
- * Result returned when inspecting a VP request before presenting.
- *
- * @property nonce The verifier's nonce for the presentation.
- * @property clientId The verifier's client identifier.
- * @property responseUri The verifier's response URI.
- * @property encryption Encryption requirements for this request.
- */
-public data class MobileWalletRequestInspection(
-    public val nonce: String?,
-    public val clientId: String?,
-    public val responseUri: String?,
-    public val encryption: MobileWalletEncryptionInfo,
 )
 
 /**
@@ -320,38 +287,6 @@ public class MobileWallet internal constructor(
         }
 
     /**
-     * Inspects a VP authorization request before presenting.
-     *
-     * Use this to show consent screen details including encryption status.
-     * Call this before [present] to preview what the verifier is requesting
-     * and whether the response will be encrypted.
-     *
-     * @param requestUrl Authorization request URL received from the verifier.
-     * @return Request details including verifier info and encryption requirements.
-     */
-    public suspend fun inspectRequest(requestUrl: String): MobileWalletRequestInspection {
-        val preview = WalletPresentationHandler.previewPresentation(
-            wallet = wallet,
-            request = PreviewPresentationRequest(requestUrl = Url(requestUrl.trim())),
-            transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
-        )
-        val authorizationRequest = preview.authorizationRequest
-        val encryption = WalletPresentationHandler.inspectEncryptionRequirements(authorizationRequest)
-
-        return MobileWalletRequestInspection(
-            nonce = authorizationRequest.nonce,
-            clientId = authorizationRequest.clientId,
-            responseUri = authorizationRequest.responseUri,
-            encryption = MobileWalletEncryptionInfo(
-                isEncryptionRequired = encryption.isEncryptionRequired,
-                encAlgorithm = encryption.encAlgorithm,
-                algAlgorithm = encryption.algAlgorithm,
-                verifierKeyThumbprint = encryption.verifierKeyThumbprint,
-            )
-        )
-    }
-
-    /**
      * Presents matching wallet credentials to an OpenID4VP verifier request.
      *
      * This immediate submission API is intended for callers that already handled
@@ -403,6 +338,16 @@ public class MobileWallet internal constructor(
         )
 
         val profilesByType = transactionDataProfiles.associateBy { it.type }
+        val encryptionRequirements = WalletPresentationHandler.inspectEncryptionRequirements(result.authorizationRequest)
+        val encryption = if (encryptionRequirements.isEncryptionRequired) {
+            MobileWalletEncryptionInfo.Required(
+                contentEncryptionAlgorithm = requireNotNull(encryptionRequirements.encAlgorithm),
+                keyManagementAlgorithm = requireNotNull(encryptionRequirements.algAlgorithm),
+                verifierKeyThumbprint = requireNotNull(encryptionRequirements.verifierKeyThumbprint),
+            )
+        } else {
+            MobileWalletEncryptionInfo.NotRequired
+        }
         return MobileWalletPresentationPreview(
             request = MobileWalletPresentationRequestInfo(
                 clientId = result.authorizationRequest.clientId,
@@ -410,6 +355,9 @@ public class MobileWallet internal constructor(
                 responseUri = result.authorizationRequest.responseUri,
                 state = result.authorizationRequest.state,
                 nonce = result.authorizationRequest.nonce,
+                responseMode = result.authorizationRequest.responseMode?.let { mode ->
+                    Json.encodeToString(OpenID4VPResponseMode.serializer(), mode).trim('"')
+                },
                 transactionData = result.transactionData.map { item ->
                     val profile = profilesByType[item.type]
                     MobileWalletTransactionDataItem(
@@ -424,6 +372,7 @@ public class MobileWallet internal constructor(
             ),
             credentialOptions = result.credentialOptions.map { it.toMobileCredentialOption() },
             credentialRequirements = result.credentialRequirements.map { it.toMobileCredentialRequirement() },
+            encryption = encryption,
         )
     }
 

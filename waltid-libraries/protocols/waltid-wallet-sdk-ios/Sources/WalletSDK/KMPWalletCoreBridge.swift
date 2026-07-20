@@ -586,7 +586,24 @@ private extension MobileWalletPresentationPreview {
             credentialOptions: swiftArray(credentialOptions, of: MobileWalletPresentationCredentialOption.self)
                 .map { $0.toSwiftCredentialOption() },
             credentialRequirements: swiftArray(credentialRequirements, of: MobileWalletPresentationCredentialRequirement.self)
-                .map { $0.toSwiftCredentialRequirement() }
+                .map { $0.toSwiftCredentialRequirement() },
+            encryption: encryption.toSwiftEncryptionInfo()
+        )
+    }
+}
+
+private extension MobileWalletEncryptionInfo {
+    func toSwiftEncryptionInfo() -> PresentationEncryptionInfo {
+        guard isRequired else { return .notRequired }
+        guard let contentEncryptionAlgorithm,
+              let keyManagementAlgorithm,
+              let verifierKeyThumbprint else {
+            preconditionFailure("Required presentation encryption metadata is incomplete")
+        }
+        return .required(
+            contentEncryptionAlgorithm: contentEncryptionAlgorithm,
+            keyManagementAlgorithm: keyManagementAlgorithm,
+            verifierKeyThumbprint: verifierKeyThumbprint
         )
     }
 }
@@ -599,6 +616,7 @@ private extension MobileWalletPresentationRequestInfo {
             responseURI: responseUri.flatMap(URL.init(string:)),
             state: state,
             nonce: nonce,
+            responseMode: responseMode,
             transactionData: swiftArray(transactionData, of: MobileWalletTransactionDataItem.self)
                 .map { $0.toSwiftTransactionData() }
         )
