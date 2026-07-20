@@ -77,6 +77,7 @@ class ResponseEncryptionHandlerTest {
         assertEquals("A256GCM", result.encAlgorithm)
         assertEquals("ECDH-ES", result.algAlgorithm)
         assertEquals("test-enc-key-1", result.keyId)
+        assertEquals(32, result.verifierKeyThumbprint.decodeFromBase64Url().size)
     }
 
     @Test

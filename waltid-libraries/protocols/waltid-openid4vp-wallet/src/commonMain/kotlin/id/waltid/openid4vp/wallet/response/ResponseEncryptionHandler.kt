@@ -1,6 +1,8 @@
 package id.waltid.openid4vp.wallet.response
 
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonCanonicalizationUtils
+import id.walt.crypto.utils.ShaUtils
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -69,7 +71,7 @@ object ResponseEncryptionHandler {
 
         val eligibleKeys = keys.filter(::isSupportedEncryptionKey).map { jwk ->
             val key = JWKKey.importJWK(jwk.toString()).getOrThrow()
-            EligibleEncryptionKey(jwk, key, key.getThumbprint())
+            EligibleEncryptionKey(jwk, key, calculateRfc7638Thumbprint(key))
         }
         val selected = eligibleKeys.sortedWith(
             compareBy<EligibleEncryptionKey>(
@@ -113,6 +115,13 @@ object ResponseEncryptionHandler {
         val key: JWKKey,
         val thumbprint: String,
     )
+
+    // Derive the raw RFC 7638 value here because some platform crypto backends
+    // expose the same digest wrapped in an RFC 9278 URN.
+    private suspend fun calculateRfc7638Thumbprint(key: JWKKey): String =
+        ShaUtils.calculateSha256Base64Url(
+            JsonCanonicalizationUtils.convertToRequiredMembersJsonString(key)
+        )
 
     private fun isSupportedEncryptionKey(key: JsonObject): Boolean {
         val use = key["use"]?.jsonPrimitive?.contentOrNull
