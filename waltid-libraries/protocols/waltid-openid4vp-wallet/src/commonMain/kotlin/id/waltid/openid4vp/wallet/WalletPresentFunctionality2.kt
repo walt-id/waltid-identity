@@ -259,13 +259,18 @@ object WalletPresentFunctionality2 {
         parameters: Parameters,
     ): WalletPresentResult {
         val response = webPostToken.sendForm(responseUri, parameters)
-        val responseBody = response.bodyAsText()
-        val responseBodyJson = Json.parseToJsonElement(responseBody).jsonObject
+        return directPostResult(response.status.isSuccess(), response.bodyAsText())
+    }
+
+    internal fun directPostResult(success: Boolean, responseBody: String): WalletPresentResult {
+        val responseBodyJson = responseBody.takeIf(String::isNotBlank)
+            ?.let { body -> runCatching { Json.parseToJsonElement(body) }.getOrElse { JsonPrimitive(body) } }
+            ?: JsonObject(emptyMap())
 
         return WalletPresentResult(
-            transmissionSuccess = response.status.isSuccess(),
+            transmissionSuccess = success,
             verifierResponse = responseBodyJson,
-            redirectTo = responseBodyJson["redirect_uri"]?.jsonPrimitive?.content,
+            redirectTo = (responseBodyJson as? JsonObject)?.get("redirect_uri")?.jsonPrimitive?.content,
         )
     }
 
