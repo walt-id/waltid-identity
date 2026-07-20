@@ -51,6 +51,25 @@ class Oid4vciIssuerSdJwtHaip(
         }
     """.trimIndent()
     private val clientJwksJson = Json.decodeFromString<JsonObject>(clientJwks)
+    // Client2 must use a different signing key for multi-client conformance modules.
+    // language=JSON
+    private val client2Jwks = """
+        {
+            "keys": [
+                {
+                    "kty": "EC",
+                    "crv": "P-256",
+                    "alg": "ES256",
+                    "use": "sig",
+                    "kid": "conformance-test-key-2",
+                    "d": "jvakpzaRupzb8sCvDWyRwzPAAN7xF4Hsg0W845p55ec",
+                    "x": "zVDfMnnJIr9cse46coCxNpv6iZ7ZaDhFDA0gCu-bxT0",
+                    "y": "y9EGu_woCWPjcebrxuNRWJIXzfdIJMkvFMOXQ60DR50"
+                }
+            ]
+        }
+    """.trimIndent()
+    private val client2JwksJson = Json.decodeFromString<JsonObject>(client2Jwks)
 
     // Client attester keys for HAIP test configuration
     // language=JSON
@@ -118,7 +137,7 @@ class Oid4vciIssuerSdJwtHaip(
             }
             putJsonObject("client2") {
                 put("client_id", "conformance-haip-issuer-client-2")
-                put("jwks", clientJwksJson)
+                put("jwks", client2JwksJson)
             }
             put("description", JsonPrimitive("OID4VCI 1.0 Issuer HAIP - SD-JWT VC + DPoP + private_key_jwt"))
         },

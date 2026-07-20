@@ -41,6 +41,8 @@ class IssuerConformanceTests {
         private const val authorizationServerEnv = "OPENID4VCI_CONFORMANCE_AUTHORIZATION_SERVER"
         private const val credentialProofTypeHintProperty = "openid4vci.conformance.credential-proof-type-hint"
         private const val credentialProofTypeHintEnv = "OPENID4VCI_CONFORMANCE_CREDENTIAL_PROOF_TYPE_HINT"
+        private const val timeoutMinutesProperty = "openid4vci.conformance.timeout-minutes"
+        private const val timeoutMinutesEnv = "OPENID4VCI_CONFORMANCE_TIMEOUT_MINUTES"
 
         private fun propertyOrEnv(property: String, env: String): String? =
             System.getProperty(property) ?: System.getenv(env)
@@ -124,6 +126,9 @@ class IssuerConformanceTests {
         val credentialProofTypeHint: String? =
             propertyOrEnv(credentialProofTypeHintProperty, credentialProofTypeHintEnv)
 
+        val timeoutMinutes: Long =
+            propertyOrEnv(timeoutMinutesProperty, timeoutMinutesEnv)?.toLongOrNull() ?: 240L
+
         val conformanceServerVersionResult = runBlocking {
             runCatching {
                 ConformanceInterface(ConformanceConfig.CONFORMANCE_HOST, ConformanceConfig.CONFORMANCE_PORT).getServerVersion()
@@ -145,7 +150,7 @@ class IssuerConformanceTests {
             assumeTrue(isConformanceAvailable, "OpenID conformance suite is not reachable")
             assumeTrue(isIssuerConfigured, "No credential issuer URL / enterprise issuer target configured")
 
-            withTimeout(10.minutes) {
+            withTimeout(timeoutMinutes.minutes) {
                 IssuerConformanceTestRunner(
                     credentialIssuerUrl = requireNotNull(credentialIssuerUrl),
                     conformanceHost = ConformanceConfig.CONFORMANCE_HOST,

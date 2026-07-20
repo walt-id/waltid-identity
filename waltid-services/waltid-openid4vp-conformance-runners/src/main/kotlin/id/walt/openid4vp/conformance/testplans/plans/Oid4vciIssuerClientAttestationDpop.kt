@@ -47,6 +47,25 @@ class Oid4vciIssuerClientAttestationDpop(
         }
     """.trimIndent()
 
+    // Client2 must use a different signing key for multi-client conformance modules.
+    // language=JSON
+    private val client2Jwks = """
+        {
+            "keys": [
+                {
+                    "kty": "EC",
+                    "crv": "P-256",
+                    "alg": "ES256",
+                    "use": "sig",
+                    "kid": "conformance-test-key-2",
+                    "d": "jvakpzaRupzb8sCvDWyRwzPAAN7xF4Hsg0W845p55ec",
+                    "x": "zVDfMnnJIr9cse46coCxNpv6iZ7ZaDhFDA0gCu-bxT0",
+                    "y": "y9EGu_woCWPjcebrxuNRWJIXzfdIJMkvFMOXQ60DR50"
+                }
+            ]
+        }
+    """.trimIndent()
+
     // Client attestation issuer (the entity that issues client attestations)
     private val clientAttestationIssuer = "https://client-attestation.example.com"
 
@@ -83,7 +102,7 @@ class Oid4vciIssuerClientAttestationDpop(
                 },
                 "client2": {
                     "client_id": "conformance-test-client-2",
-                    "jwks": $clientJwks
+                    "jwks": $client2Jwks
                 },
                 "description": "OID4VCI 1.0 Issuer - DPoP + Client Attestation"
             }
@@ -116,6 +135,25 @@ class Oid4vciIssuerClientAttestationDpopPreAuth(
                     "d": "KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ",
                     "x": "G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM",
                     "y": "ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"
+                }
+            ]
+        }
+    """.trimIndent()
+
+    // Client2 must use a different signing key for multi-client conformance modules.
+    // language=JSON
+    private val client2Jwks = """
+        {
+            "keys": [
+                {
+                    "kty": "EC",
+                    "crv": "P-256",
+                    "alg": "ES256",
+                    "use": "sig",
+                    "kid": "conformance-test-key-2",
+                    "d": "jvakpzaRupzb8sCvDWyRwzPAAN7xF4Hsg0W845p55ec",
+                    "x": "zVDfMnnJIr9cse46coCxNpv6iZ7ZaDhFDA0gCu-bxT0",
+                    "y": "y9EGu_woCWPjcebrxuNRWJIXzfdIJMkvFMOXQ60DR50"
                 }
             ]
         }
@@ -156,7 +194,7 @@ class Oid4vciIssuerClientAttestationDpopPreAuth(
                 },
                 "client2": {
                     "client_id": "conformance-test-client-2",
-                    "jwks": $clientJwks
+                    "jwks": $client2Jwks
                 },
                 "description": "OID4VCI 1.0 Issuer - DPoP + Client Attestation (Pre-Auth)"
             }

@@ -1,11 +1,13 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
 import io.ktor.plugin.features.*
+import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 object Versions {
     const val HOPLITE_VERSION = "2.9.0"
+    const val PLAYWRIGHT_VERSION = "1.60.0"
 }
 
 plugins {
@@ -71,6 +73,12 @@ dependencies {
     implementation(identityLibs.klogging)
     implementation(identityLibs.slf4j.klogging)
     implementation("io.ktor:ktor-client-encoding:3.2.2")
+    implementation("com.microsoft.playwright:playwright:${Versions.PLAYWRIGHT_VERSION}") {
+        exclude(group = "org.junit.jupiter")
+        exclude(group = "org.junit.platform")
+        exclude(group = "org.opentest4j")
+        exclude(group = "org.slf4j", module = "slf4j-simple")
+    }
 
     // Test
 
@@ -112,6 +120,47 @@ tasks.test {
     val truststorePath = file("conformance-truststore.jks").absolutePath
     systemProperty("javax.net.ssl.trustStore", truststorePath)
     systemProperty("javax.net.ssl.trustStorePassword", "changeit")
+}
+
+fun selectedPlaywrightBrowser(): String = when (
+    ((findProperty("playwright.browser") as String?) ?: System.getProperty("playwright.browser")
+    ?: System.getenv("PLAYWRIGHT_BROWSER"))
+        ?.trim()
+        ?.lowercase()
+) {
+    null, "" -> "chromium"
+    "chromium", "chrome" -> "chromium"
+    "firefox" -> "firefox"
+    "webkit", "safari" -> "webkit"
+    else -> error("Unsupported PLAYWRIGHT_BROWSER value. Expected one of: chromium, firefox, webkit")
+}
+
+fun playwrightInstallWithDeps(): Boolean = when (
+    ((findProperty("playwright.installWithDeps") as String?) ?: System.getenv("PLAYWRIGHT_INSTALL_WITH_DEPS"))
+        ?.trim()
+        ?.lowercase()
+) {
+    null, "", "false", "0", "no", "off" -> false
+    "true", "1", "yes", "on" -> true
+    else -> error(
+        "Unsupported PLAYWRIGHT_INSTALL_WITH_DEPS/playwright.installWithDeps value. Expected true or false"
+    )
+}
+
+fun playwrightInstallArgs(): List<String> = buildList {
+    add("install")
+    if (playwrightInstallWithDeps()) {
+        add("--with-deps")
+    }
+    add(selectedPlaywrightBrowser())
+}
+
+tasks.register<JavaExec>("installPlaywrightBrowsers") {
+    group = "verification"
+    description = "Install the Playwright browser used by issuer conformance authorization-code tests."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.microsoft.playwright.CLI")
+    args(playwrightInstallArgs())
 }
 
 fun registerWalletProfileTestTask(taskName: String, testFilter: String, descriptionText: String) {

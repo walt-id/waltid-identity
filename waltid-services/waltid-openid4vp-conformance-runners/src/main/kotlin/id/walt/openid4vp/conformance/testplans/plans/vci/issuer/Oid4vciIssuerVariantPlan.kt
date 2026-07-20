@@ -3,31 +3,27 @@ package id.walt.openid4vp.conformance.testplans.plans.vci.issuer
 import id.walt.openid4vp.conformance.testplans.runner.req.IssuerTestPlanConfiguration
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * Phase-1 OpenID4VCI issuer conformance plan:
- * wallet-initiated + authorization-code + DPoP + client attestation.
+ * Generic OpenID4VCI issuer plan for the base oid4vci-1_0-issuer-test-plan.
+ *
+ * The conformance suite owns which test modules are applicable for a variant. This
+ * class only supplies the selected variant and the local issuer/client configuration.
  */
-class Oid4vciIssuerClientAttestationDpop(
+class Oid4vciIssuerVariantPlan(
     private val issuerUrl: String,
     private val credentialConfigurationId: String,
-    private val credentialFormat: CredentialFormatVariant,
+    private val variant: IssuerVariant,
     private val clientAttestationIssuer: String,
     private val clientAttesterJwks: JsonObject,
     private val authorizationServer: String? = null,
     private val credentialProofTypeHint: String? = null,
+    private val staticTxCode: String? = null,
 ) : IssuerTestPlan {
 
-    enum class CredentialFormatVariant(val variantValue: String, val metadataFormat: String) {
-        SD_JWT_VC("sd_jwt_vc", "dc+sd-jwt"),
-        MDOC("mdoc", "mso_mdoc")
-    }
-
-    // Client keys for DPoP
+    // Client keys for DPoP and private_key_jwt tests.
     // language=JSON
     private val clientJwks = """
         {
@@ -65,27 +61,14 @@ class Oid4vciIssuerClientAttestationDpop(
         }
     """.trimIndent()
     private val client2JwksJson = Json.decodeFromString<JsonObject>(client2Jwks)
-    // Using pre-authorized_code for baseline happy-path testing.
-    private val moduleVariant = """
-        {
-          "fapi_profile": "vci",
-          "sender_constrain": "dpop",
-          "client_auth_type": "client_attestation",
-          "vci_authorization_code_flow_variant": "wallet_initiated",
-          "authorization_request_type": "simple",
-          "fapi_request_method": "unsigned",
-          "vci_grant_type": "pre-authorized_code",
-          "fapi_response_mode": "plain_response",
-          "credential_format": "${credentialFormat.variantValue}"
-        }
-    """.trimIndent()
+    private val moduleVariant = variant.toJsonObject().toString()
 
     override val config = IssuerTestPlanConfiguration(
         testPlanCreationUrl = {
             append("planName", "oid4vci-1_0-issuer-test-plan")
             append("variant", moduleVariant)
         },
-        testPlanCreationConfiguration = buildJsonObject {
+        testPlanCreationConfiguration = kotlinx.serialization.json.buildJsonObject {
             putJsonObject("vci") {
                 put("credential_issuer_url", issuerUrl)
                 put("credential_configuration_id", credentialConfigurationId)
@@ -106,31 +89,13 @@ class Oid4vciIssuerClientAttestationDpop(
                 put("client_id", "conformance-test-client-2")
                 put("jwks", client2JwksJson)
             }
-            put("description", JsonPrimitive("OID4VCI 1.0 Issuer - ${credentialFormat.variantValue} - DPoP + Client Attestation"))
+            put("description", variant.description)
         },
         moduleVariant = moduleVariant,
         issuerUrl = issuerUrl,
         skippableModules = setOf("oid4vci-1_0-issuer-metadata-test-signed"),
-        requiresPreAuthorizedOffer = true,
-        credentialProfileId = deriveProfileId(credentialConfigurationId)
+        requiresPreAuthorizedOffer = variant.requiresCredentialOffer,
+        credentialProfileId = deriveIssuerCredentialProfileId(credentialConfigurationId),
+        staticTxCode = staticTxCode,
     )
-
-    /**
-     * Derive the profile ID from the credential configuration ID.
-     * Maps credential configuration IDs to issuer-api2 profile IDs.
-     */
-    private fun deriveProfileId(credentialConfigurationId: String): String {
-        return when {
-            credentialConfigurationId.contains("photoID_credential") -> "photoIdCredentialSdJwt"
-            credentialConfigurationId.contains("org.iso.23220.photoid") -> "isoPhotoId"
-            credentialConfigurationId.contains("org.iso.18013.5.1.mDL") -> "isoMdl"
-            credentialConfigurationId.contains("urn:eu.europa.ec.eudi:por:1") -> "powerOfRepresentationSdJwt"
-            credentialConfigurationId.contains("urn:eu.europa.ec.eudi:cor:1") -> "companyRegistrationSdJwt"
-            credentialConfigurationId.contains("urn:eudi:pid:1") -> "eudiPidSdJwt"
-            credentialConfigurationId.contains("eu.europa.ec.eudi.pid.1") -> "eudiPidMdoc"
-            credentialConfigurationId.contains("identity_credential") -> "identityCredentialSdJwt"
-            credentialConfigurationId.contains("eu.europa.ec.av.1") -> "euAgeVerificationMdoc"
-            else -> throw IllegalArgumentException("Unknown credential configuration ID: $credentialConfigurationId")
-        }
-    }
 }
