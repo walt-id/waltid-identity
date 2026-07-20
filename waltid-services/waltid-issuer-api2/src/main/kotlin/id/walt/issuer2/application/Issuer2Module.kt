@@ -18,6 +18,7 @@ import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
+import id.walt.issuer2.service.openid4vci.CredentialProofKeyCommitment
 import id.walt.issuer2.service.openid4vci.CredentialNonceService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 
@@ -26,6 +27,7 @@ class Issuer2Module @JvmOverloads constructor(
     metadataConfig: Issuer2MetadataConfig,
     profilesConfig: Issuer2ProfilesConfig,
     credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null,
+    credentialProofKeyCommitment: CredentialProofKeyCommitment? = null,
 ) {
     private val issuanceSessionRepository = ConfiguredIssuanceSessionRepository()
     private val authorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
@@ -76,6 +78,7 @@ class Issuer2Module @JvmOverloads constructor(
         metadataService = metadataService,
         notificationService = notificationService,
         credentialProofKeyAcceptance = credentialProofKeyAcceptance,
+        credentialProofKeyCommitment = credentialProofKeyCommitment,
         credentialNonceService = credentialNonceService,
     )
 
