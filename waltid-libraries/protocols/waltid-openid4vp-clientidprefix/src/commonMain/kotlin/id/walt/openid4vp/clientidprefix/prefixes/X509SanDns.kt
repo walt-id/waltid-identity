@@ -10,6 +10,7 @@ import id.walt.openid4vp.clientidprefix.RequestContext
 import id.walt.openid4vp.clientidprefix.extractSanDnsNamesFromDer
 import id.walt.x509.CertificateDer
 import id.walt.x509.validateCertificateChain
+import id.walt.x509.platformSupportsPkixCertificatePathValidation
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.Url
 import kotlinx.serialization.Serializable
@@ -27,12 +28,13 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
     }
 
     init {
-        // A simple regex to check for a plausible DNS name format.
-        val dnsRegex = "^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?.)+[a-zA-Z]{2,6}$".toRegex()
-        require(dnsRegex.matches(dnsName)) { "Invalid DNS name format for x509_san_dns." }
+        require(isValidDnsName(dnsName)) { "Invalid DNS name format for x509_san_dns." }
     }
 
     suspend fun authenticateX509SanDns(clientId: X509SanDns, context: RequestContext): ClientValidationResult {
+        if (!platformSupportsPkixCertificatePathValidation) {
+            return ClientValidationResult.Failure(ClientIdError.UnsupportedPlatformX509Validation)
+        }
         val jws = context.requestObjectJws
             ?: return ClientValidationResult.Failure(ClientIdError.MissingRequestObject)
 
@@ -95,7 +97,7 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
         }
 
         // 4. Check if the client_id's DNS name is in the SAN list.
-        if (clientId.dnsName !in sans) {
+        if (sans.none { it.equals(clientId.dnsName, ignoreCase = true) }) {
             return ClientValidationResult.Failure(ClientIdError.SanDnsMismatch(clientId.dnsName, sans))
         }
 
@@ -106,7 +108,11 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
             val responseUriHost = runCatching {
                 Url(responseUri).host
             }.getOrNull()
-            if (responseUriHost != null && !responseUriHost.endsWith(clientId.dnsName) && responseUriHost != clientId.dnsName) {
+            val normalizedHost = responseUriHost?.trimEnd('.')?.lowercase()
+            val normalizedClientDns = clientId.dnsName.trimEnd('.').lowercase()
+            val hostMatches = normalizedHost == normalizedClientDns ||
+                normalizedHost?.endsWith(".$normalizedClientDns") == true
+            if (responseUriHost != null && !hostMatches) {
                 log.warn {
                     "x509_san_dns: response_uri host '$responseUriHost' does not match client_id DNS name '${clientId.dnsName}'. " +
                         "Some ecosystems (e.g. HAIP) require this to match. Consider enabling strict response_uri validation."
@@ -118,5 +124,16 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
             ?: return ClientValidationResult.Failure(ClientIdError.MissingClientMetadata)
 
         return ClientValidationResult.Success(metadataJson)
+    }
+
+    private fun isValidDnsName(value: String): Boolean {
+        val normalized = value.trimEnd('.')
+        if (normalized.isEmpty() || normalized.length > 253 || normalized.any { it.code > 0x7f }) return false
+        return normalized.split('.').all { label ->
+            label.length in 1..63 &&
+                label.first().isLetterOrDigit() &&
+                label.last().isLetterOrDigit() &&
+                label.all { it.isLetterOrDigit() || it == '-' }
+        }
     }
 }

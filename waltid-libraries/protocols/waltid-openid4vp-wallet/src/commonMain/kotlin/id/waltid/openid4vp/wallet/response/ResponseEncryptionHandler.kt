@@ -28,7 +28,7 @@ object ResponseEncryptionHandler {
     data class EncryptionConfig(
         val verifierJwk: JsonObject,
         val verifierKey: JWKKey,
-        val keyId: String,
+        val keyId: String?,
         val encAlgorithm: String,
         val algAlgorithm: String,
         val verifierKeyThumbprint: String,
@@ -67,27 +67,23 @@ object ResponseEncryptionHandler {
         val keys = clientMetadata.jwks?.keys.orEmpty()
         require(keys.isNotEmpty()) { "No encryption keys found in client_metadata.jwks" }
 
-        val keyIds = keys.map { key ->
-            key["kid"]?.jsonPrimitive?.contentOrNull
-                ?: throw IllegalArgumentException("Every client_metadata JWK must contain kid")
+        val eligibleKeys = keys.filter(::isSupportedEncryptionKey).map { jwk ->
+            val key = JWKKey.importJWK(jwk.toString()).getOrThrow()
+            EligibleEncryptionKey(jwk, key, key.getThumbprint())
         }
-        require(keyIds.distinct().size == keyIds.size) { "client_metadata JWK kid values must be unique" }
-
-        val verifierJwkData = keys.filter { key ->
-            isSupportedEncryptionKey(key)
-        }.sortedBy { key ->
-            // Verifier JWK ordering must not change wallet behavior. The supported
-            // combination is fixed above; kid provides a stable final tie-breaker.
-            key.getValue("kid").jsonPrimitive.content
-        }.firstOrNull() ?: throw IllegalArgumentException(
+        val selected = eligibleKeys.sortedWith(
+            compareBy<EligibleEncryptionKey>(
+                { it.thumbprint },
+                { it.jwk["kid"]?.jsonPrimitive?.contentOrNull.orEmpty() },
+            )
+        ).firstOrNull() ?: throw IllegalArgumentException(
             "No supported encryption JWK (EC/P-256/$SUPPORTED_ALG) found in client_metadata.jwks"
         )
 
-        val keyId = requireNotNull(verifierJwkData["kid"]?.jsonPrimitive?.contentOrNull)
+        val verifierJwkData = selected.jwk
+        val keyId = verifierJwkData["kid"]?.jsonPrimitive?.contentOrNull
         val alg = requireNotNull(verifierJwkData["alg"]?.jsonPrimitive?.contentOrNull)
-        log.trace { "Selected verifier encryption key: $keyId" }
-
-        val verifierKey = JWKKey.importJWK(verifierJwkData.toString()).getOrThrow()
+        log.trace { "Selected verifier encryption key: ${keyId ?: selected.thumbprint}" }
 
         // Select content encryption algorithm
         // Default is A128GCM per OID4VP spec
@@ -104,13 +100,19 @@ object ResponseEncryptionHandler {
 
         EncryptionConfig(
             verifierJwk = verifierJwkData,
-            verifierKey = verifierKey,
+            verifierKey = selected.key,
             keyId = keyId,
             encAlgorithm = encAlg,
             algAlgorithm = alg,
-            verifierKeyThumbprint = verifierKey.getThumbprint(),
+            verifierKeyThumbprint = selected.thumbprint,
         )
     }
+
+    private data class EligibleEncryptionKey(
+        val jwk: JsonObject,
+        val key: JWKKey,
+        val thumbprint: String,
+    )
 
     private fun isSupportedEncryptionKey(key: JsonObject): Boolean {
         val use = key["use"]?.jsonPrimitive?.contentOrNull

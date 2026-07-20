@@ -490,7 +490,13 @@ object WalletPresentationHandler {
             expectedRequestObjectAudience = wallet.requestObjectAudience,
             x509TrustPolicy = wallet.requestObjectX509TrustPolicy,
             fetchRequestUri = { uri, method ->
-                AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(fetcher, uri, method)
+                AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                    webResolveAuthReq = fetcher,
+                    requestUri = uri,
+                    requestUriMethod = method,
+                    requestUriPostWalletMetadata = AuthorizationRequestResolver
+                        .buildRequestUriPostWalletMetadata(wallet.requestObjectX509TrustPolicy),
+                )
             },
         ).authorizationRequest
     }
@@ -861,6 +867,8 @@ object WalletPresentationHandler {
                     webResolveAuthReq = fetcher,
                     requestUri = requestUri,
                     requestUriMethod = requestUriMethod,
+                    requestUriPostWalletMetadata = AuthorizationRequestResolver
+                        .buildRequestUriPostWalletMetadata(wallet.requestObjectX509TrustPolicy),
                 )
             },
         )
@@ -943,14 +951,11 @@ object WalletPresentationHandler {
     }
 
     private fun DcqlMatcher.DcqlMatchResult.findMatchingDisclosure(claim: ClaimsQuery): DcqlDisclosure? {
-        val claimName = claim.path
-            .lastOrNull { pathPart -> pathPart is JsonPrimitive && pathPart.isString }
-            ?.jsonPrimitive?.content
-            ?: return null
         val allowedValues = claim.values.orEmpty()
 
         return credential.disclosures?.firstOrNull { disclosure ->
-            disclosure.name == claimName && (allowedValues.isEmpty() || disclosure.value in allowedValues)
+            DcqlMatcher.run { disclosure.matchesPath(claim.path) } &&
+                (allowedValues.isEmpty() || disclosure.value in allowedValues)
         }
     }
 
@@ -1026,7 +1031,7 @@ object WalletPresentationHandler {
             format = format,
             data = credentialData,
             originalCredential = this,
-            disclosures = sdvc?.disclosures?.map { DcqlDisclosure(it.name, it.value) }
+            disclosures = sdvc?.disclosures?.map { DcqlDisclosure(it.name, it.value, it.location) }
         )
     }
 }

@@ -24,6 +24,7 @@ import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestParameterCodec
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
+import id.waltid.openid4vp.wallet.request.WalletCapabilities
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.URLBuilder
 import io.ktor.http.Url
@@ -178,7 +179,7 @@ class OpenId4VpPresentationService(
     private fun DigitalCredential.toDcqlDisclosures(): List<DcqlDisclosure>? =
         (this as? SelectivelyDisclosableVerifiableCredential)
             ?.disclosures
-            ?.map { DcqlDisclosure(it.name, it.value) }
+            ?.map { DcqlDisclosure(it.name, it.value, it.location) }
 
     private suspend fun buildRuntimeRequestUriPostWalletMetadata(walletId: Uuid): String {
         val runtimeKeyTypes = KeysService.list(walletId)
@@ -191,7 +192,9 @@ class OpenId4VpPresentationService(
 
         val runtimeCapabilities = WalletPresentationFormatRegistry.capabilitiesFromKeyTypes(runtimeKeyTypes)
         val runtimeVpFormatsSupported = WalletPresentationFormatRegistry.buildVpFormatsSupported(runtimeCapabilities)
-        return AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(runtimeVpFormatsSupported)
+        return AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+            WalletCapabilities(vpFormatsSupported = runtimeVpFormatsSupported)
+        )
     }
 
     companion object {

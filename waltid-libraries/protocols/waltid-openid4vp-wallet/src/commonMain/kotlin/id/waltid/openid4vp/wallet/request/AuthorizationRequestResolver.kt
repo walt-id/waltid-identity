@@ -10,12 +10,14 @@ import id.walt.openid4vp.clientidprefix.ClientIdPrefixParser
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
 import id.walt.openid4vp.clientidprefix.X509TrustPolicy
+import id.walt.openid4vp.clientidprefix.prefixes.RedirectUri
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.webdatafetching.WebDataFetcher
+import id.walt.x509.platformSupportsPkixCertificatePathValidation
 import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
 import id.waltid.openid4vp.wallet.validation.SignedRequestValidator
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -35,19 +37,24 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Wallet capabilities advertised in `wallet_metadata` for request_uri_method=post.
  *
- * Per OID4VP 1.0 §5.1, when the wallet fetches a signed request via POST,
+ * Per OID4VP 1.0 §5.10, when the wallet fetches a signed request via POST,
  * it SHOULD include `wallet_metadata` with its supported VP formats and
  * encryption algorithms.
  *
  * @property vpFormatsSupported Supported VP formats (e.g., jwt_vc_json, vc+sd-jwt, mso_mdoc).
  * @property authorizationEncryptionAlgValuesSupported Key agreement algorithms (default: ECDH-ES).
  * @property authorizationEncryptionEncValuesSupported Content encryption algorithms (default: A128GCM, A256GCM).
+ * @property clientIdPrefixesSupported Client Identifier Prefixes that this wallet can securely process.
  */
 @Serializable
 data class WalletCapabilities(
     val vpFormatsSupported: JsonObject = WalletPresentationFormatRegistry.buildVpFormatsSupported(),
     val authorizationEncryptionAlgValuesSupported: List<String> = listOf("ECDH-ES"),
     val authorizationEncryptionEncValuesSupported: List<String> = listOf("A128GCM", "A256GCM"),
+    val clientIdPrefixesSupported: List<String> = listOf(
+        ClientIdPrefix.REDIRECT_URI.value,
+        ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value,
+    ),
 )
 
 object AuthorizationRequestResolver {
@@ -75,6 +82,8 @@ object AuthorizationRequestResolver {
         val contentType: ContentType?,
         val body: String,
         val walletNonce: String? = null,
+        /** Final URL after redirects, when the transport can expose it. */
+        val resolvedRequestUri: String? = null,
     )
 
     /**
@@ -106,13 +115,6 @@ object AuthorizationRequestResolver {
         .map { it.responseType }
     private val responseModesSupported = (OpenID4VPResponseMode.entries - OpenID4VPResponseMode.DC_API_RESPONSES)
         .map { json.encodeToJsonElement(OpenID4VPResponseMode.serializer(), it).jsonPrimitive.content }
-    private val unsupportedClientIdPrefixes = setOf(
-        ClientIdPrefix.PRE_REGISTERED,
-        ClientIdPrefix.OPENID_FEDERATION,
-    )
-    private val clientIdPrefixesSupported = (ClientIdPrefix.entries - unsupportedClientIdPrefixes)
-        .map { it.value }
-
     /**
      * Builds wallet_metadata JSON for request_uri_method=post requests.
      *
@@ -124,7 +126,7 @@ object AuthorizationRequestResolver {
         buildJsonObject {
             put("response_types_supported", responseTypesSupported.toJsonArray())
             put("response_modes_supported", responseModesSupported.toJsonArray())
-            put("client_id_prefixes_supported", clientIdPrefixesSupported.toJsonArray())
+            put("client_id_prefixes_supported", capabilities.clientIdPrefixesSupported.distinct().toJsonArray())
             put("vp_formats_supported", capabilities.vpFormatsSupported)
             put(
                 "authorization_encryption_alg_values_supported",
@@ -136,6 +138,25 @@ object AuthorizationRequestResolver {
             )
         },
     )
+
+    /**
+     * Returns the prefixes that can be securely processed with the active wallet
+     * configuration on this target. Trust-dependent and incomplete mechanisms are
+     * deliberately omitted rather than advertised optimistically.
+     */
+    fun supportedClientIdPrefixes(x509TrustPolicy: X509TrustPolicy?): List<String> = buildList {
+        add(ClientIdPrefix.REDIRECT_URI.value)
+        add(ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value)
+        if (x509TrustPolicy != null && platformSupportsPkixCertificatePathValidation) {
+            add(ClientIdPrefix.X509_HASH.value)
+            add(ClientIdPrefix.X509_SAN_DNS.value)
+        }
+    }
+
+    fun buildRequestUriPostWalletMetadata(x509TrustPolicy: X509TrustPolicy?): String =
+        buildRequestUriPostWalletMetadata(
+            WalletCapabilities(clientIdPrefixesSupported = supportedClientIdPrefixes(x509TrustPolicy))
+        )
 
     private fun Iterable<String>.toJsonArray(): JsonArray = JsonArray(map(::JsonPrimitive))
 
@@ -185,6 +206,7 @@ object AuthorizationRequestResolver {
             contentType = response.contentType(),
             body = response.bodyAsText(),
             walletNonce = walletNonce,
+            resolvedRequestUri = response.request.url.toString(),
         )
     }
 
@@ -240,7 +262,7 @@ object AuthorizationRequestResolver {
             )
         }
 
-        return ResolvedAuthorizationRequest.Plain(parseParameters(requestUrl.parameters))
+        return ResolvedAuthorizationRequest.Plain(parseAndAuthenticatePlainRequest(requestUrl.parameters))
     }
 
     internal fun buildRequestUriPostBody(
@@ -269,6 +291,55 @@ object AuthorizationRequestResolver {
         ).also { it.dcqlQuery?.precheck() }
     }
 
+    /**
+     * Authenticates an Authorization Request passed directly as URI parameters.
+     * Mechanisms that depend on a signature or pre-registration are never accepted
+     * without the corresponding authentication input. The redirect_uri prefix is
+     * the self-asserted method supported for plain requests and is bound to its
+     * delivery URI here.
+     */
+    private suspend fun parseAndAuthenticatePlainRequest(parameters: Parameters): AuthorizationRequest {
+        val clientId = requireNotNull(parameters["client_id"]) {
+            "client_id is required in an Authorization Request"
+        }
+        val parsedClientId = ClientIdPrefixParser.parse(clientId)
+            .getOrElse { error -> throw IllegalArgumentException("Could not parse client_id prefix: $clientId", error) }
+
+        require(parsedClientId is RedirectUri) {
+            "Client Identifier '$clientId' cannot be authenticated as a plain request without a configured registration or signed Request Object"
+        }
+
+        val embeddedUri = parsedClientId.rawValue.substringAfter(':')
+        val responseMode = parameters["response_mode"]
+        val deliveryParameter = if (responseMode in setOf("direct_post", "direct_post.jwt")) {
+            "response_uri"
+        } else {
+            "redirect_uri"
+        }
+        parameters[deliveryParameter]?.let { explicitUri ->
+            require(explicitUri == embeddedUri) {
+                "$deliveryParameter must exactly match the URI encoded in client_id"
+            }
+        }
+
+        val effectiveParameters = Parameters.build {
+            appendAll(parameters)
+            if (parameters[deliveryParameter] == null) append(deliveryParameter, embeddedUri)
+        }
+        val authorizationRequest = parseParameters(effectiveParameters)
+        val context = RequestContext(
+            clientId = clientId,
+            clientMetadata = authorizationRequest.clientMetadata,
+            redirectUri = authorizationRequest.redirectUri,
+            responseUri = authorizationRequest.responseUri,
+        )
+        when (val result = ClientIdPrefixAuthenticator.authenticate(parsedClientId, context)) {
+            is ClientValidationResult.Success -> Unit
+            is ClientValidationResult.Failure -> throw SignedAuthorizationRequestValidationException(result.error)
+        }
+        return authorizationRequest
+    }
+
     private suspend fun resolveFromRequestUri(
         requestUri: String,
         requestUriMethod: String?,
@@ -282,8 +353,14 @@ object AuthorizationRequestResolver {
         log.trace { "Resolving AuthorizationRequest via request_uri" }
 
         val requestUriMethod = requestUriMethod?.let(::parseRequestUriMethod)
+        if (requestUriMethod == RequestUriHttpMethod.POST) {
+            requireHttpsRequestUri(requestUri)
+        }
         log.trace { "Fetching AuthorizationRequest from request_uri using method ${requestUriMethod?.method ?: "get"}" }
         val response = fetchRequestUri(requestUri, requestUriMethod)
+        if (requestUriMethod == RequestUriHttpMethod.POST) {
+            response.resolvedRequestUri?.let(::requireHttpsRequestUri)
+        }
         response.status.run { check(isSuccess()) { "AuthorizationRequest cannot be retrieved ($this) from $requestUri: ${response.body}" } }
 
         val contentType = requireNotNull(response.contentType) { "AuthorizationRequest response does not define a content type" }
@@ -415,6 +492,14 @@ object AuthorizationRequestResolver {
         RequestUriHttpMethod.GET.method -> RequestUriHttpMethod.GET
         RequestUriHttpMethod.POST.method -> RequestUriHttpMethod.POST
         else -> throw IllegalArgumentException("invalid_request_uri_method: $value is neither 'get' nor 'post'")
+    }
+
+    private fun requireHttpsRequestUri(requestUri: String) {
+        val url = runCatching { Url(requestUri) }
+            .getOrElse { error -> throw IllegalArgumentException("request_uri must be a valid HTTPS URL", error) }
+        require(url.protocol == URLProtocol.HTTPS) {
+            "request_uri_method=post requires an HTTPS request_uri"
+        }
     }
 
     private fun requireMatchingClientId(outerClientId: String?, innerClientId: String?) {

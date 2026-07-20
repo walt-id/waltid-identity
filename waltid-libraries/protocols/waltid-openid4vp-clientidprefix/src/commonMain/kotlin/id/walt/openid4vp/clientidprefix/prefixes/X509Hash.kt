@@ -10,6 +10,7 @@ import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
 import id.walt.x509.CertificateDer
 import id.walt.x509.validateCertificateChain
+import id.walt.x509.platformSupportsPkixCertificatePathValidation
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -27,6 +28,9 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
     }
 
     suspend fun authenticateX509Hash(clientId: X509Hash, context: RequestContext): ClientValidationResult {
+        if (!platformSupportsPkixCertificatePathValidation) {
+            return ClientValidationResult.Failure(ClientIdError.UnsupportedPlatformX509Validation)
+        }
         val jws = context.requestObjectJws
             ?: return ClientValidationResult.Failure(ClientIdError.MissingRequestObject)
 

@@ -139,7 +139,7 @@ data class AuthorizationRequest(
     val idTokenType: String? = null,
 
     /**
-     * OPTIONAL. Per OID4VP 1.0 §5.6 (request_uri_method=post):
+     * OPTIONAL. Per OID4VP 1.0 §5.10.1 (request_uri_method=post):
      * when the wallet sends `wallet_nonce` in the POST to the request URI, the verifier
      * MUST echo it back in the signed request object. The wallet validates this claim
      * to ensure the request object was freshly signed for this specific request.

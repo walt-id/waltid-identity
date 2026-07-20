@@ -25,7 +25,7 @@ data class DcqlHolderPolicyCheck(
                 data = credential.credentialData,
                 originalCredential = credential,
                 disclosures = if (credential is SelectivelyDisclosableVerifiableCredential)
-                    credential.disclosures?.map { DcqlDisclosure(it.name, it.value) }
+                    credential.disclosures?.map { DcqlDisclosure(it.name, it.value, it.location) }
                 else null
             )
         }

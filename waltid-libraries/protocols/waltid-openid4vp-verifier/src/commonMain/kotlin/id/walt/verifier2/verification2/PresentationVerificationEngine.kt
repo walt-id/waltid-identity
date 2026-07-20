@@ -191,7 +191,8 @@ object PresentationVerificationEngine {
          * `CredentialQuery`. Receives the credential (wrapped as [DcqlCredential]) and the list of
          * authority constraints; returns true if the credential satisfies at least one entry.
          *
-         * When null (default), `trusted_authorities` constraints are not enforced.
+         * When null (default), a request containing `trusted_authorities` is rejected
+         * because the verifier cannot establish the requested issuer trust.
          * Pass [id.walt.credentials.trustedauthorities.DcqlTrustedAuthoritiesChecker.checker]
          * from JVM callers to enable AKI-based authority verification.
          */
@@ -306,32 +307,37 @@ object PresentationVerificationEngine {
             // --- trusted_authorities check ---
             // Per OID4VP §6.1.1: if a CredentialQuery specifies trusted_authorities, every credential
             // presented for that query MUST satisfy at least one authority entry.
-            if (trustedAuthoritiesChecker != null) {
-                val dcqlQuery = session.authorizationRequest.dcqlQuery
-                if (dcqlQuery != null) {
-                    for ((queryId, credentials) in allSuccessfullyValidatedAndProcessedData) {
-                        val credentialQuery = dcqlQuery.credentials.find { it.id == queryId }
-                        val authorities = credentialQuery?.trustedAuthorities
-                        if (!authorities.isNullOrEmpty()) {
-                            for (credential in credentials) {
+            val dcqlQuery = session.authorizationRequest.dcqlQuery
+            if (dcqlQuery != null) {
+                for ((queryId, credentials) in allSuccessfullyValidatedAndProcessedData) {
+                    val credentialQuery = dcqlQuery.credentials.find { it.id == queryId }
+                    val authorities = credentialQuery?.trustedAuthorities
+                    if (!authorities.isNullOrEmpty()) {
+                        for (credential in credentials) {
+                            val trusted = trustedAuthoritiesChecker?.let { checker ->
                                 val dcqlCredential = RawDcqlCredential(
                                     id = queryId,
                                     format = credentialQuery.format.name,
                                     data = credential.credentialData,
                                     originalCredential = credential
                                 )
-                                if (!trustedAuthoritiesChecker(dcqlCredential, authorities)) {
-                                    val msg = "Credential for query '$queryId' does not satisfy trusted_authorities constraint"
-                                    log.warn { msg }
-                                    session.updateSession(SessionEvent.presentation_validation_available) {
-                                        failure = SessionFailure.PresentationValidation(
-                                            reason = msg,
-                                            failedPolicies = emptyMap()
-                                        )
-                                    }
-                                    session.failSession(SessionEvent.presentation_validation_failed)
-                                    throw PresentationRejectionException(msg)
+                                checker(dcqlCredential, authorities)
+                            } ?: false
+                            if (!trusted) {
+                                val msg = if (trustedAuthoritiesChecker == null) {
+                                    "Credential query '$queryId' declares trusted_authorities but no authority checker is configured"
+                                } else {
+                                    "Credential for query '$queryId' does not satisfy trusted_authorities constraint"
                                 }
+                                log.warn { msg }
+                                session.updateSession(SessionEvent.presentation_validation_available) {
+                                    failure = SessionFailure.PresentationValidation(
+                                        reason = msg,
+                                        failedPolicies = emptyMap()
+                                    )
+                                }
+                                session.failSession(SessionEvent.presentation_validation_failed)
+                                throw PresentationRejectionException(msg)
                             }
                         }
                     }

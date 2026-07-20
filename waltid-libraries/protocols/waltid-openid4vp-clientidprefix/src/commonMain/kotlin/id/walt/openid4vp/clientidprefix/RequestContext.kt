@@ -64,6 +64,8 @@ sealed class ClientIdError(val message: String) {
     object X509HashMismatch : ClientIdError("The client_id hash does not match the hash of the provided certificate.")
     object MissingX509TrustPolicy : ClientIdError("No wallet-controlled X.509 trust policy is configured.")
     object UntrustedCertificateChain : ClientIdError("The Request Object certificate chain is not trusted.")
+    object UnsupportedPlatformX509Validation :
+        ClientIdError("Complete PKIX certificate-path validation is not available on this platform.")
     object TrustAnchorIncludedInX5c : ClientIdError("The Request Object x5c contains a configured trust anchor.")
     object SelfSignedLeafCertificate : ClientIdError("The Request Object signing certificate must not be self-signed.")
 

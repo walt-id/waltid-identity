@@ -188,17 +188,24 @@ class ResponseEncryptionHandlerTest {
     }
 
     @Test
-    fun extractEncryptionConfig_rejectsMissingOrDuplicateKid() = runTest {
+    fun extractEncryptionConfig_acceptsSelectedKeyWithoutKid() = runTest {
         val missingKid = JsonObject(testEcPublicKeyJwk - "kid")
-        val duplicateKid = JsonObject(testEcPublicKeyJwk + ("x" to JsonPrimitive("different-coordinate")))
+        val config = ResponseEncryptionHandler.extractEncryptionConfig(encryptedRequest(listOf(missingKid))).getOrThrow()
 
-        listOf(
-            listOf(missingKid),
-            listOf(testEcPublicKeyJwk, duplicateKid),
-        ).forEach { keys ->
-            val result = ResponseEncryptionHandler.extractEncryptionConfig(encryptedRequest(keys))
-            assertTrue(result.isFailure)
-        }
+        assertNotNull(config)
+        assertNull(config.keyId)
+    }
+
+    @Test
+    fun extractEncryptionConfig_ignoresUnrelatedKeyWithoutKid() = runTest {
+        val unrelatedKeyWithoutKid = JsonObject(
+            testEcPublicKeyJwk - "kid" + ("use" to JsonPrimitive("sig")) + ("alg" to JsonPrimitive("ES256"))
+        )
+        val config = ResponseEncryptionHandler.extractEncryptionConfig(
+            encryptedRequest(listOf(unrelatedKeyWithoutKid, testEcPublicKeyJwk))
+        ).getOrThrow()
+
+        assertEquals("test-enc-key-1", config?.keyId)
     }
 
     @Test
@@ -252,6 +259,20 @@ class ResponseEncryptionHandlerTest {
         assertEquals("ECDH-ES", protectedHeader["alg"]?.jsonPrimitive?.content)
         assertEquals("A256GCM", protectedHeader["enc"]?.jsonPrimitive?.content)
         assertEquals("test-enc-key-1", protectedHeader["kid"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun encryptResponse_omitsKidWhenSelectedJwkHasNoKid() = runTest {
+        val keyWithoutKid = JsonObject(testEcPublicKeyJwk - "kid")
+        val config = assertNotNull(
+            ResponseEncryptionHandler.extractEncryptionConfig(encryptedRequest(listOf(keyWithoutKid))).getOrThrow()
+        )
+        val jwe = ResponseEncryptionHandler.encryptResponse(buildJsonObject { put("state", JsonPrimitive("state")) }, config)
+        val protectedHeader = Json.parseToJsonElement(
+            jwe.substringBefore('.').decodeFromBase64Url().decodeToString()
+        ).jsonObject
+
+        assertTrue("kid" !in protectedHeader)
     }
 
     private fun encryptedRequest(

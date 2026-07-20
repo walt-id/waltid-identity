@@ -63,6 +63,7 @@ object WalletPresentFunctionality2 {
         typeRegistry: TransactionDataTypeRegistry,
         encryptionConfig: ResponseEncryptionHandler.EncryptionConfig?,
     ): String {
+        validateMatchedCredentialSelection(authorizationRequest, matchedData)
         val vpTokenMapContents = mutableMapOf<String, JsonArray>()
 
         for ((queryId, matchedCredsWithClaimsList) in matchedData) {
@@ -118,19 +119,22 @@ object WalletPresentFunctionality2 {
             }
         }
 
-        if (vpTokenMapContents.isEmpty() && authorizationRequest.dcqlQuery?.credentials?.isNotEmpty() == true) {
-            // No credentials matched any part of a non-empty DCQL query.
-            // Depending on policy, this might be an error or an empty vp_token.
-            // OpenID4VP spec implies vp_token is only returned if something matches.
-            // "A VP Token is only returned if the corresponding Authorization Request contained a dcql_query parameter..."
-            // "...There MUST NOT be any entry in the JSON-encoded object for optional Credential Queries when there are no matching Credentials..."
-            // So, if all queries were effectively optional and none matched, an empty vp_token is possible.
-            // If required queries didn't match, DcqlMatcher should have failed earlier.
-            log.warn { "No presentations generated for any query ID. Returning empty vp_token object." }
-        }
-
         log.trace { "Generated VP Token Map Contents: $vpTokenMapContents" }
         return Json.encodeToString(JsonObject(vpTokenMapContents))
+    }
+
+    internal fun validateMatchedCredentialSelection(
+        authorizationRequest: AuthorizationRequest,
+        matchedData: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+    ) {
+        val query = authorizationRequest.dcqlQuery ?: return
+        val matchedIds = matchedData.filterValues { it.isNotEmpty() }.keys
+        val satisfied = query.credentialSets?.all { set ->
+            !set.required || set.options.any { option -> option.all(matchedIds::contains) }
+        } ?: query.credentials.all { matchedIds.contains(it.id) }
+        require(satisfied) {
+            "Matched credentials do not satisfy all required DCQL credential queries"
+        }
     }
 
     @Serializable
@@ -342,6 +346,8 @@ object WalletPresentFunctionality2 {
                         webResolveAuthReq = webResolveAuthReq,
                         requestUri = requestUri,
                         requestUriMethod = requestUriMethod,
+                        requestUriPostWalletMetadata = AuthorizationRequestResolver
+                            .buildRequestUriPostWalletMetadata(x509TrustPolicy),
                         sendWalletMetadata = true,
                     )
                 },
@@ -570,9 +576,9 @@ object WalletPresentFunctionality2 {
                     webResolveAuthReq = webResolveAuthReq,
                     requestUri = requestUri,
                     requestUriMethod = requestUriMethod,
-                    // Optional wallet metadata is omitted until the caller explicitly profiles
-                    // its values. Some Final-compliant verifier endpoints reject unsupported
-                    // capability members, while wallet_nonce remains mandatory for this flow.
+                    requestUriPostWalletMetadata = AuthorizationRequestResolver
+                        .buildRequestUriPostWalletMetadata(x509TrustPolicy),
+                    // Advertise only capabilities this target and trust configuration can process.
                     sendWalletMetadata = true,
                 )
             },

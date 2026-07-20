@@ -46,7 +46,7 @@ object Verifier2VPDirectPostHandler {
      * Optional callback for `trusted_authorities` verification per OID4VP §6.1.1.
      * Set this from JVM code to enable AKI-based trust chain checking, e.g.:
      *   `Verifier2VPDirectPostHandler.trustedAuthoritiesChecker = DcqlTrustedAuthoritiesChecker.checker`
-     * Defaults to null — trusted_authorities constraints are not enforced unless set.
+     * Defaults to null — requests containing trusted_authorities fail closed unless set.
      */
     var trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null
 

@@ -715,32 +715,6 @@ object Wallet2RouteHandler {
                         call.respond(WalletPresentationHandler.resolveRequest(wallet, req))
                     }
 
-                    post("/inspect-encryption", {
-                        summary = "Inspect encryption requirements for a VP request"
-                        description = "Resolves the VP request and inspects its encryption requirements. " +
-                            "Returns whether encrypted responses are required, the encryption algorithms, " +
-                            "and verifier key information for consent screen display."
-                        request { pathParameter<String>("walletId"); body<ResolveVpRequestRequest>() }
-                        response { HttpStatusCode.OK to { body<EncryptionRequirementsResult>() } }
-                    }) {
-                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
-                        val req = call.receive<ResolveVpRequestRequest>()
-                        // First resolve the request to get the AuthorizationRequest
-                        val resolved = WalletPresentationHandler.resolveRequest(wallet, req)
-                        // Then inspect encryption requirements using the resolved request
-                        // Note: We need to re-resolve to get the full AuthorizationRequest for inspection
-                        // This is a limitation - ideally inspectEncryptionRequirements would work with ResolveVpRequestResult
-                        // For now, use the same request URL/object to get encryption info
-                        call.respond(
-                            EncryptionRequirementsResult(
-                                isEncryptionRequired = resolved.requiresEncryptedResponse,
-                                encAlgorithm = if (resolved.requiresEncryptedResponse) "A128GCM" else null,
-                                algAlgorithm = if (resolved.requiresEncryptedResponse) "ECDH-ES" else null,
-                                verifierKeyThumbprint = null // Would require full resolution
-                            )
-                        )
-                    }
-
                     post("/match-credentials", {
                         summary = "Isolated: DCQL-match supplied credentials against a query"
                         description = "Stateless — caller provides credentials inline. " +

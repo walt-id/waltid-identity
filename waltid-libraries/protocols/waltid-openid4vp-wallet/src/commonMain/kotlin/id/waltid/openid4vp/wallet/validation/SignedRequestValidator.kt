@@ -22,11 +22,11 @@ import kotlin.time.Clock
  * Validates signed authorization request objects per OID4VP 1.0 §5.
  *
  * This validator enforces:
- * 1. JOSE typ header == "oauth-authz-req+jwt" (§5.3)
+ * 1. JOSE typ header == "oauth-authz-req+jwt" (§5)
  * 2. Mandatory aud claim with correct value (§5.8)
  * 3. Mandatory, identical outer and inner client_id values (RFC 9101 §6.3)
  * 4. JWT signature verification via client_id prefix authentication
- * 5. wallet_nonce validation for request_uri_method=post (§5.6)
+ * 5. wallet_nonce validation for request_uri_method=post (§5.10.1)
  * 6. Optional exp and nbf temporal claim validation (RFC 7519 §4.1.4, §4.1.5)
  */
 object SignedRequestValidator {
@@ -39,7 +39,7 @@ object SignedRequestValidator {
     private const val SELF_ISSUED_AUD = "https://self-issued.me/v2"
 
     /**
-     * Required JOSE typ header value for signed authorization requests per OID4VP 1.0 §5.3.
+     * Required JOSE typ header value for signed authorization requests per OID4VP 1.0 §5.
      */
     private const val REQUIRED_TYP = "oauth-authz-req+jwt"
 
@@ -90,7 +90,7 @@ object SignedRequestValidator {
      * @param requestObjectJwt The signed JWT request object.
      * @param outerClientId The mandatory client_id from the outer Authorization Request.
      * @param expectedWalletNonce If set, validates that the JWT contains this wallet_nonce claim.
-     *        Required for request_uri_method=post per OID4VP 1.0 §5.6.
+     *        Required for request_uri_method=post per OID4VP 1.0 §5.10.1.
      * @param expectedAudience The discovery-mode-specific audience. Static Discovery uses
      *        `https://self-issued.me/v2`; Dynamic Discovery uses the discovered Wallet issuer.
      * @param unsignedPolicy Policy for handling unsigned (alg=none) requests.

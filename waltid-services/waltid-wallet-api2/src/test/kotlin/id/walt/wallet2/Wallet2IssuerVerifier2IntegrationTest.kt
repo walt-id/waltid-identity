@@ -539,13 +539,14 @@ class Wallet2IssuerVerifier2IntegrationTest {
                         .body<VerificationSessionCreationResponse>()
                 }
                 val sessionId = verifierSession.sessionId
-                val bootstrapUrl = verifierSession.fullAuthorizationRequestUrl
-                    ?: Url("$walletBase/verification-session/$sessionId/request")
+                val authorizationRequestUrl = requireNotNull(verifierSession.fullAuthorizationRequestUrl) {
+                    "Verifier session did not return a full Authorization Request URL"
+                }
 
                 // 5. Wallet presents to the verifier using the returned authorization request URL.
                 testAndReturn("[$tag] Wallet presents credential (OID4VP 1.0)") {
                     http.post("/wallet/$walletId/credentials/present") {
-                        setBody(PresentCredentialRequest(requestUrl = bootstrapUrl, did = holderDid))
+                        setBody(PresentCredentialRequest(requestUrl = authorizationRequestUrl, did = holderDid))
                     }.also {
                         assertEquals(HttpStatusCode.OK, it.status, "Present failed: ${it.body<String>()}")
                     }

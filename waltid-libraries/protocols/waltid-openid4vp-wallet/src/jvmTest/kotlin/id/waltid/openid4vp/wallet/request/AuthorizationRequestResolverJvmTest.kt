@@ -34,7 +34,9 @@ class AuthorizationRequestResolverJvmTest {
     fun `request uri post wallet metadata declares supported response and client id capabilities`() {
         val metadata = Json.parseToJsonElement(
             AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
-                vpFormatsSupported = jsonObjectOf("dc+sd-jwt" to jsonObjectOf()),
+                WalletCapabilities(
+                    vpFormatsSupported = jsonObjectOf("dc+sd-jwt" to jsonObjectOf()),
+                )
             ),
         ).jsonObject
 
@@ -46,14 +48,7 @@ class AuthorizationRequestResolverJvmTest {
             listOf("fragment", "query", "direct_post", "direct_post.jwt", "form_post"),
             metadata.getValue("response_modes_supported").jsonArray.map { it.jsonPrimitive.content },
         )
-        val expectedClientIdPrefixes =
-            listOf(
-                "redirect_uri",
-                "x509_san_dns",
-                "x509_hash",
-                "decentralized_identifier",
-                "verifier_attestation",
-            )
+        val expectedClientIdPrefixes = listOf("redirect_uri", "decentralized_identifier")
         assertFalse("client_id_schemes_supported" in metadata)
         assertEquals(
             expectedClientIdPrefixes,
@@ -81,7 +76,9 @@ class AuthorizationRequestResolverJvmTest {
         }
         val fetcher = WebDataFetcher.wrapping(client, id = "authorization-request-resolver-test")
         val walletMetadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
-            vpFormatsSupported = jsonObjectOf("dc+sd-jwt" to jsonObjectOf()),
+            WalletCapabilities(
+                vpFormatsSupported = jsonObjectOf("dc+sd-jwt" to jsonObjectOf()),
+            )
         )
 
         val response = AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
@@ -319,11 +316,162 @@ class AuthorizationRequestResolverJvmTest {
     }
 
     @Test
+    fun `plain requests reject prefixes that require signed request objects`() {
+        listOf(
+            "x509_hash:certificate-thumbprint",
+            "x509_san_dns:verifier.example",
+            "decentralized_identifier:did:example:verifier",
+            "verifier_attestation:verifier.example",
+            "openid_federation:https://verifier.example",
+        ).forEach { clientId ->
+            val requestUrl = URLBuilder("openid4vp://authorize").apply {
+                parameters.append("client_id", clientId)
+                parameters.append("nonce", "nonce-123")
+            }.build()
+
+            val failure = assertFailsWith<IllegalArgumentException>(clientId) {
+                runBlocking {
+                    AuthorizationRequestResolver.resolve(
+                        requestUrl,
+                        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                    ) { _, _ -> error("plain request must not fetch") }
+                }
+            }
+            assertTrue(failure.message.orEmpty().contains("cannot be authenticated as a plain request"))
+        }
+    }
+
+    @Test
+    fun `plain pre-registered request fails closed without a client registry`() {
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "registered-verifier")
+            parameters.append("client_metadata", "{}")
+            parameters.append("nonce", "nonce-123")
+        }.build()
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            runBlocking {
+                AuthorizationRequestResolver.resolve(
+                    requestUrl,
+                    AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                ) { _, _ -> error("plain request must not fetch") }
+            }
+        }
+        assertTrue(failure.message.orEmpty().contains("without a configured registration"))
+    }
+
+    @Test
+    fun `redirect uri prefix derives and binds direct post response uri`() {
+        val deliveryUri = "https://verifier.example/response"
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "redirect_uri:$deliveryUri")
+            parameters.append("client_metadata", "{}")
+            parameters.append("response_mode", "direct_post")
+            parameters.append("nonce", "nonce-123")
+        }.build()
+
+        val resolved = runBlocking {
+            AuthorizationRequestResolver.resolve(
+                requestUrl,
+                AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            ) { _, _ -> error("plain request must not fetch") }
+        }
+        assertEquals(deliveryUri, resolved.authorizationRequest.responseUri)
+
+        val mismatch = URLBuilder(requestUrl).apply {
+            parameters.append("response_uri", "https://attacker.example/collect")
+        }.build()
+        val failure = assertFailsWith<IllegalArgumentException> {
+            runBlocking {
+                AuthorizationRequestResolver.resolve(
+                    mismatch,
+                    AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+                ) { _, _ -> error("plain request must not fetch") }
+            }
+        }
+        assertTrue(failure.message.orEmpty().contains("must exactly match"))
+    }
+
+    @Test
+    fun `redirect uri prefix requires client metadata`() {
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "redirect_uri:https://verifier.example/callback")
+            parameters.append("nonce", "nonce-123")
+        }.build()
+
+        val failure = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
+            runBlocking {
+                AuthorizationRequestResolver.resolve(
+                    requestUrl,
+                    AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                ) { _, _ -> error("plain request must not fetch") }
+            }
+        }
+        assertTrue(failure.message.orEmpty().contains("client_metadata"))
+    }
+
+    @Test
+    fun `request uri post requires HTTPS before fetch and after redirects`() {
+        val insecureRequest = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier2")
+            parameters.append("request_uri", "http://verifier.example/request.jwt")
+            parameters.append("request_uri_method", "post")
+        }.build()
+        var fetchCalled = false
+        assertFailsWith<IllegalArgumentException> {
+            runBlocking {
+                AuthorizationRequestResolver.resolve(
+                    insecureRequest,
+                    AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                ) { _, _ ->
+                    fetchCalled = true
+                    error("must not fetch")
+                }
+            }
+        }
+        assertFalse(fetchCalled)
+
+        val secureRequest = URLBuilder(insecureRequest).apply {
+            parameters["request_uri"] = "https://verifier.example/request.jwt"
+        }.build()
+        val failure = assertFailsWith<IllegalArgumentException> {
+            runBlocking {
+                AuthorizationRequestResolver.resolve(
+                    secureRequest,
+                    AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                ) { _, _ ->
+                    AuthorizationRequestResolver.RequestUriFetchResponse(
+                        status = HttpStatusCode.OK,
+                        contentType = ContentType.parse("application/oauth-authz-req+jwt"),
+                        body = "not-reached",
+                        resolvedRequestUri = "http://verifier.example/request.jwt",
+                    )
+                }
+            }
+        }
+        assertTrue(failure.message.orEmpty().contains("HTTPS"))
+    }
+
+    @Test
     fun `wallet metadata uses OID4VP Final encryption parameter names`() {
         val metadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(WalletCapabilities())
         assertTrue(metadata.contains("authorization_encryption_alg_values_supported"))
         assertTrue(metadata.contains("authorization_encryption_enc_values_supported"))
         assertTrue(!metadata.contains("encrypted_response_enc_values_supported"))
+    }
+
+    @Test
+    fun `wallet metadata advertises only explicitly configured client id prefixes`() {
+        val metadata = Json.parseToJsonElement(
+            AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                WalletCapabilities(clientIdPrefixesSupported = listOf("redirect_uri", "x509_hash"))
+            )
+        ).jsonObject
+
+        assertEquals(
+            listOf("redirect_uri", "x509_hash"),
+            metadata.getValue("client_id_prefixes_supported").jsonArray.map { it.jsonPrimitive.content },
+        )
     }
 
     @Test
