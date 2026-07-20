@@ -6,8 +6,12 @@ import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.Verification2Session
 import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.ContentType
 import io.ktor.http.Url
+import io.ktor.http.contentType
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.routing
@@ -21,6 +25,10 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 
 class VerificationSessionRepositoryTest {
     @Test
@@ -67,6 +75,58 @@ class VerificationSessionRepositoryTest {
     }
 
     @Test
+    fun `failed parsing can restore an unchanged processing claim`() = runTest {
+        val repository = InMemoryVerificationSessionRepository()
+        repository.create(session("retryable"))
+        val claim = repository.claimForProcessingWithOriginal("retryable")
+
+        repository.restoreProcessingClaim(claim)
+
+        assertEquals(Verification2Session.VerificationSessionStatus.ACTIVE, repository.get("retryable")!!.session.status)
+        repository.claimForProcessing("retryable")
+    }
+
+    @Test
+    fun `claim rollback never overwrites persisted processing progress`() = runTest {
+        val repository = InMemoryVerificationSessionRepository()
+        repository.create(session("progressed"))
+        val claim = repository.claimForProcessingWithOriginal("progressed")
+        repository.update("progressed") { attempted = true }
+
+        repository.restoreProcessingClaim(claim)
+
+        assertEquals(true, repository.get("progressed")!!.session.attempted)
+    }
+
+    @Test
+    fun `terminal session uses retention instead of request expiration`() = runTest {
+        val repository = InMemoryVerificationSessionRepository()
+        val now = Clock.System.now()
+        val completed = session("completed").copy(
+            expirationDate = now - 1.minutes,
+            retentionDate = now + 1.minutes,
+            status = Verification2Session.VerificationSessionStatus.SUCCESSFUL,
+            attempted = true,
+        )
+        val unused = session("unused").copy(
+            expirationDate = now - 1.minutes,
+            retentionDate = now + 1.minutes,
+        )
+        val expired = session("expired").copy(
+            expirationDate = now - 1.minutes,
+            retentionDate = now + 1.minutes,
+            status = Verification2Session.VerificationSessionStatus.EXPIRED,
+        )
+        repository.create(completed)
+        repository.create(unused)
+        repository.create(expired)
+
+        assertNotNull(repository.get("completed"))
+        assertNull(repository.get("unused"))
+        assertNull(repository.get("expired"))
+    }
+
+    @Test
     fun `info route returns 404 for missing session`() = testApplication {
         application {
             install(ContentNegotiation) { json() }
@@ -100,6 +160,27 @@ class VerificationSessionRepositoryTest {
         }
 
         assertEquals(HttpStatusCode.ServiceUnavailable, client.get("/verification-session/missing/info").status)
+    }
+
+    @Test
+    fun `malformed direct-post response restores session for retry`() = testApplication {
+        val repository = InMemoryVerificationSessionRepository()
+        repository.create(session("malformed"))
+        application {
+            install(ContentNegotiation) { json() }
+            install(SSE)
+            configureStatusPages()
+            routing { Verifier2Service.run { registerRoute(repository) } }
+        }
+
+        val response = client.post("/verification-session/malformed/response") {
+            contentType(ContentType.Application.Json)
+            setBody("{")
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertEquals(Verification2Session.VerificationSessionStatus.ACTIVE, repository.get("malformed")!!.session.status)
+        repository.claimForProcessing("malformed")
     }
 
     private fun session(id: String) = Verification2Session(
