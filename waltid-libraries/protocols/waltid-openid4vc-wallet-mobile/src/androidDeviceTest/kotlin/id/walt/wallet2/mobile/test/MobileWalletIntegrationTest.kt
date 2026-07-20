@@ -212,7 +212,7 @@ class MobileWalletIntegrationTest {
         val client = MobileWalletFactory(context).create(walletConfig("reject-${scenario.id}"))
         client.bootstrap()
 
-        val session = DemoTestBackend.createVerifierSession(scenario)
+        val session = DemoTestBackend.createResponseBoundVerifierSession(scenario)
         client.previewPresentation(session.authorizationRequestUri)
         val result = client.rejectPresentation(session.authorizationRequestUri)
 

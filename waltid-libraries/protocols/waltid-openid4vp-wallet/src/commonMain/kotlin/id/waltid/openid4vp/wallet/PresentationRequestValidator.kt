@@ -42,7 +42,14 @@ object PresentationRequestValidator {
             WalletPresentationFormatRegistry.defaultCapabilities(),
     ): PresentationRequestValidationResult {
         val request = resolvedRequest.authorizationRequest
-        requireDispatchableResponse(resolvedRequest)
+        requireUsableResponse(request)
+        fun invalid(
+            code: WalletPresentFunctionality2.OID4VPErrorCode,
+            message: String,
+        ): PresentationRequestValidationResult.Invalid {
+            requireErrorResponseCanBeSent(resolvedRequest)
+            return PresentationRequestValidationResult.Invalid(PresentationRequestError(code, message))
+        }
 
         if (request.nonce.isNullOrBlank()) {
             return invalid(
@@ -154,10 +161,30 @@ object PresentationRequestValidator {
         }
     }
 
-    private fun requireDispatchableResponse(resolvedRequest: ResolvedAuthorizationRequest) {
+    /**
+     * Requires an authenticated or client-bound destination before exposing an error as reportable.
+     * A valid preview needs this check only if the caller later rejects it.
+     */
+    fun requireErrorResponseCanBeSent(resolvedRequest: ResolvedAuthorizationRequest) {
         val request = resolvedRequest.authorizationRequest
+        requireUsableResponse(request)
+        if (resolvedRequest is ResolvedAuthorizationRequest.Plain) {
+            val responseDestination = when (request.walletResponseMode()) {
+                OpenID4VPResponseMode.DIRECT_POST,
+                OpenID4VPResponseMode.DIRECT_POST_JWT,
+                -> request.responseUri
+
+                else -> request.redirectUri
+            }
+            require(responseDestination != null && request.clientId == "redirect_uri:$responseDestination") {
+                "A plain Authorization Request must bind client_id to its response destination before an error response can be sent safely"
+            }
+        }
+    }
+
+    private fun requireUsableResponse(request: AuthorizationRequest) {
         require(!request.clientId.isNullOrBlank()) {
-            "Authorization Request client_id is required; an error response cannot be sent safely"
+            "Authorization Request client_id is required"
         }
         when (request.walletResponseMode()) {
             OpenID4VPResponseMode.FRAGMENT,
@@ -186,20 +213,7 @@ object PresentationRequestValidator {
                 "Authorization Request response mode cannot be determined; an error response cannot be sent safely",
             )
         }
-
-        if (resolvedRequest is ResolvedAuthorizationRequest.Plain) {
-            val redirectUri = request.redirectUri
-            require(redirectUri != null && request.clientId == "redirect_uri:$redirectUri") {
-                "A plain Authorization Request must bind client_id to redirect_uri before an error response can be sent safely"
-            }
-        }
     }
-
-    private fun invalid(
-        code: WalletPresentFunctionality2.OID4VPErrorCode,
-        message: String,
-    ): PresentationRequestValidationResult.Invalid =
-        PresentationRequestValidationResult.Invalid(PresentationRequestError(code, message))
 
     private val supportedResponseTypes = setOf(
         OpenID4VPResponseType.VP_TOKEN,

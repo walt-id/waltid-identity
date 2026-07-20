@@ -248,7 +248,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let wallet = try await makeWallet(walletId: walletId)
         _ = try await wallet.bootstrap()
-        let session = try await DemoBackend.shared.createVerifierSession(scenario: scenario)
+        let session = try await DemoBackend.shared.createResponseBoundVerifierSession(scenario: scenario)
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
         _ = try await wallet.previewPresentation(request: presentationURL)
         let result = try await wallet.rejectPresentation(request: presentationURL)

@@ -368,6 +368,7 @@ object WalletPresentationHandler {
             availableCredentialQueryIds = availableCredentialQueryIds,
         )
         if (availabilityError != null) {
+            PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedAuthorizationRequest)
             rememberPreviewedAuthorizationRequest(
                 wallet = wallet,
                 requestUrl = request.requestUrl,
@@ -494,6 +495,7 @@ object WalletPresentationHandler {
         val detectedError = (preview as? PreviewedPresentationRequest.Invalid)?.error
         val errorCode = detectedError?.code?.code ?: request.errorCode
             ?: WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED.code
+        PresentationRequestValidator.requireErrorResponseCanBeSent(preview.resolvedAuthorizationRequest)
         onEvent(WalletSessionEvent.presentation_request_parsed)
 
         val result = WalletPresentFunctionality2.walletRejectHandling(

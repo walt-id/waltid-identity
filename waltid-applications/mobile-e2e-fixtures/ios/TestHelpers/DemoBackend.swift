@@ -134,6 +134,14 @@ public final class DemoBackend {
         )
     }
 
+    public func createResponseBoundVerifierSession(scenario: DemoCredentialScenario) async throws -> DemoVerifierSession {
+        try await createVerifierSession(
+            scenario: scenario,
+            transactionData: [],
+            bindClientIDToResponseURI: true
+        )
+    }
+
     public func createTransactionDataVerifierSession(
         scenario: DemoCredentialScenario = DemoBackend.transactionDataPresentationScenario
     ) async throws -> DemoVerifierSession {
@@ -172,18 +180,29 @@ public final class DemoBackend {
 
     private func createVerifierSession(
         scenario: DemoCredentialScenario,
-        transactionData: [[String: Any]]
+        transactionData: [[String: Any]],
+        bindClientIDToResponseURI: Bool = false
     ) async throws -> DemoVerifierSession {
         let endpoint = Self.verifierBaseURL
             .appendingPathComponent("verification-session")
             .appendingPathComponent("create")
+        let requestedSessionID = bindClientIDToResponseURI ? UUID().uuidString.lowercased() : nil
+        var coreFlow: [String: Any] = [
+            "dcql_query": [
+                "credentials": [scenario.verifierCredentialQuery],
+            ],
+        ]
+        if let requestedSessionID {
+            let responseURI = Self.verifierBaseURL
+                .appendingPathComponent("verification-session")
+                .appendingPathComponent(requestedSessionID)
+                .appendingPathComponent("response")
+            coreFlow["sessionId"] = requestedSessionID
+            coreFlow["clientId"] = "redirect_uri:\(responseURI.absoluteString)"
+        }
         var payload: [String: Any] = [
             "flow_type": "cross_device",
-            "core_flow": [
-                "dcql_query": [
-                    "credentials": [scenario.verifierCredentialQuery],
-                ],
-            ],
+            "core_flow": coreFlow,
         ]
         if !transactionData.isEmpty {
             payload["openid"] = ["transactionData": transactionData]
@@ -201,6 +220,13 @@ public final class DemoBackend {
                 domain: "WalletE2E",
                 code: 301,
                 userInfo: [NSLocalizedDescriptionKey: "Missing sessionId in public demo verifier2 response: \(response)"]
+            )
+        }
+        guard requestedSessionID == nil || requestedSessionID == sessionID else {
+            throw NSError(
+                domain: "WalletE2E",
+                code: 308,
+                userInfo: [NSLocalizedDescriptionKey: "Public demo verifier2 did not preserve the requested session ID"]
             )
         }
         let requestURL = response["bootstrapAuthorizationRequestUrl"] as? String

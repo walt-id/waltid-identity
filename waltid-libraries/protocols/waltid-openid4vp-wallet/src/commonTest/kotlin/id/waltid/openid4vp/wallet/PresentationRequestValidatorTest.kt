@@ -277,10 +277,14 @@ class PresentationRequestValidatorTest {
             responseMode = OpenID4VPResponseMode.FRAGMENT,
             responseUri = null,
             redirectUri = "https://verifier.example/callback",
+            nonce = null,
         )
 
-        assertIs<PresentationRequestValidationResult.Valid>(
-            validate(request, resolvedRequest = ResolvedAuthorizationRequest.Plain(request)),
+        assertEquals(
+            WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST,
+            assertIs<PresentationRequestValidationResult.Invalid>(
+                validate(request, resolvedRequest = ResolvedAuthorizationRequest.Plain(request)),
+            ).error.code,
         )
     }
 
@@ -291,6 +295,7 @@ class PresentationRequestValidatorTest {
             responseMode = OpenID4VPResponseMode.FRAGMENT,
             responseUri = null,
             redirectUri = "https://verifier.example/callback",
+            nonce = null,
         )
 
         assertFailsWith<IllegalArgumentException> {
@@ -299,12 +304,42 @@ class PresentationRequestValidatorTest {
     }
 
     @Test
-    fun unauthenticatedPlainDirectPostRequestRemainsLocal() {
+    fun validUnboundPlainDirectPostRequestCanProceedButCannotReturnAnError() {
         val request = request()
+        val resolvedRequest = ResolvedAuthorizationRequest.Plain(request)
+
+        assertIs<PresentationRequestValidationResult.Valid>(
+            validate(request, resolvedRequest = resolvedRequest),
+        )
+        assertFailsWith<IllegalArgumentException> {
+            PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedRequest)
+        }
+    }
+
+    @Test
+    fun invalidPlainDirectPostRequestRemainsLocal() {
+        val request = request(nonce = null)
 
         assertFailsWith<IllegalArgumentException> {
             validate(request, resolvedRequest = ResolvedAuthorizationRequest.Plain(request))
         }
+    }
+
+    @Test
+    fun responseBoundPlainDirectPostRequestCanReturnAnErrorSafely() {
+        val responseUri = "https://verifier.example/response"
+        val request = request(
+            clientId = "redirect_uri:$responseUri",
+            responseUri = responseUri,
+            nonce = null,
+        )
+
+        assertEquals(
+            WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST,
+            assertIs<PresentationRequestValidationResult.Invalid>(
+                validate(request, resolvedRequest = ResolvedAuthorizationRequest.Plain(request)),
+            ).error.code,
+        )
     }
 
     private fun validate(
@@ -326,6 +361,7 @@ class PresentationRequestValidatorTest {
         responseMode: OpenID4VPResponseMode = OpenID4VPResponseMode.DIRECT_POST,
         responseUri: String? = "https://verifier.example/response",
         redirectUri: String? = null,
+        nonce: String? = "nonce",
         dcqlQuery: DcqlQuery? = DcqlQuery(credentials = listOf(credentialQuery())),
         scope: String? = null,
         clientMetadata: ClientMetadata? = null,
@@ -336,7 +372,7 @@ class PresentationRequestValidatorTest {
         responseMode = responseMode,
         responseUri = responseUri,
         redirectUri = redirectUri,
-        nonce = "nonce",
+        nonce = nonce,
         dcqlQuery = dcqlQuery,
         scope = scope,
         clientMetadata = clientMetadata,

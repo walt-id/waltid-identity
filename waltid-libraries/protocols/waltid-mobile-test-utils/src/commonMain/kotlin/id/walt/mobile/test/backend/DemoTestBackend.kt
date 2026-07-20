@@ -22,6 +22,7 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
+import kotlin.uuid.Uuid
 
 /**
  * Test helper for the public walt.id issuer2/verifier2 demo stack.
@@ -147,6 +148,14 @@ object DemoTestBackend {
         return createVerifierSession(scenario.verifierCredentialQuery)
     }
 
+    suspend fun createResponseBoundVerifierSession(scenario: CredentialScenario): VerifierSession {
+        return createVerifierSession(
+            credentialQuery = scenario.verifierCredentialQuery,
+            transactionData = emptyList(),
+            bindClientIdToResponseUri = true,
+        )
+    }
+
     suspend fun createVerifierSession(credentialQuery: JsonObject): VerifierSession {
         return createVerifierSession(
             credentialQuery = credentialQuery,
@@ -190,10 +199,17 @@ object DemoTestBackend {
     private suspend fun createVerifierSession(
         credentialQuery: JsonObject,
         transactionData: List<JsonObject>,
+        bindClientIdToResponseUri: Boolean = false,
     ): VerifierSession {
+        val requestedSessionId = Uuid.random().toString().takeIf { bindClientIdToResponseUri }
         val payload = buildJsonObject {
             put("flow_type", "cross_device")
             putJsonObject("core_flow") {
+                requestedSessionId?.let { sessionId ->
+                    val responseUri = "$VERIFIER_BASE_URL/verification-session/$sessionId/response"
+                    put("sessionId", sessionId)
+                    put("clientId", "redirect_uri:$responseUri")
+                }
                 putJsonObject("dcql_query") {
                     putJsonArray("credentials") {
                         add(credentialQuery)
@@ -215,6 +231,9 @@ object DemoTestBackend {
         )
         val sessionId = response["sessionId"]?.jsonPrimitive?.contentOrNull
             ?: error("Missing sessionId in public demo verifier2 response: $response")
+        check(requestedSessionId == null || requestedSessionId == sessionId) {
+            "Public demo verifier2 did not preserve the requested session ID"
+        }
         val authorizationRequestUri = response["bootstrapAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
             ?: response["authorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
             ?: response["fullAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
