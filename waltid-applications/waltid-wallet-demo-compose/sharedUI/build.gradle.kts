@@ -40,6 +40,26 @@ kotlin {
             implementation(identityLibs.compose.foundation)
             implementation(identityLibs.compose.ui)
             implementation(identityLibs.compose.material3)
+            implementation(identityLibs.compose.material.icons.core)
+            implementation(identityLibs.compose.navigation3.ui)
+            implementation(identityLibs.coil.compose)
+        }
+
+        if (enableAndroidBuild || enableIosBuild) {
+            val mobileMain by creating {
+                dependsOn(commonMain.get())
+                dependencies {
+                    implementation(identityLibs.easyqrscan)
+                }
+            }
+
+            if (enableAndroidBuild) {
+                androidMain.get().dependsOn(mobileMain)
+            }
+
+            if (enableIosBuild) {
+                iosMain.get().dependsOn(mobileMain)
+            }
         }
 
         commonTest.dependencies {

@@ -7,13 +7,27 @@ import WalletSDK
 ///
 /// Tests the Swift package facade that iOS apps consume directly.
 /// Uses real iOS Keychain crypto, SQLDelight persistence, and OID4VCI/VP protocol
-/// against the public EUDI test backend.
+/// against public walt.id demo and EUDI test backends.
 ///
 /// These are integration tests (not E2E UI tests) - they test the library directly
 /// without UI automation.
 final class MobileWalletIntegrationTests: XCTestCase {
 
     private let testWalletId = "ios-unit-test-wallet"
+    private static let eudiPidSdJwtCredentialID = "eu.europa.ec.eudi.pid_vc_sd_jwt"
+    private static let eudiEhicSdJwtCredentialID = "eu.europa.ec.eudi.ehic_sd_jwt_vc"
+    private static let demoTransactionDataProfiles: [WalletTransactionDataProfile] = [
+        WalletTransactionDataProfile(
+            type: "org.waltid.transaction-data.payment-authorization",
+            displayName: "Payment Authorization",
+            fields: ["amount", "currency", "payee"]
+        ),
+        WalletTransactionDataProfile(
+            type: "org.waltid.transaction-data.account-access",
+            displayName: "Account Access",
+            fields: ["account_identifier", "access_scope"]
+        )
+    ]
 
     // Timeouts (aligned with Android for cross-platform consistency)
     private let verifierPollingTimeout: TimeInterval = 30  // 30 sec - backend verification
@@ -58,7 +72,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     private func makeWallet(walletId: String? = nil) async throws -> Wallet {
         try await Wallet(
-            configuration: WalletConfiguration(walletID: walletId ?? testWalletId)
+            configuration: WalletConfiguration(
+                walletID: walletId ?? testWalletId,
+                transactionDataProfiles: Self.demoTransactionDataProfiles
+            )
         )
     }
 
@@ -66,7 +83,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await Wallet(
             configuration: WalletConfiguration(
                 walletID: testWalletId,
-                persistence: persistence
+                persistence: persistence,
+                transactionDataProfiles: Self.demoTransactionDataProfiles
             )
         )
     }
@@ -158,13 +176,15 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertEqual(deletedKeys, ["\(testWalletId):wallet_\(testWalletId)"])
     }
 
-    func testReceiveCredentialFromEudi() async throws {
+    func testReceiveEudiPidSdJwtFromEudi() async throws {
         let wallet = try await makeWallet()
         _ = try await wallet.bootstrap()
 
-        let offer = try await EudiTestBackend.shared.generateOffer()
+        let offer = try await EudiTestBackend.shared.generateOffer(credentialId: Self.eudiPidSdJwtCredentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await wallet.receive(offer: offerURL)
+        let resolution = try await wallet.resolveOffer(offer: offerURL)
+        XCTAssertTrue(resolution.transactionCodeRequired, "EUDI offer should require a transaction code")
+        let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
 
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
     }
@@ -181,36 +201,28 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await receiveCredentialFromDemoIssuer2(scenarioID: "iso-mdl")
     }
 
-    func testReceiveAndPresentFullFlow() async throws {
-        let wallet = try await makeWallet()
+    func testReceiveAndPresentEudiEhicSdJwtAgainstEudi() async throws {
+        try await receiveAndPresentEudiCredential(credentialID: Self.eudiEhicSdJwtCredentialID)
+    }
 
-        let bootstrapResult = try await wallet.bootstrap()
-        let did = bootstrapResult.did
+    func testPreviewAndSubmitEudiEhicSdJwtAgainstEudi() async throws {
+        try await previewAndSubmitEudiCredential(credentialID: Self.eudiEhicSdJwtCredentialID)
+    }
 
-        let offer = try await EudiTestBackend.shared.generateOffer()
-        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await wallet.receive(offer: offerURL)
-        XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
-
-        let credentials = try await wallet.credentials()
-        XCTAssertFalse(credentials.isEmpty, "Should have stored credentials")
-
-        let credentialId = await EudiTestBackend.shared.extractCredentialIdFromOfferUrl(offerUrl: offer.offerUrl)
-        let transaction = try await EudiTestBackend.shared.createVerifierTransaction(credentialId: credentialId)
-        let presentationURL = try XCTUnwrap(URL(string: transaction.authorizationRequestUri))
-
-        let presentResult = try await wallet.present(
-            request: presentationURL,
-            did: did
+    func testReceiveAndPresentEudiPidSdJwtAgainstEudi() async throws {
+        try XCTSkipIf(
+            true,
+            "Upstream issue: https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/172"
         )
+        try await receiveAndPresentEudiCredential(credentialID: Self.eudiPidSdJwtCredentialID)
+    }
 
-        XCTAssertTrue(
-            presentResult.success,
-            "Presentation should succeed. Credentials: \(credentials), Result: \(presentResult)"
+    func testPreviewAndSubmitEudiPidSdJwtAgainstEudi() async throws {
+        try XCTSkipIf(
+            true,
+            "Upstream issue: https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/172"
         )
-
-        // Wait for verifier to confirm receipt
-        try await TestHelpers.waitForVerifierSuccess(transactionID: transaction.transactionId, timeoutSeconds: verifierPollingTimeout)
+        try await previewAndSubmitEudiCredential(credentialID: Self.eudiPidSdJwtCredentialID)
     }
 
     func testReceiveAndPresentEudiPidSdJwtAgainstDemoIssuer2AndVerifier2() async throws {
@@ -221,43 +233,35 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await receiveAndPresentDemoCredential(scenarioID: "eudi-pid-mdoc")
     }
 
+    func testPreviewAndSubmitEudiPidSdJwtAgainstDemoIssuer2AndVerifier2() async throws {
+        try await previewAndSubmitDemoCredential(scenarioID: "eudi-pid-sdjwt")
+    }
+
+    func testPreviewAndSubmitEudiPidMdocAgainstDemoIssuer2AndVerifier2() async throws {
+        try await previewAndSubmitDemoCredential(scenarioID: "eudi-pid-mdoc")
+    }
+
     func testReceiveAndPresentIsoMdlAgainstDemoIssuer2AndVerifier2() async throws {
         try await receiveAndPresentDemoCredential(scenarioID: "iso-mdl")
     }
 
-    func testCredentialPersistsAcrossControllerRecreation() async throws {
-        let wallet1 = try await makeWallet()
+    func testEudiPidSdJwtPersistsAcrossControllerRecreation() async throws {
+        let walletId = "ios-eudi-pid-sd-jwt-persistence-\(UUID().uuidString)"
+        await clearTestData(walletId: walletId)
+        let wallet1 = try await makeWallet(walletId: walletId)
+        _ = try await wallet1.bootstrap()
 
-        let bootstrapResult = try await wallet1.bootstrap()
-        let did = bootstrapResult.did
-
-        let offer = try await EudiTestBackend.shared.generateOffer()
+        let offer = try await EudiTestBackend.shared.generateOffer(credentialId: Self.eudiPidSdJwtCredentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await wallet1.receive(offer: offerURL)
+        let credentialIDs = try await wallet1.receive(offer: offerURL, txCode: offer.txCode)
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
 
         // Recreate wallet facade (simulates app restart)
-        let wallet2 = try await makeWallet()
+        let wallet2 = try await makeWallet(walletId: walletId)
 
         _ = try await wallet2.bootstrap()
         let credentials = try await wallet2.credentials()
         XCTAssertFalse(credentials.isEmpty, "Credentials should persist across controller recreation")
-
-        let credentialId = await EudiTestBackend.shared.extractCredentialIdFromOfferUrl(offerUrl: offer.offerUrl)
-        let transaction = try await EudiTestBackend.shared.createVerifierTransaction(credentialId: credentialId)
-        let presentationURL = try XCTUnwrap(URL(string: transaction.authorizationRequestUri))
-
-        let presentResult = try await wallet2.present(
-            request: presentationURL,
-            did: did
-        )
-
-        XCTAssertTrue(
-            presentResult.success,
-            "Should present from persisted credentials. Credentials: \(credentials), Result: \(presentResult)"
-        )
-
-        try await TestHelpers.waitForVerifierSuccess(transactionID: transaction.transactionId, timeoutSeconds: verifierPollingTimeout)
     }
 
     func testDemoCredentialPersistsAcrossControllerRecreation() async throws {
@@ -281,6 +285,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         _ = try await wallet2.bootstrap()
         let credentials = try await wallet2.credentials()
         XCTAssertFalse(credentials.isEmpty, "public demo credential should persist across controller recreation")
+        try assertStoredCredentialDisplayData(scenario: scenario, credentials: credentials)
 
         let session = try await DemoBackend.shared.createVerifierSession(scenario: scenario)
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
@@ -292,6 +297,121 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertTrue(
             presentResult.success,
             "Should present persisted public demo credential for \(scenario.displayName). Credentials: \(credentials), Result: \(presentResult)"
+        )
+
+        try await DemoBackend.shared.waitForVerifierSuccess(
+            sessionID: session.sessionID,
+            timeoutSeconds: verifierPollingTimeout
+        )
+    }
+
+    private func receiveAndPresentEudiCredential(credentialID: String) async throws {
+        let walletId = "ios-eudi-present-\(UUID().uuidString)"
+        await clearTestData(walletId: walletId)
+        let wallet = try await makeWallet(walletId: walletId)
+        let bootstrapResult = try await wallet.bootstrap()
+
+        let offer = try await EudiTestBackend.shared.generateOffer(credentialId: credentialID)
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+        let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
+        XCTAssertFalse(credentialIDs.isEmpty, "Should receive EUDI credential \(credentialID)")
+
+        let credentials = try await wallet.credentials()
+        XCTAssertFalse(credentials.isEmpty, "Should store EUDI credential \(credentialID)")
+
+        let offeredCredentialID = await EudiTestBackend.shared.extractCredentialIdFromOfferUrl(offerUrl: offer.offerUrl)
+        let transaction = try await EudiTestBackend.shared.createVerifierTransaction(credentialId: offeredCredentialID)
+        let presentationURL = try XCTUnwrap(URL(string: transaction.authorizationRequestUri))
+        let result = try await wallet.present(request: presentationURL, did: bootstrapResult.did)
+        XCTAssertTrue(
+            result.success,
+            "EUDI presentation should succeed for \(credentialID). Credentials: \(credentials), Result: \(result)"
+        )
+
+        try await TestHelpers.waitForVerifierSuccess(
+            transactionID: transaction.transactionId,
+            timeoutSeconds: verifierPollingTimeout
+        )
+    }
+
+    private func previewAndSubmitEudiCredential(credentialID: String) async throws {
+        let walletId = "ios-eudi-preview-submit-\(UUID().uuidString)"
+        await clearTestData(walletId: walletId)
+        let wallet = try await makeWallet(walletId: walletId)
+        let bootstrapResult = try await wallet.bootstrap()
+
+        let offer = try await EudiTestBackend.shared.generateOffer(credentialId: credentialID)
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+        let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
+        XCTAssertFalse(credentialIDs.isEmpty, "Should receive EUDI credential \(credentialID)")
+
+        let offeredCredentialID = await EudiTestBackend.shared.extractCredentialIdFromOfferUrl(offerUrl: offer.offerUrl)
+        let transaction = try await EudiTestBackend.shared.createVerifierTransaction(credentialId: offeredCredentialID)
+        let presentationURL = try XCTUnwrap(URL(string: transaction.authorizationRequestUri))
+        let preview = try await wallet.previewPresentation(request: presentationURL)
+        XCTAssertFalse(
+            preview.credentialOptions.isEmpty,
+            "Should preview a matching EUDI credential for \(credentialID): \(preview)"
+        )
+        XCTAssertTrue(
+            preview.credentialOptions.allSatisfy { credentialIDs.contains($0.credentialID) },
+            "Preview should only offer credentials received in this test. Received: \(credentialIDs), Preview: \(preview)"
+        )
+
+        let result = try await wallet.submitPresentation(
+            request: presentationURL,
+            selectedCredentialOptions: preview.credentialOptions.map(\.selection),
+            did: bootstrapResult.did
+        )
+        XCTAssertTrue(
+            result.success,
+            "EUDI stepwise presentation should succeed for \(credentialID). Preview: \(preview), Result: \(result)"
+        )
+
+        try await TestHelpers.waitForVerifierSuccess(
+            transactionID: transaction.transactionId,
+            timeoutSeconds: verifierPollingTimeout
+        )
+    }
+
+    private func previewAndSubmitDemoCredential(scenarioID: String) async throws {
+        let scenario = try demoPresentationScenario(scenarioID)
+        let walletId = "ios-demo-preview-submit-\(scenario.id)-\(UUID().uuidString)"
+        await clearTestData(walletId: walletId)
+
+        let wallet = try await makeWallet(walletId: walletId)
+        let bootstrapResult = try await wallet.bootstrap()
+        let did = bootstrapResult.did
+
+        let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+        let credentialIDs = try await wallet.receive(offer: offerURL)
+        XCTAssertFalse(
+            credentialIDs.isEmpty,
+            "Should receive \(scenario.displayName) from public demo issuer2"
+        )
+
+        let session = try await DemoBackend.shared.createVerifierSession(scenario: scenario)
+        let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
+        let preview = try await wallet.previewPresentation(request: presentationURL)
+        XCTAssertFalse(
+            preview.credentialOptions.isEmpty,
+            "Should preview at least one matching credential for \(scenario.displayName): \(preview)"
+        )
+        XCTAssertTrue(
+            preview.credentialOptions.allSatisfy { credentialIDs.contains($0.credentialID) },
+            "Preview should only offer credentials received in this test. Received: \(credentialIDs), Preview: \(preview)"
+        )
+
+        let result = try await wallet.submitPresentation(
+            request: presentationURL,
+            selectedCredentialOptions: preview.credentialOptions.map(\.selection),
+            did: did
+        )
+
+        XCTAssertTrue(
+            result.success,
+            "public demo verifier2 stepwise presentation should succeed for \(scenario.displayName). Preview: \(preview), Result: \(result)"
         )
 
         try await DemoBackend.shared.waitForVerifierSuccess(
@@ -316,6 +436,9 @@ final class MobileWalletIntegrationTests: XCTestCase {
             credentialIDs.isEmpty,
             "Should receive \(scenario.displayName) from public demo issuer2"
         )
+
+        let credentials = try await wallet.credentials()
+        try assertStoredCredentialDisplayData(scenario: scenario, credentials: credentials)
     }
 
     private func receiveAndPresentDemoCredential(scenarioID: String) async throws {
@@ -337,6 +460,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let credentials = try await wallet.credentials()
         XCTAssertFalse(credentials.isEmpty, "Should have stored \(scenario.displayName) credentials")
+        try assertStoredCredentialDisplayData(scenario: scenario, credentials: credentials)
 
         let session = try await DemoBackend.shared.createVerifierSession(scenario: scenario)
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
@@ -362,6 +486,63 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     private func demoPresentationScenario(_ id: String) throws -> DemoCredentialScenario {
         try XCTUnwrap(DemoBackend.presentationScenarios.first { $0.id == id })
+    }
+
+    private func assertStoredCredentialDisplayData(
+        scenario: DemoCredentialScenario,
+        credentials: [Credential]
+    ) throws {
+        let credential = try XCTUnwrap(
+            credentials.first { $0.format == scenario.format } ?? credentials.first,
+            "\(scenario.displayName) should be present in wallet credentials"
+        )
+        XCTAssertEqual(credential.format, scenario.format, "\(scenario.displayName) should expose the expected format")
+
+        let data = try XCTUnwrap(credential.credentialDataJSON.data(using: .utf8))
+        let json = try JSONSerialization.jsonObject(with: data)
+        XCTAssertTrue(
+            containsAnyUserFacingClaim(json),
+            "\(scenario.displayName) display data should include readable user-facing claims: \(credential.credentialDataJSON)"
+        )
+
+        if let object = json as? [String: Any] {
+            XCTAssertTrue(
+                object.keys.contains { $0 != "_sd" },
+                "\(scenario.displayName) display data should not expose only selective-disclosure commitments"
+            )
+        }
+    }
+
+    private func containsAnyUserFacingClaim(_ value: Any) -> Bool {
+        if let object = value as? [String: Any] {
+            return object.keys.contains { userFacingClaimNames.contains(normalizedClaimName($0)) } ||
+                object.values.contains { containsAnyUserFacingClaim($0) }
+        }
+        if let array = value as? [Any] {
+            return array.contains { containsAnyUserFacingClaim($0) }
+        }
+        return false
+    }
+
+    private func normalizedClaimName(_ name: String) -> String {
+        name.filter { $0.isLetter || $0.isNumber }.lowercased()
+    }
+
+    private var userFacingClaimNames: Set<String> {
+        [
+            "birthdate",
+            "birthplace",
+            "documentnumber",
+            "familyname",
+            "familynamebirth",
+            "givenname",
+            "nationality",
+            "portrait",
+            "residentcity",
+            "residentcountry",
+            "residentstate",
+            "residentstreet",
+        ]
     }
 }
 

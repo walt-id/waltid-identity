@@ -6,4 +6,5 @@ identity_dir="$(cd "$script_dir/../../.." && pwd -P)"
 
 "$identity_dir/gradlew" -p "$identity_dir" \
   :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedDebugAndroidTest \
+  -PtransactionDataProfiles.url=https://wallet.demo.walt.id/wallet-api/transaction-data-profiles \
   --info

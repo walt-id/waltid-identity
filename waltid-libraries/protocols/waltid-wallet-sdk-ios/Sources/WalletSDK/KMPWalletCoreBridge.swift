@@ -47,6 +47,20 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return .init(keyID: value.keyId, did: value.did)
     }
 
+    func resolveOffer(offer: URL) async throws -> OfferResolution {
+        let result = try await bridge.resolveOffer(offerUrl: offer.absoluteString)
+        let value = try Self.successValue(
+            result,
+            as: MobileWalletOfferResolution.self,
+            operation: "resolve credential offer"
+        )
+        return OfferResolution(
+            transactionCodeRequired: value.transactionCodeRequired,
+            credentialIssuer: value.credentialIssuer,
+            offeredCredentials: swiftArray(value.offeredCredentials, of: String.self)
+        )
+    }
+
     func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String] {
         let result = try await bridge.receive(
             offerUrl: offer.absoluteString,
@@ -103,6 +117,55 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
     }
 
+    func previewPresentation(request: URL) async throws -> PresentationPreview {
+        let result = try await bridge.previewPresentation(requestUrl: request.absoluteString)
+        let value = try Self.successValue(
+            result,
+            as: MobileWalletPresentationPreview.self,
+            operation: "preview presentation"
+        )
+
+        return value.toSwiftPreview()
+    }
+
+    func submitPresentation(
+        request: URL,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?,
+        runPolicies: Bool?
+    ) async throws -> PresentationResult {
+        let result = try await bridge.submitPresentation(
+            requestUrl: request.absoluteString,
+            selectedCredentialOptions: selectedCredentialOptions.map {
+                MobileWalletPresentationCredentialSelection(
+                    queryId: $0.queryID,
+                    credentialId: $0.credentialID
+                )
+            },
+            selectedDisclosureOptions: selectedDisclosureOptions?.map {
+                MobileWalletPresentationDisclosureSelection(
+                    queryId: $0.queryID,
+                    credentialId: $0.credentialID,
+                    path: $0.path
+                )
+            },
+            did: did,
+            runPolicies: runPolicies.map { KotlinBoolean(bool: $0) }
+        )
+        let value = try Self.successValue(
+            result,
+            as: MobileWalletPresentationResult.self,
+            operation: "submit presentation"
+        )
+
+        return .init(
+            success: value.success,
+            redirectTo: value.redirectTo.flatMap(URL.init(string:)),
+            verifierResponseJSON: value.verifierResponseJson
+        )
+    }
+
     private static func successValue<T>(
         _ result: any WalletBridgeResult,
         as type: T.Type,
@@ -143,7 +206,18 @@ private extension WalletConfiguration {
             defaultKeyType: defaultKeyType.toKMPKeyType(),
             persistence: persistence.toKMPPersistence(),
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
-            attestation: attestation?.toKMPAttestationConfiguration()
+            attestation: attestation?.toKMPAttestationConfiguration(),
+            transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() }
+        )
+    }
+}
+
+private extension WalletTransactionDataProfile {
+    func toKMPTransactionDataProfile() -> MobileWalletTransactionDataProfile {
+        MobileWalletTransactionDataProfile(
+            type: type,
+            displayName: displayName,
+            fields: fields
         )
     }
 }
@@ -496,9 +570,110 @@ private extension MobileWalletCredential {
             issuer: issuer,
             subject: subject,
             label: label,
-            addedAt: addedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
+            addedAt: addedAt.flatMap { ISO8601DateFormatter().date(from: $0) },
+            credentialDataJSON: requiredCredentialDataJSON(credentialDataJson)
         )
     }
+}
+
+private extension MobileWalletPresentationPreview {
+    func toSwiftPreview() -> PresentationPreview {
+        PresentationPreview(
+            request: request.toSwiftRequestInfo(),
+            credentialOptions: swiftArray(credentialOptions, of: MobileWalletPresentationCredentialOption.self)
+                .map { $0.toSwiftCredentialOption() },
+            credentialRequirements: swiftArray(credentialRequirements, of: MobileWalletPresentationCredentialRequirement.self)
+                .map { $0.toSwiftCredentialRequirement() }
+        )
+    }
+}
+
+private extension MobileWalletPresentationRequestInfo {
+    func toSwiftRequestInfo() -> PresentationRequestInfo {
+        PresentationRequestInfo(
+            clientID: clientId,
+            verifierName: verifierName,
+            responseURI: responseUri.flatMap(URL.init(string:)),
+            state: state,
+            nonce: nonce,
+            transactionData: swiftArray(transactionData, of: MobileWalletTransactionDataItem.self)
+                .map { $0.toSwiftTransactionData() }
+        )
+    }
+}
+
+private extension MobileWalletPresentationCredentialOption {
+    func toSwiftCredentialOption() -> PresentationCredentialOption {
+        PresentationCredentialOption(
+            queryID: queryId,
+            credentialID: credentialId,
+            multiple: multiple,
+            format: format,
+            issuer: issuer,
+            subject: subject,
+            label: label,
+            credentialDataJSON: requiredCredentialDataJSON(credentialDataJson),
+            disclosures: swiftArray(disclosures, of: MobileWalletPresentationDisclosure.self)
+                .map { $0.toSwiftDisclosure() }
+        )
+    }
+}
+
+private extension MobileWalletPresentationCredentialRequirement {
+    func toSwiftCredentialRequirement() -> PresentationCredentialRequirement {
+        PresentationCredentialRequirement(options: swiftStringMatrix(options))
+    }
+}
+
+private func requiredCredentialDataJSON(_ value: String?) -> String {
+    guard let value else {
+        assertionFailure("KMP wallet returned nil credential data JSON for a non-null SDK field")
+        return "{}"
+    }
+    return value
+}
+
+private func swiftStringMatrix(_ value: Any) -> [[String]] {
+    swiftArray(value, of: Any.self).map { option in
+        swiftArray(option, of: String.self)
+    }
+}
+
+private extension MobileWalletPresentationDisclosure {
+    func toSwiftDisclosure() -> PresentationDisclosure {
+        PresentationDisclosure(
+            path: path,
+            name: name,
+            valueJSON: valueJson,
+            displayValue: displayValue,
+            selectivelyDisclosable: selectivelyDisclosable,
+            required: required,
+            selectable: selectable
+        )
+    }
+}
+
+private extension MobileWalletTransactionDataItem {
+    func toSwiftTransactionData() -> PresentationTransactionData {
+        PresentationTransactionData(
+            type: type,
+            displayName: displayName,
+            credentialQueryIDs: swiftArray(credentialQueryIds, of: String.self),
+            supportedFields: swiftArray(supportedFields, of: String.self),
+            rawJSON: rawJson,
+            detailsJSON: detailsJson
+        )
+    }
+}
+
+private func swiftArray<T>(_ value: Any, of type: T.Type) -> [T] {
+    if let values = value as? [T] {
+        return values
+    }
+    if let values = value as? NSArray {
+        return values.compactMap { $0 as? T }
+    }
+    return []
 }
 
 private extension MobileWalletEvent {
@@ -559,4 +734,5 @@ private extension WalletBridgeError {
         }
     }
 }
+
 #endif

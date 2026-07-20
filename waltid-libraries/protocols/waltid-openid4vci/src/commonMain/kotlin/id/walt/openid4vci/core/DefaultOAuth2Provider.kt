@@ -3,6 +3,14 @@ package id.walt.openid4vci.core
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.Session
+import id.walt.openid4vci.clientauth.AuthenticatedClient
+import id.walt.openid4vci.clientauth.ClientAuthenticationContext
+import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
+import id.walt.openid4vci.clientauth.ClientAuthenticationResult
+import id.walt.openid4vci.clientauth.ClientAuthenticationService
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolution
+import id.walt.openid4vci.clientauth.isAnonymousPreAuthorizedCodeTokenRequest
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.platform.urlEncode
@@ -11,6 +19,7 @@ import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequest
+import id.walt.openid4vci.requests.credential.encryption.CredentialRequestEncryptionNotSupported
 import id.walt.openid4vci.responses.authorization.AuthorizationResponse
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
@@ -23,8 +32,10 @@ import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.token.TokenResponseOptions
 import id.walt.openid4vci.responses.token.withOptions
 import id.walt.openid4vci.responses.credential.CredentialResponse
+import id.walt.openid4vci.responses.credential.CredentialResponseBody
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
+import id.walt.openid4vci.responses.credential.toJsonObject
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
@@ -60,7 +71,6 @@ import kotlin.time.Instant
 class DefaultOAuth2Provider(
     val config: OAuth2ProviderConfig,
 ) : OAuth2Provider {
-
     override suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult =
         when (val resolution = resolveAuthorizationParameters(parameters)) {
             is AuthorizationParameterResolution.Success ->
@@ -138,7 +148,7 @@ class DefaultOAuth2Provider(
         val params = buildMap {
             put("code", response.code)
             response.state?.let { put("state", it) }
-            response.scope?.let { put("scope", it) }
+            authorizationRequest.issClaim?.let { put("iss", it) }
             putAll(response.extraParameters)
         }
 
@@ -156,7 +166,10 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override suspend fun createPushedAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult {
+    override suspend fun createPushedAuthorizationRequest(
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>>,
+    ): AuthorizationRequestResult {
         if (parameters["request_uri"].orEmpty().any { it.isNotBlank() }) {
             return AuthorizationRequestResult.Failure(
                 OAuthError(
@@ -165,7 +178,32 @@ class DefaultOAuth2Provider(
                 )
             )
         }
-        return config.authorizationRequestValidator.validate(parameters)
+
+        val authenticatedClient = when (
+            val authResult = authenticateClient(
+                endpoint = ClientAuthenticationEndpoint.PUSHED_AUTHORIZATION,
+                parameters = parameters,
+                headers = headers,
+            )
+        ) {
+            is ClientAuthenticationResult.Authenticated -> authResult.client
+            is ClientAuthenticationResult.Failure -> return AuthorizationRequestResult.Failure(authResult.error)
+            ClientAuthenticationResult.Unauthenticated -> null
+        }
+
+        val effectiveParameters = when (
+            val resolution = parameters.withAuthenticatedClientId(authenticatedClient)
+        ) {
+            is ClientIdParameterResolution.Success -> resolution.parameters
+            is ClientIdParameterResolution.Failure -> return AuthorizationRequestResult.Failure(resolution.error)
+        }
+
+        return when (val result = config.authorizationRequestValidator.validate(effectiveParameters)) {
+            is AuthorizationRequestResult.Success ->
+                AuthorizationRequestResult.Success(result.request.withAuthenticatedClient(authenticatedClient))
+
+            is AuthorizationRequestResult.Failure -> result
+        }
     }
 
     override suspend fun createPushedAuthorizationResponse(
@@ -187,7 +225,9 @@ class DefaultOAuth2Provider(
             when (
                 val result = handler.handlePushedAuthorizationEndpointRequest(
                     authorizationRequest = authorizationRequest,
-                    clientAuthentication = clientAuthentication,
+                    clientAuthentication = clientAuthentication.ifEmpty {
+                        authorizationRequest.authenticatedClient?.toMetadataMap().orEmpty()
+                    },
                 )
             ) {
                 is PushedAuthorizationResponseResult.Success -> return result
@@ -229,13 +269,95 @@ class DefaultOAuth2Provider(
             headers = noStoreHeaders(),
         )
 
-    override fun createAccessTokenRequest(
+    override suspend fun createAccessTokenRequest(
         parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>>,
         session: Session?
     ): AccessTokenRequestResult {
-        return config.accessTokenRequestValidator.validate(
+        if (config.clientAuthenticationServiceResolver == null &&
+            isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers) &&
+            !config.preAuthorizedCodeIssuer.anonymousAccessSupported
+        ) {
+            return AccessTokenRequestResult.Failure(
+                OAuthError(OAuthErrorCodes.INVALID_CLIENT, "Anonymous pre-authorized code access is not supported"),
+            )
+        }
+
+        val authResult =
+            if (config.clientAuthenticationServiceResolver == null && canSkipTokenClientAuthentication(parameters, headers)) {
+                ClientAuthenticationResult.Unauthenticated
+            } else {
+                authenticateClient(
+                    endpoint = ClientAuthenticationEndpoint.TOKEN,
+                    parameters = parameters,
+                    headers = headers,
+                )
+            }
+
+        val authenticatedClient = when (authResult) {
+            is ClientAuthenticationResult.Authenticated -> authResult.client
+            is ClientAuthenticationResult.Failure -> return AccessTokenRequestResult.Failure(authResult.error)
+            ClientAuthenticationResult.Unauthenticated -> null
+        }
+
+        val validationResult = validateAccessTokenRequest(
+            parameters = when (
+                val resolution = parameters.withAuthenticatedClientId(authenticatedClient)
+            ) {
+                is ClientIdParameterResolution.Success -> resolution.parameters
+                is ClientIdParameterResolution.Failure -> return AccessTokenRequestResult.Failure(resolution.error)
+            },
+            session = session,
+            authenticatedClient = authenticatedClient,
+        )
+
+        return validationResult
+    }
+
+    private fun canSkipTokenClientAuthentication(
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>>,
+    ): Boolean =
+        config.preAuthorizedCodeIssuer.anonymousAccessSupported &&
+            isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers)
+
+    private fun validateAccessTokenRequest(
+        parameters: Map<String, List<String>>,
+        session: Session?,
+        authenticatedClient: AuthenticatedClient?,
+    ): AccessTokenRequestResult =
+        when (val result = config.accessTokenRequestValidator.validate(
             parameters = parameters,
             session = session ?: DefaultSession()
+        )) {
+            is AccessTokenRequestResult.Success ->
+                AccessTokenRequestResult.Success(result.request.withAuthenticatedClient(authenticatedClient))
+
+            is AccessTokenRequestResult.Failure -> result
+        }
+
+    private suspend fun authenticateClient(
+        endpoint: ClientAuthenticationEndpoint,
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>>,
+    ): ClientAuthenticationResult {
+        val resolution = config.clientAuthenticationServiceResolver?.resolve(endpoint, parameters, headers)
+            ?: ClientAuthenticationServiceResolution(
+                serviceConfig = config.clientAuthenticationServiceConfig,
+                context = ClientAuthenticationContext(
+                    authorizationServerIssuer = config.authorizationServerIssuer,
+                ),
+            )
+
+        if (resolution.skipAuthentication) {
+            return ClientAuthenticationResult.Unauthenticated
+        }
+
+        return ClientAuthenticationService(resolution.serviceConfig).authenticate(
+            endpoint = endpoint,
+            parameters = parameters,
+            headers = headers,
+            context = resolution.context,
         )
     }
 
@@ -264,7 +386,7 @@ class DefaultOAuth2Provider(
 
     override fun writeAccessTokenError(error: OAuthError): AccessTokenResponseHttp =
         AccessTokenResponseHttp(
-            status = 400,
+            status = oauthJsonErrorStatus(error),
             headers = TOKEN_RESPONSE_HEADERS,
             payload = buildMap {
                 put("error", JsonPrimitive(error.error))
@@ -322,20 +444,45 @@ class DefaultOAuth2Provider(
         session: Session?,
         accessTokenContext: AccessTokenContext?
     ): CredentialRequestResult {
-        if (accessTokenContext != null) {
-            val verifier = config.accessTokenVerifier
-                ?: return CredentialRequestResult.Failure(
-                    OAuthError("invalid_request", "access token verifier not configured")
+        verifyCredentialAccessToken(accessTokenContext)?.let { return it }
+        return when (val result = config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())) {
+            is CredentialRequestResult.Success ->
+                if (result.request.credentialResponseEncryption != null) {
+                    CredentialRequestResult.Failure(
+                        OAuthError(
+                            "invalid_request",
+                            "credential_response_encryption requires an encrypted Credential Request",
+                        )
+                    )
+                } else {
+                    result
+                }
+
+            is CredentialRequestResult.Failure -> result
+        }
+    }
+
+    override suspend fun createCredentialRequest(
+        encryptedCredentialRequest: String,
+        session: Session?,
+        accessTokenContext: AccessTokenContext?
+    ): CredentialRequestResult {
+        verifyCredentialAccessToken(accessTokenContext)?.let { return it }
+        val decryptor = config.credentialRequestDecryptor
+            ?: return CredentialRequestResult.Failure(
+                OAuthError(
+                    CredentialErrorCodes.ENCRYPTION_NOT_SUPPORTED,
+                    "credential request encryption is not supported",
                 )
-            try {
-                verifier.verify(
-                    token = accessTokenContext.token,
-                    expectedIssuer = accessTokenContext.expectedIssuer,
-                    expectedAudience = accessTokenContext.expectedAudience,
-                )
-            } catch (e: Exception) {
-                return CredentialRequestResult.Failure(OAuthError("invalid_request", e.message))
-            }
+            )
+        val parameters = try {
+            decryptor.decrypt(encryptedCredentialRequest).toParametersMap()
+        } catch (e: CredentialRequestEncryptionNotSupported) {
+            return CredentialRequestResult.Failure(
+                OAuthError(CredentialErrorCodes.ENCRYPTION_NOT_SUPPORTED, e.message)
+            )
+        } catch (e: Exception) {
+            return CredentialRequestResult.Failure(OAuthError("invalid_request", e.message))
         }
         return config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())
     }
@@ -359,7 +506,7 @@ class DefaultOAuth2Provider(
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return CredentialResponseResult.Failure(
                 OAuthError(
-                    error = "unsupported_credential_configuration",
+                    error = CredentialErrorCodes.UNSUPPORTED_CREDENTIAL_CONFIGURATION,
                     description = "No handler for format ${configuration.format.value}"
                 )
             )
@@ -396,29 +543,52 @@ class DefaultOAuth2Provider(
     override fun writeCredentialResponse(
         request: CredentialRequest,
         response: CredentialResponse
-    ): CredentialResponseHttp =
-        CredentialResponseHttp(
+    ): CredentialResponseHttp {
+        val payload = response.toJsonObject()
+        val encryption = request.credentialResponseEncryption
+            ?: return CredentialResponseHttp(status = 200, payload = payload)
+
+        val encrypted = try {
+            config.credentialResponseEncryptor.encrypt(payload, encryption)
+        } catch (e: Exception) {
+            return writeCredentialError(
+                request,
+                OAuthError("invalid_request", e.message ?: "Credential response encryption failed"),
+            )
+        }
+        return CredentialResponseHttp(
             status = 200,
-            payload = buildMap {
-                response.credentials?.let { issued ->
-                    put(
-                        "credentials",
-                        buildJsonArray {
-                            issued.forEach { credentialEntry ->
-                                add(
-                                    JsonObject(
-                                        mapOf("credential" to credentialEntry.credential)
-                                    )
-                                )
-                            }
-                        }
-                    )
-                }
-                response.transactionId?.let { put("transaction_id", JsonPrimitive(it)) }
-                response.interval?.let { put("interval", JsonPrimitive(it)) }
-                response.notificationId?.let { put("notification_id", JsonPrimitive(it)) }
-            }
+            body = CredentialResponseBody.EncryptedJwt(encrypted),
         )
+    }
+
+    private suspend fun verifyCredentialAccessToken(accessTokenContext: AccessTokenContext?): CredentialRequestResult.Failure? {
+        if (accessTokenContext == null) return null
+        val verifier = config.accessTokenVerifier
+            ?: return CredentialRequestResult.Failure(
+                OAuthError("invalid_request", "access token verifier not configured")
+            )
+        return try {
+            verifier.verify(
+                token = accessTokenContext.token,
+                expectedIssuer = accessTokenContext.expectedIssuer,
+                expectedAudience = accessTokenContext.expectedAudience,
+            )
+            null
+        } catch (e: Exception) {
+            CredentialRequestResult.Failure(OAuthError("invalid_request", e.message))
+        }
+    }
+
+    private fun JsonObject.toParametersMap(): Map<String, List<String>> =
+        entries.associate { (key, value) ->
+            val encoded = if (value is JsonPrimitive && value.isString) {
+                value.content
+            } else {
+                value.toString()
+            }
+            key to listOf(encoded)
+        }
 
     private fun appendParams(base: String, parameters: Map<String, String>): String {
         if (parameters.isEmpty()) return base
@@ -539,8 +709,50 @@ class DefaultOAuth2Provider(
             "Pragma" to "no-cache",
         )
 
+    private fun Map<String, List<String>>.withAuthenticatedClientId(
+        authenticatedClient: AuthenticatedClient?,
+    ): ClientIdParameterResolution {
+        if (authenticatedClient == null) {
+            return ClientIdParameterResolution.Success(this)
+        }
+
+        val clientIdValues = this["client_id"].orEmpty().filter { it.isNotBlank() }
+        if (clientIdValues.size > 1) {
+            return ClientIdParameterResolution.Failure(
+                OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Multiple values for client_id not allowed"),
+            )
+        }
+
+        val providedClientId = clientIdValues.firstOrNull()
+        if (providedClientId != null && providedClientId != authenticatedClient.id) {
+            return ClientIdParameterResolution.Failure(
+                OAuthError(
+                    error = OAuthErrorCodes.INVALID_CLIENT,
+                    description = "client_id does not match authenticated client",
+                ),
+            )
+        }
+
+        return if (providedClientId == null) {
+            ClientIdParameterResolution.Success(this + ("client_id" to listOf(authenticatedClient.id)))
+        } else {
+            ClientIdParameterResolution.Success(this)
+        }
+    }
+
+    private fun AuthenticatedClient.toMetadataMap(): Map<String, String> =
+        mapOf(
+            "client_id" to id,
+            "client_authentication_method" to authenticationMethod,
+        )
+
     private sealed class AuthorizationParameterResolution {
         data class Success(val parameters: Map<String, List<String>>) : AuthorizationParameterResolution()
         data class Failure(val error: OAuthError) : AuthorizationParameterResolution()
+    }
+
+    private sealed class ClientIdParameterResolution {
+        data class Success(val parameters: Map<String, List<String>>) : ClientIdParameterResolution()
+        data class Failure(val error: OAuthError) : ClientIdParameterResolution()
     }
 }

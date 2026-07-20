@@ -14,7 +14,7 @@ struct StatusBannerView: View {
             Text(message)
                 .font(.subheadline)
                 .lineLimit(2)
-                .accessibilityIdentifier("wallet.status")
+                .accessibilityIdentifier(WalletAccessibilityID.status)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
@@ -34,5 +34,22 @@ struct StatusBannerView: View {
         if isError { return .red }
         if isLoading { return .secondary }
         return .waltBlueDark
+    }
+}
+
+struct WarningBannerView: View {
+    let message: String
+
+    var body: some View {
+        Text(message)
+            .font(.subheadline)
+            .lineLimit(3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Color.orange.opacity(0.16))
+            .foregroundColor(.orange)
+            .cornerRadius(8)
+            .accessibilityIdentifier(WalletAccessibilityID.transactionDataProfilesWarning)
     }
 }

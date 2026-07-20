@@ -4,19 +4,26 @@ import id.walt.issuer2.controller.openapi.OpenId4VciRoutesDocs
 import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
+import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
+import id.walt.openid4vci.responses.credential.CredentialResponseBody
+import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.auth.OAuthAccessTokenResponse
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.request.receiveParameters
+import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.util.toMap
 import kotlinx.serialization.json.JsonObject
@@ -60,22 +67,31 @@ class OpenId4VciController(
             }
 
             post("par", OpenId4VciRoutesDocs.pushedAuthorizationRequest()) {
-                val response = protocolService.processPushedAuthorizationRequest(call.receiveParameters().toMap())
+                val response = protocolService.processPushedAuthorizationRequest(
+                    parameters = call.receiveParameters().toMap(),
+                    headers = call.request.headers.toMap(),
+                )
                 response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
                 call.respond(HttpStatusCode.fromValue(response.status), response.payload)
             }
 
             get("authorize", OpenId4VciRoutesDocs.authorize()) {
                 val response = protocolService.processAuthorizeRequest(call.parameters.toMap())
-                response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
                 response.redirectUri?.let { redirectUri ->
+                    response.headers.filterKeys { it.lowercase() != "location" }
+                        .forEach { (name, value) -> call.response.headers.append(name, value) }
                     call.respondRedirect(redirectUri)
-                } ?: call.respond(HttpStatusCode.fromValue(response.status), response.body ?: "")
+                } ?: run {
+                    response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
+                    call.respond(HttpStatusCode.fromValue(response.status), response.body ?: "")
+                }
             }
 
             val authOAuthInterceptor = createRouteScopedPlugin("issuer2AuthOAuthInterceptor") {
                 onCallRespond { call ->
-                    val internalAuthorizationRequest = call.parameters["internalAuthReq"] ?: return@onCallRespond
+                    val internalAuthorizationRequest = call.parameters.getAll("internalAuthReq")?.joinToString("/")
+                        ?: call.parameters["internalAuthReq"]
+                        ?: return@onCallRespond
                     protocolService.processExternalLoginInterception(
                         externalAuthorizationRequest = call.response.headers.allValues().toMap()["Location"]?.firstOrNull(),
                         internalAuthorizationRequest = internalAuthorizationRequest,
@@ -102,33 +118,69 @@ class OpenId4VciController(
                         authServerState = state,
                         idToken = idToken,
                     )
-                    response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
                     response.redirectUri?.let { redirectUri ->
+                        response.headers.filterKeys { it.lowercase() != "location" }
+                            .forEach { (name, value) -> call.response.headers.append(name, value) }
                         call.respondRedirect(redirectUri)
-                    } ?: call.respond(HttpStatusCode.fromValue(response.status), response.body ?: "")
+                    } ?: run {
+                        response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
+                        call.respond(HttpStatusCode.fromValue(response.status), response.body ?: "")
+                    }
                 }
             }
 
             post("token", OpenId4VciRoutesDocs.token()) {
-                val response = protocolService.processTokenRequest(call.receiveParameters().toMap())
+                val response = protocolService.processTokenRequest(
+                    parameters = call.receiveParameters().toMap(),
+                    headers = call.request.headers.toMap(),
+                )
                 response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
                 call.respond(HttpStatusCode.fromValue(response.status), response.payload)
             }
 
             post("nonce", OpenId4VciRoutesDocs.nonce()) {
+                call.response.headers.append(HttpHeaders.CacheControl, "no-store")
                 call.respond(buildJsonObject {
                     protocolService.createNonceResponse().forEach { (key, value) -> put(key, value) }
                 })
             }
 
             post("credential", OpenId4VciRoutesDocs.credential()) {
-                val accessToken = call.request.headers[HttpHeaders.Authorization]
-                    ?.substringAfter("Bearer ")
-                    ?: throw IllegalArgumentException("No bearer access token found")
-                val request = call.receive<JsonObject>()
-                val response = protocolService.processCredentialRequest(accessToken, request)
-                call.respond(HttpStatusCode.fromValue(response.status), response.payload)
+                val authHeader = call.request.headers[HttpHeaders.Authorization]
+                    ?: throw IllegalArgumentException("No Authorization header found")
+                val accessToken = when {
+                    authHeader.startsWith("Bearer ", ignoreCase = true) -> authHeader.substring(7)
+                    else -> throw IllegalArgumentException("Authorization header must start with Bearer")
+                }
+                val response =
+                    if (call.isEncryptedCredentialRequest()) {
+                        protocolService.processCredentialRequest(accessToken, call.receiveText())
+                    } else {
+                        protocolService.processCredentialRequest(accessToken, call.receive<JsonObject>())
+                    }
+                call.respondCredentialResponse(response)
             }
+        }
+    }
+
+    private fun ApplicationCall.isEncryptedCredentialRequest(): Boolean =
+        request.headers[HttpHeaders.ContentType]
+            ?.substringBefore(';')
+            ?.trim()
+            ?.equals(CredentialEncryptionProfile.MEDIA_TYPE_JWT, ignoreCase = true) == true
+
+    private suspend fun ApplicationCall.respondCredentialResponse(response: CredentialResponseHttp) {
+        response.headers.forEach { (name, value) -> this.response.headers.append(name, value) }
+        val status = HttpStatusCode.fromValue(response.status)
+
+        when (val body = response.body) {
+            is CredentialResponseBody.Json -> respond(status, body.payload)
+            is CredentialResponseBody.EncryptedJwt ->
+                respondText(
+                    text = body.value,
+                    contentType = ContentType.parse(body.contentType),
+                    status = status,
+                )
         }
     }
 }

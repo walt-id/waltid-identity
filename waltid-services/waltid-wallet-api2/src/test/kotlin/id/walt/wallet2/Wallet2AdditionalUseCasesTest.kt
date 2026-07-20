@@ -3,6 +3,7 @@ package id.walt.wallet2
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialFormat
@@ -25,8 +26,8 @@ import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
-import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
+import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
@@ -54,18 +55,8 @@ import id.walt.verifier2.verifierApi
 import id.walt.wallet2.data.StoredCredentialMetadata
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletKeyInfo
-import id.walt.wallet2.handlers.ExchangeCodeRequest
-import id.walt.wallet2.handlers.GenerateAuthorizationUrlRequest
-import id.walt.wallet2.handlers.GenerateAuthorizationUrlResult
-import id.walt.wallet2.handlers.MatchCredentialsFromStoreRequest
-import id.walt.wallet2.handlers.MatchCredentialsResult
-import id.walt.wallet2.handlers.PresentCredentialRequest
-import id.walt.wallet2.handlers.ReceiveCredentialRequest
-import id.walt.wallet2.handlers.ReceiveCredentialResult
-import id.walt.wallet2.handlers.ResolveVpRequestRequest
-import id.walt.wallet2.handlers.ResolveVpRequestResult
+import id.walt.wallet2.handlers.*
 import id.walt.wallet2.server.handlers.CreateWalletRequest
-import id.walt.wallet2.server.handlers.GenerateKeyRequest
 import id.walt.wallet2.server.handlers.ImportKeyRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import id.walt.wallet2.server.handlers.WalletInfoResponse
@@ -122,8 +113,10 @@ class Wallet2AdditionalUseCasesTest {
         E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {
-                ConfigManager.preloadConfig("wallet-service",
-                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port")))
+                ConfigManager.preloadConfig(
+                    "wallet-service",
+                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port"))
+                )
             },
             init = { DidService.minimalInit() },
             module = { wallet2Module(withPlugins = false) }
@@ -139,11 +132,13 @@ class Wallet2AdditionalUseCasesTest {
             val walletId = testAndReturn("Create wallet with embedded static key") {
                 http.post("/wallet") {
                     contentType(ContentType.Application.Json)
-                    setBody(CreateWalletRequest(
-                        keyStoreIds = null,       // no key store
-                        noDidStore = true,        // also no DID store for simplicity
-                        staticKey = staticKeyJson
-                    ))
+                    setBody(
+                        CreateWalletRequest(
+                            keyStoreIds = null,       // no key store
+                            noDidStore = true,        // also no DID store for simplicity
+                            staticKey = staticKeyJson
+                        )
+                    )
                 }.also { assertEquals(HttpStatusCode.Created, it.status) }
                     .body<WalletCreatedResponse>().walletId
             }
@@ -173,8 +168,10 @@ class Wallet2AdditionalUseCasesTest {
         E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {
-                ConfigManager.preloadConfig("wallet-service",
-                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port")))
+                ConfigManager.preloadConfig(
+                    "wallet-service",
+                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port"))
+                )
             },
             init = { DidService.minimalInit() },
             module = { wallet2Module(withPlugins = false) }
@@ -204,17 +201,21 @@ class Wallet2AdditionalUseCasesTest {
             // The imported key should appear in the key list
             testAndReturn("Imported key visible in key list") {
                 val keys = http.get("/wallet/$walletId/keys").body<List<WalletKeyInfo>>()
-                assertTrue(keys.any { it.keyId == importedKey.keyId },
-                    "Imported key ${importedKey.keyId} should be in $keys")
+                assertTrue(
+                    keys.any { it.keyId == importedKey.keyId },
+                    "Imported key ${importedKey.keyId} should be in $keys"
+                )
             }
 
             // Create a DID from the imported key
             testAndReturn("Create DID using imported key") {
                 http.post("/wallet/$walletId/dids/create") {
                     contentType(ContentType.Application.Json)
-                    setBody(id.walt.wallet2.server.handlers.CreateDidRequest(
-                        method = "key", keyId = importedKey.keyId
-                    ))
+                    setBody(
+                        id.walt.wallet2.server.handlers.CreateDidRequest(
+                            method = "key", keyId = importedKey.keyId
+                        )
+                    )
                 }.also { assertEquals(HttpStatusCode.Created, it.status) }
                     .body<WalletDidEntry>()
                     .also { assertTrue(it.did.startsWith("did:key:")) }
@@ -234,8 +235,10 @@ class Wallet2AdditionalUseCasesTest {
         E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {
-                ConfigManager.preloadConfig("wallet-service",
-                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port")))
+                ConfigManager.preloadConfig(
+                    "wallet-service",
+                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port"))
+                )
             },
             init = { DidService.minimalInit() },
             module = { wallet2Module(withPlugins = false) }
@@ -269,10 +272,11 @@ class Wallet2AdditionalUseCasesTest {
             }
 
             // Import a credential into wallet-1
-            val rawCred = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaWQ6a2V5OnNoYXJlZCIsImlzcyI6Imh0dHBzOi8vZXhhbXBsZS5jb20iLCJ2YyI6eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSJdLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIl0sImNyZWRlbnRpYWxTdWJqZWN0Ijp7ImlkIjoiZGlkOmtleTpzaGFyZWQifX19.sig"
+            val rawCred =
+                "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaWQ6a2V5OnNoYXJlZCIsImlzcyI6Imh0dHBzOi8vZXhhbXBsZS5jb20iLCJ2YyI6eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSJdLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIl0sImNyZWRlbnRpYWxTdWJqZWN0Ijp7ImlkIjoiZGlkOmtleTpzaGFyZWQifX19.sig"
             http.post("/wallet/$wallet1Id/credentials/import") {
                 contentType(ContentType.Application.Json)
-                setBody(id.walt.wallet2.server.handlers.ImportCredentialRequest(rawCredential = rawCred, label = "Shared"))
+                setBody(ImportCredentialRequest(rawCredential = rawCred, label = "Shared"))
             }
 
             // Both wallets should see the credential (shared store)
@@ -282,8 +286,10 @@ class Wallet2AdditionalUseCasesTest {
             }
             testAndReturn("Wallet-2 sees the same credential (shared store)") {
                 val creds = http.get("/wallet/$wallet2Id/credentials").body<List<StoredCredentialMetadata>>()
-                assertTrue(creds.isNotEmpty(),
-                    "Wallet-2 should see credential imported via wallet-1 (shared store)")
+                assertTrue(
+                    creds.isNotEmpty(),
+                    "Wallet-2 should see credential imported via wallet-1 (shared store)"
+                )
             }
         }
     }
@@ -314,40 +320,50 @@ class Wallet2AdditionalUseCasesTest {
 
         val preAuthRepo: PreAuthorizedCodeRepository = object : PreAuthorizedCodeRepository {
             private val r = java.util.concurrent.ConcurrentHashMap<String, PreAuthorizedCodeRecord>()
-            override suspend fun save(record: PreAuthorizedCodeRecord) { if (r.containsKey(record.code)) throw DuplicateCodeException(); r[record.code] = record }
+            override suspend fun save(record: PreAuthorizedCodeRecord) {
+                if (r.containsKey(record.code)) throw DuplicateCodeException(); r[record.code] = record
+            }
+
             override suspend fun get(code: String) = r[code]
             override suspend fun consume(code: String) = r.remove(code)
         }
         val authCodeRepo: AuthorizationCodeRepository = object : AuthorizationCodeRepository {
             private val r = java.util.concurrent.ConcurrentHashMap<String, AuthorizationCodeRecord>()
-            override suspend fun save(record: AuthorizationCodeRecord) { if (r.containsKey(record.code)) throw DuplicateCodeException(); r[record.code] = record }
+            override suspend fun save(record: AuthorizationCodeRecord) {
+                if (r.containsKey(record.code)) throw DuplicateCodeException(); r[record.code] = record
+            }
+
             override suspend fun consume(code: String) = r.remove(code)
         }
         val session = DefaultSession(subject = "pres-holder")
-        val provider = buildOAuth2Provider(OAuth2ProviderConfig(
-            authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
-            authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
-            tokenEndpointHandlers = TokenEndpointHandlers(),
-            authorizationCodeRepository = authCodeRepo,
-            preAuthorizedCodeRepository = preAuthRepo,
-            preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthRepo),
-            accessTokenIssuer = JwtAccessTokenIssuer(resolver = { accessTokenKey }),
-            accessTokenVerifier = JwtAccessTokenVerifier(resolver = { _ -> accessTokenKey }),
-            refreshTokenIssuer = JwtRefreshTokenIssuer(signingKeyResolver = { accessTokenKey }),
-            refreshTokenVerifier = JwtRefreshTokenVerifier(verificationKeyResolver = { _ -> accessTokenKey }),
-            refreshTokenRepository = InMemoryRefreshTokenRepository(),
-            accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
-            credentialRequestValidator = DefaultCredentialRequestValidator(),
-            credentialEndpointHandlers = CredentialEndpointHandlers()
-        ))
+        val provider = buildOAuth2Provider(
+            OAuth2ProviderConfig(
+                authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
+                authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
+                tokenEndpointHandlers = TokenEndpointHandlers(),
+                authorizationCodeRepository = authCodeRepo,
+                preAuthorizedCodeRepository = preAuthRepo,
+                preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthRepo),
+                accessTokenIssuer = JwtAccessTokenIssuer(resolver = { accessTokenKey }),
+                accessTokenVerifier = JwtAccessTokenVerifier(resolver = { _ -> accessTokenKey }),
+                refreshTokenIssuer = JwtRefreshTokenIssuer(signingKeyResolver = { accessTokenKey }),
+                refreshTokenVerifier = JwtRefreshTokenVerifier(verificationKeyResolver = { _ -> accessTokenKey }),
+                refreshTokenRepository = InMemoryRefreshTokenRepository(),
+                accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
+                credentialRequestValidator = DefaultCredentialRequestValidator(),
+                credentialEndpointHandlers = CredentialEndpointHandlers()
+            )
+        )
         runBlocking {
-            preAuthRepo.save(DefaultPreAuthorizedCodeRecord(
-                code = preAuthCode, clientId = null, txCode = null, txCodeValue = null,
-                grantedScopes = emptySet(), grantedAudience = emptySet(), session = session,
-                expiresAt = Clock.System.now() + 10.minutes,
-                credentialNonce = "pres-nonce",
-                credentialNonceExpiresAt = Clock.System.now() + 10.minutes
-            ))
+            preAuthRepo.save(
+                DefaultPreAuthorizedCodeRecord(
+                    code = preAuthCode, clientId = null, txCode = null, txCodeValue = null,
+                    grantedScopes = emptySet(), grantedAudience = emptySet(), session = session,
+                    expiresAt = Clock.System.now() + 10.minutes,
+                    credentialNonce = "pres-nonce",
+                    credentialNonceExpiresAt = Clock.System.now() + 10.minutes
+                )
+            )
         }
         val issuerMetadata = CredentialIssuerMetadata.fromBaseUrl(
             baseUrl = issuerBase, credentialConfigurationsSupported = mapOf(credentialConfigId to configuration)
@@ -361,26 +377,90 @@ class Wallet2AdditionalUseCasesTest {
             install(ContentNegotiation) { json(json) }
             routing {
                 get("/.well-known/openid-credential-issuer") { call.respond(issuerMetadata) }
-                get("/.well-known/oauth-authorization-server") { call.respond(AuthorizationServerMetadata(issuer = issuerBase, authorizationEndpoint = "$issuerBase/authorize", tokenEndpoint = "$issuerBase/token", responseTypesSupported = setOf("code"), grantTypesSupported = setOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"))) }
-                get("/.well-known/openid-configuration") { call.respond(AuthorizationServerMetadata(issuer = issuerBase, authorizationEndpoint = "$issuerBase/authorize", tokenEndpoint = "$issuerBase/token", responseTypesSupported = setOf("code"), grantTypesSupported = setOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"))) }
+                get("/.well-known/oauth-authorization-server") {
+                    call.respond(
+                        AuthorizationServerMetadata(
+                            issuer = issuerBase,
+                            authorizationEndpoint = "$issuerBase/authorize",
+                            tokenEndpoint = "$issuerBase/token",
+                            responseTypesSupported = setOf("code"),
+                            grantTypesSupported = setOf("urn:ietf:params:oauth:grant-type:pre-authorized_code")
+                        )
+                    )
+                }
+                get("/.well-known/openid-configuration") {
+                    call.respond(
+                        AuthorizationServerMetadata(
+                            issuer = issuerBase,
+                            authorizationEndpoint = "$issuerBase/authorize",
+                            tokenEndpoint = "$issuerBase/token",
+                            responseTypesSupported = setOf("code"),
+                            grantTypesSupported = setOf("urn:ietf:params:oauth:grant-type:pre-authorized_code")
+                        )
+                    )
+                }
                 post("/token") {
                     val params = call.receiveParameters()
-                    val code = params["pre-authorized_code"] ?: return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error", "invalid_request") })
-                    val tr = provider.createAccessTokenRequest(mapOf("grant_type" to listOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"), "pre-authorized_code" to listOf(code), "client_id" to listOf(params["client_id"] ?: "wallet-client")))
-                    if (tr !is AccessTokenRequestResult.Success) return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error","invalid_grant") })
+                    val code = params["pre-authorized_code"] ?: return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject { put("error", "invalid_request") })
+                    val tr = provider.createAccessTokenRequest(
+                        mapOf(
+                            "grant_type" to listOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"),
+                            "pre-authorized_code" to listOf(code),
+                            "client_id" to listOf(params["client_id"] ?: "wallet-client")
+                        )
+                    )
+                    if (tr !is AccessTokenRequestResult.Success) return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject { put("error", "invalid_grant") })
                     val resp = provider.createAccessTokenResponse(tr.request.withIssuer(issuerBase))
-                    if (resp !is AccessTokenResponseResult.Success) return@post call.respond(HttpStatusCode.InternalServerError, buildJsonObject { put("error","server_error") })
-                    call.respond(buildJsonObject { put("access_token", resp.response.accessToken); put("token_type", "Bearer"); put("c_nonce", "pres-nonce"); put("c_nonce_expires_in", 300) })
+                    if (resp !is AccessTokenResponseResult.Success) return@post call.respond(
+                        HttpStatusCode.InternalServerError,
+                        buildJsonObject { put("error", "server_error") })
+                    call.respond(buildJsonObject {
+                        put("access_token", resp.response.accessToken); put(
+                        "token_type",
+                        "Bearer"
+                    ); put("c_nonce", "pres-nonce"); put("c_nonce_expires_in", 300)
+                    })
                 }
                 post("/credential") {
                     val body = json.parseToJsonElement(call.receiveText()).jsonObject
-                    val configId = body["credential_configuration_id"]?.jsonPrimitive?.content ?: return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error","invalid_request") })
+                    val configId = body["credential_configuration_id"]?.jsonPrimitive?.content ?: return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject { put("error", "invalid_request") })
                     val proofsObj = body["proofs"]?.takeIf { it !is JsonNull }?.jsonObject
                     val proofJwt = proofsObj?.get("jwt")?.jsonArray?.firstOrNull()?.jsonPrimitive?.content
-                    val cr = provider.createCredentialRequest(mapOf("credential_configuration_id" to listOf(configId), "proofs" to listOf(buildJsonObject { put("jwt", buildJsonArray { proofJwt?.let { add(JsonPrimitive(it)) } }) }.toString())), session)
-                    if (cr !is CredentialRequestResult.Success) return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error","invalid_proof") })
-                    val credResp = provider.createCredentialResponse(request = cr.request.withIssuer(issuerBase), configuration = configuration, issuerKey = issuerKey, issuerId = issuerBase, credentialData = buildJsonObject { put("given_name", "Bob"); put("family_name", "Builder"); put("age_over_18", true); put("issuing_country", "AT") }, selectiveDisclosure = null)
-                    if (credResp !is CredentialResponseResult.Success) return@post call.respond(HttpStatusCode.InternalServerError, buildJsonObject { put("error","server_error") })
+                    val cr = provider.createCredentialRequest(
+                        mapOf(
+                            "credential_configuration_id" to listOf(configId),
+                            "proofs" to listOf(buildJsonObject {
+                                put(
+                                    "jwt",
+                                    buildJsonArray { proofJwt?.let { add(JsonPrimitive(it)) } })
+                            }.toString())
+                        ), session
+                    )
+                    if (cr !is CredentialRequestResult.Success) return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject { put("error", "invalid_proof") })
+                    val credResp = provider.createCredentialResponse(
+                        request = cr.request.withIssuer(issuerBase),
+                        configuration = configuration,
+                        issuerKey = issuerKey,
+                        issuerId = issuerBase,
+                        credentialData = buildJsonObject {
+                            put("given_name", "Bob"); put("family_name", "Builder"); put(
+                            "age_over_18",
+                            true
+                        ); put("issuing_country", "AT")
+                        },
+                        selectiveDisclosure = null
+                    )
+                    if (credResp !is CredentialResponseResult.Success) return@post call.respond(
+                        HttpStatusCode.InternalServerError,
+                        buildJsonObject { put("error", "server_error") })
                     val httpResp = provider.writeCredentialResponse(cr.request.withIssuer(issuerBase), credResp.response)
                     call.respond(HttpStatusCode.fromValue(httpResp.status), httpResp.payload)
                 }
@@ -392,7 +472,15 @@ class Wallet2AdditionalUseCasesTest {
                 features = listOf(OSSWallet2FeatureCatalog, OSSVerifier2FeatureCatalog),
                 preload = {
                     ConfigManager.preloadConfig("wallet-service", OSSWallet2ServiceConfig(publicBaseUrl = Url(walletBase)))
-                    ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(clientId = "test-verifier-pres", clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Test Verifier"), urlPrefix = "$walletBase/verification-session", urlHost = "openid4vp://authorize"))
+                    ConfigManager.preloadConfig(
+                        "verifier-service",
+                        OSSVerifier2ServiceConfig(
+                            clientId = "test-verifier-pres",
+                            clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Test Verifier"),
+                            urlPrefix = "$walletBase/verification-session",
+                            urlHost = "openid4vp://authorize"
+                        )
+                    )
                 },
                 init = { DidService.minimalInit() },
                 module = { isolatedPresentationModule() }
@@ -407,7 +495,7 @@ class Wallet2AdditionalUseCasesTest {
 
                 val keyInfo = http.post("/wallet/$walletId/keys/generate") {
                     contentType(ContentType.Application.Json)
-                    setBody(GenerateKeyRequest(keyType = "Ed25519"))
+                    setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.Ed25519))
                 }.body<WalletKeyInfo>()
 
                 val holderDid = http.post("/wallet/$walletId/dids/create") {
@@ -429,14 +517,16 @@ class Wallet2AdditionalUseCasesTest {
 
                 // ── Isolated step: match-credentials-from-store ──
                 // Query for a PID credential - should match the one we received
-                val dcqlForPid = DcqlQuery(credentials = listOf(
-                    CredentialQuery(
-                        id = "pid",
-                        format = CredentialFormat.DC_SD_JWT,
-                        meta = SdJwtVcMeta(vctValues = listOf(pidVct)),
-                        claims = listOf(ClaimsQuery(pathStrings = listOf("given_name")))
+                val dcqlForPid = DcqlQuery(
+                    credentials = listOf(
+                        CredentialQuery(
+                            id = "pid",
+                            format = CredentialFormat.DC_SD_JWT,
+                            meta = SdJwtVcMeta(vctValues = listOf(pidVct)),
+                            claims = listOf(ClaimsQuery(pathStrings = listOf("given_name")))
+                        )
                     )
-                ))
+                )
                 val matchResult = testAndReturn("match-credentials-from-store: PID query matches") {
                     http.post("/wallet/$walletId/credentials/present/match-credentials-from-store") {
                         contentType(ContentType.Application.Json)
@@ -448,13 +538,15 @@ class Wallet2AdditionalUseCasesTest {
                 assertTrue(matchResult.matchedQueryIds.contains("pid"))
 
                 // Query for a non-matching type - should return 0 matches
-                val dcqlForMdl = DcqlQuery(credentials = listOf(
-                    CredentialQuery(
-                        id = "mdl",
-                        format = CredentialFormat.MSO_MDOC,
-                        meta = id.walt.dcql.models.meta.MsoMdocMeta(doctypeValue = "org.iso.18013.5.1.mDL")
+                val dcqlForMdl = DcqlQuery(
+                    credentials = listOf(
+                        CredentialQuery(
+                            id = "mdl",
+                            format = CredentialFormat.MSO_MDOC,
+                            meta = id.walt.dcql.models.meta.MsoMdocMeta(doctypeValue = "org.iso.18013.5.1.mDL")
+                        )
                     )
-                ))
+                )
                 val noMatchResult = testAndReturn("match-credentials-from-store: MDL query no match") {
                     http.post("/wallet/$walletId/credentials/present/match-credentials-from-store") {
                         contentType(ContentType.Application.Json)
@@ -467,10 +559,14 @@ class Wallet2AdditionalUseCasesTest {
                 // ── Isolated step: create verifier session, resolve the VP request ──
                 val verifierSession = testAndReturn("Verifier creates presentation session") {
                     http.post("/verification-session/create") {
-                        setBody(CrossDeviceFlowSetup(core = GeneralFlowConfig(
-                            dcqlQuery = dcqlForPid,
-                            policies = Verification2Session.DefinedVerificationPolicies(vc_policies = VCPolicyList(policies = emptyList()))
-                        )) as VerificationSessionSetup)
+                        setBody(
+                            CrossDeviceFlowSetup(
+                                core = GeneralFlowConfig(
+                                    dcqlQuery = dcqlForPid,
+                                    policies = Verification2Session.DefinedVerificationPolicies(vc_policies = VCPolicyList(policies = emptyList()))
+                                )
+                            ) as VerificationSessionSetup
+                        )
                     }.also { assertEquals(HttpStatusCode.OK, it.status) }
                         .body<VerificationSessionCreationResponse>()
                 }
@@ -500,8 +596,10 @@ class Wallet2AdditionalUseCasesTest {
                 testAndReturn("Verification session is SUCCESSFUL after presentation") {
                     val info = http.get("/verification-session/${verifierSession.sessionId}/info")
                         .body<Verification2Session>()
-                    assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, info.status,
-                        "Session ended with ${info.status}: ${info.statusReason}")
+                    assertEquals(
+                        Verification2Session.VerificationSessionStatus.SUCCESSFUL, info.status,
+                        "Session ended with ${info.status}: ${info.statusReason}"
+                    )
                     assertTrue(info.presentedCredentials?.isNotEmpty() == true)
                 }
             }
@@ -537,44 +635,54 @@ class Wallet2AdditionalUseCasesTest {
 
         val preAuthRepo: PreAuthorizedCodeRepository = object : PreAuthorizedCodeRepository {
             private val r = java.util.concurrent.ConcurrentHashMap<String, PreAuthorizedCodeRecord>()
-            override suspend fun save(record: PreAuthorizedCodeRecord) { if (r.containsKey(record.code)) throw DuplicateCodeException(); r[record.code] = record }
+            override suspend fun save(record: PreAuthorizedCodeRecord) {
+                if (r.containsKey(record.code)) throw DuplicateCodeException(); r[record.code] = record
+            }
+
             override suspend fun get(code: String) = r[code]
             override suspend fun consume(code: String) = r.remove(code)
         }
         val authCodeRepo: AuthorizationCodeRepository = object : AuthorizationCodeRepository {
             private val r = java.util.concurrent.ConcurrentHashMap<String, AuthorizationCodeRecord>()
-            override suspend fun save(record: AuthorizationCodeRecord) { if (r.containsKey(record.code)) throw DuplicateCodeException(); r[record.code] = record }
+            override suspend fun save(record: AuthorizationCodeRecord) {
+                if (r.containsKey(record.code)) throw DuplicateCodeException(); r[record.code] = record
+            }
+
             override suspend fun consume(code: String) = r.remove(code)
         }
         val session = DefaultSession(subject = "auth-code-holder")
-        val provider = buildOAuth2Provider(OAuth2ProviderConfig(
-            authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
-            authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
-            tokenEndpointHandlers = TokenEndpointHandlers(),
-            authorizationCodeRepository = authCodeRepo,
-            preAuthorizedCodeRepository = preAuthRepo,
-            preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthRepo),
-            accessTokenIssuer = JwtAccessTokenIssuer(resolver = { accessTokenKey }),
-            accessTokenVerifier = JwtAccessTokenVerifier(resolver = { _ -> accessTokenKey }),
-            refreshTokenIssuer = JwtRefreshTokenIssuer(signingKeyResolver = { accessTokenKey }),
-            refreshTokenVerifier = JwtRefreshTokenVerifier(verificationKeyResolver = { _ -> accessTokenKey }),
-            refreshTokenRepository = InMemoryRefreshTokenRepository(),
-            accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
-            credentialRequestValidator = DefaultCredentialRequestValidator(),
-            credentialEndpointHandlers = CredentialEndpointHandlers()
-        ))
+        val provider = buildOAuth2Provider(
+            OAuth2ProviderConfig(
+                authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
+                authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
+                tokenEndpointHandlers = TokenEndpointHandlers(),
+                authorizationCodeRepository = authCodeRepo,
+                preAuthorizedCodeRepository = preAuthRepo,
+                preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthRepo),
+                accessTokenIssuer = JwtAccessTokenIssuer(resolver = { accessTokenKey }),
+                accessTokenVerifier = JwtAccessTokenVerifier(resolver = { _ -> accessTokenKey }),
+                refreshTokenIssuer = JwtRefreshTokenIssuer(signingKeyResolver = { accessTokenKey }),
+                refreshTokenVerifier = JwtRefreshTokenVerifier(verificationKeyResolver = { _ -> accessTokenKey }),
+                refreshTokenRepository = InMemoryRefreshTokenRepository(),
+                accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
+                credentialRequestValidator = DefaultCredentialRequestValidator(),
+                credentialEndpointHandlers = CredentialEndpointHandlers()
+            )
+        )
 
         // Seed the auth code directly (simulates the result of a browser authorization)
         runBlocking {
-            authCodeRepo.save(DefaultAuthorizationCodeRecord(
-                code = authCodeValue,
-                clientId = "wallet-client",
-                redirectUri = "openid://",
-                grantedScopes = emptySet<String>(),
-                grantedAudience = emptySet<String>(),
-                session = session,
-                expiresAt = Clock.System.now() + 10.minutes
-            ))
+            authCodeRepo.save(
+                DefaultAuthorizationCodeRecord(
+                    code = authCodeValue,
+                    clientId = "wallet-client",
+                    redirectUri = "openid://",
+                    grantedScopes = emptySet<String>(),
+                    grantedAudience = emptySet<String>(),
+                    session = session,
+                    expiresAt = Clock.System.now() + 10.minutes
+                )
+            )
         }
 
         val issuerMetadata = CredentialIssuerMetadata.fromBaseUrl(
@@ -590,8 +698,28 @@ class Wallet2AdditionalUseCasesTest {
             install(ContentNegotiation) { json(json) }
             routing {
                 get("/.well-known/openid-credential-issuer") { call.respond(issuerMetadata) }
-                get("/.well-known/oauth-authorization-server") { call.respond(AuthorizationServerMetadata(issuer = issuerBase, authorizationEndpoint = "$issuerBase/authorize", tokenEndpoint = "$issuerBase/token", responseTypesSupported = setOf("code"), grantTypesSupported = setOf("authorization_code"))) }
-                get("/.well-known/openid-configuration") { call.respond(AuthorizationServerMetadata(issuer = issuerBase, authorizationEndpoint = "$issuerBase/authorize", tokenEndpoint = "$issuerBase/token", responseTypesSupported = setOf("code"), grantTypesSupported = setOf("authorization_code"))) }
+                get("/.well-known/oauth-authorization-server") {
+                    call.respond(
+                        AuthorizationServerMetadata(
+                            issuer = issuerBase,
+                            authorizationEndpoint = "$issuerBase/authorize",
+                            tokenEndpoint = "$issuerBase/token",
+                            responseTypesSupported = setOf("code"),
+                            grantTypesSupported = setOf("authorization_code")
+                        )
+                    )
+                }
+                get("/.well-known/openid-configuration") {
+                    call.respond(
+                        AuthorizationServerMetadata(
+                            issuer = issuerBase,
+                            authorizationEndpoint = "$issuerBase/authorize",
+                            tokenEndpoint = "$issuerBase/token",
+                            responseTypesSupported = setOf("code"),
+                            grantTypesSupported = setOf("authorization_code")
+                        )
+                    )
+                }
                 // Authorization endpoint - in real flows the user is redirected here; we just note it for test
                 get("/authorize") {
                     // Simulate issuer immediately redirecting back with a pre-seeded code
@@ -599,24 +727,73 @@ class Wallet2AdditionalUseCasesTest {
                 }
                 post("/token") {
                     val params = call.receiveParameters()
-                    val grantType = params["grant_type"] ?: return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error","invalid_request") })
-                    if (grantType != "authorization_code") return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error","unsupported_grant_type") })
-                    val code = params["code"] ?: return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error","invalid_request") })
-                    val tr = provider.createAccessTokenRequest(mapOf("grant_type" to listOf(grantType), "code" to listOf(code), "client_id" to listOf(params["client_id"] ?: "wallet-client"), "redirect_uri" to listOf(params["redirect_uri"] ?: "openid://")))
-                    if (tr !is AccessTokenRequestResult.Success) return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error","invalid_grant") })
+                    val grantType = params["grant_type"] ?: return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject { put("error", "invalid_request") })
+                    if (grantType != "authorization_code") return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject { put("error", "unsupported_grant_type") })
+                    val code = params["code"] ?: return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject { put("error", "invalid_request") })
+                    val tr = provider.createAccessTokenRequest(
+                        mapOf(
+                            "grant_type" to listOf(grantType),
+                            "code" to listOf(code),
+                            "client_id" to listOf(params["client_id"] ?: "wallet-client"),
+                            "redirect_uri" to listOf(params["redirect_uri"] ?: "openid://")
+                        )
+                    )
+                    if (tr !is AccessTokenRequestResult.Success) return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject { put("error", "invalid_grant") })
                     val resp = provider.createAccessTokenResponse(tr.request.withIssuer(issuerBase))
-                    if (resp !is AccessTokenResponseResult.Success) return@post call.respond(HttpStatusCode.InternalServerError, buildJsonObject { put("error","server_error") })
-                    call.respond(buildJsonObject { put("access_token", resp.response.accessToken); put("token_type", "Bearer"); put("c_nonce", "auth-nonce"); put("c_nonce_expires_in", 300) })
+                    if (resp !is AccessTokenResponseResult.Success) return@post call.respond(
+                        HttpStatusCode.InternalServerError,
+                        buildJsonObject { put("error", "server_error") })
+                    call.respond(buildJsonObject {
+                        put("access_token", resp.response.accessToken); put(
+                        "token_type",
+                        "Bearer"
+                    ); put("c_nonce", "auth-nonce"); put("c_nonce_expires_in", 300)
+                    })
                 }
                 post("/credential") {
                     val body = json.parseToJsonElement(call.receiveText()).jsonObject
-                    val configId = body["credential_configuration_id"]?.jsonPrimitive?.content ?: return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error","invalid_request") })
+                    val configId = body["credential_configuration_id"]?.jsonPrimitive?.content ?: return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject { put("error", "invalid_request") })
                     val proofsObj = body["proofs"]?.takeIf { it !is JsonNull }?.jsonObject
                     val proofJwt = proofsObj?.get("jwt")?.jsonArray?.firstOrNull()?.jsonPrimitive?.content
-                    val cr = provider.createCredentialRequest(mapOf("credential_configuration_id" to listOf(configId), "proofs" to listOf(buildJsonObject { put("jwt", buildJsonArray { proofJwt?.let { add(JsonPrimitive(it)) } }) }.toString())), session)
-                    if (cr !is CredentialRequestResult.Success) return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error","invalid_proof") })
-                    val credResp = provider.createCredentialResponse(request = cr.request.withIssuer(issuerBase), configuration = configuration, issuerKey = issuerKey, issuerId = issuerBase, credentialData = buildJsonObject { put("given_name", "Charlie"); put("family_name", "AuthCode"); put("issuing_country", "AT") }, selectiveDisclosure = null)
-                    if (credResp !is CredentialResponseResult.Success) return@post call.respond(HttpStatusCode.InternalServerError, buildJsonObject { put("error","server_error") })
+                    val cr = provider.createCredentialRequest(
+                        mapOf(
+                            "credential_configuration_id" to listOf(configId),
+                            "proofs" to listOf(buildJsonObject {
+                                put(
+                                    "jwt",
+                                    buildJsonArray { proofJwt?.let { add(JsonPrimitive(it)) } })
+                            }.toString())
+                        ), session
+                    )
+                    if (cr !is CredentialRequestResult.Success) return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject { put("error", "invalid_proof") })
+                    val credResp = provider.createCredentialResponse(
+                        request = cr.request.withIssuer(issuerBase),
+                        configuration = configuration,
+                        issuerKey = issuerKey,
+                        issuerId = issuerBase,
+                        credentialData = buildJsonObject {
+                            put("given_name", "Charlie"); put(
+                            "family_name",
+                            "AuthCode"
+                        ); put("issuing_country", "AT")
+                        },
+                        selectiveDisclosure = null
+                    )
+                    if (credResp !is CredentialResponseResult.Success) return@post call.respond(
+                        HttpStatusCode.InternalServerError,
+                        buildJsonObject { put("error", "server_error") })
                     val httpResp = provider.writeCredentialResponse(cr.request.withIssuer(issuerBase), credResp.response)
                     call.respond(HttpStatusCode.fromValue(httpResp.status), httpResp.payload)
                 }
@@ -640,26 +817,31 @@ class Wallet2AdditionalUseCasesTest {
 
                 val keyInfo = http.post("/wallet/$walletId/keys/generate") {
                     contentType(ContentType.Application.Json)
-                    setBody(GenerateKeyRequest(keyType = "secp256r1"))
+                    setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.secp256r1))
                 }.body<WalletKeyInfo>()
 
                 // ── Step 1: Generate authorization URL ──
                 val authUrlResult = testAndReturn("Auth-code isolated: generate-authorization-url") {
                     http.post("/wallet/$walletId/credentials/receive/authorization-url") {
                         contentType(ContentType.Application.Json)
-                        setBody(GenerateAuthorizationUrlRequest(
-                            offerJson = Json.encodeToJsonElement(offer).jsonObject,
-                            clientId = "wallet-client",
-                            redirectUri = Url("openid://"),
-                            usePkce = false
-                        ))
+                        setBody(
+                            GenerateAuthorizationUrlRequest(
+                                offerJson = Json.encodeToJsonElement(offer).jsonObject,
+                                clientId = "wallet-client",
+                                redirectUri = Url("openid://"),
+                                usePkce = false
+                            )
+                        )
                     }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
                         .body<GenerateAuthorizationUrlResult>()
                 }
                 assertNotNull(authUrlResult.authorizationUrl)
-                assertTrue(authUrlResult.authorizationUrl.toString().startsWith(issuerBase),
-                    "Authorization URL should point to issuer: ${authUrlResult.authorizationUrl}")
+                assertTrue(
+                    authUrlResult.authorizationUrl.toString().startsWith(issuerBase),
+                    "Authorization URL should point to issuer: ${authUrlResult.authorizationUrl}"
+                )
                 assertNotNull(authUrlResult.state)
+                assertEquals(offer.credentialIssuer, authUrlResult.credentialIssuerBaseUrl)
                 // usePkce=false: no PKCE for this test (DefaultAuthorizationCodeRecord has no code_challenge)
 
                 // ── Step 2: Exchange auth code for token (isolated) ──
@@ -670,11 +852,11 @@ class Wallet2AdditionalUseCasesTest {
                 val exchangeResp = http.post("/wallet/$walletId/credentials/receive/exchange-code") {
                     contentType(ContentType.Application.Json)
                     setBody(ExchangeCodeRequest(
-                        tokenEndpoint = Url("$issuerBase/token"),
                         code = authCodeValue,
+                        credentialIssuerBaseUrl = authUrlResult.credentialIssuerBaseUrl,
                         codeVerifier = null,  // no PKCE in this test
                         clientId = "wallet-client",
-                        redirectUri = Url("openid://")
+                        redirectUri = Url("openid://"),
                     ))
                 }
                 // The wallet correctly called the token endpoint. Whether the token exchange
@@ -682,7 +864,7 @@ class Wallet2AdditionalUseCasesTest {
                 // reachable (not 404/405) and the request was formed correctly.
                 assertTrue(
                     exchangeResp.status != HttpStatusCode.NotFound &&
-                    exchangeResp.status != HttpStatusCode.MethodNotAllowed,
+                            exchangeResp.status != HttpStatusCode.MethodNotAllowed,
                     "exchange-code endpoint must be reachable: got ${exchangeResp.status}"
                 )
 

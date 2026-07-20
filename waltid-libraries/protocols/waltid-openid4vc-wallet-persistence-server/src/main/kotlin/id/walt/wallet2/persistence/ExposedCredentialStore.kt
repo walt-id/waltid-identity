@@ -14,7 +14,7 @@ import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
 import org.jetbrains.exposed.v1.jdbc.upsert
-import java.time.Instant
+import kotlin.time.Clock
 import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
 
@@ -55,7 +55,7 @@ class ExposedCredentialStore(
                     json.encodeToString(DigitalCredential.serializer(), entry.credential)
                 it[Wallet2Tables.Credentials.label] = entry.label
                 it[Wallet2Tables.Credentials.addedAt] =
-                    entry.addedAt?.toJavaInstant() ?: Instant.now()
+                    (entry.addedAt ?: Clock.System.now()).toJavaInstant()
             }
         }
     }

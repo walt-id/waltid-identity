@@ -1,6 +1,22 @@
-# waltid-wallet-api2
+<div align="center">
+<h1>walt.id Wallet API 2</h1>
+ <span>by </span><a href="https://walt.id">walt.id</a>
+ <p>The next-generation walt.id Wallet, rebuilt from scratch on a clean KMP-compatible core for OpenID4VCI 1.0 and OpenID4VP 1.0.</p>
 
-> **OpenID4VCI 1.0 + OpenID4VP 1.0 Wallet Service** - the next-generation walt.id Wallet, rebuilt from scratch on a clean KMP-compatible core.
+<a href="https://walt.id/community">
+<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
+</a>
+<a href="https://www.linkedin.com/company/walt-id/">
+<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
+</a>
+  
+  <h2>Status</h2>
+  <p align="center">
+    <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
+    <br/>
+    <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
+  </p>
+</div>
 
 ## Overview
 
@@ -252,7 +268,7 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive \
 #### Step-by-step (isolated steps)
 
 ```bash
-# Step 1: Resolve the offer - returns issuer, offered credentials, grant type
+# Step 1: Resolve the offer - returns issuer, token endpoint, offered credentials, grant type
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/resolve-offer \
   -H "Content-Type: application/json" \
   -d "{\"offerUrl\":\"$OFFER_URL\"}"
@@ -260,7 +276,11 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/reso
 # Step 2: Request an access token
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/request-token \
   -H "Content-Type: application/json" \
-  -d '{"tokenEndpoint":"https://issuer.example.com/token","preAuthorizedCode":"abc123"}'
+  -d '{
+    "tokenEndpoint": "https://issuer.example.com/token",
+    "credentialIssuer": "https://issuer.example.com",
+    "preAuthorizedCode": "abc123"
+  }'
 
 ACCESS_TOKEN="..."
 C_NONCE="..."
@@ -290,7 +310,7 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/fetc
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/authorization-url \
   -H "Content-Type: application/json" \
   -d "{\"offerUrl\":\"$OFFER_URL\",\"usePkce\":true}"
-# → {"authorizationUrl":"https://issuer.example.com/authorize?...","codeVerifier":"...","state":"..."}
+# → {"authorizationUrl":"https://issuer.example.com/authorize?...","codeVerifier":"...","state":"...","credentialIssuerBaseUrl":"https://issuer.example.com"}
 
 # (User follows authorizationUrl in a browser, then is redirected back with ?code=...)
 
@@ -298,7 +318,7 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/auth
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/exchange-code \
   -H "Content-Type: application/json" \
   -d '{
-    "tokenEndpoint": "https://issuer.example.com/token",
+    "credentialIssuerBaseUrl": "https://issuer.example.com",
     "code": "<code-from-redirect>",
     "codeVerifier": "<pkce-verifier>",
     "redirectUri": "openid://"
@@ -445,3 +465,17 @@ Key endpoint groups:
 | Presentation (OID4VP 1.0) | `/wallet/{walletId}/credentials/present/...`                             |
 | Named Stores              | `GET/POST /stores/{keys,credentials,dids}/...`                           |
 | Auth (optional)           | `/auth/register`, `/auth/emailpass`, `/auth/logout`, `/auth/account/...` |
+
+## Join the community
+
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
+* Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
+* Find more indepth documentation on our [docs site](https://docs.walt.id)
+
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
+
+<div align="center">
+<img src="../../assets/walt-banner.png" alt="walt.id banner" />
+</div>

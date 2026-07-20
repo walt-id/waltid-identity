@@ -21,23 +21,22 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
 internal fun PinScreen(
     controller: WalletDemoController,
-    auth: WalletAuthState,
+    auth: WalletAuthState.PinEntry,
     isBusy: Boolean,
 ) {
     val setup = auth as? WalletAuthState.Setup
     val pin = when (auth) {
         is WalletAuthState.Setup -> auth.pin
         is WalletAuthState.Login -> auth.pin
-        WalletAuthState.Unlocked -> ""
     }
     val error = when (auth) {
         is WalletAuthState.Setup -> auth.error
         is WalletAuthState.Login -> auth.error
-        WalletAuthState.Unlocked -> null
     }
 
     Column(
@@ -71,7 +70,7 @@ internal fun PinScreen(
             isError = error != null,
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag("wallet.pinInput"),
+                .testTag(WalletUiTestTags.PinInput),
             singleLine = true,
         )
 
@@ -85,7 +84,7 @@ internal fun PinScreen(
                 isError = error != null,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("wallet.pinConfirmationInput"),
+                    .testTag(WalletUiTestTags.PinConfirmationInput),
                 singleLine = true,
             )
         }
@@ -99,9 +98,39 @@ internal fun PinScreen(
             enabled = !isBusy,
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag("wallet.pinSubmitButton"),
+                .testTag(WalletUiTestTags.PinSubmitButton),
         ) {
             Text(if (setup != null) "Set PIN" else "Unlock")
+        }
+    }
+}
+
+@Composable
+internal fun PinStorageUnavailableScreen(
+    controller: WalletDemoController,
+    message: String,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Spacer(Modifier.height(12.dp))
+        Text("walt.id Wallet", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text("PIN storage unavailable", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "$message. The wallet remains locked.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.error,
+        )
+        Button(
+            onClick = controller::retryPinStorage,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("wallet.pinStorageRetryButton"),
+        ) {
+            Text("Retry")
         }
     }
 }

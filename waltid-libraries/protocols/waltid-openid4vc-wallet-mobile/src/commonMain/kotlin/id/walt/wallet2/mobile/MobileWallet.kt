@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.wallet2.mobile
 
 import id.walt.crypto.keys.Key
@@ -12,16 +14,27 @@ import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.handlers.PresentCredentialRequest
+import id.walt.wallet2.handlers.PresentationCredentialOption
+import id.walt.wallet2.handlers.PresentationCredentialRequirement
+import id.walt.wallet2.handlers.PresentationCredentialSelection
+import id.walt.wallet2.handlers.PresentationDisclosureSelection
+import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
+import id.walt.wallet2.handlers.ResolveOfferRequest
+import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 /**
  * Result returned after a mobile wallet has been initialized with signing material and a DID.
@@ -35,7 +48,11 @@ public data class MobileWalletBootstrapResult(
 )
 
 /**
- * Lightweight credential summary suitable for mobile UI lists.
+ * Credential entry suitable for mobile UI lists and detail display.
+ *
+ * The credential content is exposed as a JSON string so Kotlin, Swift, and other
+ * consumers can decode it with native platform tools without depending on Kotlinx
+ * JSON value types in the public mobile API.
  *
  * @property id Wallet-local credential identifier.
  * @property format Credential format, such as `jwt_vc_json`, `vc+sd-jwt`, or `mso_mdoc`.
@@ -43,6 +60,7 @@ public data class MobileWalletBootstrapResult(
  * @property subject Subject identifier extracted from the credential when available.
  * @property label Optional display label stored with the credential.
  * @property addedAt ISO-8601 timestamp string for when the credential was added, when known.
+ * @property credentialDataJson Parsed credential data encoded as JSON for app-side display.
  */
 public data class MobileWalletCredential(
     public val id: String,
@@ -51,6 +69,20 @@ public data class MobileWalletCredential(
     public val subject: String?,
     public val label: String?,
     public val addedAt: String?,
+    public val credentialDataJson: String,
+)
+
+/**
+ * Result of resolving an OpenID4VCI credential offer before issuance.
+ *
+ * @property transactionCodeRequired Whether the app must collect a transaction code from the user.
+ */
+public data class MobileWalletOfferResolution(
+    public val transactionCodeRequired: Boolean,
+    /** Issuer identifier (URL) from the credential offer. */
+    public val credentialIssuer: String,
+    /** Credential configuration IDs advertised in the offer. */
+    public val offeredCredentials: List<String>,
 )
 
 /**
@@ -99,6 +131,7 @@ public class MobileWallet internal constructor(
     private val keyGenerator: suspend (KeyType) -> Key,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     attestationConfig: WalletAttestationConfig? = null,
+    private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {
@@ -181,7 +214,31 @@ public class MobileWallet internal constructor(
         }
 
     /**
+     * Resolves a credential offer and reports any transaction code the app must collect.
+     *
+     * Apps can use this before [receive] to decide whether to prompt the user for a code. While the
+     * preview is retained, the matching [receive] call reuses this exact resolution.
+     *
+     * @param offerUrl Credential offer URL, including `openid-credential-offer://` URLs.
+     * @return Issuer, offered credential, and transaction-code metadata for app-side review.
+     */
+    public suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution =
+        WalletIssuanceHandler.previewOffer(
+            wallet = wallet,
+            request = ResolveOfferRequest(offerUrl = Url(offerUrl.trim())),
+        ).let { result ->
+            MobileWalletOfferResolution(
+                transactionCodeRequired = result.txCodeRequired,
+                credentialIssuer = result.credentialIssuer,
+                offeredCredentials = result.offeredCredentials,
+            )
+        }
+
+    /**
      * Receives credentials from an OpenID4VCI credential offer.
+     *
+     * A matching prior [resolveOffer] call binds issuance to the reviewed resolution. Without one,
+     * the offer is resolved as part of this call.
      *
      * @param offerUrl Credential offer URL, including `openid-credential-offer://` URLs.
      * @param txCode Optional transaction code for pre-authorized offers.
@@ -207,7 +264,7 @@ public class MobileWallet internal constructor(
     /**
      * Lists all credentials currently stored in the mobile wallet.
      *
-     * @return Credential summaries ordered by the underlying credential store.
+     * @return Credential entries, including display JSON, ordered by the underlying credential store.
      */
     public suspend fun credentials(): List<MobileWalletCredential> =
         wallet.streamAllCredentials().toList().map { credential ->
@@ -219,11 +276,17 @@ public class MobileWallet internal constructor(
                 subject = meta.subject,
                 label = meta.label,
                 addedAt = meta.addedAt?.toString(),
+                credentialDataJson = credential.credential.credentialData.encodeJsonObject(),
             )
         }
 
     /**
      * Presents matching wallet credentials to an OpenID4VP verifier request.
+     *
+     * This immediate submission API is intended for callers that already handled
+     * request review and user consent. Apps that need to display verifier details,
+     * credential choices, selective disclosures, or transaction data should use
+     * [previewPresentation] followed by [submitPresentation].
      *
      * @param requestUrl Authorization request URL received from the verifier.
      * @param did Optional DID override for selecting the wallet DID used in the presentation.
@@ -242,6 +305,7 @@ public class MobileWallet internal constructor(
                 did = did,
                 runPolicies = runPolicies,
             ),
+            transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             onEvent = ::emitSessionEvent,
         )
 
@@ -253,6 +317,78 @@ public class MobileWallet internal constructor(
             },
         )
     }
+
+    /**
+     * Resolves and previews an OpenID4VP presentation request without submitting credentials.
+     */
+    public suspend fun previewPresentation(requestUrl: String): MobileWalletPresentationPreview {
+        val result = WalletPresentationHandler.previewPresentation(
+            wallet = wallet,
+            request = PreviewPresentationRequest(
+                requestUrl = Url(requestUrl.trim()),
+            ),
+            transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
+            onEvent = ::emitSessionEvent,
+        )
+
+        val profilesByType = transactionDataProfiles.associateBy { it.type }
+        return MobileWalletPresentationPreview(
+            request = MobileWalletPresentationRequestInfo(
+                clientId = result.authorizationRequest.clientId,
+                verifierName = result.authorizationRequest.clientMetadata?.clientName,
+                responseUri = result.authorizationRequest.responseUri,
+                state = result.authorizationRequest.state,
+                nonce = result.authorizationRequest.nonce,
+                transactionData = result.transactionData.map { item ->
+                    val profile = profilesByType[item.type]
+                    MobileWalletTransactionDataItem(
+                        type = item.type,
+                        displayName = profile?.displayName ?: item.type,
+                        credentialQueryIds = item.credentialQueryIds,
+                        supportedFields = profile?.fields.orEmpty(),
+                        rawJson = item.rawJson.encodeJsonObject(),
+                        detailsJson = item.details.encodeJsonObject(),
+                    )
+                },
+            ),
+            credentialOptions = result.credentialOptions.map { it.toMobileCredentialOption() },
+            credentialRequirements = result.credentialRequirements.map { it.toMobileCredentialRequirement() },
+        )
+    }
+
+    /**
+     * Submits a presentation using the credential options selected by the user from [previewPresentation].
+     */
+    public suspend fun submitPresentation(
+        requestUrl: String,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+        runPolicies: Boolean? = null,
+    ): MobileWalletPresentationResult =
+        WalletPresentationHandler.submitPresentation(
+            wallet = wallet,
+            request = SubmitPresentationRequest(
+                requestUrl = Url(requestUrl.trim()),
+                selectedCredentialOptions = selectedCredentialOptions.map {
+                    PresentationCredentialSelection(
+                        queryId = it.queryId,
+                        credentialId = it.credentialId,
+                    )
+                },
+                selectedDisclosureOptions = selectedDisclosureOptions?.map {
+                    PresentationDisclosureSelection(
+                        queryId = it.queryId,
+                        credentialId = it.credentialId,
+                        path = it.path,
+                    )
+                },
+                did = did,
+                runPolicies = runPolicies,
+            ),
+            transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
+            onEvent = ::emitSessionEvent,
+        ).toMobilePresentationResult()
 
     /**
      * Deletes local wallet material owned by this mobile wallet instance.
@@ -278,4 +414,48 @@ public class MobileWallet internal constructor(
         eventStream.tryEmit(mobileEvent)
         onEvent(mobileEvent)
     }
+
+    private fun PresentationCredentialOption.toMobileCredentialOption(): MobileWalletPresentationCredentialOption =
+        MobileWalletPresentationCredentialOption(
+            queryId = queryId,
+            credentialId = credentialId,
+            multiple = multiple,
+            format = format,
+            issuer = issuer,
+            subject = subject,
+            label = label,
+            credentialDataJson = credentialData.encodeJsonObject(),
+            disclosures = disclosures.map { disclosure ->
+                MobileWalletPresentationDisclosure(
+                    path = disclosure.path,
+                    name = disclosure.name,
+                    valueJson = Json.encodeToString(JsonElement.serializer(), disclosure.value),
+                    displayValue = disclosure.value.displayValue(),
+                    selectivelyDisclosable = disclosure.selectivelyDisclosable,
+                    required = disclosure.required,
+                    selectable = disclosure.selectable,
+                )
+            },
+        )
+
+    private fun PresentationCredentialRequirement.toMobileCredentialRequirement(): MobileWalletPresentationCredentialRequirement =
+        MobileWalletPresentationCredentialRequirement(options = options)
+
+    private fun WalletPresentResult.toMobilePresentationResult(): MobileWalletPresentationResult =
+        MobileWalletPresentationResult(
+            success = transmissionSuccess ?: false,
+            redirectTo = redirectTo,
+            verifierResponseJson = verifierResponse?.let {
+                Json.encodeToString(JsonElement.serializer(), it)
+            },
+        )
+
+    private fun JsonObject.encodeJsonObject(): String =
+        Json.encodeToString(JsonObject.serializer(), this)
+
+    private fun JsonElement.displayValue(): String? =
+        when (this) {
+            is JsonPrimitive -> contentOrNull
+            else -> toString()
+        }
 }

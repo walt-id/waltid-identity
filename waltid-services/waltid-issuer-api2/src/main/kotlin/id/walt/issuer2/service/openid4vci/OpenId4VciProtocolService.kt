@@ -71,9 +71,12 @@ class OpenId4VciProtocolService(
         explicitNulls = false
     }
 
-    suspend fun processPushedAuthorizationRequest(parameters: Map<String, List<String>>): PushedAuthorizationResponseHttp {
+    suspend fun processPushedAuthorizationRequest(
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>> = emptyMap(),
+    ): PushedAuthorizationResponseHttp {
         return try {
-            val parRequest = when (val result = oauth2Provider.createPushedAuthorizationRequest(parameters)) {
+            val parRequest = when (val result = oauth2Provider.createPushedAuthorizationRequest(parameters, headers)) {
                 is AuthorizationRequestResult.Success -> result.request
                 is AuthorizationRequestResult.Failure -> return oauth2Provider.writePushedAuthorizationError(result.error)
             }
@@ -208,8 +211,11 @@ class OpenId4VciProtocolService(
         )
     }
 
-    suspend fun processTokenRequest(parameters: Map<String, List<String>>): AccessTokenResponseHttp {
-        val accessTokenRequest = when (val result = oauth2Provider.createAccessTokenRequest(parameters)) {
+    suspend fun processTokenRequest(
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>> = emptyMap(),
+    ): AccessTokenResponseHttp {
+        val accessTokenRequest = when (val result = oauth2Provider.createAccessTokenRequest(parameters, headers)) {
             is AccessTokenRequestResult.Success -> result.request
             is AccessTokenRequestResult.Failure -> return oauth2Provider.writeAccessTokenError(result.error)
         }.withIssuer(metadataService.issuerBaseUrl())
@@ -239,14 +245,34 @@ class OpenId4VciProtocolService(
 
     suspend fun processCredentialRequest(accessToken: String, parameters: JsonObject): CredentialResponseHttp {
         val parameterMap = parameters.toParametersMap()
-        val credentialRequest = when (
-            val result = oauth2Provider.createCredentialRequest(
+        return processCredentialRequest(accessToken) {
+            oauth2Provider.createCredentialRequest(
                 parameters = parameterMap,
                 accessTokenContext = AccessTokenContext(
                     token = accessToken,
                     expectedIssuer = metadataService.issuerBaseUrl(),
                 ),
             )
+        }
+    }
+
+    suspend fun processCredentialRequest(accessToken: String, encryptedCredentialRequest: String): CredentialResponseHttp =
+        processCredentialRequest(accessToken) {
+            oauth2Provider.createCredentialRequest(
+                encryptedCredentialRequest = encryptedCredentialRequest,
+                accessTokenContext = AccessTokenContext(
+                    token = accessToken,
+                    expectedIssuer = metadataService.issuerBaseUrl(),
+                ),
+            )
+        }
+
+    private suspend fun processCredentialRequest(
+        accessToken: String,
+        createCredentialRequest: suspend () -> CredentialRequestResult,
+    ): CredentialResponseHttp {
+        val credentialRequest = when (
+            val result = createCredentialRequest()
         ) {
             is CredentialRequestResult.Success -> result.request
             is CredentialRequestResult.Failure -> return oauth2Provider.writeCredentialError(result.error)

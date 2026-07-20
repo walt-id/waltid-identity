@@ -17,7 +17,7 @@ dependencies {
 
     // JDBC drivers — SQLite (default) and Postgres (optional)
     implementation(identityLibs.sqlite.jdbc)
-    compileOnly(identityLibs.postgresql)
+    implementation(identityLibs.postgresql)
 
     // Connection pooling
     implementation(identityLibs.hikaricp)

@@ -25,6 +25,9 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(identityLibs.kotlinx.coroutines.core)
+            implementation(identityLibs.kotlinx.datetime)
+            implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.ktor.http)
         }
 
         if (enableMobileWallet) {
@@ -32,6 +35,11 @@ kotlin {
                 dependsOn(commonMain.get())
                 dependencies {
                     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
+                    implementation(identityLibs.ktor.client.core)
+                    implementation(identityLibs.ktor.client.content.negotiation)
+                    implementation(identityLibs.ktor.serialization.kotlinx.json)
+                    implementation(identityLibs.cryptography.core)
+                    implementation(identityLibs.whyoleg.cryptography.random)
                 }
             }
 
@@ -42,6 +50,13 @@ kotlin {
 
                 androidMain.dependencies {
                     implementation(identityLibs.ktor.client.android)
+                }
+
+                getByName("androidDeviceTest").dependencies {
+                    implementation(kotlin("test"))
+                    implementation(identityLibs.kotlinx.coroutines.test)
+                    implementation(identityLibs.androidx.test.ext.junit)
+                    implementation(identityLibs.androidx.test.runner)
                 }
             }
 

@@ -1,5 +1,9 @@
 package id.walt.wallet2.mobile
 
+import id.walt.credentials.CredentialDetectorTypes
+import id.walt.credentials.CredentialParser
+import id.walt.credentials.examples.SdJwtExamples
+import id.walt.credentials.formats.SdJwtCredential
 import id.walt.crypto.keys.KeyType
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
@@ -19,8 +23,14 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -35,8 +45,26 @@ class MobileWalletTest {
         assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
         assertEquals(null, config.attestationConfig)
         assertEquals(MobileWalletPersistence(), config.persistence)
+        assertEquals(emptyList(), config.transactionDataProfiles)
         assertIs<MobileWalletDatabaseKey.Managed>(config.persistence.databaseKey)
         assertEquals(MobileWalletStores(), config.persistence.stores)
+    }
+
+    @Test
+    fun mobileWalletConfigAcceptsCustomTransactionDataProfiles() {
+        val profiles = listOf(
+            MobileWalletTransactionDataProfile(
+                type = "example.transaction",
+                displayName = "Example Transaction",
+                fields = listOf("amount"),
+            )
+        )
+
+        val config = MobileWalletConfig(transactionDataProfiles = profiles)
+
+        assertEquals(profiles, config.transactionDataProfiles)
+        val registry = profiles.toTransactionDataTypeRegistry()
+        assertEquals(setOf("example.transaction"), registry.types)
     }
 
     @Test
@@ -153,6 +181,111 @@ class MobileWalletTest {
         assertEquals("""{"accepted":true}""", result.verifierResponseJson)
     }
 
+    @Test
+    fun credentialsExposeStoredCredentialDataAsJsonString() = runTest {
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "credential-1",
+                credential = SdJwtCredential(
+                    dmtype = CredentialDetectorTypes.SDJWTVCSubType.sdjwtvc,
+                    credentialData = buildJsonObject {
+                        put("given_name", "Ada")
+                    },
+                    issuer = "https://issuer.example",
+                    subject = "did:key:subject",
+                    signature = null,
+                    signed = null,
+                ),
+                label = "PID",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "custom-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            keyGenerator = { error("Injected credential listing should not generate a key") },
+        )
+
+        val credential = wallet.credentials().single()
+
+        assertEquals("credential-1", credential.id)
+        assertEquals("dc+sd-jwt", credential.format)
+        assertEquals("https://issuer.example", credential.issuer)
+        assertEquals("did:key:subject", credential.subject)
+        assertEquals("PID", credential.label)
+        assertEquals("""{"given_name":"Ada"}""", credential.credentialDataJson)
+    }
+
+    @Test
+    fun credentialsExposeResolvedSdJwtClaimsWhenDisclosuresAreAvailable() = runTest {
+        val (_, parsedCredential) = CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2)
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "credential-sd-jwt",
+                credential = parsedCredential,
+                label = "PID",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "custom-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            keyGenerator = { error("Injected credential listing should not generate a key") },
+        )
+
+        val displayData = displayJson.parseToJsonElement(wallet.credentials().single().credentialDataJson).jsonObject
+
+        assertEquals("Inga", displayData["given_name"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("Silverstone", displayData["family_name"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("1991-11-06", displayData["birthdate"]?.jsonPrimitive?.contentOrNull)
+        assertFalse(displayData.containsKey("_sd"), "resolved SD-JWT display data should not expose digest commitments as the primary content")
+    }
+
+    @Test
+    fun presentationPreviewUsesSwiftFriendlyCredentialAndClaimDtos() {
+        val preview = MobileWalletPresentationPreview(
+            request = MobileWalletPresentationRequestInfo(
+                clientId = "https://verifier.example",
+                verifierName = "Example Verifier",
+                responseUri = "https://verifier.example/direct-post",
+                state = "state-1",
+                nonce = "nonce-1",
+            ),
+            credentialOptions = listOf(
+                MobileWalletPresentationCredentialOption(
+                    queryId = "pid",
+                    credentialId = "credential-1",
+                    multiple = true,
+                    format = "vc+sd-jwt",
+                    issuer = "https://issuer.example",
+                    subject = "did:key:subject",
+                    label = "PID",
+                    credentialDataJson = """{"given_name":"Ada"}""",
+                    disclosures = listOf(
+                        MobileWalletPresentationDisclosure(
+                            path = "$.given_name",
+                            name = "given_name",
+                            valueJson = """"Ada"""",
+                            displayValue = "Ada",
+                            selectivelyDisclosable = true,
+                        )
+                    ),
+                )
+            ),
+            credentialRequirements = listOf(
+                MobileWalletPresentationCredentialRequirement(options = listOf(listOf("pid")))
+            ),
+        )
+
+        assertEquals("https://verifier.example", preview.request.clientId)
+        assertEquals("credential-1", preview.credentialOptions.single().credentialId)
+        assertEquals(true, preview.credentialOptions.single().multiple)
+        assertEquals("Ada", preview.credentialOptions.single().disclosures.single().displayValue)
+        assertEquals(listOf(listOf("pid")), preview.credentialRequirements.single().options)
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun mobileWalletEventStreamDoesNotBackpressureSlowCollectors() = runTest {
@@ -179,6 +312,11 @@ class MobileWalletTest {
         phase = MobileWalletEventPhase.issuance,
         status = MobileWalletEventStatus.progress,
     )
+
+    private val displayJson = kotlinx.serialization.json.Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
 
     private class RecordingDatabaseKeyProvider : DatabaseEncryptionKeyProvider {
         override suspend fun getOrCreateKey(walletId: String, databaseName: String): DatabaseEncryptionKey =

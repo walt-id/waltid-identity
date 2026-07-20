@@ -111,7 +111,7 @@ object Verifier2Service {
                             httpJson.encodeToString(serializer, it)
                         }) {
                             val verifierSession =
-                                sessions[call.parameters.getOrFail("sessionId")]
+                                sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
                                     ?: throw IllegalArgumentException("Unknown session id")
 
                             // Get the flow for this specific target.

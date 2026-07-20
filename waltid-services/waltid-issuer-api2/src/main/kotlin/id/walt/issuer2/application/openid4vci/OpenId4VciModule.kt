@@ -1,7 +1,9 @@
 package id.walt.issuer2.application.openid4vci
 
 import id.walt.crypto.keys.KeyManager
+import id.walt.issuer2.config.CredentialEncryptionKeyConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.OAuth2ProviderConfig
 import id.walt.openid4vci.core.PushedAuthorizationConfig
@@ -24,6 +26,7 @@ import id.walt.openid4vci.tokens.jwt.JwtVerificationKeyResolver
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 import id.walt.openid4vci.validation.DefaultCredentialRequestValidator
+import kotlinx.coroutines.runBlocking
 
 data class OpenId4VciModule(
     val oauth2Provider: OAuth2Provider,
@@ -44,17 +47,21 @@ data class OpenId4VciModule(
             val verificationKeyResolver = JwtVerificationKeyResolver {
                 KeyManager.resolveSerializedKey(config.ciTokenKey)
             }
-            val preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository)
+            val preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(
+                repository = preAuthorizedCodeRepository,
+                anonymousAccessSupported = config.supportsPreAuthAnonymous(),
+            )
 
             val accessTokenVerifier = JwtAccessTokenVerifier(verificationKeyResolver)
             val provider = buildOAuth2Provider(
                 OAuth2ProviderConfig(
 
+                    authorizationServerIssuer = config.openId4VciBaseUrl(),
+                    authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
                     authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
                     tokenEndpointHandlers = TokenEndpointHandlers(),
                     credentialEndpointHandlers = CredentialEndpointHandlers(),
 
-                    authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
                     accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
                     credentialRequestValidator = DefaultCredentialRequestValidator(),
 
@@ -66,6 +73,9 @@ data class OpenId4VciModule(
                         repository = parRepository,
                         enforcePushedAuthorizationRequests = config.enforcePushedAuthorizationRequests,
                     ),
+                    clientAuthenticationServiceConfig = createClientAuthenticationServiceConfig(config),
+                    credentialRequestDecryptor = config.credentialEncryptionKey
+                        ?.let(CredentialEncryptionKeyConfig::requestDecryptor),
 
 
                     accessTokenIssuer = JwtAccessTokenIssuer(signingKeyResolver),
@@ -82,6 +92,14 @@ data class OpenId4VciModule(
                 oauth2Provider = provider,
                 preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,
             )
+        }
+
+        private fun createClientAuthenticationServiceConfig(config: Issuer2ServiceConfig): ClientAuthenticationServiceConfig {
+            val clientAuthenticationConfig = config.clientAuthenticationConfig
+                ?: return ClientAuthenticationServiceConfig()
+            return runBlocking {
+                clientAuthenticationConfig.toClientAuthenticationServiceConfig()
+            }
         }
     }
 }

@@ -1,5 +1,8 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolver
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.par.PushedAuthorizationEndpointHandlers
@@ -9,11 +12,14 @@ import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.PARRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
+import id.walt.openid4vci.requests.credential.encryption.CredentialRequestDecryptor
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import id.walt.openid4vci.tokens.access.AccessTokenVerifier
 import id.walt.openid4vci.tokens.refresh.RefreshTokenIssuer
 import id.walt.openid4vci.tokens.refresh.RefreshTokenVerifier
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
+import id.walt.openid4vci.responses.credential.encryption.CredentialResponseEncryptor
+import id.walt.openid4vci.responses.credential.encryption.JweCredentialResponseEncryptor
 import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.CredentialRequestValidator
@@ -33,6 +39,8 @@ import id.walt.openid4vci.validation.IssuerStateValidator
  * repositories stay internal to the DI layer so applications pass in their own implementations.
  */
 data class OAuth2ProviderConfig(
+    val authorizationServerIssuer: String? = null,
+
     val authorizationRequestValidator: AuthorizationRequestValidator,
     val issuerStateValidator: IssuerStateValidator? = null,
     val authorizationEndpointHandlers: AuthorizationEndpointHandlers,
@@ -40,6 +48,13 @@ data class OAuth2ProviderConfig(
 
     val pushedAuthorizationEndpointHandlers: PushedAuthorizationEndpointHandlers = PushedAuthorizationEndpointHandlers(),
     val pushedAuthorizationConfig: PushedAuthorizationConfig? = null,
+
+    // Static client-auth setup for providers with one fixed runtime configuration.
+    val clientAuthenticationServiceConfig: ClientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(),
+    // Dynamic client-auth setup for singleton providers that resolve configuration from request context.
+    // If present, it owns client-auth policy for the request. Static config is used only when this is null.
+    val clientAuthenticationServiceResolver: ClientAuthenticationServiceResolver? = null,
+    val clientAttestationConfig: ClientAttestationConfig? = null,
 
     val accessTokenRequestValidator: AccessTokenRequestValidator,
     val tokenEndpointHandlers: TokenEndpointHandlers,
@@ -53,7 +68,9 @@ data class OAuth2ProviderConfig(
     val preAuthorizedCodeIssuer: PreAuthorizedCodeIssuer,
 
     val credentialRequestValidator: CredentialRequestValidator,
+    val credentialRequestDecryptor: CredentialRequestDecryptor? = null,
     val credentialEndpointHandlers: CredentialEndpointHandlers,
+    val credentialResponseEncryptor: CredentialResponseEncryptor = JweCredentialResponseEncryptor,
 )
 
 data class PushedAuthorizationConfig(
