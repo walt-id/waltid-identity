@@ -30,6 +30,8 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.server.util.*
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
@@ -59,9 +61,13 @@ object Verifier2Service {
         log.trace { "Updating session due to '$event': ${session.id}" }
         val updated = repository.update(session.id, block).session
 
-        Verifier2SessionUpdate(updated.id, event, updated)
-            .toKtorSessionUpdate()
-            .notifySessionUpdate(updated.id, updated.notifications)
+        try {
+            Verifier2SessionUpdate(updated.id, event, updated)
+                .toKtorSessionUpdate()
+                .notifySessionUpdate(updated.id, updated.notifications)
+        } catch (exception: Exception) {
+            log.warn(exception) { "Could not deliver verification session notification for ${updated.id}" }
+        }
     }
 
     /**
@@ -176,13 +182,24 @@ object Verifier2Service {
                         }) { body ->
                         val sessionId = call.parameters.getOrFail(VERIFICATION_SESSION)
                         log.trace { "Received verification session response to session: $sessionId" }
-                        val verificationSession = repository.claimForProcessing(sessionId).session
-
-                        call.respondHandleDirectPostResponse(
-                            verificationSession = verificationSession,
-                            updateSessionCallback = updateSessionCallback,
-                            failSessionCallback = failSessionCallback
-                        )
+                        val claim = repository.claimForProcessingWithOriginal(sessionId)
+                        try {
+                            call.respondHandleDirectPostResponse(
+                                verificationSession = claim.claimed.session,
+                                updateSessionCallback = updateSessionCallback,
+                                failSessionCallback = failSessionCallback,
+                                beforeRespond = { rejected ->
+                                    if (rejected) repository.restoreProcessingClaim(claim)
+                                },
+                            )
+                        } catch (exception: Exception) {
+                            try {
+                                withContext(NonCancellable) { repository.restoreProcessingClaim(claim) }
+                            } catch (rollbackException: Exception) {
+                                exception.addSuppressed(rollbackException)
+                            }
+                            throw exception
+                        }
                     }
                 }
             }
