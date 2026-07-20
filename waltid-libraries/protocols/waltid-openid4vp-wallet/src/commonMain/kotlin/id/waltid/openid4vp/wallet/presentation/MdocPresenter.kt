@@ -28,6 +28,7 @@ import id.walt.mdoc.objects.handover.OpenID4VPHandover
 import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.verifier.openid.transactiondata.DEFAULT_HASH_ALGORITHM
 import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
@@ -109,8 +110,11 @@ object MdocPresenter {
         log.debug { "Handling mso_mdoc credential" }
 
         val mdocsCredential = digitalCredential as MdocsCredential
-        val responseUri = authorizationRequest.responseUri
-            ?: throw IllegalArgumentException("response_uri is required for mso_mdoc presentation")
+        val responseUri = when (authorizationRequest.responseMode) {
+            OpenID4VPResponseMode.DIRECT_POST, OpenID4VPResponseMode.DIRECT_POST_JWT ->
+                authorizationRequest.responseUri
+            else -> authorizationRequest.redirectUri
+        } ?: throw IllegalArgumentException("A response_uri or redirect_uri is required for mso_mdoc presentation")
 
         val document: Document = mdocsCredential.document
         val issuerSigned: IssuerSigned = document.issuerSigned
@@ -140,8 +144,10 @@ object MdocPresenter {
         )
         log.trace { "Wallet-created device auth: $deviceAuth" }
 
+        val selectedClaimKeys = matchResult.selectedDisclosures?.keys.orEmpty()
         val dcqlQueryClaims = matchResult.originalQuery.claims
-        requireNotNull(dcqlQueryClaims) { "Missing claims for DCQL credential query: ${matchResult.originalQuery}" }
+            .orEmpty()
+            .filter { it.path.joinToString(".") in selectedClaimKeys }
 
         //--- SD START
         val selectedIssuerSignedItems = dcqlQueryClaims
@@ -157,12 +163,13 @@ object MdocPresenter {
             .mapValues { (sdNamespace2, claimQueries) ->
                 claimQueries.map { claimsQuery ->
                     val path = claimsQuery.path
-                    require(path.size == 2) { "mso_mdoc Claims Query path must contain exactly two elements" }
-                    require(path.all { it is JsonPrimitive && it.isString }) {
-                        "mso_mdoc Claims Query path elements must be strings"
+                    require(path.size == 2 && path.all { it is JsonPrimitive && it.isString }) {
+                        "An mdoc claim path must contain exactly two string elements: $path"
                     }
-                    val sdNamespace = path[0].jsonPrimitive.content
-                    val sdElementIdentifier = path[1].jsonPrimitive.content
+
+                    // Extract the actual Strings from the JsonElements
+                    val sdNamespace: String = path[0].jsonPrimitive.content
+                    val sdElementIdentifier: String = path[1].jsonPrimitive.content
 
                     check(sdNamespace == sdNamespace2) { "Namespace mismatch: $sdNamespace != $sdNamespace2" }
 
@@ -181,8 +188,7 @@ object MdocPresenter {
                     matchedIssuerSignedItem
                 }.distinctBy { it.elementIdentifier } // 3. Prevent duplicate disclosures if multiple deep paths hit the same element
             }
-        log.trace { "Selected disc:" + matchResult.selectedDisclosures }
-        log.trace { "DCQL claims:  " + authorizationRequest.dcqlQuery!!.credentials.first().claims!! }
+        log.trace { "Selected disclosures: ${matchResult.selectedDisclosures}" }
 
         val issuerSignedWithSelectedNamespaceItems =
             IssuerSigned.fromIssuerSignedItems(

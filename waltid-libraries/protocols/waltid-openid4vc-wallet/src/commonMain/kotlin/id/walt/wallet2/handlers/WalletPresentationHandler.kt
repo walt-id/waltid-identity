@@ -3,6 +3,7 @@
 package id.walt.wallet2.handlers
 
 import id.walt.credentials.formats.DigitalCredential
+import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
@@ -17,6 +18,8 @@ import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.handlers.WalletPresentationHandler.matchCredentials
+import id.walt.wallet2.handlers.WalletPresentationHandler.matchCredentialsFromStore
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
@@ -30,13 +33,24 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 
 private val log = KotlinLogging.logger {}
+
+// ---------------------------------------------------------------------------
+// Shared VP request-source contract
+// ---------------------------------------------------------------------------
+
+/**
+ * Common contract for request types that carry an untrusted OpenID4VP request URL.
+ * Resolution and Request Object authentication always happen inside the wallet.
+ */
+interface VpRequestSource {
+    val requestUrl: Url
+}
 
 // ---------------------------------------------------------------------------
 // Request / response types
@@ -54,30 +68,32 @@ data class PresentCredentialRequest(
      * May be an openid4vp:// URL with inline parameters, or an https:// URL
      * whose request_uri parameter points to the actual request object.
      */
-    val requestUrl: Url,
+    override val requestUrl: Url,
 
     val keyId: String? = null,
     val did: String? = null,
     val runPolicies: Boolean? = null
-)
+) : VpRequestSource
 
 @Serializable
 data class PresentCredentialIsolatedRequest(
-    val requestUrl: Url,
+    override val requestUrl: Url,
     val credentials: List<StoredCredential>,
     val keyId: String? = null,
     val did: String? = null
-)
+) : VpRequestSource
 
 // Isolated step types
 
 @Serializable
 data class ResolveVpRequestRequest(
-    val requestUrl: Url,
-)
+    override val requestUrl: Url,
+) : VpRequestSource
 
 @Serializable
 data class ResolveVpRequestResult(
+    /** Complete authenticated request to use for subsequent manual presentation steps. */
+    val authorizationRequest: AuthorizationRequest,
     val nonce: String?,
     val clientId: String?,
     val responseUri: Url?,
@@ -85,7 +101,9 @@ data class ResolveVpRequestResult(
     /** Response mode from the authorization request (e.g., direct_post, direct_post.jwt). */
     val responseMode: String? = null,
     /** True if the verifier requires encrypted responses (direct_post.jwt or dc_api.jwt). */
-    val requiresEncryptedResponse: Boolean = false
+    val requiresEncryptedResponse: Boolean = false,
+    /** The DCQL query from the authorization request, ready to pass to match-credentials or present. */
+    val dcqlQuery: DcqlQuery?,
 )
 
 @Serializable
@@ -231,7 +249,7 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ): WalletPresentResult {
-        val key = resolveKey(wallet, request.keyId)
+        val key = wallet.resolveKey(keyId = request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
         val keyId = key.getKeyId()
@@ -278,7 +296,7 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ): WalletPresentResult {
-        val key = resolveKey(wallet, request.keyId)
+        val key = wallet.resolveKey(keyId = request.keyId)
             ?: error("No key available for isolated presentation")
         val did = request.did ?: wallet.defaultDid()
 
@@ -373,7 +391,7 @@ object WalletPresentationHandler {
     ): WalletPresentResult {
         request.selectedCredentialOptions.requireValidPresentationCredentialSelection()
         val resolvedAuthorizationRequest = consumePreviewedAuthorizationRequest(wallet, request.requestUrl)
-        val key = resolveKey(wallet, null)
+        val key = wallet.resolveKey(keyId = null)
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
         val selectedQueryIds = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.queryId }
@@ -445,12 +463,14 @@ object WalletPresentationHandler {
         val authRequest = resolveAuthenticatedAuthorizationRequest(wallet, request)
 
         return ResolveVpRequestResult(
+            authorizationRequest = authRequest,
             nonce = authRequest.nonce,
             clientId = authRequest.clientId,
             responseUri = authRequest.responseUri?.let { Url(it) },
             hasRequestUri = request.requestUrl.parameters.contains("request_uri"),
             responseMode = authRequest.responseMode?.name,
-            requiresEncryptedResponse = authRequest.responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES
+            requiresEncryptedResponse = authRequest.responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES,
+            dcqlQuery = authRequest.dcqlQuery,
         )
     }
 
@@ -478,22 +498,12 @@ object WalletPresentationHandler {
      */
     suspend fun matchCredentials(request: MatchCredentialsRequest): MatchCredentialsResult {
         // Build index: rawCredential index → wallet credential id
-        val idByIndex = request.credentials.mapIndexed { idx, stored -> idx.toString() to stored.id }.toMap()
-
+        val idByIndex = request.credentials.withIndex().associate { (idx, stored) -> idx.toString() to stored.id }
         val rawCredentials = request.credentials.mapIndexed { idx, stored ->
             stored.credential.toRawDcqlCredential(idx.toString())
         }
         val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrThrow()
-
-        val matchedCredentialIds = matched.mapValues { (_, results) ->
-            results.map { result -> idByIndex[result.credential.id] ?: result.credential.id }
-        }
-
-        return MatchCredentialsResult(
-            matchedQueryIds = matched.keys.toList(),
-            matchCount = matched.values.sumOf { it.size },
-            matchedCredentialIds = matchedCredentialIds
-        )
+        return buildMatchResult(matched, idByIndex)
     }
 
     /**
@@ -542,11 +552,22 @@ object WalletPresentationHandler {
     // Helpers
     // ---------------------------------------------------------------------------
 
-    private suspend fun resolveKey(wallet: Wallet, keyId: String?) = when {
-        keyId != null -> wallet.findKey(keyId)
-            ?: error("Key '$keyId' not found in any wallet key store")
-        else -> wallet.defaultKey()
-    }
+    // resolveKey is now wallet.resolveKey(keyId = keyId) - see Wallet.resolveKey
+
+    /**
+     * Builds a [MatchCredentialsResult] from raw DCQL match results and an index-to-wallet-id map.
+     * Extracted to eliminate duplication between [matchCredentials] and [matchCredentialsFromStore].
+     */
+    private fun buildMatchResult(
+        matched: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+        idByIndex: Map<String, String>
+    ) = MatchCredentialsResult(
+        matchedQueryIds = matched.keys.toList(),
+        matchCount = matched.values.sumOf { it.size },
+        matchedCredentialIds = matched.mapValues { (_, results) ->
+            results.map { idByIndex[it.credential.id] ?: it.credential.id }
+        }
+    )
 
     /**
      * DCQL-matches the wallet's own stored credentials against [query] without
@@ -560,16 +581,89 @@ object WalletPresentationHandler {
         wallet: Wallet,
         request: MatchCredentialsFromStoreRequest
     ): MatchCredentialsResult {
-        val matched = selectFromStores(wallet, request.dcqlQuery)
-        val matchedCredentialIds = matched.mapValues { (_, results) ->
-            results.map { result -> result.credential.id }
+        // Build idByIndex and rawCredentials in a single streaming pass over the credential stores.
+        // selectFromStores uses integer indices as DCQL credential IDs internally; we need the
+        // idx -> wallet-assigned-id map to translate them back before returning to the caller.
+        val idByIndex = mutableMapOf<String, String>()
+        val rawCredentials = mutableListOf<RawDcqlCredential>()
+        var idx = 0
+        wallet.streamAllCredentials().collect { stored ->
+            val key = idx.toString()
+            idByIndex[key] = stored.id
+            rawCredentials += stored.credential.toRawDcqlCredential(key)
+            idx++
         }
-        return MatchCredentialsResult(
-            matchedQueryIds = matched.keys.toList(),
-            matchCount = matched.values.sumOf { it.size },
-            matchedCredentialIds = matchedCredentialIds
-        )
+        if (rawCredentials.isEmpty()) return MatchCredentialsResult(emptyList(), 0, emptyMap())
+        val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrThrow()
+        return buildMatchResult(matched, idByIndex)
     }
+
+    /**
+     * Isolated step 3: build the VP token from the wallet's stored credentials
+     * that were selected in step 2.
+     *
+     * @param wallet The wallet owning the credentials.
+     * @param request Contains the resolved authorization request, selected credential IDs,
+     *   and optional key/DID overrides.
+     */
+    suspend fun buildVpToken(wallet: Wallet, request: BuildVpTokenRequest): BuildVpTokenResult {
+        val key = wallet.resolveKey(request.key, request.keyId)
+            ?: throw IllegalArgumentException("Wallet has no key available for VP token building")
+        val did = request.did ?: wallet.defaultDid()
+
+        val dcqlQuery = request.authorizationRequest.dcqlQuery
+            ?: throw IllegalArgumentException("AuthorizationRequest has no dcql_query")
+
+        val queriesById = dcqlQuery.credentials.associateBy { it.id }
+        val unknownQueryIds = request.selectedCredentialIds.keys - queriesById.keys
+        require(unknownQueryIds.isEmpty()) { "Unknown DCQL query IDs selected: $unknownQueryIds" }
+        require(request.selectedCredentialIds.isNotEmpty()) { "No credentials selected" }
+
+        val matchedCredentials = request.selectedCredentialIds.mapValues { (queryId, credentialIds) ->
+            val query = requireNotNull(queriesById[queryId])
+            require(credentialIds.isNotEmpty()) { "No credentials selected for DCQL query '$queryId'" }
+            require(query.multiple || credentialIds.size == 1) {
+                "DCQL query '$queryId' does not allow multiple credentials"
+            }
+
+            val selectedCredentials = credentialIds.distinct().map { credentialId ->
+                wallet.findCredential(credentialId)
+                    ?: throw IllegalArgumentException("Credential '$credentialId' not found in wallet")
+            }
+            val matches = DcqlMatcher.match(
+                query = DcqlQuery(credentials = listOf(query)),
+                availableCredentials = selectedCredentials.map { stored ->
+                    stored.credential.toRawDcqlCredential(stored.id)
+                },
+            ).getOrThrow()[queryId].orEmpty()
+            require(matches.size == selectedCredentials.size) {
+                "One or more selected credentials do not satisfy DCQL query '$queryId'"
+            }
+            matches
+        }
+
+        val vpToken = WalletPresentFunctionality2.buildVpToken(
+            authorizationRequest = request.authorizationRequest,
+            matchedCredentials = matchedCredentials,
+            holderKey = key,
+            holderDid = did,
+        )
+        val idToken = WalletPresentFunctionality2.buildIdToken(request.authorizationRequest, key, did)
+        return BuildVpTokenResult(vpToken = vpToken, idToken = idToken)
+    }
+
+    /**
+     * Isolated step 4: send the authorization response to the verifier.
+     *
+     * @param request Contains the authorization request, VP token, and optional ID token.
+     * @return The [WalletPresentResult] describing the transmission outcome.
+     */
+    suspend fun sendAuthorizationResponse(request: SendAuthorizationResponseRequest): WalletPresentResult =
+        WalletPresentFunctionality2.sendAuthorizationResponse(
+            authorizationRequest = request.authorizationRequest,
+            vpToken = request.vpToken,
+            idToken = request.idToken,
+        ).getOrThrow()
 
     /**
      * Streams all credentials from all wallet credential stores, converts each
@@ -932,3 +1026,55 @@ object WalletPresentationHandler {
         )
     }
 }
+
+// ---------------------------------------------------------------------------
+// Isolated-step request / response types for the manual presentation flow
+// ---------------------------------------------------------------------------
+
+/**
+ * Request to build a VP token from already-matched credentials.
+ *
+ * Used in the manual presentation flow:
+ * 1. `POST /present/resolve-request` - resolves the authorization request
+ * 2. `POST /present/match-credentials-from-store` - selects matching credentials
+ * 3. `POST /present/build-vp-token` - builds the VP token (this request)
+ * 4. `POST /present/send-response` - transmits the response to the verifier
+ */
+@Serializable
+data class BuildVpTokenRequest(
+    /** The resolved authorization request from step 1. */
+    val authorizationRequest: AuthorizationRequest,
+    /**
+     * Credential IDs (wallet-assigned) to include, grouped by DCQL query ID.
+     * These are the IDs returned by `match-credentials-from-store`.
+     */
+    val selectedCredentialIds: Map<String, List<String>>,
+    /** Key to use for signing. Defaults to the wallet's default key. */
+    val key: DirectSerializedKey? = null,
+    val keyId: String? = null,
+    /** DID to use as holder binding. Defaults to the wallet's default DID. */
+    val did: String? = null,
+)
+
+@Serializable
+data class BuildVpTokenResult(
+    /** The serialized `vp_token` JSON string, ready for [SendAuthorizationResponseRequest]. */
+    val vpToken: String,
+    /** The Self-Issued ID Token for SIOPv2 flows, or null for plain vp_token flows. */
+    val idToken: String? = null,
+)
+
+/**
+ * Request to send the authorization response to the verifier.
+ *
+ * Final step of the manual presentation flow.
+ */
+@Serializable
+data class SendAuthorizationResponseRequest(
+    /** The resolved authorization request from step 1. */
+    val authorizationRequest: AuthorizationRequest,
+    /** The VP token from step 3. */
+    val vpToken: String,
+    /** The ID token from step 3, or null. */
+    val idToken: String? = null,
+)

@@ -587,6 +587,8 @@ class WalletSdkBridgeTest {
             resolvedOfferUrl = offerUrl
             return MobileWalletOfferResolution(
                 transactionCodeRequired = true,
+                credentialIssuer = "https://issuer.example",
+                offeredCredentials = listOf("ExampleCredential"),
             )
         }
 

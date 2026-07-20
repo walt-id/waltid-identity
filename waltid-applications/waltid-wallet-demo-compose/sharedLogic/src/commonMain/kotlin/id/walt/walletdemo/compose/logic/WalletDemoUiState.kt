@@ -2,10 +2,12 @@ package id.walt.walletdemo.compose.logic
 
 data class WalletDemoUiState(
     val auth: WalletAuthState = WalletAuthState.Setup(),
+    val isAuthenticating: Boolean = false,
     val session: WalletSessionState = WalletSessionState.NotBootstrapped,
     val operation: WalletOperationState = WalletOperationState.Idle,
     val selectedTab: WalletDemoTab = WalletDemoTab.Credentials,
     val requestDrafts: WalletRequestDrafts = WalletRequestDrafts(),
+    val offerPreview: WalletDemoOfferPreview? = null,
     val lastReceivedCredentialIds: List<String> = emptyList(),
     val receiveCompleted: Boolean = false,
     val receiveNavigationResetKey: Int = 0,

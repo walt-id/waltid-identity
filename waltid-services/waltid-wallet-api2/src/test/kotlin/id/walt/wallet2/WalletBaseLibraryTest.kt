@@ -2,17 +2,16 @@ package id.walt.wallet2
 
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletDidEntry
+import id.walt.wallet2.handlers.ImportCredentialRequest
+import id.walt.wallet2.handlers.WalletCredentialHandler
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
+import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 /**
  * Unit tests for waltid-openid4vc-wallet base library:
@@ -83,12 +82,39 @@ class WalletBaseLibraryTest {
     }
 
     @Test
+    fun testDeletingWalletRemovesAccountMapping() = runTest {
+        val store = InMemoryWalletStore()
+        store.saveWallet(Wallet(id = "wallet"))
+        store.linkWalletToAccount("account", "wallet")
+
+        store.deleteWallet("wallet")
+
+        assertTrue(store.getWalletIdsForAccount("account").isNullOrEmpty())
+    }
+
+    @Test
+    fun testRawCredentialImportUsesSharedWalletOperation() = runTest {
+        val credentialStore = InMemoryCredentialStore()
+        val wallet = Wallet(id = "wallet", credentialStores = listOf(credentialStore))
+        val rawCredential =
+            "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaWQ6a2V5OnRlc3QiLCJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwidmMiOnsiQGNvbnRleHQiOlsiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiXSwidHlwZSI6WyJWZXJpZmlhYmxlQ3JlZGVudGlhbCIsIlRlc3RDcmVkZW50aWFsIl0sImNyZWRlbnRpYWxTdWJqZWN0Ijp7ImlkIjoiZGlkOmtleTp0ZXN0IiwibmFtZSI6IlRlc3QifX19.signature"
+
+        val imported = WalletCredentialHandler.importCredential(
+            wallet,
+            ImportCredentialRequest(rawCredential = rawCredential, label = "Imported"),
+        )
+
+        assertEquals("Imported", imported.label)
+        assertEquals(imported, credentialStore.getCredential(imported.id))
+    }
+
+    @Test
     fun testCreateWalletRequest_initBlockEnforcesExclusivity() {
         // Both offerUrl and offerJson → should throw
         val threw = runCatching {
             id.walt.wallet2.handlers.ReceiveCredentialRequest(
                 offerUrl = io.ktor.http.Url("openid-credential-offer://example"),
-                offerJson = kotlinx.serialization.json.JsonObject(emptyMap())
+                offerJson = JsonObject(emptyMap())
             )
         }.isFailure
         assertTrue(threw, "Should have thrown when both offerUrl and offerJson are set")
@@ -101,9 +127,10 @@ class WalletBaseLibraryTest {
     }
 
     @Test
-    fun testPresentCredentialRequest_requiresOriginalUrl() {
-        val requestUrl = io.ktor.http.Url("openid4vp://authorize")
+    fun testPresentCredentialRequestCarriesUntrustedRequestUrl() {
+        val requestUrl = io.ktor.http.Url("openid4vp://authorize?client_id=test")
         val request = id.walt.wallet2.handlers.PresentCredentialRequest(requestUrl = requestUrl)
+
         assertEquals(requestUrl, request.requestUrl)
     }
 }

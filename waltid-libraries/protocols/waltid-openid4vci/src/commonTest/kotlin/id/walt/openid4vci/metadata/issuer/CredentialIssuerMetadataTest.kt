@@ -10,6 +10,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 
 class CredentialIssuerMetadataTest {
 
@@ -202,6 +203,31 @@ class CredentialIssuerMetadataTest {
                 encryptionRequired = true,
             ),
         )
+    }
+
+    @Test
+    fun `fromBaseUrl derives matching response encryption metadata from request encryption metadata`() {
+        val requestEncryption = CredentialRequestEncryption(
+            jwks = encryptionJwks(),
+            encValuesSupported = setOf("A128GCM"),
+            zipValuesSupported = setOf("DEF"),
+            encryptionRequired = true,
+        )
+
+        val metadata = CredentialIssuerMetadata.fromBaseUrl(
+            baseUrl = "https://issuer.example",
+            credentialConfigurationsSupported = mapOf(
+                "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
+            ),
+            credentialRequestEncryption = requestEncryption,
+        )
+
+        assertEquals(requestEncryption, metadata.credentialRequestEncryption)
+        val responseEncryption = assertNotNull(metadata.credentialResponseEncryption)
+        assertEquals(setOf("ECDH-ES"), responseEncryption.algValuesSupported)
+        assertEquals(requestEncryption.encValuesSupported, responseEncryption.encValuesSupported)
+        assertEquals(requestEncryption.zipValuesSupported, responseEncryption.zipValuesSupported)
+        assertEquals(requestEncryption.encryptionRequired, responseEncryption.encryptionRequired)
     }
 
     @Test
@@ -474,5 +500,24 @@ class CredentialIssuerMetadataTest {
         assertEquals("https://issuer.example/authorize", asMetadata.authorizationEndpoint)
         assertEquals("https://issuer.example/token", asMetadata.tokenEndpoint)
         assertEquals("https://issuer.example/jwks", asMetadata.jwksUri)
+    }
+
+    private fun encryptionJwks() = buildJsonObject {
+        put(
+            "keys",
+            JsonArray(
+                listOf(
+                    buildJsonObject {
+                        put("kty", JsonPrimitive("EC"))
+                        put("kid", JsonPrimitive("ac"))
+                        put("use", JsonPrimitive("enc"))
+                        put("crv", JsonPrimitive("P-256"))
+                        put("alg", JsonPrimitive("ECDH-ES"))
+                        put("x", JsonPrimitive("YO4epjifD-KWeq1sL2tNmm36BhXnkJ0He-WqMYrp9Fk"))
+                        put("y", JsonPrimitive("Hekpm0zfK7C-YccH5iBjcIXgf6YdUvNUac_0At55Okk"))
+                    }
+                )
+            )
+        )
     }
 }

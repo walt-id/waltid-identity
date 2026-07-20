@@ -72,11 +72,57 @@ OpenID4VP 1.0 verifier implementation. Provides integration-ready components for
 
 **Use when:** You're building a verifier service that needs to request verifiable presentations from wallets using OpenID4VP 1.0.
 
+### Wallet Libraries
 
+Learn more about mobile development with walt.id in our [Mobile Development Guide](../../docs/mobile-development.md) and check out our example applications for [Compose](../../waltid-applications/waltid-compose-wallet-demo) and [iOS](../../waltid-applications/waltid-wallet-demo-ios) Wallets.
 
-  
-  
+#### Core Wallet Libraries
 
+### [🟢 waltid-openid4vc-wallet](./waltid-openid4vc-wallet)
+
+Core Wallet Module for OpenID4VCI 1.0 issuance and OpenID4VP 1.0 presentation. Provides a complete, multiplatform wallet library with pluggable storage backends, supporting both pre-authorized code and authorization code grant flows for issuance, and DCQL-based credential presentation.
+
+**Use when:** You're building a wallet application or service that needs to support OpenID4VCI 1.0 and OpenID4VP 1.0.
+
+### [🟢 waltid-openid4vp-wallet](./waltid-openid4vp-wallet)
+
+OpenID4VP 1.0 wallet implementation. Provides integration-ready components for building wallets that respond to verifier presentation requests using OpenID4VP 1.0.
+
+**Use when:** You're building a wallet application that needs to handle verifier presentation requests using OpenID4VP 1.0.
+
+### [🟢 waltid-openid4vci-wallet](./waltid-openid4vci-wallet)
+
+OpenID4VCI 1.0 wallet (holder) implementation. Provides offer parsing, metadata resolution, token exchange, and proof-of-possession for wallets receiving credentials.
+
+**Use when:** You're building a wallet that needs to receive credentials using OpenID4VCI 1.0.
+
+#### Wallet Server Libraries
+
+### [🟢 waltid-openid4vc-wallet-persistence-server](./waltid-openid4vc-wallet-persistence)
+
+SQL-backed persistence for the Wallet Server. Provides Exposed ORM-based implementations of wallet stores supporting SQLite and PostgreSQL.
+
+**Use when:** You need persistent storage for wallet data (keys, credentials, DIDs) that survives application restarts.
+
+#### Mobile Wallet Libraries
+
+### [🟢 waltid-openid4vc-wallet-mobile](./waltid-openid4vc-wallet-persistence)
+
+Kotlin Multiplatform SDK for the walt.id mobile wallet. Example application showing integration can be found in the [waltid-compose-wallet-demo](https://github.com/walt-id/waltid-compose-wallet-demo) repository.
+
+**Use when:** Building Kotlin Multiplatform Compose wallets and native Android Wallets.
+
+### [🟢 waltid-openid4vc-wallet-sdk-ios](./waltid-openid4vc-wallet-persistence)
+
+Swift facade for the walt.id mobile wallet. Example application showing integration can be found in the [waltid-ios-wallet-demo](https://github.com/walt-id/waltid-ios-wallet-demo) repository.
+
+**Use when:** Building native iOS Wallets.
+
+### [🟢 waltid-openid4vc-wallet-persistence-mobile](./waltid-openid4vc-wallet-persistence)
+
+SQL-backed persistence for the Wallet SDK. Provides Exposed ORM-based implementations of wallet stores supporting SQLite.
+
+**Use when:** You need persistent storage for wallet data (keys, credentials, DIDs) that survives application restarts on mobile.
 
 ### Helper Libraries:
 
@@ -104,44 +150,12 @@ ISO/IEC 18013-7 Annex C (DC API / Apple Wallet) verifier support. Provides HPKE 
 
 **Use when:** You need to verify mdoc credentials via the Digital Credentials API (browser-based flows, Apple Wallet integration).
 
-  
-  
-
-
-### Wallet Libraries:
-
-### [🟢 waltid-openid4vc-wallet](./waltid-openid4vc-wallet)
-
-Core Wallet Module for OpenID4VCI 1.0 issuance and OpenID4VP 1.0 presentation. Provides a complete, multiplatform wallet library with pluggable storage backends, supporting both pre-authorized code and authorization code grant flows for issuance, and DCQL-based credential presentation.
-
-**Use when:** You're building a wallet application or service that needs to support OpenID4VCI 1.0 and OpenID4VP 1.0.
-
-### [🟢 waltid-openid4vp-wallet](./waltid-openid4vp-wallet)
-
-OpenID4VP 1.0 wallet implementation. Provides integration-ready components for building wallets that respond to verifier presentation requests using OpenID4VP 1.0.
-
-**Use when:** You're building a wallet application that needs to handle verifier presentation requests using OpenID4VP 1.0.
-
-### [🟢 waltid-openid4vci-wallet](./waltid-openid4vci-wallet)
-
-OpenID4VCI 1.0 wallet (holder) implementation. Provides offer parsing, metadata resolution, token exchange, and proof-of-possession for wallets receiving credentials.
-
-**Use when:** You're building a wallet that needs to receive credentials using OpenID4VCI 1.0.
-
-### [🟢 waltid-openid4vc-wallet-persistence](./waltid-openid4vc-wallet-persistence)
-
-SQL-backed persistence for the Wallet SDK. Provides Exposed ORM-based implementations of wallet stores supporting SQLite and PostgreSQL.
-
-**Use when:** You need persistent storage for wallet data (keys, credentials, DIDs) that survives application restarts.
-
-
-
 ## Protocol Versions
 
 - **Draft Implementations**: Use [waltid-openid4vc](./waltid-openid4vc) for OID4VCI Draft 11/13 and OID4VP Draft 14/20
 - **OpenID4VP 1.0**: Use the `waltid-openid4vp-`* libraries for the final OpenID4VP 1.0 specification
 - **OpenID4VCI 1.0**: Use [waltid-openid4vci](./waltid-openid4vci) for issuer-side and [waltid-openid4vci-wallet](./waltid-openid4vci-wallet) for wallet-side
-- **Wallet SDK**: Use [waltid-openid4vc-wallet](./waltid-openid4vc-wallet) for a complete wallet library supporting both OpenID4VCI 1.0 and OpenID4VP 1.0
+- **Wallet SDKs**: Use [waltid-openid4vc-wallet-mobile](./waltid-openid4vc-wallet) for a complete wallet library supporting both OpenID4VCI 1.0 and OpenID4VP 1.0 on mobile, or [waltid-openid4vc-wallet-server](./waltid-openid4vc-wallet)  for building custodial REST API-based wallets.
 
 ## Join the community
 
@@ -152,7 +166,3 @@ SQL-backed persistence for the Wallet SDK. Provides Exposed ORM-based implementa
 ## License
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
-
-<div align="center">
-<img src="../../assets/walt-banner.png" alt="walt.id banner" />
-</div>

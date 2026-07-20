@@ -240,6 +240,7 @@ object Verifier2VPDirectPostHandler {
         updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
         failSessionCallback: suspend (session: Verification2Session, event: SessionEvent, updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit) -> Unit,
         policyContext: PolicyExecutionContext = PolicyExecutionContext.Empty,
+        beforeRespond: suspend (rejected: Boolean) -> Unit = {},
     ) {
         val call = this
 
@@ -262,6 +263,7 @@ object Verifier2VPDirectPostHandler {
                 policyContext = policyContext
             )
 
+            beforeRespond(false)
             call.respond(result)
         } catch (e: PresentationRejectionException) {
             // OID4VP 1.0 §8.2 / §response_mode_post: the verifier signals rejection with a 4xx
@@ -274,6 +276,7 @@ object Verifier2VPDirectPostHandler {
                 put("error_description", e.message ?: "Presentation rejected")
                 verificationSession.redirects?.errorRedirectUri?.let { put("redirect_uri", it.toString()) }
             }
+            beforeRespond(true)
             call.respond(HttpStatusCode.BadRequest, errorBody)
         }
     }

@@ -309,6 +309,20 @@ class AuthorizationRequestResolverJvmTest {
         assertTrue(!metadata.contains("encrypted_response_enc_values_supported"))
     }
 
+    @Test
+    fun `request uri post can omit optional wallet metadata`() {
+        val parameters = parseQueryString(
+            AuthorizationRequestResolver.buildRequestUriPostBody(
+                walletNonce = "nonce",
+                walletMetadata = "{\"vp_formats_supported\":{}}",
+                sendWalletMetadata = false,
+            )
+        )
+
+        assertEquals("nonce", parameters["wallet_nonce"])
+        assertEquals(null, parameters["wallet_metadata"])
+    }
+
     private fun resolveAllowUnsigned(requestObject: String, outerClientId: String?) = runBlocking {
         val requestUrl = URLBuilder("openid4vp://authorize").apply {
             outerClientId?.let { parameters.append("client_id", it) }

@@ -43,7 +43,9 @@ class ExposedWalletStore(private val db: Database) : WalletStore {
                 credentialStoreIds = credentialStoreIds,
                 didStoreId = didStoreId,
                 serializedStaticKey = walletRow[Wallet2Tables.Wallets.serializedStaticKey],
-                staticDid = walletRow[Wallet2Tables.Wallets.staticDid]
+                staticDid = walletRow[Wallet2Tables.Wallets.staticDid],
+                defaultKeyId = walletRow[Wallet2Tables.Wallets.defaultKeyId],
+                defaultDidId = walletRow[Wallet2Tables.Wallets.defaultDidId],
             )
         }
 
@@ -54,6 +56,8 @@ class ExposedWalletStore(private val db: Database) : WalletStore {
                 it[Wallet2Tables.Wallets.id] = descriptor.id
                 it[Wallet2Tables.Wallets.serializedStaticKey] = descriptor.serializedStaticKey
                 it[Wallet2Tables.Wallets.staticDid] = descriptor.staticDid
+                it[Wallet2Tables.Wallets.defaultKeyId] = descriptor.defaultKeyId
+                it[Wallet2Tables.Wallets.defaultDidId] = descriptor.defaultDidId
             }
 
             // Ensure named store rows exist

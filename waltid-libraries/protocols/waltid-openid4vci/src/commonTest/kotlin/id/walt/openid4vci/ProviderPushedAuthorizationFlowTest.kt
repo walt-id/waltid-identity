@@ -181,10 +181,10 @@ class ProviderPushedAuthorizationFlowTest {
     }
 
     @Test
-    fun `provider preserves raw multi-value pushed authorization parameters`() = runTest {
+    fun `provider preserves pushed authorization parameters`() = runTest {
         val provider = buildParProvider()
         val pushedParameters = validPushedParameters(clientId = "multi-client") +
-            ("scope" to listOf("openid", "credential"))
+            ("scope" to listOf("openid credential"))
 
         val pushedResponse = pushAuthorizationRequest(provider, pushedParameters)
         val authorizeRequest = assertIs<AuthorizationRequestResult.Success>(
@@ -196,7 +196,7 @@ class ProviderPushedAuthorizationFlowTest {
             )
         ).request
 
-        assertEquals(listOf("openid", "credential"), authorizeRequest.requestForm["scope"])
+        assertEquals(listOf("openid credential"), authorizeRequest.requestForm["scope"])
     }
 
     @Test

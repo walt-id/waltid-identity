@@ -33,6 +33,12 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
         ui.replaceText(in: offerInput, value: offer.offerUrl)
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        let offerReadyStatus = ui.waitForStatus(
+            prefixes: ["Review credential offer", "Receive failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        XCTAssertEqual(offerReadyStatus, "Review credential offer", "Offer preview did not appear, status: \(offerReadyStatus ?? "nil")")
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
         let receiveStatus = ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
@@ -96,6 +102,12 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
         ui.replaceText(in: offerInput, value: offer.offerUrl)
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        let offerReadyStatus2 = ui.waitForStatus(
+            prefixes: ["Review credential offer", "Receive failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        XCTAssertEqual(offerReadyStatus2, "Review credential offer", "Offer preview did not appear, status: \(offerReadyStatus2 ?? "nil")")
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
         let receiveStatus = ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
@@ -156,23 +168,23 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         }
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
 
-        let resolutionStatus = ui.waitForStatus(
-            prefixes: ["Transaction code required", "Receive failed", "Bootstrap failed"],
+        let previewStatus = ui.waitForStatus(
+            prefixes: ["Review credential offer", "Receive failed", "Bootstrap failed"],
             timeout: credentialOperationTimeout
         )
-        guard resolutionStatus == "Transaction code required" else {
-            XCTFail("Transaction-code prompt did not become ready, status: \(resolutionStatus ?? "nil")")
+        guard previewStatus == "Review credential offer" else {
+            XCTFail("Offer preview did not appear, status: \(previewStatus ?? "nil")")
             return
         }
 
         let txCodeInput = ui.textInput(identifier: "wallet.txCodeInput", fallbackLabel: "Transaction code")
         guard txCodeInput.waitForExistence(timeout: 20) else {
-            XCTFail("Transaction-code input did not appear")
+            XCTFail("Transaction-code input did not appear in offer review")
             return
         }
 
         ui.replaceText(in: txCodeInput, value: incorrectCode(for: transactionCode))
-        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         let rejectedStatus = ui.waitForStatus(
             prefixes: ["Receive failed"],
             timeout: credentialOperationTimeout
@@ -182,8 +194,9 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             return
         }
 
+        // The reviewed offer remains active so the corrected code can be retried directly.
         ui.replaceText(in: txCodeInput, value: transactionCode)
-        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         let receivedStatus = ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
             timeout: credentialOperationTimeout
@@ -229,6 +242,11 @@ final class MockCredentialDisplayUITests: XCTestCase {
             value: "openid-credential-offer://mock"
         )
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         XCTAssertEqual(
             ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
             "Received 1 credential(s)"
