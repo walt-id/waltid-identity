@@ -131,21 +131,16 @@ class MobileWalletIntegrationTest {
     }
 
     @Test
-    fun previewAndSubmitEncryptedEudiPidMdocAgainstEudi() = runBlocking {
-        val credentialConfigurationId = "eu.europa.ec.eudi.pid_mso_mdoc"
-        val client = MobileWalletFactory(context).create(
-            walletConfig(
-                prefix = "eudi-encrypted-mdoc",
-                requestObjectX509Trust = eudiVerifierTrust,
-            )
-        )
+    fun previewAndSubmitEncryptedEudiPidMdocAgainstDemoIssuer2AndVerifier2() = runBlocking {
+        val scenario = demoScenario("eudi-pid-mdoc")
+        val client = MobileWalletFactory(context).create(walletConfig("demo-encrypted-mdoc"))
         val bootstrapResult = client.bootstrap()
-        val offer = EudiTestBackend.generateOffer(credentialConfigurationId)
+        val offer = DemoTestBackend.createOffer(scenario)
         val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
-        assertTrue(credentialIds.isNotEmpty(), "Should receive an EUDI PID mdoc")
+        assertTrue(credentialIds.isNotEmpty(), "Should receive a demo EUDI PID mdoc")
 
-        val transaction = EudiTestBackend.createVerifierTransaction(
-            credentialId = credentialConfigurationId,
+        val transaction = DemoTestBackend.createVerifierSession(
+            scenario = scenario,
             encryptedResponse = true,
         )
         val preview = client.previewPresentation(transaction.authorizationRequestUri)
@@ -159,8 +154,8 @@ class MobileWalletIntegrationTest {
             selectedCredentialOptions = preview.credentialOptions.map { it.selection },
             did = bootstrapResult.did,
         )
-        assertTrue(result.success, "Encrypted EUDI PID mdoc presentation should succeed: $result")
-        EudiTestBackend.waitForVerifierSuccess(transaction.transactionId)
+        assertTrue(result.success, "Encrypted demo EUDI PID mdoc presentation should succeed: $result")
+        DemoTestBackend.waitForVerifierSuccess(transaction.sessionId)
     }
 
     @Test

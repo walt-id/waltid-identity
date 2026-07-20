@@ -22,6 +22,7 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
+import kotlin.uuid.Uuid
 
 /**
  * Test helper for the public walt.id issuer2/verifier2 demo stack.
@@ -143,14 +144,21 @@ object DemoTestBackend {
         return GeneratedOffer(offerUrl = offerUrl, txCode = txCode)
     }
 
-    suspend fun createVerifierSession(scenario: CredentialScenario): VerifierSession {
-        return createVerifierSession(scenario.verifierCredentialQuery)
+    suspend fun createVerifierSession(
+        scenario: CredentialScenario,
+        encryptedResponse: Boolean = false,
+    ): VerifierSession {
+        return createVerifierSession(scenario.verifierCredentialQuery, encryptedResponse)
     }
 
-    suspend fun createVerifierSession(credentialQuery: JsonObject): VerifierSession {
+    suspend fun createVerifierSession(
+        credentialQuery: JsonObject,
+        encryptedResponse: Boolean = false,
+    ): VerifierSession {
         return createVerifierSession(
             credentialQuery = credentialQuery,
             transactionData = emptyList(),
+            encryptedResponse = encryptedResponse,
         )
     }
 
@@ -165,6 +173,7 @@ object DemoTestBackend {
         return createVerifierSession(
             credentialQuery = scenario.verifierCredentialQuery,
             transactionData = listOf(paymentAuthorizationTransactionData("pid", paymentAuthorizationFields)),
+            encryptedResponse = false,
         )
     }
 
@@ -190,10 +199,16 @@ object DemoTestBackend {
     private suspend fun createVerifierSession(
         credentialQuery: JsonObject,
         transactionData: List<JsonObject>,
+        encryptedResponse: Boolean,
     ): VerifierSession {
+        val sessionId = Uuid.random().toString()
+        val responseUri = "$VERIFIER_BASE_URL/verification-session/$sessionId/response"
         val payload = buildJsonObject {
             put("flow_type", "cross_device")
             putJsonObject("core_flow") {
+                put("sessionId", sessionId)
+                put("clientId", "redirect_uri:$responseUri")
+                if (encryptedResponse) put("encrypted_response", true)
                 putJsonObject("dcql_query") {
                     putJsonArray("credentials") {
                         add(credentialQuery)
@@ -213,8 +228,11 @@ object DemoTestBackend {
             url = "$VERIFIER_BASE_URL/verification-session/create",
             body = payload,
         )
-        val sessionId = response["sessionId"]?.jsonPrimitive?.contentOrNull
+        val responseSessionId = response["sessionId"]?.jsonPrimitive?.contentOrNull
             ?: error("Missing sessionId in public demo verifier2 response: $response")
+        check(responseSessionId == sessionId) {
+            "Public demo verifier2 changed the requested session ID: requested=$sessionId, response=$responseSessionId"
+        }
         // This fixture creates an unsigned session. Use the fully encoded Authorization Request;
         // the bootstrap request_uri endpoint is a Request Object endpoint and must not return the
         // public demo's unsigned application/json response as though it were a JAR JWT.
@@ -222,7 +240,7 @@ object DemoTestBackend {
             ?: response["authorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
             ?: error("Missing inline authorization request URL in public demo verifier2 response: $response")
 
-        return VerifierSession(sessionId, authorizationRequestUri)
+        return VerifierSession(responseSessionId, authorizationRequestUri)
     }
 
     private fun paymentAuthorizationTransactionData(
