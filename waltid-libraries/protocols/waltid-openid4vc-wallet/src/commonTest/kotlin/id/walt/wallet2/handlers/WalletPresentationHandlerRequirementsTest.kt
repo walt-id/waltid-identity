@@ -16,6 +16,7 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
@@ -37,10 +38,23 @@ import kotlin.test.assertTrue
 class WalletPresentationHandlerRequirementsTest {
 
     @Test
-    fun presentationCompletionUsesProtocolOutcomeInsteadOfResultContainer() {
-        assertFalse(WalletPresentResult(transmissionSuccess = false).completedSuccessfully())
-        assertTrue(WalletPresentResult(getUrl = "https://verifier.example/callback").completedSuccessfully())
-        assertTrue(WalletPresentResult(formPostHtml = "<form></form>").completedSuccessfully())
+    fun presentationEventsReflectProtocolOutcome() {
+        assertEquals(
+            WalletSessionEvent.presentation_completed,
+            WalletPresentResult(transmissionSuccess = true).presentationOutcomeEvent(),
+        )
+        assertEquals(
+            WalletSessionEvent.presentation_failed,
+            WalletPresentResult(transmissionSuccess = false).presentationOutcomeEvent(),
+        )
+        assertEquals(
+            WalletSessionEvent.presentation_response_prepared,
+            WalletPresentResult(getUrl = "https://verifier.example/callback").presentationOutcomeEvent(),
+        )
+        assertEquals(
+            WalletSessionEvent.presentation_response_prepared,
+            WalletPresentResult(formPostHtml = "<form></form>").presentationOutcomeEvent(),
+        )
     }
 
     @Test

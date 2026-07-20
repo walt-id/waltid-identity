@@ -198,8 +198,8 @@ class MobileWalletIntegrationTest {
             selectedCredentialOptions = preview.credentialOptions.map { option -> option.selection },
             did = bootstrapResult.did,
         )
-        assertTrue(
-            result.success,
+        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
+            result,
             "public demo verifier2 transaction-data presentation should succeed: preview=$preview, result=$result",
         )
 
@@ -216,7 +216,10 @@ class MobileWalletIntegrationTest {
         client.previewPresentation(session.authorizationRequestUri)
         val result = client.rejectPresentation(session.authorizationRequestUri)
 
-        assertTrue(result.success, "Wallet should deliver access_denied to public demo verifier2: $result")
+        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
+            result,
+            "Wallet should deliver access_denied to public demo verifier2: $result",
+        )
         val info = DemoTestBackend.waitForVerifierFailure(
             sessionId = session.sessionId,
             expectedError = "access_denied",
@@ -282,8 +285,8 @@ class MobileWalletIntegrationTest {
             selectedDisclosureOptions = emptyList(),
             did = bootstrapResult.did,
         )
-        assertTrue(
-            defaultOffResult.success,
+        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
+            defaultOffResult,
             "Optional-off presentation should succeed against public demo verifier2: preview=$defaultOffPreview, result=$defaultOffResult",
         )
         DemoTestBackend.waitForVerifierSuccess(defaultOffSession.sessionId)
@@ -325,8 +328,8 @@ class MobileWalletIntegrationTest {
             ),
             did = bootstrapResult.did,
         )
-        assertTrue(
-            selectedResult.success,
+        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
+            selectedResult,
             "Optional-selected presentation should succeed against public demo verifier2: preview=$selectedPreview, result=$selectedResult",
         )
         DemoTestBackend.waitForVerifierSuccess(selectedSession.sessionId)
@@ -379,8 +382,8 @@ class MobileWalletIntegrationTest {
 
         val session = DemoTestBackend.createVerifierSession(scenario)
         val presentResult = client2.present(session.authorizationRequestUri, did = bootstrapResult.did)
-        assertTrue(
-            presentResult.success,
+        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
+            presentResult,
             "Should present persisted public demo credential for ${scenario.displayName}: credentials=$credentials, result=$presentResult",
         )
         DemoTestBackend.waitForVerifierSuccess(session.sessionId)
@@ -423,8 +426,8 @@ class MobileWalletIntegrationTest {
         val offeredCredentialId = EudiTestBackend.extractCredentialIdFromOfferUrl(offer.offerUrl)
         val transaction = EudiTestBackend.createVerifierTransaction(offeredCredentialId)
         val presentResult = client.present(transaction.authorizationRequestUri, did = bootstrapResult.did)
-        assertTrue(
-            presentResult.success,
+        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
+            presentResult,
             "EUDI presentation should succeed for $credentialId: credentials=$credentials, result=$presentResult",
         )
 
@@ -461,8 +464,8 @@ class MobileWalletIntegrationTest {
             },
             did = bootstrapResult.did,
         )
-        assertTrue(
-            result.success,
+        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
+            result,
             "EUDI stepwise presentation should succeed for $credentialId: preview=$preview, result=$result",
         )
 
@@ -487,8 +490,8 @@ class MobileWalletIntegrationTest {
 
         val session = DemoTestBackend.createVerifierSession(scenario)
         val presentResult = client.present(session.authorizationRequestUri, did = bootstrapResult.did)
-        assertTrue(
-            presentResult.success,
+        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
+            presentResult,
             "public demo verifier2 presentation should succeed for ${scenario.displayName}: credentials=$credentials, result=$presentResult",
         )
 
@@ -528,8 +531,8 @@ class MobileWalletIntegrationTest {
             },
             did = bootstrapResult.did,
         )
-        assertTrue(
-            result.success,
+        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
+            result,
             "public demo verifier2 stepwise presentation should succeed for ${scenario.displayName}: preview=$preview, result=$result",
         )
 

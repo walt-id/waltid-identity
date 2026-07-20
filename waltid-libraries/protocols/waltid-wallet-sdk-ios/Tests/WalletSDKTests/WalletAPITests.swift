@@ -334,13 +334,6 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(bridge.presentCalls.first?.runPolicies, true)
     }
 
-    func testPresentationResultSuccessIsDerivedFromItsLegalOutcome() {
-        XCTAssertTrue(PresentationResult.prepared(.openURL(URL(string: "https://verifier.example")!)).success)
-        XCTAssertTrue(PresentationResult.prepared(.submitForm(html: "<form></form>")).success)
-        XCTAssertTrue(PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}")).success)
-        XCTAssertFalse(PresentationResult.transmitted(.failed(verifierResponseJSON: "{}")).success)
-    }
-
     func testPreviewPresentationForwardsRequestAndReturnsPreview() async throws {
         let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
         let bridge = FakeWalletCoreBridge()

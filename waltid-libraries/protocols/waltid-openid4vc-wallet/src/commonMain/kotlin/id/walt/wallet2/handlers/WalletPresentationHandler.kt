@@ -76,8 +76,22 @@ data class PresentCredentialRequest(
     val runPolicies: Boolean? = null
 ) : VpRequestSource
 
-internal fun WalletPresentResult.completedSuccessfully(): Boolean =
-    transmissionSuccess ?: (getUrl != null || formPostHtml != null)
+internal fun WalletPresentResult.presentationOutcomeEvent(): WalletSessionEvent = when {
+    transmissionSuccess == true -> WalletSessionEvent.presentation_completed
+    transmissionSuccess == false -> WalletSessionEvent.presentation_failed
+    getUrl != null || formPostHtml != null -> WalletSessionEvent.presentation_response_prepared
+    else -> WalletSessionEvent.presentation_failed
+}
+
+private suspend fun Result<WalletPresentResult>.emitPresentationOutcome(
+    onEvent: suspend (WalletSessionEvent) -> Unit,
+): WalletPresentResult {
+    exceptionOrNull()?.let { error ->
+        onEvent(WalletSessionEvent.presentation_failed)
+        throw error
+    }
+    return getOrThrow().also { result -> onEvent(result.presentationOutcomeEvent()) }
+}
 
 @Serializable
 data class PresentCredentialIsolatedRequest(
@@ -270,15 +284,7 @@ object WalletPresentationHandler {
             transactionDataTypeRegistry = transactionDataTypeRegistry,
         )
 
-        if (result.isSuccess) {
-            onEvent(WalletSessionEvent.presentation_completed)
-            log.info { "Presentation completed successfully" }
-        } else {
-            onEvent(WalletSessionEvent.presentation_failed)
-            log.warn { "Presentation failed: ${result.exceptionOrNull()?.message}" }
-        }
-
-        return result.getOrThrow()
+        return result.emitPresentationOutcome(onEvent)
     }
 
     /**
@@ -313,13 +319,7 @@ object WalletPresentationHandler {
             transactionDataTypeRegistry = transactionDataTypeRegistry,
         )
 
-        if (result.isSuccess) {
-            onEvent(WalletSessionEvent.presentation_completed)
-        } else {
-            onEvent(WalletSessionEvent.presentation_failed)
-        }
-
-        return result.getOrThrow()
+        return result.emitPresentationOutcome(onEvent)
     }
 
     suspend fun previewPresentation(
@@ -467,13 +467,7 @@ object WalletPresentationHandler {
             transactionDataTypeRegistry = transactionDataTypeRegistry,
         )
 
-        if (result.isSuccess) {
-            onEvent(WalletSessionEvent.presentation_completed)
-        } else {
-            onEvent(WalletSessionEvent.presentation_failed)
-        }
-
-        return result.getOrThrow()
+        return result.emitPresentationOutcome(onEvent)
     }
 
     /**
@@ -504,14 +498,7 @@ object WalletPresentationHandler {
             errorDescription = request.errorDescription.takeIf { detectedError == null },
         )
 
-        onEvent(
-            if (result.getOrNull()?.completedSuccessfully() == true) {
-                WalletSessionEvent.presentation_completed
-            } else {
-                WalletSessionEvent.presentation_failed
-            }
-        )
-        return result.getOrThrow()
+        return result.emitPresentationOutcome(onEvent)
     }
 
     // ---------------------------------------------------------------------------

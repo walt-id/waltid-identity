@@ -610,11 +610,6 @@ public enum PresentationResult: Equatable, Sendable {
     /// The verifier returned a response after protocol transmission.
     case transmitted(Transmitted)
 
-    /// `true` unless the verifier rejected or could not receive the transmitted response.
-    public var success: Bool {
-        if case .transmitted(.failed) = self { return false }
-        return true
-    }
 }
 
 /// Result of resolving and validating an OpenID4VP request for presentation preview.

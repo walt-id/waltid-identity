@@ -253,7 +253,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         _ = try await wallet.previewPresentation(request: presentationURL)
         let result = try await wallet.rejectPresentation(request: presentationURL)
 
-        XCTAssertTrue(result.success, "Wallet should deliver access_denied to public demo verifier2: \(result)")
+        assertTransmittedSuccess(result, "Wallet should deliver access_denied to public demo verifier2: \(result)")
         let info = try await DemoBackend.shared.waitForVerifierFailure(
             sessionID: session.sessionID,
             expectedError: "access_denied",
@@ -338,8 +338,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
             did: did
         )
 
-        XCTAssertTrue(
-            presentResult.success,
+        assertTransmittedSuccess(
+            presentResult,
             "Should present persisted public demo credential for \(scenario.displayName). Credentials: \(credentials), Result: \(presentResult)"
         )
 
@@ -367,8 +367,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let transaction = try await EudiTestBackend.shared.createVerifierTransaction(credentialId: offeredCredentialID)
         let presentationURL = try XCTUnwrap(URL(string: transaction.authorizationRequestUri))
         let result = try await wallet.present(request: presentationURL, did: bootstrapResult.did)
-        XCTAssertTrue(
-            result.success,
+        assertTransmittedSuccess(
+            result,
             "EUDI presentation should succeed for \(credentialID). Credentials: \(credentials), Result: \(result)"
         )
 
@@ -408,8 +408,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
             selectedCredentialOptions: preview.credentialOptions.map(\.selection),
             did: bootstrapResult.did
         )
-        XCTAssertTrue(
-            result.success,
+        assertTransmittedSuccess(
+            result,
             "EUDI stepwise presentation should succeed for \(credentialID). Preview: \(preview), Result: \(result)"
         )
 
@@ -455,8 +455,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
             did: did
         )
 
-        XCTAssertTrue(
-            result.success,
+        assertTransmittedSuccess(
+            result,
             "public demo verifier2 stepwise presentation should succeed for \(scenario.displayName). Preview: \(preview), Result: \(result)"
         )
 
@@ -563,8 +563,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
             did: did
         )
 
-        XCTAssertTrue(
-            presentResult.success,
+        assertTransmittedSuccess(
+            presentResult,
             "public demo verifier2 presentation should succeed for \(scenario.displayName). Credentials: \(credentials), Result: \(presentResult)"
         )
 
@@ -674,5 +674,17 @@ private actor RecordingWalletDatabaseKeyProvider: WalletDatabaseKeyProvider {
 
     func deleteDatabaseKey(walletID: String, databaseName: String) async throws {
         deletedKeys.append("\(walletID):\(databaseName)")
+    }
+}
+
+private func assertTransmittedSuccess(
+    _ result: PresentationResult,
+    _ message: @autoclosure () -> String,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    guard case .transmitted(.succeeded) = result else {
+        XCTFail(message(), file: file, line: line)
+        return
     }
 }

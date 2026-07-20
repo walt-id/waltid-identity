@@ -177,12 +177,17 @@ class MobileWalletTest {
     @Test
     fun walletSessionEventsMapToMobileWalletEventsInCommonCode() {
         val progress = WalletSessionEvent.issuance_offer_resolved.toMobileWalletEvent()
+        val prepared = WalletSessionEvent.presentation_response_prepared.toMobileWalletEvent()
         val completed = WalletSessionEvent.presentation_completed.toMobileWalletEvent()
         val failed = WalletSessionEvent.issuance_failed.toMobileWalletEvent()
 
         assertEquals(MobileWalletEventPhase.issuance, progress.phase)
         assertEquals(MobileWalletEventStatus.progress, progress.status)
         assertEquals("issuance_offer_resolved", progress.name)
+
+        assertEquals(MobileWalletEventPhase.presentation, prepared.phase)
+        assertEquals(MobileWalletEventStatus.progress, prepared.status)
+        assertEquals("presentation_response_prepared", prepared.name)
 
         assertEquals(MobileWalletEventPhase.presentation, completed.phase)
         assertEquals(MobileWalletEventStatus.completed, completed.status)
@@ -202,7 +207,6 @@ class MobileWalletTest {
 
         assertEquals("""{"accepted":true}""", result.verifierResponseJson)
         assertEquals("wallet://return", result.redirectUrl)
-        assertTrue(result.success)
     }
 
     @Test
@@ -231,7 +235,6 @@ class MobileWalletTest {
             MobileWalletPresentationResult.Transmitted.Failed("""{"error":"server_error"}"""),
             result,
         )
-        assertFalse(result.success)
     }
 
     @Test

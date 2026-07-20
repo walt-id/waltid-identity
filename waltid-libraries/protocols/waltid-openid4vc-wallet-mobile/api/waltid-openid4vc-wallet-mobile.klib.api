@@ -217,9 +217,6 @@ sealed interface id.walt.wallet2.mobile/MobileWalletPresentationPreviewResult { 
 }
 
 sealed interface id.walt.wallet2.mobile/MobileWalletPresentationResult { // id.walt.wallet2.mobile/MobileWalletPresentationResult|null[0]
-    open val success // id.walt.wallet2.mobile/MobileWalletPresentationResult.success|{}success[0]
-        open fun <get-success>(): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletPresentationResult.success.<get-success>|<get-success>(){}[0]
-
     sealed interface Prepared : id.walt.wallet2.mobile/MobileWalletPresentationResult { // id.walt.wallet2.mobile/MobileWalletPresentationResult.Prepared|null[0]
         final class OpenUrl : id.walt.wallet2.mobile/MobileWalletPresentationResult.Prepared { // id.walt.wallet2.mobile/MobileWalletPresentationResult.Prepared.OpenUrl|null[0]
             constructor <init>(kotlin/String) // id.walt.wallet2.mobile/MobileWalletPresentationResult.Prepared.OpenUrl.<init>|<init>(kotlin.String){}[0]

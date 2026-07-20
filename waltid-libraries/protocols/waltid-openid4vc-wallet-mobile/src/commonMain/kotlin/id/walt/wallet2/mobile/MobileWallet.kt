@@ -96,10 +96,6 @@ public data class MobileWalletOfferResolution(
  * mutually exclusive response artifacts out of the same result instance.
  */
 public sealed interface MobileWalletPresentationResult {
-    /** `true` unless the verifier rejected or could not receive the transmitted response. */
-    public val success: Boolean
-        get() = this !is Transmitted.Failed
-
     /** The protocol response still requires a host-app delivery action. */
     public sealed interface Prepared : MobileWalletPresentationResult {
         /** The host app must open [url] to deliver the protocol response. */

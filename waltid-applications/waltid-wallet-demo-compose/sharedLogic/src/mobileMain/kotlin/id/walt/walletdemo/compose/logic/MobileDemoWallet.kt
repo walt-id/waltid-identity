@@ -48,16 +48,10 @@ internal class MobileDemoWallet(
         mobileWallet.receive(offerUrl, txCode = txCode)
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
-        mobileWallet.present(requestUrl = requestUrl, did = did).let { result ->
-            if (result.success) {
-                WalletDemoOperationResult.Success(
-                    WalletDisplayText.PresentationSent,
-                    result.toDemoContinuation(),
-                )
-            } else {
-                WalletDemoOperationResult.Failure(WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation)
-            }
-        }
+        mobileWallet.present(requestUrl = requestUrl, did = did).toDemoOperationResult(
+            successMessage = WalletDisplayText.PresentationSent,
+            failureMessage = WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation,
+        )
 
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult =
         when (val result = mobileWallet.previewPresentation(requestUrl)) {
@@ -96,38 +90,40 @@ internal class MobileDemoWallet(
                 )
             },
             did = did,
-        ).let { result ->
-            if (result.success) {
-                WalletDemoOperationResult.Success(
-                    WalletDisplayText.PresentationSent,
-                    result.toDemoContinuation(),
-                )
-            } else {
-                WalletDemoOperationResult.Failure(WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation)
-            }
-        }
+        ).toDemoOperationResult(
+            successMessage = WalletDisplayText.PresentationSent,
+            failureMessage = WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation,
+        )
 
     override suspend fun rejectPresentation(requestUrl: String): WalletDemoOperationResult =
-        mobileWallet.rejectPresentation(requestUrl = requestUrl).let { result ->
-            if (result.success) {
-                WalletDemoOperationResult.Success(
-                    WalletDisplayText.PresentationDeclined,
-                    result.toDemoContinuation(),
-                )
-            } else {
-                WalletDemoOperationResult.Failure(WalletDisplayText.RejectionFinishedWithoutVerifierConfirmation)
-            }
-        }
+        mobileWallet.rejectPresentation(requestUrl = requestUrl).toDemoOperationResult(
+            successMessage = WalletDisplayText.PresentationDeclined,
+            failureMessage = WalletDisplayText.RejectionFinishedWithoutVerifierConfirmation,
+        )
 
 }
 
-private fun MobileWalletPresentationResult.toDemoContinuation(): WalletDemoPresentationContinuation? =
+private fun MobileWalletPresentationResult.toDemoOperationResult(
+    successMessage: String,
+    failureMessage: String,
+): WalletDemoOperationResult =
     when (this) {
-        is MobileWalletPresentationResult.Prepared.OpenUrl -> WalletDemoPresentationContinuation.Url(url)
-        is MobileWalletPresentationResult.Prepared.SubmitForm -> WalletDemoPresentationContinuation.FormPostHtml(html)
-        is MobileWalletPresentationResult.Transmitted.Succeeded ->
-            redirectUrl?.let(WalletDemoPresentationContinuation::Url)
-        is MobileWalletPresentationResult.Transmitted.Failed -> null
+        is MobileWalletPresentationResult.Prepared.OpenUrl -> WalletDemoOperationResult.Success(
+            successMessage,
+            WalletDemoPresentationContinuation.Url(url),
+        )
+
+        is MobileWalletPresentationResult.Prepared.SubmitForm -> WalletDemoOperationResult.Success(
+            successMessage,
+            WalletDemoPresentationContinuation.FormPostHtml(html),
+        )
+
+        is MobileWalletPresentationResult.Transmitted.Succeeded -> WalletDemoOperationResult.Success(
+            successMessage,
+            redirectUrl?.let(WalletDemoPresentationContinuation::Url),
+        )
+
+        is MobileWalletPresentationResult.Transmitted.Failed -> WalletDemoOperationResult.Failure(failureMessage)
     }
 
 internal fun DemoWalletConfig.toWalletAttestationConfig(): WalletAttestationConfig? =

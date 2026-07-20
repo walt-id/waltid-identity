@@ -243,8 +243,8 @@ class WalletSdkBridgeTest {
             errorDescription = "User declined",
         )
 
-        assertIs<WalletBridgeResult.Success<MobileWalletPresentationResult>>(result)
-        assertEquals(true, result.value.success)
+        val success = assertIs<WalletBridgeResult.Success<MobileWalletPresentationResult>>(result)
+        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(success.value)
         assertEquals("openid4vp://request", operations.rejectedRequestUrl)
         assertEquals(MobileWalletPresentationErrorCode.accessDenied, operations.rejectedErrorCode)
         assertEquals("User declined", operations.rejectedErrorDescription)
