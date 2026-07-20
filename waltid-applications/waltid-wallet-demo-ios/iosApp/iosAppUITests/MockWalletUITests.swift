@@ -108,6 +108,14 @@ final class MockWalletUITests: XCTestCase {
             ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
             "Review credential offer"
         )
+        XCTAssertTrue(app.secureTextFields["wallet.txCodeInput"].waitForExistence(timeout: 10))
+        let transactionCodeSection = app.staticTexts["wallet.offerTransactionCodeSection"]
+        XCTAssertTrue(transactionCodeSection.waitForExistence(timeout: 10))
+        XCTAssertLessThan(
+            app.staticTexts["wallet.status"].frame.minY,
+            transactionCodeSection.frame.minY,
+            "Receive status should precede the offer review"
+        )
 
         let accept = app.buttons["Accept"]
         let decline = app.buttons["Decline"]
@@ -836,6 +844,8 @@ final class MockWalletUITests: XCTestCase {
 
     private func assertVerifierTechnicalDetailsCollapsedUntilRequested(app: XCUIApplication, ui: WalletE2EUI) {
         XCTAssertFalse(app.staticTexts["Client ID"].exists, "Technical verifier fields should not be expanded by default")
+        XCTAssertTrue(app.staticTexts["wallet.presentationTechnicalDetailsSection"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["wallet.verifierTechnicalDetailsToggle"].waitForExistence(timeout: 10))
         ui.tapButton(identifier: "wallet.verifierTechnicalDetailsToggle", fallbackLabel: "Show details")
         XCTAssertTrue(app.staticTexts["Client ID"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["https://verifier.example/response"].waitForExistence(timeout: 10))

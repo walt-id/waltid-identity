@@ -15,7 +15,10 @@ struct OfferReviewView: View {
             Text("Credential offer")
                 .font(.headline)
 
-            ReviewMetadataSection(title: "Issuer") {
+            ReviewMetadataSection(
+                title: "Issuer",
+                titleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerSection
+            ) {
                 MetadataIdentityView(
                     display: preview.issuer.display,
                     fallbackName: preview.issuer.credentialIssuer,
@@ -24,10 +27,12 @@ struct OfferReviewView: View {
                         : preview.issuer.credentialIssuer
                 )
             }
-            .accessibilityIdentifier(WalletAccessibilityID.offerIssuerSection)
 
             if !preview.offeredCredentials.isEmpty {
-                ReviewMetadataSection(title: "Offered credentials") {
+                ReviewMetadataSection(
+                    title: "Offered credentials",
+                    titleAccessibilityIdentifier: WalletAccessibilityID.offerCredentialsSection
+                ) {
                     ForEach(Array(preview.offeredCredentials.enumerated()), id: \.offset) { index, credential in
                         if index > 0 {
                             Divider()
@@ -35,11 +40,13 @@ struct OfferReviewView: View {
                         OfferedCredentialView(credential: credential)
                     }
                 }
-                .accessibilityIdentifier(WalletAccessibilityID.offerCredentialsSection)
             }
 
             if let requirement = preview.transactionCode {
-                ReviewMetadataSection(title: "Transaction code") {
+                ReviewMetadataSection(
+                    title: "Transaction code",
+                    titleAccessibilityIdentifier: WalletAccessibilityID.offerTransactionCodeSection
+                ) {
                     Text(requirement.description ?? "Enter the transaction code provided by the issuer.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -67,7 +74,6 @@ struct OfferReviewView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .accessibilityIdentifier(WalletAccessibilityID.offerTransactionCodeSection)
             }
 
             HStack(spacing: 8) {

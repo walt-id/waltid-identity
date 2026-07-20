@@ -13,7 +13,10 @@ struct VerifierReviewSections: View {
         VStack(alignment: .leading, spacing: 14) {
             if let verifierMetadata = request.verifierMetadata,
                verifierDisplayName != nil || !verifierDetails.isEmpty {
-                ReviewMetadataSection(title: "Verifier") {
+                ReviewMetadataSection(
+                    title: "Verifier",
+                    titleAccessibilityIdentifier: WalletAccessibilityID.presentationVerifierSection
+                ) {
                     if let verifierDisplayName {
                         MetadataIdentityView(
                             display: verifierMetadata.display,
@@ -26,20 +29,22 @@ struct VerifierReviewSections: View {
                     }
                     MetadataDetailList(items: verifierDetails)
                 }
-                .accessibilityIdentifier(WalletAccessibilityID.presentationVerifierSection)
             }
 
             ForEach(transactionDataGroups) { group in
                 ClaimGroupView(group: group)
             }
 
-            ReviewMetadataSection(title: "Response protection") {
+            ReviewMetadataSection(
+                title: "Response protection",
+                titleAccessibilityIdentifier: WalletAccessibilityID.presentationResponseProtectionSection
+            ) {
                 MetadataDetailList(items: responseProtectionDetails)
             }
-            .accessibilityIdentifier(WalletAccessibilityID.presentationResponseProtectionSection)
 
             ReviewMetadataSection(
                 title: "Technical request details",
+                titleAccessibilityIdentifier: WalletAccessibilityID.presentationTechnicalDetailsSection,
                 contentInsets: technicalDetailsExpanded
                     ? EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
                     : EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16)
@@ -64,7 +69,6 @@ struct VerifierReviewSections: View {
                     .accessibilityIdentifier(WalletAccessibilityID.verifierTechnicalDetails)
                 }
             }
-            .accessibilityIdentifier(WalletAccessibilityID.presentationTechnicalDetailsSection)
         }
     }
 
