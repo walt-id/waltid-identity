@@ -299,9 +299,10 @@ class WalletIssuanceSessionService(
             ?: return failAndRemove(sessionId, WalletIssuanceErrorCode.INVALID_SESSION)
         val requirement = grant.txCode
         if (requirement != null && transactionCode.isNullOrBlank()) {
-            return failAndRemove(sessionId, WalletIssuanceErrorCode.INVALID_INPUT)
+            restoreSession(active, SessionState.READY)
+            return failed(sessionId, WalletIssuanceErrorCode.INVALID_INPUT)
         }
-        return complete(active) {
+        return complete(active, retryTokenRejection = requirement != null) {
             tokenForPreAuthorized(active, grant.preAuthorizedCode, transactionCode)
         }
     }
@@ -392,16 +393,17 @@ class WalletIssuanceSessionService(
 
     private suspend fun complete(
         active: ActiveSession,
+        retryTokenRejection: Boolean = false,
         obtainToken: suspend () -> TokenRequestBuilder.TokenResponse,
     ): WalletIssuanceOutcome {
         val storedIds = mutableListOf<String>()
         return try {
-            val dpop = active.dpopAlgorithms()
-            if (dpop != null && active.key.keyType.jwsAlg !in dpop) {
+            val advertisedDpop = active.dpopAlgorithms()
+            if (advertisedDpop != null && active.key.keyType.jwsAlg !in advertisedDpop) {
                 throw IssuanceStageException(WalletIssuanceErrorCode.CRYPTO)
             }
             val token = obtainToken()
-            validateTokenType(token.token_type, dpop != null)
+            val dpop = dpopAlgorithmsForToken(token.token_type, advertisedDpop)
             onEvent(WalletSessionEvent.issuance_token_obtained)
 
             val deferredResults = issueCredentials(active, token, dpop, storedIds)
@@ -414,7 +416,15 @@ class WalletIssuanceSessionService(
                 WalletIssuanceOutcome.Stored(active.public.id, storedIds)
             }
         } catch (error: TokenRequestException) {
-            removeSession(active.public.id)
+            if (
+                retryTokenRejection &&
+                storedIds.isEmpty() &&
+                error.oauthError == "invalid_grant"
+            ) {
+                restoreSession(active, SessionState.READY)
+            } else {
+                removeSession(active.public.id)
+            }
             failed(
                 active.public.id,
                 if (error.statusCode == 0) WalletIssuanceErrorCode.NETWORK else WalletIssuanceErrorCode.ISSUER_RESPONSE,
@@ -924,16 +934,16 @@ class WalletIssuanceSessionService(
         }
     }
 
-    private fun validateTokenType(tokenType: String, dpopEnabled: Boolean) {
-        if (dpopEnabled) {
-            require(tokenType.equals("DPoP", ignoreCase = true)) {
-                "Authorization server did not return a DPoP-bound access token"
-            }
-        } else {
-            require(tokenType.equals("Bearer", ignoreCase = true)) {
-                "Authorization server returned an unsupported token type"
-            }
+    private fun dpopAlgorithmsForToken(
+        tokenType: String,
+        advertisedAlgorithms: Set<String>?,
+    ): Set<String>? = when {
+        tokenType.equals("DPoP", ignoreCase = true) -> requireNotNull(advertisedAlgorithms) {
+            "Authorization server returned a DPoP token without advertising DPoP support"
         }
+
+        tokenType.equals("Bearer", ignoreCase = true) -> null
+        else -> error("Authorization server returned an unsupported token type")
     }
 
     private fun authorizationScheme(tokenType: String): String =
@@ -965,6 +975,14 @@ class WalletIssuanceSessionService(
 
     private suspend fun removeSession(sessionId: String) {
         mutex.withLock { sessions.remove(sessionId) }
+    }
+
+    private suspend fun restoreSession(active: ActiveSession, state: SessionState) {
+        mutex.withLock {
+            if (sessions[active.public.id] === active && active.state == SessionState.PROCESSING) {
+                active.state = state
+            }
+        }
     }
 
     private suspend fun failAndRemove(
