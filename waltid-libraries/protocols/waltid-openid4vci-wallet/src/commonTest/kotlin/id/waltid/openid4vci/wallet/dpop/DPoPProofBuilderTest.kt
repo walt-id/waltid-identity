@@ -16,7 +16,7 @@ import kotlin.test.assertNotNull
 class DPoPProofBuilderTest {
     @Test
     fun createsFreshBoundProofsWithoutQueryOrFragmentInHtu() = runTest {
-        val key = JWKKey.generate(KeyType.secp256r1)
+        val key = JWKKey.generate(KeyType.secp256k1)
         val builder = DPoPProofBuilder()
         val first = builder.buildProof(
             key = key,
@@ -24,20 +24,20 @@ class DPoPProofBuilderTest {
             targetUri = "https://issuer.example:8443/token?secret=value#ignored",
             accessToken = "access-token",
             nonce = "server-nonce",
-            supportedAlgorithms = setOf("ES256"),
+            supportedAlgorithms = setOf("ES256K"),
         )
         val second = builder.buildProof(
             key = key,
             httpMethod = "POST",
             targetUri = "https://issuer.example:8443/token",
             accessToken = "access-token",
-            supportedAlgorithms = setOf("ES256"),
+            supportedAlgorithms = setOf("ES256K"),
         )
 
         val header = jwtPart(first, 0)
         val payload = jwtPart(first, 1)
         assertEquals("dpop+jwt", header["typ"]?.jsonPrimitive?.content)
-        assertEquals("ES256", header["alg"]?.jsonPrimitive?.content)
+        assertEquals("ES256K", header["alg"]?.jsonPrimitive?.content)
         assertNotNull(header["jwk"])
         assertEquals("POST", payload["htm"]?.jsonPrimitive?.content)
         assertEquals("https://issuer.example:8443/token", payload["htu"]?.jsonPrimitive?.content)
@@ -48,7 +48,7 @@ class DPoPProofBuilderTest {
 
     @Test
     fun rejectsUnsupportedHolderAlgorithm() = runTest {
-        val key = JWKKey.generate(KeyType.secp256r1)
+        val key = JWKKey.generate(KeyType.secp256k1)
         assertFailsWith<IllegalArgumentException> {
             DPoPProofBuilder().buildProof(
                 key = key,
