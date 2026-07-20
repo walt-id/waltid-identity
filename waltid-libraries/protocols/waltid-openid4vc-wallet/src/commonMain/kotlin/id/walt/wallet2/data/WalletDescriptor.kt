@@ -32,4 +32,16 @@ data class WalletDescriptor(
 
     /** Static DID fallback when no DID store is configured. */
     val staticDid: String? = null,
+
+    /**
+     * ID of the preferred default key. When set, [Wallet.defaultKey] returns this key
+     * instead of the first key in the stores. Null means "use first key".
+     */
+    val defaultKeyId: String? = null,
+
+    /**
+     * The preferred default DID. When set, [Wallet.defaultDid] returns this DID
+     * instead of the first DID in the store. Null means "use first DID".
+     */
+    val defaultDidId: String? = null,
 )

@@ -15,6 +15,22 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     private let presentationOperationTimeout: TimeInterval = 180
     private let verifierPollingTimeout: TimeInterval = 30
 
+    func testPinPersistsAcrossAppRestart() throws {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        let environment = isolatedWalletEnvironment()
+
+        ui.launch(environment: environment)
+        let readyStatus = ui.waitForStatus(
+            prefixes: ["Wallet ready", "Bootstrap failed"],
+            timeout: walletReadyTimeout
+        )
+        XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
+
+        app.terminate()
+        ui.launchExpectingLoginAndUnlock(environment: environment, walletReadyTimeout: walletReadyTimeout)
+    }
+
     func testBootstrapCreatesDid() async throws {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
@@ -54,6 +70,12 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         )
         XCTAssertTrue(offerURLApplied, "Offer URL did not appear in UI after deep link")
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        let offerPreviewStatus = ui.waitForStatus(
+            prefixes: ["Review credential offer", "Receive failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        XCTAssertEqual(offerPreviewStatus, "Review credential offer", "Offer preview did not appear, status: \(offerPreviewStatus ?? "nil")")
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
         let receiveStatus = ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
@@ -162,20 +184,21 @@ final class PublicDemoBackendE2ETests: XCTestCase {
                 prefixes: ["Receive failed", "Bootstrap failed", "Wallet ready"],
                 timeout: 1
             )
-            XCTFail("Transaction-code input did not appear, status: \(status ?? "nil")")
+            XCTFail("Transaction-code input did not appear in offer review, status: \(status ?? "nil")")
             return
         }
 
         ui.replaceText(in: txCodeInput, value: incorrectCode(for: transactionCode))
-        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         let rejectedStatus = ui.waitForStatus(prefixes: ["Receive failed"], timeout: credentialOperationTimeout)
         guard rejectedStatus?.starts(with: "Receive failed") == true else {
             XCTFail("Incorrect transaction code was not rejected, status: \(rejectedStatus ?? "nil")")
             return
         }
 
+        // The reviewed offer remains active so the corrected code can be retried directly.
         ui.replaceText(in: txCodeInput, value: transactionCode)
-        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         let receivedStatus = ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
             timeout: credentialOperationTimeout
@@ -209,6 +232,12 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         )
         XCTAssertTrue(offerURLApplied, "Offer URL did not appear in UI after deep link")
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        let offerPreviewStatus2 = ui.waitForStatus(
+            prefixes: ["Review credential offer", "Receive failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        XCTAssertEqual(offerPreviewStatus2, "Review credential offer", "Offer preview did not appear, status: \(offerPreviewStatus2 ?? "nil")")
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
         let receiveStatus = ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
@@ -267,6 +296,12 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         )
         XCTAssertTrue(offerURLApplied, "Offer URL did not appear in UI after deep link")
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        let offerPreviewStatus3 = ui.waitForStatus(
+            prefixes: ["Review credential offer", "Receive failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        XCTAssertEqual(offerPreviewStatus3, "Review credential offer", "Offer preview did not appear, status: \(offerPreviewStatus3 ?? "nil")")
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
         let receiveStatus = ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
@@ -278,12 +313,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         app.terminate()
         try await Task.sleep(nanoseconds: 2_000_000_000)
 
-        ui.launch(environment: environment)
-        let readyAfterRestart = ui.waitForStatus(
-            prefixes: ["Wallet ready", "Bootstrap failed"],
-            timeout: walletReadyTimeout
-        )
-        XCTAssertEqual(readyAfterRestart, "Wallet ready", "Wallet did not become ready after restart, status: \(readyAfterRestart ?? "nil")")
+        ui.launchExpectingLoginAndUnlock(environment: environment, walletReadyTimeout: walletReadyTimeout)
         XCTAssertFalse(app.staticTexts["No credentials"].exists, "Credentials did not persist across app restart")
     }
 
