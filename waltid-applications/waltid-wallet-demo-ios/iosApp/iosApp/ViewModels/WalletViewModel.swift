@@ -665,22 +665,27 @@ class WalletViewModel: ObservableObject {
         failureMessage: String
     ) {
         clearPendingPresentationContinuation()
-        guard result.success else {
+        switch result {
+        case .transmitted(.failed):
             presentationCompleted = false
             setError(failureMessage, tab: .present)
-            return
-        }
-
-        let continuationURL = result.redirectTo ?? result.responseURL
-        let formPostHTML = continuationURL == nil ? result.formPostHTML : nil
-        if continuationURL != nil || formPostHTML != nil {
+        case .prepared(.openURL(let url)):
             pendingPresentationSuccessMessage = successMessage
-            pendingPresentationContinuationURL = continuationURL
-            pendingPresentationFormPostHTML = formPostHTML
+            pendingPresentationContinuationURL = url
             presentationCompleted = false
-        } else {
-            presentationCompleted = true
-            setSuccess(successMessage, tab: .present)
+        case .prepared(.submitForm(let html)):
+            pendingPresentationSuccessMessage = successMessage
+            pendingPresentationFormPostHTML = html
+            presentationCompleted = false
+        case .transmitted(.succeeded(_, let redirectURL)):
+            if let redirectURL {
+                pendingPresentationSuccessMessage = successMessage
+                pendingPresentationContinuationURL = redirectURL
+                presentationCompleted = false
+            } else {
+                presentationCompleted = true
+                setSuccess(successMessage, tab: .present)
+            }
         }
     }
 

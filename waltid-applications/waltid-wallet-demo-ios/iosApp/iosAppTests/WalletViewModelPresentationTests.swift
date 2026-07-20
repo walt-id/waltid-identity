@@ -11,11 +11,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
         let viewModel = WalletViewModel(
             walletID: "reject-presentation-\(UUID().uuidString)",
             walletClient: MockWalletClient(
-                rejectionResult: PresentationResult(
-                    success: true,
-                    redirectTo: continuationURL,
-                    verifierResponseJSON: nil
-                )
+                rejectionResult: .prepared(.openURL(continuationURL))
             )
         )
 
@@ -50,12 +46,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
         let viewModel = WalletViewModel(
             walletID: "reject-form-post-\(UUID().uuidString)",
             walletClient: MockWalletClient(
-                rejectionResult: PresentationResult(
-                    success: true,
-                    redirectTo: nil,
-                    verifierResponseJSON: nil,
-                    formPostHTML: html
-                )
+                rejectionResult: .prepared(.submitForm(html: html))
             )
         )
 

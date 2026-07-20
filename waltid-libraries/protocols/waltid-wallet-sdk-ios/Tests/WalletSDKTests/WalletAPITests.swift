@@ -303,15 +303,13 @@ final class WalletAPITests: XCTestCase {
 
     func testPresentForwardsRequestAndReturnsPresentationResult() async throws {
         let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
-        let redirect = URL(string: "https://verifier.example/callback")!
-        let responseURL = URL(string: "https://verifier.example/response?state=123")!
+        let redirectURL = URL(string: "https://verifier.example/continue")!
         let bridge = FakeWalletCoreBridge()
-        bridge.presentResult = .init(
-            success: true,
-            redirectTo: redirect,
-            verifierResponseJSON: #"{"status":"ok"}"#,
-            responseURL: responseURL,
-            formPostHTML: "<form></form>"
+        bridge.presentResult = .transmitted(
+            .succeeded(
+                verifierResponseJSON: #"{"status":"ok"}"#,
+                redirectURL: redirectURL
+            )
         )
         let wallet = Wallet(bridge: bridge)
 
@@ -321,14 +319,26 @@ final class WalletAPITests: XCTestCase {
             runPolicies: true
         )
 
-        XCTAssertEqual(result.redirectTo, redirect)
-        XCTAssertEqual(result.verifierResponseJSON, #"{"status":"ok"}"#)
-        XCTAssertEqual(result.responseURL, responseURL)
-        XCTAssertEqual(result.formPostHTML, "<form></form>")
+        XCTAssertEqual(
+            result,
+            .transmitted(
+                .succeeded(
+                    verifierResponseJSON: #"{"status":"ok"}"#,
+                    redirectURL: redirectURL
+                )
+            )
+        )
         XCTAssertEqual(bridge.presentCalls.count, 1)
         XCTAssertEqual(bridge.presentCalls.first?.request, request)
         XCTAssertEqual(bridge.presentCalls.first?.did, "did:key:wallet")
         XCTAssertEqual(bridge.presentCalls.first?.runPolicies, true)
+    }
+
+    func testPresentationResultSuccessIsDerivedFromItsLegalOutcome() {
+        XCTAssertTrue(PresentationResult.prepared(.openURL(URL(string: "https://verifier.example")!)).success)
+        XCTAssertTrue(PresentationResult.prepared(.submitForm(html: "<form></form>")).success)
+        XCTAssertTrue(PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}")).success)
+        XCTAssertFalse(PresentationResult.transmitted(.failed(verifierResponseJSON: "{}")).success)
     }
 
     func testPreviewPresentationForwardsRequestAndReturnsPreview() async throws {
@@ -424,12 +434,7 @@ final class WalletAPITests: XCTestCase {
         let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
         let bridge = FakeWalletCoreBridge()
         let responseURL = URL(string: "https://verifier.example/callback?error=access_denied")!
-        bridge.rejectResult = PresentationResult(
-            success: true,
-            redirectTo: nil,
-            verifierResponseJSON: nil,
-            responseURL: responseURL
-        )
+        bridge.rejectResult = .prepared(.openURL(responseURL))
         let wallet = Wallet(bridge: bridge)
 
         let result = try await wallet.rejectPresentation(
@@ -442,7 +447,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(bridge.rejectCalls.first?.request, request)
         XCTAssertEqual(bridge.rejectCalls.first?.error, .accessDenied)
         XCTAssertEqual(bridge.rejectCalls.first?.errorDescription, "User declined")
-        XCTAssertEqual(result.responseURL, responseURL)
+        XCTAssertEqual(result, .prepared(.openURL(responseURL)))
     }
 
     func testBridgeErrorsSurfaceAsWalletErrors() async {
@@ -630,10 +635,10 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     )
     var receiveResult: [String] = []
     var credentialsResult: [Credential] = []
-    var presentResult = PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
+    var presentResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
     var previewResult = PresentationPreview(request: .init(clientID: nil), credentialOptions: [])
-    var submitResult = PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
-    var rejectResult = PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
+    var submitResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
+    var rejectResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
     private(set) var bootstrapCalls: [BootstrapCall] = []
     private(set) var resolvedOffers: [URL] = []
     private(set) var receiveCalls: [ReceiveCall] = []

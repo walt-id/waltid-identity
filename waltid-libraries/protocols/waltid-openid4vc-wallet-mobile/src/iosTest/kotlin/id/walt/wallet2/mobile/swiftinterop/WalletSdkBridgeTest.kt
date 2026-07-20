@@ -160,9 +160,13 @@ class WalletSdkBridgeTest {
         )
 
         assertIs<WalletBridgeResult.Success<MobileWalletPresentationResult>>(result)
-        assertEquals(true, result.value.success)
-        assertEquals("wallet://return", result.value.redirectTo)
-        assertEquals("""{"accepted":true}""", result.value.verifierResponseJson)
+        assertEquals(
+            MobileWalletPresentationResult.Transmitted.Succeeded(
+                verifierResponseJson = """{"accepted":true}""",
+                redirectUrl = "wallet://return",
+            ),
+            result.value,
+        )
         assertEquals("openid4vp://request", operations.presentationRequestUrl)
         assertEquals("did:jwk:issuer", operations.presentationDid)
         assertEquals(true, operations.presentationRunPolicies)
@@ -645,10 +649,9 @@ class WalletSdkBridgeTest {
             presentationRequestUrl = requestUrl
             presentationDid = did
             presentationRunPolicies = runPolicies
-            return MobileWalletPresentationResult(
-                success = true,
-                redirectTo = "wallet://return",
+            return MobileWalletPresentationResult.Transmitted.Succeeded(
                 verifierResponseJson = """{"accepted":true}""",
+                redirectUrl = "wallet://return",
             )
         }
 
@@ -693,10 +696,9 @@ class WalletSdkBridgeTest {
             submittedDisclosureOptions = selectedDisclosureOptions
             submittedDid = did
             submittedRunPolicies = runPolicies
-            return MobileWalletPresentationResult(
-                success = true,
-                redirectTo = "wallet://return",
+            return MobileWalletPresentationResult.Transmitted.Succeeded(
                 verifierResponseJson = """{"accepted":true}""",
+                redirectUrl = "wallet://return",
             )
         }
 
@@ -708,10 +710,9 @@ class WalletSdkBridgeTest {
             rejectedRequestUrl = requestUrl
             rejectedErrorCode = errorCode
             rejectedErrorDescription = errorDescription
-            return MobileWalletPresentationResult(
-                success = true,
-                redirectTo = "wallet://return",
+            return MobileWalletPresentationResult.Transmitted.Succeeded(
                 verifierResponseJson = """{"accepted":false}""",
+                redirectUrl = "wallet://return",
             )
         }
     }

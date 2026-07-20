@@ -21,26 +21,26 @@ let result = try await wallet.submitPresentation(
     did: bootstrap.did
 )
 
-guard result.success else {
-    showPresentationFailure()
-    return
-}
-
-if let redirect = result.redirectTo ?? result.responseURL {
-    await openVerifierRedirect(redirect)
-} else if let html = result.formPostHTML {
+switch result {
+case .transmitted(.succeeded(_, let redirectURL)):
+    if let redirectURL {
+        await openVerifierRedirect(redirectURL)
+    } else {
+        showPresentationComplete()
+    }
+case .prepared(.openURL(let url)):
+    await openVerifierRedirect(url)
+case .prepared(.submitForm(let html)):
     await renderAndSubmitFormPost(html)
-} else {
-    showPresentationComplete()
+case .transmitted(.failed):
+    showPresentationFailure()
 }
 ```
 
-The returned ``PresentationResult`` includes the protocol success flag, optional
-front-channel response artifacts, and optional raw verifier response JSON. A
-successful result means the SDK either transmitted the response or prepared it
-for the host. When `responseURL` or `formPostHTML` is present, keep the operation
-pending until the host opens the URL or loads the self-submitting HTML and the
-navigation succeeds. Surface handoff failures so the user can retry.
+The returned ``PresentationResult`` identifies the host's next action without
+combining mutually exclusive response artifacts. Keep `.prepared(.openURL)` and
+`.prepared(.submitForm)` operations pending until the handoff or navigation
+succeeds, and surface delivery failures so the user can retry.
 
 ### Reject a Presentation Request
 
@@ -55,17 +55,19 @@ let result = try await wallet.rejectPresentation(
     errorDescription: "The user declined the request"
 )
 
-guard result.success else {
-    showRejectionFailure()
-    return
-}
-
-if let redirect = result.redirectTo ?? result.responseURL {
-    await openVerifierRedirect(redirect)
-} else if let html = result.formPostHTML {
+switch result {
+case .transmitted(.succeeded(_, let redirectURL)):
+    if let redirectURL {
+        await openVerifierRedirect(redirectURL)
+    } else {
+        showRejectionComplete()
+    }
+case .prepared(.openURL(let url)):
+    await openVerifierRedirect(url)
+case .prepared(.submitForm(let html)):
     await renderAndSubmitFormPost(html)
-} else {
-    showRejectionComplete()
+case .transmitted(.failed):
+    showRejectionFailure()
 }
 ```
 

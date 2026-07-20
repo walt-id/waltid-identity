@@ -583,46 +583,37 @@ public struct WalletBootstrapResult: Equatable, Sendable {
 }
 
 /// Result of responding to an OpenID4VP presentation request.
-public struct PresentationResult: Equatable, Sendable {
-    /// Indicates whether the protocol response was transmitted or prepared successfully.
-    ///
-    /// When ``responseURL`` or ``formPostHTML`` is present, the host app must
-    /// still deliver that front-channel response before treating the flow as complete.
-    public let success: Bool
+///
+/// Each case represents the next action required from the host app.
+public enum PresentationResult: Equatable, Sendable {
+    /// A protocol response that still requires a host-app delivery action.
+    public enum Prepared: Equatable, Sendable {
+        /// The host app must open the URL to deliver the protocol response.
+        case openURL(URL)
 
-    /// Optional verifier redirect URL.
-    public let redirectTo: URL?
+        /// The host app must render the HTML so its self-submitting form can deliver the protocol response.
+        case submitForm(html: String)
+    }
 
-    /// Optional raw verifier response JSON.
-    public let verifierResponseJSON: String?
+    /// A protocol response that was transmitted and received a JSON verifier response.
+    public enum Transmitted: Equatable, Sendable {
+        /// The verifier accepted the protocol response.
+        case succeeded(verifierResponseJSON: String, redirectURL: URL? = nil)
 
-    /// Front-channel query or fragment response URL for the host app to open.
-    public let responseURL: URL?
+        /// The verifier rejected or could not process the protocol response.
+        case failed(verifierResponseJSON: String)
+    }
 
-    /// Self-submitting form-post response for the host app to render.
-    public let formPostHTML: String?
+    /// The host app still needs to deliver the prepared response.
+    case prepared(Prepared)
 
-    /// Creates a presentation result.
-    ///
-    /// - Parameters:
-    ///   - success: Indicates whether the protocol response was transmitted or
-    ///     prepared successfully. A returned front-channel artifact still requires host delivery.
-    ///   - redirectTo: Optional verifier redirect URL.
-    ///   - verifierResponseJSON: Optional raw verifier response JSON.
-    ///   - responseURL: Front-channel response URL for the host app to open.
-    ///   - formPostHTML: Self-submitting form-post response for the host app to render.
-    public init(
-        success: Bool,
-        redirectTo: URL?,
-        verifierResponseJSON: String?,
-        responseURL: URL? = nil,
-        formPostHTML: String? = nil
-    ) {
-        self.success = success
-        self.redirectTo = redirectTo
-        self.verifierResponseJSON = verifierResponseJSON
-        self.responseURL = responseURL
-        self.formPostHTML = formPostHTML
+    /// The verifier returned a response after protocol transmission.
+    case transmitted(Transmitted)
+
+    /// `true` unless the verifier rejected or could not receive the transmitted response.
+    public var success: Bool {
+        if case .transmitted(.failed) = self { return false }
+        return true
     }
 }
 

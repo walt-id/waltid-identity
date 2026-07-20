@@ -108,9 +108,13 @@ internal class MobileDemoWallet(
 }
 
 private fun MobileWalletPresentationResult.toDemoContinuation(): WalletDemoPresentationContinuation? =
-    redirectTo?.let(WalletDemoPresentationContinuation::Url)
-        ?: responseUrl?.let(WalletDemoPresentationContinuation::Url)
-        ?: formPostHtml?.let(WalletDemoPresentationContinuation::FormPostHtml)
+    when (this) {
+        is MobileWalletPresentationResult.Prepared.OpenUrl -> WalletDemoPresentationContinuation.Url(url)
+        is MobileWalletPresentationResult.Prepared.SubmitForm -> WalletDemoPresentationContinuation.FormPostHtml(html)
+        is MobileWalletPresentationResult.Transmitted.Succeeded ->
+            redirectUrl?.let(WalletDemoPresentationContinuation::Url)
+        is MobileWalletPresentationResult.Transmitted.Failed -> null
+    }
 
 internal fun DemoWalletConfig.toWalletAttestationConfig(): WalletAttestationConfig? =
     attestationBaseUrl.takeIf { it.isNotBlank() }?.let {

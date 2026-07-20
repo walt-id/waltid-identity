@@ -87,21 +87,47 @@ public data class MobileWalletOfferResolution(
 )
 
 /**
- * Result returned after attempting to answer an OpenID4VP presentation request.
+ * Result of answering an OpenID4VP presentation request.
  *
- * @property success `true` when the wallet transmitted or prepared the protocol response successfully.
- * @property redirectTo Optional verifier redirect URI returned by the presentation flow.
- * @property verifierResponseJson Raw verifier response body encoded as JSON, when the verifier returns structured JSON.
- * @property responseUrl Front-channel query or fragment response URL for the host app to open.
- * @property formPostHtml Self-submitting form-post response for the host app to render.
+ * Each subtype represents the next action required from the host app. This keeps
+ * mutually exclusive response artifacts out of the same result instance.
  */
-public data class MobileWalletPresentationResult(
-    public val success: Boolean,
-    public val redirectTo: String?,
-    public val verifierResponseJson: String? = null,
-    public val responseUrl: String? = null,
-    public val formPostHtml: String? = null,
-)
+public sealed interface MobileWalletPresentationResult {
+    /** `true` unless the verifier rejected or could not receive the transmitted response. */
+    public val success: Boolean
+        get() = this !is Transmitted.Failed
+
+    /** The protocol response still requires a host-app delivery action. */
+    public sealed interface Prepared : MobileWalletPresentationResult {
+        /** The host app must open [url] to deliver the protocol response. */
+        public data class OpenUrl(
+            public val url: String,
+        ) : Prepared
+
+        /** The host app must render [html] so its self-submitting form can deliver the protocol response. */
+        public data class SubmitForm(
+            public val html: String,
+        ) : Prepared
+    }
+
+    /** The protocol response was transmitted and the verifier returned a JSON response. */
+    public sealed interface Transmitted : MobileWalletPresentationResult {
+        /** Raw verifier response body encoded as JSON. */
+        public val verifierResponseJson: String
+
+        /** The verifier accepted the protocol response. */
+        public data class Succeeded(
+            override val verifierResponseJson: String,
+            /** Optional post-response redirect for the host app to open. */
+            public val redirectUrl: String? = null,
+        ) : Transmitted
+
+        /** The verifier rejected or could not process the protocol response. */
+        public data class Failed(
+            override val verifierResponseJson: String,
+        ) : Transmitted
+    }
+}
 
 /**
  * OAuth 2.0 client-attestation configuration used during mobile issuance.
@@ -470,12 +496,42 @@ public class MobileWallet internal constructor(
 }
 
 internal fun WalletPresentResult.toMobilePresentationResult(): MobileWalletPresentationResult =
-    MobileWalletPresentationResult(
-        success = transmissionSuccess ?: (getUrl != null || formPostHtml != null),
-        redirectTo = redirectTo,
-        verifierResponseJson = verifierResponse?.let {
-            Json.encodeToString(JsonElement.serializer(), it)
-        },
-        responseUrl = getUrl,
-        formPostHtml = formPostHtml,
-    )
+    verifierResponse?.let { Json.encodeToString(JsonElement.serializer(), it) }.let { responseJson ->
+        val responseUrl = getUrl
+        val formHtml = formPostHtml
+        when {
+            responseUrl != null -> {
+                require(
+                    transmissionSuccess == null &&
+                        formHtml == null &&
+                        responseJson == null &&
+                        redirectTo == null
+                ) {
+                    "Prepared URL result contains incompatible protocol fields"
+                }
+                MobileWalletPresentationResult.Prepared.OpenUrl(responseUrl)
+            }
+
+            formHtml != null -> {
+                require(transmissionSuccess == null && responseJson == null && redirectTo == null) {
+                    "Prepared form result contains incompatible protocol fields"
+                }
+                MobileWalletPresentationResult.Prepared.SubmitForm(formHtml)
+            }
+
+            transmissionSuccess == true -> MobileWalletPresentationResult.Transmitted.Succeeded(
+                verifierResponseJson = requireNotNull(responseJson) {
+                    "Transmitted presentation result is missing the verifier response"
+                },
+                redirectUrl = redirectTo,
+            )
+
+            transmissionSuccess == false -> MobileWalletPresentationResult.Transmitted.Failed(
+                verifierResponseJson = requireNotNull(responseJson) {
+                    "Failed presentation transmission is missing the verifier response"
+                },
+            )
+
+            else -> error("Presentation result has no protocol outcome")
+        }
+    }

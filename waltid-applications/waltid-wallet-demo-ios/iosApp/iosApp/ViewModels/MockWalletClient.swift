@@ -23,11 +23,7 @@ actor MockWalletClient: WalletClient {
         duplicatePresentationOptions: Bool = false,
         transactionCodeRequired: Bool = false,
         presentationPreview: PresentationPreview? = nil,
-        rejectionResult: PresentationResult = PresentationResult(
-            success: true,
-            redirectTo: nil,
-            verifierResponseJSON: nil
-        )
+        rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}"))
     ) {
         self.storedCredentials = storedCredentials
         self.operationDelayNanoseconds = operationDelayMilliseconds * 1_000_000
@@ -63,7 +59,7 @@ actor MockWalletClient: WalletClient {
 
     func present(request: URL, did: String?) async throws -> PresentationResult {
         try await delayOperation()
-        return PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
+        return .transmitted(.succeeded(verifierResponseJSON: "{}"))
     }
 
     func previewPresentation(request: URL) async throws -> PresentationPreview {
@@ -87,7 +83,7 @@ actor MockWalletClient: WalletClient {
         did: String?
     ) async throws -> PresentationResult {
         try await delayOperation()
-        return PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
+        return .transmitted(.succeeded(verifierResponseJSON: "{}"))
     }
 
     func rejectPresentation(request: URL) async throws -> PresentationResult {

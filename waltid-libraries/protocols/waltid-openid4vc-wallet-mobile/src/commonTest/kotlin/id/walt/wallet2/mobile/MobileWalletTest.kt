@@ -31,6 +31,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
@@ -194,13 +195,14 @@ class MobileWalletTest {
 
     @Test
     fun presentationResultCarriesVerifierResponseAsJsonString() {
-        val result = MobileWalletPresentationResult(
-            success = true,
-            redirectTo = "wallet://return",
+        val result = MobileWalletPresentationResult.Transmitted.Succeeded(
             verifierResponseJson = """{"accepted":true}""",
+            redirectUrl = "wallet://return",
         )
 
         assertEquals("""{"accepted":true}""", result.verifierResponseJson)
+        assertEquals("wallet://return", result.redirectUrl)
+        assertTrue(result.success)
     }
 
     @Test
@@ -209,10 +211,13 @@ class MobileWalletTest {
             .toMobilePresentationResult()
         val formPost = WalletPresentResult(formPostHtml = "<form></form>").toMobilePresentationResult()
 
-        assertTrue(responseUrl.success)
-        assertEquals("https://verifier.example/callback?error=access_denied", responseUrl.responseUrl)
-        assertTrue(formPost.success)
-        assertEquals("<form></form>", formPost.formPostHtml)
+        assertEquals(
+            MobileWalletPresentationResult.Prepared.OpenUrl(
+                "https://verifier.example/callback?error=access_denied"
+            ),
+            responseUrl,
+        )
+        assertEquals(MobileWalletPresentationResult.Prepared.SubmitForm("<form></form>"), formPost)
     }
 
     @Test
@@ -222,7 +227,24 @@ class MobileWalletTest {
             verifierResponse = buildJsonObject { put("error", "server_error") },
         ).toMobilePresentationResult()
 
+        assertEquals(
+            MobileWalletPresentationResult.Transmitted.Failed("""{"error":"server_error"}"""),
+            result,
+        )
         assertFalse(result.success)
+    }
+
+    @Test
+    fun presentationResultRejectsIncompatibleCoreArtifacts() {
+        assertFailsWith<IllegalArgumentException> {
+            WalletPresentResult(
+                getUrl = "https://verifier.example/callback",
+                formPostHtml = "<form></form>",
+            ).toMobilePresentationResult()
+        }
+        assertFailsWith<IllegalArgumentException> {
+            WalletPresentResult(transmissionSuccess = true).toMobilePresentationResult()
+        }
     }
 
     @Test
