@@ -2,28 +2,43 @@ package id.walt.wallet2.mobile.test
 
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
+import id.walt.dcql.models.CredentialFormat
+import id.walt.dcql.models.CredentialQuery
+import id.walt.dcql.models.DcqlQuery
+import id.walt.dcql.models.meta.NoMeta
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.mobile.test.backend.EudiTestBackend
+import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
+import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
+import id.walt.wallet2.mobile.MobileWalletPresentationPreview
+import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
+import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import org.junit.Ignore
 import org.junit.Test
 import java.util.Base64
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -167,7 +182,7 @@ class MobileWalletIntegrationTest {
         )
 
         val session = DemoTestBackend.createTransactionDataVerifierSession(scenario)
-        val preview = client.previewPresentation(session.authorizationRequestUri)
+        val preview = client.previewPresentation(session.authorizationRequestUri).requireReadyPreview()
         val transactionData = preview.request.transactionData.singleOrNull()
         assertNotNull(transactionData, "Preview should expose payment transaction data: preview=$preview")
         assertEquals("Payment Authorization", transactionData.displayName)
@@ -210,6 +225,28 @@ class MobileWalletIntegrationTest {
     }
 
     @Test
+    fun invalidTransactionDataCanBeReviewedAndReportedWithoutBackendSupport() = runBlocking {
+        val client = MobileWalletFactory(context).create(walletConfig("invalid-transaction-data"))
+        client.bootstrap()
+        val requestUrl = invalidTransactionDataRequestUrl()
+
+        val preview = assertIs<MobileWalletPresentationPreviewResult.Invalid>(
+            client.previewPresentation(requestUrl),
+        )
+
+        assertEquals(MobileWalletPresentationErrorCode.invalidTransactionData, preview.errorCode)
+        assertEquals("redirect_uri:https://verifier.example/callback", preview.request.clientId)
+
+        val result = assertIs<MobileWalletPresentationResult.Prepared.OpenUrl>(
+            client.rejectPresentation(requestUrl),
+        )
+        assertEquals(
+            "https://verifier.example/callback#error=invalid_transaction_data&state=state-123",
+            result.url,
+        )
+    }
+
+    @Test
     fun previewAndSubmitOptionalBirthDateClaimSetAgainstDemoIssuer2AndVerifier2() = runBlocking {
         val scenario = DemoTestBackend.optionalBirthDatePresentationScenario
         val client = MobileWalletFactory(context).create(walletConfig("optional-birth-date-${scenario.id}"))
@@ -223,7 +260,7 @@ class MobileWalletIntegrationTest {
         )
 
         val defaultOffSession = DemoTestBackend.createVerifierSession(scenario)
-        val defaultOffPreview = client.previewPresentation(defaultOffSession.authorizationRequestUri)
+        val defaultOffPreview = client.previewPresentation(defaultOffSession.authorizationRequestUri).requireReadyPreview()
         val defaultOffOption = defaultOffPreview.singleReceivedCredentialOption(credentialIds)
         val defaultOffBirthDate = defaultOffOption.disclosures.singleOrNull { it.name == "birth_date" }
         assertNotNull(
@@ -268,7 +305,7 @@ class MobileWalletIntegrationTest {
         )
 
         val selectedSession = DemoTestBackend.createVerifierSession(scenario)
-        val selectedPreview = client.previewPresentation(selectedSession.authorizationRequestUri)
+        val selectedPreview = client.previewPresentation(selectedSession.authorizationRequestUri).requireReadyPreview()
         val selectedOption = selectedPreview.singleReceivedCredentialOption(credentialIds)
         val selectedBirthDate = selectedOption.disclosures.singleOrNull { it.name == "birth_date" }
         assertNotNull(
@@ -404,7 +441,7 @@ class MobileWalletIntegrationTest {
 
         val offeredCredentialId = EudiTestBackend.extractCredentialIdFromOfferUrl(offer.offerUrl)
         val transaction = EudiTestBackend.createVerifierTransaction(offeredCredentialId)
-        val preview = client.previewPresentation(transaction.authorizationRequestUri)
+        val preview = client.previewPresentation(transaction.authorizationRequestUri).requireReadyPreview()
         assertTrue(
             preview.credentialOptions.isNotEmpty(),
             "Should preview a matching EUDI credential for $credentialId: preview=$preview",
@@ -471,7 +508,7 @@ class MobileWalletIntegrationTest {
         )
 
         val session = DemoTestBackend.createVerifierSession(scenario)
-        val preview = client.previewPresentation(session.authorizationRequestUri)
+        val preview = client.previewPresentation(session.authorizationRequestUri).requireReadyPreview()
         assertTrue(
             preview.credentialOptions.isNotEmpty(),
             "Should preview at least one matching credential for ${scenario.displayName}: preview=$preview",
@@ -509,7 +546,35 @@ class MobileWalletIntegrationTest {
             credentialId = credentialId,
         )
 
-    private fun id.walt.wallet2.mobile.MobileWalletPresentationPreview.singleReceivedCredentialOption(
+    private fun MobileWalletPresentationPreviewResult.requireReadyPreview(): MobileWalletPresentationPreview =
+        (this as? MobileWalletPresentationPreviewResult.Ready)?.preview
+            ?: error("Expected a valid presentation preview, got $this")
+
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    private fun invalidTransactionDataRequestUrl(): String = AuthorizationRequest(
+        clientId = "redirect_uri:https://verifier.example/callback",
+        redirectUri = "https://verifier.example/callback",
+        responseMode = OpenID4VPResponseMode.FRAGMENT,
+        nonce = "nonce",
+        state = "state-123",
+        dcqlQuery = DcqlQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "pid",
+                    format = CredentialFormat.DC_SD_JWT,
+                    meta = NoMeta,
+                )
+            )
+        ),
+        transactionData = listOf(
+            buildJsonObject {
+                put("type", "unsupported")
+                put("credential_ids", buildJsonArray { add(JsonPrimitive("pid")) })
+            }.toString().encodeToByteArray().let(Base64.getUrlEncoder().withoutPadding()::encodeToString),
+        ),
+    ).toHttpUrl().toString()
+
+    private fun MobileWalletPresentationPreview.singleReceivedCredentialOption(
         credentialIds: List<String>,
     ) = credentialOptions.singleOrNull { it.credentialId in credentialIds }
         ?: error("Expected exactly one preview option for received credential IDs $credentialIds: $this")

@@ -7,7 +7,7 @@ protocol WalletClient {
     func resolveOffer(offer: URL) async throws -> OfferResolution
     func receive(offer: URL, txCode: String?) async throws -> [String]
     func present(request: URL, did: String?) async throws -> PresentationResult
-    func previewPresentation(request: URL) async throws -> PresentationPreview
+    func previewPresentation(request: URL) async throws -> PresentationPreviewResult
     func submitPresentation(
         request: URL,
         selectedCredentialOptions: [PresentationCredentialSelection],
@@ -45,7 +45,7 @@ final class SDKWalletClient: WalletClient {
         try await wallet().present(request: request, did: did)
     }
 
-    func previewPresentation(request: URL) async throws -> PresentationPreview {
+    func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         try await wallet().previewPresentation(request: request)
     }
 

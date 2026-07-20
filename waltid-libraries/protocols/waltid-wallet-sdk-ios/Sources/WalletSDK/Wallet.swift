@@ -127,9 +127,9 @@ public actor Wallet {
     /// Resolves and previews an OpenID4VP presentation request without submitting credentials.
     ///
     /// - Parameter request: OpenID4VP authorization request URL received by the app.
-    /// - Returns: Verifier metadata and matching credential options.
-    /// - Throws: ``WalletError`` when the request cannot be resolved or matched.
-    public func previewPresentation(request: URL) async throws -> PresentationPreview {
+    /// - Returns: A reviewable preview or a protocol error that can be returned after user interaction.
+    /// - Throws: ``WalletError`` when the request cannot be resolved safely or a local wallet operation fails.
+    public func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         try await bridge.previewPresentation(request: request)
     }
 
@@ -166,13 +166,14 @@ public actor Wallet {
     ///
     /// - Parameters:
     ///   - request: OpenID4VP authorization request URL received by the app.
-    ///   - error: Authorization error code. Use ``PresentationErrorCode/accessDenied`` for user decline.
+    ///   - error: Optional authorization error code. Omit it to use the error detected during an invalid
+    ///     preview, or `access_denied` for a valid request declined by the user.
     ///   - errorDescription: Optional verifier-facing error description.
     /// - Returns: Error-response delivery outcome.
     /// - Throws: ``WalletError`` when the request cannot be resolved or the error response cannot be sent.
     public func rejectPresentation(
         request: URL,
-        error: PresentationErrorCode = .accessDenied,
+        error: PresentationErrorCode? = nil,
         errorDescription: String? = nil
     ) async throws -> PresentationResult {
         try await bridge.rejectPresentation(

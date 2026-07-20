@@ -130,8 +130,8 @@ private actor TransactionCodeWalletClient: WalletClient {
         .transmitted(.succeeded(verifierResponseJSON: "{}"))
     }
 
-    func previewPresentation(request: URL) async throws -> PresentationPreview {
-        PresentationPreview(request: PresentationRequestInfo(clientID: nil), credentialOptions: [])
+    func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
+        .ready(PresentationPreview(request: PresentationRequestInfo(clientID: nil), credentialOptions: []))
     }
 
     func submitPresentation(

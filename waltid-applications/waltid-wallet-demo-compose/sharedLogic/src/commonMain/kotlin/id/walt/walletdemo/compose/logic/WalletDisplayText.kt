@@ -16,6 +16,7 @@ internal enum class WalletDeepLinkScheme(val scheme: String) {
 
 internal object WalletDisplayText {
     const val ReviewPresentationRequest = "Review presentation request"
+    const val ReviewPresentationError = "Review presentation error"
     const val StartingWallet = "Starting wallet..."
     const val ResolvingCredentialOffer = "Resolving credential offer..."
     const val ReviewCredentialOffer = "Review credential offer"
@@ -31,6 +32,7 @@ internal object WalletDisplayText {
     const val WalletReady = "Wallet ready"
     const val PresentationSent = "Presentation sent"
     const val PresentationDeclined = "Presentation declined"
+    const val VerifierNotified = "Verifier notified"
     const val PresentationFinishedWithoutVerifierConfirmation = "Presentation finished without verifier confirmation"
     const val RejectionFinishedWithoutVerifierConfirmation = "Rejection finished without verifier confirmation"
     const val PresentationContinuationFailed = "Could not deliver the verifier response"

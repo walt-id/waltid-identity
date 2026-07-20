@@ -40,6 +40,44 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun invalidPresentationPreviewCanBeDismissedOrReturnedToVerifier() = runTest {
+        val error = WalletDemoPresentationError(
+            verifier = VerifierDetails(name = "Example Verifier", clientId = "https://verifier.example"),
+            errorCode = "invalid_transaction_data",
+            message = "Unsupported transaction_data type",
+        )
+        val wallet = FakeDemoWallet(presentationError = error)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Present)
+        controller.updatePresentationRequestUrl("openid4vp://invalid")
+        controller.previewPresentation()
+        runCurrent()
+
+        assertEquals(error, controller.state.value.presentationError)
+        assertEquals(null, controller.state.value.presentationPreview)
+        assertEquals(WalletDisplayText.ReviewPresentationError, controller.state.value.statusText)
+        assertFalse(controller.state.value.presentationUrlEntryEnabled)
+        assertTrue(controller.state.value.presentationReviewEnabled)
+
+        controller.rejectPresentation()
+        runCurrent()
+
+        assertEquals("openid4vp://invalid", wallet.rejectedRequestUrl)
+        assertEquals(null, controller.state.value.presentationError)
+        assertEquals(WalletDisplayText.VerifierNotified, controller.state.value.statusText)
+
+        controller.updatePresentationRequestUrl("openid4vp://invalid-again")
+        controller.previewPresentation()
+        runCurrent()
+        controller.startNewPresentationFlow()
+
+        assertEquals(null, controller.state.value.presentationError)
+        assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
+        assertEquals(null, wallet.rejectedRequestUrl.takeIf { it == "openid4vp://invalid-again" })
+    }
+
+    @Test
     fun setupPinRejectsInvalidLengthAndNonDigits() = runTest {
         val controller = controllerWith(FakeDemoWallet(), this)
 
@@ -1217,6 +1255,7 @@ private class FakeDemoWallet(
         clientId = null,
         credentialOptions = emptyList(),
     ),
+    private val presentationError: WalletDemoPresentationError? = null,
 ) : DemoWallet {
     var bootstrapCalls = 0
     var resolveOfferCalls = 0
@@ -1267,9 +1306,10 @@ private class FakeDemoWallet(
         return presentationResult
     }
 
-    override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreview {
+    override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult {
         previewedRequestUrl = requestUrl
-        return presentationPreview
+        return presentationError?.let(WalletDemoPresentationPreviewResult::Invalid)
+            ?: WalletDemoPresentationPreviewResult.Ready(presentationPreview)
     }
 
     override suspend fun submitPresentation(

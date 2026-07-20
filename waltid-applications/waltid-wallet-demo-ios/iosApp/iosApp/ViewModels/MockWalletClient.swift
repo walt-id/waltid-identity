@@ -13,8 +13,9 @@ actor MockWalletClient: WalletClient {
     private let verifierStyle: VerifierStyle
     private let duplicatePresentationOptions: Bool
     private let transactionCodeRequired: Bool
-    private let presentationPreviewOverride: PresentationPreview?
+    private let presentationPreviewResultOverride: PresentationPreviewResult?
     private let rejectionResult: PresentationResult
+    private(set) var rejectedRequestURLs: [URL] = []
 
     init(
         storedCredentials: [Credential] = [],
@@ -22,7 +23,7 @@ actor MockWalletClient: WalletClient {
         verifierStyle: VerifierStyle = .named,
         duplicatePresentationOptions: Bool = false,
         transactionCodeRequired: Bool = false,
-        presentationPreview: PresentationPreview? = nil,
+        presentationPreviewResult: PresentationPreviewResult? = nil,
         rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}"))
     ) {
         self.storedCredentials = storedCredentials
@@ -30,7 +31,7 @@ actor MockWalletClient: WalletClient {
         self.verifierStyle = verifierStyle
         self.duplicatePresentationOptions = duplicatePresentationOptions
         self.transactionCodeRequired = transactionCodeRequired
-        self.presentationPreviewOverride = presentationPreview
+        self.presentationPreviewResultOverride = presentationPreviewResult
         self.rejectionResult = rejectionResult
     }
 
@@ -62,17 +63,19 @@ actor MockWalletClient: WalletClient {
         return .transmitted(.succeeded(verifierResponseJSON: "{}"))
     }
 
-    func previewPresentation(request: URL) async throws -> PresentationPreview {
+    func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         try await delayOperation()
-        if let presentationPreviewOverride {
-            return presentationPreviewOverride
+        if let presentationPreviewResultOverride {
+            return presentationPreviewResultOverride
         }
-        return PresentationPreview(
-            request: previewRequestInfo,
-            credentialOptions: duplicatePresentationOptions ? Self.duplicateOptions : [Self.defaultOption],
-            credentialRequirements: [
-                PresentationCredentialRequirement(options: [duplicatePresentationOptions ? ["identity", "age"] : ["pid"]])
-            ]
+        return .ready(
+            PresentationPreview(
+                request: previewRequestInfo,
+                credentialOptions: duplicatePresentationOptions ? Self.duplicateOptions : [Self.defaultOption],
+                credentialRequirements: [
+                    PresentationCredentialRequirement(options: [duplicatePresentationOptions ? ["identity", "age"] : ["pid"]])
+                ]
+            )
         )
     }
 
@@ -88,6 +91,7 @@ actor MockWalletClient: WalletClient {
 
     func rejectPresentation(request: URL) async throws -> PresentationResult {
         try await delayOperation()
+        rejectedRequestURLs.append(request)
         return rejectionResult
     }
 

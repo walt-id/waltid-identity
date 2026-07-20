@@ -24,6 +24,7 @@ import id.walt.walletdemo.compose.logic.presentationReviewEnabled
 import id.walt.walletdemo.compose.logic.presentationUrlEntryEnabled
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.PresentationReviewSection
+import id.walt.walletdemo.compose.ui.components.PresentationErrorSection
 import id.walt.walletdemo.compose.ui.components.UrlActionSection
 
 @Composable
@@ -94,6 +95,15 @@ internal fun PresentTab(
                 onCredentialClick = onCredentialClick,
                 onSubmit = onSubmit,
                 onReject = onReject,
+            )
+        }
+
+        state.presentationError?.let { error ->
+            PresentationErrorSection(
+                error = error,
+                enabled = state.presentationReviewEnabled,
+                onNotifyVerifier = onReject,
+                onDismiss = onStartNew,
             )
         }
     }

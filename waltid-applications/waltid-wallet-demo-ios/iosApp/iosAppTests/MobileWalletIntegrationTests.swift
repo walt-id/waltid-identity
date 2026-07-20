@@ -263,6 +263,28 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertEqual(failure["type"] as? String, "wallet_error_response")
     }
 
+    func testInvalidTransactionDataCanBeReviewedAndReportedWithoutBackendSupport() async throws {
+        let walletId = "ios-invalid-transaction-data-\(UUID().uuidString)"
+        await clearTestData(walletId: walletId)
+        let wallet = try await makeWallet(walletId: walletId)
+        _ = try await wallet.bootstrap()
+        let presentationURL = try invalidTransactionDataPresentationURL()
+
+        let previewResult = try await wallet.previewPresentation(request: presentationURL)
+        guard case .invalid(let error) = previewResult else {
+            return XCTFail("Expected invalid_transaction_data, got \(previewResult)")
+        }
+
+        XCTAssertEqual(error.code, .invalidTransactionData)
+        XCTAssertEqual(error.request.clientID, "redirect_uri:https://verifier.example/callback")
+
+        let result = try await wallet.rejectPresentation(request: presentationURL)
+        XCTAssertEqual(
+            result,
+            .prepared(.openURL(URL(string: "https://verifier.example/callback#error=invalid_transaction_data&state=state-123")!))
+        )
+    }
+
     func testReceiveAndPresentIsoMdlAgainstDemoIssuer2AndVerifier2() async throws {
         try await receiveAndPresentDemoCredential(scenarioID: "iso-mdl")
     }
@@ -370,7 +392,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let offeredCredentialID = await EudiTestBackend.shared.extractCredentialIdFromOfferUrl(offerUrl: offer.offerUrl)
         let transaction = try await EudiTestBackend.shared.createVerifierTransaction(credentialId: offeredCredentialID)
         let presentationURL = try XCTUnwrap(URL(string: transaction.authorizationRequestUri))
-        let preview = try await wallet.previewPresentation(request: presentationURL)
+        let previewResult = try await wallet.previewPresentation(request: presentationURL)
+        let preview = try requireReadyPreview(previewResult)
         XCTAssertFalse(
             preview.credentialOptions.isEmpty,
             "Should preview a matching EUDI credential for \(credentialID): \(preview)"
@@ -415,7 +438,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let session = try await DemoBackend.shared.createVerifierSession(scenario: scenario)
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
-        let preview = try await wallet.previewPresentation(request: presentationURL)
+        let previewResult = try await wallet.previewPresentation(request: presentationURL)
+        let preview = try requireReadyPreview(previewResult)
         XCTAssertFalse(
             preview.credentialOptions.isEmpty,
             "Should preview at least one matching credential for \(scenario.displayName): \(preview)"
@@ -440,6 +464,54 @@ final class MobileWalletIntegrationTests: XCTestCase {
             sessionID: session.sessionID,
             timeoutSeconds: verifierPollingTimeout
         )
+    }
+
+    private func requireReadyPreview(_ result: PresentationPreviewResult) throws -> PresentationPreview {
+        switch result {
+        case .ready(let preview):
+            return preview
+        case .invalid(let error):
+            XCTFail("Expected a valid presentation preview, got \(error.code.rawValue): \(error.message)")
+            throw NSError(
+                domain: "MobileWalletIntegrationTests",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: error.message]
+            )
+        }
+    }
+
+    private func invalidTransactionDataPresentationURL() throws -> URL {
+        let transactionData = try JSONSerialization.data(withJSONObject: [
+            "type": "unsupported",
+            "credential_ids": ["pid"]
+        ])
+        let encodedTransactionData = transactionData.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        let transactionDataParameter = try JSONSerialization.data(withJSONObject: [encodedTransactionData])
+        let dcqlQuery = try JSONSerialization.data(withJSONObject: [
+            "credentials": [[
+                "id": "pid",
+                "format": "dc+sd-jwt",
+                "meta": [:]
+            ]]
+        ])
+        var components = URLComponents()
+        components.scheme = "openid4vp"
+        components.host = "authorize"
+        components.queryItems = [
+            URLQueryItem(name: "client_id", value: "redirect_uri:https://verifier.example/callback"),
+            URLQueryItem(name: "response_type", value: "vp_token"),
+            URLQueryItem(name: "response_mode", value: "fragment"),
+            URLQueryItem(name: "redirect_uri", value: "https://verifier.example/callback"),
+            URLQueryItem(name: "nonce", value: "nonce"),
+            URLQueryItem(name: "state", value: "state-123"),
+            URLQueryItem(name: "dcql_query", value: String(decoding: dcqlQuery, as: UTF8.self)),
+            URLQueryItem(name: "transaction_data", value: String(decoding: transactionDataParameter, as: UTF8.self))
+        ]
+        components.percentEncodedQuery = components.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+        return try XCTUnwrap(components.url)
     }
 
     private func receiveCredentialFromDemoIssuer2(scenarioID: String) async throws {

@@ -34,7 +34,7 @@ private val WalletRequestDrafts.hasValidTxCode: Boolean
     get() = !transactionCodeRequired || txCode.isNotBlank()
 
 val WalletDemoUiState.presentationUrlEntryEnabled: Boolean
-    get() = !isBusy && presentationPreview == null && !presentationCompleted
+    get() = !isBusy && presentationReview == null && !presentationCompleted
 
 val WalletDemoUiState.presentationPreviewActionEnabled: Boolean
     get() = session is WalletSessionState.Ready &&
@@ -42,7 +42,7 @@ val WalletDemoUiState.presentationPreviewActionEnabled: Boolean
         presentationUrlEntryEnabled
 
 val WalletDemoUiState.presentationReviewEnabled: Boolean
-    get() = !isBusy && presentationPreview != null && !presentationCompleted
+    get() = !isBusy && presentationReview != null && !presentationCompleted
 
 val WalletDemoUiState.statusText: String
     get() = statusText(selectedTab)
@@ -66,7 +66,8 @@ private fun WalletDemoUiState.tabStatusText(tab: WalletDemoTab): String? =
         }
         WalletDemoTab.Present -> when {
             presentationCompleted -> WalletDisplayText.PresentationSent
-            presentationPreview != null -> WalletDisplayText.ReviewPresentationRequest
+            presentationReview is WalletDemoPresentationPreviewResult.Invalid -> WalletDisplayText.ReviewPresentationError
+            presentationReview is WalletDemoPresentationPreviewResult.Ready -> WalletDisplayText.ReviewPresentationRequest
             else -> null
         }
     }

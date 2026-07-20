@@ -26,6 +26,7 @@ class WalletPresentFunctionality2Test {
             ),
             resolvedAuthorizationRequest = ResolvedAuthorizationRequest.Plain(
                 AuthorizationRequest(
+                    clientId = "redirect_uri:https://wallet.example/callback",
                     responseMode = OpenID4VPResponseMode.FRAGMENT,
                     redirectUri = "https://wallet.example/callback",
                     nonce = "nonce-from-preview",
@@ -38,6 +39,6 @@ class WalletPresentFunctionality2Test {
             transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
         ).getOrThrow()
 
-        assertEquals("https://wallet.example/callback#vp_token=%7B%7D", result.getUrl)
+        assertEquals("https://wallet.example/callback#error=invalid_request", result.getUrl)
     }
 }

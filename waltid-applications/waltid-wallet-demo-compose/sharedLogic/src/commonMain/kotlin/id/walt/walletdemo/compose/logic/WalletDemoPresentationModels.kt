@@ -1,5 +1,16 @@
 package id.walt.walletdemo.compose.logic
 
+sealed interface WalletDemoPresentationPreviewResult {
+    data class Ready(val preview: WalletDemoPresentationPreview) : WalletDemoPresentationPreviewResult
+    data class Invalid(val error: WalletDemoPresentationError) : WalletDemoPresentationPreviewResult
+}
+
+data class WalletDemoPresentationError(
+    val verifier: VerifierDetails,
+    val errorCode: String,
+    val message: String,
+)
+
 data class WalletDemoPresentationPreview(
     val verifierName: String?,
     val clientId: String?,

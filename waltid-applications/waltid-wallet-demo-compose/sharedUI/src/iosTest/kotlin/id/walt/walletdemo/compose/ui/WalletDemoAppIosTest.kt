@@ -42,6 +42,10 @@ class WalletDemoAppIosTest {
         scenarios.presentTabAllowsPreviewAndDeclineWithoutCredentials()
 
     @Test
+    fun invalidPresentationCanBeDismissedLocallyOrReportedToVerifier() =
+        scenarios.invalidPresentationCanBeDismissedLocallyOrReportedToVerifier()
+
+    @Test
     fun presentTabPreviewsCredentialsAndCanStartNewFlowAfterSuccess() =
         scenarios.presentTabPreviewsCredentialsAndCanStartNewFlowAfterSuccess()
 

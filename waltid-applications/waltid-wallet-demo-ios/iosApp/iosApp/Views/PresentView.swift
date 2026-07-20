@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import WalletSDK
 
 struct PresentView: View {
     @Environment(\.openURL) private var openURL
@@ -69,6 +70,15 @@ struct PresentView: View {
                             onReject: viewModel.rejectPresentation
                         )
                     }
+
+                    if let error = viewModel.presentationError {
+                        PresentationErrorView(
+                            error: error,
+                            isEnabled: viewModel.presentationReviewEnabled,
+                            onNotifyVerifier: viewModel.rejectPresentation,
+                            onDismiss: viewModel.startNewPresentationFlow
+                        )
+                    }
                 }
                 .padding()
             }
@@ -129,6 +139,46 @@ struct PresentView: View {
                 EmptyView()
             }
         }
+    }
+}
+
+private struct PresentationErrorView: View {
+    let error: PresentationPreviewError
+    let isEnabled: Bool
+    let onNotifyVerifier: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("This request cannot be completed")
+                .font(.headline)
+            VerifierDetailsView(request: error.request)
+            Text(error.message)
+            Text("OpenID4VP error: \(error.code.rawValue)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("You can notify the verifier or dismiss the request without sending a response.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                Button("Notify verifier", action: onNotifyVerifier)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.waltBlue)
+                    .disabled(!isEnabled)
+                    .accessibilityIdentifier(WalletAccessibilityID.presentationErrorNotifyButton)
+
+                Button("Dismiss", action: onDismiss)
+                    .buttonStyle(.bordered)
+                    .disabled(!isEnabled)
+                    .accessibilityIdentifier(WalletAccessibilityID.presentationErrorDismissButton)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(WalletAccessibilityID.presentationError)
     }
 }
 

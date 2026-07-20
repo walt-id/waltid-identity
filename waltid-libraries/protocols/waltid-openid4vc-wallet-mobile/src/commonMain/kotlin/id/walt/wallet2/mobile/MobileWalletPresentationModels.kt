@@ -13,6 +13,23 @@ public data class MobileWalletPresentationPreview(
     val credentialRequirements: List<MobileWalletPresentationCredentialRequirement> = emptyList(),
 )
 
+/** Result of resolving and validating an OpenID4VP request for presentation preview. */
+public sealed interface MobileWalletPresentationPreviewResult {
+    /** The request is valid and can be reviewed, submitted, or declined. */
+    public data class Ready(
+        public val preview: MobileWalletPresentationPreview,
+    ) : MobileWalletPresentationPreviewResult
+
+    /** The request cannot be fulfilled, but the detected protocol error can be returned after user interaction. */
+    public data class Invalid(
+        /** Validated response destination and request context to show before returning the error. */
+        public val request: MobileWalletPresentationRequestInfo,
+        public val errorCode: MobileWalletPresentationErrorCode,
+        /** Local diagnostic intended for wallet UI; it is not sent to the verifier automatically. */
+        public val message: String,
+    ) : MobileWalletPresentationPreviewResult
+}
+
 /**
  * A required presentation credential-query combination.
  *

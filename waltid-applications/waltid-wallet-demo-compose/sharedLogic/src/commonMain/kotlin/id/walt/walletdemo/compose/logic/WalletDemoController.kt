@@ -143,7 +143,7 @@ class WalletDemoController(
         _state.update {
             it.copy(
                 requestDrafts = it.requestDrafts.copy(presentationRequestUrl = value),
-                presentationPreview = null,
+                presentationReview = null,
                 selectedPresentationCredentialOptions = emptySet(),
                 selectedPresentationDisclosureOptions = emptySet(),
                 presentationCompleted = false,
@@ -168,7 +168,7 @@ class WalletDemoController(
                         lastReceivedCredentialIds = emptyList(),
                         receiveCompleted = false,
                         receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
-                        presentationPreview = null,
+                        presentationReview = null,
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
                         presentationCompleted = false,
@@ -183,7 +183,7 @@ class WalletDemoController(
                     it.copy(
                         selectedTab = WalletDemoTab.Present,
                         requestDrafts = it.requestDrafts.copy(presentationRequestUrl = url),
-                        presentationPreview = null,
+                        presentationReview = null,
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
                         presentationCompleted = false,
@@ -220,7 +220,7 @@ class WalletDemoController(
         _state.update {
             it.copy(
                 requestDrafts = it.requestDrafts.copy(presentationRequestUrl = ""),
-                presentationPreview = null,
+                presentationReview = null,
                 selectedPresentationCredentialOptions = emptySet(),
                 selectedPresentationDisclosureOptions = emptySet(),
                 presentationCompleted = false,
@@ -423,7 +423,7 @@ class WalletDemoController(
             _state.update {
                 it.copy(
                     operation = WalletOperationState.ResolvingPresentation,
-                    presentationPreview = null,
+                    presentationReview = null,
                     selectedPresentationCredentialOptions = emptySet(),
                     selectedPresentationDisclosureOptions = emptySet(),
                     presentationCompleted = false,
@@ -432,14 +432,23 @@ class WalletDemoController(
             }
             runCatching {
                 wallet.previewPresentation(requestUrl)
-            }.onSuccess { preview ->
-                _state.update {
-                    it.copy(
-                        operation = WalletOperationState.Idle,
-                        presentationPreview = preview,
-                        selectedPresentationCredentialOptions = preview.defaultCredentialSelection(),
-                        selectedPresentationDisclosureOptions = emptySet(),
-                    )
+            }.onSuccess { result ->
+                _state.update { state ->
+                    when (result) {
+                        is WalletDemoPresentationPreviewResult.Ready -> state.copy(
+                            operation = WalletOperationState.Idle,
+                            presentationReview = result,
+                            selectedPresentationCredentialOptions = result.preview.defaultCredentialSelection(),
+                            selectedPresentationDisclosureOptions = emptySet(),
+                        )
+
+                        is WalletDemoPresentationPreviewResult.Invalid -> state.copy(
+                            operation = WalletOperationState.Idle,
+                            presentationReview = result,
+                            selectedPresentationCredentialOptions = emptySet(),
+                            selectedPresentationDisclosureOptions = emptySet(),
+                        )
+                    }
                 }
             }.onFailure { error ->
                 setOperationError(WalletDisplayText.PreviewFailed, error, WalletDemoTab.Present)
@@ -538,7 +547,8 @@ class WalletDemoController(
         val current = _state.value
         current.session as? WalletSessionState.Ready ?: return
         val requestUrl = current.requestDrafts.presentationRequestUrl.trim()
-        if (requestUrl.isBlank() || current.presentationPreview == null) return
+        if (requestUrl.isBlank() || current.presentationReview == null) return
+        val isReportingError = current.presentationReview is WalletDemoPresentationPreviewResult.Invalid
 
         scope.launch(dispatcher) {
             _state.update { it.copy(operation = WalletOperationState.DecliningPresentation) }
@@ -547,7 +557,11 @@ class WalletDemoController(
             }.onSuccess { result ->
                 _state.update {
                     it.withPresentationResult(
-                        result = result,
+                        result = if (isReportingError && result is WalletDemoOperationResult.Success) {
+                            result.copy(message = WalletDisplayText.VerifierNotified)
+                        } else {
+                            result
+                        },
                         clearPreview = true,
                         clearSelections = true,
                         resetNavigation = true,
@@ -560,7 +574,7 @@ class WalletDemoController(
                             message = WalletDisplayText.failure(WalletDisplayText.RejectFailed, error),
                             tab = WalletDemoTab.Present,
                         ),
-                        presentationPreview = null,
+                        presentationReview = null,
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
                         presentationCompleted = false,
@@ -598,7 +612,7 @@ class WalletDemoController(
                     tab = WalletDemoTab.Present,
                 )
             },
-            presentationPreview = if (clearPreview) null else presentationPreview,
+            presentationReview = if (clearPreview) null else presentationReview,
             selectedPresentationCredentialOptions =
                 if (clearSelections) emptySet() else selectedPresentationCredentialOptions,
             selectedPresentationDisclosureOptions =

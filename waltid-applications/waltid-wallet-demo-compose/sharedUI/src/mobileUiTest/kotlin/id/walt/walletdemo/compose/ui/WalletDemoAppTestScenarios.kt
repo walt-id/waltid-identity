@@ -29,6 +29,7 @@ import androidx.compose.ui.test.v2.runComposeUiTest
 import id.walt.walletdemo.compose.logic.DemoPinStore
 import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.InMemoryDemoPinStore
+import id.walt.walletdemo.compose.logic.VerifierDetails
 import id.walt.walletdemo.compose.logic.WalletDemoBootstrapResult
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
@@ -39,7 +40,9 @@ import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialRequirem
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosure
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
+import id.walt.walletdemo.compose.logic.WalletDemoPresentationError
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreview
+import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreviewResult
 import id.walt.walletdemo.compose.logic.WalletOperationState
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.statusText
@@ -283,6 +286,51 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.PresentationRejectButton).performScrollTo().assertIsEnabled().performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationCompleted }
         assertEquals("openid4vp://example", wallet.rejectedRequestUrl)
+    }
+
+    fun invalidPresentationCanBeDismissedLocallyOrReportedToVerifier() = runComposeUiTest {
+        val error = WalletDemoPresentationError(
+            verifier = VerifierDetails(name = "Example Verifier", clientId = "https://verifier.example"),
+            errorCode = "invalid_transaction_data",
+            message = "Unsupported transaction data type",
+        )
+        val wallet = FakeDemoWallet(
+            credentials = listOf(sampleCredential),
+            presentationPreviewResult = WalletDemoPresentationPreviewResult.Invalid(error),
+        )
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag(WalletUiTestTags.PresentTab).performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationInput).performTextInput("openid4vp://invalid")
+        onNodeWithTag(WalletUiTestTags.PresentButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationError == error }
+
+        onNodeWithTag(WalletUiTestTags.PresentationError).performScrollTo().assertIsDisplayed()
+        onNodeWithText("Example Verifier").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Unsupported transaction data type").performScrollTo().assertIsDisplayed()
+        onNodeWithText("OpenID4VP error: invalid_transaction_data").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationInput).assertIsNotEnabled()
+        onNodeWithTag(WalletUiTestTags.PresentationErrorNotifyButton).assertIsEnabled()
+        onNodeWithTag(WalletUiTestTags.PresentationErrorDismissButton)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationError == null }
+
+        assertEquals(null, wallet.rejectedRequestUrl)
+        onNodeWithTag(WalletUiTestTags.PresentationInput).assertIsEnabled().performTextInput("openid4vp://invalid")
+        onNodeWithTag(WalletUiTestTags.PresentButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationError == error }
+        onNodeWithTag(WalletUiTestTags.PresentationErrorNotifyButton).performScrollTo().performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationCompleted }
+
+        assertEquals("openid4vp://invalid", wallet.rejectedRequestUrl)
+        onNodeWithTag(WalletUiTestTags.Status).assertTextContains("Verifier notified")
     }
 
     fun presentTabPreviewsCredentialsAndCanStartNewFlowAfterSuccess() = runComposeUiTest {
@@ -858,6 +906,7 @@ private class FakeDemoWallet(
     private val credentialsAfterReceive: List<WalletDemoCredential>? = null,
     private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult.Success("Presentation sent"),
     private val presentationPreview: WalletDemoPresentationPreview = WalletDemoAppTestScenarios.samplePresentationPreview,
+    private val presentationPreviewResult: WalletDemoPresentationPreviewResult? = null,
     private val receiveGate: CompletableDeferred<Unit>? = null,
     private val previewGate: CompletableDeferred<Unit>? = null,
     private val transactionCodeRequired: Boolean = false,
@@ -895,10 +944,10 @@ private class FakeDemoWallet(
         return presentationResult
     }
 
-    override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreview {
+    override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult {
         previewedRequestUrl = requestUrl
         previewGate?.await()
-        return presentationPreview
+        return presentationPreviewResult ?: WalletDemoPresentationPreviewResult.Ready(presentationPreview)
     }
 
     override suspend fun submitPresentation(

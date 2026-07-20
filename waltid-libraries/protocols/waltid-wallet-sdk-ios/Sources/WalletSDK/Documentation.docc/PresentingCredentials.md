@@ -13,13 +13,21 @@ Pass the verifier request URL and, when needed, the DID returned by
 ``Wallet/bootstrap(keyType:didMethod:)``.
 
 ```swift
-let preview = try await wallet.previewPresentation(request: authorizationRequestURL)
+let previewResult = try await wallet.previewPresentation(request: authorizationRequestURL)
 
-let result = try await wallet.submitPresentation(
-    request: authorizationRequestURL,
-    selectedCredentialOptions: preview.credentialOptions.map(\.selection),
-    did: bootstrap.did
-)
+let result: PresentationResult
+switch previewResult {
+case .ready(let preview):
+    result = try await wallet.submitPresentation(
+        request: authorizationRequestURL,
+        selectedCredentialOptions: preview.credentialOptions.map(\.selection),
+        did: bootstrap.did
+    )
+case .invalid(let error):
+    showRequestError(error)
+    // After user interaction, either dismiss locally or notify the verifier.
+    result = try await wallet.rejectPresentation(request: authorizationRequestURL)
+}
 
 switch result {
 case .transmitted(.succeeded(_, let redirectURL)):
@@ -44,15 +52,14 @@ succeeds, and surface delivery failures so the user can retry.
 
 ### Reject a Presentation Request
 
-Use ``Wallet/rejectPresentation(request:error:errorDescription:)`` for
-user rejection and handle its continuation exactly like a credential-bearing
-response:
+Use ``Wallet/rejectPresentation(request:error:errorDescription:)`` after a preview.
+For a valid request, omitting `error` sends `access_denied`. For an invalid preview,
+omitting `error` sends the error classified by the wallet. Handle its continuation
+exactly like a credential-bearing response:
 
 ```swift
 let result = try await wallet.rejectPresentation(
-    request: authorizationRequestURL,
-    error: .accessDenied,
-    errorDescription: "The user declined the request"
+    request: authorizationRequestURL
 )
 
 switch result {

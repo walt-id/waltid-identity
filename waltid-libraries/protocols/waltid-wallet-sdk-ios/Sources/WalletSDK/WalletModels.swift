@@ -617,6 +617,39 @@ public enum PresentationResult: Equatable, Sendable {
     }
 }
 
+/// Result of resolving and validating an OpenID4VP request for presentation preview.
+public enum PresentationPreviewResult: Equatable, Sendable {
+    /// The request is valid and can be reviewed, submitted, or declined.
+    case ready(PresentationPreview)
+
+    /// The request cannot be fulfilled, but its protocol error can be returned after user interaction.
+    case invalid(PresentationPreviewError)
+}
+
+/// Protocol error detected while previewing a presentation request.
+public struct PresentationPreviewError: Equatable, Sendable {
+    /// Validated response destination and request context to show before returning the error.
+    public let request: PresentationRequestInfo
+
+    /// OpenID4VP or OAuth authorization error code selected by the wallet.
+    public let code: PresentationErrorCode
+
+    /// Local diagnostic intended for wallet UI; it is not sent to the verifier automatically.
+    public let message: String
+
+    /// Creates a presentation preview error.
+    ///
+    /// - Parameters:
+    ///   - request: Validated response destination and request context shown before responding.
+    ///   - code: OpenID4VP or OAuth authorization error code selected by the wallet.
+    ///   - message: Local diagnostic that is not sent to the verifier automatically.
+    public init(request: PresentationRequestInfo, code: PresentationErrorCode, message: String) {
+        self.request = request
+        self.code = code
+        self.message = message
+    }
+}
+
 /// Preview of an OpenID4VP presentation request before the wallet submits a VP token.
 public struct PresentationPreview: Equatable, Sendable {
     /// Verifier/request information shown to the user.
