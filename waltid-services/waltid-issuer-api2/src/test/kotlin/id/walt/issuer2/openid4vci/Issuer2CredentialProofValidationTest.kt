@@ -15,6 +15,8 @@ import id.walt.issuer2.testsupport.createWalletFlowCredentialOffer
 import id.walt.issuer2.testsupport.credentialRequest
 import id.walt.issuer2.testsupport.getSession
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
+import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
+import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.prooftypes.Proofs
 import io.ktor.client.HttpClient
@@ -41,6 +43,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
+import kotlin.io.encoding.Base64
 
 class Issuer2CredentialProofValidationTest {
 
@@ -78,6 +81,24 @@ class Issuer2CredentialProofValidationTest {
         assertRejected(proof(key, nonce = flow.nonce(), type = "JWT"))
         assertRejected(Proofs())
         assertRejected(Proofs(jwt = listOf("not-a-jwt")))
+        assertRejected(proof(key, nonce = flow.nonce(), kid = "did:example:unrelated#key-1"))
+        val holderDid = DidJwkRegistrar().registerByKey(key, DidJwkCreateOptions(KeyType.secp256r1)).did
+        assertRejected(
+            withConflictingMalformedJwk(proof(
+                key = key,
+                nonce = flow.nonce(),
+                kid = "$holderDid#0",
+                includeJwk = false,
+            ), key)
+        )
+        assertRejected(
+            proof(
+                key = key,
+                nonce = flow.nonce(),
+                kid = "$holderDid#unrelated",
+                includeJwk = false,
+            )
+        )
 
         val reusableNonce = flow.nonce()
         assertRejected(
@@ -150,6 +171,8 @@ class Issuer2CredentialProofValidationTest {
         audience: List<String> = listOf("http://localhost/openid4vci"),
         issuedAt: Long = Clock.System.now().epochSeconds,
         type: String = "openid4vci-proof+jwt",
+        kid: String? = null,
+        includeJwk: Boolean = true,
     ): Proofs {
         val payload = buildJsonObject {
             val audienceClaim = if (audience.size == 1) {
@@ -164,7 +187,8 @@ class Issuer2CredentialProofValidationTest {
         val header = buildJsonObject {
             put("typ", type)
             put("alg", key.keyType.jwsAlg)
-            put("jwk", key.getPublicKey().exportJWKObject())
+            if (includeJwk) put("jwk", key.getPublicKey().exportJWKObject())
+            kid?.let { put("kid", it) }
         }
         return Proofs(jwt = listOf(signingKey.signJws(payload.toString().encodeToByteArray(), header)))
     }
@@ -172,6 +196,18 @@ class Issuer2CredentialProofValidationTest {
     private suspend fun assertInvalidProof(response: HttpResponse) {
         assertEquals(HttpStatusCode.BadRequest, response.status)
         assertEquals("invalid_proof", response.body<JsonObject>()["error"]?.jsonPrimitive?.content)
+    }
+
+    private fun withConflictingMalformedJwk(proofs: Proofs, key: Key): Proofs {
+        val parts = proofs.jwt.orEmpty().single().split('.')
+        val header = buildJsonObject {
+            put("typ", "openid4vci-proof+jwt")
+            put("alg", key.keyType.jwsAlg)
+            put("kid", "did:example:holder#key-1")
+            put("jwk", "invalid")
+        }
+        val encodedHeader = Base64.UrlSafe.encode(header.toString().encodeToByteArray()).trimEnd('=')
+        return Proofs(jwt = listOf("$encodedHeader.${parts[1]}.${parts[2]}"))
     }
 }
 
