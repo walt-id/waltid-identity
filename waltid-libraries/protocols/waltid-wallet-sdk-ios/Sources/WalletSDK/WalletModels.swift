@@ -1137,6 +1137,11 @@ public struct PresentationCredentialRequirement: Equatable, Sendable {
     /// - Parameter options: Alternative query-id combinations that can satisfy
     ///   this requirement.
     public init(options: [[String]]) {
+        precondition(!options.isEmpty, "A presentation credential requirement must contain at least one option.")
+        precondition(
+            options.allSatisfy { !$0.isEmpty },
+            "Each presentation credential requirement option must contain at least one query ID."
+        )
         self.options = options
     }
 }
@@ -1411,8 +1416,13 @@ public struct PresentationDisclosure: Equatable, Identifiable, Sendable {
         self.displayValue = displayValue
         self.selectivelyDisclosable = selectivelyDisclosable
         let resolvedRequired = required ?? !selectivelyDisclosable
+        let resolvedSelectable = selectable ?? (selectivelyDisclosable && !resolvedRequired)
+        precondition(
+            !resolvedSelectable || (selectivelyDisclosable && !resolvedRequired),
+            "A selectable disclosure must be selectively disclosable and optional."
+        )
         self.required = resolvedRequired
-        self.selectable = selectable ?? (selectivelyDisclosable && !resolvedRequired)
+        self.selectable = resolvedSelectable
     }
 }
 
@@ -1521,18 +1531,21 @@ public struct WalletEvent: Equatable, Sendable {
 
     /// Creates a wallet progress event.
     ///
-    /// - Parameters:
-    ///   - name: Event name emitted by the wallet core.
-    ///   - phase: High-level issuance or presentation phase.
-    ///   - status: High-level progress status.
-    public init(
-        name: String,
-        phase: WalletEventPhase,
-        status: WalletEventStatus
-    ) {
+    /// - Parameter name: Event name emitted by the wallet core.
+    public init(name: String) {
+        precondition(
+            name.hasPrefix("issuance_") || name.hasPrefix("presentation_"),
+            "A wallet event name must identify an issuance or presentation event."
+        )
         self.name = name
-        self.phase = phase
-        self.status = status
+        self.phase = name.hasPrefix("issuance_") ? .issuance : .presentation
+        if name.hasSuffix("_completed") {
+            self.status = .completed
+        } else if name.hasSuffix("_failed") {
+            self.status = .failed
+        } else {
+            self.status = .progress
+        }
     }
 }
 

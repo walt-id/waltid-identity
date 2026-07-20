@@ -708,7 +708,7 @@ final class id.walt.wallet2.mobile/MobileWalletCredentialClaimMetadata { // id.w
 }
 
 final class id.walt.wallet2.mobile/MobileWalletEvent { // id.walt.wallet2.mobile/MobileWalletEvent|null[0]
-    constructor <init>(kotlin/String, id.walt.wallet2.mobile/MobileWalletEventPhase, id.walt.wallet2.mobile/MobileWalletEventStatus) // id.walt.wallet2.mobile/MobileWalletEvent.<init>|<init>(kotlin.String;id.walt.wallet2.mobile.MobileWalletEventPhase;id.walt.wallet2.mobile.MobileWalletEventStatus){}[0]
+    constructor <init>(kotlin/String) // id.walt.wallet2.mobile/MobileWalletEvent.<init>|<init>(kotlin.String){}[0]
 
     final val name // id.walt.wallet2.mobile/MobileWalletEvent.name|{}name[0]
         final fun <get-name>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletEvent.name.<get-name>|<get-name>(){}[0]
@@ -718,9 +718,7 @@ final class id.walt.wallet2.mobile/MobileWalletEvent { // id.walt.wallet2.mobile
         final fun <get-status>(): id.walt.wallet2.mobile/MobileWalletEventStatus // id.walt.wallet2.mobile/MobileWalletEvent.status.<get-status>|<get-status>(){}[0]
 
     final fun component1(): kotlin/String // id.walt.wallet2.mobile/MobileWalletEvent.component1|component1(){}[0]
-    final fun component2(): id.walt.wallet2.mobile/MobileWalletEventPhase // id.walt.wallet2.mobile/MobileWalletEvent.component2|component2(){}[0]
-    final fun component3(): id.walt.wallet2.mobile/MobileWalletEventStatus // id.walt.wallet2.mobile/MobileWalletEvent.component3|component3(){}[0]
-    final fun copy(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletEventPhase = ..., id.walt.wallet2.mobile/MobileWalletEventStatus = ...): id.walt.wallet2.mobile/MobileWalletEvent // id.walt.wallet2.mobile/MobileWalletEvent.copy|copy(kotlin.String;id.walt.wallet2.mobile.MobileWalletEventPhase;id.walt.wallet2.mobile.MobileWalletEventStatus){}[0]
+    final fun copy(kotlin/String = ...): id.walt.wallet2.mobile/MobileWalletEvent // id.walt.wallet2.mobile/MobileWalletEvent.copy|copy(kotlin.String){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletEvent.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletEvent.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletEvent.toString|toString(){}[0]

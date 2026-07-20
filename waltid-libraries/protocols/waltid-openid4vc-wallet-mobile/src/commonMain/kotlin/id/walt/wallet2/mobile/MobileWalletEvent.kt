@@ -35,14 +35,22 @@ public enum class MobileWalletEventStatus {
  * Observable mobile wallet session event.
  *
  * @property name Stable event name emitted by the underlying wallet flow.
- * @property phase Issuance or presentation flow that emitted the event.
- * @property status Current progress state for the event.
  */
 public data class MobileWalletEvent(
     public val name: String,
-    public val phase: MobileWalletEventPhase,
-    public val status: MobileWalletEventStatus,
-)
+) {
+    init {
+        require(name.startsWith("issuance_") || name.startsWith("presentation_")) {
+            "A mobile wallet event name must identify an issuance or presentation event."
+        }
+    }
+
+    /** Issuance or presentation flow that emitted the event. */
+    public val phase: MobileWalletEventPhase = phaseFor(name)
+
+    /** Current progress state for the event. */
+    public val status: MobileWalletEventStatus = statusFor(name)
+}
 
 internal class MobileWalletEventStream(
     replay: Int = 10,
@@ -59,19 +67,18 @@ internal class MobileWalletEventStream(
     fun tryEmit(event: MobileWalletEvent): Boolean = mutableEvents.tryEmit(event)
 }
 
-internal fun WalletSessionEvent.toMobileWalletEvent() = MobileWalletEvent(
-    name = name,
-    phase = when {
-        name.startsWith("issuance_") -> MobileWalletEventPhase.issuance
-        else -> MobileWalletEventPhase.presentation
-    },
-    status = when (this) {
-        WalletSessionEvent.issuance_completed,
-        WalletSessionEvent.presentation_completed -> MobileWalletEventStatus.completed
+internal fun WalletSessionEvent.toMobileWalletEvent() = MobileWalletEvent(name)
 
-        WalletSessionEvent.issuance_failed,
-        WalletSessionEvent.presentation_failed -> MobileWalletEventStatus.failed
+private fun phaseFor(name: String): MobileWalletEventPhase =
+    if (name.startsWith("issuance_")) {
+        MobileWalletEventPhase.issuance
+    } else {
+        MobileWalletEventPhase.presentation
+    }
 
+private fun statusFor(name: String): MobileWalletEventStatus =
+    when {
+        name.endsWith("_completed") -> MobileWalletEventStatus.completed
+        name.endsWith("_failed") -> MobileWalletEventStatus.failed
         else -> MobileWalletEventStatus.progress
-    },
-)
+    }

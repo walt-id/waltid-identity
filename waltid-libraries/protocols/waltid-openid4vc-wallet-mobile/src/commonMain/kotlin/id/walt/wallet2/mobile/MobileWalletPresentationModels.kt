@@ -60,7 +60,16 @@ public data class MobileWalletPresentationPreviewHandle(val value: String) {
  */
 public data class MobileWalletPresentationCredentialRequirement(
     val options: List<List<String>>,
-)
+) {
+    init {
+        require(options.isNotEmpty()) {
+            "A presentation credential requirement must contain at least one option."
+        }
+        require(options.all { it.isNotEmpty() }) {
+            "Each presentation credential requirement option must contain at least one query ID."
+        }
+    }
+}
 
 /**
  * Verifier and transaction metadata extracted from a presentation request.
@@ -155,7 +164,13 @@ public data class MobileWalletPresentationDisclosure(
     val selectivelyDisclosable: Boolean,
     val required: Boolean = !selectivelyDisclosable,
     val selectable: Boolean = selectivelyDisclosable && !required,
-)
+) {
+    init {
+        require(!selectable || (selectivelyDisclosable && !required)) {
+            "A selectable disclosure must be selectively disclosable and optional."
+        }
+    }
+}
 
 /**
  * Decoded transaction_data item attached to a presentation request.
