@@ -37,6 +37,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import io.ktor.http.getSplitValues
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
@@ -176,7 +177,7 @@ class Issuer2MetadataEndpointTest {
                 ContentType.parse(mediaType),
                 response.contentType()?.withoutParameters(),
             )
-            assertTrue(response.headers[HttpHeaders.Vary].orEmpty().contains(HttpHeaders.Accept))
+            assertTrue(HttpHeaders.Accept in response.headers.getSplitValues(HttpHeaders.Vary).orEmpty())
 
             val compactJws = response.bodyAsText()
             val decoded = compactJws.decodeJws()
