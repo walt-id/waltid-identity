@@ -3,6 +3,7 @@ package id.walt.openid4vp.clientidprefix
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.openid4vp.clientidprefix.prefixes.X509Hash
 import id.walt.x509.CertificateDer
+import id.walt.x509.platformSupportsPkixCertificatePathValidation
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -76,7 +77,16 @@ class X509AuthenticationFailureTest {
             ),
         )
         val failure = assertIs<ClientValidationResult.Failure>(result)
-        assertEquals(expected, failure.error)
+        // JS and iOS reject X.509 authentication at the platform capability boundary;
+        // JVM continues through the detailed validation branch exercised by these cases.
+        val expectedError = if (platformSupportsPkixCertificatePathValidation) {
+            expected
+        } else {
+            ClientIdError.UnsupportedPlatformX509Validation
+        }
+        // Kotlin/JS does not preserve referential equality for serialized object subclasses,
+        // so compare the stable public error contract rather than object identity.
+        assertEquals(expectedError.message, failure.error.message)
     }
 
     private fun jws(header: String): String =
