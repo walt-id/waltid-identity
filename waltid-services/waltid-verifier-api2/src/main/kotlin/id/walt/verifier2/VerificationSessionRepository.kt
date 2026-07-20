@@ -4,11 +4,15 @@ import id.walt.commons.web.WebException
 import id.walt.verifier2.data.Verification2Session
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.minutes
 
 data class VerificationSessionSnapshot(
     val session: Verification2Session,
     val version: Long,
+)
+
+data class VerificationSessionProcessingClaim(
+    val original: VerificationSessionSnapshot,
+    val claimed: VerificationSessionSnapshot,
 )
 
 interface VerificationSessionRepository {
@@ -21,7 +25,10 @@ interface VerificationSessionRepository {
     ): VerificationSessionSnapshot
     suspend fun delete(sessionId: String): Boolean
 
-    suspend fun claimForProcessing(sessionId: String): VerificationSessionSnapshot {
+    suspend fun claimForProcessing(sessionId: String): VerificationSessionSnapshot =
+        claimForProcessingWithOriginal(sessionId).claimed
+
+    suspend fun claimForProcessingWithOriginal(sessionId: String): VerificationSessionProcessingClaim {
         val current = get(sessionId) ?: throw VerificationSessionNotFoundException(sessionId)
         val status = current.session.status
         if (current.session.attempted || status.successful != null || status in setOf(
@@ -33,7 +40,25 @@ interface VerificationSessionRepository {
         val claimed = current.session.copyForStorage().apply {
             this.status = Verification2Session.VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST
         }
-        return compareAndSet(sessionId, current.version, claimed)
+        return VerificationSessionProcessingClaim(
+            original = current,
+            claimed = compareAndSet(sessionId, current.version, claimed),
+        )
+    }
+
+    suspend fun restoreProcessingClaim(claim: VerificationSessionProcessingClaim) {
+        val current = get(claim.claimed.session.id) ?: return
+        if (current.version != claim.claimed.version ||
+            current.session.status != Verification2Session.VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST ||
+            current.session.attempted
+        ) {
+            return
+        }
+        try {
+            compareAndSet(current.session.id, current.version, claim.original.session)
+        } catch (_: StaleVerificationSessionException) {
+            // A concurrent persisted update supersedes rollback.
+        }
     }
 
     suspend fun update(
@@ -67,7 +92,7 @@ class InMemoryVerificationSessionRepository : VerificationSessionRepository {
 
     override suspend fun get(sessionId: String): VerificationSessionSnapshot? = synchronized(sessions) {
         sessions[sessionId]?.let { snapshot ->
-            val expiresAt = snapshot.session.expirationDate ?: snapshot.session.creationDate + 10.minutes
+            val expiresAt = snapshot.session.persistenceExpirationDate()
             if (expiresAt < Clock.System.now()) {
                 sessions.remove(sessionId)
                 null
