@@ -15,8 +15,8 @@ class DcApiTest {
     {
       "id": "610965bb-3b17-4e70-90c7-45bd4c26b282",
       "setup": {
-        "flow_type": "dc_api",
-        "core": {
+        "flow_type": "dc_api_openid4vp",
+        "core_flow": {
           "dcql_query": {
             "credentials": [
               {
@@ -80,7 +80,7 @@ class DcApiTest {
         },
         "client_metadata": { },
         "expected_origins": [
-          "https://digital-credentials.walt.id"
+          "https://portal2.demo.walt.id"
         ]
       },
       "authorizationRequestUrl": "https://digital-credentials.walt.id?response_type=vp_token&client_id=x509_hash%3Aabc-xyz-base64url-sha256-hash-of-der-x509-leaf&state=9f0a99ba-68d8-4de3-92b3-6f236d9a1586&response_mode=dc_api&nonce=b9cc2837-fbe2-4c2c-a047-750071aa0063&dcql_query=%7B%22credentials%22%3A%5B%7B%22id%22%3A%22my_mdl%22%2C%22format%22%3A%22mso_mdoc%22%2C%22meta%22%3A%7B%22doctype_value%22%3A%22org.iso.18013.5.1.mDL%22%7D%2C%22claims%22%3A%5B%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22family_name%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22given_name%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22age_over_21%22%5D%7D%5D%7D%5D%7D&client_metadata=%7B%7D&expected_origins=%5B%22https%3A%2F%2Fdigital-credentials.walt.id%22%5D",

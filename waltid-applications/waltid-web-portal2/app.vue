@@ -20,14 +20,9 @@ const issuerProfiles = useProfiles(issuerBase);
 const issuerJson = ref("");
 const issuerSelectedIndex = ref(0);
 
-// dc_api examples rely on the W3C Digital Credentials API flow, which the current
-// QR-based logic can't handle. Filter them out until that handling is ported.
 const verifierSwagger = useSwaggerExamples(
   verifierBase,
   "/verification-session/create",
-  {
-    excludeTitle: (title) => title.toLowerCase().includes("dc_api"),
-  },
 );
 const verifierSession = useVerifierSession(verifierBase);
 const verifierJson = ref("");

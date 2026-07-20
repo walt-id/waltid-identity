@@ -46,8 +46,6 @@ This portal enables users to:
 
 **Quickstart Guide**: Follow our [5-minute quickstart guide](https://docs.walt.id/community-stack/home/quickstart-5-min) for a walkthrough of the credential flows.
 
-> **Note on `dc_api` examples**: Verifier Swagger examples whose title contains `dc_api` are currently filtered out of the dropdown. They use the W3C Digital Credentials API flow, which the current QR-based logic does not yet support. This filter will be removed once that handling is ported.
-
 ## Key Concepts
 
 ### Credential Issuance Flow
