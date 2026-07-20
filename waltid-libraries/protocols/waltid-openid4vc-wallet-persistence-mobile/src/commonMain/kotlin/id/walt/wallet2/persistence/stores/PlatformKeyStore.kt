@@ -29,6 +29,7 @@ public class PlatformKeyStore(
     private val queries: WalletPersistenceQueries,
 ) : WalletKeyStore {
 
+    /** This store persists requested and effective key-use authorization metadata. */
     override val supportsKeyUseAuthorizationMetadata: Boolean = true
 
     /**
@@ -102,6 +103,9 @@ public class PlatformKeyStore(
         return persistKey(key, keyInfo = null)
     }
 
+    /**
+     * Persists [key] together with creation-time authorization and backing metadata from [keyInfo].
+     */
     override suspend fun addKey(key: Key, keyInfo: WalletKeyInfo): String {
         return persistKey(key, keyInfo)
     }

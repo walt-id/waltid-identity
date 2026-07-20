@@ -81,7 +81,12 @@ public enum class WalletBridgeKeyUseAuthorizationPolicy {
     BiometricCurrentSet,
 }
 
-/** Swift-facing localized operating-system authorization prompt text. */
+/**
+ * Swift-facing localized operating-system authorization prompt text.
+ *
+ * @property message Reason shown to the user when authorizing a signing operation.
+ * @property cancelText Cancellation action text where the platform supports configuring it.
+ */
 public data class WalletBridgeKeyUseAuthorizationPrompt(
     public val message: String = "Please authorize cryptographic signature",
     public val cancelText: String = "Cancel",
@@ -253,6 +258,10 @@ public interface WalletBridgeDidStore {
  * @property keyId Stable wallet-local key identifier.
  * @property keyType Wallet key type name.
  * @property algorithm Optional signing algorithm label supplied by Swift.
+ * @property requestedKeyUseAuthorizationPolicy Policy requested when the key was created.
+ * @property effectiveKeyUseAuthorizationPolicy Policy enforced by the restored key.
+ * @property isPlatformBacked Whether the private key is held by a platform key store.
+ * @property effectiveHardwareBacking Effective hardware backing when reliably determined.
  */
 public data class WalletBridgeKeyInfo(
     public val keyId: String,
@@ -340,7 +349,19 @@ public interface WalletBridgeKeyGenerator {
     public suspend fun generateKey(keyType: MobileWalletKeyType): WalletBridgeStoredKey
 }
 
-/** Swift-facing platform key capability result. */
+/**
+ * Swift-facing platform key capability result.
+ *
+ * @property platform Mobile platform that evaluated the request.
+ * @property keyType Requested signing-key type.
+ * @property keyUseAuthorizationPolicy Requested immutable key-use authorization policy.
+ * @property supported Whether this exact request can be enforced without fallback.
+ * @property platformBackingAvailable Whether platform-backed key storage is available.
+ * @property secureHardwareRequired Whether the request requires secure hardware backing.
+ * @property secureHardwareAvailable Whether required secure hardware availability is known on this device.
+ * @property effectiveHardwareBacking Effective backing when it can be determined from platform key information.
+ * @property failure Stable reason the request is unsupported, or `null` when supported.
+ */
 public data class WalletBridgeKeyCapability(
     public val platform: String,
     public val keyType: MobileWalletKeyType,
@@ -607,6 +628,7 @@ public enum class WalletBridgeErrorCategory {
  * @property category Coarse failure category.
  * @property message Human-readable failure message.
  * @property causeClass Kotlin exception class name when available.
+ * @property keyUseAuthorizationFailure Stable protected-key failure reason when available.
  */
 @Serializable
 public data class WalletBridgeError(
