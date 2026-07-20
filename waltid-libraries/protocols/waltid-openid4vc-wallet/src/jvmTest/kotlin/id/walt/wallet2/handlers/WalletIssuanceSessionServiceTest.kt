@@ -282,6 +282,85 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
+    fun advertisedDpopUsesTheTokenResponseToSelectResourceProtection() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = true))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(dpop = true, authorizationCode = false))
+                TOKEN_ENDPOINT -> {
+                    assertNotNull(request.headers["DPoP"])
+                    jsonResponse("""{"access_token":"access-token","token_type":"Bearer"}""")
+                }
+                NONCE_ENDPOINT -> jsonResponse("""{"c_nonce":"endpoint-nonce"}""")
+                CREDENTIAL_ENDPOINT -> {
+                    assertEquals("Bearer access-token", request.headers[HttpHeaders.Authorization])
+                    assertEquals(null, request.headers["DPoP"])
+                    assertNotNull(Json.parseToJsonElement(request.bodyText()).jsonObject["proofs"])
+                    jsonResponse(
+                        """{"transaction_id":"transaction-1","interval":7}""",
+                        HttpStatusCode.Accepted,
+                    )
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(Wallet("test", staticKey = key), httpClient = client)
+
+        val session = service.start(preAuthorizedRequest())
+        assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
+    }
+
+    @Test
+    fun rejectedTransactionCodeDoesNotConsumeTheSession() = runTest {
+        var tokenCalls = 0
+        val service = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> {
+                    tokenCalls += 1
+                    if (request.bodyText().contains("tx_code=wrong")) {
+                        jsonResponse("""{"error":"invalid_grant"}""", HttpStatusCode.BadRequest)
+                    } else {
+                        assertTrue(request.bodyText().contains("tx_code=correct"))
+                        jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                    }
+                }
+                CREDENTIAL_ENDPOINT -> jsonResponse(
+                    """{"transaction_id":"transaction-1","interval":5}""",
+                    HttpStatusCode.Accepted,
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val request = WalletIssuanceSessionRequest(
+            offerJson = buildJsonObject {
+                put("credential_issuer", ISSUER)
+                put("credential_configuration_ids", Json.parseToJsonElement("""["test-credential"]"""))
+                put(
+                    "grants",
+                    Json.parseToJsonElement(
+                        """{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"pre-code","tx_code":{"input_mode":"text","length":7}}}"""
+                    ),
+                )
+            },
+            clientId = "wallet-client",
+            redirectUri = Url(REDIRECT_URI),
+        )
+
+        val session = service.start(request)
+        val rejected = assertIs<WalletIssuanceOutcome.Failed>(
+            service.continuePreAuthorized(session.id, "wrong")
+        )
+        assertEquals(WalletIssuanceErrorCode.ISSUER_RESPONSE, rejected.error.code)
+        assertIs<WalletIssuanceOutcome.Deferred>(
+            service.continuePreAuthorized(session.id, "correct")
+        )
+        assertEquals(2, tokenCalls)
+    }
+
+    @Test
     fun advertisedParIsUsedForAuthorizationRequest() = runTest {
         var parCalls = 0
         val service = service { request ->
