@@ -552,15 +552,9 @@ private fun AuthorizationRequest.toMobileRequestInfo(
     responseEncryption: ResponseEncryption.Metadata? = null,
     transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
 ): MobileWalletPresentationRequestInfo {
-    val verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales)
     return MobileWalletPresentationRequestInfo(
         clientId = clientId,
-        verifierMetadata = verifierMetadata,
-        verifierDisplayName = deriveVerifierDisplayName(
-            clientId = clientId,
-            responseUri = responseUri,
-            metadata = verifierMetadata,
-        ),
+        verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
         responseUri = responseUri,
         state = state,
         nonce = nonce,

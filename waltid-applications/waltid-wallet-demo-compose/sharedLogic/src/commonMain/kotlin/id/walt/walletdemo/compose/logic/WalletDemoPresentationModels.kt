@@ -13,7 +13,6 @@ data class WalletDemoPresentationError(
 
 data class WalletDemoPresentationPreview(
     val verifierMetadata: WalletDemoVerifierMetadata?,
-    val verifierDisplayName: String,
     val clientId: String?,
     val responseUri: String? = null,
     val state: String? = null,

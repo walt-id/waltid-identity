@@ -63,7 +63,7 @@ implementation:
 
 ```kotlin
 val preview = wallet.previewPresentation(requestUrl)
-showVerifierName(preview.request.verifierDisplayName)
+preview.request.verifierMetadata?.display?.name?.let(::showVerifierName)
 when (val encryption = preview.request.responseEncryption) {
     MobileWalletResponseEncryption.NotRequired -> showPlainResponseNotice()
     is MobileWalletResponseEncryption.Required -> showEncryptedResponseNotice(

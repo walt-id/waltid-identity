@@ -183,7 +183,6 @@ private actor TransactionCodeWalletClient: WalletClient {
             PresentationPreview(
                 request: PresentationRequestInfo(
                     clientID: nil,
-                    verifierDisplayName: "Unknown verifier",
                     responseEncryption: .notRequired
                 ),
                 credentialOptions: []

@@ -30,7 +30,7 @@ class MobileWalletMetadataModelsTest {
                     CredentialDisplay(name = "Personalausweis", locale = "de"),
                     CredentialDisplay(
                         name = "US Person ID",
-                        locale = "en-US",
+                        locale = "en",
                         description = "Government-issued identity credential",
                     ),
                 ),
@@ -99,6 +99,29 @@ class MobileWalletMetadataModelsTest {
     }
 
     @Test
+    fun localeLookupFallsBackToUnlocalizedThenFirstEntry() {
+        fun resolve(display: List<IssuerDisplay>): String? = WalletOfferPreviewResult(
+            issuerMetadata = CredentialIssuerMetadata(
+                credentialIssuer = "https://issuer.example",
+                credentialEndpoint = "https://issuer.example/credential",
+                display = display,
+                credentialConfigurationsSupported = emptyMap(),
+            ),
+            offeredCredentials = emptyList(),
+            transactionCode = null,
+        ).toMobileOfferResolution(listOf("en-AU")).issuer.display?.name
+
+        assertEquals(
+            "Default",
+            resolve(listOf(IssuerDisplay(name = "German", locale = "de"), IssuerDisplay(name = "Default"))),
+        )
+        assertEquals(
+            "German",
+            resolve(listOf(IssuerDisplay(name = "German", locale = "de"), IssuerDisplay(name = "French", locale = "fr"))),
+        )
+    }
+
+    @Test
     fun transactionCodeMetadataMapsProtocolDefaultsAndConstraints() {
         val result = TxCode(
             inputMode = null,
@@ -136,47 +159,10 @@ class MobileWalletMetadataModelsTest {
 
         assertEquals("Deutscher Verifizierer", result.display?.name)
         assertEquals("de", result.display?.locale)
-        assertEquals("https://verifier.example/de.png", result.display?.logoUri)
+        assertEquals("https://verifier.example/default.png", result.display?.logoUri)
         assertEquals("https://verifier.example/de", result.clientUri)
         assertEquals("https://verifier.example/de/privacy", result.policyUri)
         assertEquals("https://verifier.example/de/terms", result.termsOfServiceUri)
-    }
-
-    @Test
-    fun verifierDisplayNameUsesMetadataThenCanonicalClientIdentityFallbacks() {
-        val metadata = MobileWalletVerifierMetadata(
-            display = MobileWalletMetadataDisplay(
-                name = "Named verifier",
-                locale = "en",
-                logoUri = null,
-                logoAltText = null,
-            ),
-            clientUri = null,
-            policyUri = null,
-            termsOfServiceUri = null,
-        )
-
-        assertEquals(
-            "Named verifier",
-            deriveVerifierDisplayName("x509_san_dns:verifier.example", null, metadata),
-        )
-        assertEquals(
-            "verifier.example",
-            deriveVerifierDisplayName("x509_san_dns:verifier.example", null, null),
-        )
-        assertEquals(
-            "DID verifier",
-            deriveVerifierDisplayName("decentralized_identifier:did:example:123", null, null),
-        )
-        assertEquals(
-            "verifier.example",
-            deriveVerifierDisplayName("https://verifier.example/client", null, null),
-        )
-        assertEquals(
-            "response.example",
-            deriveVerifierDisplayName(null, "https://response.example/direct-post", null),
-        )
-        assertEquals("Unknown verifier", deriveVerifierDisplayName(null, null, null))
     }
 
     @Test

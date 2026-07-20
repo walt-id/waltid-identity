@@ -52,7 +52,7 @@ internal fun OfferReviewSection(
         ) {
             MetadataIdentityRow(
                 display = preview.issuer.display,
-                fallbackName = preview.issuer.credentialIssuer.ifBlank { "Unknown issuer" },
+                fallbackName = preview.issuer.credentialIssuer,
                 supportingText = preview.issuer.credentialIssuer.takeIf {
                     it.isNotBlank() && it != preview.issuer.display?.name
                 },

@@ -5,7 +5,6 @@ actor MockWalletClient: WalletClient {
     enum VerifierStyle {
         case named
         case did
-        case x509SanDns
     }
 
     private var storedCredentials: [Credential]
@@ -144,7 +143,6 @@ actor MockWalletClient: WalletClient {
                     termsOfServiceURI: nil
                 )
             },
-            verifierDisplayName: verifierDisplayName,
             responseURI: URL(string: "https://verifier.example/response"),
             state: "state-123",
             nonce: "nonce-456",
@@ -157,7 +155,6 @@ actor MockWalletClient: WalletClient {
         switch verifierStyle {
         case .named: return "https://verifier.example/client"
         case .did: return Self.didClientID
-        case .x509SanDns: return Self.x509SanDnsClientID
         }
     }
 
@@ -176,20 +173,11 @@ actor MockWalletClient: WalletClient {
     private var verifierName: String? {
         switch verifierStyle {
         case .named: return "Example Verifier"
-        case .did, .x509SanDns: return nil
-        }
-    }
-
-    private var verifierDisplayName: String {
-        switch verifierStyle {
-        case .named: return "Example Verifier"
-        case .did: return "DID verifier"
-        case .x509SanDns: return "verifier.example"
+        case .did: return nil
         }
     }
 
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
-    private static let x509SanDnsClientID = "x509_san_dns:verifier.example"
     private static let samplePortraitDisclosureValueJSON = "[-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]"
 
     private static let paymentAuthorizationTransactionData = PresentationTransactionData(

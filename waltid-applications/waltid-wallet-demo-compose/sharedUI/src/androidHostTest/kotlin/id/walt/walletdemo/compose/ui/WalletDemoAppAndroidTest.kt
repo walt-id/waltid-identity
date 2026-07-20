@@ -67,12 +67,8 @@ class WalletDemoAppAndroidTest {
         scenarios.presentationDisclosureImagesRenderAsImages()
 
     @Test
-    fun presentTabShowsReadableVerifierFallbackForDidClientIds() =
-        scenarios.presentTabShowsReadableVerifierFallbackForDidClientIds()
-
-    @Test
-    fun presentTabShowsReadableVerifierFallbackForX509SanDnsClientIds() =
-        scenarios.presentTabShowsReadableVerifierFallbackForX509SanDnsClientIds()
+    fun presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails() =
+        scenarios.presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails()
 
     @Test
     fun presentationDetailsResolveDuplicateCredentialOptionsIndependently() =

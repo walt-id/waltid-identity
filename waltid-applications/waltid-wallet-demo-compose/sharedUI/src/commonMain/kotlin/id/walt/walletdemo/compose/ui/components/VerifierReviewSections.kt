@@ -26,16 +26,19 @@ internal fun VerifierReviewSections(preview: WalletDemoPresentationPreview, modi
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        ReviewMetadataSection(
-            title = "Verifier",
-            modifier = Modifier.testTag(WalletUiTestTags.PresentationVerifierSection),
-        ) {
-            MetadataIdentityRow(
-                display = preview.verifierMetadata?.display,
-                fallbackName = preview.verifierDisplayName,
-                supportingText = null,
-            )
-            MetadataDetailLine("Trust", "Unknown")
+        preview.verifierMetadata?.display?.let { display ->
+            display.name?.trim()?.takeIf { it.isNotEmpty() }?.let { name ->
+                ReviewMetadataSection(
+                    title = "Verifier",
+                    modifier = Modifier.testTag(WalletUiTestTags.PresentationVerifierSection),
+                ) {
+                    MetadataIdentityRow(
+                        display = display,
+                        fallbackName = name,
+                        supportingText = null,
+                    )
+                }
+            }
         }
 
         preview.transactionData.forEach { group ->

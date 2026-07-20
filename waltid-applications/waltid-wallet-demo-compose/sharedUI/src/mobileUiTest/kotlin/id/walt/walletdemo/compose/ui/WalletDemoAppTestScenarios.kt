@@ -477,12 +477,11 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath)).assertIsDisplayed()
     }
 
-    fun presentTabShowsReadableVerifierFallbackForDidClientIds() = runComposeUiTest {
+    fun presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails() = runComposeUiTest {
         val wallet = FakeDemoWallet(
             credentials = listOf(sampleCredential),
             presentationPreview = samplePresentationPreview.copy(
                 verifierMetadata = null,
-                verifierDisplayName = "DID verifier",
                 clientId = sampleDidClientId,
             ),
         )
@@ -497,36 +496,10 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.presentButton").performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
-        onNodeWithText("DID verifier").performScrollTo().assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.PresentationVerifierSection).assertCountEquals(0)
         onAllNodesWithText(sampleDidClientId).assertCountEquals(0)
-        onNodeWithTag("wallet.verifierTechnicalDetailsToggle").performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.VerifierTechnicalDetailsToggle).performScrollTo().performClick()
         onNodeWithText(sampleDidClientId).performScrollTo().assertIsDisplayed()
-    }
-
-    fun presentTabShowsReadableVerifierFallbackForX509SanDnsClientIds() = runComposeUiTest {
-        val wallet = FakeDemoWallet(
-            credentials = listOf(sampleCredential),
-            presentationPreview = samplePresentationPreview.copy(
-                verifierMetadata = null,
-                verifierDisplayName = "verifier.example",
-                clientId = sampleX509SanDnsClientId,
-            ),
-        )
-        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
-
-        setContent { WalletDemoApp(controller) }
-        unlockWithPin()
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
-
-        onNodeWithTag("wallet.tab.present").performClick()
-        onNodeWithTag("wallet.presentationInput").performTextInput("openid4vp://example")
-        onNodeWithTag("wallet.presentButton").performSemanticsAction(SemanticsActions.OnClick)
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
-
-        onNodeWithText("verifier.example").performScrollTo().assertIsDisplayed()
-        onAllNodesWithText(sampleX509SanDnsClientId).assertCountEquals(0)
-        onNodeWithTag("wallet.verifierTechnicalDetailsToggle").performScrollTo().performClick()
-        onNodeWithText(sampleX509SanDnsClientId).performScrollTo().assertIsDisplayed()
     }
 
     fun presentationDetailsResolveDuplicateCredentialOptionsIndependently() = runComposeUiTest {
@@ -875,7 +848,6 @@ class WalletDemoAppTestScenarios {
         )
 
         val samplePresentationPreview = WalletDemoPresentationPreview(
-            verifierDisplayName = "Example Verifier",
             verifierMetadata = WalletDemoVerifierMetadata(
                 display = WalletDemoMetadataDisplay(
                     name = "Example Verifier",
@@ -944,7 +916,6 @@ class WalletDemoAppTestScenarios {
         )
 
         const val sampleDidClientId = "decentralized_identifier:did:jwk:abc"
-        const val sampleX509SanDnsClientId = "x509_san_dns:verifier.example"
         private const val samplePortraitDisclosureValueJson =
             "[-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]"
 

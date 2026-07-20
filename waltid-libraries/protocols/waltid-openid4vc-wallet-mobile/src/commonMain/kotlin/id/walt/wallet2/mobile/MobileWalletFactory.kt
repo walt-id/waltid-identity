@@ -23,7 +23,8 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
  * @property attestationConfig Optional client-attestation configuration for issuer deployments that require it.
  * @property persistence Persistence mode used for wallet-local state.
  * @property onEvent Optional callback for observing wallet issuance and presentation session events.
- * @property preferredLocales Ordered BCP 47 locale preferences used to select protocol display metadata.
+ * @property preferredLocales Ordered BCP 47 locale preferences used for progressive language-tag lookup.
+ * When no preference matches, selection falls back to an unlocalized entry and then the first entry.
  * @property transactionDataProfiles Transaction data profiles this mobile wallet accepts in OpenID4VP requests.
  */
 public data class MobileWalletConfig(

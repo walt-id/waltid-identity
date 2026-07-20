@@ -4,18 +4,9 @@ import id.walt.openid4vci.metadata.issuer.ClaimDisplay
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.metadata.issuer.IssuerDisplay
 import id.walt.openid4vci.offers.TxCode
-import id.walt.openid4vp.clientidprefix.ClientIdPrefixParser
-import id.walt.openid4vp.clientidprefix.prefixes.DecentralizedIdentifier
-import id.walt.openid4vp.clientidprefix.prefixes.OpenIdFederation
-import id.walt.openid4vp.clientidprefix.prefixes.PreRegistered
-import id.walt.openid4vp.clientidprefix.prefixes.RedirectUri
-import id.walt.openid4vp.clientidprefix.prefixes.VerifierAttestation
-import id.walt.openid4vp.clientidprefix.prefixes.X509Hash
-import id.walt.openid4vp.clientidprefix.prefixes.X509SanDns
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.wallet2.handlers.WalletOfferPreviewResult
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
-import io.ktor.http.Url
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.experimental.ExperimentalObjCName
 import kotlin.native.ObjCName
@@ -250,29 +241,6 @@ internal fun ClientMetadata.toMobileVerifierMetadata(
     )
 }
 
-internal fun deriveVerifierDisplayName(
-    clientId: String?,
-    responseUri: String?,
-    metadata: MobileWalletVerifierMetadata?,
-): String {
-    metadata?.display?.name?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
-
-    val normalizedClientId = clientId?.trim()?.takeIf { it.isNotEmpty() }
-    normalizedClientId?.let(::urlHost)?.let { return it }
-    val parsedClientId = normalizedClientId?.let { ClientIdPrefixParser.parse(it).getOrNull() }
-    return when (parsedClientId) {
-        is RedirectUri -> parsedClientId.uri.host
-        is X509SanDns -> parsedClientId.dnsName
-        is X509Hash -> "X.509 verifier"
-        is DecentralizedIdentifier -> "DID verifier"
-        is VerifierAttestation -> "Verifier attestation"
-        is OpenIdFederation -> urlHost(parsedClientId.entityId) ?: "OpenID Federation verifier"
-        is PreRegistered -> urlHost(parsedClientId.rawValue)
-            ?: parsedClientId.rawValue.takeIf { it.length <= 48 }
-        else -> null
-    } ?: responseUri?.let(::urlHost) ?: "Unknown verifier"
-}
-
 internal fun TxCode.toMobileRequirement(): MobileWalletTransactionCodeRequirement {
     val expectedLength = length
     require(expectedLength == null || expectedLength > 0) { "Transaction code length must be positive when provided" }
@@ -346,14 +314,6 @@ private fun <T> List<T>?.selectPreferred(
         localeLookupTags(preferred).forEach { candidate ->
             entries.firstOrNull { normalizeLocale(locale(it)) == candidate }?.let { return it }
         }
-        val preferredSubtags = preferred.split('-')
-        val preferredLanguage = preferredSubtags.first()
-        val preferredScript = preferredSubtags.firstOrNull { it.length == 4 }
-        entries.firstOrNull { entry ->
-            val entrySubtags = normalizeLocale(locale(entry))?.split('-') ?: return@firstOrNull false
-            entrySubtags.first() == preferredLanguage &&
-                (preferredScript == null || preferredScript in entrySubtags)
-        }?.let { return it }
     }
     return entries.firstOrNull { locale(it).isNullOrBlank() } ?: entries.first()
 }
@@ -384,7 +344,3 @@ private fun localeLookupTags(locale: String): List<String> = buildList {
         if (subtags.lastOrNull()?.length == 1) subtags.removeAt(subtags.lastIndex)
     }
 }
-
-private fun urlHost(value: String): String? = runCatching { Url(value).host }
-    .getOrNull()
-    ?.takeIf { it.isNotBlank() }

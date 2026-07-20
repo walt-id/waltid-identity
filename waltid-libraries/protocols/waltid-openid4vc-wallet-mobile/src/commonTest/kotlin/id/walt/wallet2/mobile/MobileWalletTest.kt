@@ -329,7 +329,6 @@ class MobileWalletTest {
                     policyUri = null,
                     termsOfServiceUri = null,
                 ),
-                verifierDisplayName = "Example Verifier",
                 responseUri = "https://verifier.example/direct-post",
                 state = "state-1",
                 nonce = "nonce-1",

@@ -18,9 +18,7 @@ struct OfferReviewView: View {
             ReviewMetadataSection(title: "Issuer") {
                 MetadataIdentityView(
                     display: preview.issuer.display,
-                    fallbackName: preview.issuer.credentialIssuer.isEmpty
-                        ? "Unknown issuer"
-                        : preview.issuer.credentialIssuer,
+                    fallbackName: preview.issuer.credentialIssuer,
                     supportingText: preview.issuer.display?.name == preview.issuer.credentialIssuer
                         ? nil
                         : preview.issuer.credentialIssuer

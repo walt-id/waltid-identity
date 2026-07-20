@@ -627,7 +627,6 @@ private extension MobileWalletPresentationRequestInfo {
         PresentationRequestInfo(
             clientID: clientId,
             verifierMetadata: verifierMetadata?.toSwiftVerifierMetadata(),
-            verifierDisplayName: verifierDisplayName,
             responseURI: responseUri.flatMap(URL.init(string:)),
             state: state,
             nonce: nonce,

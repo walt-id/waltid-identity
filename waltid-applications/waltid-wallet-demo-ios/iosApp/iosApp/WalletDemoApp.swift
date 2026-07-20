@@ -53,9 +53,6 @@ struct WalletDemoApp: App {
     }
 
     private static func mockVerifierStyle(environment: [String: String]) -> MockWalletClient.VerifierStyle {
-        if environment["E2E_MOCK_DNS_VERIFIER"] == "1" {
-            return .x509SanDns
-        }
         if environment["E2E_MOCK_DID_VERIFIER"] == "1" {
             return .did
         }

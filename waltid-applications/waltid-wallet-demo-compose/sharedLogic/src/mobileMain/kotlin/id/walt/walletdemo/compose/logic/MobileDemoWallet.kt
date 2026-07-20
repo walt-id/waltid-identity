@@ -150,7 +150,6 @@ internal fun DemoWalletConfig.toWalletAttestationConfig(): WalletAttestationConf
 private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentationPreview =
     WalletDemoPresentationPreview(
         verifierMetadata = request.verifierMetadata?.toDemoMetadata(),
-        verifierDisplayName = request.verifierDisplayName,
         clientId = request.clientId,
         responseUri = request.responseUri,
         state = request.state,

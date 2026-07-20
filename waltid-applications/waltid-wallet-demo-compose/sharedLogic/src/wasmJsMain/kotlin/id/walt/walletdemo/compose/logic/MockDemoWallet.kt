@@ -61,7 +61,6 @@ private class MockDemoWallet : DemoWallet {
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult =
         WalletDemoPresentationPreviewResult.Ready(
             WalletDemoPresentationPreview(
-                verifierDisplayName = "Verifier",
                 responseEncryption = WalletDemoResponseEncryption.NotRequired,
                 verifierMetadata = WalletDemoVerifierMetadata(
                     display = WalletDemoMetadataDisplay(

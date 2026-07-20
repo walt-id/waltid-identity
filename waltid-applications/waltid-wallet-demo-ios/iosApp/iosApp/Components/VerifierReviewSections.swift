@@ -11,15 +11,18 @@ struct VerifierReviewSections: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            ReviewMetadataSection(title: "Verifier") {
-                MetadataIdentityView(
-                    display: request.verifierMetadata?.display,
-                    fallbackName: request.verifierDisplayName,
-                    supportingText: nil
-                )
-                MetadataDetailLine(label: "Trust", value: CredentialDisplayText.unknown)
+            if let display = request.verifierMetadata?.display,
+               let name = display.name?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !name.isEmpty {
+                ReviewMetadataSection(title: "Verifier") {
+                    MetadataIdentityView(
+                        display: display,
+                        fallbackName: name,
+                        supportingText: nil
+                    )
+                }
+                .accessibilityIdentifier(WalletAccessibilityID.presentationVerifierSection)
             }
-            .accessibilityIdentifier(WalletAccessibilityID.presentationVerifierSection)
 
             ForEach(transactionDataGroups) { group in
                 ClaimGroupView(group: group)
