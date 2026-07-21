@@ -7,6 +7,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
+import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -19,6 +20,8 @@ import id.walt.wallet2.handlers.PresentationCredentialRequirement
 import id.walt.wallet2.handlers.PresentationCredentialSelection
 import id.walt.wallet2.handlers.PresentationDisclosureSelection
 import id.walt.wallet2.handlers.PreviewPresentationRequest
+import id.walt.wallet2.handlers.PreviewPresentationResult
+import id.walt.wallet2.handlers.RejectPresentationRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
 import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.SubmitPresentationRequest
@@ -26,6 +29,7 @@ import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.Flow
@@ -86,17 +90,45 @@ public data class MobileWalletOfferResolution(
 )
 
 /**
- * Result returned after attempting to answer an OpenID4VP presentation request.
+ * Result of answering an OpenID4VP presentation request.
  *
- * @property success `true` when the wallet transmitted the presentation successfully.
- * @property redirectTo Optional verifier redirect URI returned by the presentation flow.
- * @property verifierResponseJson Raw verifier response body encoded as JSON, when the verifier returns structured JSON.
+ * Each subtype represents the next action required from the host app. This keeps
+ * mutually exclusive response artifacts out of the same result instance.
  */
-public data class MobileWalletPresentationResult(
-    public val success: Boolean,
-    public val redirectTo: String?,
-    public val verifierResponseJson: String? = null,
-)
+public sealed interface MobileWalletPresentationResult {
+    /** The protocol response still requires a host-app delivery action. */
+    public sealed interface Prepared : MobileWalletPresentationResult {
+        /** The host app must open [url] to deliver the protocol response. */
+        public data class OpenUrl(
+            /** URL the host app must open to deliver the protocol response. */
+            public val url: String,
+        ) : Prepared
+
+        /** The host app must render [html] so its self-submitting form can deliver the protocol response. */
+        public data class SubmitForm(
+            /** HTML document the host app must render to deliver the protocol response. */
+            public val html: String,
+        ) : Prepared
+    }
+
+    /** The protocol response was transmitted and the verifier returned a JSON response. */
+    public sealed interface Transmitted : MobileWalletPresentationResult {
+        /** Raw verifier response body encoded as JSON. */
+        public val verifierResponseJson: String
+
+        /** The verifier accepted the protocol response. */
+        public data class Succeeded(
+            override val verifierResponseJson: String,
+            /** Optional post-response redirect for the host app to open. */
+            public val redirectUrl: String? = null,
+        ) : Transmitted
+
+        /** The verifier rejected or could not process the protocol response. */
+        public data class Failed(
+            override val verifierResponseJson: String,
+        ) : Transmitted
+    }
+}
 
 /**
  * OAuth 2.0 client-attestation configuration used during mobile issuance.
@@ -291,7 +323,7 @@ public class MobileWallet internal constructor(
      * @param requestUrl Authorization request URL received from the verifier.
      * @param did Optional DID override for selecting the wallet DID used in the presentation.
      * @param runPolicies Optional override for verifier policy execution in the core presentation handler.
-     * @return Transmission status, optional redirect, and optional verifier response details.
+     * @return The prepared host action or transmitted verifier outcome.
      */
     public suspend fun present(
         requestUrl: String,
@@ -309,19 +341,15 @@ public class MobileWallet internal constructor(
             onEvent = ::emitSessionEvent,
         )
 
-        return MobileWalletPresentationResult(
-            success = result.transmissionSuccess ?: false,
-            redirectTo = result.redirectTo,
-            verifierResponseJson = result.verifierResponse?.let {
-                Json.encodeToString(JsonElement.serializer(), it)
-            },
-        )
+        return result.toMobilePresentationResult()
     }
 
     /**
      * Resolves and previews an OpenID4VP presentation request without submitting credentials.
+     * Protocol failures with a validated response destination are returned as [MobileWalletPresentationPreviewResult.Invalid].
+     * Resolution or validation failures that cannot be answered safely remain local exceptions.
      */
-    public suspend fun previewPresentation(requestUrl: String): MobileWalletPresentationPreview {
+    public suspend fun previewPresentation(requestUrl: String): MobileWalletPresentationPreviewResult {
         val result = WalletPresentationHandler.previewPresentation(
             wallet = wallet,
             request = PreviewPresentationRequest(
@@ -331,15 +359,17 @@ public class MobileWallet internal constructor(
             onEvent = ::emitSessionEvent,
         )
 
-        val profilesByType = transactionDataProfiles.associateBy { it.type }
-        return MobileWalletPresentationPreview(
-            request = MobileWalletPresentationRequestInfo(
-                clientId = result.authorizationRequest.clientId,
-                verifierName = result.authorizationRequest.clientMetadata?.clientName,
-                responseUri = result.authorizationRequest.responseUri,
-                state = result.authorizationRequest.state,
-                nonce = result.authorizationRequest.nonce,
-                transactionData = result.transactionData.map { item ->
+        return when (result) {
+            is PreviewPresentationResult.Invalid ->
+                MobileWalletPresentationPreviewResult.Invalid(
+                    request = result.authorizationRequest.toMobileRequestInfo(),
+                    errorCode = result.error.code.toMobileErrorCode(),
+                    message = result.error.message,
+                )
+
+            is PreviewPresentationResult.Ready -> {
+                val profilesByType = transactionDataProfiles.associateBy { it.type }
+                val transactionData = result.transactionData.map { item ->
                     val profile = profilesByType[item.type]
                     MobileWalletTransactionDataItem(
                         type = item.type,
@@ -349,11 +379,16 @@ public class MobileWallet internal constructor(
                         rawJson = item.rawJson.encodeJsonObject(),
                         detailsJson = item.details.encodeJsonObject(),
                     )
-                },
-            ),
-            credentialOptions = result.credentialOptions.map { it.toMobileCredentialOption() },
-            credentialRequirements = result.credentialRequirements.map { it.toMobileCredentialRequirement() },
-        )
+                }
+                MobileWalletPresentationPreviewResult.Ready(
+                    MobileWalletPresentationPreview(
+                        request = result.authorizationRequest.toMobileRequestInfo(transactionData),
+                        credentialOptions = result.credentialOptions.map { it.toMobileCredentialOption() },
+                        credentialRequirements = result.credentialRequirements.map { it.toMobileCredentialRequirement() },
+                    )
+                )
+            }
+        }
     }
 
     /**
@@ -387,6 +422,26 @@ public class MobileWallet internal constructor(
                 runPolicies = runPolicies,
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
+            onEvent = ::emitSessionEvent,
+        ).toMobilePresentationResult()
+
+    /**
+     * Sends an OpenID4VP error response for a request resolved by [previewPresentation].
+     * When [errorCode] is omitted, the wallet uses the detected error for an invalid preview or
+     * [MobileWalletPresentationErrorCode.accessDenied] for a valid request declined by the user.
+     */
+    public suspend fun rejectPresentation(
+        requestUrl: String,
+        errorCode: MobileWalletPresentationErrorCode? = null,
+        errorDescription: String? = null,
+    ): MobileWalletPresentationResult =
+        WalletPresentationHandler.rejectPresentation(
+            wallet = wallet,
+            request = RejectPresentationRequest(
+                requestUrl = Url(requestUrl.trim()),
+                errorCode = errorCode?.errorCode,
+                errorDescription = errorDescription,
+            ),
             onEvent = ::emitSessionEvent,
         ).toMobilePresentationResult()
 
@@ -441,15 +496,6 @@ public class MobileWallet internal constructor(
     private fun PresentationCredentialRequirement.toMobileCredentialRequirement(): MobileWalletPresentationCredentialRequirement =
         MobileWalletPresentationCredentialRequirement(options = options)
 
-    private fun WalletPresentResult.toMobilePresentationResult(): MobileWalletPresentationResult =
-        MobileWalletPresentationResult(
-            success = transmissionSuccess ?: false,
-            redirectTo = redirectTo,
-            verifierResponseJson = verifierResponse?.let {
-                Json.encodeToString(JsonElement.serializer(), it)
-            },
-        )
-
     private fun JsonObject.encodeJsonObject(): String =
         Json.encodeToString(JsonObject.serializer(), this)
 
@@ -458,4 +504,71 @@ public class MobileWallet internal constructor(
             is JsonPrimitive -> contentOrNull
             else -> toString()
         }
+}
+
+internal fun WalletPresentResult.toMobilePresentationResult(): MobileWalletPresentationResult =
+    verifierResponse?.let { Json.encodeToString(JsonElement.serializer(), it) }.let { responseJson ->
+        val responseUrl = getUrl
+        val formHtml = formPostHtml
+        when {
+            responseUrl != null -> {
+                require(
+                    transmissionSuccess == null &&
+                        formHtml == null &&
+                        responseJson == null &&
+                        redirectTo == null
+                ) {
+                    "Prepared URL result contains incompatible protocol fields"
+                }
+                MobileWalletPresentationResult.Prepared.OpenUrl(responseUrl)
+            }
+
+            formHtml != null -> {
+                require(transmissionSuccess == null && responseJson == null && redirectTo == null) {
+                    "Prepared form result contains incompatible protocol fields"
+                }
+                MobileWalletPresentationResult.Prepared.SubmitForm(formHtml)
+            }
+
+            transmissionSuccess == true -> MobileWalletPresentationResult.Transmitted.Succeeded(
+                verifierResponseJson = requireNotNull(responseJson) {
+                    "Transmitted presentation result is missing the verifier response"
+                },
+                redirectUrl = redirectTo,
+            )
+
+            transmissionSuccess == false -> MobileWalletPresentationResult.Transmitted.Failed(
+                verifierResponseJson = requireNotNull(responseJson) {
+                    "Failed presentation transmission is missing the verifier response"
+                },
+            )
+
+            else -> error("Presentation result has no protocol outcome")
+        }
+    }
+
+private fun AuthorizationRequest.toMobileRequestInfo(
+    transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
+): MobileWalletPresentationRequestInfo = MobileWalletPresentationRequestInfo(
+    clientId = clientId,
+    verifierName = clientMetadata?.clientName,
+    responseUri = responseUri,
+    state = state,
+    nonce = nonce,
+    transactionData = transactionData,
+)
+
+private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {
+    WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED -> MobileWalletPresentationErrorCode.accessDenied
+    WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST -> MobileWalletPresentationErrorCode.invalidRequest
+    WalletPresentFunctionality2.OID4VPErrorCode.INVALID_CLIENT -> MobileWalletPresentationErrorCode.invalidClient
+    WalletPresentFunctionality2.OID4VPErrorCode.INVALID_SCOPE -> MobileWalletPresentationErrorCode.invalidScope
+    WalletPresentFunctionality2.OID4VPErrorCode.UNAUTHORIZED_CLIENT -> MobileWalletPresentationErrorCode.unauthorizedClient
+    WalletPresentFunctionality2.OID4VPErrorCode.UNSUPPORTED_RESPONSE_TYPE -> MobileWalletPresentationErrorCode.unsupportedResponseType
+    WalletPresentFunctionality2.OID4VPErrorCode.SERVER_ERROR -> MobileWalletPresentationErrorCode.serverError
+    WalletPresentFunctionality2.OID4VPErrorCode.TEMPORARILY_UNAVAILABLE -> MobileWalletPresentationErrorCode.temporarilyUnavailable
+    WalletPresentFunctionality2.OID4VPErrorCode.VP_FORMATS_NOT_SUPPORTED -> MobileWalletPresentationErrorCode.vpFormatsNotSupported
+    WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST_URI_METHOD -> MobileWalletPresentationErrorCode.invalidRequestUriMethod
+    WalletPresentFunctionality2.OID4VPErrorCode.INVALID_TRANSACTION_DATA -> MobileWalletPresentationErrorCode.invalidTransactionData
+    WalletPresentFunctionality2.OID4VPErrorCode.WALLET_UNAVAILABLE -> MobileWalletPresentationErrorCode.walletUnavailable
 }

@@ -38,12 +38,20 @@ class WalletDemoAppIosTest {
         scenarios.receiveAndPresentTabsExposeQrScanActions()
 
     @Test
-    fun presentTabExplainsWhyPreviewIsUnavailableWithoutCredentials() =
-        scenarios.presentTabExplainsWhyPreviewIsUnavailableWithoutCredentials()
+    fun presentTabAllowsPreviewAndDeclineWithoutCredentials() =
+        scenarios.presentTabAllowsPreviewAndDeclineWithoutCredentials()
+
+    @Test
+    fun invalidPresentationCanBeDismissedLocallyOrReportedToVerifier() =
+        scenarios.invalidPresentationCanBeDismissedLocallyOrReportedToVerifier()
 
     @Test
     fun presentTabPreviewsCredentialsAndCanStartNewFlowAfterSuccess() =
         scenarios.presentTabPreviewsCredentialsAndCanStartNewFlowAfterSuccess()
+
+    @Test
+    fun presentTabDeclineSendsProtocolRejection() =
+        scenarios.presentTabDeclineSendsProtocolRejection()
 
     @Test
     fun presentationDisclosureImagesRenderAsImages() =

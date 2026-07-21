@@ -8,10 +8,12 @@ import id.walt.mobile.test.backend.EnterpriseMobilePlatform
 import id.walt.mobile.test.backend.EnterpriseMobileScenario
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.util.UUID
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 @EnterpriseMobileTest
@@ -60,8 +62,8 @@ class EnterpriseMobileWalletIntegrationTest {
 
         val session = fixture.createVerifierSession(scenario, EnterpriseMobilePlatform.ANDROID)
         val presentResult = wallet2.present(session.authorizationRequestUri, did = bootstrapResult.did)
-        assertTrue(
-            presentResult.success,
+        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
+            presentResult,
             "Should present persisted Enterprise credential for ${scenario.displayName}: credentials=$credentials, result=$presentResult",
         )
         fixture.waitForVerifierSuccess(session.sessionId)
@@ -105,8 +107,8 @@ class EnterpriseMobileWalletIntegrationTest {
 
         val session = fixture.createVerifierSession(scenario, EnterpriseMobilePlatform.ANDROID)
         val presentResult = wallet.present(session.authorizationRequestUri, did = bootstrapResult.did)
-        assertTrue(
-            presentResult.success,
+        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
+            presentResult,
             "Enterprise verifier2 presentation should succeed for ${scenario.displayName}: credentials=$credentials, result=$presentResult",
         )
 
