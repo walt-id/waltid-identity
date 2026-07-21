@@ -8,6 +8,8 @@ import id.walt.credentials.examples.SdJwtExamples
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
+import id.walt.wallet2.data.WalletDidEntry
+import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -233,6 +235,99 @@ class WalletIssuanceSessionServiceTest {
         val session = service.start(preAuthorizedRequest())
         assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
         assertEquals(1, credentialCalls)
+    }
+
+    @Test
+    fun proofPrefersHolderDidBoundToSelectedKey() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val holderDid = "did:jwk:holder"
+        val holderDidKeyId = "$holderDid#0"
+        val didStore = InMemoryDidStore().also { store ->
+            store.addDid(
+                WalletDidEntry(
+                    did = holderDid,
+                    document = didDocument(holderDid, holderDidKeyId, key),
+                )
+            )
+        }
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(
+                    issuerMetadata(proofRequired = true)
+                        .replace(
+                            "\"cryptographic_binding_methods_supported\":[\"jwk\"]",
+                            "\"cryptographic_binding_methods_supported\":[\"jwk\",\"did:jwk\"]",
+                        )
+                )
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                NONCE_ENDPOINT -> jsonResponse("""{"c_nonce":"endpoint-nonce"}""")
+                CREDENTIAL_ENDPOINT -> {
+                    val body = Json.parseToJsonElement(request.bodyText()).jsonObject
+                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proofHeader = jwtPart(proof, 0)
+                    assertEquals(holderDidKeyId, proofHeader["kid"]?.jsonPrimitive?.content)
+                    assertEquals(null, proofHeader["jwk"])
+                    jsonResponse("""{"transaction_id":"transaction-1"}""", HttpStatusCode.Accepted)
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            wallet = Wallet("test", staticKey = key, didStore = didStore),
+            httpClient = client,
+        )
+
+        val session = service.start(preAuthorizedRequest().copy(did = holderDid))
+        assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
+    }
+
+    @Test
+    fun proofNeverUsesHolderDidBoundToAnotherKey() = runTest {
+        val selectedKey = JWKKey.generate(KeyType.secp256r1)
+        val otherKey = JWKKey.generate(KeyType.secp256r1)
+        val holderDid = "did:jwk:other-holder"
+        val didStore = InMemoryDidStore().also { store ->
+            store.addDid(
+                WalletDidEntry(
+                    did = holderDid,
+                    document = didDocument(holderDid, "$holderDid#0", otherKey),
+                )
+            )
+        }
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(
+                    issuerMetadata(proofRequired = true)
+                        .replace(
+                            "\"cryptographic_binding_methods_supported\":[\"jwk\"]",
+                            "\"cryptographic_binding_methods_supported\":[\"jwk\",\"did:jwk\"]",
+                        )
+                )
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                NONCE_ENDPOINT -> jsonResponse("""{"c_nonce":"endpoint-nonce"}""")
+                CREDENTIAL_ENDPOINT -> {
+                    val body = Json.parseToJsonElement(request.bodyText()).jsonObject
+                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proofHeader = jwtPart(proof, 0)
+                    assertEquals(null, proofHeader["kid"])
+                    assertEquals(
+                        Json.parseToJsonElement(selectedKey.getPublicKey().exportJWK()).jsonObject,
+                        proofHeader["jwk"],
+                    )
+                    jsonResponse("""{"transaction_id":"transaction-1"}""", HttpStatusCode.Accepted)
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            wallet = Wallet("test", staticKey = selectedKey, didStore = didStore),
+            httpClient = client,
+        )
+
+        val session = service.start(preAuthorizedRequest().copy(did = holderDid))
+        assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
     }
 
     @Test
@@ -585,6 +680,18 @@ class WalletIssuanceSessionServiceTest {
 
     private fun HttpRequestData.bodyText(): String =
         (body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
+
+    private suspend fun didDocument(did: String, keyId: String, key: JWKKey) = buildJsonObject {
+        put("id", did)
+        put("verificationMethod", buildJsonArray {
+            add(buildJsonObject {
+                put("id", keyId)
+                put("controller", did)
+                put("type", "JsonWebKey2020")
+                put("publicKeyJwk", Json.parseToJsonElement(key.getPublicKey().exportJWK()))
+            })
+        })
+    }
 
     private fun jwtPart(jwt: String, index: Int) =
         Json.parseToJsonElement(jwt.split('.')[index].decodeFromBase64Url().decodeToString()).jsonObject
