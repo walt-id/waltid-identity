@@ -39,6 +39,7 @@ class OpenId4VpPresentationService(
     private val credentialService: CredentialsService,
     private val unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
         AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+    private val requestUriDataFetcher: WebDataFetcher = defaultRequestUriDataFetcher,
 ) {
     private val logger = KotlinLogging.logger { }
     private val json = Json {
@@ -59,7 +60,7 @@ class OpenId4VpPresentationService(
             enforceFinalRequestObject = false,
         ) { requestUri, requestUriMethod ->
             AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
-                webResolveAuthReq = webResolveAuthReq,
+                webResolveAuthReq = requestUriDataFetcher,
                 requestUri = requestUri,
                 requestUriMethod = requestUriMethod,
                 requestUriPostWalletMetadata = runtimeRequestUriPostWalletMetadata,
@@ -198,7 +199,8 @@ class OpenId4VpPresentationService(
     }
 
     companion object {
-        private val webResolveAuthReq = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
+        private val defaultRequestUriDataFetcher =
+            WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
 
         fun isOpenId4VpRequestCandidate(request: String): Boolean = runCatching {
             val parameters = Url(request).parameters

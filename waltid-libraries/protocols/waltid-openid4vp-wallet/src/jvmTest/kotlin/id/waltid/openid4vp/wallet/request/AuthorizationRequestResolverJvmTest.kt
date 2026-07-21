@@ -412,27 +412,36 @@ class AuthorizationRequestResolverJvmTest {
 
     @Test
     fun `request uri post requires HTTPS before fetch and after redirects`() {
-        val insecureRequest = URLBuilder("openid4vp://authorize").apply {
-            parameters.append("client_id", "verifier2")
-            parameters.append("request_uri", "http://verifier.example/request.jwt")
-            parameters.append("request_uri_method", "post")
-        }.build()
-        var fetchCalled = false
-        assertFailsWith<IllegalArgumentException> {
-            runBlocking {
-                AuthorizationRequestResolver.resolve(
-                    insecureRequest,
-                    AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
-                ) { _, _ ->
-                    fetchCalled = true
-                    error("must not fetch")
+        listOf(
+            "http://verifier.example/request.jwt",
+            "http://localhost/request.jwt",
+            "http://127.0.0.1/request.jwt",
+            "http://[::1]/request.jwt",
+        ).forEach { insecureRequestUri ->
+            val insecureRequest = URLBuilder("openid4vp://authorize").apply {
+                parameters.append("client_id", "verifier2")
+                parameters.append("request_uri", insecureRequestUri)
+                parameters.append("request_uri_method", "post")
+            }.build()
+            var fetchCalled = false
+            assertFailsWith<IllegalArgumentException>(insecureRequestUri) {
+                runBlocking {
+                    AuthorizationRequestResolver.resolve(
+                        insecureRequest,
+                        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                    ) { _, _ ->
+                        fetchCalled = true
+                        error("must not fetch")
+                    }
                 }
             }
+            assertFalse(fetchCalled, insecureRequestUri)
         }
-        assertFalse(fetchCalled)
 
-        val secureRequest = URLBuilder(insecureRequest).apply {
-            parameters["request_uri"] = "https://verifier.example/request.jwt"
+        val secureRequest = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier2")
+            parameters.append("request_uri", "https://verifier.example/request.jwt")
+            parameters.append("request_uri_method", "post")
         }.build()
         val failure = assertFailsWith<IllegalArgumentException> {
             runBlocking {

@@ -108,13 +108,11 @@ class MobileWalletIntegrationTest {
         receiveCredentialFromDemoIssuer2("iso-mdl")
     }
 
-    @Ignore("Upstream EUDI verifier request-object endpoint intermittently returns HTTP 400; OID4VP presentation is covered by the public demo tests")
     @Test
     fun receiveAndPresentEudiEhicSdJwtAgainstEudi() = runBlocking {
         receiveAndPresentEudiCredential(EUDI_EHIC_SD_JWT_CREDENTIAL_ID)
     }
 
-    @Ignore("Upstream EUDI verifier request-object endpoint intermittently returns HTTP 400; OID4VP presentation is covered by the public demo tests")
     @Test
     fun previewAndSubmitEudiEhicSdJwtAgainstEudi() = runBlocking {
         previewAndSubmitEudiCredential(EUDI_EHIC_SD_JWT_CREDENTIAL_ID)

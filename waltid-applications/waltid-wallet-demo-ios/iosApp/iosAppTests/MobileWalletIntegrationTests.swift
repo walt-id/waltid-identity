@@ -206,7 +206,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
     func testReceiveAndPresentEudiEhicSdJwtAgainstEudi() async throws {
         try XCTSkipIf(
             true,
-            "Upstream EUDI verifier request-object endpoint intermittently returns HTTP 400; OID4VP presentation is covered by the public demo tests"
+            "Pending native iOS PKIX/x509_hash Request Object authentication and EUDI trust-anchor refresh; tracked by https://github.com/walt-id/waltid-identity/pull/1940"
         )
         try await receiveAndPresentEudiCredential(credentialID: Self.eudiEhicSdJwtCredentialID)
     }
@@ -214,7 +214,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
     func testPreviewAndSubmitEudiEhicSdJwtAgainstEudi() async throws {
         try XCTSkipIf(
             true,
-            "Upstream EUDI verifier request-object endpoint intermittently returns HTTP 400; OID4VP presentation is covered by the public demo tests"
+            "Pending native iOS PKIX/x509_hash Request Object authentication and EUDI trust-anchor refresh; tracked by https://github.com/walt-id/waltid-identity/pull/1940"
         )
         try await previewAndSubmitEudiCredential(credentialID: Self.eudiEhicSdJwtCredentialID)
     }

@@ -497,9 +497,7 @@ object AuthorizationRequestResolver {
     private fun requireHttpsRequestUri(requestUri: String) {
         val url = runCatching { Url(requestUri) }
             .getOrElse { error -> throw IllegalArgumentException("request_uri must be a valid HTTPS URL", error) }
-        val isLoopbackHttp = url.protocol == URLProtocol.HTTP &&
-            url.host.lowercase() in setOf("localhost", "127.0.0.1", "::1")
-        require(url.protocol == URLProtocol.HTTPS || isLoopbackHttp) {
+        require(url.protocol == URLProtocol.HTTPS) {
             "request_uri_method=post requires an HTTPS request_uri"
         }
     }
