@@ -22,14 +22,20 @@ private enum WalletStatusText {
     static let transactionCodeRequired = "Transaction code required"
     static let resolvingPresentation = "Resolving presentation..."
     static let presentingCredential = "Presenting credential..."
+    static let decliningPresentation = "Declining presentation..."
     static let bootstrappingWallet = "Bootstrapping wallet..."
     static let reviewPresentationRequest = "Review presentation request"
+    static let reviewPresentationError = "Review presentation error"
     static let presentationSent = "Presentation sent"
-    static let presentationReviewCancelled = "Presentation review cancelled"
+    static let presentationDeclined = "Presentation declined"
+    static let verifierNotified = "Verifier notified"
     static let presentationFinishedWithoutVerifierConfirmation = "Presentation finished without verifier confirmation"
+    static let rejectionFinishedWithoutVerifierConfirmation = "Rejection finished without verifier confirmation"
     static let receiveFailed = "Receive failed"
     static let previewFailed = "Preview failed"
     static let presentFailed = "Present failed"
+    static let rejectFailed = "Reject failed"
+    static let presentationContinuationFailed = "Could not deliver the verifier response"
     static let bootstrapFailed = "Bootstrap failed"
     static let invalidOfferURL = "invalid offer URL"
     static let invalidRequestURL = "invalid request URL"
@@ -70,7 +76,7 @@ class WalletViewModel: ObservableObject {
     @Published var txCode = ""
     @Published var transactionCodeRequired = false
     @Published var presentationRequestUrl = ""
-    @Published var presentationPreview: PresentationPreview?
+    @Published private(set) var presentationReview: PresentationPreviewResult?
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
     @Published var selectedPresentationDisclosureOptions: Set<PresentationDisclosureSelection> = []
     @Published var selectedTab: WalletTab = .credentials
@@ -82,8 +88,21 @@ class WalletViewModel: ObservableObject {
     @Published var presentationNavigationResetKey = 0
     @Published var inputFocusResetKey = 0
     @Published var transactionDataProfilesWarning: String?
+    @Published private(set) var pendingPresentationContinuationURL: URL?
+    @Published private(set) var pendingPresentationFormPostHTML: String?
     private var statusTab: WalletTab?
     private var receiveTask: Task<Void, Never>?
+    private var pendingPresentationSuccessMessage: String?
+
+    var presentationPreview: PresentationPreview? {
+        if case .ready(let preview)? = presentationReview { return preview }
+        return nil
+    }
+
+    var presentationError: PresentationPreviewError? {
+        if case .invalid(let error)? = presentationReview { return error }
+        return nil
+    }
 
     var receiveUrlEntryEnabled: Bool {
         !isLoading && offerPreview == nil && !receiveCompleted
@@ -116,18 +135,17 @@ class WalletViewModel: ObservableObject {
     }
 
     var presentationUrlEntryEnabled: Bool {
-        !isLoading && presentationPreview == nil && !presentationCompleted
+        !isLoading && presentationReview == nil && !presentationCompleted
     }
 
     var presentationPreviewActionEnabled: Bool {
         isReady &&
             !presentationRequestUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            !credentials.isEmpty &&
             presentationUrlEntryEnabled
     }
 
     var presentationReviewEnabled: Bool {
-        !isLoading && presentationPreview != nil && !presentationCompleted
+        !isLoading && presentationReview != nil && !presentationCompleted
     }
 
     var presentationCredentialSelectionComplete: Bool {
@@ -284,19 +302,21 @@ class WalletViewModel: ObservableObject {
             lastReceivedCredentialIDs = []
             receiveCompleted = false
             receiveNavigationResetKey += 1
-            presentationPreview = nil
+            presentationReview = nil
             selectedPresentationCredentialOptions = []
             selectedPresentationDisclosureOptions = []
             presentationCompleted = false
+            clearPendingPresentationContinuation()
             resetFlowStatusForIncomingURL()
         case .presentationRequest:
             receiveTask?.cancel()
             selectedTab = .present
             presentationRequestUrl = url.absoluteString
-            presentationPreview = nil
+            presentationReview = nil
             selectedPresentationCredentialOptions = []
             selectedPresentationDisclosureOptions = []
             presentationCompleted = false
+            clearPendingPresentationContinuation()
             presentationNavigationResetKey += 1
             resetFlowStatusForIncomingURL()
         case nil:
@@ -324,10 +344,11 @@ class WalletViewModel: ObservableObject {
         receiveTask?.cancel()
         resetInputFocus()
         presentationRequestUrl = ""
-        presentationPreview = nil
+        presentationReview = nil
         selectedPresentationCredentialOptions = []
         selectedPresentationDisclosureOptions = []
         presentationCompleted = false
+        clearPendingPresentationContinuation()
         presentationNavigationResetKey += 1
         isLoading = false
         isError = false
@@ -483,12 +504,10 @@ class WalletViewModel: ObservableObject {
                     request: request,
                     did: did.isEmpty ? nil : did
                 )
-                presentationCompleted = result.success
-                setSuccess(
-                    result.success
-                        ? WalletStatusText.presentationSent
-                        : WalletStatusText.presentationFinishedWithoutVerifierConfirmation,
-                    tab: .present
+                handlePresentationResult(
+                    result,
+                    successMessage: WalletStatusText.presentationSent,
+                    failureMessage: WalletStatusText.presentationFinishedWithoutVerifierConfirmation
                 )
             } catch {
                 setError(WalletStatusText.failure(WalletStatusText.presentFailed, error), tab: .present)
@@ -505,17 +524,25 @@ class WalletViewModel: ObservableObject {
         }
 
         setLoading(WalletStatusText.resolvingPresentation, tab: .present)
-        presentationPreview = nil
+        presentationReview = nil
         selectedPresentationCredentialOptions = []
         selectedPresentationDisclosureOptions = []
         presentationCompleted = false
+        clearPendingPresentationContinuation()
         Task {
             do {
-                let preview = try await walletClient.previewPresentation(request: request)
-                presentationPreview = preview
-                selectedPresentationCredentialOptions = preview.defaultCredentialSelection()
-                selectedPresentationDisclosureOptions = []
-                setSuccess(WalletStatusText.reviewPresentationRequest, tab: .present)
+                let result = try await walletClient.previewPresentation(request: request)
+                presentationReview = result
+                switch result {
+                case .ready(let preview):
+                    selectedPresentationCredentialOptions = preview.defaultCredentialSelection()
+                    selectedPresentationDisclosureOptions = []
+                    setSuccess(WalletStatusText.reviewPresentationRequest, tab: .present)
+                case .invalid:
+                    selectedPresentationCredentialOptions = []
+                    selectedPresentationDisclosureOptions = []
+                    setSuccess(WalletStatusText.reviewPresentationError, tab: .present)
+                }
             } catch {
                 setError(WalletStatusText.failure(WalletStatusText.previewFailed, error), tab: .present)
             }
@@ -590,12 +617,10 @@ class WalletViewModel: ObservableObject {
                 )
                 selectedPresentationCredentialOptions = []
                 selectedPresentationDisclosureOptions = []
-                presentationCompleted = result.success
-                setSuccess(
-                    result.success
-                        ? WalletStatusText.presentationSent
-                        : WalletStatusText.presentationFinishedWithoutVerifierConfirmation,
-                    tab: .present
+                handlePresentationResult(
+                    result,
+                    successMessage: WalletStatusText.presentationSent,
+                    failureMessage: WalletStatusText.presentationFinishedWithoutVerifierConfirmation
                 )
             } catch {
                 setError(WalletStatusText.failure(WalletStatusText.presentFailed, error), tab: .present)
@@ -603,14 +628,98 @@ class WalletViewModel: ObservableObject {
         }
     }
 
-    func cancelPresentationReview() {
+    func rejectPresentation() {
         resetInputFocus()
-        presentationPreview = nil
+        let trimmedRequestUrl = presentationRequestUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let presentationReview, let request = URL(string: trimmedRequestUrl) else {
+            setError(WalletStatusText.failure(WalletStatusText.rejectFailed, WalletStatusText.invalidRequestURL), tab: .present)
+            return
+        }
+        let isReportingError: Bool
+        if case .invalid = presentationReview {
+            isReportingError = true
+        } else {
+            isReportingError = false
+        }
+
+        setLoading(WalletStatusText.decliningPresentation, tab: .present)
+        Task {
+            do {
+                let result = try await walletClient.rejectPresentation(request: request)
+                finishRejection()
+                handlePresentationResult(
+                    result,
+                    successMessage: isReportingError
+                        ? WalletStatusText.verifierNotified
+                        : WalletStatusText.presentationDeclined,
+                    failureMessage: WalletStatusText.rejectionFinishedWithoutVerifierConfirmation
+                )
+            } catch {
+                finishRejection()
+                presentationCompleted = false
+                setError(WalletStatusText.failure(WalletStatusText.rejectFailed, error), tab: .present)
+            }
+        }
+    }
+
+    private func finishRejection() {
+        presentationReview = nil
         selectedPresentationCredentialOptions = []
         selectedPresentationDisclosureOptions = []
-        presentationCompleted = false
         presentationNavigationResetKey += 1
-        setSuccess(WalletStatusText.presentationReviewCancelled, tab: .present)
+    }
+
+    func completePresentationContinuation() {
+        guard let successMessage = pendingPresentationSuccessMessage else { return }
+        clearPendingPresentationContinuation()
+        presentationCompleted = true
+        setSuccess(successMessage, tab: .present)
+    }
+
+    func failPresentationContinuation(_ reason: String) {
+        guard pendingPresentationSuccessMessage != nil else { return }
+        clearPendingPresentationContinuation()
+        presentationCompleted = false
+        setError(
+            WalletStatusText.failure(WalletStatusText.presentationContinuationFailed, reason),
+            tab: .present
+        )
+    }
+
+    private func handlePresentationResult(
+        _ result: PresentationResult,
+        successMessage: String,
+        failureMessage: String
+    ) {
+        clearPendingPresentationContinuation()
+        switch result {
+        case .transmitted(.failed):
+            presentationCompleted = false
+            setError(failureMessage, tab: .present)
+        case .prepared(.openURL(let url)):
+            pendingPresentationSuccessMessage = successMessage
+            pendingPresentationContinuationURL = url
+            presentationCompleted = false
+        case .prepared(.submitForm(let html)):
+            pendingPresentationSuccessMessage = successMessage
+            pendingPresentationFormPostHTML = html
+            presentationCompleted = false
+        case .transmitted(.succeeded(_, let redirectURL)):
+            if let redirectURL {
+                pendingPresentationSuccessMessage = successMessage
+                pendingPresentationContinuationURL = redirectURL
+                presentationCompleted = false
+            } else {
+                presentationCompleted = true
+                setSuccess(successMessage, tab: .present)
+            }
+        }
+    }
+
+    private func clearPendingPresentationContinuation() {
+        pendingPresentationContinuationURL = nil
+        pendingPresentationFormPostHTML = nil
+        pendingPresentationSuccessMessage = nil
     }
 
     private func bootstrap() {
@@ -730,6 +839,9 @@ class WalletViewModel: ObservableObject {
             }
             if presentationPreview != nil {
                 return WalletStatusText.reviewPresentationRequest
+            }
+            if presentationError != nil {
+                return WalletStatusText.reviewPresentationError
             }
             return baseStatusMessage
         }

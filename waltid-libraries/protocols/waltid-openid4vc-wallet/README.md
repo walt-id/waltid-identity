@@ -197,6 +197,7 @@ Both handlers emit events for progress tracking:
 
 - `presentation_request_parsed`
 - `presentation_credentials_selected`
+- `presentation_response_prepared`
 - `presentation_completed`
 - `presentation_failed`
 
