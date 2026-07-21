@@ -198,7 +198,7 @@ class MobileWalletIntegrationTest {
             "Preview should expose readable payment details: ${transactionData.detailsJson}",
         )
         val result = client.submitPresentation(
-            requestUrl = session.authorizationRequestUri,
+            previewHandle = preview.previewHandle,
             selectedCredentialOptions = preview.credentialOptions.map { option -> option.selection },
             did = bootstrapResult.did,
         )
@@ -284,7 +284,7 @@ class MobileWalletIntegrationTest {
         )
 
         val defaultOffResult = client.submitPresentation(
-            requestUrl = defaultOffSession.authorizationRequestUri,
+            previewHandle = defaultOffPreview.previewHandle,
             selectedCredentialOptions = listOf(defaultOffOption.selection),
             selectedDisclosureOptions = emptyList(),
             did = bootstrapResult.did,
@@ -321,7 +321,7 @@ class MobileWalletIntegrationTest {
         )
 
         val selectedResult = client.submitPresentation(
-            requestUrl = selectedSession.authorizationRequestUri,
+            previewHandle = selectedPreview.previewHandle,
             selectedCredentialOptions = listOf(selectedOption.selection),
             selectedDisclosureOptions = listOf(
                 MobileWalletPresentationDisclosureSelection(
@@ -463,7 +463,7 @@ class MobileWalletIntegrationTest {
         )
 
         val result = client.submitPresentation(
-            requestUrl = transaction.authorizationRequestUri,
+            previewHandle = preview.previewHandle,
             selectedCredentialOptions = preview.credentialOptions.map { option ->
                 MobileWalletPresentationCredentialSelection(
                     queryId = option.queryId,
@@ -530,7 +530,7 @@ class MobileWalletIntegrationTest {
         )
 
         val result = client.submitPresentation(
-            requestUrl = session.authorizationRequestUri,
+            previewHandle = preview.previewHandle,
             selectedCredentialOptions = preview.credentialOptions.map { option ->
                 MobileWalletPresentationCredentialSelection(
                     queryId = option.queryId,

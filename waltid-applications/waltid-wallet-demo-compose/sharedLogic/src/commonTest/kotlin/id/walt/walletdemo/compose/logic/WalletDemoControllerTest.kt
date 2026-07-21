@@ -13,6 +13,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+private val issuancePreviewHandle = WalletDemoIssuancePreviewHandle("issuance-preview")
+private val presentationPreviewHandle = WalletDemoPresentationPreviewHandle("presentation-preview")
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class WalletDemoControllerTest {
 
@@ -207,7 +210,7 @@ class WalletDemoControllerTest {
         runCurrent()
 
         assertEquals("openid-credential-offer://example", wallet.resolvedOfferUrl)
-        assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
+        assertEquals(issuancePreviewHandle, wallet.receivedPreviewHandle)
         assertEquals(1, wallet.receiveCalls)
         assertEquals(
             WalletOperationState.Succeeded("Received 1 credential(s)", WalletDemoTab.Receive),
@@ -228,7 +231,7 @@ class WalletDemoControllerTest {
         controller.previewOffer()
         runCurrent()
 
-        assertEquals(null, wallet.receivedOfferUrl)
+        assertEquals(null, wallet.receivedPreviewHandle)
         assertEquals("Wallet ready", controller.state.value.statusText)
     }
 
@@ -263,7 +266,7 @@ class WalletDemoControllerTest {
         runCurrent()
 
         assertEquals(1, wallet.receiveCalls)
-        assertEquals(offerUrl, wallet.receivedOfferUrl)
+        assertEquals(issuancePreviewHandle, wallet.receivedPreviewHandle)
         assertEquals("abc-123", wallet.receivedTxCode)
         assertTrue(controller.state.value.receiveCompleted)
         assertEquals("", controller.state.value.requestDrafts.txCode)
@@ -310,6 +313,21 @@ class WalletDemoControllerTest {
 
         assertEquals("123456", controller.state.value.requestDrafts.txCode)
         assertTrue(controller.state.value.acceptOfferEnabled)
+    }
+
+    @Test
+    fun decliningOfferDiscardsSelectedIssuancePreview() = runTest {
+        val wallet = FakeDemoWallet()
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.previewOffer()
+        runCurrent()
+        controller.declineOffer()
+        runCurrent()
+
+        assertEquals(listOf(issuancePreviewHandle), wallet.discardedIssuancePreviewHandles)
+        assertEquals(null, controller.state.value.offerPreview)
     }
 
     @Test
@@ -461,8 +479,9 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun presentationPreviewApproveAndRejectUseStepwiseWalletApi() = runTest {
+    fun presentationPreviewSubmitRejectAndDismissUseSelectedHandle() = runTest {
         val preview = WalletDemoPresentationPreview(
+            previewHandle = presentationPreviewHandle,
             responseEncryption = WalletDemoResponseEncryption.NotRequired,
             verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
@@ -512,22 +531,35 @@ class WalletDemoControllerTest {
 
         controller.previewPresentation()
         runCurrent()
-        controller.rejectPresentation()
+        controller.cancelPresentationReview()
         runCurrent()
 
-        assertEquals("openid4vp://example", wallet.rejectedRequestUrl)
         assertEquals(
-            WalletOperationState.Succeeded("Presentation declined", WalletDemoTab.Present),
+            WalletOperationState.Succeeded("Presentation review cancelled", WalletDemoTab.Present),
             controller.state.value.operation,
         )
         assertEquals(null, controller.state.value.presentationPreview)
         assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
         assertEquals(emptySet(), controller.state.value.selectedPresentationDisclosureOptions)
+        assertEquals(listOf(presentationPreviewHandle), wallet.discardedPresentationPreviewHandles)
+
+        controller.previewPresentation()
+        runCurrent()
+        controller.rejectPresentation()
+        runCurrent()
+
+        assertEquals(listOf(presentationPreviewHandle), wallet.rejectedPresentationPreviewHandles)
+        assertEquals(null, controller.state.value.presentationPreview)
+        assertEquals(
+            WalletOperationState.Succeeded("Presentation rejected", WalletDemoTab.Present),
+            controller.state.value.operation,
+        )
     }
 
     @Test
     fun presentationDisclosureSelectionDefaultsOffAndSubmitsSelectedPaths() = runTest {
         val preview = WalletDemoPresentationPreview(
+            previewHandle = presentationPreviewHandle,
             responseEncryption = WalletDemoResponseEncryption.NotRequired,
             verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
@@ -622,6 +654,7 @@ class WalletDemoControllerTest {
         )
         val second = first.copy(queryId = "age", label = "PID age")
         val preview = WalletDemoPresentationPreview(
+            previewHandle = presentationPreviewHandle,
             responseEncryption = WalletDemoResponseEncryption.NotRequired,
             verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
@@ -676,6 +709,7 @@ class WalletDemoControllerTest {
         )
         val second = first.copy(credentialId = "cred-2", label = "PID two")
         val preview = WalletDemoPresentationPreview(
+            previewHandle = presentationPreviewHandle,
             responseEncryption = WalletDemoResponseEncryption.NotRequired,
             verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
@@ -742,6 +776,7 @@ class WalletDemoControllerTest {
             ),
         )
         val preview = WalletDemoPresentationPreview(
+            previewHandle = presentationPreviewHandle,
             responseEncryption = WalletDemoResponseEncryption.NotRequired,
             verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
@@ -796,6 +831,7 @@ class WalletDemoControllerTest {
         )
         val photoId = mdl.copy(queryId = "photo-id", credentialId = "cred-2", label = "Photo ID")
         val preview = WalletDemoPresentationPreview(
+            previewHandle = presentationPreviewHandle,
             responseEncryption = WalletDemoResponseEncryption.NotRequired,
             verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
@@ -827,6 +863,7 @@ class WalletDemoControllerTest {
             disclosures = emptyList(),
         )
         val preview = WalletDemoPresentationPreview(
+            previewHandle = presentationPreviewHandle,
             responseEncryption = WalletDemoResponseEncryption.NotRequired,
             verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
@@ -873,6 +910,7 @@ class WalletDemoControllerTest {
             disclosures = emptyList(),
         )
         val preview = WalletDemoPresentationPreview(
+            previewHandle = presentationPreviewHandle,
             responseEncryption = WalletDemoResponseEncryption.NotRequired,
             verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
@@ -943,6 +981,7 @@ class WalletDemoControllerTest {
         val wallet = FakeDemoWallet(
             credentials = listOf(sampleCredential),
             presentationPreview = WalletDemoPresentationPreview(
+                previewHandle = presentationPreviewHandle,
                 responseEncryption = WalletDemoResponseEncryption.NotRequired,
                 verifierMetadata = verifierMetadata("Example Verifier"),
                 clientId = "https://verifier.example",
@@ -1099,6 +1138,7 @@ class WalletDemoControllerTest {
     @Test
     fun presentationCompletionCanStartNewFlow() = runTest {
         val preview = WalletDemoPresentationPreview(
+            previewHandle = presentationPreviewHandle,
             responseEncryption = WalletDemoResponseEncryption.NotRequired,
             verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
@@ -1280,6 +1320,7 @@ private class RecoverableDemoPinStore : DemoPinStore {
 private fun offerPreview(
     transactionCode: WalletDemoTransactionCodeRequirement? = null,
 ): WalletDemoOfferPreview = WalletDemoOfferPreview(
+    previewHandle = issuancePreviewHandle,
     issuer = WalletDemoIssuerMetadata(
         credentialIssuer = "https://issuer.example",
         display = WalletDemoMetadataDisplay(
@@ -1330,8 +1371,9 @@ private class FakeDemoWallet(
     private val receiveGate: CompletableDeferred<Unit>? = null,
     private val ignoreReceiveCancellation: Boolean = false,
     private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult.Success(WalletDisplayText.PresentationSent),
-    private val rejectionResult: WalletDemoOperationResult = WalletDemoOperationResult.Success(WalletDisplayText.PresentationDeclined),
+    private val rejectionResult: WalletDemoOperationResult = WalletDemoOperationResult.Success(WalletDisplayText.PresentationRejected),
     private val presentationPreview: WalletDemoPresentationPreview = WalletDemoPresentationPreview(
+        previewHandle = presentationPreviewHandle,
         responseEncryption = WalletDemoResponseEncryption.NotRequired,
         verifierMetadata = null,
         clientId = null,
@@ -1342,15 +1384,17 @@ private class FakeDemoWallet(
     var bootstrapCalls = 0
     var resolveOfferCalls = 0
     var resolvedOfferUrl: String? = null
-    var receivedOfferUrl: String? = null
+    var receivedPreviewHandle: WalletDemoIssuancePreviewHandle? = null
     var receivedTxCode: String? = null
     var receiveCalls = 0
     var presentedRequestUrl: String? = null
     var previewedRequestUrl: String? = null
-    var submittedRequestUrl: String? = null
-    var rejectedRequestUrl: String? = null
+    var submittedPreviewHandle: WalletDemoPresentationPreviewHandle? = null
     var submittedCredentialOptions: List<WalletDemoPresentationCredentialSelection>? = null
     var submittedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>? = null
+    val discardedIssuancePreviewHandles = mutableListOf<WalletDemoIssuancePreviewHandle>()
+    val discardedPresentationPreviewHandles = mutableListOf<WalletDemoPresentationPreviewHandle>()
+    val rejectedPresentationPreviewHandles = mutableListOf<WalletDemoPresentationPreviewHandle>()
 
     override suspend fun bootstrap(): WalletDemoBootstrapResult {
         bootstrapCalls += 1
@@ -1371,9 +1415,12 @@ private class FakeDemoWallet(
         return offerResolution
     }
 
-    override suspend fun receive(offerUrl: String, txCode: String?): List<String> {
+    override suspend fun receive(
+        previewHandle: WalletDemoIssuancePreviewHandle,
+        txCode: String?,
+    ): List<String> {
         receiveCalls += 1
-        receivedOfferUrl = offerUrl
+        receivedPreviewHandle = previewHandle
         receivedTxCode = txCode
         if (ignoreReceiveCancellation) {
             withContext(NonCancellable) { receiveGate?.await() }
@@ -1381,6 +1428,10 @@ private class FakeDemoWallet(
             receiveGate?.await()
         }
         return receivedCredentialIds
+    }
+
+    override suspend fun discardIssuancePreview(previewHandle: WalletDemoIssuancePreviewHandle) {
+        discardedIssuancePreviewHandles += previewHandle
     }
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult {
@@ -1395,19 +1446,25 @@ private class FakeDemoWallet(
     }
 
     override suspend fun submitPresentation(
-        requestUrl: String,
+        previewHandle: WalletDemoPresentationPreviewHandle,
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String?,
     ): WalletDemoOperationResult {
-        submittedRequestUrl = requestUrl
+        submittedPreviewHandle = previewHandle
         submittedCredentialOptions = selectedCredentialOptions
         submittedDisclosureOptions = selectedDisclosureOptions
         return WalletDemoOperationResult.Success(WalletDisplayText.PresentationSent)
     }
 
-    override suspend fun rejectPresentation(requestUrl: String): WalletDemoOperationResult {
-        rejectedRequestUrl = requestUrl
+    override suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle) {
+        discardedPresentationPreviewHandles += previewHandle
+    }
+
+    override suspend fun rejectPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+    ): WalletDemoOperationResult {
+        rejectedPresentationPreviewHandles += previewHandle
         return rejectionResult
     }
 }

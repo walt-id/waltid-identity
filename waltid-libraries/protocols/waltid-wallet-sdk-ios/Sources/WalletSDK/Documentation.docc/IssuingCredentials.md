@@ -1,7 +1,8 @@
 # Issuing Credentials
 
 Resolve an OpenID4VCI credential offer, collect a transaction code when the
-issuer requires one, and use ``Wallet/receive(offer:txCode:clientID:)`` to
+issuer requires one, and use the returned preview handle with
+``Wallet/receive(previewHandle:txCode:clientID:)`` to
 persist the issued credentials in the wallet.
 
 ## Overview
@@ -27,7 +28,7 @@ if let requirement = resolution.transactionCode {
 }
 
 let credentialIDs = try await wallet.receive(
-    offer: credentialOfferURL,
+    previewHandle: resolution.previewHandle,
     txCode: transactionCode
 )
 ```
@@ -42,3 +43,7 @@ let issuedCredentials = credentials.filter { credentialIDs.contains($0.id) }
 
 > Tip: Collect ``Wallet/events`` while issuance is running if the UI needs
 > progress updates for issuer communication, credential storage, or completion.
+
+If the user closes the review without accepting it, call
+``Wallet/discardIssuancePreview(_:)``. Failed issuance attempts retain the
+handle for retry; successful issuance consumes it.

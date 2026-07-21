@@ -60,6 +60,7 @@ kotlin {
             // Cryptography and DID
             api(project(":waltid-libraries:crypto:waltid-crypto"))
             api(project(":waltid-libraries:waltid-did"))
+            implementation(identityLibs.whyoleg.cryptography.random)
         }
 
         jvmMain.dependencies {
