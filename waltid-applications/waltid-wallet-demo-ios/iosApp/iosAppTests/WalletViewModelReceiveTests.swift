@@ -143,6 +143,7 @@ private actor TransactionCodeWalletClient: WalletClient {
             try? await Task.sleep(nanoseconds: resolveDelayNanoseconds)
         }
         return OfferResolution(
+            previewHandle: IssuancePreviewHandle(value: "transaction-code-preview"),
             issuer: IssuerMetadata(
                 credentialIssuer: "https://issuer.example",
                 display: MetadataDisplay(
@@ -167,12 +168,14 @@ private actor TransactionCodeWalletClient: WalletClient {
         )
     }
 
-    func receive(offer: URL, txCode: String?) async throws -> [String] {
+    func receive(previewHandle: IssuancePreviewHandle, txCode: String?) async throws -> [String] {
         receiveCalls += 1
         receivedTxCodes.append(txCode ?? "")
         credentialIssued = true
         return [Self.credential.id]
     }
+
+    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {}
 
     func present(request: URL, did: String?) async throws -> PresentationResult {
         .transmitted(.succeeded(verifierResponseJSON: "{}"))
@@ -181,6 +184,7 @@ private actor TransactionCodeWalletClient: WalletClient {
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         .ready(
             PresentationPreview(
+                previewHandle: PresentationPreviewHandle(value: "transaction-code-presentation-preview"),
                 request: PresentationRequestInfo(
                     clientID: nil,
                     responseEncryption: .notRequired
@@ -191,7 +195,7 @@ private actor TransactionCodeWalletClient: WalletClient {
     }
 
     func submitPresentation(
-        request: URL,
+        previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
@@ -199,9 +203,11 @@ private actor TransactionCodeWalletClient: WalletClient {
         .transmitted(.succeeded(verifierResponseJSON: "{}"))
     }
 
-    func rejectPresentation(request: URL) async throws -> PresentationResult {
+    func rejectPresentation(previewHandle: PresentationPreviewHandle) async throws -> PresentationResult {
         .transmitted(.succeeded(verifierResponseJSON: "{}"))
     }
+
+    func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {}
 
     private static let credential = Credential(
         id: "credential-1",

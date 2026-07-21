@@ -145,6 +145,11 @@ final class MockWalletUITests: XCTestCase {
             value: "openid-credential-offer://mock"
         )
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10), "Received 1 credential(s)")
 
         ui.tapTab(label: "Present")
@@ -158,10 +163,10 @@ final class MockWalletUITests: XCTestCase {
             "Review presentation request"
         )
 
-        ui.tapButton(identifier: "wallet.presentationRejectButton", fallbackLabel: "Decline")
+        ui.tapButton(identifier: "wallet.presentationRejectButton", fallbackLabel: "Reject")
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Presentation declined", "Reject failed"], timeout: 10),
-            "Presentation declined"
+            ui.waitForStatus(prefixes: ["Presentation rejected", "Reject failed"], timeout: 10),
+            "Presentation rejected"
         )
         XCTAssertFalse(app.buttons["wallet.presentationRejectButton"].exists)
         XCTAssertTrue(app.buttons["wallet.presentationNewButton"].waitForExistence(timeout: 10))

@@ -23,8 +23,13 @@ internal class LazyDemoWallet(
     override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview =
         wallet().resolveOffer(offerUrl)
 
-    override suspend fun receive(offerUrl: String, txCode: String?): List<String> =
-        wallet().receive(offerUrl, txCode)
+    override suspend fun receive(
+        previewHandle: WalletDemoIssuancePreviewHandle,
+        txCode: String?,
+    ): List<String> = wallet().receive(previewHandle, txCode)
+
+    override suspend fun discardIssuancePreview(previewHandle: WalletDemoIssuancePreviewHandle) =
+        wallet().discardIssuancePreview(previewHandle)
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
         wallet().present(requestUrl, did)
@@ -33,13 +38,16 @@ internal class LazyDemoWallet(
         wallet().previewPresentation(requestUrl)
 
     override suspend fun submitPresentation(
-        requestUrl: String,
+        previewHandle: WalletDemoPresentationPreviewHandle,
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String?,
     ): WalletDemoOperationResult =
-        wallet().submitPresentation(requestUrl, selectedCredentialOptions, selectedDisclosureOptions, did)
+        wallet().submitPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did)
 
-    override suspend fun rejectPresentation(requestUrl: String): WalletDemoOperationResult =
-        wallet().rejectPresentation(requestUrl)
+    override suspend fun rejectPresentation(previewHandle: WalletDemoPresentationPreviewHandle) =
+        wallet().rejectPresentation(previewHandle)
+
+    override suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle) =
+        wallet().discardPresentationPreview(previewHandle)
 }

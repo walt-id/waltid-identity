@@ -316,6 +316,7 @@ class MobileWalletTest {
     @Test
     fun presentationPreviewUsesSwiftFriendlyCredentialAndClaimDtos() {
         val preview = MobileWalletPresentationPreview(
+            previewHandle = MobileWalletPresentationPreviewHandle("preview-1"),
             request = MobileWalletPresentationRequestInfo(
                 clientId = "https://verifier.example",
                 verifierMetadata = MobileWalletVerifierMetadata(
