@@ -702,9 +702,14 @@ class WalletIssuanceSessionService(
         )
     }
 
-    private fun ActiveSession.dpopAlgorithms(): Set<String>? =
-        resolved.authorizationServerMetadata.dpopSigningAlgValuesSupported
-            ?.takeIf { it.isNotEmpty() }
+    private fun ActiveSession.dpopAlgorithms(): Set<String>? {
+        val metadata = resolved.authorizationServerMetadata
+        val grant = resolved.offer.getGrantType() ?: return null
+        val grantIsAdvertised = metadata.grantTypesSupported?.contains(grant.value)
+            ?: (grant is GrantType.AuthorizationCode)
+        return metadata.dpopSigningAlgValuesSupported
+            ?.takeIf { grantIsAdvertised && it.isNotEmpty() }
+    }
 
     private fun ActiveSession.dpopFactory(): DPoPProofFactory? =
         dpopAlgorithms()?.let { algorithms ->

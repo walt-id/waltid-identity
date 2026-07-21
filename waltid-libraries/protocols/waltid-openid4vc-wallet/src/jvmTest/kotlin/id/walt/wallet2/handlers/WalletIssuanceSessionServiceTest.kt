@@ -697,6 +697,40 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
+    fun dpopIsNotAppliedToAnUnadvertisedGrant() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(
+                    authorizationServerMetadata(
+                        dpop = true,
+                        authorizationCode = false,
+                        advertiseSelectedGrant = false,
+                    )
+                )
+                TOKEN_ENDPOINT -> {
+                    assertEquals(null, request.headers["DPoP"])
+                    jsonResponse("""{"access_token":"access-token","token_type":"Bearer"}""")
+                }
+                CREDENTIAL_ENDPOINT -> {
+                    assertEquals("Bearer access-token", request.headers[HttpHeaders.Authorization])
+                    assertEquals(null, request.headers["DPoP"])
+                    jsonResponse(
+                        """{"transaction_id":"transaction-1","interval":7}""",
+                        HttpStatusCode.Accepted,
+                    )
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(Wallet("test", staticKey = key), httpClient = client)
+
+        val session = service.start(preAuthorizedRequest())
+        assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
+    }
+
+    @Test
     fun rejectedTransactionCodeDoesNotConsumeTheSession() = runTest {
         var tokenCalls = 0
         val service = service { request ->
@@ -907,13 +941,14 @@ class WalletIssuanceSessionServiceTest {
         dpop: Boolean = false,
         authorizationCode: Boolean = true,
         responseIssuer: Boolean = false,
+        advertiseSelectedGrant: Boolean = true,
     ) = """
         {
           "issuer":"$ISSUER",
-          ${if (authorizationCode) "\"authorization_endpoint\":\"$AUTHORIZATION_ENDPOINT\"," else ""}
+          ${if (authorizationCode || !advertiseSelectedGrant) "\"authorization_endpoint\":\"$AUTHORIZATION_ENDPOINT\"," else ""}
           "token_endpoint":"$TOKEN_ENDPOINT",
           "response_types_supported":["code"],
-          "grant_types_supported":["${if (authorizationCode) "authorization_code" else "urn:ietf:params:oauth:grant-type:pre-authorized_code"}"]
+          "grant_types_supported":["${if (authorizationCode || !advertiseSelectedGrant) "authorization_code" else "urn:ietf:params:oauth:grant-type:pre-authorized_code"}"]
           ${if (dpop) ",\"dpop_signing_alg_values_supported\":[\"ES256\"]" else ""}
           ${if (responseIssuer) ",\"authorization_response_iss_parameter_supported\":true" else ""}
         }
