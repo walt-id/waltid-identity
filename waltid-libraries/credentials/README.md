@@ -132,6 +132,11 @@ VICAL (Verifiable Issuer Certificate Authority List) trust list validation for m
 
 **Use when:** You need to validate mdoc credentials against VICAL trust lists for trust anchor verification.
 
+#### **[🟢 waltid-trust-registry](./waltid-trust-registry)**
+Trust-list ingestion and resolution for ETSI TS 119 612 TSL/LoTL XML and ETSI TS 119 602 LoTE JSON/XML. Provides source-assurance policies, freshness evaluation, and certificate-chain resolution against registry-owned trust anchors.
+
+**Use when:** You need to load ETSI trust lists and determine whether a certificate chain or provider is trusted by an admitted source.
+
 ## Library Relationships
 
 ```
@@ -172,6 +177,8 @@ VICAL (Verifiable Issuer Certificate Authority List) trust list validation for m
 │                         │ examples                      │
 │                         ├───────────────────────────────┤
 │                         │ waltid-vical                  │
+│                         ├───────────────────────────────┤
+│                         │ waltid-trust-registry         │
 └─────────────────────────┴───────────────────────────────┘
 ```
 
@@ -198,6 +205,7 @@ VICAL (Verifiable Issuer Certificate Authority List) trust list validation for m
 4. Use **waltid-digital-credentials** to parse credentials and presentations for verification
 5. Use **waltid-dcql** to create credential queries for OpenID4VP 1.0
 6. Use **waltid-dif-definitions-parser** to create Presentation Definitions for draft implementations
+7. Use **waltid-trust-registry** to resolve issuer certificate chains against ETSI trust sources
 
 ### Working with mdoc Credentials
 
@@ -213,6 +221,7 @@ Each library has its own README with detailed documentation. For quick reference
 - **New to credentials?** Start with [waltid-digital-credentials](./waltid-digital-credentials) to understand the unified abstraction
 - **Building an issuer?** See [waltid-w3c-credentials](./waltid-w3c-credentials) for W3C credentials or [waltid-mdoc-credentials2](./waltid-mdoc-credentials2) for mdocs
 - **Building a verifier?** See [waltid-verification-policies2](./waltid-verification-policies2) for credential verification and [waltid-verification-policies2-vp](./waltid-verification-policies2-vp) for presentation verification
+- **Integrating ETSI trust lists?** See [waltid-trust-registry](./waltid-trust-registry) for loading and resolving TSL, LoTL, and LoTE sources
 - **Building a wallet?** See [waltid-digital-credentials](./waltid-digital-credentials) and [waltid-holder-policies](./waltid-holder-policies)
 
 ## Dependencies Between Libraries
