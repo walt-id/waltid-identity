@@ -154,4 +154,5 @@ dist
 *-lock.yml
 *.lock
 *.lockb
+!package-lock.json
 .output
