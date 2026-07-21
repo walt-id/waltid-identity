@@ -57,6 +57,8 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 
 private const val INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER = "_issuer2_session_id"
+private const val TOKEN_ENDPOINT_PATH = "token"
+private const val CREDENTIAL_ENDPOINT_PATH = "credential"
 private val AUTHORIZATION_CODE_SESSION_LIFETIME = 5.minutes
 
 class OpenId4VciProtocolService(
@@ -215,7 +217,11 @@ class OpenId4VciProtocolService(
         parameters: Map<String, List<String>>,
         headers: Map<String, List<String>> = emptyMap(),
     ): AccessTokenResponseHttp {
-        val accessTokenRequest = when (val result = oauth2Provider.createAccessTokenRequest(parameters, headers)) {
+        val accessTokenRequest = when (val result = oauth2Provider.createAccessTokenRequest(
+            parameters = parameters,
+            headers = headers,
+            tokenEndpointUri = endpointUri(TOKEN_ENDPOINT_PATH),
+        )) {
             is AccessTokenRequestResult.Success -> result.request
             is AccessTokenRequestResult.Failure -> return oauth2Provider.writeAccessTokenError(result.error)
         }.withIssuer(metadataService.issuerBaseUrl())
@@ -620,6 +626,9 @@ class OpenId4VciProtocolService(
 
     private fun parseQueryParameters(query: String): Map<String, List<String>> =
         parseQueryString(query).entries().associate { it.key to it.value }
+
+    private fun endpointUri(path: String): String =
+        "${metadataService.issuerBaseUrl().trimEnd('/')}/$path"
 
     private fun Exception.toAuthorizationError(): OAuthError =
         when (this) {
