@@ -42,8 +42,6 @@ import id.waltid.openid4vp.wallet.DcApiWallet
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -184,9 +182,6 @@ public class MobileWallet internal constructor(
     private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {
     private val eventStream = MobileWalletEventStream()
-    private val digitalCredentialPreviewMutex = Mutex()
-    private val digitalCredentialPreviewCredentialIds = mutableMapOf<String, Set<String>>()
-
     /**
      * Buffered stream of recent issuance and presentation events emitted by this wallet.
      */
@@ -389,18 +384,11 @@ public class MobileWallet internal constructor(
                 protocol = request.protocol,
                 data = Json.parseToJsonElement(request.dataJson).jsonObject,
                 origin = request.verifiedOrigin,
+                eligibleCredentialIds = selectedCredentialIds.ifEmpty { null },
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             onEvent = ::emitSessionEvent,
         )
-        val options = result.credentialOptions
-            .filter { selectedCredentialIds.isEmpty() || it.credentialId in selectedCredentialIds }
-        require(options.isNotEmpty()) { "The selected registry entries no longer satisfy this request" }
-        val allowedCredentialIds = options.mapTo(mutableSetOf()) { it.credentialId }
-        digitalCredentialPreviewMutex.withLock {
-            digitalCredentialPreviewCredentialIds[result.requestId] = allowedCredentialIds
-        }
-
         val authorizationRequest = result.resolvedRequest.authorizationRequest
         val profilesByType = transactionDataProfiles.associateBy { it.type }
         val encryptionRequirements = WalletPresentationHandler.inspectEncryptionRequirements(authorizationRequest)
@@ -437,7 +425,7 @@ public class MobileWallet internal constructor(
                     Json.encodeToString(OpenID4VPResponseMode.serializer(), mode).trim('"')
                 },
             ),
-            credentialOptions = options.map { it.toMobileCredentialOption() },
+            credentialOptions = result.credentialOptions.map { it.toMobileCredentialOption() },
             credentialRequirements = result.credentialRequirements.map { it.toMobileCredentialRequirement() },
             encryption = encryption,
             readerTrust = MobileWalletReaderTrust.NotApplicable,
@@ -453,13 +441,7 @@ public class MobileWallet internal constructor(
         selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
         did: String? = null,
     ): MobileWalletDigitalCredentialResponse {
-        val allowedCredentialIds = digitalCredentialPreviewMutex.withLock {
-            digitalCredentialPreviewCredentialIds.remove(requestId)
-        } ?: throw IllegalArgumentException("Unknown or already consumed Digital Credentials preview")
         require(selectedCredentialOptions.isNotEmpty()) { "At least one credential must be selected after consent" }
-        require(selectedCredentialOptions.all { it.credentialId in allowedCredentialIds }) {
-            "A selected credential was not offered by the retained Digital Credentials preview"
-        }
         val response = WalletPresentationHandler.submitDcApiPresentation(
             wallet = wallet,
             request = SubmitDcApiPresentationRequest(

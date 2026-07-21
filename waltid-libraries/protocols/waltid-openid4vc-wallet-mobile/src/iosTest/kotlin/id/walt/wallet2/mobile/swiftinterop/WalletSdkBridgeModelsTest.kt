@@ -1,7 +1,6 @@
 package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
-import id.walt.wallet2.mobile.MobileWalletLegacyKeyPolicy
 import kotlinx.coroutines.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -56,7 +55,7 @@ class WalletSdkBridgeModelsTest {
     }
 
     @Test
-    fun bridgeRequiresCompleteCrossProcessConfigurationAndMapsFailClosedMigrationPolicy() {
+    fun bridgeRequiresCompleteCrossProcessConfiguration() {
         assertFailsWith<IllegalArgumentException> {
             WalletBridgeConfiguration(appGroupIdentifier = "group.example").toMobileWalletConfig()
         }
@@ -68,9 +67,5 @@ class WalletSdkBridgeModelsTest {
 
         assertEquals("group.example", config.crossProcessAccess?.appGroupIdentifier)
         assertEquals("TEAM.example", config.crossProcessAccess?.keychainAccessGroup)
-        assertEquals(
-            MobileWalletLegacyKeyPolicy.REQUIRE_CREDENTIAL_REISSUANCE,
-            config.crossProcessAccess?.legacyKeyPolicy,
-        )
     }
 }

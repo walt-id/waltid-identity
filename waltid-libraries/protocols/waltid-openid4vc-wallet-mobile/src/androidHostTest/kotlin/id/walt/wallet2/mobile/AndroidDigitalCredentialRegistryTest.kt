@@ -24,9 +24,12 @@ class AndroidDigitalCredentialRegistryTest {
         val capabilities = registry.capabilities
 
         assertTrue(capabilities.platformAvailable)
-        assertTrue(capabilities.capabilities.single {
+        assertFalse(capabilities.registrationAvailable)
+        val unsigned = capabilities.capabilities.single {
             it.protocol == MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED
-        }.supported)
+        }
+        assertFalse(unsigned.supported)
+        assertTrue(unsigned.unsupportedReason?.contains("registration") == true)
         val multisigned = capabilities.capabilities.single {
             it.protocol == MobileWalletDigitalCredentialProtocols.OPENID4VP_MULTISIGNED
         }

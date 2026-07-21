@@ -145,8 +145,17 @@ class DcApiWalletTest {
     }
 
     @Test
-    fun `dc api response echoes authorization request state`() = runTest {
-        val authorizationRequest = authorizationRequest(state = "state-123")
+    fun `dc api ignores parameters that are not defined by appendix A`() = runTest {
+        val authorizationRequest = authorizationRequest(
+            state = "state-123",
+            redirectUri = "https://verifier.example/redirect",
+            responseUri = "https://verifier.example/direct-post",
+        )
+        DcApiWallet.validateAuthorizationRequest(
+            request = authorizationRequest,
+            signed = false,
+            origin = "https://verifier.example",
+        )
         val response = DcApiWallet.buildResponse(
             request = ResolvedDcApiRequest(
                 protocol = DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
@@ -156,7 +165,8 @@ class DcApiWalletTest {
             vpToken = "{}",
         )
 
-        assertEquals("state-123", response.data["state"]?.jsonPrimitive?.content)
+        assertFalse(response.data.containsKey("state"))
+        assertEquals(setOf("vp_token"), response.data.keys)
     }
 
     @Test
@@ -263,6 +273,8 @@ class DcApiWalletTest {
         clientId: String? = null,
         expectedOrigins: List<String>? = null,
         state: String? = null,
+        redirectUri: String? = null,
+        responseUri: String? = null,
         clientMetadata: ClientMetadata? = null,
     ): AuthorizationRequest = json.decodeFromJsonElement(
         AuthorizationRequest.serializer(),
@@ -275,6 +287,8 @@ class DcApiWalletTest {
                 )
             }
             state?.let { this["state"] = JsonPrimitive(it) }
+            redirectUri?.let { this["redirect_uri"] = JsonPrimitive(it) }
+            responseUri?.let { this["response_uri"] = JsonPrimitive(it) }
             clientMetadata?.let {
                 this["client_metadata"] = json.encodeToJsonElement(ClientMetadata.serializer(), it)
             }

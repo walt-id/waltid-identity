@@ -6,13 +6,10 @@ import SwiftUI
 import WalletSDK
 
 private enum ProviderConfiguration {
-    static let appGroupIdentifier = "group.id.walt.wallet.demo"
-    static let documentTypesKey = "id.walt.wallet.identity-document-types"
-    static let registryIDKey = "id.walt.wallet.identity-document-registry-id"
-    static let registrationIDsKey = "id.walt.wallet.identity-document-registration-ids"
+    static let appGroupIdentifier = IdentityDocumentSharedConfiguration.appGroupIdentifier
 
     static var keychainAccessGroup: String {
-        guard let value = Bundle.main.object(forInfoDictionaryKey: "WALTKeychainAccessGroup") as? String,
+        guard let value = IdentityDocumentSharedConfiguration.keychainAccessGroup,
               !value.isEmpty else {
             preconditionFailure("The document provider requires a resolved shared Keychain access group")
         }
@@ -38,31 +35,8 @@ struct WaltIdentityDocumentProvider: IdentityDocumentProvider {
     }
 
     func performRegistrationUpdates() async {
-        guard let defaults = UserDefaults(suiteName: ProviderConfiguration.appGroupIdentifier) else { return }
-        let store = IdentityDocumentProviderRegistrationStore()
-        guard await store.status == .authorized else { return }
-        do {
-            for identifier in defaults.stringArray(forKey: ProviderConfiguration.registrationIDsKey) ?? [] {
-                try await store.removeRegistration(forDocumentIdentifier: identifier)
-            }
-            let registryID = defaults.string(forKey: ProviderConfiguration.registryIDKey) ?? "empty"
-            let documentTypes = (defaults.stringArray(forKey: ProviderConfiguration.documentTypesKey) ?? []).sorted()
-            let identifiers = documentTypes.map {
-                "id.walt.wallet.\(registryID).\(Data($0.utf8).base64EncodedString())"
-            }
-            for (documentType, identifier) in zip(documentTypes, identifiers) {
-                try await store.addRegistration(
-                    MobileDocumentRegistration(
-                        mobileDocumentType: documentType,
-                        supportedAuthorityKeyIdentifiers: [],
-                        documentIdentifier: identifier
-                    )
-                )
-            }
-            defaults.set(identifiers, forKey: ProviderConfiguration.registrationIDsKey)
-        } catch {
-            // IdentityDocumentServices invokes this method again when registration state changes.
-        }
+        // IdentityDocumentServices invokes this method again when registration state changes.
+        try? await IdentityDocumentRegistrationCoordinator.update()
     }
 }
 
@@ -73,6 +47,7 @@ private struct AnnexCConsentView: View {
     @State private var wallet: Wallet?
     @State private var failure: String?
     @State private var isSubmitting = false
+    @State private var selectedCredentialIDsByQuery: [String: String] = [:]
 
     var body: some View {
         NavigationStack {
@@ -85,10 +60,33 @@ private struct AnnexCConsentView: View {
                             Text(preview.verifiedOrigin)
                         }
                         Section("Requested information") {
-                            ForEach(preview.parsedRequest.documents, id: \.documentType) { document in
+                            ForEach(Array(preview.parsedRequest.documents.enumerated()), id: \.offset) { _, document in
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(document.documentType).font(.headline)
                                     Text(document.namespaces.values.flatMap { $0 }.sorted().joined(separator: ", "))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        Section("Credentials") {
+                            ForEach(queryIDs(in: preview), id: \.self) { queryID in
+                                let options = credentialOptions(for: queryID, in: preview)
+                                Picker(
+                                    "Credential",
+                                    selection: Binding<String?>(
+                                        get: { selectedCredentialIDsByQuery[queryID] },
+                                        set: { selectedCredentialIDsByQuery[queryID] = $0 }
+                                    )
+                                ) {
+                                    Text("Choose a credential").tag(nil as String?)
+                                    ForEach(options) { option in
+                                        Text(credentialTitle(option)).tag(option.credentialID as String?)
+                                    }
+                                }
+                                if let credentialID = selectedCredentialIDsByQuery[queryID],
+                                   let selected = options.first(where: { $0.credentialID == credentialID }) {
+                                    Text(credentialDetail(selected))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
@@ -109,7 +107,7 @@ private struct AnnexCConsentView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Share") { submit() }
-                        .disabled(preview == nil || isSubmitting)
+                        .disabled(preview == nil || !hasCompleteSelection || isSubmitting)
                 }
             }
             .task { await prepare() }
@@ -126,9 +124,16 @@ private struct AnnexCConsentView: View {
             let wallet = try await Wallet(configuration: ProviderConfiguration.walletConfiguration)
             _ = try await wallet.bootstrap()
             self.wallet = wallet
-            preview = try await wallet.previewAnnexCPresentation(
+            let preparedPreview = try await wallet.previewAnnexCPresentation(
                 parsedRequest: parsed,
                 verifiedOrigin: try canonicalOrigin(origin)
+            )
+            preview = preparedPreview
+            selectedCredentialIDsByQuery = Dictionary(
+                uniqueKeysWithValues: queryIDs(in: preparedPreview).compactMap { queryID in
+                    let options = credentialOptions(for: queryID, in: preparedPreview)
+                    return options.count == 1 ? (queryID, options[0].credentialID) : nil
+                }
             )
         } catch {
             failure = error.localizedDescription
@@ -137,15 +142,22 @@ private struct AnnexCConsentView: View {
 
     private func submit() {
         guard let wallet, let preview else { return }
+        let selections = queryIDs(in: preview).compactMap { queryID -> PresentationCredentialSelection? in
+            guard let credentialID = selectedCredentialIDsByQuery[queryID],
+                  let option = credentialOptions(for: queryID, in: preview).first(where: {
+                      $0.credentialID == credentialID
+                  }) else { return nil }
+            return option.selection
+        }
+        guard selections.count == queryIDs(in: preview).count else {
+            failure = ProviderFailure.missingCredentialSelection.localizedDescription
+            return
+        }
         isSubmitting = true
         Task {
             do {
                 try await context.sendResponse { rawRequest in
                     let raw = try RawAnnexCRequest(data: rawRequest.requestData)
-                    let selections = preview.credentialOptions.reduce(into: [PresentationCredentialSelection]()) { result, option in
-                        guard !result.contains(where: { $0.queryID == option.queryID }) else { return }
-                        result.append(option.selection)
-                    }
                     let response = try await wallet.submitAnnexCPresentation(
                         requestID: preview.requestID,
                         verifiedOrigin: preview.verifiedOrigin,
@@ -167,6 +179,35 @@ private struct AnnexCConsentView: View {
                 isSubmitting = false
             }
         }
+    }
+
+    private var hasCompleteSelection: Bool {
+        guard let preview else { return false }
+        return queryIDs(in: preview).allSatisfy { queryID in
+            guard let credentialID = selectedCredentialIDsByQuery[queryID] else { return false }
+            return credentialOptions(for: queryID, in: preview).contains { $0.credentialID == credentialID }
+        }
+    }
+
+    private func queryIDs(in preview: AnnexCPresentationPreview) -> [String] {
+        Array(Set(preview.credentialOptions.map(\.queryID))).sorted()
+    }
+
+    private func credentialOptions(
+        for queryID: String,
+        in preview: AnnexCPresentationPreview
+    ) -> [PresentationCredentialOption] {
+        preview.credentialOptions.filter { $0.queryID == queryID }
+    }
+
+    private func credentialTitle(_ option: PresentationCredentialOption) -> String {
+        option.label ?? option.issuer ?? "Credential"
+    }
+
+    private func credentialDetail(_ option: PresentationCredentialOption) -> String {
+        [option.issuer, option.subject, option.credentialID]
+            .compactMap { $0 }
+            .joined(separator: " · ")
     }
 
     private func parse(_ request: ISO18013MobileDocumentRequest) throws -> AnnexCParsedRequest {
@@ -238,6 +279,7 @@ private enum ProviderFailure: LocalizedError {
     case alternativeRequestSetsUnsupported
     case emptyRequest
     case invalidResponseEncoding
+    case missingCredentialSelection
     case missingVerifiedOrigin
 
     var errorDescription: String? {
@@ -245,6 +287,7 @@ private enum ProviderFailure: LocalizedError {
         case .alternativeRequestSetsUnsupported: return "Alternative document request sets are not supported"
         case .emptyRequest: return "The request does not contain any documents"
         case .invalidResponseEncoding: return "The encrypted response could not be encoded"
+        case .missingCredentialSelection: return "Choose one credential for every requested document"
         case .missingVerifiedOrigin: return "IdentityDocumentServices did not assert a website origin"
         }
     }

@@ -49,14 +49,7 @@ public data class MobileWalletConfig(
 public data class MobileWalletCrossProcessAccess(
     public val appGroupIdentifier: String,
     public val keychainAccessGroup: String,
-    public val legacyKeyPolicy: MobileWalletLegacyKeyPolicy = MobileWalletLegacyKeyPolicy.REQUIRE_CREDENTIAL_REISSUANCE,
 )
-
-/** Existing non-exportable keys cannot be moved into another Keychain access group. */
-public enum class MobileWalletLegacyKeyPolicy {
-    /** Fail closed and require credentials bound to the legacy key to be reissued. */
-    REQUIRE_CREDENTIAL_REISSUANCE,
-}
 
 /**
  * Transaction data profile accepted by the mobile wallet.

@@ -1,4 +1,7 @@
 import Foundation
+#if os(iOS)
+import IdentityDocumentServices
+#endif
 
 /// Actor-isolated entry point for the walt.id wallet SDK on iOS.
 ///
@@ -184,8 +187,18 @@ public actor Wallet {
     }
 
     /// Returns the current IdentityDocumentServices capability snapshot.
-    public func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
-        bridge.digitalCredentialCapabilities()
+    public func digitalCredentialCapabilities() async -> DigitalCredentialCapabilities {
+        #if os(iOS)
+        if #available(iOS 26.0, *),
+           let appGroupIdentifier = configuration.crossProcessAccess?.appGroupIdentifier {
+            let status = await IdentityDocumentProviderRegistrationStore().status
+            DigitalCredentialRegistrationStorage.persist(
+                status: status,
+                appGroupIdentifier: appGroupIdentifier
+            )
+        }
+        #endif
+        return bridge.digitalCredentialCapabilities()
     }
 
     /// Retains Apple's parsed Annex C request until the user consents to raw request access.

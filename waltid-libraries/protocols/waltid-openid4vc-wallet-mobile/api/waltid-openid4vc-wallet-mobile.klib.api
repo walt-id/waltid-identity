@@ -116,16 +116,6 @@ final enum class id.walt.wallet2.mobile/MobileWalletKeyType : kotlin/Enum<id.wal
     final fun values(): kotlin/Array<id.walt.wallet2.mobile/MobileWalletKeyType> // id.walt.wallet2.mobile/MobileWalletKeyType.values|values#static(){}[0]
 }
 
-final enum class id.walt.wallet2.mobile/MobileWalletLegacyKeyPolicy : kotlin/Enum<id.walt.wallet2.mobile/MobileWalletLegacyKeyPolicy> { // id.walt.wallet2.mobile/MobileWalletLegacyKeyPolicy|null[0]
-    enum entry REQUIRE_CREDENTIAL_REISSUANCE // id.walt.wallet2.mobile/MobileWalletLegacyKeyPolicy.REQUIRE_CREDENTIAL_REISSUANCE|null[0]
-
-    final val entries // id.walt.wallet2.mobile/MobileWalletLegacyKeyPolicy.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile/MobileWalletLegacyKeyPolicy> // id.walt.wallet2.mobile/MobileWalletLegacyKeyPolicy.entries.<get-entries>|<get-entries>#static(){}[0]
-
-    final fun valueOf(kotlin/String): id.walt.wallet2.mobile/MobileWalletLegacyKeyPolicy // id.walt.wallet2.mobile/MobileWalletLegacyKeyPolicy.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<id.walt.wallet2.mobile/MobileWalletLegacyKeyPolicy> // id.walt.wallet2.mobile/MobileWalletLegacyKeyPolicy.values|values#static(){}[0]
-}
-
 final enum class id.walt.wallet2.mobile/MobileWalletPresentationErrorCode : kotlin/Enum<id.walt.wallet2.mobile/MobileWalletPresentationErrorCode> { // id.walt.wallet2.mobile/MobileWalletPresentationErrorCode|null[0]
     enum entry accessDenied // id.walt.wallet2.mobile/MobileWalletPresentationErrorCode.accessDenied|null[0]
     enum entry invalidClient // id.walt.wallet2.mobile/MobileWalletPresentationErrorCode.invalidClient|null[0]
@@ -965,19 +955,16 @@ final class id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord { // id.
 }
 
 final class id.walt.wallet2.mobile/MobileWalletCrossProcessAccess { // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess|null[0]
-    constructor <init>(kotlin/String, kotlin/String, id.walt.wallet2.mobile/MobileWalletLegacyKeyPolicy = ...) // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.<init>|<init>(kotlin.String;kotlin.String;id.walt.wallet2.mobile.MobileWalletLegacyKeyPolicy){}[0]
+    constructor <init>(kotlin/String, kotlin/String) // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.<init>|<init>(kotlin.String;kotlin.String){}[0]
 
     final val appGroupIdentifier // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.appGroupIdentifier|{}appGroupIdentifier[0]
         final fun <get-appGroupIdentifier>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.appGroupIdentifier.<get-appGroupIdentifier>|<get-appGroupIdentifier>(){}[0]
     final val keychainAccessGroup // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.keychainAccessGroup|{}keychainAccessGroup[0]
         final fun <get-keychainAccessGroup>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.keychainAccessGroup.<get-keychainAccessGroup>|<get-keychainAccessGroup>(){}[0]
-    final val legacyKeyPolicy // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.legacyKeyPolicy|{}legacyKeyPolicy[0]
-        final fun <get-legacyKeyPolicy>(): id.walt.wallet2.mobile/MobileWalletLegacyKeyPolicy // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.legacyKeyPolicy.<get-legacyKeyPolicy>|<get-legacyKeyPolicy>(){}[0]
 
     final fun component1(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.component1|component1(){}[0]
     final fun component2(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.component2|component2(){}[0]
-    final fun component3(): id.walt.wallet2.mobile/MobileWalletLegacyKeyPolicy // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.component3|component3(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletLegacyKeyPolicy = ...): id.walt.wallet2.mobile/MobileWalletCrossProcessAccess // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.copy|copy(kotlin.String;kotlin.String;id.walt.wallet2.mobile.MobileWalletLegacyKeyPolicy){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ...): id.walt.wallet2.mobile/MobileWalletCrossProcessAccess // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.copy|copy(kotlin.String;kotlin.String){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCrossProcessAccess.toString|toString(){}[0]

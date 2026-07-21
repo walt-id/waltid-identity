@@ -485,10 +485,6 @@ class MobileWalletTest {
         assertIs<MobileWalletReaderTrust.Unverified>(
             UnconfiguredMobileWalletReaderTrustEvaluator.evaluate(emptyList())
         )
-        assertEquals(
-            MobileWalletLegacyKeyPolicy.REQUIRE_CREDENTIAL_REISSUANCE,
-            MobileWalletCrossProcessAccess("group.example", "TEAM.example").legacyKeyPolicy,
-        )
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

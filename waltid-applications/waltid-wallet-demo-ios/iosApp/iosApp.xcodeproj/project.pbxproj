@@ -14,6 +14,7 @@
 		A7520000000000000000000A /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 256D4E3F703216DC04F0C650 /* WalletSDK */; };
 		A7520000000000000000000C /* IdentityDocumentProvider.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = A75200000000000000000002 /* IdentityDocumentProvider.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A75200000000000000000011 /* IdentityDocumentRegistrationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000010 /* IdentityDocumentRegistrationCoordinator.swift */; };
+		A75200000000000000000017 /* IdentityDocumentRegistrationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000010 /* IdentityDocumentRegistrationCoordinator.swift */; };
 		A75200000000000000000012 /* IdentityDocumentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000013 /* IdentityDocumentProvider.swift */; };
 		A1000500AAAA000100000050 /* CodeScanner in Frameworks */ = {isa = PBXBuildFile; productRef = A1000501AAAA000000000051 /* CodeScanner */; };
 		A1000001AAAA000100000001 /* WalletViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001AAAA000000000001 /* WalletViewModel.swift */; };
@@ -669,6 +670,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A75200000000000000000017 /* IdentityDocumentRegistrationCoordinator.swift in Sources */,
 				A75200000000000000000012 /* IdentityDocumentProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
