@@ -63,7 +63,7 @@ jobs:
 
       - name: Build debug APK
         if: ${{ steps.detect.outputs.exists == 'true' }}
-        run: ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug --no-daemon --console=plain --warning-mode=summary
+        run: ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug -PappVersionName=${{ inputs.version }} --no-daemon --console=plain --warning-mode=summary
         env:
           CI: "true"
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
