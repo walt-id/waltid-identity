@@ -62,6 +62,7 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
+            implementation(project(":waltid-libraries:protocols:waltid-18013-7-verifier"))
             implementation(identityLibs.kotlinx.coroutines.test)
             implementation(identityLibs.ktor.client.core)
             implementation(identityLibs.kotlinx.serialization.json)
