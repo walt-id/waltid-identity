@@ -209,18 +209,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
     }
 
     func testReceiveAndPresentEudiEhicSdJwtAgainstEudi() async throws {
-        try XCTSkipIf(
-            true,
-            "Pending native iOS PKIX/x509_hash Request Object authentication and EUDI trust-anchor refresh; tracked by https://github.com/walt-id/waltid-identity/pull/1940"
-        )
         try await receiveAndPresentEudiCredential(credentialID: Self.eudiEhicSdJwtCredentialID)
     }
 
     func testPreviewAndSubmitEudiEhicSdJwtAgainstEudi() async throws {
-        try XCTSkipIf(
-            true,
-            "Pending native iOS PKIX/x509_hash Request Object authentication and EUDI trust-anchor refresh; tracked by https://github.com/walt-id/waltid-identity/pull/1940"
-        )
         try await previewAndSubmitEudiCredential(credentialID: Self.eudiEhicSdJwtCredentialID)
     }
 
