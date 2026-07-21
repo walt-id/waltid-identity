@@ -9,6 +9,7 @@ import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 public class SqlDelightIssuanceSessionStore(
     private val queries: WalletPersistenceQueries,
 ) : WalletIssuanceSessionStore {
+    /** Returns the encrypted continuation record identified by [id], when present. */
     override suspend fun get(id: String): WalletIssuanceSessionRecord? =
         queries.selectIssuanceSessionRecordById(id).executeAsOneOrNull()?.let { row ->
             WalletIssuanceSessionRecord(
@@ -20,6 +21,7 @@ public class SqlDelightIssuanceSessionStore(
             )
         }
 
+    /** Returns all encrypted continuation records currently retained by the wallet. */
     override suspend fun list(): List<WalletIssuanceSessionRecord> =
         queries.selectAllIssuanceSessionRecords().executeAsList().map { row ->
             WalletIssuanceSessionRecord(
@@ -31,6 +33,7 @@ public class SqlDelightIssuanceSessionStore(
             )
         }
 
+    /** Inserts or replaces an encrypted continuation [record]. */
     override suspend fun put(record: WalletIssuanceSessionRecord) {
         queries.insertIssuanceSessionRecord(
             record_id = record.id,
@@ -41,6 +44,7 @@ public class SqlDelightIssuanceSessionStore(
         )
     }
 
+    /** Removes the record identified by [id] and reports whether it existed. */
     override suspend fun remove(id: String): Boolean {
         val exists = queries.selectIssuanceSessionRecordById(id).executeAsOneOrNull() != null
         if (exists) queries.deleteIssuanceSessionRecordById(id)
