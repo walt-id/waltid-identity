@@ -326,6 +326,124 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
+    fun cancellationWhilePersistingTransitionInvalidatesSession() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val records = BlockingTransitionSessionStore()
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            wallet = Wallet("transition-cancellation", staticKey = key),
+            sessionStore = records,
+            httpClient = client,
+        )
+        val session = service.start(preAuthorizedRequest())
+
+        val continuation = async { service.continuePreAuthorized(session.id) }
+        records.processingWriteStarted.await()
+        continuation.cancel()
+
+        assertFailsWith<CancellationException> { continuation.await() }
+        assertTrue(records.records.isEmpty())
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_SESSION,
+            assertIs<WalletIssuanceOutcome.Failed>(service.continuePreAuthorized(session.id)).error.code,
+        )
+    }
+
+    @Test
+    fun processingSessionIsDiscardedAfterServiceRecreation() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val records = RecordingSessionStore()
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val wallet = Wallet("interrupted-transition", staticKey = key)
+        val session = WalletIssuanceSessionService(wallet, sessionStore = records, httpClient = client)
+            .start(preAuthorizedRequest())
+        val active = records.records.values.single()
+        val processingPayload = active.payload.replace("\"state\":\"READY\"", "\"state\":\"PROCESSING\"")
+        assertTrue(processingPayload != active.payload)
+        records.records[active.id] = active.copy(payload = processingPayload)
+
+        val restored = WalletIssuanceSessionService(wallet, sessionStore = records, httpClient = client)
+        val outcome = restored.continuePreAuthorized(session.id)
+
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_SESSION,
+            assertIs<WalletIssuanceOutcome.Failed>(outcome).error.code,
+        )
+        assertTrue(records.records.isEmpty())
+    }
+
+    @Test
+    fun clearSessionsRemovesActiveAndDeferredContinuations() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val records = RecordingSessionStore()
+        var authorizationServerMetadataCalls = 0
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(
+                    authorizationServerMetadata(authorizationCode = authorizationServerMetadataCalls++ == 0)
+                )
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                CREDENTIAL_ENDPOINT -> jsonResponse(
+                    """{"transaction_id":"transaction-1","interval":5}""",
+                    HttpStatusCode.Accepted,
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            wallet = Wallet("clear-sessions", staticKey = key),
+            sessionStore = records,
+            httpClient = client,
+        )
+        val authorization = service.start(authRequest())
+        val preAuthorized = service.start(preAuthorizedRequest())
+        val deferred = assertIs<WalletIssuanceOutcome.Deferred>(
+            service.continuePreAuthorized(preAuthorized.id)
+        )
+        assertEquals(
+            setOf(
+                WalletIssuanceSessionRecordKind.ACTIVE_SESSION,
+                WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL,
+            ),
+            records.records.values.map { it.kind }.toSet(),
+        )
+
+        service.clearSessions()
+
+        assertTrue(records.records.isEmpty())
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_SESSION,
+            assertIs<WalletIssuanceOutcome.Failed>(
+                service.continueAuthorization(
+                    WalletIssuanceAuthorizationCallback(
+                        authorization.id,
+                        callback(authorization, "after-clear"),
+                    )
+                )
+            ).error.code,
+        )
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_SESSION,
+            assertIs<WalletIssuanceOutcome.Failed>(
+                service.resumeDeferred(deferred.credentials.single().id)
+            ).error.code,
+        )
+    }
+
+    @Test
     fun deferredCredentialCanBeResumedAndStored() = runTest {
         val key = JWKKey.generate(KeyType.secp256r1)
         val credential = key.signJws(
@@ -1000,6 +1118,22 @@ class WalletIssuanceSessionServiceTest {
         override suspend fun get(id: String): WalletIssuanceSessionRecord? = records[id]
         override suspend fun list(): List<WalletIssuanceSessionRecord> = records.values.toList()
         override suspend fun put(record: WalletIssuanceSessionRecord) {
+            records[record.id] = record
+        }
+        override suspend fun remove(id: String): Boolean = records.remove(id) != null
+    }
+
+    private class BlockingTransitionSessionStore : WalletIssuanceSessionStore {
+        val records = linkedMapOf<String, WalletIssuanceSessionRecord>()
+        val processingWriteStarted = CompletableDeferred<Unit>()
+
+        override suspend fun get(id: String): WalletIssuanceSessionRecord? = records[id]
+        override suspend fun list(): List<WalletIssuanceSessionRecord> = records.values.toList()
+        override suspend fun put(record: WalletIssuanceSessionRecord) {
+            if ("\"state\":\"PROCESSING\"" in record.payload) {
+                processingWriteStarted.complete(Unit)
+                kotlinx.coroutines.awaitCancellation()
+            }
             records[record.id] = record
         }
         override suspend fun remove(id: String): Boolean = records.remove(id) != null
