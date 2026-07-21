@@ -2,7 +2,6 @@ package id.waltid.openid4vp.wallet.presentation
 
 import id.walt.crypto.keys.Key
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -23,9 +22,6 @@ import kotlin.time.Duration.Companion.minutes
  * - OID4VP 1.0 §"Combining this specification with SIOPv2"
  */
 object SelfIssuedIdTokenBuilder {
-
-    private val log = KotlinLogging.logger { }
-
     /**
      * Creates a signed Self-Issued ID Token for the given authorization request.
      *
@@ -78,10 +74,6 @@ object SelfIssuedIdTokenBuilder {
             if (subJwk != null) {
                 put("sub_jwk", subJwk)
             }
-        }
-
-        log.trace {
-            "Building Self-Issued ID Token: sub=$sub, aud=${holderBindingAudience ?: authorizationRequest.clientId}"
         }
 
         return holderKey.signJws(
