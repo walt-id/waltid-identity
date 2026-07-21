@@ -1,9 +1,11 @@
 package id.walt.wallet2.persistence
 
 import id.walt.wallet2.data.WalletDescriptor
+import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.stores.WalletStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
@@ -44,6 +46,9 @@ class ExposedWalletStore(private val db: Database) : WalletStore {
                 didStoreId = didStoreId,
                 serializedStaticKey = walletRow[Wallet2Tables.Wallets.serializedStaticKey],
                 staticDid = walletRow[Wallet2Tables.Wallets.staticDid],
+                requestObjectX509Trust = walletRow[Wallet2Tables.Wallets.requestObjectX509Trust]
+                    ?.let { Json.decodeFromString(WalletX509TrustConfig.serializer(), it) },
+                requestObjectAudience = walletRow[Wallet2Tables.Wallets.requestObjectAudience],
                 defaultKeyId = walletRow[Wallet2Tables.Wallets.defaultKeyId],
                 defaultDidId = walletRow[Wallet2Tables.Wallets.defaultDidId],
             )
@@ -56,6 +61,9 @@ class ExposedWalletStore(private val db: Database) : WalletStore {
                 it[Wallet2Tables.Wallets.id] = descriptor.id
                 it[Wallet2Tables.Wallets.serializedStaticKey] = descriptor.serializedStaticKey
                 it[Wallet2Tables.Wallets.staticDid] = descriptor.staticDid
+                it[Wallet2Tables.Wallets.requestObjectX509Trust] = descriptor.requestObjectX509Trust
+                    ?.let { trustConfig -> Json.encodeToString(WalletX509TrustConfig.serializer(), trustConfig) }
+                it[Wallet2Tables.Wallets.requestObjectAudience] = descriptor.requestObjectAudience
                 it[Wallet2Tables.Wallets.defaultKeyId] = descriptor.defaultKeyId
                 it[Wallet2Tables.Wallets.defaultDidId] = descriptor.defaultDidId
             }

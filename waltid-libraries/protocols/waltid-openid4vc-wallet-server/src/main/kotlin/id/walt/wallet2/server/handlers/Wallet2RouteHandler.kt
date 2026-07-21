@@ -739,34 +739,6 @@ object Wallet2RouteHandler {
                         call.respond(WalletPresentationHandler.matchCredentialsFromStore(wallet, req))
                     }
 
-                    post("/build-vp-token", {
-                        summary = "Build VP token from selected credentials"
-                        description =
-                            "Step 3 of the manual presentation flow. " +
-                                    "Takes the resolved authorization request (from /resolve-request) and the " +
-                                    "credential IDs selected by the user (from /match-credentials-from-store), " +
-                                    "then builds and signs the vp_token. " +
-                                    "Pass the result to /send-response to complete the flow."
-                        request { pathParameter<String>("walletId"); body<BuildVpTokenRequest>() }
-                        response { HttpStatusCode.OK to { body<BuildVpTokenResult>() } }
-                    }) {
-                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
-                        val req = call.receive<BuildVpTokenRequest>()
-                        call.respond(WalletPresentationHandler.buildVpToken(wallet, req))
-                    }
-
-                    post("/send-response", {
-                        summary = "Send authorization response to the verifier"
-                        description =
-                            "Step 4 of the manual presentation flow. " +
-                                    "Transmits the vp_token (from /build-vp-token) to the verifier " +
-                                    "according to the response_mode in the authorization request."
-                        request { pathParameter<String>("walletId"); body<SendAuthorizationResponseRequest>() }
-                        response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
-                    }) {
-                        val req = call.receive<SendAuthorizationResponseRequest>()
-                        call.respond(WalletPresentationHandler.sendAuthorizationResponse(req))
-                    }
                 }
             }
         }

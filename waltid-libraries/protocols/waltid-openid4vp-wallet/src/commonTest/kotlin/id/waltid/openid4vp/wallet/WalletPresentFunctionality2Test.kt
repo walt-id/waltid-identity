@@ -51,6 +51,35 @@ class WalletPresentFunctionality2Test {
     }
 
     @Test
+    fun resolvedAuthorizationRequestRejectsMissingNonceBeforeCredentialSelection() = runTest {
+        var credentialsSelected = false
+        val result = WalletPresentFunctionality2.walletPresentHandling(
+            holderKey = JWKKey.generate(KeyType.Ed25519),
+            holderDid = "did:example:holder",
+            presentationRequestUrl = Url("openid4vp://authorize"),
+            resolvedAuthorizationRequest = ResolvedAuthorizationRequest.Plain(
+                AuthorizationRequest(
+                    clientId = "redirect_uri:https://wallet.example/callback",
+                    responseMode = OpenID4VPResponseMode.FRAGMENT,
+                    redirectUri = "https://wallet.example/callback",
+                    nonce = null,
+                    dcqlQuery = DcqlQuery(credentials = emptyList()),
+                )
+            ),
+            selectCredentialsForQuery = {
+                credentialsSelected = true
+                emptyMap()
+            },
+            holderPoliciesToRun = null,
+            runPolicies = null,
+            transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+        ).getOrThrow()
+
+        assertEquals("https://wallet.example/callback#error=invalid_request", result.getUrl)
+        assertTrue(!credentialsSelected, "A request without nonce must not reach consent or credential selection")
+    }
+
+    @Test
     fun postSelectionRejectionRequiresBoundPlainResponseDestination() = runTest {
         var credentialsSelected = false
         val failure = assertFailsWith<IllegalArgumentException> {
