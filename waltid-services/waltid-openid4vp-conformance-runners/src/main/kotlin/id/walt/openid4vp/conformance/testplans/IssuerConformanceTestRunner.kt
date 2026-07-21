@@ -9,9 +9,6 @@ import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantRep
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantRunResult
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantRunStatus
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantSelection
-import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerTestPlan
-import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.Oid4vciIssuerClientAttestationDpop
-import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.Oid4vciIssuerSdJwtHaip
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.Oid4vciIssuerVariantPlan
 import id.walt.openid4vp.conformance.testplans.runner.IssuerTestPlanRunner
 import io.ktor.client.*
@@ -26,7 +23,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.URI
-import kotlin.reflect.jvm.jvmName
 import kotlin.test.assertNotNull
 
 /**
@@ -48,49 +44,33 @@ class IssuerConformanceTestRunner(
     private val staticTxCode: String? = System.getenv("OPENID4VCI_CONFORMANCE_STATIC_TX_CODE")?.ifBlank { null },
     private val variantSelection: IssuerVariantSelection = IssuerVariantSelection.fromEnvironment(),
 ) {
-    private val http = HttpClient {
-        install(ContentNegotiation) {
-            json()
-        }
-    }
-
     suspend fun run(): List<TestPlanResult> {
         val conformance = ConformanceInterface(conformanceHost, conformancePort)
-        val conformanceVersion = conformance.getServerVersion()
-        assertNotNull(conformanceVersion)
-        println("✅ Conformance server version $conformanceVersion available!")
-
-        val metadata = fetchIssuerMetadata()
-        val matrixMode = System.getenv("OPENID4VCI_CONFORMANCE_MATRIX")?.ifBlank { "all" } ?: "all"
-
-        return if (matrixMode.equals("legacy", ignoreCase = true)) {
-            runLegacy(metadata)
-        } else {
-            runMatrix(metadata)
-        }
-    }
-
-    private suspend fun runLegacy(metadata: JsonObject): List<TestPlanResult> {
-        val testPlans = buildTestPlans(metadata)
-        require(testPlans.isNotEmpty()) {
-            "No legacy issuer plans could be constructed for $credentialIssuerUrl"
-        }
-
-        val issuerBaseUrl = extractBaseUrl(credentialIssuerUrl)
-        val issuerInterface = IssuerInterface(issuerBaseUrl)
-
         return try {
-            testPlans.flatMap { plan ->
-                val planName = plan::class.simpleName ?: plan::class.jvmName
-                println("Running issuer plan: $planName")
-                IssuerTestPlanRunner(plan.config, conformanceHost, conformancePort, issuerInterface).test()
+            val metadataHttp = HttpClient {
+                install(ContentNegotiation) {
+                    json()
+                }
+            }
+            try {
+                val conformanceVersion = conformance.getServerVersion()
+                assertNotNull(conformanceVersion)
+                println("✅ Conformance server version $conformanceVersion available!")
+
+                val metadata = fetchIssuerMetadata(metadataHttp)
+                runMatrix(metadata, conformance)
+            } finally {
+                metadataHttp.close()
             }
         } finally {
-            issuerInterface.close()
+            conformance.close()
         }
     }
 
-    private suspend fun runMatrix(metadata: JsonObject): List<TestPlanResult> {
+    private suspend fun runMatrix(
+        metadata: JsonObject,
+        conformance: ConformanceInterface,
+    ): List<TestPlanResult> {
         val resolvedIds = resolveCredentialConfigurationIds(metadata)
         val allVariants = IssuerVariantMatrix.all()
         val selectedVariants = variantSelection.select(allVariants)
@@ -146,7 +126,7 @@ class IssuerConformanceTestRunner(
                         credentialProofTypeHint = credentialProofTypeHint,
                         staticTxCode = staticTxCode,
                     )
-                    IssuerTestPlanRunner(plan.config, conformanceHost, conformancePort, issuerInterface).attempt(variant)
+                    IssuerTestPlanRunner(plan.config, conformance, issuerInterface).attempt(variant)
                 }.getOrElse {
                     IssuerVariantRunResult(
                         variantId = variant.id,
@@ -164,7 +144,7 @@ class IssuerConformanceTestRunner(
         println("Wrote issuer conformance matrix artifacts to ${variantSelection.reportDir}")
 
         if (variantSelection.strictResults) {
-            val failingResults = results.filter { it.status in strictFailureStatuses }
+            val failingResults = results.filter { it.status != IssuerVariantRunStatus.PASSED }
             require(failingResults.isEmpty()) {
                 "OpenID4VCI issuer matrix strict mode failed for ${failingResults.size} variants. " +
                     "See ${variantSelection.reportDir}/summary.md"
@@ -184,7 +164,7 @@ class IssuerConformanceTestRunner(
         }
     }
 
-    private suspend fun fetchIssuerMetadata(): JsonObject {
+    private suspend fun fetchIssuerMetadata(http: HttpClient): JsonObject {
         val metadataUrl = buildIssuerMetadataUrl(credentialIssuerUrl)
         val response = http.get(metadataUrl)
         val responseBody = response.bodyAsText()
@@ -232,57 +212,6 @@ class IssuerConformanceTestRunner(
         )
     }
 
-    private fun buildTestPlans(metadata: JsonObject): List<IssuerTestPlan> {
-        val resolvedIds = resolveCredentialConfigurationIds(metadata)
-
-        println("Resolved phase-1 issuer credential configuration ids:")
-        println("  sd-jwt-vc -> ${resolvedIds.sdJwt ?: "<not found>"}")
-        println("  mdoc      -> ${resolvedIds.mdoc ?: "<not found>"}")
-
-        return buildList {
-            // Baseline test plans (original profiles)
-            resolvedIds.sdJwt?.let {
-                add(
-                    Oid4vciIssuerClientAttestationDpop(
-                        issuerUrl = credentialIssuerUrl,
-                        credentialConfigurationId = it,
-                        credentialFormat = Oid4vciIssuerClientAttestationDpop.CredentialFormatVariant.SD_JWT_VC,
-                        clientAttestationIssuer = clientAttestationIssuer,
-                        clientAttesterJwks = clientAttesterJwks,
-                        authorizationServer = authorizationServer,
-                        credentialProofTypeHint = credentialProofTypeHint,
-                    )
-                )
-            }
-            resolvedIds.mdoc?.let {
-                add(
-                    Oid4vciIssuerClientAttestationDpop(
-                        issuerUrl = credentialIssuerUrl,
-                        credentialConfigurationId = it,
-                        credentialFormat = Oid4vciIssuerClientAttestationDpop.CredentialFormatVariant.MDOC,
-                        clientAttestationIssuer = clientAttestationIssuer,
-                        clientAttesterJwks = clientAttesterJwks,
-                        authorizationServer = authorizationServer,
-                        credentialProofTypeHint = credentialProofTypeHint,
-                    )
-                )
-            }
-
-            // HAIP test plans
-            resolvedIds.sdJwt?.let {
-                add(
-                    Oid4vciIssuerSdJwtHaip(
-                        issuerUrl = credentialIssuerUrl,
-                        credentialConfigurationId = it,
-                        clientAttestationIssuer = clientAttestationIssuer,
-                        authorizationServer = authorizationServer,
-                        credentialProofTypeHint = credentialProofTypeHint,
-                    )
-                )
-            }
-        }
-    }
-
     private fun credentialConfigurationIdFor(
         variant: IssuerVariant,
         resolvedIds: ResolvedCredentialConfigurationIds,
@@ -315,11 +244,4 @@ class IssuerConformanceTestRunner(
         return "${uri.scheme}://${uri.authority}"
     }
 
-    private companion object {
-        val strictFailureStatuses = setOf(
-            IssuerVariantRunStatus.BLOCKED,
-            IssuerVariantRunStatus.SUITE_INVALID,
-            IssuerVariantRunStatus.FAILED,
-        )
-    }
 }
