@@ -115,11 +115,14 @@ ktor {
     }
 }
 
-tasks.test {
-    // Configure SSL truststore for conformance suite tests
-    val truststorePath = file("conformance-truststore.jks").absolutePath
-    systemProperty("javax.net.ssl.trustStore", truststorePath)
-    systemProperty("javax.net.ssl.trustStorePassword", "changeit")
+val conformanceTruststorePath = providers.environmentVariable("CONFORMANCE_TRUSTSTORE_PATH")
+    .orElse(file("conformance-truststore.jks").absolutePath)
+val conformanceTruststorePassword = providers.environmentVariable("CONFORMANCE_TRUSTSTORE_PASSWORD")
+    .orElse("changeit")
+
+tasks.withType<Test>().configureEach {
+    systemProperty("javax.net.ssl.trustStore", conformanceTruststorePath.get())
+    systemProperty("javax.net.ssl.trustStorePassword", conformanceTruststorePassword.get())
 }
 
 fun selectedPlaywrightBrowser(): String = when (
@@ -140,8 +143,8 @@ fun playwrightInstallWithDeps(): Boolean = when (
         ?.trim()
         ?.lowercase()
 ) {
-    null, "", "false", "0", "no", "off" -> false
-    "true", "1", "yes", "on" -> true
+    null, "", "true", "1", "yes", "on" -> true
+    "false", "0", "no", "off" -> false
     else -> error(
         "Unsupported PLAYWRIGHT_INSTALL_WITH_DEPS/playwright.installWithDeps value. Expected true or false"
     )
@@ -170,10 +173,6 @@ fun registerWalletProfileTestTask(taskName: String, testFilter: String, descript
 
         testClassesDirs = tasks.test.get().testClassesDirs
         classpath = tasks.test.get().classpath
-
-        val truststorePath = file("conformance-truststore.jks").absolutePath
-        systemProperty("javax.net.ssl.trustStore", truststorePath)
-        systemProperty("javax.net.ssl.trustStorePassword", "changeit")
 
         useJUnitPlatform()
         filter {
