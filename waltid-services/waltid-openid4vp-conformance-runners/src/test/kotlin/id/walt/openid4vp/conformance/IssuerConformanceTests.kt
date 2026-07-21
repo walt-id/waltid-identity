@@ -2,7 +2,6 @@ package id.walt.openid4vp.conformance
 
 import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.testplans.IssuerConformanceTestRunner
-import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -128,28 +127,13 @@ class IssuerConformanceTests {
 
         val timeoutMinutes: Long =
             propertyOrEnv(timeoutMinutesProperty, timeoutMinutesEnv)?.toLongOrNull() ?: 240L
-
-        val conformanceServerVersionResult = runBlocking {
-            runCatching {
-                ConformanceInterface(ConformanceConfig.CONFORMANCE_HOST, ConformanceConfig.CONFORMANCE_PORT).getServerVersion()
-            }.onFailure {
-                println("Error getting server version: $it")
-            }
-        }
-
-        @JvmStatic
-        val isConformanceAvailable = conformanceServerVersionResult.isSuccess
-
-        @JvmStatic
-        val isIssuerConfigured = credentialIssuerUrl != null
     }
 
     @Test
     fun runIssuerConformanceTests() {
-        runBlocking {
-            assumeTrue(isConformanceAvailable, "OpenID conformance suite is not reachable")
-            assumeTrue(isIssuerConfigured, "No credential issuer URL / enterprise issuer target configured")
+        assumeTrue(credentialIssuerUrl != null, "No credential issuer URL / enterprise issuer target configured")
 
+        runBlocking {
             withTimeout(timeoutMinutes.minutes) {
                 IssuerConformanceTestRunner(
                     credentialIssuerUrl = requireNotNull(credentialIssuerUrl),
