@@ -351,6 +351,45 @@ class WalletPresentationHandlerRequirementsTest {
             rejection.getUrl,
         )
     }
+
+    @Test
+    fun mutableRequestUriContentRemainsBoundToReviewedPreview() = runTest {
+        val wallet = Wallet(
+            id = "mutable-request-uri",
+            credentialStores = listOf(InMemoryCredentialStore()),
+            staticKey = JWKKey.generate(KeyType.Ed25519),
+        )
+        val requestUrl = Url("openid4vp://authorize?request_uri=https%3A%2F%2Fverifier.example%2Fmutable.jwt")
+        var currentState = "reviewed"
+        var resolutionCalls = 0
+
+        val preview = WalletPresentationHandler.previewPresentation(
+            wallet = wallet,
+            request = PreviewPresentationRequest(requestUrl),
+            onEvent = {},
+            transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+            resolveAuthorizationRequest = { resolvedUrl ->
+                assertEquals(requestUrl, resolvedUrl)
+                resolutionCalls += 1
+                resolvedPreviewRequest(currentState)
+            },
+        )
+        currentState = "mutated"
+        val invalidPreview = assertIs<PreviewPresentationResult.Invalid>(preview)
+
+        val result = WalletPresentationHandler.rejectPresentation(
+            wallet,
+            RejectPresentationRequest(invalidPreview.handle),
+        )
+
+        assertEquals("reviewed", invalidPreview.authorizationRequest.state)
+        assertEquals(
+            "https://verifier.example/callback#error=${invalidPreview.error.code.code}&state=reviewed",
+            result.getUrl,
+        )
+        assertEquals(1, resolutionCalls)
+    }
+
     @Test
     fun presentationPreviewIsWalletBoundAndDismissalDiscardsIt() = runTest {
         val wallet = Wallet(id = "presentation-owner")
@@ -450,6 +489,18 @@ class WalletPresentationHandlerRequirementsTest {
         WalletPresentationHandler.PreviewedPresentation.Ready(
             requestUrl = requestUrl,
             resolvedAuthorizationRequest = resolvedRequest(state),
+        )
+
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    private fun resolvedPreviewRequest(state: String): ResolvedAuthorizationRequest =
+        ResolvedAuthorizationRequest.Plain(
+            AuthorizationRequest(
+                clientId = "redirect_uri:https://verifier.example/callback",
+                redirectUri = "https://verifier.example/callback",
+                responseMode = OpenID4VPResponseMode.FRAGMENT,
+                state = state,
+                dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery("pid"))),
+            )
         )
 
     @Test

@@ -3,6 +3,7 @@ package id.walt.wallet2.mobile
 /**
  * Preview of an OpenID4VP presentation request before the wallet submits a VP token.
  *
+ * @property previewHandle Opaque handle required for submit, reject, or local dismissal.
  * @property request Verifier, protocol, and transaction metadata extracted from the request.
  * @property credentialOptions Wallet-local credentials that can satisfy the presentation request.
  * @property credentialRequirements Required DCQL credential query combinations that must be satisfied before submission.
@@ -35,12 +36,17 @@ public sealed interface MobileWalletPresentationPreviewResult {
     ) : MobileWalletPresentationPreviewResult
 }
 
-/** Opaque presentation preview handle. It is valid only for the wallet that created it. */
+/**
+ * Opaque presentation preview handle. It is valid only for the wallet that created it.
+ *
+ * @property value Opaque identifier returned by [MobileWallet.previewPresentation].
+ */
 public data class MobileWalletPresentationPreviewHandle(val value: String) {
     init {
         require(value.isNotBlank()) { "Presentation preview handle must not be blank" }
     }
 
+    /** Returns a redacted representation that does not reveal [value]. */
     public override fun toString(): String = "MobileWalletPresentationPreviewHandle(<redacted>)"
 }
 

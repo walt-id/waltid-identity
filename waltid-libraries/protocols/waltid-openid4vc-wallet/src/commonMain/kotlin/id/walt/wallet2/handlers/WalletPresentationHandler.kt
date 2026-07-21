@@ -356,6 +356,20 @@ object WalletPresentationHandler {
         request: PreviewPresentationRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
+    ): PreviewPresentationResult = previewPresentation(
+        wallet = wallet,
+        request = request,
+        onEvent = onEvent,
+        transactionDataTypeRegistry = transactionDataTypeRegistry,
+        resolveAuthorizationRequest = ::resolveAuthorizationRequest,
+    )
+
+    internal suspend fun previewPresentation(
+        wallet: Wallet,
+        request: PreviewPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest,
     ): PreviewPresentationResult {
         onEvent(WalletSessionEvent.presentation_request_parsed)
         val resolvedAuthorizationRequest = resolveAuthorizationRequest(request.requestUrl)
