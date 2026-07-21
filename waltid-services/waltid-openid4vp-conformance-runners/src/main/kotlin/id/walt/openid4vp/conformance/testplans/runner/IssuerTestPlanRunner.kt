@@ -30,6 +30,8 @@ class IssuerTestPlanRunner(
     private val conformanceHost = conformance.conformanceHost
     private val conformancePort = conformance.conformancePort
     private val moduleSelection = IssuerModuleSelection.fromEnvironment()
+    private val excludePreAuthorizedMultipleClients = System.getenv(EXCLUDE_PREAUTH_MULTIPLE_CLIENTS_ENV)
+        ?.equals("true", ignoreCase = true) == true
     private val browserAutomationConfig = IssuerBrowserAutomationConfig.fromEnvironment()
     private val browserAutomation = IssuerConformanceBrowserAutomation(
         config = browserAutomationConfig,
@@ -93,7 +95,18 @@ class IssuerTestPlanRunner(
         println("Created test plan: $testPlanId")
         println("The conformance suite will call issuer: ${config.issuerUrl}")
 
-        val modulesToRun = moduleSelection.filter(createTestPlanResponse.modules) { it.testModule }
+        val selectedModules = moduleSelection.filter(createTestPlanResponse.modules) { it.testModule }
+        val modulesToRun = selectedModules.filterNot { module ->
+            excludePreAuthorizedMultipleClients &&
+                variant.grantType == PRE_AUTHORIZATION_CODE &&
+                module.testModule == MULTIPLE_CLIENTS_MODULE
+        }
+        if (modulesToRun.size != selectedModules.size) {
+            println(
+                "Excluding $MULTIPLE_CLIENTS_MODULE for pre_authorization_code because the " +
+                    "upstream module reuses client 1's consumed pre-authorized code for client 2."
+            )
+        }
         if (modulesToRun.isEmpty()) {
             return IssuerVariantRunResult(
                 variantId = variant.id,
@@ -213,6 +226,13 @@ class IssuerTestPlanRunner(
 
     private fun Throwable.compactMessage(): String =
         listOfNotNull(javaClass.simpleName, message).joinToString(": ")
+
+    private companion object {
+        const val EXCLUDE_PREAUTH_MULTIPLE_CLIENTS_ENV =
+            "OPENID4VCI_CONFORMANCE_EXCLUDE_PREAUTH_MULTIPLE_CLIENTS"
+        const val MULTIPLE_CLIENTS_MODULE = "oid4vci-1_0-issuer-happy-flow-multiple-clients"
+        const val PRE_AUTHORIZATION_CODE = "pre_authorization_code"
+    }
 
     private fun credentialOfferProviderFor(testModule: String): (suspend () -> String)? {
         val authMethod = config.credentialOfferAuthMethod ?: return null
