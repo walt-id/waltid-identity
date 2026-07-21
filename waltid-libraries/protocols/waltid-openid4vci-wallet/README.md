@@ -85,6 +85,7 @@ import id.waltid.openid4vci.wallet.*
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.waltid.openid4vci.wallet.offer.*
 import id.waltid.openid4vci.wallet.metadata.*
+import id.waltid.openid4vci.wallet.nonce.NonceRequestBuilder
 import id.waltid.openid4vci.wallet.token.*
 import id.waltid.openid4vci.wallet.proof.*
 import io.ktor.client.*
@@ -126,19 +127,18 @@ if (preAuthGrant != null) {
         txCode = null // or user-provided PIN
     )
 
-    // 7. Obtain a fresh proof nonce from the issuer-advertised Nonce Endpoint
-    val nonceEndpoint = requireNotNull(issuerMetadata.nonceEndpoint) {
-        "A nonce_endpoint is required when the credential configuration requires proof"
+    // 7. Obtain a fresh proof nonce when the issuer advertises a Nonce Endpoint
+    val nonce = issuerMetadata.nonceEndpoint?.let { nonceEndpoint ->
+        NonceRequestBuilder(httpClient).requestNonce(nonceEndpoint).cNonce
     }
-    val nonce = NonceRequestBuilder(httpClient).requestNonce(nonceEndpoint)
 
-    // 8. Generate proof of possession
+    // 8. Generate proof of possession, omitting the nonce claim when none was obtained
     val key = KeyManager.loadKey("my-key-id")
     val proofBuilder = JwtProofBuilder()
     val proof = proofBuilder.buildProof(
         key = key,
         audience = offer.credentialIssuer,
-        nonce = nonce.cNonce
+        nonce = nonce
     )
 
     // 9. Request credential (Implementation coming soon)
