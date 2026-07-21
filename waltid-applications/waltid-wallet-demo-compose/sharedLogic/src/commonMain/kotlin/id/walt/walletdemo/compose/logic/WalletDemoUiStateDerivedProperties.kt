@@ -1,31 +1,127 @@
 package id.walt.walletdemo.compose.logic
 
 val WalletDemoUiState.isBusy: Boolean
-    get() = session is WalletSessionState.Bootstrapping ||
+    get() = isAuthenticating ||
+        session is WalletSessionState.Bootstrapping ||
+        operation is WalletOperationState.ResolvingOffer ||
         operation is WalletOperationState.Receiving ||
+        operation is WalletOperationState.ResolvingPresentation ||
         operation is WalletOperationState.Presenting
 
 val WalletDemoUiState.isError: Boolean
-    get() = session is WalletSessionState.Failed ||
-        operation is WalletOperationState.Failed
+    get() = isErrorFor(selectedTab)
+
+val WalletDemoUiState.isStatusBusy: Boolean
+    get() = session is WalletSessionState.Bootstrapping ||
+        (operation.belongsTo(selectedTab) && operation.isBusyOperation)
+
+val WalletDemoUiState.receiveUrlEntryEnabled: Boolean
+    get() = !isBusy && offerPreview == null && !receiveCompleted
+
+val WalletDemoUiState.receiveActionEnabled: Boolean
+    get() = session is WalletSessionState.Ready &&
+        requestDrafts.offerUrl.isNotBlank() &&
+        receiveUrlEntryEnabled
+
+val WalletDemoUiState.offerReviewEnabled: Boolean
+    get() = !isBusy && offerPreview != null && !receiveCompleted
+
+val WalletDemoUiState.acceptOfferEnabled: Boolean
+    get() = offerReviewEnabled && requestDrafts.hasValidTxCode
+
+private val WalletRequestDrafts.hasValidTxCode: Boolean
+    get() = !transactionCodeRequired || txCode.isNotBlank()
+
+val WalletDemoUiState.presentationUrlEntryEnabled: Boolean
+    get() = !isBusy && presentationPreview == null && !presentationCompleted
+
+val WalletDemoUiState.presentationPreviewActionEnabled: Boolean
+    get() = (session as? WalletSessionState.Ready)?.credentials?.isNotEmpty() == true &&
+        requestDrafts.presentationRequestUrl.isNotBlank() &&
+        presentationUrlEntryEnabled
+
+val WalletDemoUiState.presentationReviewEnabled: Boolean
+    get() = !isBusy && presentationPreview != null && !presentationCompleted
 
 val WalletDemoUiState.statusText: String
-    get() = when (operation) {
-        WalletOperationState.Idle -> session.statusText(auth)
-        WalletOperationState.Receiving -> "Receiving credential..."
-        WalletOperationState.Presenting -> "Presenting credential..."
-        is WalletOperationState.Succeeded -> operation.message
-        is WalletOperationState.Failed -> operation.message
+    get() = statusText(selectedTab)
+
+fun WalletDemoUiState.statusText(tab: WalletDemoTab): String =
+    operation.statusTextFor(tab)
+        ?: tabStatusText(tab)
+        ?: session.statusText(auth)
+
+private fun WalletDemoUiState.isErrorFor(tab: WalletDemoTab): Boolean =
+    session is WalletSessionState.Failed ||
+        (operation is WalletOperationState.Failed && operation.belongsTo(tab))
+
+private fun WalletDemoUiState.tabStatusText(tab: WalletDemoTab): String? =
+    when (tab) {
+        WalletDemoTab.Credentials -> null
+        WalletDemoTab.Receive -> if (receiveCompleted && lastReceivedCredentialIds.isNotEmpty()) {
+            WalletDisplayText.receivedCredentials(lastReceivedCredentialIds.size)
+        } else {
+            null
+        }
+        WalletDemoTab.Present -> when {
+            presentationCompleted -> WalletDisplayText.PresentationSent
+            presentationPreview != null -> WalletDisplayText.ReviewPresentationRequest
+            else -> null
+        }
     }
 
 private fun WalletSessionState.statusText(auth: WalletAuthState): String =
     when (this) {
         WalletSessionState.NotBootstrapped -> when (auth) {
-            is WalletAuthState.Setup -> "Set up a PIN to unlock the wallet"
-            is WalletAuthState.Login -> "Enter PIN to unlock the wallet"
-            WalletAuthState.Unlocked -> "Wallet not ready"
+            is WalletAuthState.Setup -> WalletDisplayText.SetupPin
+            is WalletAuthState.Login -> WalletDisplayText.UnlockPin
+            is WalletAuthState.StorageUnavailable -> auth.message
+            WalletAuthState.Unlocked -> WalletDisplayText.WalletNotReady
         }
-        WalletSessionState.Bootstrapping -> "Bootstrapping wallet..."
-        is WalletSessionState.Ready -> "Wallet ready"
+        WalletSessionState.Bootstrapping -> WalletDisplayText.BootstrappingWallet
+        is WalletSessionState.Ready -> WalletDisplayText.WalletReady
         is WalletSessionState.Failed -> message
+    }
+
+private fun WalletOperationState.statusTextFor(tab: WalletDemoTab): String? =
+    if (!belongsTo(tab)) {
+        null
+    } else {
+        when (this) {
+            WalletOperationState.Idle -> null
+            WalletOperationState.ResolvingOffer -> WalletDisplayText.ResolvingCredentialOffer
+            WalletOperationState.OfferPreview -> WalletDisplayText.ReviewCredentialOffer
+            WalletOperationState.Receiving -> WalletDisplayText.ReceivingCredential
+            WalletOperationState.ResolvingPresentation -> WalletDisplayText.ResolvingPresentation
+            WalletOperationState.Presenting -> WalletDisplayText.PresentingCredential
+            is WalletOperationState.Succeeded -> message
+            is WalletOperationState.Failed -> message
+        }
+    }
+
+private fun WalletOperationState.belongsTo(tab: WalletDemoTab): Boolean =
+    when (this) {
+        WalletOperationState.Idle -> false
+        WalletOperationState.ResolvingOffer,
+        WalletOperationState.OfferPreview,
+        WalletOperationState.Receiving -> tab == WalletDemoTab.Receive
+        WalletOperationState.ResolvingPresentation,
+        WalletOperationState.Presenting,
+        -> tab == WalletDemoTab.Present
+        is WalletOperationState.Succeeded -> this.tab == null || this.tab == tab
+        is WalletOperationState.Failed -> this.tab == null || this.tab == tab
+    }
+
+private val WalletOperationState.isBusyOperation: Boolean
+    get() = when (this) {
+        WalletOperationState.ResolvingOffer,
+        WalletOperationState.Receiving,
+        WalletOperationState.ResolvingPresentation,
+        WalletOperationState.Presenting,
+        -> true
+        WalletOperationState.Idle,
+        WalletOperationState.OfferPreview,
+        is WalletOperationState.Succeeded,
+        is WalletOperationState.Failed,
+        -> false
     }

@@ -2,12 +2,20 @@ import Foundation
 
 enum WalletAccessibilityID {
     static let status = identifier("status")
+    static let transactionDataProfilesWarning = identifier("transactionDataProfilesWarning")
     static let credentialsEmpty = identifier("credentials", "empty")
+    static let credentialsTabContent = identifier("credentialsTabContent")
     static let offerInput = identifier("offerInput")
+    static let offerScanButton = identifier("offerScanButton")
+    static let txCodeInput = identifier("txCodeInput")
     static let receiveButton = identifier("receiveButton")
     static let receiveNewButton = identifier("receiveNewButton")
     static let receiveTabContent = identifier("receiveTabContent")
+    static let offerReview = identifier("offerReview")
+    static let offerAcceptButton = identifier("offerAcceptButton")
+    static let offerDeclineButton = identifier("offerDeclineButton")
     static let presentationInput = identifier("presentationInput")
+    static let presentationScanButton = identifier("presentationScanButton")
     static let presentButton = identifier("presentButton")
     static let presentationNewButton = identifier("presentationNewButton")
     static let presentTabContent = identifier("presentTabContent")
@@ -43,6 +51,14 @@ enum WalletAccessibilityID {
 
     static func presentationCredential(_ id: String) -> String {
         identifier("presentationCredential", id)
+    }
+
+    static func presentationDisclosure(_ id: String) -> String {
+        identifier("presentationDisclosure", id)
+    }
+
+    static func presentationDisclosureToggle(_ id: String) -> String {
+        identifier("presentationDisclosureToggle", id)
     }
 
     private static func identifier(_ segments: String...) -> String {

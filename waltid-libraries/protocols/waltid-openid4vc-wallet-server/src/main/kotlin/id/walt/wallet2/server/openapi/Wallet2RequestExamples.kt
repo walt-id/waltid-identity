@@ -1,8 +1,9 @@
 package id.walt.wallet2.server.openapi
 
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.wallet2.server.handlers.CreateDidRequest
 import id.walt.wallet2.server.handlers.CreateWalletRequest
-import id.walt.wallet2.server.handlers.GenerateKeyRequest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -42,11 +43,11 @@ object Wallet2RequestExamples {
         didStoreId = "shared-dids",
     )
 
-    val GENERATE_KEY_ED25519 = GenerateKeyRequest(keyType = "Ed25519")
+    val GENERATE_KEY_ED25519 = TypedKeyGenerationRequest.Jwk(keyType = KeyType.Ed25519)
 
-    val GENERATE_KEY_SECP256R1 = GenerateKeyRequest(keyType = "secp256r1")
+    val GENERATE_KEY_SECP256R1 = TypedKeyGenerationRequest.Jwk(keyType = KeyType.secp256r1)
 
-    val GENERATE_KEY_SECP256K1 = GenerateKeyRequest(keyType = "secp256k1")
+    val GENERATE_KEY_SECP256K1 = TypedKeyGenerationRequest.Jwk(keyType = KeyType.secp256k1)
 
     val CREATE_DID_KEY_WITH_KEY_ID = CreateDidRequest(
         method = "key",

@@ -1,4 +1,5 @@
 import Foundation
+import WalletSDK
 import XCTest
 @testable import iosApp
 
@@ -565,6 +566,82 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(mimeType, "image/png")
     }
 
+    func testPresentationCredentialOptionPrependsRequestedDisclosures() throws {
+        let option = PresentationCredentialOption(
+            queryID: "pid",
+            credentialID: "credential-1",
+            format: "dc+sd-jwt",
+            issuer: "https://issuer.example",
+            subject: "did:key:holder",
+            label: "PID",
+            credentialDataJSON: """
+            {
+              "given_name": "Alice",
+              "family_name": "Tester"
+            }
+            """,
+            disclosures: [
+                PresentationDisclosure(
+                    path: #"["$","given_name"]"#,
+                    name: "given_name",
+                    valueJSON: #""Alice""#,
+                    displayValue: "Alice",
+                    selectivelyDisclosable: true,
+                    required: true,
+                    selectable: false
+                ),
+                PresentationDisclosure(
+                    path: #"["eu.europa.ec.eudi.pid.1","portrait"]"#,
+                    name: "portrait",
+                    valueJSON: onePixelPNGByteArrayJSON(),
+                    displayValue: nil,
+                    selectivelyDisclosable: true,
+                    required: false,
+                    selectable: true
+                )
+            ]
+        )
+
+        let details = CredentialDisplayNormalizer.details(for: option)
+
+        let requested = try XCTUnwrap(details.groups.first)
+        XCTAssertEqual(requested.title, "Requested disclosures")
+        XCTAssertEqual(requested.items.map(\.label), ["Given name", "Portrait"])
+        XCTAssertEqual(requested.items.map(\.path.id), ["disclosures[0].given_name", "disclosures[1].portrait"])
+        XCTAssertEqual(requested.items.first?.value, .text("Alice"))
+        guard case .image(_, _, let mimeType, let byteCount) = requested.items.last?.value else {
+            return XCTFail("Expected requested portrait disclosure to render as an image")
+        }
+        XCTAssertEqual(mimeType, "image/png")
+        XCTAssertEqual(byteCount, onePixelPNGData.count)
+
+        let personal = try XCTUnwrap(details.groups.first { $0.title == "Personal details" })
+        XCTAssertEqual(personal.items.map(\.label), ["Given name", "Family name"])
+        XCTAssertEqual(details.id, option.selection.id)
+    }
+
+    func testPresentationCredentialOptionOmitsRequestedDisclosuresWhenEmpty() {
+        let option = PresentationCredentialOption(
+            queryID: "pid",
+            credentialID: "credential-1",
+            format: "dc+sd-jwt",
+            issuer: nil,
+            subject: nil,
+            label: "PID",
+            credentialDataJSON: """
+            {
+              "given_name": "Alice"
+            }
+            """,
+            disclosures: []
+        )
+
+        let details = CredentialDisplayNormalizer.details(for: option)
+
+        XCTAssertFalse(details.groups.contains { $0.title == "Requested disclosures" })
+        XCTAssertEqual(details.groups.first?.title, "Personal details")
+    }
+
     func testBuildsCredentialInfoGroupFromWalletSummaryFields() throws {
         let addedAt = try XCTUnwrap(Self.isoDateFormatter.date(from: "2026-07-09T12:00:00Z"))
         let details = CredentialDisplayNormalizer.details(
@@ -616,6 +693,48 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertTrue(details.groups.isEmpty)
     }
 
+    func testTransactionDataGroupsRenderProfileAndDetailsReadably() throws {
+        let request = PresentationRequestInfo(
+            transactionData: [
+                PresentationTransactionData(
+                    type: "org.waltid.transaction-data.payment-authorization",
+                    displayName: "Payment Authorization",
+                    credentialQueryIDs: ["pid", "payment"],
+                    supportedFields: ["amount", "currency", "payee"],
+                    rawJSON: """
+                    {
+                      "type": "org.waltid.transaction-data.payment-authorization",
+                      "credential_ids": ["pid", "payment"],
+                      "amount": "42.00",
+                      "currency": "EUR",
+                      "payee": "ACME Corp"
+                    }
+                    """,
+                    detailsJSON: """
+                    {
+                      "amount": "42.00",
+                      "currency": "EUR",
+                      "payee": "ACME Corp"
+                    }
+                    """
+                )
+            ]
+        )
+
+        let payment = try XCTUnwrap(CredentialDisplayNormalizer.transactionDataGroups(for: request).single)
+        let valuesByLabel = Dictionary(uniqueKeysWithValues: payment.items.map { item in
+            (item.label, item.textValue ?? item.rawValue ?? "")
+        })
+
+        XCTAssertEqual(payment.title, "Payment Authorization")
+        XCTAssertEqual(Array(payment.items.prefix(3).map(\.label)), ["Amount", "Currency", "Payee"])
+        XCTAssertEqual(valuesByLabel["Type"], "org.waltid.transaction-data.payment-authorization")
+        XCTAssertEqual(valuesByLabel["Credential queries"], "pid, payment")
+        XCTAssertEqual(valuesByLabel["Amount"], "42.00")
+        XCTAssertEqual(valuesByLabel["Currency"], "EUR")
+        XCTAssertEqual(valuesByLabel["Payee"], "ACME Corp")
+    }
+
     private func onePixelPNGByteArrayJSON() -> String {
         "[" + onePixelPNGData.map { String($0) }.joined(separator: ",") + "]"
     }
@@ -635,4 +754,19 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
         return formatter
     }()
+}
+
+private extension ClaimItem {
+    var textValue: String? {
+        if case .text(let value) = self.value {
+            return value
+        }
+        return nil
+    }
+}
+
+private extension Collection {
+    var single: Element? {
+        count == 1 ? first : nil
+    }
 }

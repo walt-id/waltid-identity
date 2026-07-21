@@ -1,6 +1,7 @@
 package id.walt.issuer2.application.openid4vci
 
 import id.walt.crypto.keys.KeyManager
+import id.walt.issuer2.config.CredentialEncryptionKeyConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
 import id.walt.openid4vci.core.OAuth2Provider
@@ -73,6 +74,8 @@ data class OpenId4VciModule(
                         enforcePushedAuthorizationRequests = config.enforcePushedAuthorizationRequests,
                     ),
                     clientAuthenticationServiceConfig = createClientAuthenticationServiceConfig(config),
+                    credentialRequestDecryptor = config.credentialEncryptionKey
+                        ?.let(CredentialEncryptionKeyConfig::requestDecryptor),
 
 
                     accessTokenIssuer = JwtAccessTokenIssuer(signingKeyResolver),

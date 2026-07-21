@@ -3,9 +3,9 @@ package id.walt.openid4vci.requests.credential
 import id.walt.openid4vci.Client
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.prooftypes.Proofs
+import id.walt.openid4vci.requests.credential.encryption.CredentialResponseEncryptionParameters
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
 
 /**
  * Credential request for the credential endpoint.
@@ -25,7 +25,7 @@ sealed interface CredentialRequest {
     val credentialIdentifier: String?
     val credentialConfigurationId: String?
     val proofs: Proofs?
-    val credentialResponseEncryption: JsonObject?
+    val credentialResponseEncryption: CredentialResponseEncryptionParameters?
     val requestForm: Map<String, List<String>>
     val session: Session?
     val issClaim: String?

@@ -6,6 +6,7 @@ plugins {
 }
 
 val javaVersion = identityLibs.versions.java.library.get().toInt()
+val publicDemoTransactionDataProfilesUrl = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
 
 android {
     namespace = "id.walt.walletdemo.compose.android"
@@ -23,6 +24,7 @@ android {
         buildConfigField("String", "ATTESTATION_ATTESTER_PATH", "\"${findProperty("attestation.attesterPath") ?: ""}\"")
         buildConfigField("String", "ATTESTATION_BEARER_TOKEN", "\"${findProperty("attestation.bearerToken") ?: ""}\"")
         buildConfigField("String", "ATTESTATION_HOST_HEADER", "\"${findProperty("attestation.hostHeader") ?: ""}\"")
+        buildConfigField("String", "TRANSACTION_DATA_PROFILES_URL", "\"${findProperty("transactionDataProfiles.url") ?: publicDemoTransactionDataProfilesUrl}\"")
     }
 
     buildFeatures {

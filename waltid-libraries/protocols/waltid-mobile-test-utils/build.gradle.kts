@@ -14,5 +14,8 @@ kotlin {
             implementation(identityLibs.ktor.client.core)
             implementation(identityLibs.kotlinx.serialization.json)
         }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
     }
 }

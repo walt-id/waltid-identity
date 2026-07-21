@@ -8,13 +8,16 @@ fun createIosDemoWallet(
 ): DemoWallet {
 
     return LazyDemoWallet {
+        val transactionDataProfiles = config.resolveDemoTransactionDataProfiles()
         MobileDemoWallet(
             MobileWalletFactory().create(
                 MobileWalletConfig(
                     walletId = config.walletId,
                     attestationConfig = config.toWalletAttestationConfig(),
+                    transactionDataProfiles = transactionDataProfiles.profiles,
                 )
-            )
+            ),
+            warning = transactionDataProfiles.warning,
         )
     }
 }

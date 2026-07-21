@@ -15,6 +15,99 @@ enum CredentialDisplayNormalizer {
         )
     }
 
+    static func details(for option: PresentationCredentialOption) -> CredentialDetails {
+        let parsed = details(
+            id: option.selection.id,
+            title: option.label ?? option.format,
+            issuer: option.issuer,
+            subject: option.subject,
+            format: option.format,
+            addedAt: nil,
+            credentialDataJSON: option.credentialDataJSON
+        )
+        let requestedItems = option.disclosures.enumerated().map { index, disclosure in
+            let path = disclosurePath(index: index, disclosure: disclosure)
+            return ClaimItem(
+                path: path.itemPath,
+                pathComponents: path.components,
+                label: CredentialDisplayVocabulary.disclosureLabel(
+                    name: disclosure.name,
+                    path: disclosure.path
+                ),
+                value: disclosureValue(for: disclosure, path: path),
+                rawValue: disclosure.valueJSON,
+                roles: CredentialDisplayVocabulary.roles(for: path.components)
+            )
+        }
+        let requestedGroups = requestedItems.isEmpty
+            ? []
+            : [ClaimGroup(title: CredentialDisplayVocabulary.requestedDisclosuresTitle, items: requestedItems)]
+
+        return CredentialDetails(
+            id: parsed.id,
+            title: parsed.title,
+            issuer: parsed.issuer,
+            subject: parsed.subject,
+            format: parsed.format,
+            addedAt: parsed.addedAt,
+            groups: requestedGroups + parsed.groups
+        )
+    }
+
+    static func transactionDataGroups(for request: PresentationRequestInfo) -> [ClaimGroup] {
+        let baseTitles = request.transactionData.map { item in
+            item.displayName.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+                ?? CredentialDisplayVocabulary.transactionDataTitle
+        }
+        let titleCounts = baseTitles.reduce(into: [String: Int]()) { counts, title in
+            counts[title, default: 0] += 1
+        }
+        var seenTitles: [String: Int] = [:]
+
+        return request.transactionData.enumerated().map { index, item in
+            let baseTitle = baseTitles[index]
+            seenTitles[baseTitle, default: 0] += 1
+            let title = titleCounts[baseTitle, default: 0] > 1
+                ? "\(baseTitle) \(seenTitles[baseTitle, default: 0])"
+                : baseTitle
+
+            let typePath = DisplayClaimPath.transactionData(index: index, field: .type)
+            var items = claimItems(
+                fromJSON: item.detailsJSON,
+                pathPrefix: .transactionData(index: index, field: .details),
+                fallbackLabel: CredentialDisplayVocabulary.transactionDataLabel(.details)
+            )
+
+            items.append(
+                ClaimItem(
+                    path: typePath.itemPath,
+                    pathComponents: typePath.components,
+                    label: CredentialDisplayVocabulary.transactionDataLabel(.type),
+                    value: .text(item.type),
+                    rawValue: item.type,
+                    roles: CredentialDisplayVocabulary.roles(for: typePath.components)
+                )
+            )
+
+            if !item.credentialQueryIDs.isEmpty {
+                let queryPath = DisplayClaimPath.transactionData(index: index, field: .credentialQueryIDs)
+                let value = item.credentialQueryIDs.joined(separator: ", ")
+                items.append(
+                    ClaimItem(
+                        path: queryPath.itemPath,
+                        pathComponents: queryPath.components,
+                        label: CredentialDisplayVocabulary.transactionDataLabel(.credentialQueryIDs),
+                        value: .text(value),
+                        rawValue: value,
+                        roles: CredentialDisplayVocabulary.roles(for: queryPath.components)
+                    )
+                )
+            }
+
+            return ClaimGroup(title: title, items: items)
+        }
+    }
+
     static func details(
         id: String,
         title: String,
@@ -90,6 +183,38 @@ enum CredentialDisplayNormalizer {
             rawValue: rawString(value),
             roles: CredentialDisplayVocabulary.roles(for: path.components)
         )
+    }
+
+    private static func claimItems(
+        fromJSON rawJSON: String,
+        pathPrefix: DisplayClaimPath,
+        fallbackLabel: String
+    ) -> [ClaimItem] {
+        guard let parsed = CredentialDisplayJSONParser.parse(rawJSON) else {
+            let trimmed = rawJSON.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? [] : [
+                ClaimItem(
+                    path: pathPrefix.itemPath,
+                    pathComponents: pathPrefix.components,
+                    label: fallbackLabel,
+                    value: .raw(trimmed),
+                    rawValue: trimmed,
+                    roles: CredentialDisplayVocabulary.roles(for: pathPrefix.components)
+                )
+            ]
+        }
+
+        guard case .object(let members) = parsed else {
+            return [
+                claimItem(path: pathPrefix, label: fallbackLabel, value: parsed)
+            ]
+        }
+
+        return members.flatMap { member in
+            let path = pathPrefix.child(member.key)
+            return claimRows(path: path, label: CredentialDisplayVocabulary.humanizedLabel(member.key), value: member.value)
+                .map(\.item)
+        }
     }
 
     private static func protocolDisplayValue(
@@ -213,6 +338,38 @@ enum CredentialDisplayNormalizer {
         value.rawJSON
     }
 
+    private static func disclosurePath(index: Int, disclosure: PresentationDisclosure) -> DisplayClaimPath {
+        let leaf = ClaimPathExpression.parse(disclosure.path).leafKey
+            ?? disclosure.name?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+            ?? "value"
+        return DisplayClaimPath(
+            itemPath: ClaimItemPath.topLevel("disclosures").indexedChild(index).child(leaf),
+            components: ["disclosures", leaf]
+        )
+    }
+
+    private static func disclosureValue(
+        for disclosure: PresentationDisclosure,
+        path: DisplayClaimPath
+    ) -> DisplayValue {
+        if let parsed = CredentialDisplayJSONParser.parse(disclosure.valueJSON) {
+            let parsedValue = displayValue(for: parsed, path: path)
+            if case .text = parsedValue,
+               let displayValue = disclosure.displayValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !displayValue.isEmpty {
+                return .text(displayValue)
+            }
+            return parsedValue
+        }
+
+        if let displayValue = disclosure.displayValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !displayValue.isEmpty {
+            return .text(displayValue)
+        }
+
+        return .raw(disclosure.valueJSON)
+    }
+
     private static func epochDateStringIfTemporal(value: String, path: DisplayClaimPath) -> String? {
         guard CredentialDisplayVocabulary.roles(for: path.components).contains(.temporal),
               let rawEpoch = Int64(value.trimmingCharacters(in: .whitespacesAndNewlines)),
@@ -235,6 +392,12 @@ enum CredentialDisplayNormalizer {
     private static let minimumCredibleEpochSeconds: Int64 = 100_000_000
     private static let epochMillisecondsThreshold: Int64 = 10_000_000_000
     private static let imageWrapperClaimName = "elementValue"
+}
+
+private extension String {
+    var nonEmpty: String? {
+        isEmpty ? nil : self
+    }
 }
 
 private struct ClaimRow {
