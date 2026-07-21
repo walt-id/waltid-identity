@@ -116,17 +116,30 @@ private struct OfferedCredentialView: View {
             }
             if !credential.claims.isEmpty {
                 Divider()
-                Text("Claims")
-                    .font(.caption.weight(.medium))
-                ForEach(Array(credential.claims.enumerated()), id: \.offset) { index, claim in
-                    if index > 0 {
-                        Divider()
+                MetadataDisclosure(
+                    title: "Supported claims (\(credential.claims.count))",
+                    initiallyExpanded: false,
+                    accessibilityIdentifier: WalletAccessibilityID.offerSupportedClaims
+                ) {
+                    ForEach(Array(credential.claimDisplayGroups.enumerated()), id: \.offset) { groupIndex, group in
+                        if groupIndex > 0 {
+                            Divider()
+                        }
+                        Text(group.title)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.tint)
+                        ForEach(Array(group.claims.enumerated()), id: \.offset) { index, claim in
+                            if index > 0 {
+                                Divider()
+                            }
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(claim.label).font(.caption)
+                                Text(claim.inclusion)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
-                    let fallback = claim.path.joined(separator: ".")
-                    let trimmedName = claim.displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let name = trimmedName.flatMap { value in value.isEmpty ? nil : value } ?? fallback
-                    Text(claim.mandatory == true ? "\(name) (required)" : name)
-                        .font(.caption)
                 }
             }
         }

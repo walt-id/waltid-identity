@@ -20,10 +20,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import id.walt.walletdemo.compose.logic.WalletDemoCredentialClaimMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
 import id.walt.walletdemo.compose.logic.WalletDemoOfferedCredentialMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeInputMode
+import id.walt.walletdemo.compose.logic.claimDisplayGroups
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
@@ -158,21 +158,31 @@ private fun OfferedCredentialContent(credential: WalletDemoOfferedCredentialMeta
         }
         if (credential.claims.isNotEmpty()) {
             MetadataRowDivider()
-            Text("Claims", style = MaterialTheme.typography.labelMedium)
-            credential.claims.forEachIndexed { index, claim ->
-                if (index > 0) MetadataRowDivider()
-                CredentialClaimLine(claim)
+            MetadataDisclosure(
+                title = "Supported claims (${credential.claims.size})",
+                initiallyExpanded = false,
+                modifier = Modifier.testTag(WalletUiTestTags.OfferSupportedClaims),
+            ) {
+                credential.claimDisplayGroups().forEachIndexed { groupIndex, group ->
+                    if (groupIndex > 0) MetadataRowDivider()
+                    Text(
+                        text = group.title,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    group.claims.forEachIndexed { index, claim ->
+                        if (index > 0) MetadataRowDivider()
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(claim.label, style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                text = claim.inclusion,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
             }
         }
     }
-}
-
-@Composable
-private fun CredentialClaimLine(claim: WalletDemoCredentialClaimMetadata) {
-    val fallback = claim.path.joinToString(".")
-    val value = claim.displayName?.takeIf { it.isNotBlank() } ?: fallback
-    Text(
-        text = if (claim.mandatory == true) "$value (required)" else value,
-        style = MaterialTheme.typography.bodySmall,
-    )
 }

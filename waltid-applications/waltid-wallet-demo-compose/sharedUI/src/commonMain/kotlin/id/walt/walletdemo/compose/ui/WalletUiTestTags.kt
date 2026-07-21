@@ -15,6 +15,7 @@ internal object WalletUiTestTags {
     val OfferReview = tag("offerReview")
     val OfferIssuerSection = tag("offerIssuerSection")
     val OfferCredentialsSection = tag("offerCredentialsSection")
+    val OfferSupportedClaims = tag("offerSupportedClaims")
     val OfferTransactionCodeSection = tag("offerTransactionCodeSection")
     val OfferAcceptButton = tag("offerAcceptButton")
     val OfferDeclineButton = tag("offerDeclineButton")

@@ -34,6 +34,7 @@ import id.walt.walletdemo.compose.logic.VerifierDetails
 import id.walt.walletdemo.compose.logic.WalletDemoBootstrapResult
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialClaimMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoIssuerMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
@@ -106,6 +107,11 @@ class WalletDemoAppTestScenarios {
         onNodeWithContentDescription("Back").assertIsDisplayed()
         onNodeWithText("Credential details").assertIsDisplayed()
         onAllNodesWithText("Example Credential").assertCountEquals(1)
+        onNodeWithTag(WalletUiTestTags.claimGroup("About this credential"))
+            .performScrollTo()
+            .assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.claim("system.format")).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.claimGroup("About this credential")).performClick()
         onNodeWithText("Example Issuer").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.claim("system.format")).performScrollTo().assertIsDisplayed()
         onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
@@ -257,6 +263,71 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.status").assertTextContains("Credential offer declined")
         onNodeWithTag(WalletUiTestTags.ReceiveButton).assertIsEnabled()
         assertEquals(null, wallet.receivedOfferUrl)
+    }
+
+    fun offerClaimsUseSemanticGroupsAndInclusionLabels() = runComposeUiTest {
+        val wallet = FakeDemoWallet(
+            offeredCredential = WalletDemoOfferedCredentialMetadata(
+                configurationId = "org.iso.23220.photoid.1",
+                format = "mso_mdoc",
+                vct = null,
+                doctype = "org.iso.23220.photoid.1",
+                display = WalletDemoMetadataDisplay(
+                    name = "Photo ID",
+                    logoUri = null,
+                    logoAltText = null,
+                ),
+                claims = listOf(
+                    WalletDemoCredentialClaimMetadata(
+                        path = listOf("org.iso.23220.1", "given_name"),
+                        mandatory = true,
+                        displayName = "Given name",
+                    ),
+                    WalletDemoCredentialClaimMetadata(
+                        path = listOf("org.iso.23220.1", "age_over_18"),
+                        mandatory = true,
+                        displayName = null,
+                    ),
+                    WalletDemoCredentialClaimMetadata(
+                        path = listOf("org.iso.23220.1", "age_over_65"),
+                        mandatory = false,
+                        displayName = null,
+                    ),
+                    WalletDemoCredentialClaimMetadata(
+                        path = listOf("org.iso.23220.dtc.1", "dtc_dg1"),
+                        mandatory = null,
+                        displayName = null,
+                    ),
+                    WalletDemoCredentialClaimMetadata(
+                        path = listOf("org.iso.23220.dtc.1", "dtc_sod"),
+                        mandatory = true,
+                        displayName = null,
+                    ),
+                ),
+            )
+        )
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag(WalletUiTestTags.ReceiveTab).performClick()
+        onNodeWithTag(WalletUiTestTags.OfferInput).performTextInput("openid-credential-offer://example")
+        onNodeWithTag(WalletUiTestTags.ReceiveButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+
+        onNodeWithTag(WalletUiTestTags.OfferSupportedClaims).performScrollTo().assertIsDisplayed()
+        onAllNodesWithText("18 or older").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.OfferSupportedClaims).performClick()
+        onNodeWithText("Age attestations").performScrollTo().assertIsDisplayed()
+        onNodeWithText("18 or older").performScrollTo().assertIsDisplayed()
+        onNodeWithText("65 or older").performScrollTo().assertIsDisplayed()
+        onAllNodesWithText("Always included").assertCountEquals(3)
+        onAllNodesWithText("May be included").assertCountEquals(2)
+        onNodeWithText("Travel document data").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Document security object (SOD)").performScrollTo().assertIsDisplayed()
+        onNodeWithText("DG1: Machine-readable zone").performScrollTo().assertIsDisplayed()
     }
 
     fun receiveAndPresentTabsExposeQrScanActions() = runComposeUiTest {
@@ -952,6 +1023,18 @@ private class FakeDemoWallet(
     private val receiveGate: CompletableDeferred<Unit>? = null,
     private val previewGate: CompletableDeferred<Unit>? = null,
     private val transactionCodeRequired: Boolean = false,
+    private val offeredCredential: WalletDemoOfferedCredentialMetadata = WalletDemoOfferedCredentialMetadata(
+        configurationId = "ExampleCredential",
+        format = "vc+sd-jwt",
+        vct = "ExampleCredential",
+        doctype = null,
+        display = WalletDemoMetadataDisplay(
+            name = "Example Credential",
+            logoUri = null,
+            logoAltText = null,
+        ),
+        claims = emptyList(),
+    ),
 ) : DemoWallet {
     var bootstrapCalls = 0
     var receivedOfferUrl: String? = null
@@ -977,20 +1060,7 @@ private class FakeDemoWallet(
                     logoAltText = null,
                 ),
             ),
-            offeredCredentials = listOf(
-                WalletDemoOfferedCredentialMetadata(
-                    configurationId = "ExampleCredential",
-                    format = "vc+sd-jwt",
-                    vct = "ExampleCredential",
-                    doctype = null,
-                    display = WalletDemoMetadataDisplay(
-                        name = "Example Credential",
-                        logoUri = null,
-                        logoAltText = null,
-                    ),
-                    claims = emptyList(),
-                )
-            ),
+            offeredCredentials = listOf(offeredCredential),
             transactionCode = transactionCodeRequired.takeIf { it }?.let {
                 WalletDemoTransactionCodeRequirement(
                     inputMode = WalletDemoTransactionCodeInputMode.Numeric,

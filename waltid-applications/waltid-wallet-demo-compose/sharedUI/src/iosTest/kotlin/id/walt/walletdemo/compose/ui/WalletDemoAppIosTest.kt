@@ -34,6 +34,10 @@ class WalletDemoAppIosTest {
         scenarios.transactionCodeOfferCanBeDeclinedWithoutCode()
 
     @Test
+    fun offerClaimsUseSemanticGroupsAndInclusionLabels() =
+        scenarios.offerClaimsUseSemanticGroupsAndInclusionLabels()
+
+    @Test
     fun receiveAndPresentTabsExposeQrScanActions() =
         scenarios.receiveAndPresentTabsExposeQrScanActions()
 

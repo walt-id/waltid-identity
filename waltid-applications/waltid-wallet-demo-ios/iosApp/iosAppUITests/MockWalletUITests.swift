@@ -167,6 +167,43 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.buttons["wallet.presentationNewButton"].waitForExistence(timeout: 10))
     }
 
+    func testOfferClaimsUseSemanticGroupsAndInclusionLabels() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: [
+            "E2E_MOCK_WALLET": "1",
+            "E2E_MOCK_MDOC_METADATA": "1",
+        ])
+
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            "Wallet ready"
+        )
+
+        ui.tapTab(label: "Receive")
+        ui.replaceText(
+            in: ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL"),
+            value: "openid-credential-offer://mock"
+        )
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
+            "Review credential offer"
+        )
+
+        XCTAssertFalse(app.staticTexts["18 or older"].exists)
+        ui.tapButton(identifier: "wallet.offerSupportedClaims", fallbackLabel: "Supported claims (5)")
+        XCTAssertTrue(app.staticTexts["Age attestations"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["18 or older"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["65 or older"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Always included"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["May be included"].waitForExistence(timeout: 10))
+        ui.assertExists(identifier: "wallet.offerSupportedClaims")
+        XCTAssertTrue(app.staticTexts["Travel document data"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Document security object (SOD)"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["DG1: Machine-readable zone"].waitForExistence(timeout: 10))
+    }
+
     func testPresentTabAllowsPreviewAndDeclineWithoutCredentials() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
@@ -505,6 +542,10 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Credential details"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Mobile driving licence"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Expires 2026-06-17"].waitForExistence(timeout: 10))
+        ui.tapButton(
+            identifier: "wallet.claimGroupDisclosure.About_this_credential",
+            fallbackLabel: "4 entries"
+        )
         XCTAssertTrue(app.staticTexts["Example Issuer"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["jwt_vc_json"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Given name"].waitForExistence(timeout: 10))

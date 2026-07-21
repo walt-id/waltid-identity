@@ -20,7 +20,8 @@ struct WalletDemoApp: App {
                     verifierStyle: Self.mockVerifierStyle(environment: env),
                     duplicatePresentationOptions: env["E2E_MOCK_DUPLICATE_PRESENTATION_OPTIONS"] == "1",
                     transactionCodeRequired: env["E2E_MOCK_TX_CODE_REQUIRED"] == "1",
-                    responseEncryptionRequired: env["E2E_MOCK_UNENCRYPTED_RESPONSE"] != "1"
+                    responseEncryptionRequired: env["E2E_MOCK_UNENCRYPTED_RESPONSE"] != "1",
+                    mdocMetadata: env["E2E_MOCK_MDOC_METADATA"] == "1"
                 )
             )
         }

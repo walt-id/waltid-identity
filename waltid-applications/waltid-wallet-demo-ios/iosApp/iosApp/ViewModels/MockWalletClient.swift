@@ -16,6 +16,7 @@ actor MockWalletClient: WalletClient {
     private let rejectionResult: PresentationResult
     private(set) var rejectedRequestURLs: [URL] = []
     private let responseEncryptionRequired: Bool
+    private let mdocMetadata: Bool
 
     init(
         storedCredentials: [Credential] = [],
@@ -26,6 +27,7 @@ actor MockWalletClient: WalletClient {
         presentationPreviewResult: PresentationPreviewResult? = nil,
         rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}")),
         responseEncryptionRequired: Bool = true,
+        mdocMetadata: Bool = false
     ) {
         self.storedCredentials = storedCredentials
         self.operationDelayNanoseconds = operationDelayMilliseconds * 1_000_000
@@ -35,6 +37,7 @@ actor MockWalletClient: WalletClient {
         self.presentationPreviewResultOverride = presentationPreviewResult
         self.rejectionResult = rejectionResult
         self.responseEncryptionRequired = responseEncryptionRequired
+        self.mdocMetadata = mdocMetadata
     }
 
     func bootstrap() async throws -> WalletBootstrapResult {
@@ -57,22 +60,7 @@ actor MockWalletClient: WalletClient {
                     logoAltText: nil
                 )
             ),
-            offeredCredentials: [
-                OfferedCredentialMetadata(
-                    configurationID: "ExampleCredential",
-                    format: "jwt_vc_json",
-                    scope: nil,
-                    vct: nil,
-                    doctype: nil,
-                    display: MetadataDisplay(
-                        name: "Example credential",
-                        locale: "en",
-                        logoURI: nil,
-                        logoAltText: nil
-                    ),
-                    claims: []
-                )
-            ],
+            offeredCredentials: [mdocMetadata ? Self.photoIDMetadata : Self.exampleCredentialMetadata],
             transactionCode: transactionCodeRequired
                 ? TransactionCodeRequirement(inputMode: .numeric, length: 6, description: "Enter the six-digit code")
                 : nil
@@ -81,7 +69,7 @@ actor MockWalletClient: WalletClient {
 
     func receive(offer: URL, txCode: String?) async throws -> [String] {
         try await delayOperation()
-        storedCredentials = [Self.sampleCredential]
+        storedCredentials = [mdocMetadata ? Self.photoIDCredential : Self.sampleCredential]
         return storedCredentials.map(\.id)
     }
 
@@ -178,6 +166,62 @@ actor MockWalletClient: WalletClient {
     }
 
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
+
+    private static let exampleCredentialMetadata = OfferedCredentialMetadata(
+        configurationID: "ExampleCredential",
+        format: "jwt_vc_json",
+        scope: nil,
+        vct: nil,
+        doctype: nil,
+        display: MetadataDisplay(
+            name: "Example credential",
+            locale: "en",
+            logoURI: nil,
+            logoAltText: nil
+        ),
+        claims: []
+    )
+
+    private static let photoIDMetadata = OfferedCredentialMetadata(
+        configurationID: "org.iso.23220.photoid.1",
+        format: "mso_mdoc",
+        scope: nil,
+        vct: nil,
+        doctype: "org.iso.23220.photoid.1",
+        display: MetadataDisplay(
+            name: "Photo ID",
+            locale: "en",
+            logoURI: nil,
+            logoAltText: nil
+        ),
+        claims: [
+            CredentialClaimMetadata(
+                path: ["org.iso.23220.1", "given_name"],
+                mandatory: true,
+                displayName: "Given name"
+            ),
+            CredentialClaimMetadata(
+                path: ["org.iso.23220.1", "age_over_18"],
+                mandatory: true,
+                displayName: nil
+            ),
+            CredentialClaimMetadata(
+                path: ["org.iso.23220.1", "age_over_65"],
+                mandatory: false,
+                displayName: nil
+            ),
+            CredentialClaimMetadata(
+                path: ["org.iso.23220.dtc.1", "dtc_dg1"],
+                mandatory: nil,
+                displayName: nil
+            ),
+            CredentialClaimMetadata(
+                path: ["org.iso.23220.dtc.1", "dtc_sod"],
+                mandatory: true,
+                displayName: nil
+            )
+        ]
+    )
     private static let samplePortraitDisclosureValueJSON = "[-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]"
 
     private static let paymentAuthorizationTransactionData = PresentationTransactionData(
@@ -270,6 +314,32 @@ actor MockWalletClient: WalletClient {
           },
           "portrait": {
             "elementValue": [-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]
+          }
+        }
+        """
+    )
+
+    private static let photoIDCredential = Credential(
+        id: "photo-id-1",
+        format: "mso_mdoc",
+        issuer: "Example Issuer",
+        subject: nil,
+        label: "Photo ID",
+        addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z"),
+        credentialDataJSON: """
+        {
+          "org.iso.23220.1": {
+            "given_name": "Erika",
+            "family_name": "Mustermann",
+            "age_over_18": true,
+            "age_over_62": null,
+            "age_over_65": false
+          },
+          "org.iso.23220.dtc.1": {
+            "dtc_version": "1.0",
+            "dtc_sod": [1, 2, 3],
+            "dtc_dg1": [1, 2, 3, 4],
+            "dtc_dg2": null
           }
         }
         """

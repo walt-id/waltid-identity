@@ -52,6 +52,7 @@ class CredentialDisplayNormalizerTest {
 
         val systemInfo = assertNotNull(details.toSystemInfoGroup())
         assertEquals("About this credential", systemInfo.title)
+        assertFalse(systemInfo.initiallyExpanded)
         assertEquals(DisplayValue.Text("2026-07-09T12:00:00Z"), systemInfo.items.first { it.path.id == "system.added" }.value)
         assertEquals(DisplayValue.Text("cred-1"), systemInfo.items.first { it.path.id == "system.id" }.value)
         assertEquals(DisplayValue.Text("vc+sd-jwt"), systemInfo.items.first { it.path.id == "system.format" }.value)
@@ -93,6 +94,128 @@ class CredentialDisplayNormalizerTest {
             credentialData.items.map { it.path.id },
         )
         assertTrue(credentialData.items.none { it.value is DisplayValue.ObjectValue })
+    }
+
+    @Test
+    fun rendersMdocAgeAttestationsWithoutAbsentClaims() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "mso_mdoc",
+                issuer = null,
+                label = "Photo ID",
+                credentialDataJson = """
+                    {
+                      "org.iso.23220.1": {
+                        "given_name": "Erika",
+                        "age_over_62": null,
+                        "age_over_65": false,
+                        "age_over_18": true,
+                        "age_over_21": "yes"
+                      },
+                      "org.iso.23220.dtc.1": {
+                        "version": null,
+                        "sod": null,
+                        "dg1": null
+                      }
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val age = assertNotNull(details.groups.firstOrNull { it.title == "Age attestations" })
+        assertFalse(age.initiallyExpanded)
+        assertEquals(
+            listOf("18 or older", "21 or older", "65 or older"),
+            age.items.map { it.label },
+        )
+        assertEquals(
+            listOf(
+                DisplayValue.BooleanValue(true),
+                DisplayValue.Text("Unsupported value"),
+                DisplayValue.BooleanValue(false),
+            ),
+            age.items.map { it.value },
+        )
+        assertTrue(details.groups.flatMap { it.items }.none { it.path.id.contains("age_over_62") })
+        assertTrue(details.groups.none { it.title == "Travel document data" })
+        assertTrue(details.groups.first { it.title == "Credential data" }.initiallyExpanded)
+    }
+
+    @Test
+    fun summarizesProvidedMdocTravelDocumentData() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "mso_mdoc",
+                issuer = null,
+                label = "Photo ID",
+                credentialDataJson = """
+                    {
+                      "org.iso.23220.dtc.1": {
+                        "dtc_dg2": [1, 2, 3, 4],
+                        "dtc_dg1": "machine-readable-zone",
+                        "dtc_sod": [1, 2, 3],
+                        "dg_content_info": [1, 2],
+                        "dtc_version": "1.0"
+                      }
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val travel = assertNotNull(details.groups.firstOrNull { it.title == "Travel document data" })
+        assertFalse(travel.initiallyExpanded)
+        assertEquals(
+            listOf(
+                "Specification version",
+                "Document security object (SOD)",
+                "DG1: Machine-readable zone",
+                "DG2: Facial image",
+                "Document content information",
+            ),
+            travel.items.map { it.label },
+        )
+        assertEquals(
+            listOf(
+                DisplayValue.Text("1.0"),
+                DisplayValue.Text("Available, 3 bytes"),
+                DisplayValue.Text("Available"),
+                DisplayValue.Text("Available, 4 bytes"),
+                DisplayValue.Text("Available, 2 bytes"),
+            ),
+            travel.items.map { it.value },
+        )
+    }
+
+    @Test
+    fun keepsNullClaimsForNonMdocCredentials() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "dc+sd-jwt",
+                issuer = null,
+                label = "PID",
+                credentialDataJson = """{"middle_name": null}""",
+            )
+        )
+
+        assertEquals(DisplayValue.NullValue, details.groups.single().items.single().value)
+    }
+
+    @Test
+    fun doesNotApplyMdocSemanticsOutsideStandardNamespaces() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "mso_mdoc",
+                issuer = null,
+                label = "Example",
+                credentialDataJson = """{"example.namespace":{"age_over_18":true,"dg1":[1,2]}}""",
+            )
+        )
+
+        assertTrue(details.groups.none { it.title == "Age attestations" || it.title == "Travel document data" })
     }
 
     @Test

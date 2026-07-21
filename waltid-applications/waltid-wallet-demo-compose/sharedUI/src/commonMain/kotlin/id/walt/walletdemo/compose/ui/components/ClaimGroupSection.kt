@@ -12,11 +12,17 @@ internal fun ClaimGroupSection(group: ClaimGroup, modifier: Modifier = Modifier)
 
     ReviewMetadataSection(
         title = group.title,
-        modifier = modifier.testTag(WalletUiTestTags.claimGroup(group.title)),
+        modifier = modifier,
     ) {
-        group.items.forEachIndexed { index, item ->
-            if (index > 0) MetadataRowDivider()
-            ClaimValueRow(item = item)
+        MetadataDisclosure(
+            title = "${group.items.size} ${if (group.items.size == 1) "entry" else "entries"}",
+            initiallyExpanded = group.initiallyExpanded,
+            modifier = Modifier.testTag(WalletUiTestTags.claimGroup(group.title)),
+        ) {
+            group.items.forEachIndexed { index, item ->
+                if (index > 0) MetadataRowDivider()
+                ClaimValueRow(item = item)
+            }
         }
     }
 }
