@@ -50,7 +50,7 @@ class BiometricProtectedKeyInteractiveTest {
                 kid = alias,
                 keyType = KeyType.secp256r1,
                 keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-                interactionContext = activity,
+                interactionContextProvider = { activity },
             )
         )
         val plaintext = "authorize every key use".encodeToByteArray()
@@ -74,7 +74,7 @@ class BiometricProtectedKeyInteractiveTest {
                 kid = alias,
                 keyType = KeyType.secp256r1,
                 keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-                interactionContext = activity,
+                interactionContextProvider = { activity },
             )
         )
 

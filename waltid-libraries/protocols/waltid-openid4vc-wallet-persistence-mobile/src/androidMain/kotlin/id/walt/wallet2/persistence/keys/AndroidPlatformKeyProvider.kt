@@ -79,7 +79,7 @@ public class AndroidPlatformKeyProvider private constructor(
             keyType = request.keyType,
             keyUseAuthorizationPolicy = request.keyUseAuthorizationPolicy,
             authorizationPrompt = authorizationPrompt,
-            interactionContext = interactionContextProvider,
+            interactionContextProvider = interactionContextProvider,
         )
         return if (isPlatformBacked(request.keyType)) {
             AndroidKey.Platform.create(options)
@@ -104,7 +104,7 @@ public class AndroidPlatformKeyProvider private constructor(
             keyType = keyType,
             keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
             authorizationPrompt = authorizationPrompt,
-            interactionContext = interactionContextProvider,
+            interactionContextProvider = interactionContextProvider,
         )
         return if (keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.None) {
             runCatching { AndroidKey.Platform.load(options) }.getOrNull()

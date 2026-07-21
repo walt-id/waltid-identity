@@ -1,15 +1,27 @@
 package id.walt.crypto
 
+import at.asitplus.signum.supreme.CFCryptoOperationFailed
 import at.asitplus.signum.supreme.SignatureResult
 import at.asitplus.signum.supreme.UnlockFailed
 import id.walt.crypto.keys.KeyUseAuthorizationException
 import id.walt.crypto.keys.KeyUseAuthorizationFailure
+import id.walt.crypto.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto.keys.KeyType
+import kotlinx.cinterop.ExperimentalForeignApi
+import platform.Security.errSecItemNotFound
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertSame
 
 class MobilePlatformKeySupportTest {
+
+    private val protectedOptions = IosKey.Options(
+        keyType = KeyType.secp256r1,
+        inSecureElement = true,
+        keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+    )
 
     @Test
     fun signumUnlockFailureMapsToStableAuthorizationFailureWithoutParsingMessage() {
@@ -37,6 +49,29 @@ class MobilePlatformKeySupportTest {
         }
 
         assertSame(expected, actual)
+    }
+
+    @OptIn(ExperimentalForeignApi::class)
+    @Test
+    fun inaccessibleCurrentSetKeyMapsToStableInvalidatedFailure() {
+        val failure = assertIs<KeyUseAuthorizationException>(
+            protectedOptions.mapPlatformFailure(
+                CFCryptoOperationFailed("retrieve private key", errSecItemNotFound)
+            )
+        )
+
+        assertEquals(KeyUseAuthorizationFailure.ProtectedKeyInvalidated, failure.failure)
+    }
+
+    @Test
+    fun absentProtectedKeyRemainsStableMissingFailure() {
+        val failure = assertIs<KeyUseAuthorizationException>(
+            protectedOptions.mapPlatformFailure(
+                NoSuchElementException("No key for alias exists")
+            )
+        )
+
+        assertEquals(KeyUseAuthorizationFailure.ProtectedKeyMissing, failure.failure)
     }
 
     @Test
