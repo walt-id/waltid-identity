@@ -8,7 +8,20 @@ import kotlin.time.Instant
 // ---------------------------------------------------------------------------
 
 @Serializable
-enum class SourceFamily { TSL, LOTE, PILOT }
+enum class SourceFamily {
+    TSL,
+    LOTE
+}
+
+/** Concrete syntax and role of an ingested trust-list artifact. */
+@Serializable
+enum class TrustListFormat {
+    ETSI_TS_119_612_TRUST_LIST_XML,
+    ETSI_TS_119_612_LIST_OF_TRUST_LISTS_XML,
+    ETSI_TS_119_602_JSON,
+    ETSI_TS_119_602_XML,
+    UNKNOWN
+}
 
 // ---------------------------------------------------------------------------
 // Source assurance / freshness state
@@ -78,6 +91,7 @@ data class TrustSource(
     val sourceId: String,
     val sourceFamily: SourceFamily,
     val displayName: String,
+    val format: TrustListFormat = TrustListFormat.UNKNOWN,
     val sourceUrl: String? = null,
     val territory: String? = null,
     val issueDate: Instant? = null,
@@ -211,6 +225,7 @@ data class TrustSourceHealth(
     val sourceId: String,
     val displayName: String,
     val sourceFamily: SourceFamily,
+    val format: TrustListFormat = TrustListFormat.UNKNOWN,
     val freshnessState: FreshnessState,
     val assurance: SourceAssurance,
     val nextUpdate: Instant? = null,
@@ -229,6 +244,7 @@ data class RefreshResult(
     val entitiesLoaded: Int = 0,
     val servicesLoaded: Int = 0,
     val identitiesLoaded: Int = 0,
+    val pointersLoaded: Int = 0,
     val error: String? = null,
     val errorCode: SourceLoadErrorCode? = null,
     val assurance: SourceAssurance? = null

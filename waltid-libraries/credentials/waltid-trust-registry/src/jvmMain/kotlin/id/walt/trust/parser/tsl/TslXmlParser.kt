@@ -12,6 +12,8 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.kotlincrypto.hash.sha2.SHA256
 import java.security.cert.X509Certificate
 import kotlin.io.encoding.Base64
+import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 private val logger = KotlinLogging.logger {}
@@ -60,6 +62,9 @@ data class TslParseConfig(
  */
 object TslXmlParser {
 
+    private const val TSL_NAMESPACE = "http://uri.etsi.org/02231/v2#"
+    private const val EU_LOTL_TYPE = "http://uri.etsi.org/TrstSvc/TrustedList/TSLType/EUlistofthelists"
+
     /**
      * Parse a TSL XML document.
      *
@@ -77,6 +82,9 @@ object TslXmlParser {
     ): ParsedTslSource {
         val doc = SecureXmlParser.parseXml(xml)
         val root = doc.documentElement
+        require(root.localName == "TrustServiceStatusList" && root.namespaceURI == TSL_NAMESPACE) {
+            "Expected ETSI TS 119 612 TrustServiceStatusList in namespace $TSL_NAMESPACE"
+        }
 
         // Extract scheme information
         val schemeInfo = root.getFirstChildByLocalName("SchemeInformation")
@@ -85,6 +93,14 @@ object TslXmlParser {
         val nextUpdate = schemeInfo?.getFirstChildByLocalName("NextUpdate")?.getChildTextContent("dateTime")?.parseInstant()
         val sequenceNumber = schemeInfo?.getChildTextContent("TSLSequenceNumber")
         val versionId = schemeInfo?.getChildTextContent("TSLVersionIdentifier")
+        val tslType = schemeInfo?.getChildTextContent("TSLType")
+        val pointerCount = schemeInfo?.getFirstChildByLocalName("PointersToOtherTSL")
+            ?.getChildrenByLocalName("OtherTSLPointer")?.size ?: 0
+        val format = if (tslType == EU_LOTL_TYPE || tslType?.endsWith("listofthelists") == true) {
+            TrustListFormat.ETSI_TS_119_612_LIST_OF_TRUST_LISTS_XML
+        } else {
+            TrustListFormat.ETSI_TS_119_612_TRUST_LIST_XML
+        }
 
         // Validate signature if configured
         val signatureResult: SignatureValidationResult? = if (config.validateSignature) {
@@ -144,16 +160,23 @@ object TslXmlParser {
         val source = TrustSource(
             sourceId = sourceId,
             sourceFamily = SourceFamily.TSL,
-            displayName = "TSL $territory (seq $sequenceNumber)",
+            format = format,
+            displayName = if (format == TrustListFormat.ETSI_TS_119_612_LIST_OF_TRUST_LISTS_XML) {
+                "$territory LoTL (seq $sequenceNumber)"
+            } else {
+                "TSL $territory (seq $sequenceNumber)"
+            },
             sourceUrl = sourceUrl,
             territory = territory,
             issueDate = issueDate,
             nextUpdate = nextUpdate,
             sequenceNumber = sequenceNumber,
             assurance = assurance,
-            freshnessState = FreshnessState.UNKNOWN,
+            freshnessState = evaluateFreshness(nextUpdate),
             metadata = buildMap {
                 versionId?.let { put("tslVersion", it) }
+                tslType?.let { put("tslType", it) }
+                put("pointerCount", pointerCount.toString())
                 signatureResult?.signerCertificate?.let { cert ->
                     put("signerSubjectDN", cert.subjectX500Principal.name)
                     put("signerIssuerDN", cert.issuerX500Principal.name)
@@ -208,8 +231,9 @@ object TslXmlParser {
                     val x509Cert = digitalIdElement.getChildTextContent("X509Certificate")
                     val x509Ski = digitalIdElement.getChildTextContent("X509SKI")
                     val x509SubjectName = digitalIdElement.getChildTextContent("X509SubjectName")
+                    val otherId = digitalIdElement.getChildTextContent("Other")
 
-                    if (x509Cert != null || x509Ski != null || x509SubjectName != null) {
+                    if (x509Cert != null || x509Ski != null || x509SubjectName != null || otherId != null) {
                         val identityId = "$serviceId::id-$idIdx"
                         identities += ServiceIdentity(
                             identityId = identityId,
@@ -218,10 +242,11 @@ object TslXmlParser {
                             serviceId = serviceId,
                             certificateDerBase64 = x509Cert?.replace("\\s".toRegex(), ""),
                             certificateSha256Hex = x509Cert?.let { computeCertSha256(it) },
-                            subjectKeyIdentifierHex = x509Ski,
+                            subjectKeyIdentifierHex = x509Ski?.let(::decodeBase64Hex),
                             subjectDn = x509SubjectName,
                             metadata = buildMap {
                                 if (x509Cert != null) put("hasX509Certificate", "true")
+                                otherId?.let { put("otherId", it) }
                             }
                         )
                     }
@@ -258,13 +283,30 @@ object TslXmlParser {
         }.getOrNull()
     }
 
+    private fun decodeBase64Hex(value: String): String = runCatching {
+        Base64.decode(value.filterNot(Char::isWhitespace))
+            .joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
+    }.getOrElse { value }
+
+    private fun evaluateFreshness(nextUpdate: Instant?): FreshnessState {
+        nextUpdate ?: return FreshnessState.UNKNOWN
+        val now = Clock.System.now()
+        return when {
+            now > nextUpdate -> FreshnessState.EXPIRED
+            now > nextUpdate.minus(Duration.parse("24h")) -> FreshnessState.STALE
+            else -> FreshnessState.FRESH
+        }
+    }
+
     private fun mapTslStatus(uri: String): TrustStatus {
         val lower = uri.lowercase()
         return when {
             "granted" in lower -> TrustStatus.GRANTED
-            "recognized" in lower -> TrustStatus.RECOGNIZED
+            "recognized" in lower || "recognised" in lower -> TrustStatus.RECOGNIZED
             "accredited" in lower -> TrustStatus.ACCREDITED
             "undersupervision" in lower || "supervised" in lower -> TrustStatus.SUPERVISED
+            "accreditationrevoked" in lower -> TrustStatus.REVOKED
+            "accreditationceased" in lower || "supervisionceased" in lower -> TrustStatus.WITHDRAWN
             "deprecatedbynationallaw" in lower || "deprecated" in lower -> TrustStatus.DEPRECATED
             "suspended" in lower -> TrustStatus.SUSPENDED
             "revoked" in lower -> TrustStatus.REVOKED

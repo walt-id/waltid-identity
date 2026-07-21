@@ -4,9 +4,26 @@ Kotlin/JVM library for loading trust lists and resolving certificates, certifica
 
 Supported inputs:
 
-- ETSI TS 119 612 Trust List XML
-- Provisional LoTE JSON and XML used by current EUDI pilots
-- LoTE JSON in a compact-JWS envelope
+- ETSI TS 119 612 Trust List and List of Trusted Lists XML
+- ETSI TS 119 602 V1.1.1 JSON, validated against the ETSI Annex A.1 schema
+- ETSI TS 119 602 V1.1.1 XML, validated against the ETSI Annex A.2.1 XSD
+- TS 119 602 JSON in a compact-JWS envelope
+
+Other JSON/XML shapes are rejected.
+
+## Standards status
+
+| Area | Status |
+|---|---|
+| TS 119 602 Annex A.1 JSON syntax | ETSI JSON Schema validation and normalization implemented |
+| TS 119 602 Annex A.2.1 XML syntax | Offline ETSI XSD validation and normalization implemented |
+| TS 119 602 Annex A.2.2 / TS 119 612 XML | Ingestion implemented |
+| RFC 7515 compact JWS integrity | Implemented for embedded ECDSA payloads |
+| TS 119 602 profile rules, annexes D–I | Conformance test expansion required |
+| JAdES Baseline B / XAdES-B-B profile validation | Not complete; cryptographic signature validation alone is not a conformance claim |
+
+The library must not be described as fully ETSI-conformant until the remaining profile rules and AdES validation are
+implemented and verified against an independent conformance suite.
 
 ## Security model
 
@@ -96,13 +113,23 @@ check(result.assurance?.authenticityState == AuthenticityState.INTEGRITY_VERIFIE
 
 For `AUTHENTICATED`, use `REQUIRE_AUTHENTICATED` and configure independently trusted TSL signer certificates.
 
+The parser distinguishes a national trust list from the EU List of Trusted Lists (LoTL):
+
+```kotlin
+check(result.format == TrustListFormat.ETSI_TS_119_612_TRUST_LIST_XML)
+```
+
+For the EU LoTL, `result.format` is `ETSI_TS_119_612_LIST_OF_TRUST_LISTS_XML` and
+`result.pointersLoaded` reports the number of `OtherTSLPointer` entries. The library does not automatically fetch the
+member-state lists referenced by those pointers; register and load each required national list explicitly.
+
 ### Explicitly allow an unsigned list
 
 Unsigned LoTE inputs require an explicit policy:
 
 ```kotlin
 val result = registry.loadSourceFromContent(
-    sourceId = "pilot-lote",
+    sourceId = "wallet-providers",
     content = loteJson,
     options = SourceLoadOptions(
         acceptancePolicy = SourceAcceptancePolicy.ALLOW_UNSIGNED
@@ -143,9 +170,14 @@ Failed refreshes do not replace the active source snapshot. `RefreshResult` prov
 
 - Boolean `validateSignature` loading methods remain temporarily available but are deprecated. New integrations should use `SourceLoadOptions`.
 - Persisted sources created before the assurance model must be refreshed or migrated; missing assurance is treated as not admitted.
-- The LoTE JSON/XML shapes are provisional pilot formats, not claims of final ETSI schema conformance.
 - Compact JWS support validates embedded payloads and pinned X.509 signers; it is not full JAdES support.
 - `InMemoryTrustStore` is thread-safe but not persistent. Production deployments should provide a persistent `TrustStore` implementation.
+
+Useful public test sources:
+
+- Austria TSL: `https://www.signatur.rtr.at/vertrauensliste.xml`
+- Italy TSL: `https://eidas.agid.gov.it/TL/TSL-IT.xml`
+- EU LoTL: `https://ec.europa.eu/tools/lotl/eu-lotl.xml`
 
 ## Tests
 
@@ -155,3 +187,10 @@ Failed refreshes do not replace the active source snapshot. `RefreshResult` prov
 ```
 
 Network tests are disabled by default. Enable them explicitly with `RUN_NETWORK_TESTS=true`.
+
+Normative references:
+
+- ETSI TS 119 602 V1.1.1: <https://www.etsi.org/deliver/etsi_ts/119600_119699/119602/01.01.01_60/ts_119602v010101p.pdf>
+- ETSI schemas, pinned in the implementation to commit `e84f427f0cde99513b574ef4b5a155ac4a38eab6`:
+  <https://forge.etsi.org/rep/esi/x19_60201_lists_of_trusted_entities>
+- ETSI TS 119 612 V2.4.1: <https://www.etsi.org/deliver/etsi_ts/119600_119699/119612/02.04.01_60/ts_119612v020401p.pdf>

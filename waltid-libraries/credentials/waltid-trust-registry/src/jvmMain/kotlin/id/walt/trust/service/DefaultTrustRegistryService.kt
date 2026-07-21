@@ -4,6 +4,7 @@ import id.walt.trust.fetcher.SourceFetcher
 import id.walt.trust.fetcher.SourceFormat
 import id.walt.trust.model.*
 import id.walt.trust.parser.lote.LoteJsonParser
+import id.walt.trust.parser.lote.LoteXmlParseConfig
 import id.walt.trust.parser.lote.LoteXmlParser
 import id.walt.trust.parser.tsl.TslXmlParser
 import id.walt.trust.signature.CompactJwsValidator
@@ -282,6 +283,7 @@ class DefaultTrustRegistryService(
                 sourceId = source.sourceId,
                 displayName = source.displayName,
                 sourceFamily = source.sourceFamily,
+                format = source.format,
                 freshnessState = evaluateFreshness(source, now()),
                 assurance = source.assurance,
                 nextUpdate = source.nextUpdate,
@@ -329,7 +331,15 @@ class DefaultTrustRegistryService(
             )
         }
 
-        registerSource(sourceId, url, detectSourceFamily(fetchResult.content), options)
+        val sourceFamily = runCatching { detectSourceFamily(fetchResult.content) }.getOrElse { error ->
+            return RefreshResult(
+                sourceId = sourceId,
+                success = false,
+                error = error.message ?: "Unknown source format",
+                errorCode = SourceLoadErrorCode.UNKNOWN_FORMAT
+            )
+        }
+        registerSource(sourceId, url, sourceFamily, options)
         return loadSourceFromContentInternal(sourceId, fetchResult.content, url, options)
     }
 
@@ -465,18 +475,35 @@ class DefaultTrustRegistryService(
 
                 (sourceContent.contains("ListOfTrustedEntities") || sourceContent.contains("TrustedEntity")) && format == SourceFormat.XML -> {
                     log.info { "Parsing LoTE XML for source: $sourceId" }
-                    val result = LoteXmlParser.parse(sourceContent, sourceId, sourceUrl)
+                    require(LoteXmlParser.isNormative(sourceContent)) {
+                        "Expected the ETSI TS 119 602 Annex A.2.1 XML binding"
+                    }
+                    val requireTrustedSigner = options.acceptancePolicy == SourceAcceptancePolicy.REQUIRE_AUTHENTICATED
+                    val result = LoteXmlParser.parse(
+                        sourceContent, sourceId, sourceUrl,
+                        LoteXmlParseConfig(
+                            validateSignature = verifySignatures,
+                            signatureConfig = SignatureValidationConfig(
+                                requireTrustedCertificate = requireTrustedSigner,
+                                trustedAnchors = options.trustedSignerCertificates.map(::parseCertificate).toSet()
+                            ),
+                            requireSignature = options.acceptancePolicy in setOf(
+                                SourceAcceptancePolicy.REQUIRE_AUTHENTICATED,
+                                SourceAcceptancePolicy.REQUIRE_VALID_SIGNATURE
+                            )
+                        )
+                    )
                     ParsedContent(result.source, result.entities, result.services, result.identities)
                 }
 
                 format == SourceFormat.JSON -> {
                     log.info { "Parsing LoTE JSON for source: $sourceId" }
+                    require(LoteJsonParser.isNormative(sourceContent)) {
+                        "Expected the ETSI TS 119 602 Annex A.1 JSON binding"
+                    }
                     val result = LoteJsonParser.parse(
-                        sourceContent,
-                        sourceId,
-                        sourceUrl,
-                        envelope.assurance,
-                        envelope.validationMetadata
+                        sourceContent, sourceId, sourceUrl,
+                        envelope.assurance, envelope.validationMetadata
                     )
                     ParsedContent(result.source, result.entities, result.services, result.identities)
                 }
@@ -532,6 +559,7 @@ class DefaultTrustRegistryService(
                 entitiesLoaded = parsed.entities.size,
                 servicesLoaded = parsed.services.size,
                 identitiesLoaded = parsed.identities.size,
+                pointersLoaded = parsed.source.metadata["pointerCount"]?.toIntOrNull() ?: 0,
                 assurance = finalAssurance
             )
         } catch (e: Exception) {
@@ -768,7 +796,9 @@ class DefaultTrustRegistryService(
             content.contains("TrustServiceStatusList") || content.contains("TrustServiceProviderList") -> SourceFamily.TSL
             content.contains("ListOfTrustedEntities") || content.contains("TrustedEntity") -> SourceFamily.LOTE
             content.trimStart().startsWith("{") || content.trimStart().startsWith("[") -> SourceFamily.LOTE
-            else -> SourceFamily.PILOT
+            else -> throw IllegalArgumentException(
+                "Unknown trust-list format; expected ETSI TS 119 612 XML or ETSI TS 119 602 JSON/XML"
+            )
         }
     }
 

@@ -161,7 +161,7 @@ class Wal1186TrustRegistryTest {
             content = lote(chain.root),
             options = SourceLoadOptions(SourceAcceptancePolicy.ALLOW_UNSIGNED)
         )
-        val decision = service.resolveByProviderId("wal-1186-root", Clock.System.now())
+        val decision = service.resolveByProviderId("https://example.org/ListOfTrustedEntities/wal-1186-root", Clock.System.now())
 
         assertTrue(result.success, result.error)
         assertEquals(AuthenticityState.UNVERIFIED, result.assurance?.authenticityState)
@@ -202,26 +202,56 @@ class Wal1186TrustRegistryTest {
     }
 
     private fun lote(root: X509Certificate): String = buildJsonObject {
-        put("listMetadata", buildJsonObject {
-            put("listId", JsonPrimitive("wal-1186-test"))
-            put("listType", JsonPrimitive("trust-anchors"))
-            put("territory", JsonPrimitive("AT"))
-            put("nextUpdate", JsonPrimitive("2099-01-01T00:00:00Z"))
-        })
-        put("trustedEntities", buildJsonArray {
-            add(buildJsonObject {
-                put("entityId", JsonPrimitive("wal-1186-root"))
-                put("entityType", JsonPrimitive("TRUST_SERVICE_PROVIDER"))
-                put("legalName", JsonPrimitive("WAL-1186 Root"))
-                put("services", buildJsonArray {
-                    add(buildJsonObject {
-                        put("serviceId", JsonPrimitive("ca"))
-                        put("serviceType", JsonPrimitive("http://uri.etsi.org/TrstSvc/Svctype/CA/QC"))
-                        put("status", JsonPrimitive("GRANTED"))
-                        put("identities", buildJsonArray {
+        put("LoTE", buildJsonObject {
+            put("ListAndSchemeInformation", buildJsonObject {
+                put("LoTEVersionIdentifier", JsonPrimitive(1))
+                put("LoTESequenceNumber", JsonPrimitive(1))
+                put("LoTEType", JsonPrimitive("http://uri.etsi.org/19602/LoTEType/EUPIDProvidersList"))
+                put("SchemeOperatorName", buildJsonArray { add(multilingual("WAL-1186 Test Operator")) })
+                put("SchemeTerritory", JsonPrimitive("AT"))
+                put("ListIssueDateTime", JsonPrimitive("2026-01-01T00:00:00Z"))
+                put("NextUpdate", JsonPrimitive("2099-01-01T00:00:00Z"))
+            })
+            put("TrustedEntitiesList", buildJsonArray {
+                add(buildJsonObject {
+                    put("TrustedEntityInformation", buildJsonObject {
+                        put("TEName", buildJsonArray { add(multilingual("WAL-1186 Root")) })
+                        put("TEAddress", buildJsonObject {
+                            put("TEPostalAddress", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("lang", JsonPrimitive("en"))
+                                    put("StreetAddress", JsonPrimitive("Example street 1"))
+                                    put("Locality", JsonPrimitive("Vienna"))
+                                    put("Country", JsonPrimitive("AT"))
+                                })
+                            })
+                            put("TEElectronicAddress", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("lang", JsonPrimitive("en"))
+                                    put("uriValue", JsonPrimitive("https://example.org"))
+                                })
+                            })
+                        })
+                        put("TEInformationURI", buildJsonArray {
                             add(buildJsonObject {
-                                put("matchType", JsonPrimitive("CERTIFICATE_DER"))
-                                put("value", JsonPrimitive(TestCertificates.derBase64(root)))
+                                put("lang", JsonPrimitive("en"))
+                                put("uriValue", JsonPrimitive("https://example.org/ListOfTrustedEntities/wal-1186-root"))
+                            })
+                        })
+                    })
+                    put("TrustedEntityServices", buildJsonArray {
+                        add(buildJsonObject {
+                            put("ServiceInformation", buildJsonObject {
+                                put("ServiceName", buildJsonArray { add(multilingual("Test CA")) })
+                                put("ServiceDigitalIdentity", buildJsonObject {
+                                    put("X509Certificates", buildJsonArray {
+                                        add(buildJsonObject {
+                                            put("val", JsonPrimitive(TestCertificates.derBase64(root)))
+                                        })
+                                    })
+                                })
+                                put("ServiceTypeIdentifier", JsonPrimitive("http://uri.etsi.org/TrstSvc/Svctype/CA/QC"))
+                                put("ServiceStatus", JsonPrimitive("http://uri.etsi.org/TrstSvc/TrustedList/Svcstatus/granted"))
                             })
                         })
                     })
@@ -229,6 +259,11 @@ class Wal1186TrustRegistryTest {
             })
         })
     }.toString()
+
+    private fun multilingual(value: String) = buildJsonObject {
+        put("lang", JsonPrimitive("en"))
+        put("value", JsonPrimitive(value))
+    }
 
     private fun compactJws(
         payload: String,
