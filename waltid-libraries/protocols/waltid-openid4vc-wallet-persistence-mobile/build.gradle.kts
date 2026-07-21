@@ -60,8 +60,17 @@ kotlin {
         }
         if (enableAndroidBuild) {
             androidMain.dependencies {
+                implementation(identityLibs.androidx.biometric)
                 implementation(identityLibs.sqldelight.android.driver)
                 implementation(identityLibs.sqlcipher.android)
+            }
+            named("androidDeviceTest") {
+                dependencies {
+                    implementation(kotlin("test"))
+                    implementation(identityLibs.kotlinx.coroutines.test)
+                    implementation(identityLibs.androidx.test.ext.junit)
+                    implementation(identityLibs.androidx.test.runner)
+                }
             }
         }
         if (enableIosBuild) {

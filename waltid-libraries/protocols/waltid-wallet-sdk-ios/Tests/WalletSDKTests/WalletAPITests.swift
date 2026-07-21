@@ -8,6 +8,11 @@ final class WalletAPITests: XCTestCase {
         acceptsSendable(configuration)
         XCTAssertEqual(configuration.walletID, "default")
         XCTAssertEqual(configuration.defaultKeyType, .secp256r1)
+        XCTAssertEqual(configuration.defaultKeyUseAuthorizationPolicy, .none)
+        XCTAssertEqual(
+            configuration.keyUseAuthorizationPrompt,
+            .init(message: "Please authorize cryptographic signature", cancelText: "Cancel")
+        )
         XCTAssertTrue(configuration.persistence.databaseKey.isManaged)
         XCTAssertNil(configuration.persistence.stores.credentials)
         XCTAssertNil(configuration.persistence.stores.dids)
@@ -221,6 +226,10 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(result, .init(keyID: "key-1", did: "did:jwk:abc"))
         XCTAssertEqual(bridge.bootstrapCalls.count, 1)
         XCTAssertEqual(bridge.bootstrapCalls.first?.keyType, .ed25519)
+        XCTAssertEqual(
+            bridge.bootstrapCalls.first?.keyUseAuthorizationPolicy,
+            WalletKeyUseAuthorizationPolicy.none
+        )
         XCTAssertEqual(bridge.bootstrapCalls.first?.didMethod, "jwk")
     }
 
@@ -234,6 +243,59 @@ final class WalletAPITests: XCTestCase {
         _ = try await wallet.bootstrap(keyType: .rsa4096)
 
         XCTAssertEqual(bridge.bootstrapCalls.first?.keyType, .rsa4096)
+    }
+
+    func testBootstrapForwardsConfiguredAuthorizationPolicy() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(
+            configuration: .init(
+                defaultKeyUseAuthorizationPolicy: .biometricCurrentSet
+            ),
+            bridge: bridge
+        )
+
+        _ = try await wallet.bootstrap()
+
+        XCTAssertEqual(
+            bridge.bootstrapCalls.first?.keyUseAuthorizationPolicy,
+            .biometricCurrentSet
+        )
+    }
+
+    func testKeysAndAuthorizationCapabilityAreSwiftFriendly() async throws {
+        let bridge = FakeWalletCoreBridge()
+        bridge.keysResult = [
+            WalletKeyInfo(
+                keyID: "protected-key",
+                keyType: .secp256r1,
+                algorithm: "ES256",
+                requestedKeyUseAuthorizationPolicy: .biometricCurrentSet,
+                effectiveKeyUseAuthorizationPolicy: .biometricCurrentSet,
+                isPlatformBacked: true,
+                effectiveHardwareBacking: .secureEnclave
+            )
+        ]
+        bridge.capabilityResult = .init(
+            platform: "iOS",
+            keyType: .secp256r1,
+            keyUseAuthorizationPolicy: .biometricCurrentSet,
+            supported: true,
+            platformBackingAvailable: true,
+            secureHardwareRequired: true,
+            secureHardwareAvailable: true,
+            effectiveHardwareBacking: .secureEnclave
+        )
+        let wallet = Wallet(bridge: bridge)
+
+        let keys = try await wallet.keys()
+        let capability = try await wallet.keyUseAuthorizationCapability(
+            keyUseAuthorizationPolicy: .biometricCurrentSet
+        )
+
+        XCTAssertEqual(keys.single?.effectiveKeyUseAuthorizationPolicy, .biometricCurrentSet)
+        XCTAssertEqual(keys.single?.effectiveHardwareBacking, .secureEnclave)
+        XCTAssertTrue(capability.supported)
+        XCTAssertEqual(capability.effectiveHardwareBacking, .secureEnclave)
     }
 
     func testResolveOfferForwardsOfferAndReturnsResolution() async throws {
@@ -623,6 +685,7 @@ private extension Array {
 private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     struct BootstrapCall {
         let keyType: WalletKeyType
+        let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
         let didMethod: String
     }
 
@@ -655,6 +718,16 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     var events: AsyncStream<WalletEvent>
     var error: WalletError?
     var bootstrapResult = WalletBootstrapResult(keyID: "key", did: "did:key:wallet")
+    var keysResult: [WalletKeyInfo] = []
+    var capabilityResult = WalletKeyAuthorizationCapability(
+        platform: "iOS",
+        keyType: .secp256r1,
+        keyUseAuthorizationPolicy: .none,
+        supported: true,
+        platformBackingAvailable: true,
+        secureHardwareRequired: false,
+        secureHardwareAvailable: nil
+    )
     var offerResolutionResult = OfferResolution(
         transactionCodeRequired: false,
         credentialIssuer: "https://issuer.example",
@@ -687,13 +760,40 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         }
     }
 
-    func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult {
+    func bootstrap(
+        keyType: WalletKeyType,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy,
+        didMethod: String
+    ) async throws -> WalletBootstrapResult {
         if let error {
             throw error
         }
 
-        bootstrapCalls.append(.init(keyType: keyType, didMethod: didMethod))
+        bootstrapCalls.append(
+            .init(
+                keyType: keyType,
+                keyUseAuthorizationPolicy: keyUseAuthorizationPolicy,
+                didMethod: didMethod
+            )
+        )
         return bootstrapResult
+    }
+
+    func keys() async throws -> [WalletKeyInfo] {
+        if let error {
+            throw error
+        }
+        return keysResult
+    }
+
+    func keyUseAuthorizationCapability(
+        keyType: WalletKeyType,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+    ) async throws -> WalletKeyAuthorizationCapability {
+        if let error {
+            throw error
+        }
+        return capabilityResult
     }
 
     func resolveOffer(offer: URL) async throws -> OfferResolution {

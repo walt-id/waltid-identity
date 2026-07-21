@@ -2,19 +2,29 @@ package id.walt.crypto
 
 import at.asitplus.signum.indispensable.josef.io.joseCompliantSerializer
 import at.asitplus.signum.indispensable.josef.toJsonWebKey
+import at.asitplus.signum.supreme.CFCryptoOperationFailed
 import at.asitplus.signum.supreme.SignatureResult
 import at.asitplus.signum.supreme.dsl.REQUIRED
+import at.asitplus.signum.supreme.os.IosSigner
 import at.asitplus.signum.supreme.os.IosKeychainProvider
 import dev.whyoleg.cryptography.CryptographyProvider
 import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyHardwareBacking
 import id.walt.crypto.keys.KeyMeta
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyUseAuthorizationAware
+import id.walt.crypto.keys.KeyUseAuthorizationException
+import id.walt.crypto.keys.KeyUseAuthorizationFailure
+import id.walt.crypto.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto.keys.KeyUseAuthorizationPrompt
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import platform.Security.errSecItemNotFound
 import kotlin.io.encoding.Base64
+import kotlin.time.Duration
 import kotlin.uuid.Uuid
 
 sealed class IosKey : Key() {
@@ -22,38 +32,41 @@ sealed class IosKey : Key() {
     class Options(
         val kid: String = Uuid.random().toString(),
         val keyType: KeyType,
-        val inSecureElement: Boolean = false
+        val inSecureElement: Boolean = false,
+        val keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+        val authorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
     ) {
         init {
             if (inSecureElement) {
                 require(keyType == KeyType.secp256r1) { "kid: $kid, Error: Only KeyType.secp256r1 can be stored in secure element." }
             }
+            requireSupportedProtectedCombination()
         }
     }
 
     class Platform internal constructor(
         private val options: Options,
         override val hasPrivateKey: Boolean = true,
-    ) : IosKey() {
+    ) : IosKey(), KeyUseAuthorizationAware {
 
         companion object {
             suspend fun create(options: Options): Platform {
                 when (val curve = options.keyType.toPlatformKeyStoreCurve()) {
                     null -> IosKeychainProvider.createSigningKey(options.kid) {
                         rsa { }
+                        configureProtection(options)
                     }.getOrThrow()
                     else -> IosKeychainProvider.createSigningKey(options.kid) {
                         ec { this.curve = curve }
-                        if (options.inSecureElement) {
-                            hardware { backing = REQUIRED }
-                        }
+                        configureProtection(options)
                     }.getOrThrow()
                 }
                 return Platform(options)
             }
 
             suspend fun load(options: Options): Platform {
-                IosKeychainProvider.getSignerForKey(options.kid).getOrThrow()
+                runCatching { options.loadSigner() }
+                    .getOrElse { throw options.mapPlatformFailure(it) }
                 return Platform(options)
             }
 
@@ -63,8 +76,11 @@ sealed class IosKey : Key() {
         }
 
         override val keyType get() = options.keyType
+        override val keyUseAuthorizationPolicy get() = options.keyUseAuthorizationPolicy
+        override val isPlatformBacked: Boolean = true
 
-        private suspend fun signer() = IosKeychainProvider.getSignerForKey(options.kid).getOrThrow()
+        private suspend fun signer(): IosSigner = runCatching { options.loadSigner() }
+            .getOrElse { throw options.mapPlatformFailure(it) }
 
         override suspend fun getKeyId(): String = options.kid
 
@@ -86,15 +102,22 @@ sealed class IosKey : Key() {
 
         override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): Any {
             check(hasPrivateKey) { "Only private key can do signing." }
-            val result = signer().sign(plaintext)
-            check(result is SignatureResult.Success) { "Signing failed: $result" }
-            return result.signature.rawByteArray
+            return signer().sign(plaintext).mapPlatformFailure(options).signatureBytesOrThrow(
+                protectedKeyUse = options.keyUseAuthorizationPolicy != KeyUseAuthorizationPolicy.None,
+            )
         }
 
         override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
             check(hasPrivateKey) { "Only private key can do signing." }
             val signer = signer()
-            return signJwsWithPlatformSigner(options.keyType, plaintext, headers) { data -> signer.sign(data) }
+            return signJwsWithPlatformSigner(
+                options.keyType,
+                plaintext,
+                headers,
+                protectedKeyUse = options.keyUseAuthorizationPolicy != KeyUseAuthorizationPolicy.None,
+            ) { data ->
+                signer.sign(data).mapPlatformFailure(options)
+            }
         }
 
         override suspend fun verifyRaw(
@@ -112,6 +135,8 @@ sealed class IosKey : Key() {
         override suspend fun getPublicKey(): Key = Platform(options, hasPrivateKey = false)
         override suspend fun getPublicKeyRepresentation(): ByteArray = signer().publicKey.encodeToTlv().derEncoded
         override suspend fun getMeta(): KeyMeta = JwkKeyMeta(getKeyId())
+        override suspend fun effectiveHardwareBacking(): KeyHardwareBacking =
+            if (options.inSecureElement) KeyHardwareBacking.SecureEnclave else KeyHardwareBacking.Platform
         override suspend fun deleteKey(): Boolean = runCatching {
             IosKeychainProvider.deleteSigningKey(options.kid).getOrThrow()
         }.isSuccess
@@ -164,4 +189,86 @@ sealed class IosKey : Key() {
         override suspend fun getMeta(): KeyMeta = delegate.getMeta()
         override suspend fun deleteKey(): Boolean = delegate.deleteKey()
     }
+}
+
+private fun at.asitplus.signum.supreme.os.IosSigningKeyConfiguration.configureProtection(options: IosKey.Options) {
+    if (options.inSecureElement || options.keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.BiometricCurrentSet) {
+        hardware {
+            backing = REQUIRED
+            if (options.keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.BiometricCurrentSet) {
+                protection {
+                    factors {
+                        biometry = true
+                        biometryWithNewFactors = false
+                        deviceLock = false
+                    }
+                    timeout = Duration.ZERO
+                }
+            }
+        }
+    }
+    signer {
+        unlockPrompt {
+            message = options.authorizationPrompt.message
+            cancelText = options.authorizationPrompt.cancelText
+        }
+    }
+}
+
+private suspend fun IosKey.Options.loadSigner(): IosSigner {
+    val signer = IosKeychainProvider.getSignerForKey(kid) {
+        unlockPrompt {
+            message = authorizationPrompt.message
+            cancelText = authorizationPrompt.cancelText
+        }
+    }.getOrThrow()
+    if (
+        keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.BiometricCurrentSet &&
+        (!signer.needsAuthentication || !signer.needsAuthenticationForEveryUse)
+    ) {
+        throw KeyUseAuthorizationException(
+            failure = KeyUseAuthorizationFailure.ProtectedKeyInvalidated,
+            message = "The stored key does not enforce biometric authorization for every use",
+        )
+    }
+    return signer
+}
+
+private fun IosKey.Options.requireSupportedProtectedCombination() {
+    if (keyUseAuthorizationPolicy != KeyUseAuthorizationPolicy.BiometricCurrentSet) return
+    if (keyType != KeyType.secp256r1 || !inSecureElement) {
+        throw KeyUseAuthorizationException(
+            failure = KeyUseAuthorizationFailure.UnsupportedCombination,
+            message = "iOS biometric current-set authorization requires a Secure Enclave secp256r1 key",
+        )
+    }
+}
+
+@OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+internal fun IosKey.Options.mapPlatformFailure(throwable: Throwable): Throwable {
+    if (keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.None) return throwable
+    val causes = generateSequence(throwable as Throwable?) { it.cause }.toList()
+    return when {
+        causes.any { it is NoSuchElementException } -> KeyUseAuthorizationException(
+            failure = KeyUseAuthorizationFailure.ProtectedKeyMissing,
+            message = "The protected key is missing",
+            cause = throwable,
+        )
+
+        // BiometryCurrentSet invalidation can leave Signum's public-key metadata present while the
+        // OS makes the protected private key inaccessible as an absent Keychain item.
+        causes.filterIsInstance<CFCryptoOperationFailed>().any { it.osStatus == errSecItemNotFound } ->
+            KeyUseAuthorizationException(
+                failure = KeyUseAuthorizationFailure.ProtectedKeyInvalidated,
+                message = "The protected key is no longer usable under its biometric current-set policy",
+                cause = throwable,
+            )
+
+        else -> throwable
+    }
+}
+
+private fun SignatureResult<*>.mapPlatformFailure(options: IosKey.Options): SignatureResult<*> = when (this) {
+    is SignatureResult.Error -> SignatureResult.Error(options.mapPlatformFailure(exception))
+    else -> this
 }

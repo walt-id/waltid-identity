@@ -33,6 +33,52 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 - List credentials stored in mobile persistence.
 - Present credentials using OpenID4VP.
 - Support mobile issuance flows using OAuth 2.0 client attestation.
+- Optionally require OS-enforced biometric authorization for every use of a newly created P-256 signing key.
+
+## Per-key biometric authorization
+
+`None` remains the default and preserves existing signing behavior. To protect a newly created signing
+key, configure `BiometricCurrentSet` and preflight the active device before bootstrap:
+
+```kotlin
+val config = MobileWalletConfig(
+    walletId = "consumer-wallet",
+    defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+    keyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(
+        message = "Authorize wallet signing",
+        cancelText = "Cancel"
+    )
+)
+val wallet = MobileWalletFactory(activity).create(config)
+val capability = wallet.keyUseAuthorizationCapability()
+
+if (capability.supported) {
+    wallet.bootstrap()
+}
+```
+
+The protected portable combination is P-256 plus `BiometricCurrentSet`. Android uses an auth-per-use
+Android Keystore key restricted to strong biometrics; the factory must receive an interactive
+`FragmentActivity`, not an application context. iOS uses a P-256 Secure Enclave key bound to the
+current Face ID or Touch ID enrollment set and therefore requires a qualifying physical device.
+Protected non-P-256 requests fail without software fallback.
+
+`MobileWalletFactory(activity)` weakly references that activity. If the wallet outlives one activity
+instance, use `MobileWalletFactory(applicationContext) { activityTracker.currentFragmentActivity }`
+so protected operations resolve the current prompt host after configuration changes.
+
+This setting applies only when a key is created. It does not reclassify, replace, or rotate an existing
+key. Inspect `wallet.keys()` for each key's requested and effective policy and effective hardware
+backing when the platform can report it reliably. Changing the default affects future keys only.
+
+The operating system owns the biometric prompt; the SDK adds no custom biometric UI and accepts no
+device-passcode fallback. Authentication is required for each signing operation. With the currently
+pinned Signum version, Android cancellation, lockout, and some prompt errors are intentionally exposed
+as the stable `AuthorizationFailed` outcome because they cannot be distinguished without parsing
+unstable messages. No failed authorization is retried with an unprotected key.
+
+Key-use authorization is separate from wallet launch or app unlock. Platform biometrics and secure
+key storage alone do not establish WSCD, LoA High, ISO 18045, EUDI, or HAIP certification.
 
 ## Receiving credentials
 
@@ -114,7 +160,13 @@ val config = MobileWalletConfig(
 ```
 <!-- doc-snippet:end kotlin-custom-credential-store -->
 
-KMP consumers can override all wallet stores. Key storage and key generation are configured together so platform-managed signing keys cannot be accidentally mixed with app-owned key persistence:
+KMP consumers can override all wallet stores. Key storage and key generation are configured together
+so platform-managed signing keys cannot be accidentally mixed with app-owned key persistence. The
+legacy `(KeyType) -> Key` generator supports `None` only; protected requests require an
+authorization-aware request generator and capability implementation and are never inferred from the
+legacy callback. A custom key store must also override `supportsKeyUseAuthorizationMetadata` and the
+metadata-aware `addKey` overload only after it preserves and enforces the requested policy; otherwise
+protected bootstrap fails before generating a key:
 
 <!-- doc-snippet:start kotlin-full-store-overrides -->
 ```kotlin

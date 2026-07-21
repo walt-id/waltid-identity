@@ -4,6 +4,10 @@ package id.walt.wallet2.mobile
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyUseAuthorizationAware
+import id.walt.crypto.keys.KeyUseAuthorizationException
+import id.walt.crypto.keys.KeyUseAuthorizationFailure
+import id.walt.crypto.keys.KeyUseAuthorizationPolicy
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
@@ -13,6 +17,7 @@ import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.PresentationCredentialOption
@@ -27,6 +32,9 @@ import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
+import id.walt.wallet2.persistence.keys.PlatformKeyCapability
+import id.walt.wallet2.persistence.keys.PlatformKeyGenerationRequest
+import id.walt.wallet2.persistence.keys.PlatformKeyPlatform
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
@@ -160,13 +168,61 @@ public class MobileWallet internal constructor(
     private val keyStore: WalletKeyStore,
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
-    private val keyGenerator: suspend (KeyType) -> Key,
+    private val keyGenerator: suspend (PlatformKeyGenerationRequest) -> Key,
+    private val keyCapability: suspend (KeyType, KeyUseAuthorizationPolicy) -> PlatformKeyCapability,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
+    private val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
     attestationConfig: WalletAttestationConfig? = null,
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {
+    /** Source-compatible constructor for existing unprotected custom key generators. */
+    internal constructor(
+        walletId: String,
+        keyStore: WalletKeyStore,
+        didStore: WalletDidStore,
+        credentialStore: WalletCredentialStore,
+        keyGenerator: suspend (KeyType) -> Key,
+        defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
+        attestationConfig: WalletAttestationConfig? = null,
+        transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+        onEvent: suspend (MobileWalletEvent) -> Unit = {},
+        deleteLocalPersistence: suspend () -> Unit = {},
+    ) : this(
+        walletId = walletId,
+        keyStore = keyStore,
+        didStore = didStore,
+        credentialStore = credentialStore,
+        keyGenerator = { request ->
+            if (request.keyUseAuthorizationPolicy != KeyUseAuthorizationPolicy.None) {
+                throw KeyUseAuthorizationException(
+                    failure = KeyUseAuthorizationFailure.UnsupportedCombination,
+                    message = "The legacy key generator cannot enforce protected key-use authorization",
+                )
+            }
+            keyGenerator(request.keyType)
+        },
+        keyCapability = { keyType, policy ->
+            PlatformKeyCapability(
+                platform = PlatformKeyPlatform.Custom,
+                keyType = keyType,
+                keyUseAuthorizationPolicy = policy,
+                supported = policy == KeyUseAuthorizationPolicy.None,
+                platformBackingAvailable = false,
+                secureHardwareRequired = false,
+                secureHardwareAvailable = null,
+                failure = KeyUseAuthorizationFailure.UnsupportedCombination
+                    .takeIf { policy != KeyUseAuthorizationPolicy.None },
+            )
+        },
+        defaultKeyType = defaultKeyType,
+        attestationConfig = attestationConfig,
+        transactionDataProfiles = transactionDataProfiles,
+        onEvent = onEvent,
+        deleteLocalPersistence = deleteLocalPersistence,
+    )
+
     private val eventStream = MobileWalletEventStream()
 
     /**
@@ -198,6 +254,7 @@ public class MobileWallet internal constructor(
      * If the wallet already contains persisted DIDs, the first persisted DID and key are reused.
      *
      * @param keyType Optional key type override. When omitted, [MobileWalletConfig.defaultKeyType] is used.
+     * @param keyUseAuthorizationPolicy Optional immutable policy override for a newly created key.
      * @param didMethod DID method used for registering a new DID. The default `key` method is handled locally.
      * @return The key identifier and DID used by this wallet.
      * @throws IllegalArgumentException When persisted DID state exists without a persisted key.
@@ -205,6 +262,7 @@ public class MobileWallet internal constructor(
     public suspend fun bootstrap(
         keyType: MobileWalletKeyType? = null,
         didMethod: String = "key",
+        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy? = null,
     ): MobileWalletBootstrapResult {
         val existingDids = didStore.listDids().toList()
         if (existingDids.isNotEmpty()) {
@@ -219,8 +277,48 @@ public class MobileWallet internal constructor(
         }
 
         val effectiveKeyType = keyType ?: defaultKeyType
-        val key = keyGenerator(effectiveKeyType.toKeyType())
-        val keyId = keyStore.addKey(key)
+        val effectiveAuthorizationPolicy = keyUseAuthorizationPolicy ?: defaultKeyUseAuthorizationPolicy
+        val capability = keyUseAuthorizationCapability(effectiveKeyType, effectiveAuthorizationPolicy)
+        if (!capability.supported) {
+            throw KeyUseAuthorizationException(
+                failure = capability.failure ?: KeyUseAuthorizationFailure.UnsupportedCombination,
+                message = "The active key generator cannot enforce $effectiveAuthorizationPolicy for $effectiveKeyType",
+            )
+        }
+        val key = keyGenerator(
+            PlatformKeyGenerationRequest(
+                keyType = effectiveKeyType.toKeyType(),
+                keyUseAuthorizationPolicy = effectiveAuthorizationPolicy,
+            )
+        )
+        val authorizationAware = key as? KeyUseAuthorizationAware
+        if (
+            effectiveAuthorizationPolicy != KeyUseAuthorizationPolicy.None &&
+            (
+                authorizationAware == null ||
+                    authorizationAware.keyUseAuthorizationPolicy != effectiveAuthorizationPolicy ||
+                    !authorizationAware.isPlatformBacked
+                )
+        ) {
+            runCatching { key.deleteKey() }
+            throw KeyUseAuthorizationException(
+                failure = KeyUseAuthorizationFailure.UnsupportedCombination,
+                message = "The generated key does not enforce the requested protected key-use authorization policy",
+            )
+        }
+        val keyId = keyStore.addKey(
+            key,
+            WalletKeyInfo(
+                keyId = key.getKeyId(),
+                keyType = key.keyType.name,
+                requestedKeyUseAuthorizationPolicy = effectiveAuthorizationPolicy,
+                effectiveKeyUseAuthorizationPolicy =
+                    authorizationAware?.keyUseAuthorizationPolicy ?: effectiveAuthorizationPolicy,
+                isPlatformBacked = authorizationAware?.isPlatformBacked ?: capability.platformBackingAvailable,
+                effectiveHardwareBacking = authorizationAware?.effectiveHardwareBacking()
+                    ?: capability.effectiveHardwareBacking,
+            )
+        )
         val didResult = registerDidByKey(didMethod, key)
 
         didStore.addDid(
@@ -234,6 +332,29 @@ public class MobileWallet internal constructor(
             keyId = keyId,
             did = didResult.did,
         )
+    }
+
+    /** Returns non-secret metadata for persisted wallet signing keys. */
+    public suspend fun keys(): List<WalletKeyInfo> = keyStore.listKeys().toList()
+
+    /** Preflights whether this wallet's active key generator can enforce [keyUseAuthorizationPolicy]. */
+    public suspend fun keyUseAuthorizationCapability(
+        keyType: MobileWalletKeyType = defaultKeyType,
+        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy,
+    ): PlatformKeyCapability {
+        val capability = keyCapability(keyType.toKeyType(), keyUseAuthorizationPolicy)
+        return if (
+            keyUseAuthorizationPolicy != KeyUseAuthorizationPolicy.None &&
+            capability.supported &&
+            !keyStore.supportsKeyUseAuthorizationMetadata
+        ) {
+            capability.copy(
+                supported = false,
+                failure = KeyUseAuthorizationFailure.UnsupportedCombination,
+            )
+        } else {
+            capability
+        }
     }
 
     private suspend fun registerDidByKey(didMethod: String, key: Key) =

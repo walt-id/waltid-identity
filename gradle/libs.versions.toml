@@ -129,6 +129,7 @@ smiley4-schema-kenerator = "2.7.2"
 # a-sit-plus signum (mobile crypto)
 signum = "3.24.0"
 supreme = "0.15.0"
+androidx-biometric = "1.2.0-alpha05"
 
 [libraries]
 
@@ -365,6 +366,7 @@ kedis = { module = "io.github.domgew:kedis", version.ref = "kedis" }
 signum-indispensable = { module = "at.asitplus.signum:indispensable", version.ref = "signum" }
 signum-indispensable-josef = { module = "at.asitplus.signum:indispensable-josef", version.ref = "signum" }
 signum-supreme = { module = "at.asitplus.signum:supreme", version.ref = "supreme" }
+androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "androidx-biometric" }
 
 ## dev.whyoleg cryptography (Ed25519/secp256k1 on mobile)
 cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", version.ref = "whyoleg-cryptography" }

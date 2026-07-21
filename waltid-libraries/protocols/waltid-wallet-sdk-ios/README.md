@@ -92,6 +92,50 @@ let presentation = try await wallet.present(
 )
 ```
 
+## Per-key biometric authorization
+
+`WalletKeyUseAuthorizationPolicy.none` is the backward-compatible default. A native iOS app can opt
+new P-256 keys into Secure Enclave key-use authorization tied to the current Face ID or Touch ID set:
+
+```swift
+let wallet = try await Wallet(
+    configuration: WalletConfiguration(
+        walletID: "consumer-wallet",
+        defaultKeyType: .secp256r1,
+        defaultKeyUseAuthorizationPolicy: .biometricCurrentSet,
+        keyUseAuthorizationPrompt: .init(
+            message: "Authorize wallet signing",
+            cancelText: "Cancel"
+        )
+    )
+)
+
+let capability = try await wallet.keyUseAuthorizationCapability()
+guard capability.supported else {
+    throw WalletError.keyUseAuthorization(
+        capability.failure ?? .unsupportedCombination,
+        "Protected key creation is unavailable"
+    )
+}
+
+_ = try await wallet.bootstrap()
+let keyMetadata = try await wallet.keys()
+```
+
+The protected iOS combination is P-256 plus `.biometricCurrentSet` on a qualifying physical device.
+It requires Secure Enclave and biometric authorization for every private-key signing operation, does
+not permit device-passcode fallback, and makes the key unusable when biometric enrollment changes.
+The simulator reports the capability as unavailable; it is not evidence of Secure Enclave or biometric
+enforcement. Protected non-P-256 creation fails rather than falling back to an exported software key.
+
+The policy is immutable key metadata. Changing the configuration default affects only future key
+creation and does not protect, replace, or rotate existing keys. Use `keys()` to inspect requested and
+effective policy. Existing-key rotation, wallet/app unlock, action-scoped authorization, attestation,
+and recovery are separate concerns.
+
+The operating system owns the prompt. These platform mechanisms alone do not establish WSCD, LoA
+High, ISO 18045, EUDI, or HAIP certification.
+
 ## Local persistence
 
 `WalletConfiguration()` uses managed persistence by default. The SDK opens an encrypted SQLDelight database through SQLCipher and manages the per-wallet database key internally in iOS Keychain. Apps using the normal Swift facade do not pass database key material.
@@ -185,7 +229,7 @@ let wallet = try await Wallet(
 ```
 <!-- doc-snippet:end swift-full-store-overrides -->
 
-`StoredKey.serializedKeyJSON` is a walt.id serialized key payload and may contain private signing material. Treat it like a secret and store it only in app-owned secure storage.
+`StoredKey.serializedKeyJSON` is a walt.id serialized key payload and may contain private signing material. Treat it like a secret and store it only in app-owned secure storage. Custom serialized-key generators retain the legacy `.none` policy; they are not silently treated as supporting non-exportable protected keys.
 
 Provided database keys and custom stores can be combined when an app owns both database-key recovery and wallet-record durability:
 

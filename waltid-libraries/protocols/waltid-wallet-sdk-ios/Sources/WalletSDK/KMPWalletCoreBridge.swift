@@ -33,10 +33,15 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         }
     }
 
-    func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult {
+    func bootstrap(
+        keyType: WalletKeyType,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy,
+        didMethod: String
+    ) async throws -> WalletBootstrapResult {
         let result = try await bridge.bootstrap(
             keyType: keyType.toKMPKeyType(),
-            didMethod: didMethod
+            didMethod: didMethod,
+            keyUseAuthorizationPolicy: keyUseAuthorizationPolicy.toKMPPolicy()
         )
         let value = try Self.successValue(
             result,
@@ -45,6 +50,28 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
 
         return .init(keyID: value.keyId, did: value.did)
+    }
+
+    func keys() async throws -> [WalletKeyInfo] {
+        let result = try await bridge.keys()
+        let value = try Self.successAnyValue(result, operation: "list signing keys")
+        return try swiftArray(value, of: WalletBridgeKeyInfo.self).map { try $0.toSwiftKeyInfo() }
+    }
+
+    func keyUseAuthorizationCapability(
+        keyType: WalletKeyType,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+    ) async throws -> WalletKeyAuthorizationCapability {
+        let result = try await bridge.keyUseAuthorizationCapability(
+            keyType: keyType.toKMPKeyType(),
+            keyUseAuthorizationPolicy: keyUseAuthorizationPolicy.toKMPPolicy()
+        )
+        let value = try Self.successValue(
+            result,
+            as: WalletBridgeKeyCapability.self,
+            operation: "preflight key-use authorization"
+        )
+        return try value.toSwiftCapability()
     }
 
     func resolveOffer(offer: URL) async throws -> OfferResolution {
@@ -218,7 +245,9 @@ private extension WalletConfiguration {
             persistence: persistence.toKMPPersistence(),
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
             attestation: attestation?.toKMPAttestationConfiguration(),
-            transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() }
+            transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
+            defaultKeyUseAuthorizationPolicy: defaultKeyUseAuthorizationPolicy.toKMPPolicy(),
+            keyUseAuthorizationPrompt: keyUseAuthorizationPrompt.toKMPPrompt()
         )
     }
 }
@@ -432,7 +461,25 @@ private extension WalletKeyInfo {
         WalletBridgeKeyInfo(
             keyId: keyID,
             keyType: keyType.bridgeName,
-            algorithm: algorithm
+            algorithm: algorithm,
+            requestedKeyUseAuthorizationPolicy: requestedKeyUseAuthorizationPolicy.toKMPPolicy(),
+            effectiveKeyUseAuthorizationPolicy: effectiveKeyUseAuthorizationPolicy.toKMPPolicy(),
+            isPlatformBacked: isPlatformBacked,
+            effectiveHardwareBacking: effectiveHardwareBacking?.bridgeName
+        )
+    }
+}
+
+private extension WalletBridgeKeyInfo {
+    func toSwiftKeyInfo() throws -> WalletKeyInfo {
+        WalletKeyInfo(
+            keyID: keyId,
+            keyType: try WalletKeyType(bridgeName: keyType),
+            algorithm: algorithm,
+            requestedKeyUseAuthorizationPolicy: requestedKeyUseAuthorizationPolicy.toSwiftPolicy(),
+            effectiveKeyUseAuthorizationPolicy: effectiveKeyUseAuthorizationPolicy.toSwiftPolicy(),
+            isPlatformBacked: isPlatformBacked,
+            effectiveHardwareBacking: effectiveHardwareBacking.flatMap(WalletKeyHardwareBacking.init(bridgeName:))
         )
     }
 }
@@ -479,6 +526,92 @@ private extension WalletAttestationConfiguration {
             attesterPath: attesterPath,
             bearerToken: bearerToken,
             hostHeader: hostHeader
+        )
+    }
+}
+
+private extension WalletKeyUseAuthorizationPrompt {
+    func toKMPPrompt() -> WalletBridgeKeyUseAuthorizationPrompt {
+        WalletBridgeKeyUseAuthorizationPrompt(message: message, cancelText: cancelText)
+    }
+}
+
+private extension WalletKeyUseAuthorizationPolicy {
+    func toKMPPolicy() -> WalletBridgeKeyUseAuthorizationPolicy {
+        switch self {
+        case .none:
+            return .none
+        case .biometricCurrentSet:
+            return .biometricCurrentSet
+        }
+    }
+}
+
+private extension WalletBridgeKeyUseAuthorizationPolicy {
+    func toSwiftPolicy() -> WalletKeyUseAuthorizationPolicy {
+        switch self {
+        case .none:
+            return .none
+        case .biometricCurrentSet:
+            return .biometricCurrentSet
+        }
+    }
+}
+
+private extension WalletBridgeKeyUseAuthorizationFailure {
+    func toSwiftFailure() -> KeyUseAuthorizationFailure {
+        switch self {
+        case .unsupportedCombination: return .unsupportedCombination
+        case .biometricUnavailable: return .biometricUnavailable
+        case .biometricNotEnrolled: return .biometricNotEnrolled
+        case .interactionContextUnavailable: return .interactionContextUnavailable
+        case .authorizationFailed: return .authorizationFailed
+        case .protectedKeyInvalidated: return .protectedKeyInvalidated
+        case .protectedKeyMissing: return .protectedKeyMissing
+        }
+    }
+}
+
+private extension WalletKeyHardwareBacking {
+    init?(bridgeName: String) {
+        switch bridgeName {
+        case "Software": self = .software
+        case "Platform": self = .platform
+        case "SecureHardware": self = .secureHardware
+        case "TrustedEnvironment": self = .trustedEnvironment
+        case "StrongBox": self = .strongBox
+        case "SecureEnclave": self = .secureEnclave
+        case "Unknown": self = .unknown
+        default: return nil
+        }
+    }
+
+    var bridgeName: String {
+        switch self {
+        case .software: return "Software"
+        case .platform: return "Platform"
+        case .secureHardware: return "SecureHardware"
+        case .trustedEnvironment: return "TrustedEnvironment"
+        case .strongBox: return "StrongBox"
+        case .secureEnclave: return "SecureEnclave"
+        case .unknown: return "Unknown"
+        }
+    }
+
+}
+
+private extension WalletBridgeKeyCapability {
+    func toSwiftCapability() throws -> WalletKeyAuthorizationCapability {
+        WalletKeyAuthorizationCapability(
+            platform: platform,
+            keyType: keyType.toSwiftKeyType(),
+            keyUseAuthorizationPolicy: keyUseAuthorizationPolicy.toSwiftPolicy(),
+            supported: supported,
+            platformBackingAvailable: platformBackingAvailable,
+            secureHardwareRequired: secureHardwareRequired,
+            secureHardwareAvailable: secureHardwareAvailable?.boolValue,
+            effectiveHardwareBacking: effectiveHardwareBacking.flatMap(WalletKeyHardwareBacking.init(bridgeName:)),
+            failure: failure?.toSwiftFailure()
         )
     }
 }
@@ -838,6 +971,9 @@ private extension MobileWalletEventStatus {
 
 private extension WalletBridgeError {
     func toSwiftWalletError() -> WalletError {
+        if let failure = keyUseAuthorizationFailure {
+            return .keyUseAuthorization(failure.toSwiftFailure(), message)
+        }
         switch category {
         case .invalidInput:
             return .invalidInput(message)

@@ -1,7 +1,12 @@
 package id.walt.wallet2.persistence.stores
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyHardwareBacking
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyUseAuthorizationAware
+import id.walt.crypto.keys.KeyUseAuthorizationException
+import id.walt.crypto.keys.KeyUseAuthorizationFailure
+import id.walt.crypto.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import id.walt.wallet2.persistence.keys.PlatformKeyProvider
 import id.walt.wallet2.data.WalletKeyInfo
@@ -24,19 +29,48 @@ public class PlatformKeyStore(
     private val queries: WalletPersistenceQueries,
 ) : WalletKeyStore {
 
+    /** This store persists requested and effective key-use authorization metadata. */
+    override val supportsKeyUseAuthorizationMetadata: Boolean = true
+
     /**
      * Loads a wallet key by its wallet-local key identifier.
      */
     override suspend fun getKey(keyId: String): Key? {
         val ref = queries.selectByKeyId(keyId).executeAsOneOrNull() ?: return null
         val keyType = KeyType.valueOf(ref.key_type)
-        return if (ref.is_platform_backed == 1L) {
-            keyProvider.loadKey(keyId, keyType)
+        val authorizationPolicy = KeyUseAuthorizationPolicy.valueOf(ref.effective_authorization_policy)
+        if (
+            authorizationPolicy != KeyUseAuthorizationPolicy.None &&
+            ref.is_platform_backed != 1L
+        ) {
+            throw invalidProtectedKey(keyId, "is not marked as platform-backed")
+        }
+
+        val key = if (ref.is_platform_backed == 1L) {
+            keyProvider.loadKey(keyId, keyType, authorizationPolicy)
         } else {
             val material = ref.key_material?.encodeToByteArray()
                 ?: error("Software key '$keyId' has no stored key material")
             keyProvider.loadSoftwareKey(keyId, keyType, material)
         }
+
+        if (authorizationPolicy == KeyUseAuthorizationPolicy.None) return key
+        if (key == null) {
+            throw KeyUseAuthorizationException(
+                failure = KeyUseAuthorizationFailure.ProtectedKeyMissing,
+                message = "The protected key '$keyId' is missing from the platform key store",
+            )
+        }
+        val authorizationAware = key as? KeyUseAuthorizationAware
+        if (
+            key.keyType != keyType ||
+            authorizationAware == null ||
+            authorizationAware.keyUseAuthorizationPolicy != authorizationPolicy ||
+            !authorizationAware.isPlatformBacked
+        ) {
+            throw invalidProtectedKey(keyId, "does not enforce its persisted authorization policy")
+        }
+        return key
     }
 
     /**
@@ -44,7 +78,18 @@ public class PlatformKeyStore(
      */
     override suspend fun listKeys(): Flow<WalletKeyInfo> = flow {
         queries.selectAll().executeAsList().forEach { ref ->
-            emit(WalletKeyInfo(keyId = ref.key_id, keyType = ref.key_type))
+            emit(
+                WalletKeyInfo(
+                    keyId = ref.key_id,
+                    keyType = ref.key_type,
+                    requestedKeyUseAuthorizationPolicy =
+                        KeyUseAuthorizationPolicy.valueOf(ref.requested_authorization_policy),
+                    effectiveKeyUseAuthorizationPolicy =
+                        KeyUseAuthorizationPolicy.valueOf(ref.effective_authorization_policy),
+                    isPlatformBacked = ref.is_platform_backed == 1L,
+                    effectiveHardwareBacking = ref.effective_hardware_backing?.let(KeyHardwareBacking::valueOf),
+                )
+            )
         }
     }
 
@@ -55,8 +100,45 @@ public class PlatformKeyStore(
      * into the SQLDelight table.
      */
     override suspend fun addKey(key: Key): String {
+        return persistKey(key, keyInfo = null)
+    }
+
+    /**
+     * Persists [key] together with creation-time authorization and backing metadata from [keyInfo].
+     */
+    override suspend fun addKey(key: Key, keyInfo: WalletKeyInfo): String {
+        return persistKey(key, keyInfo)
+    }
+
+    private suspend fun persistKey(key: Key, keyInfo: WalletKeyInfo?): String {
         val keyId = key.getKeyId()
-        val isPlatformBacked = keyProvider.isPlatformBacked(key.keyType)
+        val authorizationAware = key as? KeyUseAuthorizationAware
+        val requestedAuthorizationPolicy = keyInfo?.requestedKeyUseAuthorizationPolicy
+            ?: authorizationAware?.keyUseAuthorizationPolicy
+            ?: KeyUseAuthorizationPolicy.None
+        val effectiveAuthorizationPolicy = authorizationAware?.keyUseAuthorizationPolicy
+            ?: KeyUseAuthorizationPolicy.None
+        val isPlatformBacked = authorizationAware?.isPlatformBacked
+            ?: keyInfo?.isPlatformBacked
+            ?: keyProvider.isPlatformBacked(key.keyType)
+        val hasProtectedPolicy =
+            requestedAuthorizationPolicy != KeyUseAuthorizationPolicy.None ||
+                effectiveAuthorizationPolicy != KeyUseAuthorizationPolicy.None
+        if (
+            hasProtectedPolicy &&
+            (
+                authorizationAware == null ||
+                    !isPlatformBacked ||
+                    keyInfo?.effectiveKeyUseAuthorizationPolicy?.let { it != effectiveAuthorizationPolicy } == true
+            )
+        ) {
+            throw KeyUseAuthorizationException(
+                failure = KeyUseAuthorizationFailure.UnsupportedCombination,
+                message = "Protected key metadata must match a platform-backed authorization-aware key",
+            )
+        }
+        val effectiveHardwareBacking = authorizationAware?.effectiveHardwareBacking()
+            ?: keyInfo?.effectiveHardwareBacking
         val material = if (!isPlatformBacked) keyProvider.exportSoftwareKeyMaterial(key) else null
 
         queries.insert(
@@ -65,6 +147,9 @@ public class PlatformKeyStore(
             created_at = Clock.System.now().toEpochMilliseconds(),
             is_platform_backed = if (isPlatformBacked) 1L else 0L,
             key_material = material?.decodeToString(),
+            requested_authorization_policy = requestedAuthorizationPolicy.name,
+            effective_authorization_policy = effectiveAuthorizationPolicy.name,
+            effective_hardware_backing = effectiveHardwareBacking?.name,
         )
         return keyId
     }
@@ -79,4 +164,10 @@ public class PlatformKeyStore(
         queries.deleteByKeyId(keyId)
         return true
     }
+
+    private fun invalidProtectedKey(keyId: String, reason: String): KeyUseAuthorizationException =
+        KeyUseAuthorizationException(
+            failure = KeyUseAuthorizationFailure.ProtectedKeyInvalidated,
+            message = "The protected key '$keyId' $reason",
+        )
 }

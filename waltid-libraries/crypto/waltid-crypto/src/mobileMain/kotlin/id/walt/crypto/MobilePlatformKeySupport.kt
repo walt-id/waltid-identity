@@ -13,6 +13,8 @@ import at.asitplus.signum.supreme.SignatureResult
 import at.asitplus.signum.supreme.sign.SignatureInput
 import at.asitplus.signum.supreme.sign.verifierFor
 import id.walt.crypto.keys.EccUtils
+import id.walt.crypto.keys.KeyUseAuthorizationException
+import id.walt.crypto.keys.KeyUseAuthorizationFailure
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.KeyTypes
 import kotlinx.serialization.json.Json
@@ -54,6 +56,7 @@ internal suspend fun signJwsWithPlatformSigner(
     keyType: KeyType,
     plaintext: ByteArray,
     headers: Map<String, JsonElement>,
+    protectedKeyUse: Boolean = false,
     sign: suspend (ByteArray) -> SignatureResult<*>,
 ): String {
     val jwkHeader = headers["jwk"]?.let { jwkElement ->
@@ -72,11 +75,31 @@ internal suspend fun signJwsWithPlatformSigner(
         protectedHeader = header,
         payload = plaintext,
         signer = { data ->
-            val signResult = sign(data)
-            check(signResult is SignatureResult.Success<*>) { "JWS signing failed: $signResult" }
-            signResult.signature.rawByteArray
+            sign(data).signatureBytesOrThrow(
+                protectedKeyUse = protectedKeyUse,
+                legacyFailurePrefix = "JWS signing failed",
+            )
         }
     ).toString()
+}
+
+internal fun SignatureResult<*>.signatureBytesOrThrow(
+    protectedKeyUse: Boolean,
+    legacyFailurePrefix: String = "Signing failed",
+): ByteArray {
+    if (!protectedKeyUse) {
+        check(this is SignatureResult.Success<*>) { "$legacyFailurePrefix: $this" }
+        return signature.rawByteArray
+    }
+    return when (this) {
+        is SignatureResult.Success<*> -> signature.rawByteArray
+        is SignatureResult.Failure -> throw KeyUseAuthorizationException(
+            failure = KeyUseAuthorizationFailure.AuthorizationFailed,
+            message = "Key-use authorization failed",
+            cause = problem,
+        )
+        is SignatureResult.Error -> throw exception
+    }
 }
 
 internal fun verifyRawWithPlatformSigner(

@@ -5,6 +5,10 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.KeyUseAuthorizationException
+import id.walt.crypto.keys.KeyUseAuthorizationFailure
+import id.walt.crypto.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -14,6 +18,9 @@ import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
+import id.walt.wallet2.persistence.keys.PlatformKeyCapability
+import id.walt.wallet2.persistence.keys.PlatformKeyGenerationRequest
+import id.walt.wallet2.persistence.keys.PlatformKeyPlatform
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -66,11 +73,120 @@ class MobileWalletTest {
 
         assertEquals("default", config.walletId)
         assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
+        assertEquals(KeyUseAuthorizationPolicy.None, config.defaultKeyUseAuthorizationPolicy)
+        assertEquals(KeyUseAuthorizationPrompt(), config.keyUseAuthorizationPrompt)
         assertEquals(null, config.attestationConfig)
         assertEquals(MobileWalletPersistence(), config.persistence)
         assertEquals(emptyList(), config.transactionDataProfiles)
         assertIs<MobileWalletDatabaseKey.Managed>(config.persistence.databaseKey)
         assertEquals(MobileWalletStores(), config.persistence.stores)
+    }
+
+    @Test
+    fun protectedBootstrapFailsPreflightWithoutInvokingLegacyOrFallbackGeneration() = runTest {
+        val keyStore = EmptyKeyStore()
+        var generationCalls = 0
+        val wallet = MobileWallet(
+            walletId = "protected-wallet",
+            keyStore = keyStore,
+            didStore = EmptyDidStore(),
+            credentialStore = RecordingCredentialStore(),
+            keyGenerator = { _: PlatformKeyGenerationRequest ->
+                generationCalls++
+                error("Unsupported protected requests must not generate a key")
+            },
+            keyCapability = { keyType, policy ->
+                PlatformKeyCapability(
+                    platform = PlatformKeyPlatform.Custom,
+                    keyType = keyType,
+                    keyUseAuthorizationPolicy = policy,
+                    supported = false,
+                    platformBackingAvailable = false,
+                    secureHardwareRequired = false,
+                    secureHardwareAvailable = null,
+                    failure = KeyUseAuthorizationFailure.UnsupportedCombination,
+                )
+            },
+        )
+
+        val failure = assertFailsWith<KeyUseAuthorizationException> {
+            wallet.bootstrap(keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet)
+        }
+
+        assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, failure.failure)
+        assertEquals(0, generationCalls)
+        assertEquals(0, keyStore.addKeyCalls)
+    }
+
+    @Test
+    fun protectedBootstrapFailsPreflightWhenCustomStoreCannotPreservePolicy() = runTest {
+        val keyStore = EmptyKeyStore()
+        var generationCalls = 0
+        val wallet = MobileWallet(
+            walletId = "custom-store-wallet",
+            keyStore = keyStore,
+            didStore = EmptyDidStore(),
+            credentialStore = RecordingCredentialStore(),
+            keyGenerator = { _: PlatformKeyGenerationRequest ->
+                generationCalls++
+                error("Unsupported persistence must be rejected before key generation")
+            },
+            keyCapability = { keyType, policy ->
+                PlatformKeyCapability(
+                    platform = PlatformKeyPlatform.Custom,
+                    keyType = keyType,
+                    keyUseAuthorizationPolicy = policy,
+                    supported = true,
+                    platformBackingAvailable = true,
+                    secureHardwareRequired = false,
+                    secureHardwareAvailable = null,
+                )
+            },
+        )
+
+        val capability = wallet.keyUseAuthorizationCapability(
+            keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+        )
+        val failure = assertFailsWith<KeyUseAuthorizationException> {
+            wallet.bootstrap(keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet)
+        }
+
+        assertFalse(capability.supported)
+        assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, capability.failure)
+        assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, failure.failure)
+        assertEquals(0, generationCalls)
+        assertEquals(0, keyStore.addKeyCalls)
+    }
+
+    @Test
+    fun changingDefaultDoesNotReclassifyOrReplaceExistingKey() = runTest {
+        val existing = WalletKeyInfo(
+            keyId = "existing-key",
+            keyType = KeyType.secp256r1.name,
+            requestedKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+            effectiveKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+            isPlatformBacked = true,
+        )
+        val wallet = MobileWallet(
+            walletId = "existing-wallet",
+            keyStore = PreloadedKeyStore(existing),
+            didStore = PreloadedDidStore(WalletDidEntry("did:key:existing", JsonObject(emptyMap()))),
+            credentialStore = RecordingCredentialStore(),
+            keyGenerator = { _: PlatformKeyGenerationRequest ->
+                error("An existing wallet must not generate replacement key material")
+            },
+            keyCapability = { _, _ ->
+                error("An existing wallet must not preflight a replacement key")
+            },
+            defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+        )
+
+        val bootstrap = wallet.bootstrap()
+        val persisted = wallet.keys().single()
+
+        assertEquals("existing-key", bootstrap.keyId)
+        assertEquals(KeyUseAuthorizationPolicy.None, persisted.requestedKeyUseAuthorizationPolicy)
+        assertEquals(KeyUseAuthorizationPolicy.None, persisted.effectiveKeyUseAuthorizationPolicy)
     }
 
     @Test
@@ -414,6 +530,21 @@ class MobileWalletTest {
         }
     }
 
+    private class EmptyKeyStore : WalletKeyStore {
+        var addKeyCalls = 0
+
+        override suspend fun getKey(keyId: String) = null
+
+        override suspend fun listKeys(): Flow<WalletKeyInfo> = emptyList<WalletKeyInfo>().asFlow()
+
+        override suspend fun addKey(key: id.walt.crypto.keys.Key): String {
+            addKeyCalls++
+            return key.getKeyId()
+        }
+
+        override suspend fun removeKey(keyId: String): Boolean = false
+    }
+
     private class PreloadedDidStore(private val did: WalletDidEntry) : WalletDidStore {
         var listDidsCalls = 0
         val removedDids = mutableListOf<String>()
@@ -432,6 +563,16 @@ class MobileWalletTest {
             removedDids += did
             return true
         }
+    }
+
+    private class EmptyDidStore : WalletDidStore {
+        override suspend fun getDid(did: String): WalletDidEntry? = null
+
+        override suspend fun listDids(): Flow<WalletDidEntry> = emptyList<WalletDidEntry>().asFlow()
+
+        override suspend fun addDid(entry: WalletDidEntry) = Unit
+
+        override suspend fun removeDid(did: String): Boolean = false
     }
 
     private class RecordingCredentialStore(

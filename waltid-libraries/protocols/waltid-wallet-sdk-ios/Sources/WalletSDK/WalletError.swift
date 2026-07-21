@@ -20,6 +20,9 @@ public enum WalletError: Error, Equatable, Sendable {
     /// Key management, signing, or cryptographic processing failed.
     case crypto(String)
 
+    /// A protected key could not be created or used for the stable reason provided.
+    case keyUseAuthorization(KeyUseAuthorizationFailure, String)
+
     /// The requested credential was not found in the wallet.
     case credentialNotFound(String)
 
@@ -40,6 +43,7 @@ extension WalletError: LocalizedError {
              .verifier(let message),
              .storage(let message),
              .crypto(let message),
+             .keyUseAuthorization(_, let message),
              .credentialNotFound(let message),
              .internalFailure(let message):
             return message
