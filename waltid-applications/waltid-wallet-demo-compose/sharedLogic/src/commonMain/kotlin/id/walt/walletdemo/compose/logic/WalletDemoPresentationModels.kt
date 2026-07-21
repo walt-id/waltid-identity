@@ -59,7 +59,7 @@ data class WalletDemoPresentationCredentialOption(
     val credentialId: String,
     val multiple: Boolean = false,
     val label: String,
-    val issuer: String,
+    val issuer: String?,
     val subject: String? = null,
     val format: String,
     val credentialDataJson: String,

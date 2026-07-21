@@ -35,7 +35,7 @@ internal class MobileDemoWallet(
             WalletDemoCredential(
                 id = credential.id,
                 format = credential.format,
-                issuer = credential.issuer ?: CredentialDisplayText.Unknown,
+                issuer = credential.issuer,
                 subject = credential.subject,
                 label = credential.label ?: credential.format,
                 addedAt = credential.addedAt,
@@ -168,7 +168,7 @@ private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentat
                 credentialId = option.credentialId,
                 multiple = option.multiple,
                 label = option.label ?: option.format,
-                issuer = option.issuer ?: CredentialDisplayText.Unknown,
+                issuer = option.issuer,
                 subject = option.subject,
                 format = option.format,
                 credentialDataJson = option.credentialDataJson,

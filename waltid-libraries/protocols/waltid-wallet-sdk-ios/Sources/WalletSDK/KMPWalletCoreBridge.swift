@@ -1,5 +1,15 @@
 import Foundation
 
+func parseWalletISO8601Date(_ value: String) -> Date? {
+    let formatter = ISO8601DateFormatter()
+    if let date = formatter.date(from: value) {
+        return date
+    }
+
+    formatter.formatOptions.insert(.withFractionalSeconds)
+    return formatter.date(from: value)
+}
+
 #if canImport(WalletCore) && os(iOS)
 @preconcurrency import WalletCore
 
@@ -408,7 +418,7 @@ private extension WalletBridgeStoredCredential {
             serializedCredential: serializedCredential,
             format: format,
             label: label,
-            addedAt: addedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
+            addedAt: addedAt.flatMap(parseWalletISO8601Date)
         )
     }
 }
@@ -585,7 +595,7 @@ private extension MobileWalletCredential {
             issuer: issuer,
             subject: subject,
             label: label,
-            addedAt: addedAt.flatMap { ISO8601DateFormatter().date(from: $0) },
+            addedAt: addedAt.flatMap(parseWalletISO8601Date),
             credentialDataJSON: requiredCredentialDataJSON(credentialDataJson)
         )
     }

@@ -61,6 +61,22 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
+    fun appliesUnknownIssuerOnlyToCardDisplay() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "mso_mdoc",
+                issuer = null,
+                label = "Photo ID",
+                credentialDataJson = "{}",
+            )
+        )
+
+        assertEquals(CredentialDisplayText.Unknown, details.toCardDisplayData().issuer)
+        assertFalse(details.toSystemInfoGroup()?.items.orEmpty().any { it.path.id == "system.issuer" })
+    }
+
+    @Test
     fun flattensNamespacedMdocObjectClaimsIntoDisplayRows() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(

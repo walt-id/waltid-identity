@@ -2,6 +2,17 @@ import XCTest
 @testable import WalletSDK
 
 final class WalletAPITests: XCTestCase {
+    func testParsesKotlinInstantTimestampsWithOptionalFractionalSeconds() throws {
+        let wholeSeconds = try XCTUnwrap(parseWalletISO8601Date("2026-07-21T17:20:00Z"))
+        let fractionalSeconds = try XCTUnwrap(parseWalletISO8601Date("2026-07-21T17:20:00.123456Z"))
+
+        XCTAssertEqual(
+            fractionalSeconds.timeIntervalSinceReferenceDate,
+            wholeSeconds.addingTimeInterval(0.123456).timeIntervalSinceReferenceDate,
+            accuracy: 0.001
+        )
+    }
+
     func testPublicConfigurationUsesStableDefaults() {
         let configuration = WalletConfiguration()
 
