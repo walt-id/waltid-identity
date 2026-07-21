@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 
 plugins {
     id("waltid.multiplatform.library")
@@ -94,5 +95,16 @@ mavenPublishing {
     pom {
         name.set("walt.id X.509")
         description.set("walt.id Kotlin/Java library X.509")
+    }
+}
+
+if (enableIosBuild) {
+    tasks.withType<KotlinNativeTest>().configureEach {
+        if (name.startsWith("ios")) {
+            // SecTrust returns OSStatus -26276 from the standalone Kotlin/Native
+            // test executable. The iOS implementation is covered in the app-hosted XCTest
+            // MobileWalletIntegrationTests.testAppHostedWalletValidatesSignedRequestObjectCertificateChain.
+            filter.excludeTestsMatching("id.walt.x509.X509ValidationMPTest.*")
+        }
     }
 }
