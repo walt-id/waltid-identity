@@ -30,7 +30,6 @@ import androidx.compose.ui.test.v2.runComposeUiTest
 import id.walt.walletdemo.compose.logic.DemoPinStore
 import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.InMemoryDemoPinStore
-import id.walt.walletdemo.compose.logic.VerifierDetails
 import id.walt.walletdemo.compose.logic.WalletDemoBootstrapResult
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
@@ -372,7 +371,9 @@ class WalletDemoAppTestScenarios {
 
     fun invalidPresentationCanBeDismissedLocallyOrReportedToVerifier() = runComposeUiTest {
         val error = WalletDemoPresentationError(
-            verifier = VerifierDetails(name = "Example Verifier", clientId = "https://verifier.example"),
+            verifierMetadata = samplePresentationPreview.verifierMetadata,
+            clientId = samplePresentationPreview.clientId,
+            responseEncryption = samplePresentationPreview.responseEncryption,
             errorCode = "invalid_transaction_data",
             message = "Unsupported transaction data type",
         )

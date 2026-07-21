@@ -72,7 +72,13 @@ internal class MobileDemoWallet(
             is MobileWalletPresentationPreviewResult.Invalid ->
                 WalletDemoPresentationPreviewResult.Invalid(
                     WalletDemoPresentationError(
-                        verifier = result.request.toDemoVerifierDetails(),
+                        verifierMetadata = result.request.verifierMetadata?.toDemoMetadata(),
+                        clientId = result.request.clientId,
+                        responseUri = result.request.responseUri,
+                        state = result.request.state,
+                        nonce = result.request.nonce,
+                        responseEncryption = result.request.responseEncryption.toDemoResponseEncryption(),
+                        transactionData = result.request.transactionData.toDemoTransactionDataGroups(),
                         errorCode = result.errorCode.errorCode,
                         message = result.message,
                     )
@@ -182,17 +188,6 @@ private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentat
         credentialRequirements = credentialRequirements.map { requirement ->
             WalletDemoPresentationCredentialRequirement(options = requirement.options)
         },
-    )
-
-private fun MobileWalletPresentationRequestInfo.toDemoVerifierDetails(): VerifierDetails =
-    VerifierDetails(
-        metadata = verifierMetadata?.toDemoMetadata(),
-        clientId = clientId,
-        responseUri = responseUri,
-        state = state,
-        nonce = nonce,
-        responseEncryption = responseEncryption.toDemoResponseEncryption(),
-        transactionData = transactionData.toDemoTransactionDataGroups(),
     )
 
 private fun List<MobileWalletTransactionDataItem>.toDemoTransactionDataGroups(): List<ClaimGroup> =

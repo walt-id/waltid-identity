@@ -6,22 +6,38 @@ sealed interface WalletDemoPresentationPreviewResult {
 }
 
 data class WalletDemoPresentationError(
-    val verifier: VerifierDetails,
+    override val verifierMetadata: WalletDemoVerifierMetadata?,
+    override val clientId: String?,
+    override val responseUri: String? = null,
+    override val state: String? = null,
+    override val nonce: String? = null,
+    override val responseEncryption: WalletDemoResponseEncryption,
+    override val transactionData: List<ClaimGroup> = emptyList(),
     val errorCode: String,
     val message: String,
-)
+) : WalletDemoPresentationRequestInfo
+
+interface WalletDemoPresentationRequestInfo {
+    val verifierMetadata: WalletDemoVerifierMetadata?
+    val clientId: String?
+    val responseUri: String?
+    val state: String?
+    val nonce: String?
+    val responseEncryption: WalletDemoResponseEncryption
+    val transactionData: List<ClaimGroup>
+}
 
 data class WalletDemoPresentationPreview(
-    val verifierMetadata: WalletDemoVerifierMetadata?,
-    val clientId: String?,
-    val responseUri: String? = null,
-    val state: String? = null,
-    val nonce: String? = null,
-    val responseEncryption: WalletDemoResponseEncryption,
-    val transactionData: List<ClaimGroup> = emptyList(),
+    override val verifierMetadata: WalletDemoVerifierMetadata?,
+    override val clientId: String?,
+    override val responseUri: String? = null,
+    override val state: String? = null,
+    override val nonce: String? = null,
+    override val responseEncryption: WalletDemoResponseEncryption,
+    override val transactionData: List<ClaimGroup> = emptyList(),
     val credentialOptions: List<WalletDemoPresentationCredentialOption>,
     val credentialRequirements: List<WalletDemoPresentationCredentialRequirement> = emptyList(),
-)
+) : WalletDemoPresentationRequestInfo
 
 sealed interface WalletDemoResponseEncryption {
     data object NotRequired : WalletDemoResponseEncryption

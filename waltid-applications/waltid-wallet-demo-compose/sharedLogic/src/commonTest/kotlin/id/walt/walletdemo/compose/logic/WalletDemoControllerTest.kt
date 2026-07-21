@@ -42,7 +42,9 @@ class WalletDemoControllerTest {
     @Test
     fun invalidPresentationPreviewCanBeDismissedOrReturnedToVerifier() = runTest {
         val error = WalletDemoPresentationError(
-            verifier = VerifierDetails(name = "Example Verifier", clientId = "https://verifier.example"),
+            verifierMetadata = verifierMetadata("Example Verifier"),
+            clientId = "https://verifier.example",
+            responseEncryption = WalletDemoResponseEncryption.NotRequired,
             errorCode = "invalid_transaction_data",
             message = "Unsupported transaction_data type",
         )

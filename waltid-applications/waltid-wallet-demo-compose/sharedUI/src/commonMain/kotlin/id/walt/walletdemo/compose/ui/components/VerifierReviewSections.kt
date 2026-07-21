@@ -22,14 +22,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreview
+import id.walt.walletdemo.compose.logic.WalletDemoPresentationRequestInfo
 import id.walt.walletdemo.compose.logic.WalletDemoResponseEncryption
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
-internal fun VerifierReviewSections(preview: WalletDemoPresentationPreview, modifier: Modifier = Modifier) {
+internal fun VerifierReviewSections(request: WalletDemoPresentationRequestInfo, modifier: Modifier = Modifier) {
     var technicalDetailsExpanded by rememberSaveable { mutableStateOf(false) }
-    val verifierMetadata = preview.verifierMetadata
+    val verifierMetadata = request.verifierMetadata
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -61,7 +61,7 @@ internal fun VerifierReviewSections(preview: WalletDemoPresentationPreview, modi
             }
         }
 
-        preview.transactionData.forEach { group ->
+        request.transactionData.forEach { group ->
             ClaimGroupSection(group)
         }
 
@@ -69,7 +69,7 @@ internal fun VerifierReviewSections(preview: WalletDemoPresentationPreview, modi
             title = "Response protection",
             modifier = Modifier.testTag(WalletUiTestTags.PresentationResponseProtectionSection),
         ) {
-            val encryption = preview.responseEncryption
+            val encryption = request.responseEncryption
             MetadataDetailList(
                 buildList {
                     add(
@@ -120,10 +120,10 @@ internal fun VerifierReviewSections(preview: WalletDemoPresentationPreview, modi
                 MetadataRowDivider()
                 MetadataDetailList(
                     listOf(
-                        MetadataDetailItem("Client ID", preview.clientId),
-                        MetadataDetailItem("Response URI", preview.responseUri),
-                        MetadataDetailItem("State", preview.state),
-                        MetadataDetailItem("Nonce", preview.nonce),
+                        MetadataDetailItem("Client ID", request.clientId),
+                        MetadataDetailItem("Response URI", request.responseUri),
+                        MetadataDetailItem("State", request.state),
+                        MetadataDetailItem("Nonce", request.nonce),
                     ),
                     modifier = Modifier.testTag(WalletUiTestTags.VerifierTechnicalDetails),
                 )
