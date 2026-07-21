@@ -1,0 +1,7 @@
+CREATE TABLE issuance_session_records (
+    record_id TEXT NOT NULL PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+);

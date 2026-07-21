@@ -347,18 +347,18 @@ class TokenRequestBuilderTest {
     }
 
     @Test
-    fun testExchangePreAuthorizedCodeRejectsCrossOriginRedirectWithHeaders() = runTest {
+    fun testExchangePreAuthorizedCodeRejectsCrossOriginPostPreservingRedirect() = runTest {
         var callCount = 0
         val client = createMockClient { _ ->
             callCount += 1
             when (callCount) {
                 1 -> respond(
                     content = "",
-                    status = HttpStatusCode.Found,
+                    status = HttpStatusCode.TemporaryRedirect,
                     headers = headersOf(HttpHeaders.Location, "https://other.example.com/token")
                 )
 
-                else -> error("Cross-origin redirect should not be followed when request headers are present")
+                else -> error("Cross-origin redirect should not be followed")
             }
         }
 
@@ -367,12 +367,69 @@ class TokenRequestBuilderTest {
             builder.exchangePreAuthorizedCode(
                 tokenEndpoint = tokenEndpoint,
                 preAuthorizedCode = "pre-auth-code",
-                additionalHeaders = mapOf(HttpHeaders.Authorization to "Bearer abc"),
             )
         }
 
         assertEquals("unsafe_redirect", error.oauthError)
         assertEquals(1, callCount)
+    }
+
+    @Test
+    fun testExchangePreAuthorizedCodeDoesNotRepostAfterSeeOther() = runTest {
+        var callCount = 0
+        val client = createMockClient {
+            callCount += 1
+            respond(
+                content = "",
+                status = HttpStatusCode.SeeOther,
+                headers = headersOf(HttpHeaders.Location, "https://auth.example.com/other-token"),
+            )
+        }
+
+        val error = assertFailsWith<TokenRequestException> {
+            TokenRequestBuilder(clientConfig, client).exchangePreAuthorizedCode(
+                tokenEndpoint = tokenEndpoint,
+                preAuthorizedCode = "pre-auth-code",
+            )
+        }
+
+        assertEquals(HttpStatusCode.SeeOther.value, error.statusCode)
+        assertEquals(1, callCount)
+    }
+
+    @Test
+    fun testExchangePreAuthorizedCodeFollowsSameOriginTemporaryRedirect() = runTest {
+        var callCount = 0
+        val client = createMockClient { request ->
+            callCount += 1
+            when (callCount) {
+                1 -> respond(
+                    content = "",
+                    status = HttpStatusCode.TemporaryRedirect,
+                    headers = headersOf(HttpHeaders.Location, "https://auth.example.com/other-token"),
+                )
+
+                2 -> {
+                    assertEquals("https://auth.example.com/other-token", request.url.toString())
+                    assertEquals("pre-auth-code", request.formParameters()["pre-authorized_code"])
+                    respond(
+                        content = """{"access_token":"access","token_type":"Bearer"}""",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                    )
+                }
+
+                else -> error("Token redirect should only be followed once")
+            }
+        }
+
+        val response = TokenRequestBuilder(clientConfig, client).exchangePreAuthorizedCode(
+            tokenEndpoint = tokenEndpoint,
+            preAuthorizedCode = "pre-auth-code",
+        )
+
+        assertEquals("access", response.access_token)
+        assertEquals(2, callCount)
     }
 
     @Test

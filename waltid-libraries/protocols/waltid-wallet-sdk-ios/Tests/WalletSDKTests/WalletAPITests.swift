@@ -296,6 +296,29 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(String(describing: handle), "IssuancePreviewHandle(<redacted>)")
     }
 
+    func testIssuanceSessionDescriptionRedactsAuthorizationContinuation() {
+        let authorization = IssuanceAuthorization(
+            url: URL(string: "https://issuer.example/authorize?state=secret-state")!,
+            state: "secret-state",
+            redirectURI: URL(string: "wallet.example:/callback")!,
+            pkce: .init(codeChallenge: "secret-challenge", codeChallengeMethod: "S256"),
+            pushedAuthorizationRequestUsed: false
+        )
+        let session = IssuanceSession(
+            id: "session-1",
+            offer: .init(
+                grant: .authorizationCode,
+                issuer: .init(identifier: "https://issuer.example", name: nil, locale: nil, logoURI: nil, logoAltText: nil),
+                credentials: [],
+                transactionCode: nil
+            ),
+            authorization: authorization
+        )
+
+        XCTAssertFalse(session.description.contains("secret-state"))
+        XCTAssertFalse(session.description.contains("secret-challenge"))
+    }
+
     func testCredentialsReturnsWalletCredentials() async throws {
         let credential = Credential(
             id: "credential-1",

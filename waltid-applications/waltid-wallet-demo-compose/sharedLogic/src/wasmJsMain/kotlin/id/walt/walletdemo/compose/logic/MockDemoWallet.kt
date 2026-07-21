@@ -58,6 +58,9 @@ private class MockDemoWallet : DemoWallet {
 
     override suspend fun discardIssuancePreview(previewHandle: WalletDemoIssuancePreviewHandle) = Unit
 
+    override suspend fun resumeDeferredIssuance(deferredCredentialId: String) =
+        WalletDemoIssuanceOutcome.Failed("No mock deferred credential")
+
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
         WalletDemoOperationResult.Success("Mock presentation sent")
 
