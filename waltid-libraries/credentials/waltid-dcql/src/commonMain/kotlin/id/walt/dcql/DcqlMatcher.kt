@@ -344,16 +344,18 @@ object DcqlMatcher {
 
     /** Match a Claims Path Pointer against the disclosure's complete resolved location. */
     fun DcqlDisclosure.matchesPath(queryPath: List<JsonElement>): Boolean {
-        val normalizedQueryPath = queryPath.dropWhile { segment ->
-            segment is JsonPrimitive && segment.isString && segment.content == "$"
-        }
         val disclosurePath = location ?: name
-            ?.takeIf { normalizedQueryPath.size == 1 }
+            ?.takeIf { queryPath.size == 1 }
             ?.let { listOf(JsonPrimitive(it)) }
             ?: return false
-        if (normalizedQueryPath.size != disclosurePath.size) return false
-        return normalizedQueryPath.zip(disclosurePath).all { (querySegment, actualSegment) ->
-            querySegment is JsonNull || querySegment == actualSegment
+        if (queryPath.size != disclosurePath.size) return false
+        return queryPath.zip(disclosurePath).all { (querySegment, actualSegment) ->
+            when (querySegment) {
+                is JsonNull -> actualSegment is JsonPrimitive &&
+                    !actualSegment.isString &&
+                    actualSegment.intOrNull?.let { it >= 0 } == true
+                else -> querySegment == actualSegment
+            }
         }
     }
 

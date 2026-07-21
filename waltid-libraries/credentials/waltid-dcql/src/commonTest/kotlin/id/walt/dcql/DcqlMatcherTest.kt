@@ -3,6 +3,7 @@ package id.walt.dcql
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -318,6 +319,46 @@ class DcqlMatcherTest {
         val selected = DcqlMatcher.match(query, listOf(credential)).getOrThrow()
             .getValue("employee").single().selectedDisclosures.orEmpty().values.single()
         assertEquals(employeeName, selected)
+    }
+
+    @Test
+    fun sdJwtDisclosureMatchingUsesExactClaimsPathPointerSemantics() {
+        val objectPropertyDisclosure = DcqlDisclosure(
+            name = "name",
+            value = JsonPrimitive("Alice"),
+            location = listOf(JsonPrimitive("name")),
+        )
+        val privateSsnDisclosure = DcqlDisclosure(
+            name = "ssn",
+            value = JsonPrimitive("123-45-6789"),
+            location = listOf(JsonPrimitive("address"), JsonPrimitive("private"), JsonPrimitive("ssn")),
+        )
+        val arrayDisclosure = DcqlDisclosure(
+            name = "name",
+            value = JsonPrimitive("Alice"),
+            location = listOf(JsonPrimitive("people"), JsonPrimitive(0), JsonPrimitive("name")),
+        )
+
+        assertFalse(
+            DcqlMatcher.run {
+                objectPropertyDisclosure.matchesPath(listOf(JsonPrimitive("$"), JsonPrimitive("name")))
+            },
+            "A leading dollar sign is an ordinary property name, not a root marker",
+        )
+        assertFalse(
+            DcqlMatcher.run {
+                privateSsnDisclosure.matchesPath(
+                    listOf(JsonPrimitive("address"), JsonNull, JsonPrimitive("ssn"))
+                )
+            },
+            "The null wildcard must not match an object-property segment",
+        )
+        assertTrue(
+            DcqlMatcher.run {
+                arrayDisclosure.matchesPath(listOf(JsonPrimitive("people"), JsonNull, JsonPrimitive("name")))
+            },
+            "The null wildcard matches a non-negative array index",
+        )
     }
 
     @Test

@@ -1,13 +1,13 @@
 package id.walt.openid4vp.clientidprefix.prefixes
 
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
+import id.walt.openid4vp.clientidprefix.requestObjectAlgorithmMatchesKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.validateCertificateChain
 import id.walt.x509.platformSupportsPkixCertificatePathValidation
@@ -76,7 +76,7 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
         // Verify the JWS independently so signature failures are not reported as trust failures.
         val key = runCatching { JWKKey.importFromDerCertificate(leafCertificate.bytes.toByteArray()).getOrThrow() }
             .getOrElse { return ClientValidationResult.Failure(ClientIdError.InvalidSignature) }
-        if (requestObjectAlgorithm == "ES256" && key.keyType != KeyType.secp256r1) {
+        if (!requestObjectAlgorithmMatchesKey(requestObjectAlgorithm, key.keyType)) {
             return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
         }
         key.verifyJws(jws).getOrElse {

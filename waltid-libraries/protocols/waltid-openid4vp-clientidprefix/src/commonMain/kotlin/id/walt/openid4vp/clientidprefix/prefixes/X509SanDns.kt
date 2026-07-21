@@ -1,13 +1,13 @@
 package id.walt.openid4vp.clientidprefix.prefixes
 
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
 import id.walt.openid4vp.clientidprefix.extractSanDnsNamesFromDer
+import id.walt.openid4vp.clientidprefix.requestObjectAlgorithmMatchesKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.validateCertificateChain
 import id.walt.x509.platformSupportsPkixCertificatePathValidation
@@ -82,7 +82,7 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
         val leafCertDer = leafCertificate.bytes.toByteArray()
         val key = runCatching { JWKKey.importFromDerCertificate(leafCertDer).getOrThrow() }
             .getOrElse { return ClientValidationResult.Failure(ClientIdError.InvalidSignature) }
-        if (requestObjectAlgorithm == "ES256" && key.keyType != KeyType.secp256r1) {
+        if (!requestObjectAlgorithmMatchesKey(requestObjectAlgorithm, key.keyType)) {
             return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
         }
         log.trace { "Imported key from leaf cert der for X509SanDns: $key" }

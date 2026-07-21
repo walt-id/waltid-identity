@@ -189,24 +189,48 @@ class ResponseEncryptionHandlerTest {
     }
 
     @Test
-    fun extractEncryptionConfig_acceptsSelectedKeyWithoutKid() = runTest {
+    fun extractEncryptionConfig_rejectsSelectedKeyWithoutKid() = runTest {
         val missingKid = JsonObject(testEcPublicKeyJwk - "kid")
-        val config = ResponseEncryptionHandler.extractEncryptionConfig(encryptedRequest(listOf(missingKid))).getOrThrow()
 
-        assertNotNull(config)
-        assertNull(config.keyId)
+        assertTrue(ResponseEncryptionHandler.extractEncryptionConfig(encryptedRequest(listOf(missingKid))).isFailure)
     }
 
     @Test
-    fun extractEncryptionConfig_ignoresUnrelatedKeyWithoutKid() = runTest {
+    fun extractEncryptionConfig_rejectsBlankOrNonStringKid() = runTest {
+        val invalidKids = listOf(
+            JsonObject(testEcPublicKeyJwk + ("kid" to JsonPrimitive(" "))),
+            JsonObject(testEcPublicKeyJwk + ("kid" to JsonPrimitive(7))),
+        )
+
+        invalidKids.forEach { key ->
+            assertTrue(ResponseEncryptionHandler.extractEncryptionConfig(encryptedRequest(listOf(key))).isFailure)
+        }
+    }
+
+    @Test
+    fun extractEncryptionConfig_rejectsUnrelatedKeyWithoutKid() = runTest {
         val unrelatedKeyWithoutKid = JsonObject(
             testEcPublicKeyJwk - "kid" + ("use" to JsonPrimitive("sig")) + ("alg" to JsonPrimitive("ES256"))
         )
-        val config = ResponseEncryptionHandler.extractEncryptionConfig(
-            encryptedRequest(listOf(unrelatedKeyWithoutKid, testEcPublicKeyJwk))
-        ).getOrThrow()
 
-        assertEquals("test-enc-key-1", config?.keyId)
+        assertTrue(
+            ResponseEncryptionHandler.extractEncryptionConfig(
+                encryptedRequest(listOf(unrelatedKeyWithoutKid, testEcPublicKeyJwk))
+            ).isFailure
+        )
+    }
+
+    @Test
+    fun extractEncryptionConfig_rejectsDuplicateKidAcrossRequestJwks() = runTest {
+        val duplicateKid = JsonObject(
+            testEcPublicKeyJwk + ("use" to JsonPrimitive("sig")) + ("alg" to JsonPrimitive("ES256"))
+        )
+
+        assertTrue(
+            ResponseEncryptionHandler.extractEncryptionConfig(
+                encryptedRequest(listOf(duplicateKid, testEcPublicKeyJwk))
+            ).isFailure
+        )
     }
 
     @Test
@@ -260,20 +284,6 @@ class ResponseEncryptionHandlerTest {
         assertEquals("ECDH-ES", protectedHeader["alg"]?.jsonPrimitive?.content)
         assertEquals("A256GCM", protectedHeader["enc"]?.jsonPrimitive?.content)
         assertEquals("test-enc-key-1", protectedHeader["kid"]?.jsonPrimitive?.content)
-    }
-
-    @Test
-    fun encryptResponse_omitsKidWhenSelectedJwkHasNoKid() = runTest {
-        val keyWithoutKid = JsonObject(testEcPublicKeyJwk - "kid")
-        val config = assertNotNull(
-            ResponseEncryptionHandler.extractEncryptionConfig(encryptedRequest(listOf(keyWithoutKid))).getOrThrow()
-        )
-        val jwe = ResponseEncryptionHandler.encryptResponse(buildJsonObject { put("state", JsonPrimitive("state")) }, config)
-        val protectedHeader = Json.parseToJsonElement(
-            jwe.substringBefore('.').decodeFromBase64Url().decodeToString()
-        ).jsonObject
-
-        assertTrue("kid" !in protectedHeader)
     }
 
     private fun encryptedRequest(

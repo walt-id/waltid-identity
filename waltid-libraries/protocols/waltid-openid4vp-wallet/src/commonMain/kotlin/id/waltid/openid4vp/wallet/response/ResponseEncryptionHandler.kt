@@ -30,7 +30,7 @@ object ResponseEncryptionHandler {
     data class EncryptionConfig(
         val verifierJwk: JsonObject,
         val verifierKey: JWKKey,
-        val keyId: String?,
+        val keyId: String,
         val encAlgorithm: String,
         val algAlgorithm: String,
         val verifierKeyThumbprint: String,
@@ -68,6 +68,20 @@ object ResponseEncryptionHandler {
 
         val keys = clientMetadata.jwks?.keys.orEmpty()
         require(keys.isNotEmpty()) { "No encryption keys found in client_metadata.jwks" }
+        // OID4VP 1.0 §5.1 requires every inline JWK to have a request-unique `kid`,
+        // including keys that will later be excluded by encryption eligibility checks.
+        val keyIds = keys.mapIndexed { index, jwk ->
+            (jwk["kid"] as? JsonPrimitive)
+                ?.takeIf { it.isString }
+                ?.content
+                ?.takeIf { it.isNotBlank() }
+                ?: throw IllegalArgumentException(
+                    "Every JWK in client_metadata.jwks must have a non-blank string kid (invalid key at index $index)"
+                )
+        }
+        require(keyIds.size == keyIds.toSet().size) {
+            "Every JWK in client_metadata.jwks must have a request-unique kid"
+        }
 
         val eligibleKeys = keys.filter(::isSupportedEncryptionKey).map { jwk ->
             val key = JWKKey.importJWK(jwk.toString()).getOrThrow()
@@ -83,9 +97,9 @@ object ResponseEncryptionHandler {
         )
 
         val verifierJwkData = selected.jwk
-        val keyId = verifierJwkData["kid"]?.jsonPrimitive?.contentOrNull
+        val keyId = requireNotNull(verifierJwkData["kid"]?.jsonPrimitive?.contentOrNull)
         val alg = requireNotNull(verifierJwkData["alg"]?.jsonPrimitive?.contentOrNull)
-        log.trace { "Selected verifier encryption key: ${keyId ?: selected.thumbprint}" }
+        log.trace { "Selected verifier encryption key: $keyId" }
 
         // Select content encryption algorithm
         // Default is A128GCM per OID4VP spec
@@ -149,6 +163,9 @@ object ResponseEncryptionHandler {
     ): String {
         require(config.algAlgorithm == SUPPORTED_ALG) {
             "Unsupported JWE alg ${config.algAlgorithm}"
+        }
+        require(config.verifierJwk["kid"]?.jsonPrimitive?.contentOrNull == config.keyId) {
+            "Encryption configuration kid does not match the selected verifier JWK"
         }
         log.trace { "Encrypting authorization response payload" }
         return config.verifierKey.encryptJwe(
