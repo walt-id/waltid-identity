@@ -53,4 +53,35 @@ class AuthorizationResponseParserTest {
             )
         }
     }
+
+    @Test
+    fun validatesAuthorizationResponseIssuerWhenPresentOrRequired() {
+        val accepted = AuthorizationResponseParser.parseAuthorizationResponse(
+            redirectUri = "$redirect&code=code-1&state=state-1&iss=https%3A%2F%2Fas.example",
+            expectedState = "state-1",
+            expectedRedirectUri = redirect,
+            expectedIssuer = "https://as.example",
+            requireIssuer = true,
+        )
+        assertEquals("code-1", accepted.code)
+
+        assertFailsWith<IllegalArgumentException> {
+            AuthorizationResponseParser.parseAuthorizationResponse(
+                redirectUri = "$redirect&code=code-1&state=state-1",
+                expectedState = "state-1",
+                expectedRedirectUri = redirect,
+                expectedIssuer = "https://as.example",
+                requireIssuer = true,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            AuthorizationResponseParser.parseAuthorizationResponse(
+                redirectUri = "$redirect&code=code-1&state=state-1&iss=https%3A%2F%2Fother.example",
+                expectedState = "state-1",
+                expectedRedirectUri = redirect,
+                expectedIssuer = "https://as.example",
+                requireIssuer = false,
+            )
+        }
+    }
 }

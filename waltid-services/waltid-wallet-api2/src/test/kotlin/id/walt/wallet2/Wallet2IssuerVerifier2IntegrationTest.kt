@@ -558,7 +558,8 @@ class Wallet2IssuerVerifier2IntegrationTest {
 
                 // 6. Verify session outcome
                 testAndReturn("[$tag] Verification session is SUCCESSFUL") {
-                    val verifierSession = http.awaitVerificationSession(sessionId)
+                    val verifierSession = http.get("/verification-session/$sessionId/info")
+                        .body<Verification2Session>()
                     assertEquals(
                         Verification2Session.VerificationSessionStatus.SUCCESSFUL,
                         verifierSession.status,
