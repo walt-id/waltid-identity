@@ -40,6 +40,44 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun invalidPresentationPreviewCanBeDismissedOrReturnedToVerifier() = runTest {
+        val error = WalletDemoPresentationError(
+            verifier = VerifierDetails(name = "Example Verifier", clientId = "https://verifier.example"),
+            errorCode = "invalid_transaction_data",
+            message = "Unsupported transaction_data type",
+        )
+        val wallet = FakeDemoWallet(presentationError = error)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Present)
+        controller.updatePresentationRequestUrl("openid4vp://invalid")
+        controller.previewPresentation()
+        runCurrent()
+
+        assertEquals(error, controller.state.value.presentationError)
+        assertEquals(null, controller.state.value.presentationPreview)
+        assertEquals(WalletDisplayText.ReviewPresentationError, controller.state.value.statusText)
+        assertFalse(controller.state.value.presentationUrlEntryEnabled)
+        assertTrue(controller.state.value.presentationReviewEnabled)
+
+        controller.rejectPresentation()
+        runCurrent()
+
+        assertEquals("openid4vp://invalid", wallet.rejectedRequestUrl)
+        assertEquals(null, controller.state.value.presentationError)
+        assertEquals(WalletDisplayText.VerifierNotified, controller.state.value.statusText)
+
+        controller.updatePresentationRequestUrl("openid4vp://invalid-again")
+        controller.previewPresentation()
+        runCurrent()
+        controller.startNewPresentationFlow()
+
+        assertEquals(null, controller.state.value.presentationError)
+        assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
+        assertEquals(null, wallet.rejectedRequestUrl.takeIf { it == "openid4vp://invalid-again" })
+    }
+
+    @Test
     fun setupPinRejectsInvalidLengthAndNonDigits() = runTest {
         val controller = controllerWith(FakeDemoWallet(), this)
 
@@ -445,10 +483,12 @@ class WalletDemoControllerTest {
 
         controller.previewPresentation()
         runCurrent()
-        controller.cancelPresentationReview()
+        controller.rejectPresentation()
+        runCurrent()
 
+        assertEquals("openid4vp://example", wallet.rejectedRequestUrl)
         assertEquals(
-            WalletOperationState.Succeeded("Presentation review cancelled", WalletDemoTab.Present),
+            WalletOperationState.Succeeded("Presentation declined", WalletDemoTab.Present),
             controller.state.value.operation,
         )
         assertEquals(null, controller.state.value.presentationPreview)
@@ -1045,7 +1085,7 @@ class WalletDemoControllerTest {
         controller.selectTab(WalletDemoTab.Present)
         controller.updatePresentationRequestUrl("openid4vp://example")
         assertTrue(controller.state.value.presentationUrlEntryEnabled)
-        assertFalse(controller.state.value.presentationPreviewActionEnabled)
+        assertTrue(controller.state.value.presentationPreviewActionEnabled)
 
         controller.previewPresentation()
         runCurrent()
@@ -1075,6 +1115,78 @@ class WalletDemoControllerTest {
         assertEquals(resetKeyBeforeNewFlow + 1, controller.state.value.presentationNavigationResetKey)
         assertEquals(WalletOperationState.Idle, controller.state.value.operation)
         assertEquals("Wallet ready", controller.state.value.statusText)
+    }
+
+    @Test
+    fun rejectionSurfacesVerifierContinuationExactlyOnce() = runTest {
+        val continuationUrl = "wallet-demo://presentation-complete"
+        val wallet = FakeDemoWallet(
+            rejectionResult = WalletDemoOperationResult.Success(
+                WalletDisplayText.PresentationDeclined,
+                WalletDemoPresentationContinuation.Url(continuationUrl),
+            ),
+        )
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Present)
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        controller.previewPresentation()
+        runCurrent()
+        controller.rejectPresentation()
+        runCurrent()
+
+        assertEquals(
+            WalletDemoPresentationContinuation.Url(continuationUrl),
+            controller.state.value.pendingPresentationContinuation?.continuation,
+        )
+        assertFalse(controller.state.value.presentationCompleted)
+        assertTrue(controller.state.value.operation is WalletOperationState.DecliningPresentation)
+
+        controller.completePresentationContinuation()
+
+        assertEquals(null, controller.state.value.pendingPresentationContinuation)
+        assertTrue(controller.state.value.presentationCompleted)
+        assertEquals(
+            WalletOperationState.Succeeded(WalletDisplayText.PresentationDeclined, WalletDemoTab.Present),
+            controller.state.value.operation,
+        )
+    }
+
+    @Test
+    fun formPostRejectionRemainsPendingUntilDeliveryAndSurfacesFailure() = runTest {
+        val html = "<form method=\"post\" action=\"https://verifier.example/response\"></form>"
+        val wallet = FakeDemoWallet(
+            rejectionResult = WalletDemoOperationResult.Success(
+                WalletDisplayText.PresentationDeclined,
+                WalletDemoPresentationContinuation.FormPostHtml(html),
+            ),
+        )
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Present)
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        controller.previewPresentation()
+        runCurrent()
+        controller.rejectPresentation()
+        runCurrent()
+
+        assertEquals(
+            WalletDemoPresentationContinuation.FormPostHtml(html),
+            controller.state.value.pendingPresentationContinuation?.continuation,
+        )
+        assertFalse(controller.state.value.presentationCompleted)
+
+        controller.failPresentationContinuation("network unavailable")
+
+        assertEquals(null, controller.state.value.pendingPresentationContinuation)
+        assertFalse(controller.state.value.presentationCompleted)
+        assertEquals(
+            WalletOperationState.Failed(
+                "Could not deliver the verifier response: network unavailable",
+                WalletDemoTab.Present,
+            ),
+            controller.state.value.operation,
+        )
     }
 
     private fun controllerWith(
@@ -1137,11 +1249,13 @@ private class FakeDemoWallet(
     private val receiveGate: CompletableDeferred<Unit>? = null,
     private val ignoreReceiveCancellation: Boolean = false,
     private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult.Success(WalletDisplayText.PresentationSent),
+    private val rejectionResult: WalletDemoOperationResult = WalletDemoOperationResult.Success(WalletDisplayText.PresentationDeclined),
     private val presentationPreview: WalletDemoPresentationPreview = WalletDemoPresentationPreview(
         verifierName = null,
         clientId = null,
         credentialOptions = emptyList(),
     ),
+    private val presentationError: WalletDemoPresentationError? = null,
 ) : DemoWallet {
     var bootstrapCalls = 0
     var resolveOfferCalls = 0
@@ -1152,6 +1266,7 @@ private class FakeDemoWallet(
     var presentedRequestUrl: String? = null
     var previewedRequestUrl: String? = null
     var submittedRequestUrl: String? = null
+    var rejectedRequestUrl: String? = null
     var submittedCredentialOptions: List<WalletDemoPresentationCredentialSelection>? = null
     var submittedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>? = null
 
@@ -1191,9 +1306,10 @@ private class FakeDemoWallet(
         return presentationResult
     }
 
-    override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreview {
+    override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult {
         previewedRequestUrl = requestUrl
-        return presentationPreview
+        return presentationError?.let(WalletDemoPresentationPreviewResult::Invalid)
+            ?: WalletDemoPresentationPreviewResult.Ready(presentationPreview)
     }
 
     override suspend fun submitPresentation(
@@ -1206,5 +1322,10 @@ private class FakeDemoWallet(
         submittedCredentialOptions = selectedCredentialOptions
         submittedDisclosureOptions = selectedDisclosureOptions
         return WalletDemoOperationResult.Success(WalletDisplayText.PresentationSent)
+    }
+
+    override suspend fun rejectPresentation(requestUrl: String): WalletDemoOperationResult {
+        rejectedRequestUrl = requestUrl
+        return rejectionResult
     }
 }

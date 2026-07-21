@@ -110,22 +110,18 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             operation: "present credentials"
         )
 
-        return .init(
-            success: value.success,
-            redirectTo: value.redirectTo.flatMap(URL.init(string:)),
-            verifierResponseJSON: value.verifierResponseJson
-        )
+        return try value.toSwiftPresentationResult()
     }
 
-    func previewPresentation(request: URL) async throws -> PresentationPreview {
+    func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         let result = try await bridge.previewPresentation(requestUrl: request.absoluteString)
         let value = try Self.successValue(
             result,
-            as: MobileWalletPresentationPreview.self,
+            as: MobileWalletPresentationPreviewResult.self,
             operation: "preview presentation"
         )
 
-        return value.toSwiftPreview()
+        return try value.toSwiftPreviewResult()
     }
 
     func submitPresentation(
@@ -159,11 +155,26 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             operation: "submit presentation"
         )
 
-        return .init(
-            success: value.success,
-            redirectTo: value.redirectTo.flatMap(URL.init(string:)),
-            verifierResponseJSON: value.verifierResponseJson
+        return try value.toSwiftPresentationResult()
+    }
+
+    func rejectPresentation(
+        request: URL,
+        error: PresentationErrorCode?,
+        errorDescription: String?
+    ) async throws -> PresentationResult {
+        let result = try await bridge.rejectPresentation(
+            requestUrl: request.absoluteString,
+            errorCode: error?.toKMPErrorCode(),
+            errorDescription: errorDescription
         )
+        let value = try Self.successValue(
+            result,
+            as: MobileWalletPresentationResult.self,
+            operation: "reject presentation"
+        )
+
+        return try value.toSwiftPresentationResult()
     }
 
     private static func successValue<T>(
@@ -576,6 +587,25 @@ private extension MobileWalletCredential {
     }
 }
 
+private extension MobileWalletPresentationPreviewResult {
+    func toSwiftPreviewResult() throws -> PresentationPreviewResult {
+        switch self {
+        case let result as MobileWalletPresentationPreviewResultReady:
+            return .ready(result.preview.toSwiftPreview())
+        case let result as MobileWalletPresentationPreviewResultInvalid:
+            return .invalid(
+                PresentationPreviewError(
+                    request: result.request.toSwiftRequestInfo(),
+                    code: result.errorCode.toSwiftErrorCode(),
+                    message: result.message
+                )
+            )
+        default:
+            throw WalletError.internalFailure("Unsupported presentation preview result: \(type(of: self))")
+        }
+    }
+}
+
 private extension MobileWalletPresentationPreview {
     func toSwiftPreview() -> PresentationPreview {
         PresentationPreview(
@@ -663,6 +693,102 @@ private extension MobileWalletTransactionDataItem {
             rawJSON: rawJson,
             detailsJSON: detailsJson
         )
+    }
+}
+
+private extension PresentationErrorCode {
+    func toKMPErrorCode() -> MobileWalletPresentationErrorCode {
+        switch self {
+        case .accessDenied:
+            return .accessDenied
+        case .invalidRequest:
+            return .invalidRequest
+        case .invalidClient:
+            return .invalidClient
+        case .invalidScope:
+            return .invalidScope
+        case .unauthorizedClient:
+            return .unauthorizedClient
+        case .unsupportedResponseType:
+            return .unsupportedResponseType
+        case .serverError:
+            return .serverError
+        case .temporarilyUnavailable:
+            return .temporarilyUnavailable
+        case .vpFormatsNotSupported:
+            return .vpFormatsNotSupported
+        case .invalidRequestURIMethod:
+            return .invalidRequestUriMethod
+        case .invalidTransactionData:
+            return .invalidTransactionData
+        case .walletUnavailable:
+            return .walletUnavailable
+        }
+    }
+}
+
+private extension MobileWalletPresentationErrorCode {
+    func toSwiftErrorCode() -> PresentationErrorCode {
+        switch self {
+        case .accessDenied:
+            return .accessDenied
+        case .invalidRequest:
+            return .invalidRequest
+        case .invalidClient:
+            return .invalidClient
+        case .invalidScope:
+            return .invalidScope
+        case .unauthorizedClient:
+            return .unauthorizedClient
+        case .unsupportedResponseType:
+            return .unsupportedResponseType
+        case .serverError:
+            return .serverError
+        case .temporarilyUnavailable:
+            return .temporarilyUnavailable
+        case .vpFormatsNotSupported:
+            return .vpFormatsNotSupported
+        case .invalidRequestUriMethod:
+            return .invalidRequestURIMethod
+        case .invalidTransactionData:
+            return .invalidTransactionData
+        case .walletUnavailable:
+            return .walletUnavailable
+        }
+    }
+}
+
+private extension MobileWalletPresentationResult {
+    func toSwiftPresentationResult() throws -> PresentationResult {
+        switch self {
+        case let result as MobileWalletPresentationResultTransmittedSucceeded:
+            let redirectURL: URL?
+            if let value = result.redirectUrl {
+                guard let url = URL(string: value) else {
+                    throw WalletError.invalidInput("Invalid presentation redirect URL: \(value)")
+                }
+                redirectURL = url
+            } else {
+                redirectURL = nil
+            }
+            return .transmitted(
+                .succeeded(
+                    verifierResponseJSON: result.verifierResponseJson,
+                    redirectURL: redirectURL
+                )
+            )
+        case let result as MobileWalletPresentationResultPreparedOpenUrl:
+            guard let url = URL(string: result.url) else {
+                throw WalletError.invalidInput("Invalid presentation continuation URL: \(result.url)")
+            }
+            return .prepared(.openURL(url))
+        case let result as MobileWalletPresentationResultPreparedSubmitForm:
+            return .prepared(.submitForm(html: result.html))
+        case let result as MobileWalletPresentationResultTransmittedFailed:
+            return .transmitted(.failed(verifierResponseJSON: result.verifierResponseJson))
+        default:
+            throw WalletError.internalFailure("Unknown presentation result type: \(type(of: self))")
+        }
     }
 }
 

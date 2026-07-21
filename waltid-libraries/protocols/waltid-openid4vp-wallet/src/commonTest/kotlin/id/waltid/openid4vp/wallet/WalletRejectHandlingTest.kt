@@ -95,7 +95,7 @@ class WalletRejectHandlingTest {
                 state = "state-<123>",
             ),
             error = "access_denied",
-            errorDescription = "User \"denied\"",
+            errorDescription = "User <denied> & stopped",
         ).getOrThrow()
 
         val html = assertNotNull(result.formPostHtml)
@@ -103,7 +103,7 @@ class WalletRejectHandlingTest {
         assertTrue("action=\"https://wallet.example/callback\"" in html)
         assertTrue("name=\"error\" value=\"access_denied\"" in html)
         // error_description should be HTML-escaped
-        assertTrue("name=\"error_description\" value=\"User &quot;denied&quot;\"" in html)
+        assertTrue("name=\"error_description\" value=\"User &lt;denied&gt; &amp; stopped\"" in html)
         // state should be HTML-escaped
         assertTrue("name=\"state\" value=\"state-&lt;123&gt;\"" in html)
         // auto-submit behavior present
@@ -123,5 +123,27 @@ class WalletRejectHandlingTest {
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is UnsupportedOperationException)
+    }
+
+    @Test
+    fun errorResponse_rejectsValuesOutsideRfc6749CharacterSet() = runTest {
+        listOf(
+            "" to null,
+            "access_denied" to "User \"denied\"",
+            "access_denied" to "User \\ denied",
+            "access_denied" to "Benutzer lehnte ab: ü",
+        ).forEach { (error, description) ->
+            val result = WalletPresentFunctionality2.walletRejectHandling(
+                authorizationRequest = AuthorizationRequest(
+                    redirectUri = "https://wallet.example/callback",
+                    responseMode = OpenID4VPResponseMode.QUERY,
+                ),
+                error = error,
+                errorDescription = description,
+            )
+
+            assertTrue(result.isFailure, "Expected invalid error response value to fail: $error / $description")
+            assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+        }
     }
 }

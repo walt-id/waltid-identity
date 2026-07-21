@@ -50,6 +50,10 @@ Android builds can override it with `-PtransactionDataProfiles.url=...`. Compose
 - Web/Wasm is currently a mock UI preview wired to `createMockDemoWallet()`. It does not exercise the mobile wallet SDK, platform key storage, SQLDelight persistence, EUDI flows, or Enterprise flows.
 - Production web wallet support is expected to live outside this mobile demo app. If a shared web UI is needed later, the shared UI module may need to move or split around the final web architecture.
 
+## Release APK
+
+Each GitHub release attaches a debug-signed `waltid-wallet-demo-compose-<version>.apk`, built with `assembleDebug`. Because CI signs with a fresh, throwaway debug key per release, a release APK **cannot upgrade a previously installed one** — uninstall the existing app first, then install the new one. Uninstalling resets local wallet data (see [Local wallet data](#local-wallet-data)).
+
 ## Common commands
 
 Android and shared UI:
