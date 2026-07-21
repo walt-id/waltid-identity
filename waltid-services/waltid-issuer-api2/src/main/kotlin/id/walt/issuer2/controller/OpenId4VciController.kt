@@ -101,12 +101,11 @@ class OpenId4VciController(
 
             val authOAuthInterceptor = createRouteScopedPlugin("issuer2AuthOAuthInterceptor") {
                 onCallRespond { call ->
-                    val internalAuthorizationRequest = call.parameters.getAll("internalAuthReq")?.joinToString("/")
-                        ?: call.parameters["internalAuthReq"]
+                    val authorizationRequestEnvelope = call.parameters["internalAuthReq"]
                         ?: return@onCallRespond
                     protocolService.processExternalLoginInterception(
                         externalAuthorizationRequest = call.response.headers.allValues().toMap()["Location"]?.firstOrNull(),
-                        internalAuthorizationRequest = internalAuthorizationRequest,
+                        authorizationRequestEnvelope = authorizationRequestEnvelope,
                     )
                 }
             }
