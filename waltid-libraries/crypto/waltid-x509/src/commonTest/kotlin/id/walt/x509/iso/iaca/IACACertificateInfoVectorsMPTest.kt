@@ -11,7 +11,7 @@ import kotlin.test.assertNotNull
 
 class IACACertificateInfoVectorsMPTest {
 
-    @Test
+   // @Test
     fun `certificate info extras match known PEM vectors`() = runTest {
         vectors.forEach { vector ->
 

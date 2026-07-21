@@ -1,6 +1,7 @@
 package id.walt.certificate.x509
 
 import id.walt.certificate.der.ByteArrayUtil.byteStringToBase64Pem
+import id.walt.crypto.utils.ShaUtils
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.toHexString
 import kotlin.time.Instant
@@ -18,6 +19,8 @@ interface X509Certificate {
         get() = signatureValueRaw.toHexString()
 
     val fingerprintSha256: ByteString
+        get() = ByteString(ShaUtils.sha256(encodedDer.toByteArray()))
+
     val fingerprintSha256Hex: String
         get() = fingerprintSha256.toHexString()
 
@@ -43,5 +46,5 @@ interface X509Certificate {
         val notBefore: Instant,
         val notAfter: Instant,
     )
-    typealias SubjectPublicKeyInfo = Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo
+    typealias SubjectPublicKeyInfo = PublicKeyInfo
 }

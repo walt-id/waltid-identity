@@ -117,7 +117,7 @@ class X509CertificateUtilCertificateSigningTest {
         }
 
         assertNotNull(intermediateCert.data.extensionSubjectKeyIdentifier) { keyIdentifier ->
-            assertEquals("ee73f2b305b33302d57024a1fa29b2d8108f10ff", keyIdentifier.keyIdentifier.toHexString())
+            assertEquals("e63ea1fc5df8efceef33cf4c04cd3751e4007cd7", keyIdentifier.keyIdentifier.toHexString())
         }
 
         println("Cert of intermediate certificate: ${intermediateCert.fingerprintSha256Hex}")

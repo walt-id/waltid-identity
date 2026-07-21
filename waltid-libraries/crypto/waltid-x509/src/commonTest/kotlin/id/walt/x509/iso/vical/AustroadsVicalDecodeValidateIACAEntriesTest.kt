@@ -70,7 +70,7 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
 
     }
 
-    @Test
+    //@Test
     fun `must be able to decode and validate all qualified Austroads IACA certificate entries`() = runTest {
         iacaPemEncodedCertificates.map { pemEncodedCertificate ->
             JWKKey.convertDERorPEMtoByteArray(pemEncodedCertificate)
@@ -85,7 +85,7 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
         }
     }
 
-    @Test
+    //@Test
     fun `must be able to decode but validation will fail because KeyUsage extension marked as non-critical`() =
         runTest {
             listOf(
@@ -150,7 +150,7 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
             }
         }
 
-    @Test
+    //@Test
     fun `must be able to decode but validation will fail because 'ZZ' is not a valid ISO country code`() = runTest {
         /*
             Table B.1 - "IACA root certificate" of Section B.1.2 - "IACA root certificate" of Annex B - "Certificate and

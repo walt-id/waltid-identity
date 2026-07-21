@@ -1,6 +1,7 @@
 package id.walt.certificate.x509.profile
 
 import id.walt.certificate.x509.X509Certificate
+import id.walt.certificate.x509.X509SigningAlgorithmInfo
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.extension.BasicConstraintsExtension
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
@@ -66,18 +67,19 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
     ) {
         require(issuerDnCountryCode.length == 2) { "Require two letter country code but is '${issuerDnCountryCode}'" }
         val issuerDn = listOfNotNull(
-            issuerDnSerialNumber?.let {
-                if (issuerDnCommonName != null) {
+            issuerDnSerialNumber?.ifBlank { null }?.let {
+                if (issuerDnCommonName?.ifBlank { null } != null) {
                     // append it to commonName
                     null
                 } else {
                     "SERIALNUMBER=${it}"
                 }
             },
-            issuerDnCommonName?.let { cn -> "CN=${cn}${issuerDnSerialNumber?.let { "+SERIALNUMBER=$it" } ?: ""}" },
-            issuerDnOrganizationName?.let { "O=${it}" },
-            issuerDnStateOrProvinceName?.let { "ST=${it}" },
-            issuerDnCountryCode.let { "C=${it.uppercase()}" },
+            issuerDnCommonName?.ifBlank { null }
+                ?.let { cn -> "CN=${cn}${issuerDnSerialNumber?.let { "+SERIALNUMBER=${it.trim()}" } ?: ""}" },
+            issuerDnOrganizationName?.ifBlank { null }?.let { "O=${it.trim()}" },
+            issuerDnStateOrProvinceName?.ifBlank { null }?.let { "ST=${it.trim()}" },
+            issuerDnCountryCode.let { "C=${it.uppercase().trim()}" },
         )
             .joinToString(",")
         profileIaCaRootCertificate(issuerDn, issuerEmailAddress, issuerUri)
@@ -287,14 +289,13 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
             )
         } else if (subjectPublicKeyInfo.ellipticCurveOid == null ||
             !allowedSubjectPublicKeyEllipticCurveOid.contains(subjectPublicKeyInfo.ellipticCurveOid)
-        )
-            if (x509Certificate.data.subjectDn != x509Certificate.data.issuerDn) {
-                context.addLogEntry(
-                    ValidationResult.Severity.ERROR,
-                    "subjectPublicKeyInfo",
-                    "Subject DN '${x509Certificate.data.subjectDn}' must be same as issuer DN ''${x509Certificate.data.issuerDn}'"
-                )
-            }
+        ) {
+            context.addLogEntry(
+                ValidationResult.Severity.ERROR,
+                "subjectPublicKeyInfo",
+                "Subject public key parameter elliptic curve OID expected to be one of '${allowedSubjectPublicKeyEllipticCurveOid}' but is '${subjectPublicKeyInfo.ellipticCurveOid}'"
+            )
+        }
     }
 
     /**

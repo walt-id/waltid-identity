@@ -1,6 +1,5 @@
 package id.walt.certificate.x509
 
-import id.walt.certificate.der.ByteArrayUtil
 import id.walt.certificate.der.ByteArrayUtil.byteStringToBase64Pem
 import id.walt.certificate.x509.extension.ExtensionContainer
 import kotlinx.io.bytestring.ByteString
@@ -28,14 +27,5 @@ interface Pkcs10CertificateSigningRequest {
         val subjectPublicKeyInfo: SubjectPublicKeyInfo
     }
 
-    interface SubjectPublicKeyInfo {
-        val algorithmName: String?
-        val algorithmOid: String
-        val ellipticCurveOid: String?
-        val publicKeyRaw: ByteString
-        val publicKeyHex: String
-            get() = publicKeyRaw.toHexString()
-        val publicKeyBase64: String
-            get() = ByteArrayUtil.byteArrayToBase64(publicKeyRaw.toByteArray())
-    }
+    typealias SubjectPublicKeyInfo = PublicKeyInfo
 }

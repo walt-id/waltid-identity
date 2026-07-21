@@ -12,29 +12,17 @@ group = "id.walt.crypto"
 
 kotlin {
 
-    js(IR) {
+    js {
         outputModuleName = "x509"
         nodejs {
             testTask {
                 useMocha()
-                enabled = false
+                enabled = true
             }
         }
     }
 
     sourceSets {
-        val jvmIosMain by creating {
-            dependsOn(commonMain.get())
-            dependencies {
-                implementation(identityLibs.signum.indispensable)
-                implementation(identityLibs.signum.supreme)
-            }
-        }
-        jvmMain.get().dependsOn(jvmIosMain)
-        if (enableIosBuild) {
-            iosMain.get().dependsOn(jvmIosMain)
-        }
-
         commonMain.dependencies {
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(identityLibs.kotlinx.coroutines.core)
@@ -49,34 +37,85 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.test)
             implementation(identityLibs.kotlinx.serialization.json)
         }
-        jvmMain.dependencies {
-            implementation(identityLibs.bouncycastle.prov)
-            implementation(identityLibs.bouncycastle.pkix)
-            implementation(identityLibs.nimbus.jose.jwt)
-            implementation(identityLibs.kotlinx.coroutines.core)
-        }
-        jvmTest.dependencies {
-            // Logging
-            implementation(identityLibs.slf4j.simple)
 
-            // Ktor client
-            implementation(identityLibs.ktor.client.java)
-
-            // Test
-            implementation(kotlin("test"))
-            implementation(identityLibs.junit.jupiter.api)
-            implementation(identityLibs.junit.jupiter.engine)
-
-            implementation(identityLibs.bouncycastle.prov)
-            implementation(identityLibs.nimbus.jose.jwt)
+        val commonSignumMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+                implementation(identityLibs.signum.indispensable)
+                implementation(identityLibs.kotlinx.io.bytestring)
+            }
         }
-        jsMain.dependencies {
-            implementation(identityLibs.signum.indispensable)
-        }
-        jsTest.dependencies {
-            implementation(kotlin("test-js"))
 
+        val commonSignumTest by creating {
+            dependsOn(commonTest.get())
+            dependsOn(commonSignumMain)
         }
+
+        val jvmIosMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+                implementation(identityLibs.signum.indispensable)
+                implementation(identityLibs.signum.supreme)
+            }
+        }
+
+        jvmMain {
+            dependsOn(commonSignumMain)
+            dependsOn(jvmIosMain)
+            dependencies {
+                implementation(identityLibs.signum.indispensable)
+                implementation(identityLibs.bouncycastle.prov)
+                implementation(identityLibs.bouncycastle.pkix)
+                implementation(identityLibs.nimbus.jose.jwt)
+                implementation(identityLibs.kotlinx.coroutines.core)
+            }
+        }
+
+        jvmTest {
+            dependsOn(jvmMain.get())
+            dependsOn(commonSignumTest)
+            dependencies {
+
+                // Logging
+                implementation(identityLibs.slf4j.simple)
+
+                // Ktor client
+                implementation(identityLibs.ktor.client.java)
+
+                // Test
+                implementation(kotlin("test"))
+                implementation(identityLibs.junit.jupiter.api)
+                implementation(identityLibs.junit.jupiter.engine)
+                implementation(identityLibs.junit.jupiter.params)
+
+                implementation(identityLibs.bouncycastle.prov)
+                implementation(identityLibs.nimbus.jose.jwt)
+            }
+        }
+
+
+        jsMain {
+            dependsOn(commonSignumMain)
+            dependencies {
+                implementation(identityLibs.signum.indispensable)
+            }
+        }
+
+
+        /*
+
+
+                jvmMain.get().dependsOn(jvmIosMain)
+                if (enableIosBuild) {
+                    iosMain.get().dependsOn(jvmIosMain)
+                }
+
+
+                jsTest {
+                    dependsOn(commonSignumMain)
+                }*/
     }
 
     if (enableAndroidBuild) {

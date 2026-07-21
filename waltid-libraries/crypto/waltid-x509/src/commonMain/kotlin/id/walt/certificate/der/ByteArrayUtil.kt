@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
 package id.walt.certificate.der
 
 import kotlinx.io.bytestring.ByteString

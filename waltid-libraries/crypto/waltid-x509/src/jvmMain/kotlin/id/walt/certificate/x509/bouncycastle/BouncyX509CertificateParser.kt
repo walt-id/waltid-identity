@@ -11,10 +11,16 @@ import java.io.StringReader
 internal class BouncyX509CertificateParser : X509CertificateParser {
 
     override fun parseCertificatePem(pem: String): X509Certificate {
-        val cert = StringReader(pem).use { reader ->
-            val parser = PEMParser(reader)
-            parser.readObject()
+        val result = runCatching {
+            StringReader(pem).use { reader ->
+                val parser = PEMParser(reader)
+                parser.readObject()
+            }
         }
+        if (result.isFailure) {
+            throw IllegalArgumentException("Failed to parse PEM: '${pem}'", result.exceptionOrNull())
+        }
+        val cert = result.getOrThrow()
         require(cert is X509CertificateHolder) { "Not a certificate in PEM" }
         return BouncyX509Certificate(cert)
     }

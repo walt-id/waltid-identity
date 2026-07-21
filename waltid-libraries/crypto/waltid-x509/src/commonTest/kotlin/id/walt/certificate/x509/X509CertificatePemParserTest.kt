@@ -1,10 +1,10 @@
-package id.walt.x509
+package id.walt.certificate.x509
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-class CertificateDerMPTest {
+class X509CertificatePemParserTest {
 
     @Test
     fun `fromPEMEncodedString parses LF and CRLF line endings`() {
@@ -14,65 +14,51 @@ class CertificateDerMPTest {
             newValue = "\r\n",
         )
 
-        val derFromLf = CertificateDer.fromPEMEncodedString(
-            pemEncodedCertificate = pemLf,
-        )
-        val derFromCrLf = CertificateDer.fromPEMEncodedString(
-            pemEncodedCertificate = pemCrLf,
-        )
+        val certA = X509CertificateUtil.parseCertificatePem(pemLf)
+        val certB = X509CertificateUtil.parseCertificatePem(pemCrLf)
 
         assertEquals(
-            expected = derFromLf.bytes,
-            actual = derFromCrLf.bytes,
+            expected = certA.encodedDer,
+            actual = certB.encodedDer,
         )
     }
 
     @Test
     fun `fromPEMEncodedString round trips with toPEMEncodedString`() {
-        val der = CertificateDer.fromPEMEncodedString(
-            pemEncodedCertificate = examplePem,
-        )
-
-        val roundTrip = CertificateDer.fromPEMEncodedString(
-            pemEncodedCertificate = der.toPEMEncodedString(),
-        )
+        val cert = X509CertificateUtil.parseCertificatePem(examplePem)
+        val roundTrip = X509CertificateUtil.parseCertificatePem(cert.encodedPem)
 
         assertEquals(
-            expected = der.bytes,
-            actual = roundTrip.bytes,
+            expected = cert.encodedDer,
+            actual = roundTrip.encodedDer,
         )
     }
 
     @Test
-    fun `toPEMEncodedString includes header footer and CRLF separators`() {
-        val der = CertificateDer.fromPEMEncodedString(
-            pemEncodedCertificate = examplePem,
-        )
-
-        val pem = der.toPEMEncodedString()
+    fun `toPEMEncodedString includes header footer and LF separators`() {
+        val cert = X509CertificateUtil.parseCertificatePem(examplePem)
+        val pem = cert.encodedPem
 
         assertEquals(
             expected = true,
-            actual = pem.startsWith("$pemHeader\r\n"),
+            actual = pem.startsWith("$pemHeader\n"),
         )
         assertEquals(
             expected = true,
-            actual = pem.endsWith("\r\n$pemFooter"),
+            actual = pem.endsWith("\n$pemFooter"),
         )
     }
 
     @Test
     fun `toPEMEncodedString uses 64 character lines`() {
-        val der = CertificateDer.fromPEMEncodedString(
-            pemEncodedCertificate = examplePem,
-        )
+        val cert = X509CertificateUtil.parseCertificatePem(examplePem)
 
-        val pem = der.toPEMEncodedString()
+        val pem = cert.encodedPem
         val base64Payload = pem
-            .removePrefix("$pemHeader\r\n")
-            .removeSuffix("\r\n$pemFooter")
+            .removePrefix("$pemHeader\n")
+            .removeSuffix("\n$pemFooter")
 
-        base64Payload.split("\r\n").forEach { line ->
+        base64Payload.split("\n").forEach { line ->
             assertEquals(
                 expected = true,
                 actual = line.length in 1..64,
@@ -87,13 +73,9 @@ class CertificateDerMPTest {
             $pemFooter
         """.trimIndent()
 
-        assertFailsWith<IllegalArgumentException>(
-            block = {
-                CertificateDer.fromPEMEncodedString(
-                    pemEncodedCertificate = pem,
-                )
-            },
-        )
+        assertFailsWith<IllegalArgumentException> {
+            X509CertificateUtil.parseCertificatePem(pem)
+        }
     }
 
     @Test
@@ -103,13 +85,9 @@ class CertificateDerMPTest {
             $minimalBase64Payload
         """.trimIndent()
 
-        assertFailsWith<IllegalArgumentException>(
-            block = {
-                CertificateDer.fromPEMEncodedString(
-                    pemEncodedCertificate = pem,
-                )
-            },
-        )
+        assertFailsWith<IllegalArgumentException> {
+            X509CertificateUtil.parseCertificatePem(pem)
+        }
     }
 
     @Test
@@ -120,13 +98,9 @@ class CertificateDerMPTest {
             $pemHeader
         """.trimIndent()
 
-        assertFailsWith<IllegalArgumentException>(
-            block = {
-                CertificateDer.fromPEMEncodedString(
-                    pemEncodedCertificate = pem,
-                )
-            },
-        )
+        assertFailsWith<IllegalArgumentException> {
+            X509CertificateUtil.parseCertificatePem(pem)
+        }
     }
 
     @Test
@@ -138,13 +112,9 @@ class CertificateDerMPTest {
             $pemFooter
         """.trimIndent()
 
-        assertFailsWith<IllegalArgumentException>(
-            block = {
-                CertificateDer.fromPEMEncodedString(
-                    pemEncodedCertificate = pem,
-                )
-            },
-        )
+        assertFailsWith<IllegalArgumentException> {
+            X509CertificateUtil.parseCertificatePem(pem)
+        }
     }
 
     @Test
@@ -156,13 +126,9 @@ class CertificateDerMPTest {
             trailing-content
         """.trimIndent()
 
-        assertFailsWith<IllegalArgumentException>(
-            block = {
-                CertificateDer.fromPEMEncodedString(
-                    pemEncodedCertificate = pem,
-                )
-            },
-        )
+        assertFailsWith<IllegalArgumentException> {
+            X509CertificateUtil.parseCertificatePem(pem)
+        }
     }
 
     @Test
@@ -176,13 +142,9 @@ class CertificateDerMPTest {
             $pemFooter
         """.trimIndent()
 
-        assertFailsWith<IllegalArgumentException>(
-            block = {
-                CertificateDer.fromPEMEncodedString(
-                    pemEncodedCertificate = pem,
-                )
-            },
-        )
+        assertFailsWith<IllegalArgumentException> {
+            X509CertificateUtil.parseCertificatePem(pem)
+        }
     }
 
     @Test
@@ -193,13 +155,9 @@ class CertificateDerMPTest {
             $pemFooter
         """.trimIndent()
 
-        assertFailsWith<IllegalArgumentException>(
-            block = {
-                CertificateDer.fromPEMEncodedString(
-                    pemEncodedCertificate = pem,
-                )
-            },
-        )
+        assertFailsWith<IllegalArgumentException> {
+            X509CertificateUtil.parseCertificatePem(pem)
+        }
     }
 
     @Test
@@ -210,13 +168,9 @@ class CertificateDerMPTest {
             -----END CERTIFICATE-----
         """.trimIndent()
 
-        assertFailsWith<IllegalArgumentException>(
-            block = {
-                CertificateDer.fromPEMEncodedString(
-                    pemEncodedCertificate = pem,
-                )
-            },
-        )
+        assertFailsWith<IllegalArgumentException> {
+            X509CertificateUtil.parseCertificatePem(pem)
+        }
     }
 
     @Test
@@ -227,13 +181,9 @@ class CertificateDerMPTest {
             -----END CERTIFICATE-----
         """.trimIndent()
 
-        assertFailsWith<IllegalArgumentException>(
-            block = {
-                CertificateDer.fromPEMEncodedString(
-                    pemEncodedCertificate = pem,
-                )
-            },
-        )
+        assertFailsWith<IllegalArgumentException> {
+            X509CertificateUtil.parseCertificatePem(pem)
+        }
     }
 
     private companion object {

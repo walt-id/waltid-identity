@@ -1,11 +1,14 @@
 package id.walt.x509.id.walt.certificate.x509.bouncycastle
 
+import id.walt.certificate.x509.BouncyPublicKeyInfoUtil
+import id.walt.certificate.x509.BouncyPublicKeyInfoUtil.bouncyCastleSubjectPublicKeyInfo
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateSigner
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension
 import id.walt.crypto.keys.Key
 import id.walt.x509.id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory
+import kotlinx.coroutines.runBlocking
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier
@@ -40,16 +43,36 @@ internal class BouncyX509CertificateSigner : X509CertificateSigner {
         val subject = X500Name(builder.subjectDn)
 
         val keyInfo =
-            if (builder.subjectPublicKeyInfo is X509CertificateDataBuilder.SelfSignedSubjectPublicKeyInfo) {
-                SubjectPublicKeyInfoUtil.subjectKeyInfoOfKey(issuerKey)
-            } else {
-                SubjectPublicKeyInfoUtil.subjectKeyInfoOfBuilder(builder.subjectPublicKeyInfo)
+            when (builder.subjectPublicKeyInfo) {
+                is X509CertificateDataBuilder.SelfSignedSubjectPublicKeyInfo ->
+                    runBlocking {
+                        BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(issuerKey)
+                    }
+                is X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfo -> {
+                    runBlocking {
+                        val subjectKey = builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfo
+                        BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(subjectKey.key)
+                    }
+                }
+                else -> error("unknown subjectPublicKeyInfo '${builder.subjectPublicKeyInfo::class.qualifiedName}'")
             }
-        val bouncyBuilder = X509v3CertificateBuilder(issuer, serial, notBefore, notAfter, subject, keyInfo)
+        val bouncyBuilder = X509v3CertificateBuilder(
+            issuer,
+            serial,
+            notBefore,
+            notAfter,
+            subject,
+            keyInfo.bouncyCastleSubjectPublicKeyInfo
+        )
 
         builder.extensions.values.forEach {
             if (it is SubjectKeyIdentifierExtension) {
-                bouncyBuilder.addExtension(BouncyExtensionFactory.createSubjectKeyIdentifierExtension(it, keyInfo.publicKeyData))
+                bouncyBuilder.addExtension(
+                    BouncyExtensionFactory.createSubjectKeyIdentifierExtension(
+                        it,
+                        keyInfo.bouncyCastleSubjectPublicKeyInfo.publicKeyData
+                    )
+                )
             } else {
                 bouncyBuilder.addExtension(BouncyExtensionFactory.createExtension(it))
             }

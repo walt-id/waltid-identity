@@ -5,6 +5,7 @@ import kotlinx.io.bytestring.ByteString
 import kotlin.experimental.and
 import kotlin.random.Random
 
+/*
 class MockX509Certificate : X509Certificate {
 
     class MockX509Certificate : X509Certificate.CertificateData {
@@ -32,9 +33,6 @@ class MockX509Certificate : X509Certificate {
     override val signatureValueRaw: ByteString
         get() = TODO("Not yet implemented")
 
-    override val fingerprintSha256: ByteString
-        get() = TODO("Not yet implemented")
-
     override val encodedDer: ByteString
         get() = TODO("Not yet implemented")
 
@@ -45,4 +43,4 @@ class MockX509Certificate : X509Certificate {
             return ByteString(byteArray)
         }
     }
-}
+}*/

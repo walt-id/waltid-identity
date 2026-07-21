@@ -1,5 +1,7 @@
 package id.walt.x509.id.walt.certificate.x509.bouncycastle
 
+import id.walt.certificate.x509.BouncyPublicKeyInfoUtil
+import id.walt.certificate.x509.BouncyPublicKeyInfoUtil.bouncyCastleSubjectPublicKeyInfo
 import id.walt.certificate.x509.Pkcs10CertificateSigningRequest
 import id.walt.certificate.x509.Pkcs10CertificateSigningRequestSigner
 import id.walt.certificate.x509.builder.Pkcs10CertificateSigningRequestBuilder
@@ -18,9 +20,9 @@ class BouncyPkcs10CertificateSigningRequestSigner : Pkcs10CertificateSigningRequ
         csrBuilder: Pkcs10CertificateSigningRequestBuilder
     ): Pkcs10CertificateSigningRequest {
         val subject = X500Name(csrBuilder.requestedCertificate.subjectDn)
-        val keyInfo = SubjectPublicKeyInfoUtil.subjectKeyInfoOfKey(holderKey)
+        val keyInfo = BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(holderKey)
 
-        val bouncyBuilder = PKCS10CertificationRequestBuilder(subject, keyInfo)
+        val bouncyBuilder = PKCS10CertificationRequestBuilder(subject, keyInfo.bouncyCastleSubjectPublicKeyInfo)
 
         val extGen = ExtensionsGenerator()
         csrBuilder.requestedCertificate.extensions.values.map {

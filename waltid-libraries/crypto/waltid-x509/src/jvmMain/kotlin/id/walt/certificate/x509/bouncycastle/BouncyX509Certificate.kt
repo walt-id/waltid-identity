@@ -54,15 +54,6 @@ internal class BouncyX509Certificate(val certificate: X509CertificateHolder) : X
     override val signatureValueRaw: ByteString
         get() = ByteString(certificate.getSignature())
 
-    override val fingerprintSha256: ByteString
-        get() {
-            // 1. Get the DER-encoded certificate bytes
-            val derEncoded: ByteArray = certificate.getEncoded()!!
-            // 2. Compute the cryptographic hash
-            val md = MessageDigest.getInstance("SHA-256")
-            return ByteString(md.digest(derEncoded))
-        }
-
     override val encodedDer: ByteString = ByteString(certificate.encoded)
 
 

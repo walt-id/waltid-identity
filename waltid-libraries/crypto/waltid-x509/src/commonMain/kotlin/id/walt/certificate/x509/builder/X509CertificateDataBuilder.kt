@@ -3,7 +3,6 @@ package id.walt.certificate.x509.builder
 import id.walt.certificate.x509.Pkcs10CertificateSigningRequest
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateSerialNumberGenerator
-import id.walt.certificate.x509.X509SigningAlgorithmInfo
 import id.walt.certificate.x509.extension.Extension
 import id.walt.certificate.x509.extension.MutableExtensionContainer
 import id.walt.crypto.keys.Key
@@ -26,22 +25,19 @@ open class X509CertificateDataBuilder(
 
     override val extensions: MutableMap<String, Extension> = mutableMapOf()
 
-    suspend fun subjectPublicKey(key: Key): Unit {
-        val info = X509SigningAlgorithmInfo.ofKey(key)
-        subjectPublicKeyInfo = SubjectPublicKeyInfoBuilder(
-            algorithmName = info.keyAlgorithmName,
-            algorithmOid = info.keyAlgorithmOid,
-            ellipticCurveOid = info.keyEllipticCurveOid,
-            publicKeyRaw = ByteString(key.getPublicKeyRepresentation())
-        )
+    fun subjectPublicKey(key: Key): Unit {
+        subjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfo(key)
     }
 
-    data class SubjectPublicKeyInfoBuilder(
-        override var algorithmName: String? = null,
-        override var algorithmOid: String = "",
-        override var ellipticCurveOid: String? = null,
-        override var publicKeyRaw: ByteString = ByteString(byteArrayOf()),
-    ) : Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo {
+    class WaltIdKeySubjectPublicKeyInfo(val key: Key) : X509Certificate.SubjectPublicKeyInfo {
+        override val algorithmName: String
+            get() = error("needs to be taken from issuer key")
+        override val algorithmOid: String
+            get() = error("needs to be taken from issuer key")
+        override val ellipticCurveOid: String
+            get() = error("needs to be taken from issuer key")
+        override val publicKeyRaw: ByteString
+            get() = error("needs to be taken from issuer key")
     }
 
     class SelfSignedSubjectPublicKeyInfo : X509Certificate.SubjectPublicKeyInfo {

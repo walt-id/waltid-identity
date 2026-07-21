@@ -141,7 +141,13 @@ object TestData {
         -----END EC PRIVATE KEY-----            
         """.trimIndent()
 
-    val intermediateIssuerPublicKeyHex = "030f62d46bb95bb0aef9cac3e291191042839ed4670c1c0121e58eff26983511bd"
+    val intermediateIssuerPublicKeyHex = """
+        04:0f:62:d4:6b:b9:5b:b0:ae:f9:ca:c3:e2:91:19:
+        10:42:83:9e:d4:67:0c:1c:01:21:e5:8e:ff:26:98:
+        35:11:bd:ef:38:3c:f9:e3:52:cb:d4:f5:20:ab:eb:
+        d2:62:07:2b:51:4c:ad:98:89:79:85:3f:d6:9d:c2:
+        5b:00:e9:77:93
+    """.replace("[\\s:]".toRegex(),"")
 
     val csrPem = """
         -----BEGIN CERTIFICATE REQUEST-----
