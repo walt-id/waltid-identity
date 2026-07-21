@@ -241,7 +241,7 @@ class WalletSdkBridgeTest {
                 ),
                 responseUri = "https://verifier.example/direct-post",
                 state = "state-1",
-                nonce = "nonce-1",
+                nonce = null,
                 responseEncryption = MobileWalletResponseEncryption.NotRequired,
             ),
             errorCode = MobileWalletPresentationErrorCode.invalidTransactionData,

@@ -255,6 +255,29 @@ class MobileWalletTest {
     }
 
     @Test
+    fun presentationRequestContextRequiresClientIdButAllowsMissingNonce() {
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationRequestContext(
+                clientId = " ",
+                verifierName = null,
+                responseUri = null,
+                state = null,
+                nonce = null,
+            )
+        }
+
+        val context = MobileWalletPresentationRequestContext(
+            clientId = "https://verifier.example",
+            verifierName = null,
+            responseUri = null,
+            state = null,
+            nonce = null,
+        )
+        assertEquals("https://verifier.example", context.clientId)
+        assertEquals(null, context.nonce)
+    }
+
+    @Test
     fun presentationDisclosuresRejectImpossibleSelectableStates() {
         assertFailsWith<IllegalArgumentException> {
             presentationDisclosure(selectivelyDisclosable = false, required = false, selectable = true)
