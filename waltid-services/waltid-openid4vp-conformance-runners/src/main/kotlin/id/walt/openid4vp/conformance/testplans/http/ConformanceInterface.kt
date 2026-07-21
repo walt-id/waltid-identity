@@ -23,7 +23,7 @@ import kotlin.time.Duration.Companion.seconds
 class ConformanceInterface(
     val conformanceHost: String,
     val conformancePort: Int
-) {
+) : AutoCloseable {
 
     // Use simple HttpClient - relies on javax.net.ssl.trustStore system property
     // set in build.gradle.kts for SSL certificate trust
@@ -189,4 +189,7 @@ class ConformanceInterface(
         }
     }
 
+    override fun close() {
+        conformanceHttp.close()
+    }
 }
