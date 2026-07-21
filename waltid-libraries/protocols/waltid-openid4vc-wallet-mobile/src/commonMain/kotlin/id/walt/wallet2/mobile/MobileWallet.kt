@@ -717,7 +717,15 @@ public class MobileWallet internal constructor(
                     type = credential.docType,
                     fields = credential.credentialData
                         .filterKeys { it != "docType" }
-                        .flatMap { (namespace, value) -> value.flattenRegistryFields(listOf(namespace), true) },
+                        .flatMap { (namespace, value) ->
+                            value.jsonObject.map { (element, elementValue) ->
+                                MobileWalletCredentialRegistryField(
+                                    path = listOf(namespace, element),
+                                    valueJson = Json.encodeToString(JsonElement.serializer(), elementValue),
+                                    selectivelyDisclosable = true,
+                                )
+                            }
+                        },
                     displayName = metadata.label ?: credential.docType,
                 )
                 else -> if (metadata.format in setOf("vc+sd-jwt", "dc+sd-jwt", "sd-jwt-vc")) {

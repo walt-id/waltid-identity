@@ -3,6 +3,7 @@ package id.walt.wallet2.mobile
 import id.walt.credentials.CredentialDetectorTypes
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
+import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.crypto.keys.KeyType
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
@@ -25,6 +26,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -397,6 +399,51 @@ class MobileWalletTest {
         assertEquals("https://credentials.example/pid", record.type)
         assertEquals(listOf(listOf("given_name")), record.fields.map { it.path })
         assertFalse(record.fields.any { it.path.singleOrNull() == "iss" })
+    }
+
+    @Test
+    fun digitalCredentialRegistryKeepsStructuredMdocElementsAtNamespaceElementPaths() = runTest {
+        val registry = RecordingMetadataRegistry()
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "mdl-1",
+                credential = MdocsCredential(
+                    credentialData = buildJsonObject {
+                        put("org.iso.18013.5.1", buildJsonObject {
+                            put("given_name", "Ada")
+                            put("driving_privileges", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("vehicle_category_code", "B")
+                                })
+                            })
+                        })
+                    },
+                    signed = null,
+                    docType = "org.iso.18013.5.1.mDL",
+                ),
+                label = "mDL",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "mdoc-registry-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            keyGenerator = { error("Registry refresh must not generate keys") },
+            credentialRegistry = registry,
+        )
+
+        wallet.refreshDigitalCredentialRegistration()
+
+        val fields = registry.replacements.single().second.single().fields
+        assertEquals(
+            listOf(
+                listOf("org.iso.18013.5.1", "given_name"),
+                listOf("org.iso.18013.5.1", "driving_privileges"),
+            ),
+            fields.map { it.path },
+        )
+        assertTrue(fields.all { it.path.size == 2 })
     }
 
     @Test
