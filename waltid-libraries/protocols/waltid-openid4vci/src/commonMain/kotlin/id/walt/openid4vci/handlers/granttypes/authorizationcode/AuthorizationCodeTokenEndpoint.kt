@@ -5,7 +5,6 @@ import id.walt.openid4vci.DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.TokenType
-import id.walt.openid4vci.core.TOKEN_TYPE_BEARER
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
@@ -17,6 +16,8 @@ import id.walt.openid4vci.requests.token.sanitizeForStorage
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
+import id.walt.openid4vci.tokens.access.accessTokenType
+import id.walt.openid4vci.tokens.access.dpopAccessTokenClaims
 import id.walt.openid4vci.tokens.refresh.RefreshTokenGenerationRequest
 import id.walt.openid4vci.tokens.refresh.RefreshTokenIssuer
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
@@ -94,6 +95,7 @@ class AuthorizationCodeTokenEndpoint(
                     session.customAttributes["issuance_session_id"]?.let {
                         put("issuance_session_id", it)
                     }
+                    putAll(scopedRequest.dpopAccessTokenClaims())
                 },
             )
 
@@ -122,7 +124,7 @@ class AuthorizationCodeTokenEndpoint(
                 request = scopedRequest,
                 AccessTokenResponse(
                     accessToken = accessToken,
-                    tokenType = TOKEN_TYPE_BEARER,
+                    tokenType = scopedRequest.accessTokenType(),
                     expiresIn = expiresIn,
                     refreshToken = refreshToken,
                 ),
