@@ -85,6 +85,13 @@ public actor Wallet {
     }
 
     /// Receives credentials using exactly one reviewed offer preview.
+    ///
+    /// - Parameters:
+    ///   - previewHandle: Handle returned by ``resolveOffer(offer:)``.
+    ///   - txCode: Optional transaction code requested by the issuer.
+    ///   - clientID: Client identifier to use for issuer interactions.
+    /// - Returns: Local credential identifiers stored by the wallet.
+    /// - Throws: ``WalletError`` when the handle is invalid or issuance fails.
     public func receive(
         previewHandle: IssuancePreviewHandle,
         txCode: String? = nil,
@@ -94,6 +101,9 @@ public actor Wallet {
     }
 
     /// Discards a reviewed issuance preview after local dismissal.
+    ///
+    /// - Parameter previewHandle: Handle returned by ``resolveOffer(offer:)``.
+    /// - Throws: ``WalletError`` when the handle cannot be discarded.
     public func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
         try await bridge.discardIssuancePreview(previewHandle)
     }
@@ -183,7 +193,7 @@ public actor Wallet {
     ///     preview, or `access_denied` for a valid request declined by the user.
     ///   - errorDescription: Optional verifier-facing error description.
     /// - Returns: Error-response delivery outcome.
-    /// - Throws: ``WalletError`` when the request cannot be resolved or the error response cannot be sent.
+    /// - Throws: ``WalletError`` when the handle is invalid or the error response cannot be sent.
     public func rejectPresentation(
         previewHandle: PresentationPreviewHandle,
         error: PresentationErrorCode? = nil,
@@ -197,6 +207,9 @@ public actor Wallet {
     }
 
     /// Discards a reviewed presentation after local dismissal.
+    ///
+    /// - Parameter previewHandle: Handle returned by ``previewPresentation(request:)``.
+    /// - Throws: ``WalletError`` when the handle cannot be discarded.
     public func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
         try await bridge.discardPresentationPreview(previewHandle)
     }

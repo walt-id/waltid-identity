@@ -657,21 +657,23 @@ public struct TransactionCodeRequirement: Equatable, Sendable {
     }
 }
 
-/// Opaque handle for a retained OpenID4VCI offer preview.
+/// Opaque handle for one reviewed OpenID4VCI credential offer.
 public struct IssuancePreviewHandle: Equatable, Sendable, CustomStringConvertible {
     let value: String
 
     /// Creates a handle for bridge adapters and test fixtures. Production handles come from preview operations.
+    ///
+    /// - Parameter value: Nonempty opaque handle value supplied by wallet core.
     public init(value: String) {
         precondition(!value.isEmpty, "Issuance preview handle must not be empty.")
         self.value = value
     }
 
-    /// A redacted representation that does not reveal the opaque value.
+    /// Redacted representation that does not expose the opaque handle value.
     public var description: String { "IssuancePreviewHandle(<redacted>)" }
 }
 
-/// Result of resolving and retaining an OpenID4VCI credential offer for review.
+/// Reviewed OpenID4VCI offer metadata bound to an opaque issuance handle.
 public struct OfferResolution: Equatable, Sendable {
     /// Opaque handle required to receive credentials from this reviewed offer.
     public let previewHandle: IssuancePreviewHandle
@@ -879,19 +881,23 @@ public struct PresentationPreviewError: Equatable, Sendable {
     }
 }
 
-/// Preview of an OpenID4VP presentation request before the wallet submits a VP token.
+/// Opaque handle for one reviewed OpenID4VP presentation request.
 public struct PresentationPreviewHandle: Equatable, Sendable, CustomStringConvertible {
     let value: String
 
     /// Creates a handle for bridge adapters and test fixtures. Production handles come from preview operations.
+    ///
+    /// - Parameter value: Nonempty opaque handle value supplied by wallet core.
     public init(value: String) {
         precondition(!value.isEmpty, "Presentation preview handle must not be empty.")
         self.value = value
     }
 
+    /// Redacted representation that does not expose the opaque handle value.
     public var description: String { "PresentationPreviewHandle(<redacted>)" }
 }
 
+/// Reviewed OpenID4VP request metadata bound to an opaque presentation handle.
 public struct PresentationPreview: Equatable, Sendable {
     /// Opaque handle required to submit, reject, or discard this reviewed request.
     public let previewHandle: PresentationPreviewHandle
@@ -908,6 +914,7 @@ public struct PresentationPreview: Equatable, Sendable {
     /// Creates a presentation preview.
     ///
     /// - Parameters:
+    ///   - previewHandle: Opaque handle required to act on this reviewed request.
     ///   - request: Verifier and request metadata extracted from the
     ///     presentation request.
     ///   - credentialOptions: Wallet credentials that can satisfy the
