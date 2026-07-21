@@ -217,8 +217,11 @@ class MobileWalletIntegrationTest {
         client.bootstrap()
 
         val session = DemoTestBackend.createResponseBoundVerifierSession(scenario)
-        client.previewPresentation(session.authorizationRequestUri)
-        val result = client.rejectPresentation(session.authorizationRequestUri)
+        val previewHandle = when (val preview = client.previewPresentation(session.authorizationRequestUri)) {
+            is MobileWalletPresentationPreviewResult.Ready -> preview.preview.previewHandle
+            is MobileWalletPresentationPreviewResult.Invalid -> preview.previewHandle
+        }
+        val result = client.rejectPresentation(previewHandle)
 
         assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
             result,
@@ -245,7 +248,7 @@ class MobileWalletIntegrationTest {
         assertEquals("redirect_uri:https://verifier.example/callback", preview.request.clientId)
 
         val result = assertIs<MobileWalletPresentationResult.Prepared.OpenUrl>(
-            client.rejectPresentation(requestUrl),
+            client.rejectPresentation(preview.previewHandle),
         )
         assertEquals(
             "https://verifier.example/callback#error=invalid_transaction_data&state=state-123",
