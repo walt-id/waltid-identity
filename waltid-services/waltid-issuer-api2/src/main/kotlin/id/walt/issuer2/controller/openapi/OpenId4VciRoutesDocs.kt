@@ -144,7 +144,13 @@ object OpenId4VciRoutesDocs {
 
     fun token(): RouteConfig.() -> Unit = {
         summary = "Token endpoint"
-        description = "The token endpoint."
+        description = "The token endpoint. A DPoP proof binds the issued access token to the proof key."
+        request {
+            headerParameter<String>("DPoP") {
+                required = false
+                description = "RFC 9449 DPoP proof JWT for this token request"
+            }
+        }
         response {
             HttpStatusCode.OK to {
                 description = "Access token response"
@@ -157,6 +163,14 @@ object OpenId4VciRoutesDocs {
         summary = "Credential endpoint"
         description = "The credential endpoint. Accepts plaintext JSON requests and encrypted JWT requests."
         request {
+            headerParameter<String>("Authorization") {
+                required = true
+                description = "Bearer or DPoP access-token authorization"
+            }
+            headerParameter<String>("DPoP") {
+                required = false
+                description = "Required when presenting a DPoP-bound access token"
+            }
             body<JsonObject> {
                 description = "Credential request"
                 mediaTypes(ContentType.Application.Json)
