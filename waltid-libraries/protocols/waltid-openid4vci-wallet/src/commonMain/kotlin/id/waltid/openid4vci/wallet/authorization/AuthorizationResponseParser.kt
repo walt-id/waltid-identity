@@ -48,7 +48,39 @@ object AuthorizationResponseParser {
     fun parseAuthorizationResponse(
         redirectUri: String,
         expectedState: String,
-        expectedRedirectUri: String? = null,
+    ): AuthorizationResponse = parseAuthorizationResponse(
+        redirectUri = redirectUri,
+        expectedState = expectedState,
+        expectedRedirectUri = null,
+    )
+
+    /**
+     * Parses an authorization response and binds it to the registered redirect target.
+     */
+    fun parseAuthorizationResponse(
+        redirectUri: String,
+        expectedState: String,
+        expectedRedirectUri: String?,
+    ): AuthorizationResponse = parseAuthorizationResponse(
+        redirectUri = redirectUri,
+        expectedState = expectedState,
+        expectedRedirectUri = expectedRedirectUri,
+        expectedIssuer = null,
+        requireIssuer = false,
+    )
+
+    /**
+     * Parses an authorization response and validates RFC 9207 issuer identification when present.
+     *
+     * [expectedIssuer] is compared exactly after URI parsing; [requireIssuer] should reflect the
+     * authorization server's `authorization_response_iss_parameter_supported` metadata.
+     */
+    fun parseAuthorizationResponse(
+        redirectUri: String,
+        expectedState: String,
+        expectedRedirectUri: String?,
+        expectedIssuer: String?,
+        requireIssuer: Boolean,
     ): AuthorizationResponse {
         require(redirectUri.isNotBlank()) { "Redirect URI cannot be blank" }
         require(expectedState.isNotBlank()) { "Expected state cannot be blank" }
@@ -69,7 +101,7 @@ object AuthorizationResponseParser {
         }
 
         val parameters = url.parameters
-        listOf("code", "state", "error", "error_description", "error_uri").forEach { name ->
+        listOf("code", "state", "error", "error_description", "error_uri", "iss").forEach { name ->
             require(parameters.getAll(name).orEmpty().size <= 1) {
                 "Authorization callback contains duplicate '$name' parameters"
             }
@@ -79,6 +111,19 @@ object AuthorizationResponseParser {
             ?: throw IllegalArgumentException("Authorization response missing 'state' parameter")
         if (!StateManager.validateState(expectedState, state)) {
             throw IllegalArgumentException("State validation failed")
+        }
+
+        val issuer = parameters["iss"]
+        require(!requireIssuer || issuer != null) {
+            "Authorization response missing required 'iss' parameter"
+        }
+        if (issuer != null) {
+            val expected = requireNotNull(expectedIssuer) {
+                "Authorization response contains 'iss' but no expected issuer is configured"
+            }
+            require(issuer == expected) {
+                "Authorization response issuer does not match the issuance session"
+            }
         }
 
         // Check for error response first
@@ -116,7 +161,7 @@ object AuthorizationResponseParser {
             return false
         }
 
-        val responseParameters = setOf("code", "state", "error", "error_description", "error_uri")
+        val responseParameters = setOf("code", "state", "error", "error_description", "error_uri", "iss")
         val callbackBaseNames = callback.parameters.names() - responseParameters
         if (callbackBaseNames != expected.parameters.names()) return false
         return callbackBaseNames.all { name ->

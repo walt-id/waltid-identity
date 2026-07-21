@@ -77,6 +77,14 @@ actor MockWalletClient: WalletClient {
 
     func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {}
 
+    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
+        .failed(
+            sessionID: "mock-session",
+            error: .init(code: .invalidSession, message: "No mock deferred credential"),
+            storedCredentialIDs: []
+        )
+    }
+
     func present(request: URL, did: String?) async throws -> PresentationResult {
         try await delayOperation()
         return .transmitted(.succeeded(verifierResponseJSON: "{}"))

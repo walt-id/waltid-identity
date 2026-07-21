@@ -65,7 +65,6 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             operation: "resolve credential offer"
         )
         return OfferResolution(
-            previewHandle: IssuancePreviewHandle(value: value.previewHandle.value),
             issuer: value.issuer.toSwiftIssuerMetadata(),
             offeredCredentials: swiftArray(
                 value.offeredCredentials,
@@ -93,27 +92,54 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         throw WalletError.internalFailure("Unexpected receive result type: \(type(of: value))")
     }
 
-    func receive(previewHandle: IssuancePreviewHandle, txCode: String?, clientID: String) async throws -> [String] {
-        let result = try await bridge.receivePreviewed(
-            previewHandle: MobileWalletIssuancePreviewHandle(value: previewHandle.value),
-            txCode: txCode,
-            clientId: clientID
+    func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
+        let result = try await bridge.startIssuance(
+            request: MobileWalletIssuanceRequest(
+                offerUrl: request.offer.absoluteString,
+                clientId: request.clientID,
+                redirectUri: request.redirectURI.absoluteString,
+                keyId: request.keyID,
+                did: request.did
+            )
         )
-        let value = try Self.successAnyValue(result, operation: "receive reviewed credentials")
-        if let credentialIDs = value as? [String] {
-            return credentialIDs
-        }
-        if let credentialIDs = value as? NSArray {
-            return credentialIDs.compactMap { $0 as? String }
-        }
-        throw WalletError.internalFailure("Unexpected receive result type: \(type(of: value))")
+        let value = try Self.successValue(
+            result,
+            as: Waltid_openid4vc_walletWalletIssuanceSession.self,
+            operation: "start issuance"
+        )
+        return try value.toSwiftIssuanceSession()
     }
 
-    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
-        let result = try await bridge.discardIssuancePreview(
-            previewHandle: MobileWalletIssuancePreviewHandle(value: previewHandle.value)
+    func continuePreAuthorizedIssuance(
+        sessionID: String,
+        transactionCode: String?
+    ) async throws -> IssuanceOutcome {
+        let result = try await bridge.continuePreAuthorizedIssuance(
+            sessionId: sessionID,
+            transactionCode: transactionCode
         )
-        _ = try Self.successAnyValue(result, operation: "discard issuance preview")
+        return try Self.issuanceOutcome(result, operation: "continue pre-authorized issuance")
+    }
+
+    func continueAuthorizationIssuance(
+        sessionID: String,
+        callbackURI: URL
+    ) async throws -> IssuanceOutcome {
+        let result = try await bridge.continueAuthorizationIssuance(
+            sessionId: sessionID,
+            callbackUri: callbackURI.absoluteString
+        )
+        return try Self.issuanceOutcome(result, operation: "continue authorization issuance")
+    }
+
+    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
+        let result = try await bridge.cancelIssuance(sessionId: sessionID)
+        return try Self.issuanceOutcome(result, operation: "cancel issuance")
+    }
+
+    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
+        let result = try await bridge.resumeDeferredIssuance(deferredCredentialId: deferredCredentialID)
+        return try Self.issuanceOutcome(result, operation: "resume deferred issuance")
     }
 
     func credentials() async throws -> [Credential] {
@@ -162,14 +188,14 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     }
 
     func submitPresentation(
-        previewHandle: PresentationPreviewHandle,
+        request: URL,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         did: String?,
         runPolicies: Bool?
     ) async throws -> PresentationResult {
         let result = try await bridge.submitPresentation(
-            previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value),
+            requestUrl: request.absoluteString,
             selectedCredentialOptions: selectedCredentialOptions.map {
                 MobileWalletPresentationCredentialSelection(
                     queryId: $0.queryID,
@@ -196,12 +222,12 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     }
 
     func rejectPresentation(
-        previewHandle: PresentationPreviewHandle,
+        request: URL,
         error: PresentationErrorCode?,
         errorDescription: String?
     ) async throws -> PresentationResult {
         let result = try await bridge.rejectPresentation(
-            previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value),
+            requestUrl: request.absoluteString,
             errorCode: error?.toKMPErrorCode(),
             errorDescription: errorDescription
         )
@@ -212,13 +238,6 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
 
         return try value.toSwiftPresentationResult()
-    }
-
-    func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
-        let result = try await bridge.discardPresentationPreview(
-            previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value)
-        )
-        _ = try Self.successAnyValue(result, operation: "discard presentation preview")
     }
 
     private static func successValue<T>(
@@ -234,6 +253,17 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         }
 
         return typedValue
+    }
+
+    private static func issuanceOutcome(
+        _ result: any WalletBridgeResult,
+        operation: String
+    ) throws -> IssuanceOutcome {
+        let value = try successAnyValue(result, operation: operation)
+        guard let outcome = value as? any Waltid_openid4vc_walletWalletIssuanceOutcome else {
+            throw WalletError.internalFailure("Unexpected \(operation) result type: \(type(of: value))")
+        }
+        return try outcome.toSwiftIssuanceOutcome()
     }
 
     private static func successAnyValue(
@@ -254,6 +284,135 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     }
 }
 
+private extension Waltid_openid4vc_walletWalletIssuanceSession {
+    func toSwiftIssuanceSession() throws -> IssuanceSession {
+        IssuanceSession(
+            id: id,
+            offer: try offer.toSwiftIssuanceOfferPreview(),
+            authorization: try authorization?.toSwiftIssuanceAuthorization()
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceOfferPreview {
+    func toSwiftIssuanceOfferPreview() throws -> IssuanceOfferPreview {
+        IssuanceOfferPreview(
+            grant: grant == .authorizationCode ? .authorizationCode : .preAuthorizedCode,
+            issuer: issuer.toSwiftIssuanceIssuerPreview(),
+            credentials: swiftArray(credentials, of: Waltid_openid4vc_walletWalletIssuanceCredentialPreview.self)
+                .map { $0.toSwiftIssuanceCredentialPreview() },
+            transactionCode: transactionCode?.toSwiftIssuanceTransactionCode()
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceIssuerPreview {
+    func toSwiftIssuanceIssuerPreview() -> IssuanceIssuerPreview {
+        IssuanceIssuerPreview(
+            identifier: identifier,
+            name: name,
+            locale: locale,
+            logoURI: logoUri.flatMap(URL.init(string:)),
+            logoAltText: logoAltText
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceCredentialPreview {
+    func toSwiftIssuanceCredentialPreview() -> IssuanceCredentialPreview {
+        IssuanceCredentialPreview(
+            configurationID: configurationId,
+            format: format,
+            name: name,
+            descriptionText: descriptionText,
+            logoURI: logoUri.flatMap(URL.init(string:))
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceTransactionCode {
+    func toSwiftIssuanceTransactionCode() -> IssuanceTransactionCode {
+        IssuanceTransactionCode(
+            inputMode: inputMode,
+            length: length.map { Int($0.int32Value) },
+            descriptionText: descriptionText
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceAuthorization {
+    func toSwiftIssuanceAuthorization() throws -> IssuanceAuthorization {
+        guard let authorizationURL = URL(string: url), let callbackURL = URL(string: redirectUri) else {
+            throw WalletError.internalFailure("Wallet core returned an invalid issuance URL.")
+        }
+        return IssuanceAuthorization(
+            url: authorizationURL,
+            state: state,
+            redirectURI: callbackURL,
+            pkce: IssuancePKCEState(
+                codeChallenge: pkce.codeChallenge,
+                codeChallengeMethod: pkce.codeChallengeMethod
+            ),
+            pushedAuthorizationRequestUsed: pushedAuthorizationRequestUsed
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceOutcome {
+    func toSwiftIssuanceOutcome() throws -> IssuanceOutcome {
+        switch onEnum(of: self) {
+        case let .stored(value):
+            return .stored(
+                sessionID: value.sessionId,
+                credentialIDs: swiftArray(value.credentialIds, of: String.self)
+            )
+        case let .deferred(value):
+            return .deferred(
+                sessionID: value.sessionId,
+                storedCredentialIDs: swiftArray(value.storedCredentialIds, of: String.self),
+                credentials: swiftArray(
+                    value.credentials,
+                    of: Waltid_openid4vc_walletWalletDeferredCredential.self
+                ).map { credential in
+                    DeferredCredential(
+                        id: credential.id,
+                        credentialConfigurationID: credential.credentialConfigurationId,
+                        intervalSeconds: credential.intervalSeconds?.int64Value
+                    )
+                }
+            )
+        case let .cancelled(value):
+            return .cancelled(sessionID: value.sessionId)
+        case let .failed(value):
+            return .failed(
+                sessionID: value.sessionId,
+                error: IssuanceFailure(
+                    code: value.error.code.toSwiftIssuanceErrorCode(),
+                    message: value.error.message
+                ),
+                storedCredentialIDs: swiftArray(value.storedCredentialIds, of: String.self)
+            )
+        }
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceErrorCode {
+    func toSwiftIssuanceErrorCode() -> IssuanceErrorCode {
+        switch self {
+        case .invalidSession: return .invalidSession
+        case .invalidCallback: return .invalidCallback
+        case .invalidInput: return .invalidInput
+        case .authorizationFailed: return .authorizationFailed
+        case .issuerMetadata: return .issuerMetadata
+        case .issuerResponse: return .issuerResponse
+        case .network: return .network
+        case .crypto: return .crypto
+        case .storage: return .storage
+        case .protocol: return .protocol
+        }
+    }
+}
+
 private extension WalletConfiguration {
     func toKMPConfiguration() -> WalletBridgeConfiguration {
         WalletBridgeConfiguration(
@@ -263,8 +422,7 @@ private extension WalletConfiguration {
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
             attestation: attestation?.toKMPAttestationConfiguration(),
             preferredLocales: preferredLocales,
-            transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
-            allowInsecureHttpForTests: allowInsecureHttpForTests
+            transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() }
         )
     }
 }
@@ -641,7 +799,6 @@ private extension MobileWalletPresentationPreviewResult {
         case let result as MobileWalletPresentationPreviewResultInvalid:
             return .invalid(
                 PresentationPreviewError(
-                    previewHandle: PresentationPreviewHandle(value: result.previewHandle.value),
                     request: result.request.toSwiftRequestInfo(),
                     code: result.errorCode.toSwiftErrorCode(),
                     message: result.message
@@ -656,7 +813,6 @@ private extension MobileWalletPresentationPreviewResult {
 private extension MobileWalletPresentationPreview {
     func toSwiftPreview() -> PresentationPreview {
         PresentationPreview(
-            previewHandle: PresentationPreviewHandle(value: previewHandle.value),
             request: request.toSwiftRequestInfo(),
             credentialOptions: swiftArray(credentialOptions, of: MobileWalletPresentationCredentialOption.self)
                 .map { $0.toSwiftCredentialOption() },

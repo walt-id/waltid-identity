@@ -337,7 +337,6 @@ class WalletSdkBridgeTest {
                         fields = listOf("amount"),
                     )
                 ),
-                allowInsecureHttpForTests = true,
             )
         )
 
@@ -353,7 +352,6 @@ class WalletSdkBridgeTest {
         assertEquals("token", capturedConfig?.attestationConfig?.bearerToken)
         assertEquals("attestation.example", capturedConfig?.attestationConfig?.hostHeader)
         assertEquals(listOf("de-AT", "en"), capturedConfig?.preferredLocales)
-        assertEquals(true, capturedConfig?.allowInsecureHttpForTests)
         assertEquals(
             listOf(
                 MobileWalletTransactionDataProfile(
@@ -594,7 +592,6 @@ class WalletSdkBridgeTest {
         assertEquals(MobileWalletPersistence(), config.persistence)
         assertEquals(emptyList(), config.preferredLocales)
         assertEquals(emptyList(), config.transactionDataProfiles)
-        assertEquals(false, config.allowInsecureHttpForTests)
     }
 
     @Test

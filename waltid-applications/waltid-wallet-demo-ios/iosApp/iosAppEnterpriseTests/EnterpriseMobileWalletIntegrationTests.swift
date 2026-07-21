@@ -72,8 +72,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
                         bearerToken: $0.bearerToken,
                         hostHeader: $0.hostHeader
                     )
-                },
-                allowInsecureHttpForTests: true
+                }
             )
         )
     }

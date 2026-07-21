@@ -19,10 +19,6 @@ public struct WalletConfiguration: Sendable {
 
     /// Ordered BCP 47 locale preferences used to select protocol display metadata.
     public var preferredLocales: [String]
-
-    /// Test/dev-only opt-in for local issuer nonce endpoints that cannot use HTTPS.
-    public var allowInsecureHttpForTests: Bool
-
     /// Creates wallet configuration.
     ///
     /// - Parameters:
@@ -37,16 +33,13 @@ public struct WalletConfiguration: Sendable {
     ///     wallet accepts before previewing or submitting a presentation.
     ///   - preferredLocales: Ordered BCP 47 locale preferences used for issuer,
     ///     credential, and verifier display metadata.
-    ///   - allowInsecureHttpForTests: Test/dev-only opt-in for local issuer
-    ///     nonce endpoints that cannot use HTTPS. Defaults to `false`.
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
         attestation: WalletAttestationConfiguration? = nil,
         persistence: WalletPersistence = WalletPersistence(),
         transactionDataProfiles: [WalletTransactionDataProfile] = [],
-        preferredLocales: [String] = Locale.preferredLanguages,
-        allowInsecureHttpForTests: Bool = false
+        preferredLocales: [String] = Locale.preferredLanguages
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
@@ -54,7 +47,6 @@ public struct WalletConfiguration: Sendable {
         self.persistence = persistence
         self.transactionDataProfiles = transactionDataProfiles
         self.preferredLocales = preferredLocales
-        self.allowInsecureHttpForTests = allowInsecureHttpForTests
     }
 }
 
@@ -996,11 +988,8 @@ public struct IssuanceOfferPreview: Equatable, Sendable {
     }
 }
 
-/// PKCE continuation material. Its textual representation always redacts the verifier.
+/// Non-secret PKCE metadata bound to the authorization request.
 public struct IssuancePKCEState: Equatable, Sendable, CustomStringConvertible {
-    /// High-entropy verifier retained for the authorization-code exchange.
-    public let codeVerifier: String
-
     /// S256 challenge sent in the authorization request.
     public let codeChallenge: String
 
@@ -1010,18 +999,16 @@ public struct IssuancePKCEState: Equatable, Sendable, CustomStringConvertible {
     /// Creates PKCE continuation material.
     ///
     /// - Parameters:
-    ///   - codeVerifier: High-entropy verifier retained for token exchange.
     ///   - codeChallenge: Challenge sent in the authorization request.
     ///   - codeChallengeMethod: PKCE challenge method.
-    public init(codeVerifier: String, codeChallenge: String, codeChallengeMethod: String) {
-        self.codeVerifier = codeVerifier
+    public init(codeChallenge: String, codeChallengeMethod: String) {
         self.codeChallenge = codeChallenge
         self.codeChallengeMethod = codeChallengeMethod
     }
 
     /// A diagnostic description that redacts PKCE secret material.
     public var description: String {
-        "IssuancePKCEState(codeVerifier: <redacted>, codeChallenge: <redacted>, codeChallengeMethod: \(codeChallengeMethod))"
+        "IssuancePKCEState(codeChallenge: <redacted>, codeChallengeMethod: \(codeChallengeMethod))"
     }
 }
 
@@ -1071,7 +1058,7 @@ public struct IssuanceAuthorization: Equatable, Sendable, CustomStringConvertibl
 }
 
 /// Durable issuance session returned after resolving and validating an offer.
-public struct IssuanceSession: Equatable, Sendable {
+public struct IssuanceSession: Equatable, Sendable, CustomStringConvertible {
     /// Opaque identifier used to continue or cancel this session.
     public let id: String
 
@@ -1091,6 +1078,12 @@ public struct IssuanceSession: Equatable, Sendable {
         self.id = id
         self.offer = offer
         self.authorization = authorization
+    }
+
+    /// A diagnostic description that omits authorization continuation data.
+    public var description: String {
+        let authorizationDescription = authorization == nil ? "nil" : "<redacted>"
+        return "IssuanceSession(id: \(id), offer: \(offer), authorization: \(authorizationDescription))"
     }
 }
 

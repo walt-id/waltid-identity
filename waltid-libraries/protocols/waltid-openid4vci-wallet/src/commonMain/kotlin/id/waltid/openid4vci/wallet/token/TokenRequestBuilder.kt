@@ -9,6 +9,7 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
@@ -82,7 +83,23 @@ class TokenRequestBuilder(
         codeVerifier: String? = null,
         additionalHeaders: Map<String, String> = emptyMap(),
         attestationHeaders: ClientAttestationHeaders? = null,
-        dpopProofFactory: DPoPProofFactory? = null,
+    ): TokenResponse = exchangeAuthorizationCode(
+        tokenEndpoint = tokenEndpoint,
+        code = code,
+        codeVerifier = codeVerifier,
+        additionalHeaders = additionalHeaders,
+        attestationHeaders = attestationHeaders,
+        dpopProofFactory = null,
+    )
+
+    /** Exchanges an authorization code while creating fresh DPoP proofs when requested. */
+    suspend fun exchangeAuthorizationCode(
+        tokenEndpoint: String,
+        code: String,
+        codeVerifier: String? = null,
+        additionalHeaders: Map<String, String> = emptyMap(),
+        attestationHeaders: ClientAttestationHeaders? = null,
+        dpopProofFactory: DPoPProofFactory?,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(code.isNotBlank()) { "Authorization code cannot be blank" }
@@ -134,7 +151,27 @@ class TokenRequestBuilder(
         additionalHeaders: Map<String, String> = emptyMap(),
         attestationHeaders: ClientAttestationHeaders? = null,
         anonymous: Boolean = false,
-        dpopProofFactory: DPoPProofFactory? = null,
+    ): TokenResponse = exchangePreAuthorizedCode(
+        tokenEndpoint = tokenEndpoint,
+        preAuthorizedCode = preAuthorizedCode,
+        txCode = txCode,
+        additionalParameters = additionalParameters,
+        additionalHeaders = additionalHeaders,
+        attestationHeaders = attestationHeaders,
+        anonymous = anonymous,
+        dpopProofFactory = null,
+    )
+
+    /** Exchanges a pre-authorized code while creating fresh DPoP proofs when requested. */
+    suspend fun exchangePreAuthorizedCode(
+        tokenEndpoint: String,
+        preAuthorizedCode: String,
+        txCode: String? = null,
+        additionalParameters: Map<String, String> = emptyMap(),
+        additionalHeaders: Map<String, String> = emptyMap(),
+        attestationHeaders: ClientAttestationHeaders? = null,
+        anonymous: Boolean = false,
+        dpopProofFactory: DPoPProofFactory?,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(preAuthorizedCode.isNotBlank()) { "Pre-authorized code cannot be blank" }
@@ -191,7 +228,25 @@ class TokenRequestBuilder(
         additionalHeaders: Map<String, String> = emptyMap(),
         attestationHeaders: ClientAttestationHeaders? = null,
         anonymous: Boolean = false,
-        dpopProofFactory: DPoPProofFactory? = null,
+    ): TokenResponse = refreshAccessToken(
+        tokenEndpoint = tokenEndpoint,
+        refreshToken = refreshToken,
+        additionalParameters = additionalParameters,
+        additionalHeaders = additionalHeaders,
+        attestationHeaders = attestationHeaders,
+        anonymous = anonymous,
+        dpopProofFactory = null,
+    )
+
+    /** Refreshes an access token while creating fresh DPoP proofs when requested. */
+    suspend fun refreshAccessToken(
+        tokenEndpoint: String,
+        refreshToken: String,
+        additionalParameters: Map<String, String> = emptyMap(),
+        additionalHeaders: Map<String, String> = emptyMap(),
+        attestationHeaders: ClientAttestationHeaders? = null,
+        anonymous: Boolean = false,
+        dpopProofFactory: DPoPProofFactory?,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(refreshToken.isNotBlank()) { "Refresh token cannot be blank" }
@@ -292,30 +347,29 @@ class TokenRequestBuilder(
         dpopProofFactory: DPoPProofFactory?,
         dpopNonce: String?,
     ): HttpResponse {
-        suspend fun send(endpoint: String, includeSensitiveHeaders: Boolean): HttpResponse {
-            val dpopProof = if (includeSensitiveHeaders) dpopProofFactory?.invoke(endpoint, dpopNonce) else null
+        suspend fun send(endpoint: String): HttpResponse {
+            val dpopProof = dpopProofFactory?.invoke(endpoint, dpopNonce)
             return httpClient.post(endpoint) {
                 contentType(ContentType.Application.FormUrlEncoded)
                 setBody(parameters.formUrlEncode())
-                if (includeSensitiveHeaders) {
-                    appendTokenRequestHeaders(additionalHeaders, attestationHeaders, dpopProof)
-                }
+                appendTokenRequestHeaders(additionalHeaders, attestationHeaders, dpopProof)
             }
         }
 
         val initialResponse = try {
-            send(tokenEndpoint, includeSensitiveHeaders = true)
+            send(tokenEndpoint)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw TokenRequestException(statusCode = 0, cause = e)
         }
         if (initialResponse.status.value !in REDIRECT_STATUS_CODES) return initialResponse
 
         val location = initialResponse.headers[HttpHeaders.Location] ?: return initialResponse
-        val sameOrigin = isSameOrigin(tokenEndpoint, location)
-        if (!sameOrigin && (additionalHeaders.isNotEmpty() || attestationHeaders != null || dpopProofFactory != null)) {
+        if (!isSameOrigin(tokenEndpoint, location)) {
             throw TokenRequestException(initialResponse.status.value, oauthError = "unsafe_redirect")
         }
-        return send(location, includeSensitiveHeaders = sameOrigin)
+        return send(location)
     }
 
     private suspend fun HttpResponse.oauthError(): String? {
@@ -352,6 +406,6 @@ class TokenRequestBuilder(
         const val DPOP_HEADER = "DPoP"
         const val DPOP_NONCE_HEADER = "DPoP-Nonce"
         const val USE_DPOP_NONCE = "use_dpop_nonce"
-        val REDIRECT_STATUS_CODES = setOf(301, 302, 303, 307, 308)
+        val REDIRECT_STATUS_CODES = setOf(307, 308)
     }
 }

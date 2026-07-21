@@ -54,6 +54,18 @@ struct ReceiveView: View {
                         WarningBannerView(message: warning)
                     }
 
+                    if !viewModel.deferredCredentials.isEmpty {
+                        Text("Pending credentials")
+                            .font(.subheadline.weight(.semibold))
+                        ForEach(viewModel.deferredCredentials, id: \.id) { credential in
+                            Button("Check \(credential.credentialConfigurationID)") {
+                                viewModel.resumeDeferredCredential(credential)
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(viewModel.isLoading)
+                        }
+                    }
+
                     if viewModel.receiveCompleted {
                         Button("New receive", action: viewModel.startNewReceiveFlow)
                             .buttonStyle(.bordered)
