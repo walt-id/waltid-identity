@@ -1,5 +1,6 @@
 import Foundation
 import IdentityDocumentServices
+import WalletSDK
 
 enum IdentityDocumentSharedConfiguration {
     static let appGroupIdentifier = "group.id.walt.wallet.demo"
@@ -7,6 +8,11 @@ enum IdentityDocumentSharedConfiguration {
     static let documentTypesKey = "id.walt.wallet.identity-document-types"
     static let registryIDKey = "id.walt.wallet.identity-document-registry-id"
     static let registrationIDsKey = "id.walt.wallet.identity-document-registration-ids"
+    static let supportedDocumentTypes: Set<String> = [
+        "org.iso.18013.5.1.mDL",
+        "eu.europa.ec.eudi.pid.1",
+        "eu.europa.ec.eudi.photoid.1",
+    ]
 
     static var keychainAccessGroup: String? {
         Bundle.main.object(forInfoDictionaryKey: "WALTKeychainAccessGroup") as? String
@@ -21,24 +27,29 @@ enum IdentityDocumentRegistrationCoordinator {
         }
         let store = IdentityDocumentProviderRegistrationStore()
         let status = await store.status
-        print("[WalletE2E] Identity document registration status: \(status)")
+        DigitalCredentialRegistrationStorage.persist(
+            status: status,
+            appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
+        )
         guard status == .authorized else { return }
 
-        let previousIDs = defaults.stringArray(
-            forKey: IdentityDocumentSharedConfiguration.registrationIDsKey
-        ) ?? []
-        for identifier in previousIDs {
-            try await store.removeRegistration(forDocumentIdentifier: identifier)
-        }
-
+        let requestedTypes = Set(
+            defaults.stringArray(forKey: IdentityDocumentSharedConfiguration.documentTypesKey) ?? []
+        )
+        let documentTypes = requestedTypes
+            .intersection(IdentityDocumentSharedConfiguration.supportedDocumentTypes)
+            .sorted()
         let registryID = defaults.string(forKey: IdentityDocumentSharedConfiguration.registryIDKey) ?? "empty"
-        let documentTypes = defaults.stringArray(
-            forKey: IdentityDocumentSharedConfiguration.documentTypesKey
-        ) ?? []
-        let registrationIDs = documentTypes.sorted().map { documentType in
-            "id.walt.wallet.\(registryID).\(Data(documentType.utf8).base64EncodedString())"
+        let desiredRegistrations = documentTypes.map { documentType in
+            (
+                documentType,
+                "id.walt.wallet.\(registryID).\(Data(documentType.utf8).base64EncodedString())"
+            )
         }
-        for (documentType, identifier) in zip(documentTypes.sorted(), registrationIDs) {
+        let desiredIDs = Set(desiredRegistrations.map { $0.1 })
+        let existingIDs = Set(try await store.registrations.map(\.documentIdentifier))
+
+        for (documentType, identifier) in desiredRegistrations where !existingIDs.contains(identifier) {
             try await store.addRegistration(
                 MobileDocumentRegistration(
                     mobileDocumentType: documentType,
@@ -47,7 +58,14 @@ enum IdentityDocumentRegistrationCoordinator {
                 )
             )
         }
-        defaults.set(registrationIDs, forKey: IdentityDocumentSharedConfiguration.registrationIDsKey)
+
+        let previousIDs = Set(
+            defaults.stringArray(forKey: IdentityDocumentSharedConfiguration.registrationIDsKey) ?? []
+        )
+        for identifier in previousIDs.subtracting(desiredIDs).intersection(existingIDs) {
+            try await store.removeRegistration(forDocumentIdentifier: identifier)
+        }
+        defaults.set(desiredRegistrations.map { $0.1 }, forKey: IdentityDocumentSharedConfiguration.registrationIDsKey)
     }
 
     enum RegistrationFailure: Error {

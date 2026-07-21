@@ -14,6 +14,7 @@ import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletDigitalCredentialProtocols
 import id.walt.wallet2.mobile.MobileWalletDigitalCredentialPreview
 import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.MobileWalletPresentationCredentialOption
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.data.WalletX509TrustConfig
 import kotlinx.coroutines.CoroutineScope
@@ -63,10 +64,21 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
                             encryptionInfoBase64Url = encryptionInfo,
                         )
                     )
-                    showAnnexCConsent(wallet, preview, deviceRequest, encryptionInfo)
+                    selectCredentials(preview.credentialOptions) { selections, selectedOptions ->
+                        showAnnexCConsent(
+                            wallet,
+                            preview,
+                            deviceRequest,
+                            encryptionInfo,
+                            selections,
+                            selectedOptions,
+                        )
+                    }
                 } else {
                     val preview = wallet.previewDigitalCredentialPresentation(input.request)
-                    showConsent(wallet, preview)
+                    selectCredentials(preview.credentialOptions) { selections, selectedOptions ->
+                        showConsent(wallet, preview, selections, selectedOptions)
+                    }
                 }
             }.onFailure {
                 reportFailure(it)
@@ -79,23 +91,27 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
         preview: MobileWalletAnnexCPreview,
         deviceRequest: String,
         encryptionInfo: String,
+        selections: List<MobileWalletPresentationCredentialSelection>,
+        selectedOptions: List<MobileWalletPresentationCredentialOption>,
     ) {
         val trust = when (val value = preview.readerTrust) {
             is id.walt.wallet2.mobile.MobileWalletReaderTrust.Trusted -> "Trusted reader: ${value.certificateSubject}"
             is id.walt.wallet2.mobile.MobileWalletReaderTrust.Unverified -> "Unverified reader: ${value.reason}"
             id.walt.wallet2.mobile.MobileWalletReaderTrust.NotApplicable -> "Reader trust not applicable"
         }
-        val claimLines = preview.credentialOptions.flatMap { option ->
+        val claimLines = selectedOptions.flatMap { option ->
             option.disclosures.map { disclosure ->
                 "${disclosure.name ?: disclosure.path}: ${disclosure.displayValue ?: disclosure.valueJson}"
             }
         }.distinct()
+        val credentialLines = selectedOptions.map(::credentialTitle).distinct()
         AlertDialog.Builder(this)
             .setTitle("Share mobile document?")
             .setMessage(
                 buildString {
                     append("Requester: ${preview.verifiedOrigin}\n")
                     append("$trust\n")
+                    append("\nCredential${if (credentialLines.size == 1) "" else "s"}:\n${credentialLines.joinToString("\n")}\n")
                     if (claimLines.isNotEmpty()) append("\nData to share:\n${claimLines.joinToString("\n")}")
                 }
             )
@@ -107,11 +123,6 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
             .setPositiveButton("Share") { _, _ ->
                 scope.launch {
                     runCatching {
-                        val selections = preview.credentialOptions
-                            .groupBy { it.queryId }
-                            .map { (queryId, options) ->
-                                MobileWalletPresentationCredentialSelection(queryId, options.first().credentialId)
-                            }
                         wallet.submitAnnexCPresentation(
                             MobileWalletAnnexCSubmission(
                                 requestId = preview.requestId,
@@ -132,16 +143,23 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
             .show()
     }
 
-    private fun showConsent(wallet: MobileWallet, preview: MobileWalletDigitalCredentialPreview) {
-        val claimLines = preview.credentialOptions.flatMap { option ->
-            option.disclosures.map { disclosure ->
+    private fun showConsent(
+        wallet: MobileWallet,
+        preview: MobileWalletDigitalCredentialPreview,
+        selections: List<MobileWalletPresentationCredentialSelection>,
+        selectedOptions: List<MobileWalletPresentationCredentialOption>,
+    ) {
+        val claimLines = selectedOptions.flatMap { option ->
+            option.disclosures.filter { it.required || !it.selectable }.map { disclosure ->
                 "${disclosure.name ?: disclosure.path}: ${disclosure.displayValue ?: disclosure.valueJson}"
             }
         }.distinct()
+        val credentialLines = selectedOptions.map(::credentialTitle).distinct()
         val message = buildString {
             append("Requester: ${preview.request.verifierName ?: preview.verifiedOrigin}\n")
             append("Protocol: ${preview.protocol}\n")
             append("Response encryption: ${if (preview.encryption.isRequired) "required" else "not requested"}\n")
+            append("\nCredential${if (credentialLines.size == 1) "" else "s"}:\n${credentialLines.joinToString("\n")}\n")
             if (claimLines.isNotEmpty()) append("\nData to share:\n${claimLines.joinToString("\n")}")
         }
         AlertDialog.Builder(this)
@@ -152,18 +170,17 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
                 AndroidDigitalCredentialProvider.setCancellation(resultIntent)
                 finishProviderResult()
             }
-            .setPositiveButton("Share") { _, _ -> submitAfterConsent(wallet, preview) }
+            .setPositiveButton("Share") { _, _ -> submitAfterConsent(wallet, preview, selections) }
             .show()
     }
 
-    private fun submitAfterConsent(wallet: MobileWallet, preview: MobileWalletDigitalCredentialPreview) {
+    private fun submitAfterConsent(
+        wallet: MobileWallet,
+        preview: MobileWalletDigitalCredentialPreview,
+        selections: List<MobileWalletPresentationCredentialSelection>,
+    ) {
         scope.launch {
             runCatching {
-                val selections = preview.credentialOptions
-                    .groupBy { it.queryId }
-                    .map { (queryId, options) ->
-                        MobileWalletPresentationCredentialSelection(queryId, options.first().credentialId)
-                    }
                 wallet.submitDigitalCredentialPresentation(
                     requestId = preview.requestId,
                     selectedCredentialOptions = selections,
@@ -178,8 +195,65 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
         }
     }
 
+    private fun selectCredentials(
+        options: List<MobileWalletPresentationCredentialOption>,
+        onSelected: (
+            List<MobileWalletPresentationCredentialSelection>,
+            List<MobileWalletPresentationCredentialOption>,
+        ) -> Unit,
+    ) {
+        val groups = options.groupBy { it.queryId }.toSortedMap().toList()
+        require(groups.isNotEmpty()) { "No credential satisfies this presentation request" }
+        selectCredential(groups, 0, mutableListOf(), onSelected)
+    }
+
+    private fun selectCredential(
+        groups: List<Pair<String, List<MobileWalletPresentationCredentialOption>>>,
+        index: Int,
+        selected: MutableList<MobileWalletPresentationCredentialOption>,
+        onSelected: (
+            List<MobileWalletPresentationCredentialSelection>,
+            List<MobileWalletPresentationCredentialOption>,
+        ) -> Unit,
+    ) {
+        if (index == groups.size) {
+            onSelected(
+                selected.map { MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId) },
+                selected.toList(),
+            )
+            return
+        }
+
+        val options = groups[index].second
+        require(options.isNotEmpty()) { "No credential satisfies one of the presentation queries" }
+        if (options.size == 1) {
+            selected += options.single()
+            selectCredential(groups, index + 1, selected, onSelected)
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Choose a credential")
+            .setItems(options.map(::credentialTitle).toTypedArray()) { _, selectedIndex ->
+                selected += options[selectedIndex]
+                selectCredential(groups, index + 1, selected, onSelected)
+            }
+            .setCancelable(false)
+            .setNegativeButton("Cancel") { _, _ ->
+                AndroidDigitalCredentialProvider.setCancellation(resultIntent)
+                finishProviderResult()
+            }
+            .show()
+    }
+
+    private fun credentialTitle(option: MobileWalletPresentationCredentialOption): String =
+        listOfNotNull(option.label, option.issuer, option.subject)
+            .distinct()
+            .joinToString(" · ")
+            .ifEmpty { option.credentialId }
+
     private fun reportFailure(error: Throwable) {
-        Log.e(TAG, "Digital credential presentation failed (${error::class.simpleName}): ${error.message}")
+        Log.e(TAG, "Digital credential presentation failed (${error::class.simpleName})")
         AndroidDigitalCredentialProvider.setFailure(resultIntent)
         finishProviderResult()
     }

@@ -1,4 +1,40 @@
 import Foundation
+#if os(iOS)
+import IdentityDocumentServices
+#endif
+
+/// Shared runtime-status bridge used by the SDK and an IdentityDocument provider extension.
+public enum DigitalCredentialRegistrationStorage {
+    public static let registrationStatusKey = "id.walt.wallet.identity-document-registration-status"
+
+    #if os(iOS)
+    @available(iOS 26.0, *)
+    public static func persist(
+        status: IdentityDocumentProviderRegistrationStore.Status,
+        appGroupIdentifier: String
+    ) {
+        UserDefaults(suiteName: appGroupIdentifier)?.set(
+            status.walletStorageValue,
+            forKey: registrationStatusKey
+        )
+    }
+    #endif
+}
+
+#if os(iOS)
+@available(iOS 26.0, *)
+private extension IdentityDocumentProviderRegistrationStore.Status {
+    var walletStorageValue: String {
+        switch self {
+        case .authorized: "authorized"
+        case .notDetermined: "notDetermined"
+        case .notAuthorized: "notAuthorized"
+        case .notSupported: "notSupported"
+        @unknown default: "notSupported"
+        }
+    }
+}
+#endif
 
 /// Runtime support advertised by the platform adapter, not a compile-time promise.
 public struct DigitalCredentialCapabilities: Equatable, Sendable {

@@ -123,7 +123,6 @@ public object DcApiWallet {
         val payload = buildJsonObject {
             put("vp_token", Json.parseToJsonElement(vpToken))
             idToken?.let { put("id_token", JsonPrimitive(it)) }
-            authorizationRequest.state?.let { put("state", JsonPrimitive(it)) }
         }
         val data = when (authorizationRequest.responseMode) {
             OpenID4VPResponseMode.DC_API -> payload
@@ -208,10 +207,6 @@ public object DcApiWallet {
         }
         require(!request.nonce.isNullOrBlank()) { "DC API Authorization Request nonce is required" }
         require(request.dcqlQuery != null) { "DC API Authorization Request must contain dcql_query" }
-        require(request.redirectUri == null && request.responseUri == null) {
-            "DC API Authorization Request must not use redirect_uri or response_uri transport"
-        }
-
         if (signed) {
             require(!request.clientId.isNullOrBlank()) {
                 "Signed DC API Authorization Request client_id is required"

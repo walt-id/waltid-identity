@@ -200,6 +200,7 @@ data class PreviewDcApiPresentationRequest(
     val protocol: String,
     val data: JsonObject,
     val origin: String,
+    val eligibleCredentialIds: Set<String>? = null,
 )
 
 data class PreviewDcApiPresentationResult(
@@ -322,6 +323,7 @@ object WalletPresentationHandler {
     private data class PreviewedDcApiRequest(
         val walletId: String,
         val request: ResolvedDcApiRequest,
+        val allowedCredentialIds: Set<String>,
     )
 
     /**
@@ -536,30 +538,42 @@ object WalletPresentationHandler {
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
         val matched = selectFromStores(wallet, query, useWalletCredentialIds = true)
         onEvent(WalletSessionEvent.presentation_credentials_selected)
-        val requestId = rememberPreviewedDcApiRequest(wallet, resolvedRequest)
+        val credentialOptions = matched.flatMap { (queryId, results) ->
+            results.map { result ->
+                val raw = result.credential as RawDcqlCredential
+                val stored = storedById[raw.id]
+                    ?: error("Credential '${raw.id}' disappeared while building DC API presentation preview")
+                PresentationCredentialOption(
+                    queryId = queryId,
+                    credentialId = stored.id,
+                    multiple = result.originalQuery.multiple,
+                    format = stored.credential.format,
+                    issuer = stored.credential.issuer,
+                    subject = stored.credential.subject,
+                    label = stored.label,
+                    credentialData = stored.credential.credentialData,
+                    disclosures = result.toPresentationDisclosures(),
+                )
+            }
+        }.filter { option ->
+            request.eligibleCredentialIds?.let { option.credentialId in it } ?: true
+        }
+        val credentialRequirements = query.requiredCredentialRequirements()
+        val offeredQueryIds = credentialOptions.mapTo(mutableSetOf()) { it.queryId }
+        require(credentialOptions.isNotEmpty() && credentialRequirements.satisfiedBy(offeredQueryIds)) {
+            "The selected registry entries no longer satisfy this request"
+        }
+        val requestId = rememberPreviewedDcApiRequest(
+            wallet = wallet,
+            request = resolvedRequest,
+            allowedCredentialIds = credentialOptions.mapTo(mutableSetOf()) { it.credentialId },
+        )
 
         return PreviewDcApiPresentationResult(
             requestId = requestId,
             resolvedRequest = resolvedRequest,
-            credentialRequirements = query.requiredCredentialRequirements(),
-            credentialOptions = matched.flatMap { (queryId, results) ->
-                results.map { result ->
-                    val raw = result.credential as RawDcqlCredential
-                    val stored = storedById[raw.id]
-                        ?: error("Credential '${raw.id}' disappeared while building DC API presentation preview")
-                    PresentationCredentialOption(
-                        queryId = queryId,
-                        credentialId = stored.id,
-                        multiple = result.originalQuery.multiple,
-                        format = stored.credential.format,
-                        issuer = stored.credential.issuer,
-                        subject = stored.credential.subject,
-                        label = stored.label,
-                        credentialData = stored.credential.credentialData,
-                        disclosures = result.toPresentationDisclosures(),
-                    )
-                }
-            },
+            credentialRequirements = credentialRequirements,
+            credentialOptions = credentialOptions,
             transactionData = transactionDataItems.map { decoded ->
                 PresentationTransactionDataItem(
                     type = decoded.transactionData.type,
@@ -672,7 +686,11 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ): DcApiCredentialResponse {
         request.selectedCredentialOptions.requireValidPresentationCredentialSelection()
-        val resolvedRequest = consumePreviewedDcApiRequest(wallet, request.requestId)
+        val previewedRequest = consumePreviewedDcApiRequest(wallet, request.requestId)
+        require(request.selectedCredentialOptions.all { it.credentialId in previewedRequest.allowedCredentialIds }) {
+            "A selected credential was not offered by the retained Digital Credentials preview"
+        }
+        val resolvedRequest = previewedRequest.request
         val authorizationRequest = resolvedRequest.authorizationRequest
         val key = wallet.resolveKey(keyId = null)
             ?: error("No key available: wallet has no keyStores and no staticKey")
@@ -1062,22 +1080,22 @@ object WalletPresentationHandler {
     private suspend fun rememberPreviewedDcApiRequest(
         wallet: Wallet,
         request: ResolvedDcApiRequest,
+        allowedCredentialIds: Set<String>,
     ): String = previewedDcApiRequestsMutex.withLock {
         if (previewedDcApiRequests.size >= MAX_PREVIEWED_DC_API_REQUESTS) {
             previewedDcApiRequests.remove(previewedDcApiRequests.keys.first())
         }
         val requestId = UuidUtils.randomUUIDString()
-        previewedDcApiRequests[requestId] = PreviewedDcApiRequest(wallet.id, request)
+        previewedDcApiRequests[requestId] = PreviewedDcApiRequest(wallet.id, request, allowedCredentialIds)
         requestId
     }
 
     private suspend fun consumePreviewedDcApiRequest(
         wallet: Wallet,
         requestId: String,
-    ): ResolvedDcApiRequest = previewedDcApiRequestsMutex.withLock {
+    ): PreviewedDcApiRequest = previewedDcApiRequestsMutex.withLock {
         previewedDcApiRequests.remove(requestId)
             ?.takeIf { it.walletId == wallet.id }
-            ?.request
     } ?: throw MissingPresentationPreviewException()
 
     internal fun DcqlMatcher.DcqlMatchResult.toPresentationDisclosures(): List<PresentationDisclosure> {
