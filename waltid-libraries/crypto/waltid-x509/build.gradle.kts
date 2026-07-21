@@ -38,6 +38,20 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
         }
 
+        val jvmBouncyMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+                implementation(identityLibs.bouncycastle.prov)
+                implementation(identityLibs.bouncycastle.pkix)
+            }
+        }
+
+        val jvmBouncyTest by creating {
+            dependsOn(commonTest.get())
+        }
+
+
         val commonSignumMain by creating {
             dependsOn(commonMain.get())
             dependencies {
@@ -62,12 +76,11 @@ kotlin {
         }
 
         jvmMain {
+            dependsOn(jvmBouncyMain)
             dependsOn(commonSignumMain)
             dependsOn(jvmIosMain)
             dependencies {
                 implementation(identityLibs.signum.indispensable)
-                implementation(identityLibs.bouncycastle.prov)
-                implementation(identityLibs.bouncycastle.pkix)
                 implementation(identityLibs.nimbus.jose.jwt)
                 implementation(identityLibs.kotlinx.coroutines.core)
             }
@@ -75,9 +88,9 @@ kotlin {
 
         jvmTest {
             dependsOn(jvmMain.get())
+            dependsOn(jvmBouncyTest)
             dependsOn(commonSignumTest)
             dependencies {
-
                 // Logging
                 implementation(identityLibs.slf4j.simple)
 

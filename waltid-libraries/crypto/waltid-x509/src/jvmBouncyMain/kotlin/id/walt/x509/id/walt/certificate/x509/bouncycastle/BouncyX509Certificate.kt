@@ -7,7 +7,6 @@ import id.walt.x509.id.walt.certificate.x509.bouncycastle.extension.BouncyExtens
 import kotlinx.io.bytestring.ByteString
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.cert.X509CertificateHolder
-import java.security.MessageDigest
 import kotlin.time.toKotlinInstant
 
 internal class BouncyX509Certificate(val certificate: X509CertificateHolder) : X509Certificate {
