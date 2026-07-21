@@ -2,7 +2,6 @@ package id.walt.openid4vp.conformance.testplans.runner
 
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.http.IssuerInterface
-import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariant
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantModuleRunResult
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantRunResult
@@ -25,11 +24,11 @@ import java.nio.charset.StandardCharsets
  */
 class IssuerTestPlanRunner(
     val config: IssuerTestPlanConfiguration,
-    val conformanceHost: String,
-    val conformancePort: Int,
+    val conformance: ConformanceInterface,
     val issuerInterface: IssuerInterface? = null
 ) {
-    val conformance = ConformanceInterface(conformanceHost, conformancePort)
+    private val conformanceHost = conformance.conformanceHost
+    private val conformancePort = conformance.conformancePort
     private val moduleSelection = IssuerModuleSelection.fromEnvironment()
     private val browserAutomationConfig = IssuerBrowserAutomationConfig.fromEnvironment()
     private val browserAutomation = IssuerConformanceBrowserAutomation(
@@ -52,94 +51,11 @@ class IssuerTestPlanRunner(
         }
     }
 
-    suspend fun test(): List<TestPlanResult> {
-        println("-- Conformance OID4VCI Issuer Test -- -> Setup")
-
-        if (config.requiresPreAuthorizedOffer && issuerInterface == null) {
-            throw IllegalStateException("This issuer test plan requires credential offers, but no issuer management interface is configured.")
-        }
-
-        // Create test plan
-        val createTestPlanUrl = conformance.createTestPlanUrlWithConfig(
-            config.testPlanCreationUrl
-        )
-
-        println("Creating issuer test plan... ($createTestPlanUrl)")
-        val testPlanConfig = config.withStaticTxCode()
-        val createTestPlanResponse = conformance.createTestPlan(createTestPlanUrl, testPlanConfig)
-
-        if (createTestPlanResponse.modules.isEmpty()) {
-            throw IllegalStateException("No test modules available for the specified variant. Check your configuration.")
-        }
-
-        val testPlanId = createTestPlanResponse.id
-        println("Created test plan: $testPlanId")
-        println("The conformance suite will call issuer: ${config.issuerUrl}")
-
-        val modulesToRun = moduleSelection.filter(createTestPlanResponse.modules) { it.testModule }
-        if (modulesToRun.isEmpty()) {
-            throw IllegalStateException("No conformance modules matched ${moduleSelection.description}.")
-        }
-
-        println("Running ${modulesToRun.size}/${createTestPlanResponse.modules.size} modules")
-        modulesToRun.forEach { println("   - ${it.testModule}") }
-
-        return modulesToRun.map { module ->
-            val testModule = module.testModule
-            val createTestUrl = conformance.buildCreateTestUrl(testPlanId, testModule, module.variant)
-            println("Creating test for module $testModule... ($createTestUrl)")
-            val createTestResponse = conformance.createTest(createTestUrl)
-            val testId = createTestResponse.id
-
-            println("Created test: $testId")
-            println("View test run at: https://$conformanceHost:$conformancePort/log-detail.html?log=$testId")
-            println("Waiting for conformance suite to complete issuer test...")
-
-            waitForIssuerTestCompletion(testId, credentialOfferProviderFor(testModule))
-
-            val testRunInfo = conformance.getTestRunInfo(testId)
-            println("Module $testModule finished with status=${testRunInfo.status}, result=${testRunInfo.result}")
-
-            // For skippable modules, accept INTERRUPTED status (feature not supported by issuer)
-            val acceptedStatuses = if (testModule in config.skippableModules) {
-                setOf("FINISHED", "INTERRUPTED")
-            } else {
-                setOf("FINISHED")
-            }
-
-            require(testRunInfo.status in acceptedStatuses) {
-                "Issuer test $testModule expected status in $acceptedStatuses, got ${testRunInfo.status}"
-            }
-
-            // For skippable modules that interrupted, accept FAILED (feature not implemented)
-            val acceptedResults = if (testModule in config.skippableModules) {
-                if (testRunInfo.status == "INTERRUPTED") {
-                    setOf("PASSED", "SKIPPED", "FAILED")  // INTERRUPTED tests may have FAILED result
-                } else {
-                    setOf("PASSED", "SKIPPED")
-                }
-            } else {
-                setOf("PASSED")
-            }
-
-            require(testRunInfo.result in acceptedResults) {
-                "Issuer test $testModule expected one of $acceptedResults, got ${testRunInfo.result}"
-            }
-
-            TestPlanResult(
-                conformanceTestId = testId,
-                conformanceStatus = testRunInfo.status,
-                conformanceResult = testRunInfo.result,
-                verifierStatus = null
-            )
-        }
-    }
-
     suspend fun attempt(variant: IssuerVariant): IssuerVariantRunResult {
         println("-- Conformance OID4VCI Issuer Matrix Variant ${variant.id} -- -> Setup")
 
         val variantJson = variant.toJsonObject()
-        if (config.requiresPreAuthorizedOffer && issuerInterface == null) {
+        if (config.credentialOfferAuthMethod != null && issuerInterface == null) {
             return IssuerVariantRunResult(
                 variantId = variant.id,
                 variant = variantJson,
@@ -253,23 +169,13 @@ class IssuerTestPlanRunner(
     }
 
     private fun acceptsModuleResult(testModule: String, status: String, result: String?): Boolean {
-        val acceptedStatuses = if (testModule in config.skippableModules) {
-            setOf("FINISHED", "INTERRUPTED")
-        } else {
-            setOf("FINISHED")
+        if (status == "FINISHED" && result == "PASSED") {
+            return true
         }
 
-        val acceptedResults = if (testModule in config.skippableModules) {
-            if (status == "INTERRUPTED") {
-                setOf("PASSED", "SKIPPED", "FAILED")
-            } else {
-                setOf("PASSED", "SKIPPED")
-            }
-        } else {
-            setOf("PASSED")
-        }
-
-        return status in acceptedStatuses && result in acceptedResults
+        return testModule in config.skippableModules &&
+            status in setOf("FINISHED", "INTERRUPTED") &&
+            result == "SKIPPED"
     }
 
     private fun overallStatus(moduleResults: List<IssuerVariantModuleRunResult>): IssuerVariantRunStatus {
@@ -309,16 +215,18 @@ class IssuerTestPlanRunner(
         listOfNotNull(javaClass.simpleName, message).joinToString(": ")
 
     private fun credentialOfferProviderFor(testModule: String): (suspend () -> String)? {
-        if (!config.requiresPreAuthorizedOffer) {
-            return null
-        }
+        val authMethod = config.credentialOfferAuthMethod ?: return null
 
         return suspend {
             val issuer = requireNotNull(issuerInterface) {
                 "Test module $testModule requires a credential offer, but no issuer management interface is configured."
             }
             println("Creating fresh issuer2 credential offer for module $testModule...")
-            val offerResponse = issuer.createCredentialOffer(config.credentialProfileId, config.staticTxCode)
+            val offerResponse = issuer.createCredentialOffer(
+                profileId = config.credentialProfileId,
+                authMethod = authMethod,
+                staticTxCode = config.staticTxCode,
+            )
             println("Created credential offer: ${offerResponse.offerId}")
             println("Credential offer URI: ${offerResponse.credentialOffer}")
             offerResponse.txCodeValue?.let { println("Credential offer tx_code: $it") }
