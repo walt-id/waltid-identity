@@ -2,52 +2,31 @@
 
 This document covers setup, execution, and status of OpenID4VCI Issuer conformance tests.
 
-## Test Profiles
+## Test Plan
 
-| Profile | Test Plan | Grant Type | Format | Status |
-|---------|-----------|------------|--------|--------|
-| issuer2 Client Attestation + DPoP | `oid4vci-1_0-issuer-test-plan` | `pre-authorized_code` | SD-JWT VC | Observed passing locally |
-| SD-JWT Baseline | `oid4vci-1_0-issuer-metadata-test` | `pre-authorized_code` | SD-JWT VC | ✅ PASSED |
-**Last tested:** 2026-07-14
+| Profile | Test Plan | Variants |
+|---------|-----------|----------|
+| Base VCI issuer | `oid4vci-1_0-issuer-test-plan` | 288 generated combinations |
 
 ---
 
-## Current Status
+## Matrix Behavior
 
-### ✅ Passing Tests
-
-**`oid4vci-1_0-issuer-metadata-test`** — Validates issuer metadata endpoint
-- Credential issuer URL uses HTTPS ✓
-- Metadata structure compliant ✓
-- Credential configurations valid ✓
-
-**`oid4vci-1_0-issuer-happy-flow`** — Full issuance flow
-
-```text
-sender_constrain=dpop
-client_auth_type=client_attestation
-vci_authorization_code_flow_variant=wallet_initiated
-credential_format=sd_jwt_vc
-authorization_request_type=simple
-fapi_request_method=unsigned
-vci_grant_type=pre-authorized_code
-vci_credential_encryption=plain
-fapi_profile=vci
-fapi_response_mode=plain_response
-```
-
-The runner also creates an issuer2 credential offer before creating the conformance-suite plan and injects it as `vci.credential_offer_uri`. The resulting config includes:
+The runner creates one conformance-suite plan for each selected matrix variant.
+The available axes and filters are documented in the main README. The resulting
+config includes:
 
 - `vci.credential_issuer_url`
 - `vci.credential_configuration_id`
 - `vci.client_attestation_issuer`
 - `vci.client_attester_keys_jwks`
-- `vci.credential_offer_uri`
 - `client_attestation.issuer`
 - `client_attestation.attester_jwks`
 - `client.jwks` and `client2.jwks` for DPoP
 
-Do not rename the working variant values to alternate suite enum spellings without re-running this same plan. The observed passing setup used the values above.
+For issuer-initiated variants, the runner creates a fresh issuer2 credential offer
+for each conformance module and delivers it when the suite exposes its credential
+offer endpoint.
 
 ---
 
@@ -59,7 +38,7 @@ Do not rename the working variant values to alternate suite enum spellings witho
    docker compose -f docker-compose-walt.yml up -d
    ```
 
-2. **Keycloak** running at `http://keycloak.localhost:8080` with `issuer` realm for authorization-code plans. The pre-authorized-code issuer baseline does not need Keycloak.
+2. **Keycloak** running at `http://keycloak.localhost:8080` with `issuer` realm for authorization-code variants. Pre-authorized-code variants do not need Keycloak.
 
 3. **ngrok** for exposing issuer to conformance suite
    ```bash
@@ -157,9 +136,10 @@ export OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE="$PWD/waltid-identity/wa
 ### Test Execution Flow
 
 1. The test fetches issuer metadata from `/.well-known/openid-credential-issuer/openid4vci`.
-2. The runner creates an issuer2 credential offer through the issuer management API.
-3. The runner creates `oid4vci-1_0-issuer-test-plan` with the handover variant above.
-4. The conformance suite uses the supplied `credential_offer_uri`, DPoP keys, and client-attestation keys to call issuer2.
+2. The runner generates and filters the base VCI issuer matrix.
+3. The runner creates `oid4vci-1_0-issuer-test-plan` for each selected variant.
+4. Issuer-initiated modules receive a fresh issuer2 credential offer.
+5. The runner executes the suite modules and writes matrix reports.
 
 ---
 
@@ -209,18 +189,6 @@ The conformance suite runs in Docker and can't reach `localhost`. Use ngrok URL.
 ✅ /.well-known/openid-credential-issuer/openid4vci
 ❌ /openid4vci/.well-known/openid-credential-issuer
 ```
-
----
-
-## HAIP Requirements
-
-| Req | Description | Status |
-|-----|-------------|--------|
-| I-01 | Authorization Code flow | ⚠️ Missing `iss` |
-| I-02 | FAPI2 Security Profile (PKCE, PAR) | ✅ |
-| I-03 | DPoP for sender-constrained tokens | ✅ |
-| I-22 | SD-JWT VC with holder binding | ✅ |
-| CF-02 | P-256 + SHA-256 (ES256) | ✅ |
 
 ---
 
