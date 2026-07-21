@@ -74,4 +74,5 @@ object JwtHeaderParams {
  */
 object JwtConfirmationClaims {
     const val JWK = "jwk"
+    const val JWK_THUMBPRINT = "jkt"
 }
