@@ -1,10 +1,18 @@
 package id.walt.wallet2.mobile
 
+import id.walt.cose.toCoseVerifier
 import id.walt.credentials.CredentialDetectorTypes
 import id.walt.credentials.CredentialParser
+import id.walt.credentials.examples.MdocsExamples
 import id.walt.credentials.examples.SdJwtExamples
+import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.formats.SdJwtCredential
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
+import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
+import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -24,17 +32,22 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class MobileWalletTest {
@@ -355,6 +368,233 @@ class MobileWalletTest {
         assertEquals(listOf(listOf("pid")), preview.credentialRequirements.single().options)
     }
 
+    @Test
+    fun digitalCredentialRegistryUsesStableOpaqueMetadataAndExcludesSdJwtInfrastructureClaims() = runTest {
+        val registry = RecordingMetadataRegistry()
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "credential-sensitive-local-id",
+                credential = SdJwtCredential(
+                    dmtype = CredentialDetectorTypes.SDJWTVCSubType.sdjwtvc,
+                    credentialData = buildJsonObject {
+                        put("vct", "https://credentials.example/pid")
+                        put("iss", "https://issuer.example")
+                        put("given_name", "Ada")
+                    },
+                    issuer = "https://issuer.example",
+                    subject = "did:key:subject",
+                    signature = null,
+                    signed = null,
+                ),
+                label = "PID",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "registry-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            keyGenerator = { error("Registry refresh must not generate keys") },
+            credentialRegistry = registry,
+        )
+
+        wallet.refreshDigitalCredentialRegistration()
+        wallet.refreshDigitalCredentialRegistration()
+
+        assertEquals(2, registry.replacements.size)
+        assertEquals(registry.replacements[0], registry.replacements[1])
+        val record = registry.replacements.last().second.single()
+        assertFalse(record.registryEntryId.contains("credential-sensitive-local-id"))
+        assertEquals("https://credentials.example/pid", record.type)
+        assertEquals(listOf(listOf("given_name")), record.fields.map { it.path })
+        assertFalse(record.fields.any { it.path.singleOrNull() == "iss" })
+    }
+
+    @Test
+    fun digitalCredentialRegistryKeepsStructuredMdocElementsAtNamespaceElementPaths() = runTest {
+        val registry = RecordingMetadataRegistry()
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "mdl-1",
+                credential = MdocsCredential(
+                    credentialData = buildJsonObject {
+                        put("org.iso.18013.5.1", buildJsonObject {
+                            put("given_name", "Ada")
+                            put("driving_privileges", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("vehicle_category_code", "B")
+                                })
+                            })
+                        })
+                    },
+                    signed = null,
+                    docType = "org.iso.18013.5.1.mDL",
+                ),
+                label = "mDL",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "mdoc-registry-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            keyGenerator = { error("Registry refresh must not generate keys") },
+            credentialRegistry = registry,
+        )
+
+        wallet.refreshDigitalCredentialRegistration()
+
+        val fields = registry.replacements.single().second.single().fields
+        assertEquals(
+            listOf(
+                listOf("org.iso.18013.5.1", "given_name"),
+                listOf("org.iso.18013.5.1", "driving_privileges"),
+            ),
+            fields.map { it.path },
+        )
+        assertTrue(fields.all { it.path.size == 2 })
+    }
+
+    @Test
+    fun annexCParserNormalizesNamespacesAndPreviewRejectsParsedRawMismatchBeforeConsent() = runTest {
+        val wallet = MobileWallet(
+            walletId = "annex-c-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = RecordingCredentialStore(),
+            keyGenerator = { error("Parsing must not generate keys") },
+        )
+        val raw = DeviceRequest(
+            docType = "org.iso.18013.5.1.mDL",
+            requestedElements = mapOf("org.iso.18013.5.1" to listOf("given_name", "family_name")),
+        ).encodeToBase64Url()
+
+        val parsed = wallet.parseAnnexCDeviceRequest(raw)
+
+        assertEquals("org.iso.18013.5.1.mDL", parsed.documents.single().docType)
+        assertEquals(listOf("family_name", "given_name"), parsed.documents.single().namespaces.values.single())
+        assertFailsWith<IllegalArgumentException> {
+            wallet.previewAnnexCPresentation(
+                MobileWalletAnnexCRequest(
+                    parsedRequest = MobileWalletAnnexCParsedRequest(
+                        listOf(MobileWalletAnnexCDocumentRequest("eu.europa.ec.eudi.pid.1", emptyMap()))
+                    ),
+                    verifiedOrigin = "https://verifier.example",
+                    deviceRequestBase64Url = raw,
+                    encryptionInfoBase64Url = "not-reached",
+                )
+            )
+        }
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    @Test
+    fun annexCReaderAuthenticationUsesVerifierTranscriptBuildsResponseAndRejectsTampering() = runTest {
+        val origin = "https://verifier.example"
+        val namespace = "org.iso.18013.5.1"
+        val docType = "org.iso.18013.5.1.mDL"
+        val readerCertificate = Base64.decode(READER_CERTIFICATE_BASE64)
+        // The pre-signed request avoids platform-specific private-key imports; the assertion below prevents fixture drift.
+        val signedRequest = DeviceRequest.decodeFromBase64Url(SIGNED_READER_REQUEST)
+        val signature = requireNotNull(signedRequest.docRequests.single().readerAuth)
+        val readerKey = JWKKey.importFromDerCertificate(readerCertificate).getOrThrow()
+        assertTrue(
+            signature.verifyDetached(
+                readerKey.toCoseVerifier(),
+                ReaderAuthenticationPayloads.forDocument(
+                    sessionTranscript = AnnexCTranscriptBuilder.buildSessionTranscript(READER_ENCRYPTION_INFO, origin),
+                    itemsRequest = signedRequest.docRequests.single().itemsRequest,
+                ),
+            ),
+            "Fixture must use the verifier's exact ISO 18013-7 Annex C transcript",
+        )
+        val holderSigner = JWKKey.importJWK(HOLDER_TEST_PRIVATE_JWK).getOrThrow()
+        val holderKeyId = holderSigner.getKeyId()
+        val wallet = MobileWallet(
+            walletId = "annex-c-reader-auth-wallet",
+            keyStore = PreloadedKeyStore(
+                WalletKeyInfo(keyId = holderKeyId, keyType = KeyType.Ed25519.name),
+                holderSigner,
+            ),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = RecordingCredentialStore(
+                StoredCredential(
+                    id = "mdl-1",
+                    credential = MdocsCredential(
+                        credentialData = buildJsonObject {
+                            put(namespace, buildJsonObject { put("given_name", "Ada") })
+                        },
+                        signed = MdocsExamples.mdocsExampleBase64Url,
+                        docType = docType,
+                    ),
+                    label = "mDL",
+                )
+            ),
+            keyGenerator = { error("Reader-authentication preview must not generate keys") },
+            readerTrustEvaluator = MobileWalletReaderTrustEvaluator { chain ->
+                assertEquals(1, chain.size)
+                assertContentEquals(readerCertificate, chain.single())
+                MobileWalletReaderTrust.Trusted("CN=Example")
+            },
+        )
+        val parsedRequest = wallet.parseAnnexCDeviceRequest(signedRequest.encodeToBase64Url())
+
+        val preview = wallet.previewAnnexCPresentation(
+            MobileWalletAnnexCRequest(
+                parsedRequest = parsedRequest,
+                verifiedOrigin = origin,
+                deviceRequestBase64Url = SIGNED_READER_REQUEST,
+                encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+            )
+        )
+
+        assertEquals(MobileWalletReaderTrust.Trusted("CN=Example"), preview.readerTrust)
+        val response = wallet.submitAnnexCPresentation(
+            MobileWalletAnnexCSubmission(
+                requestId = preview.requestId,
+                verifiedOrigin = origin,
+                deviceRequestBase64Url = SIGNED_READER_REQUEST,
+                encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+                selectedCredentialOptions = preview.credentialOptions.map {
+                    MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
+                },
+            )
+        )
+        assertEquals(MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C, response.protocol)
+        assertTrue(
+            displayJson.parseToJsonElement(response.dataJson).jsonObject["response"]
+                ?.jsonPrimitive?.content?.isNotBlank() == true
+        )
+
+        val tamperedSignature = signature.copy(
+            signature = signature.signature.copyOf().also { bytes ->
+                bytes[0] = (bytes[0].toInt() xor 1).toByte()
+            }
+        )
+        val tamperedRequest = signedRequest.copy(
+            docRequests = listOf(signedRequest.docRequests.single().copy(readerAuth = tamperedSignature)),
+        )
+        assertFailsWith<IllegalArgumentException> {
+            wallet.previewAnnexCPresentation(
+                MobileWalletAnnexCRequest(
+                    parsedRequest = parsedRequest,
+                    verifiedOrigin = origin,
+                    deviceRequestBase64Url = tamperedRequest.encodeToBase64Url(),
+                    encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+                )
+            )
+        }
+    }
+
+    @Test
+    fun capabilityAndMigrationModelsFailClosedByDefault() = runTest {
+        assertFalse(UnavailableMobileWalletCredentialRegistry.capabilities.platformAvailable)
+        assertFalse(UnavailableMobileWalletCredentialRegistry.capabilities.registrationAvailable)
+        assertIs<MobileWalletReaderTrust.Unverified>(
+            UnconfiguredMobileWalletReaderTrustEvaluator.evaluate(emptyList())
+        )
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun mobileWalletEventStreamDoesNotBackpressureSlowCollectors() = runTest {
@@ -387,6 +627,17 @@ class MobileWalletTest {
         isLenient = true
     }
 
+    private companion object {
+        const val READER_CERTIFICATE_BASE64 =
+            "MIIBsTCCAVegAwIBAgIUJklaRrIjkEZlDdPk2+qPneHHD6kwCgYIKoZIzj0EAwIwLjEQMA4GA1UEAwwHRXhhbXBsZTENMAsGA1UECgwEVGVzdDELMAkGA1UEBhMCVVMwHhcNMjYwMzMxMDkwNDMwWhcNMjcwMzMxMDkwNDMwWjAuMRAwDgYDVQQDDAdFeGFtcGxlMQ0wCwYDVQQKDARUZXN0MQswCQYDVQQGEwJVUzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABM4ukI9BoHfMYjKmokWc5GMiN7DJBQAPPZBHXHhwmuQE+JyeRcamM+uCS1N+naE0itVbs7fQ/5xbujSSK9pYdb6jUzBRMB0GA1UdDgQWBBSwjqgulcWH4AqTJwPjBGj3VGIAsTAfBgNVHSMEGDAWgBSwjqgulcWH4AqTJwPjBGj3VGIAsTAPBgNVHRMBAf8EBTADAQH/MAoGCCqGSM49BAMCA0gAMEUCIQCoWAleGRqR+kb+5SeRt/scogZPiQiM7wJ69tadEPPJwQIgdygIZSMQSXlxXbZ10QKtN6qSjggqFVUV4/Z2/pnBUBk="
+        const val READER_ENCRYPTION_INFO =
+            "gmVkY2FwaaJlbm9uY2VQAQIDBAUGBwgJCgsMDQ4PEHJyZWNpcGllbnRQdWJsaWNLZXmkAQIgASFYIM4ukI9BoHfMYjKmokWc5GMiN7DJBQAPPZBHXHhwmuQEIlgg-JyeRcamM-uCS1N-naE0itVbs7fQ_5xbujSSK9pYdb4"
+        const val SIGNED_READER_REQUEST =
+            "omd2ZXJzaW9uYzEuMGtkb2NSZXF1ZXN0c4GibGl0ZW1zUmVxdWVzdNgYWEqiZ2RvY1R5cGV1b3JnLmlzby4xODAxMy41LjEubURMam5hbWVTcGFjZXOhcW9yZy5pc28uMTgwMTMuNS4xoWpnaXZlbl9uYW1l9GpyZWFkZXJBdXRohEOhASahGCFZAbUwggGxMIIBV6ADAgECAhQmSVpGsiOQRmUN0-Tb6o-d4ccPqTAKBggqhkjOPQQDAjAuMRAwDgYDVQQDDAdFeGFtcGxlMQ0wCwYDVQQKDARUZXN0MQswCQYDVQQGEwJVUzAeFw0yNjAzMzEwOTA0MzBaFw0yNzAzMzEwOTA0MzBaMC4xEDAOBgNVBAMMB0V4YW1wbGUxDTALBgNVBAoMBFRlc3QxCzAJBgNVBAYTAlVTMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEzi6Qj0Ggd8xiMqaiRZzkYyI3sMkFAA89kEdceHCa5AT4nJ5FxqYz64JLU36doTSK1Vuzt9D_nFu6NJIr2lh1vqNTMFEwHQYDVR0OBBYEFLCOqC6VxYfgCpMnA-MEaPdUYgCxMB8GA1UdIwQYMBaAFLCOqC6VxYfgCpMnA-MEaPdUYgCxMA8GA1UdEwEB_wQFMAMBAf8wCgYIKoZIzj0EAwIDSAAwRQIhAKhYCV4ZGpH6Rv7lJ5G3-xyiBk-JCIzvAnr21p0Q88nBAiB3KAhlIxBJeXFdtnXRAq03qpKOCCoVVRXj9nb-mcFQGfZYQE524YTazDQiCCYBcZRzZHc0GfcMBDJVNIRZ1Svd3hXLG7pj8eTefRllnxRtj4nGQO-MQIJoRqPaDiMuIh1BLVU"
+        const val HOLDER_TEST_PRIVATE_JWK =
+            """{"kty":"OKP","crv":"Ed25519","kid":"holder-key","x":"LRHvL7I9utgSl47JksY0-uY21TlIxp_queROJJzknNM","d":"lPR4XjW-9_rI4hLjvdjmjoGC6ozblm9juDv4OHYdm5M"}"""
+    }
+
     private class RecordingDatabaseKeyProvider : DatabaseEncryptionKeyProvider {
         override suspend fun getOrCreateKey(walletId: String, databaseName: String): DatabaseEncryptionKey =
             DatabaseEncryptionKey("$walletId:$databaseName", ByteArray(32))
@@ -394,11 +645,27 @@ class MobileWalletTest {
         override suspend fun deleteKey(walletId: String, databaseName: String) = Unit
     }
 
-    private class PreloadedKeyStore(private val keyInfo: WalletKeyInfo) : WalletKeyStore {
+    private class RecordingMetadataRegistry : MobileWalletCredentialRegistry {
+        val replacements = mutableListOf<Pair<String, List<MobileWalletCredentialRegistryRecord>>>()
+        override val capabilities = UnavailableMobileWalletCredentialRegistry.capabilities
+
+        override suspend fun replace(
+            registryId: String,
+            records: List<MobileWalletCredentialRegistryRecord>,
+        ): MobileWalletCredentialRegistrationResult {
+            replacements += registryId to records
+            return MobileWalletCredentialRegistrationResult(true, records.size)
+        }
+    }
+
+    private class PreloadedKeyStore(
+        private val keyInfo: WalletKeyInfo,
+        private val key: Key? = null,
+    ) : WalletKeyStore {
         var listKeysCalls = 0
         val removedKeyIds = mutableListOf<String>()
 
-        override suspend fun getKey(keyId: String) = null
+        override suspend fun getKey(keyId: String) = key?.takeIf { keyId == keyInfo.keyId }
 
         override suspend fun listKeys(): Flow<WalletKeyInfo> {
             listKeysCalls++
@@ -439,7 +706,7 @@ class MobileWalletTest {
     ) : WalletCredentialStore {
         val removedCredentialIds = mutableListOf<String>()
 
-        override suspend fun getCredential(id: String): StoredCredential? = null
+        override suspend fun getCredential(id: String): StoredCredential? = credentials.firstOrNull { it.id == id }
 
         override suspend fun listCredentials(): Flow<StoredCredential> =
             credentials.toList().asFlow()

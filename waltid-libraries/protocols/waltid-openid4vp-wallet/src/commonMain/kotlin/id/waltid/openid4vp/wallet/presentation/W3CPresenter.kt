@@ -22,7 +22,8 @@ object W3CPresenter {
         matchResult: DcqlMatcher.DcqlMatchResult,
         authorizationRequest: AuthorizationRequest,
         holderKey: Key,
-        holderDid: String
+        holderDid: String,
+        holderBindingAudience: String? = null,
     ): JsonPrimitive {
         val selectedClaimsMap = matchResult.selectedDisclosures
 
@@ -44,7 +45,7 @@ object W3CPresenter {
             val kbJwtString = createKeyBindingJwt(
                 disclosed = disclosed,
                 nonce = authorizationRequest.nonce!!,
-                audience = authorizationRequest.clientId,
+                audience = holderBindingAudience ?: authorizationRequest.clientId,
                 selectedDisclosures = disclosuresToPresent, // Pass the actual disclosures for sd_hash
                 holderKey = holderKey,
                 transactionData = filterTransactionDataForCredentialId(
@@ -63,7 +64,7 @@ object W3CPresenter {
             val w3cPresentationJwt = PresentationBuilder().apply {
                 this.did = holderDid
                 this.nonce = authorizationRequest.nonce!!
-                this.audience = authorizationRequest.clientId
+                this.audience = holderBindingAudience ?: authorizationRequest.clientId
                 addCredential(
                     JsonPrimitive(
                         digitalCredential.signed ?: error("Signed W3C VC JWT missing for $digitalCredential")

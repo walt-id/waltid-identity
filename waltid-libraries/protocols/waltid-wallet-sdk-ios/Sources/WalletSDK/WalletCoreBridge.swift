@@ -23,6 +23,19 @@ protocol WalletCoreBridge: Sendable {
         error: PresentationErrorCode?,
         errorDescription: String?
     ) async throws -> PresentationResult
+    func digitalCredentialCapabilities() -> DigitalCredentialCapabilities
+    func previewAnnexCPresentation(
+        parsedRequest: AnnexCParsedRequest,
+        verifiedOrigin: String,
+        selectedRegistryEntryIDs: [String]
+    ) async throws -> AnnexCPresentationPreview
+    func submitAnnexCPresentation(
+        requestID: String,
+        verifiedOrigin: String,
+        deviceRequestBase64URL: String,
+        encryptionInfoBase64URL: String,
+        selectedCredentialOptions: [PresentationCredentialSelection]
+    ) async throws -> DigitalCredentialResponse
 }
 
 @available(macOS 10.15, *)
@@ -89,6 +102,30 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     ) async throws -> PresentationResult {
         throw unavailableError()
     }
+
+    func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
+        DigitalCredentialCapabilities(
+            platform: "unavailable",
+            platformAvailable: false,
+            minimumOSVersion: "iOS 26",
+            registrationAvailable: false,
+            capabilities: []
+        )
+    }
+
+    func previewAnnexCPresentation(
+        parsedRequest: AnnexCParsedRequest,
+        verifiedOrigin: String,
+        selectedRegistryEntryIDs: [String]
+    ) async throws -> AnnexCPresentationPreview { throw unavailableError() }
+
+    func submitAnnexCPresentation(
+        requestID: String,
+        verifiedOrigin: String,
+        deviceRequestBase64URL: String,
+        encryptionInfoBase64URL: String,
+        selectedCredentialOptions: [PresentationCredentialSelection]
+    ) async throws -> DigitalCredentialResponse { throw unavailableError() }
 
     private func unavailableError() -> WalletError {
         .internalFailure("WalletCore is only available when the iOS XCFramework is linked.")

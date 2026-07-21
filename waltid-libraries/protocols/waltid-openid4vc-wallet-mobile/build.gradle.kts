@@ -53,6 +53,7 @@ kotlin {
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile"))
             api(project(":waltid-libraries:crypto:waltid-crypto"))
             api(project(":waltid-libraries:waltid-did"))
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.datetime)
@@ -61,6 +62,7 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
+            implementation(project(":waltid-libraries:protocols:waltid-18013-7-verifier"))
             implementation(identityLibs.kotlinx.coroutines.test)
             implementation(identityLibs.ktor.client.core)
             implementation(identityLibs.kotlinx.serialization.json)
@@ -68,11 +70,30 @@ kotlin {
         if (enableAndroidBuild) {
             androidMain.dependencies {
                 implementation(identityLibs.ktor.client.android)
+                implementation(identityLibs.androidx.credentials.registry.mdoc)
+                implementation(identityLibs.androidx.credentials.registry.openid)
+                implementation(identityLibs.androidx.credentials.registry.sdjwtvc)
+                implementation(identityLibs.androidx.credentials.registry.provider)
+                implementation(identityLibs.androidx.credentials.registry.provider.play.services)
+                // Supplies the Apache-2.0 matcher asset used for ISO 18013-7 Annex C.
+                // No Multipaz runtime API is linked; wallet data stays in the walt.id SDK model.
+                implementation("org.multipaz:multipaz-dcapi-android:0.100.0") {
+                    isTransitive = false
+                }
+            }
+            val androidHostTest by getting {
+                dependencies {
+                    implementation(kotlin("test"))
+                    implementation(identityLibs.junit)
+                    implementation(identityLibs.robolectric)
+                }
             }
         }
         if (enableIosBuild) {
             iosMain.dependencies {
                 implementation(identityLibs.ktor.client.darwin)
+                implementation(identityLibs.signum.indispensable)
+                implementation(identityLibs.signum.supreme)
             }
         }
         if (enableAndroidBuild) {
@@ -87,5 +108,11 @@ kotlin {
                 }
             }
         }
+    }
+}
+
+tasks.withType<Test>().configureEach {
+    if (name == "testAndroidHostTest") {
+        useJUnit()
     }
 }

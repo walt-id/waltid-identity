@@ -177,6 +177,60 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return try value.toSwiftPresentationResult()
     }
 
+    func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
+        bridge.digitalCredentialCapabilities().toSwiftCapabilities()
+    }
+
+    func previewAnnexCPresentation(
+        parsedRequest: AnnexCParsedRequest,
+        verifiedOrigin: String,
+        selectedRegistryEntryIDs: [String]
+    ) async throws -> AnnexCPresentationPreview {
+        let result = try await bridge.previewAnnexCPresentation(
+            request: MobileWalletAnnexCRequest(
+                parsedRequest: parsedRequest.toKMPParsedRequest(),
+                verifiedOrigin: verifiedOrigin,
+                selectedRegistryEntryIds: selectedRegistryEntryIDs,
+                deviceRequestBase64Url: nil,
+                encryptionInfoBase64Url: nil
+            )
+        )
+        return try Self.successValue(
+            result,
+            as: MobileWalletAnnexCPreview.self,
+            operation: "preview Annex C presentation"
+        ).toSwiftPreview()
+    }
+
+    func submitAnnexCPresentation(
+        requestID: String,
+        verifiedOrigin: String,
+        deviceRequestBase64URL: String,
+        encryptionInfoBase64URL: String,
+        selectedCredentialOptions: [PresentationCredentialSelection]
+    ) async throws -> DigitalCredentialResponse {
+        let result = try await bridge.submitAnnexCPresentation(
+            submission: MobileWalletAnnexCSubmission(
+                requestId: requestID,
+                verifiedOrigin: verifiedOrigin,
+                deviceRequestBase64Url: deviceRequestBase64URL,
+                encryptionInfoBase64Url: encryptionInfoBase64URL,
+                selectedCredentialOptions: selectedCredentialOptions.map {
+                    MobileWalletPresentationCredentialSelection(
+                        queryId: $0.queryID,
+                        credentialId: $0.credentialID
+                    )
+                }
+            )
+        )
+        let value = try Self.successValue(
+            result,
+            as: MobileWalletDigitalCredentialResponse.self,
+            operation: "submit Annex C presentation"
+        )
+        return DigitalCredentialResponse(protocolIdentifier: value.protocol, dataJSON: value.dataJson)
+    }
+
     private static func successValue<T>(
         _ result: any WalletBridgeResult,
         as type: T.Type,
@@ -221,7 +275,9 @@ private extension WalletConfiguration {
             requestObjectTrustAnchorPemCertificates: requestObjectTrustAnchorPEMCertificates,
             requestObjectEnableSystemTrustAnchors: requestObjectEnableSystemTrustAnchors,
             requestObjectAudience: requestObjectAudience,
-            transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() }
+            transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
+            appGroupIdentifier: crossProcessAccess?.appGroupIdentifier,
+            keychainAccessGroup: crossProcessAccess?.keychainAccessGroup
         )
     }
 }
@@ -606,6 +662,65 @@ private extension MobileWalletPresentationPreviewResult {
         default:
             throw WalletError.internalFailure("Unsupported presentation preview result: \(type(of: self))")
         }
+    }
+}
+
+private extension AnnexCParsedRequest {
+    func toKMPParsedRequest() -> MobileWalletAnnexCParsedRequest {
+        MobileWalletAnnexCParsedRequest(
+            documents: documents.map {
+                MobileWalletAnnexCDocumentRequest(
+                    docType: $0.documentType,
+                    namespaces: $0.namespaces
+                )
+            }
+        )
+    }
+}
+
+private extension MobileWalletDigitalCredentialCapabilities {
+    func toSwiftCapabilities() -> DigitalCredentialCapabilities {
+        DigitalCredentialCapabilities(
+            platform: platform,
+            platformAvailable: platformAvailable,
+            minimumOSVersion: minimumOsVersion,
+            registrationAvailable: registrationAvailable,
+            capabilities: swiftArray(capabilities, of: MobileWalletDigitalCredentialCapability.self).map {
+                DigitalCredentialCapability(
+                    protocolIdentifier: $0.protocol,
+                    credentialFormats: swiftArray($0.credentialFormats, of: MobileWalletDigitalCredentialFormat.self).map { String(describing: $0) },
+                    requestProtection: swiftArray($0.requestProtection, of: MobileWalletDigitalCredentialRequestProtection.self).map { String(describing: $0) },
+                    responseProtection: swiftArray($0.responseProtection, of: MobileWalletDigitalCredentialResponseProtection.self).map { String(describing: $0) },
+                    supported: $0.supported,
+                    unsupportedReason: $0.unsupportedReason
+                )
+            }
+        )
+    }
+}
+
+private extension MobileWalletAnnexCPreview {
+    func toSwiftPreview() -> AnnexCPresentationPreview {
+        AnnexCPresentationPreview(
+            requestID: requestId,
+            verifiedOrigin: verifiedOrigin,
+            parsedRequest: AnnexCParsedRequest(
+                documents: swiftArray(parsedRequest.documents, of: MobileWalletAnnexCDocumentRequest.self).map {
+                    AnnexCDocumentRequest(documentType: $0.docType, namespaces: $0.namespaces as? [String: [String]] ?? [:])
+                }
+            ),
+            credentialOptions: swiftArray(credentialOptions, of: MobileWalletPresentationCredentialOption.self).map { $0.toSwiftCredentialOption() },
+            readerTrust: readerTrust.toSwiftReaderTrust()
+        )
+    }
+}
+
+private extension MobileWalletReaderTrust {
+    func toSwiftReaderTrust() -> ReaderTrust {
+        if self is MobileWalletReaderTrustNotApplicable { return .notApplicable }
+        if let value = self as? MobileWalletReaderTrustUnverified { return .unverified(reason: value.reason) }
+        if let value = self as? MobileWalletReaderTrustTrusted { return .trusted(certificateSubject: value.certificateSubject) }
+        return .unverified(reason: "Unknown reader trust state")
     }
 }
 

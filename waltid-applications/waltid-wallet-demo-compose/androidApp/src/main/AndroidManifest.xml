@@ -41,5 +41,15 @@
                 <data android:scheme="openid4vp" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".DigitalCredentialProviderActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.WalletDemoCompose">
+            <intent-filter>
+                <action android:name="androidx.credentials.registry.provider.action.GET_CREDENTIAL" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
     </application>
 </manifest>

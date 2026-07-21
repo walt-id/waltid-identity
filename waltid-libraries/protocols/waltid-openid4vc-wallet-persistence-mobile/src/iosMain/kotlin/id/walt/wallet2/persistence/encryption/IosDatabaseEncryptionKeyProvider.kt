@@ -29,6 +29,7 @@ import platform.Security.errSecItemNotFound
 import platform.Security.errSecSuccess
 import platform.Security.kSecAttrAccessible
 import platform.Security.kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+import platform.Security.kSecAttrAccessGroup
 import platform.Security.kSecAttrAccount
 import platform.Security.kSecAttrService
 import platform.Security.kSecClass
@@ -44,7 +45,9 @@ import platform.posix.memcpy
  * iOS SDK-managed database key provider backed by Keychain generic-password items.
  */
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
-public class IosDatabaseEncryptionKeyProvider : DatabaseEncryptionKeyProvider {
+public class IosDatabaseEncryptionKeyProvider(
+    private val accessGroup: String? = null,
+) : DatabaseEncryptionKeyProvider {
 
     /**
      * Returns the existing Keychain database key or creates and stores a new one.
@@ -53,6 +56,15 @@ public class IosDatabaseEncryptionKeyProvider : DatabaseEncryptionKeyProvider {
         val keyId = keyId(walletId, databaseName)
         readKeyMaterial(walletId, keyId)?.let { material ->
             return DatabaseEncryptionKey(keyId = keyId, material = material)
+        }
+
+        if (accessGroup != null) {
+            readKeyMaterial(walletId, keyId, includeAccessGroup = false)?.let { legacyMaterial ->
+                return DatabaseEncryptionKey(
+                    keyId = keyId,
+                    material = storeKeyMaterial(walletId, keyId, legacyMaterial),
+                )
+            }
         }
 
         val material = generateKeyMaterial(walletId)
@@ -78,9 +90,13 @@ public class IosDatabaseEncryptionKeyProvider : DatabaseEncryptionKeyProvider {
         }
     }
 
-    private fun readKeyMaterial(walletId: String, keyId: String): ByteArray? = memScoped {
+    private fun readKeyMaterial(
+        walletId: String,
+        keyId: String,
+        includeAccessGroup: Boolean = true,
+    ): ByteArray? = memScoped {
         val result = alloc<CFTypeRefVar>()
-        val query = keychainQuery(keyId, returnData = true)
+        val query = keychainQuery(keyId, returnData = true, includeAccessGroup = includeAccessGroup)
         try {
             when (val status = SecItemCopyMatching(query.dictionary, result.ptr)) {
                 errSecSuccess -> (CFBridgingRelease(result.value) as NSData).toByteArray()
@@ -134,12 +150,14 @@ public class IosDatabaseEncryptionKeyProvider : DatabaseEncryptionKeyProvider {
         keyId: String,
         returnData: Boolean = false,
         valueData: ByteArray? = null,
+        includeAccessGroup: Boolean = true,
     ): RetainedDictionary {
         val query = RetainedDictionary(capacity = 7)
         query.add(kSecClass, kSecClassGenericPassword)
         query.addRetained(kSecAttrService, KEYCHAIN_SERVICE)
         query.addRetained(kSecAttrAccount, keyId)
         query.add(kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
+        if (includeAccessGroup) accessGroup?.let { query.addRetained(kSecAttrAccessGroup, it) }
         if (returnData) {
             query.add(kSecReturnData, kCFBooleanTrue)
             query.add(kSecMatchLimit, kSecMatchLimitOne)

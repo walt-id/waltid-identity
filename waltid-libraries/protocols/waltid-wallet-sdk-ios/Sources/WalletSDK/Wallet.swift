@@ -1,4 +1,7 @@
 import Foundation
+#if os(iOS)
+import IdentityDocumentServices
+#endif
 
 /// Actor-isolated entry point for the walt.id wallet SDK on iOS.
 ///
@@ -182,4 +185,50 @@ public actor Wallet {
             errorDescription: errorDescription
         )
     }
+
+    /// Returns the current IdentityDocumentServices capability snapshot.
+    public func digitalCredentialCapabilities() async -> DigitalCredentialCapabilities {
+        #if os(iOS)
+        if #available(iOS 26.0, *),
+           let appGroupIdentifier = configuration.crossProcessAccess?.appGroupIdentifier {
+            let status = await IdentityDocumentProviderRegistrationStore().status
+            DigitalCredentialRegistrationStorage.persist(
+                status: status,
+                appGroupIdentifier: appGroupIdentifier
+            )
+        }
+        #endif
+        return bridge.digitalCredentialCapabilities()
+    }
+
+    /// Retains Apple's parsed Annex C request until the user consents to raw request access.
+    public func previewAnnexCPresentation(
+        parsedRequest: AnnexCParsedRequest,
+        verifiedOrigin: String,
+        selectedRegistryEntryIDs: [String] = []
+    ) async throws -> AnnexCPresentationPreview {
+        try await bridge.previewAnnexCPresentation(
+            parsedRequest: parsedRequest,
+            verifiedOrigin: verifiedOrigin,
+            selectedRegistryEntryIDs: selectedRegistryEntryIDs
+        )
+    }
+
+    /// Verifies the raw request against the retained preview and returns the HPKE response JSON.
+    public func submitAnnexCPresentation(
+        requestID: String,
+        verifiedOrigin: String,
+        deviceRequestBase64URL: String,
+        encryptionInfoBase64URL: String,
+        selectedCredentialOptions: [PresentationCredentialSelection]
+    ) async throws -> DigitalCredentialResponse {
+        try await bridge.submitAnnexCPresentation(
+            requestID: requestID,
+            verifiedOrigin: verifiedOrigin,
+            deviceRequestBase64URL: deviceRequestBase64URL,
+            encryptionInfoBase64URL: encryptionInfoBase64URL,
+            selectedCredentialOptions: selectedCredentialOptions
+        )
+    }
+
 }
