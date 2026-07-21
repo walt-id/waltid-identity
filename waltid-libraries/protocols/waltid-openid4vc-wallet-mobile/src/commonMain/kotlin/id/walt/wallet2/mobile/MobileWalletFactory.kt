@@ -13,6 +13,7 @@ import id.walt.wallet2.persistence.keys.PlatformKeyProvider
 import id.walt.wallet2.persistence.stores.PlatformKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
+import id.walt.wallet2.persistence.stores.SqlDelightIssuanceSessionStore
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 
 /**
@@ -26,7 +27,6 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
  * @property preferredLocales Ordered BCP 47 locale preferences used for progressive language-tag lookup.
  * When no preference matches, selection falls back to an unlocalized entry and then the first entry.
  * @property transactionDataProfiles Transaction data profiles this mobile wallet accepts in OpenID4VP requests.
- * @property allowInsecureHttpForTests Test/dev-only opt-in for local issuer nonce endpoints that cannot use HTTPS.
  */
 public data class MobileWalletConfig(
     public val walletId: String = "default",
@@ -36,7 +36,6 @@ public data class MobileWalletConfig(
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
-    public val allowInsecureHttpForTests: Boolean = false,
 )
 
 /**
@@ -180,6 +179,7 @@ private fun createSqlDelightMobileWallet(
     val keyStore = keyOverride?.store ?: PlatformKeyStore(keyProvider, queries)
     val credentialStore = config.persistence.stores.credentials ?: SqlDelightCredentialStore(queries)
     val didStore = config.persistence.stores.dids ?: SqlDelightDidStore(queries)
+    val issuanceSessionStore = SqlDelightIssuanceSessionStore(queries)
     val keyGenerator = keyOverride?.generate ?: { keyType: KeyType -> keyProvider.generateKey(keyType) }
 
     return MobileWallet(
@@ -187,12 +187,12 @@ private fun createSqlDelightMobileWallet(
         keyStore = keyStore,
         didStore = didStore,
         credentialStore = credentialStore,
+        issuanceSessionStore = issuanceSessionStore,
         keyGenerator = keyGenerator,
         defaultKeyType = config.defaultKeyType,
         attestationConfig = config.attestationConfig,
         preferredLocales = config.preferredLocales,
         transactionDataProfiles = config.transactionDataProfiles,
-        allowInsecureHttpForTests = config.allowInsecureHttpForTests,
         onEvent = config.onEvent,
         deleteLocalPersistence = deleteLocalPersistence,
     )

@@ -9,6 +9,7 @@ data class WalletDemoUiState(
     val requestDrafts: WalletRequestDrafts = WalletRequestDrafts(),
     val offerPreview: WalletDemoOfferPreview? = null,
     val authorizationRequestUrl: String? = null,
+    val deferredCredentials: List<WalletDemoDeferredCredential> = emptyList(),
     val lastReceivedCredentialIds: List<String> = emptyList(),
     val receiveCompleted: Boolean = false,
     val receiveNavigationResetKey: Int = 0,

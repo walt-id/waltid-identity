@@ -608,7 +608,8 @@ class Wallet2AdditionalUseCasesTest {
 
                 // ── Verify session outcome ──
                 testAndReturn("Verification session is SUCCESSFUL after presentation") {
-                    val info = http.awaitVerificationSession(verifierSession.sessionId)
+                    val info = http.get("/verification-session/${verifierSession.sessionId}/info")
+                        .body<Verification2Session>()
                     assertEquals(
                         Verification2Session.VerificationSessionStatus.SUCCESSFUL, info.status,
                         "Session ended with ${info.status}: ${info.statusReason}"

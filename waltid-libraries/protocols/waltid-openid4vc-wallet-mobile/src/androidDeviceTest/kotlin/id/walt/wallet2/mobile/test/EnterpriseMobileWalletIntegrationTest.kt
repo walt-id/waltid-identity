@@ -136,7 +136,6 @@ class EnterpriseMobileWalletIntegrationTest {
         MobileWalletConfig(
             walletId = walletId,
             attestationConfig = attestation?.toWalletAttestationConfig(),
-            allowInsecureHttpForTests = true,
             onEvent = { event -> println("WALLET EVENT: $event") },
         )
     )
