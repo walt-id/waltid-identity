@@ -28,7 +28,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import org.bouncycastle.jce.provider.BouncyCastleProvider
-import java.lang.ref.WeakReference
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration
 import kotlin.uuid.Uuid
@@ -40,22 +39,8 @@ sealed class AndroidKey : Key() {
         val keyType: KeyType,
         val keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
         val authorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
-        interactionContext: Any? = null,
+        private val interactionContextProvider: () -> FragmentActivity? = { null },
     ) {
-        private val interactionContextProvider: () -> FragmentActivity? = when (interactionContext) {
-            is FragmentActivity -> {
-                val reference = WeakReference(interactionContext)
-                val provider: () -> FragmentActivity? = { reference.get() }
-                provider
-            }
-            is Function0<*> -> {
-                { interactionContext.invoke() as? FragmentActivity }
-            }
-            else -> {
-                { null }
-            }
-        }
-
         internal val interactionContext: FragmentActivity?
             get() = interactionContextProvider().takeIf { it.canHostBiometricPrompt() }
     }

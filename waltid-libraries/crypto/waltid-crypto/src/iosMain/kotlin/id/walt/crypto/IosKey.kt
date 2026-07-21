@@ -2,6 +2,7 @@ package id.walt.crypto
 
 import at.asitplus.signum.indispensable.josef.io.joseCompliantSerializer
 import at.asitplus.signum.indispensable.josef.toJsonWebKey
+import at.asitplus.signum.supreme.CFCryptoOperationFailed
 import at.asitplus.signum.supreme.SignatureResult
 import at.asitplus.signum.supreme.dsl.REQUIRED
 import at.asitplus.signum.supreme.os.IosSigner
@@ -21,6 +22,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import platform.Security.errSecItemNotFound
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration
 import kotlin.uuid.Uuid
@@ -242,16 +244,27 @@ private fun IosKey.Options.requireSupportedProtectedCombination() {
     }
 }
 
-private fun IosKey.Options.mapPlatformFailure(throwable: Throwable): Throwable {
+@OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+internal fun IosKey.Options.mapPlatformFailure(throwable: Throwable): Throwable {
     if (keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.None) return throwable
-    return if (generateSequence(throwable as Throwable?) { it.cause }.any { it is NoSuchElementException }) {
-        KeyUseAuthorizationException(
+    val causes = generateSequence(throwable as Throwable?) { it.cause }.toList()
+    return when {
+        causes.any { it is NoSuchElementException } -> KeyUseAuthorizationException(
             failure = KeyUseAuthorizationFailure.ProtectedKeyMissing,
             message = "The protected key is missing",
             cause = throwable,
         )
-    } else {
-        throwable
+
+        // BiometryCurrentSet invalidation can leave Signum's public-key metadata present while the
+        // OS makes the protected private key inaccessible as an absent Keychain item.
+        causes.filterIsInstance<CFCryptoOperationFailed>().any { it.osStatus == errSecItemNotFound } ->
+            KeyUseAuthorizationException(
+                failure = KeyUseAuthorizationFailure.ProtectedKeyInvalidated,
+                message = "The protected key is no longer usable under its biometric current-set policy",
+                cause = throwable,
+            )
+
+        else -> throwable
     }
 }
 
