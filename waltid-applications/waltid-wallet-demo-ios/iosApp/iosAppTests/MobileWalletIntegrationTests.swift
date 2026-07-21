@@ -114,6 +114,54 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertEqual(second.keyID, first.keyID, "Encrypted wallet key reference should survive wallet facade recreation")
     }
 
+    func testCrossProcessWalletReopensSharedEncryptedStateAndSigningKey() async throws {
+        let walletID = "ios-cross-process-wallet-\(UUID().uuidString)"
+        let keychainAccessGroup = try XCTUnwrap(IdentityDocumentSharedConfiguration.keychainAccessGroup)
+        let configuration = WalletConfiguration(
+            walletID: walletID,
+            crossProcessAccess: WalletCrossProcessAccess(
+                appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier,
+                keychainAccessGroup: keychainAccessGroup
+            )
+        )
+        let wallet1 = try await Wallet(configuration: configuration)
+        let first = try await wallet1.bootstrap()
+
+        let wallet2 = try await Wallet(configuration: configuration)
+        let second = try await wallet2.bootstrap()
+
+        XCTAssertEqual(second.did, first.did, "App Group wallet state should survive facade recreation")
+        XCTAssertEqual(second.keyID, first.keyID, "Shared Keychain signing key should remain loadable")
+        try await wallet2.deleteLocalData()
+    }
+
+    func testLegacySigningKeyMigrationFailsWithCredentialReissuanceGuidance() async throws {
+        let walletID = "ios-legacy-cross-process-wallet-\(UUID().uuidString)"
+        let legacyWallet = try await Wallet(configuration: WalletConfiguration(walletID: walletID))
+        _ = try await legacyWallet.bootstrap()
+        let keychainAccessGroup = try XCTUnwrap(IdentityDocumentSharedConfiguration.keychainAccessGroup)
+        let sharedWallet = try await Wallet(
+            configuration: WalletConfiguration(
+                walletID: walletID,
+                crossProcessAccess: WalletCrossProcessAccess(
+                    appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier,
+                    keychainAccessGroup: keychainAccessGroup
+                )
+            )
+        )
+
+        do {
+            _ = try await sharedWallet.bootstrap()
+            XCTFail("A legacy non-exportable signing key must not be reported as extension-accessible")
+        } catch let WalletError.storage(message) {
+            XCTAssertTrue(message.contains("must be reissued"), "Unexpected migration error: \(message)")
+        } catch {
+            XCTFail("Expected a typed storage migration error, got: \(error)")
+        }
+
+        try? await sharedWallet.deleteLocalData()
+    }
+
     func testDeleteLocalDataRemovesManagedEncryptedWalletState() async throws {
         let wallet1 = try await makeWallet()
         let first = try await wallet1.bootstrap()
@@ -249,7 +297,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
             encryptedResponse: true
         )
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
-        let preview = try await wallet.previewPresentation(request: presentationURL)
+        let previewResult = try await wallet.previewPresentation(request: presentationURL)
+        let preview = try requireReadyPreview(previewResult)
         XCTAssertEqual(preview.request.responseMode, "direct_post.jwt")
         guard case .required = preview.encryption else {
             return XCTFail("Expected encrypted response metadata: \(preview.encryption)")
@@ -262,7 +311,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
             selectedCredentialOptions: preview.credentialOptions.map(\.selection),
             did: bootstrapResult.did
         )
-        XCTAssertTrue(result.success, "Encrypted demo EUDI PID mdoc presentation should succeed: \(result)")
+        assertTransmittedSuccess(result, "Encrypted demo EUDI PID mdoc presentation should succeed: \(result)")
         try await DemoBackend.shared.waitForVerifierSuccess(
             sessionID: session.sessionID,
             timeoutSeconds: verifierPollingTimeout
