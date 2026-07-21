@@ -6,30 +6,121 @@ Conformance test runners for OpenID4VCI and OpenID4VP against the [OpenID Founda
 
 ### Prerequisites
 
-1. **Conformance Suite** running locally:
+1. **Local conformance hostname** available at `localhost.emobix.co.uk`, as used by the existing
+   conformance-suite setup. No `/etc/hosts` change is performed by the runner.
+
+   Verify that it resolves to a loopback address without changing the host configuration:
+
    ```bash
-   cd openid/conformance-suite
-   docker compose -f docker-compose-walt.yml up -d
+   getent hosts localhost.emobix.co.uk
    ```
-   Verify: https://localhost.emobix.co.uk:8443/
 
-2. **ngrok** for exposing local services
+   After the wrapper starts Docker Compose, verify the suite through the same hostname:
 
-3. **Keycloak** for `authorization_code` flows. The pre-authorized-code wrapper preset does not need Keycloak.
+   ```bash
+   curl -ksf https://localhost.emobix.co.uk:8443/api/server
+   ```
+
+2. **issuer2** running directly on the host with this test-only runtime configuration:
+   ```hocon
+   webHost = "0.0.0.0"
+   webPort = 7002
+   baseUrl = "https://localhost.emobix.co.uk:9443"
+
+   ciTokenKey = """{"type":"jwk","jwk":{"kty":"EC","d":"KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}}"""
+   ```
+
+   Configure `clientAuthenticationConfig` with `preauth-anonymous` and the matching
+   `client-attestation` trust root from [VCI Issuer Client Attestation](#vci-issuer-client-attestation).
+   The key and certificate committed to this module are test fixtures and must not be used in production.
+
+   The issuer service exposed at `/openid4vci` must advertise both credential configuration IDs used by
+   the canonical run:
+
+   - `identity_credential` for SD-JWT VC
+   - `org.iso.18013.5.1.mDL` for mdoc
+
+   It must also support DPoP, client attestation, and plain and encrypted credential responses. Confirm the
+   two IDs in `credential_configurations_supported` at:
+
+   ```text
+   https://localhost.emobix.co.uk:9443/.well-known/openid-credential-issuer/openid4vci
+   ```
+
+3. **Docker Compose** for the conformance suite and its local HTTPS Nginx proxy.
+
+4. **Keycloak** for `authorization_code` flows. The pre-authorized-code wrapper preset does not need Keycloak.
    Authorization-code presets use the same public Keycloak test user as issuer2 integration tests:
-   `jane@walt.id` / `jane`.
+   `jane@walt.id` / `jane`. The Keycloak client must allow this redirect URI:
+
+   ```text
+   https://localhost.emobix.co.uk:9443/openid4vci/external/oauth/callback
+   ```
+
+5. **Playwright system dependencies** for `authorization_code` flows. The wrapper installs Chromium and
+   its operating-system dependencies with Playwright `install --with-deps` by default, so the current user
+   must be able to install system packages. Set `OPENID4VCI_CONFORMANCE_INSTALL_PLAYWRIGHT=false` only when
+   the required browser and system libraries are already installed.
 
 ### Running Tests
 
 ```bash
 cd waltid-unified-build
 
-# VCI Issuer tests, pre-authorized-code-first wrapper preset by default
-export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://YOUR-NGROK.ngrok-free.app/openid4vci"
+# Default VCI issuer run: 12 variants, metadata and positive modules only.
+./run-issuer-conformance-local.sh
+```
+
+### Default selection
+
+With no selection variables set, the wrapper uses the `vci-client-attestation-dpop-simple-unsigned` preset
+and runs only the `metadata,positive` module groups. This produces 12 valid variants:
+
+- 2 credential formats: `sd_jwt_vc`, `mdoc`
+- 3 grant/flow pairs: `authorization_code` with both flow variants, and
+  `pre_authorization_code` with `issuer_initiated`
+- 2 credential-response modes: `plain`, `encrypted`
+- `client_attestation`, `dpop`, `simple`, and `unsigned` for the remaining axes
+
+The invalid `pre_authorization_code` + `wallet_initiated` pair is not generated. Strict result checking,
+the static transaction code, browser automation, Jane's test credentials, and Playwright installation are
+also enabled by the wrapper.
+
+The first authorization-code run installs Chromium and its operating-system dependencies and may require
+package-manager privileges. On success, inspect the suite at `https://localhost.emobix.co.uk:8443` and the
+matrix reports under `build/reports/openid4vci-issuer-matrix` in this module.
+
+### Changing the selection
+
+Set environment variables on the command to override the defaults. For example, keep the 12 variants but
+run every module returned by the conformance plan:
+
+```bash
+OPENID4VCI_CONFORMANCE_MODULE_GROUPS=all \
+  ./run-issuer-conformance-local.sh
+```
+
+Run all 288 generated base-plan variants and every returned module:
+
+```bash
+OPENID4VCI_CONFORMANCE_PRESET=all-basic-plan \
+OPENID4VCI_CONFORMANCE_MODULE_GROUPS=all \
+  ./run-issuer-conformance-local.sh
+```
+
+Use `OPENID4VCI_CONFORMANCE_PRESET=custom` with the matrix filter variables documented under
+[VCI Issuer Variant Matrix](#vci-issuer-variant-matrix) for any narrower selection.
+
+### Other execution modes
+
+```bash
+
+# A remote issuer can still be selected explicitly.
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://issuer.example.com/openid4vci"
 ./run-issuer-conformance-local.sh
 
-# Direct Gradle execution, if the conformance suite is already running and trusted
-export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://YOUR-NGROK.ngrok-free.app/openid4vci"
+# Direct Gradle execution, if the suite, proxy, and truststore are already configured
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://localhost.emobix.co.uk:9443/openid4vci"
 export OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE="$PWD/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/keys/attester-key.json"
 export OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION=true
 export OPENID4VCI_CONFORMANCE_AUTH_USERNAME="jane@walt.id"
@@ -133,8 +224,9 @@ waltid-openid4vp-conformance-runners/
 
 | Issue | Solution |
 |-------|----------|
-| "Connect timed out" | Use ngrok URL, not localhost (Docker can't reach host) |
-| "Invalid redirect_uri" | Add ngrok URL to Keycloak client redirect URIs |
+| issuer2 is unreachable | Start issuer2 on `0.0.0.0:7002`; Docker Nginx reaches it through `host.docker.internal` |
+| Local hostname is unresolved | Run `getent hosts localhost.emobix.co.uk` and confirm it returns a loopback address; the runner does not modify `/etc/hosts` |
+| "Invalid redirect_uri" | Add `https://localhost.emobix.co.uk:9443/openid4vci/external/oauth/callback` to the Keycloak client redirect URIs |
 | Tests stuck in WAITING | Enable `OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION=true` for authorization_code flows |
 | Missing Playwright browser | Run `./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers` |
 | Keycloak login error | Check `OPENID4VCI_CONFORMANCE_AUTH_USERNAME` and `OPENID4VCI_CONFORMANCE_AUTH_PASSWORD` |
@@ -162,10 +254,10 @@ For issuer2 `x509-chain` verification, trust the matching local root CA:
 src/test/resources/certs/root-ca.pem
 ```
 
-For the local handover run, issuer2 needs matching base URL, CI token key, and client-attestation trust configuration. Replace `baseUrl` when the ngrok tunnel changes.
+For the local handover run, issuer2 needs the local Nginx base URL, matching CI token key, and client-attestation trust configuration.
 
 ```hocon
-baseUrl = "https://9bc0-2a02-8109-8686-5d00-8333-124e-42b0-6481.ngrok-free.app"
+baseUrl = "https://localhost.emobix.co.uk:9443"
 
 ciTokenKey = """{"type":"jwk","jwk":{"kty":"EC","d":"KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}}"""
 
@@ -201,7 +293,9 @@ VACJ445Tx9FAuQIhAN6yqTj1u30N51FsULyrdbwXRgBRo7CgE1CZC9ejeD1E
 }
 ```
 
-Do not include local runtime artifacts such as `mongo/` or a locally mutated `conformance-truststore.jks` in a clean handover commit.
+The wrapper copies the committed truststore to `build/conformance/conformance-truststore.jks` before
+importing its generated certificate. The committed `conformance-truststore.jks` remains unchanged.
+Do not include local runtime artifacts such as `mongo/` or `build/` in a clean handover commit.
 
 ## VCI Issuer Variant Matrix
 
@@ -296,11 +390,20 @@ The important difference from issuer2's internal integration tests is that the c
 intercept the authorization code. The browser must follow the redirect back to the conformance suite callback,
 because the suite is the OAuth client/wallet in these tests.
 
-The default wrapper preset is `vci-client-attestation-dpop-simple-unsigned-preauth`, which runs
-pre-authorized-code variants only. The wrapper enables browser automation automatically when the
-selected module set can include `oid4vci-1_0-issuer-happy-flow-multiple-clients`, because that
-positive pre-authorized-code module starts a second-client front-channel authorization request after
-the first credential issuance.
+The default wrapper preset is `vci-client-attestation-dpop-simple-unsigned`, with module groups
+`metadata,positive`. It selects the 12 variants described in [Default selection](#default-selection).
+`run-issuer-conformance-local.sh` always excludes
+`oid4vci-1_0-issuer-happy-flow-multiple-clients` from `pre_authorization_code` variants: the upstream
+module currently reuses client 1's consumed pre-authorized code for client 2 and receives the correct
+`invalid_grant` response. The module remains enabled for `authorization_code` variants. Remove the
+targeted wrapper exclusion only after the upstream module requests a fresh credential offer for its
+second pre-authorized client or marks that grant variant as inapplicable.
+
+For local issuer tests, Docker Nginx exposes `https://localhost.emobix.co.uk:9443` and proxies requests to
+the bare-metal issuer2 process at `http://host.docker.internal:7002`. The conformance-suite container
+resolves `localhost.emobix.co.uk` to Nginx through a Docker network alias, while host-side Gradle and
+Playwright use the published port. This removes the public tunnel and its connection limits from the
+local issuer workflow.
 
 Defaults used by `run-issuer-conformance-local.sh` for `all-basic-plan` and the mixed
 `vci-client-attestation-dpop-simple-unsigned` preset:
@@ -312,13 +415,13 @@ export OPENID4VCI_CONFORMANCE_AUTH_PASSWORD="jane"
 export OPENID4VCI_CONFORMANCE_AUTH_TIMEOUT_SECONDS=90
 export PLAYWRIGHT_BROWSER=chromium
 export PLAYWRIGHT_HEADLESS=true
-export PLAYWRIGHT_INSTALL_WITH_DEPS=false
+export PLAYWRIGHT_INSTALL_WITH_DEPS=true
 export OPENID4VCI_CONFORMANCE_INSTALL_PLAYWRIGHT=true
 ```
 
-`PLAYWRIGHT_INSTALL_WITH_DEPS=true` makes Playwright try to install OS packages through the system package
-manager. Use it only when the current user can install apt dependencies; otherwise install missing packages
-manually, for example `sudo apt-get install libavif13`.
+Playwright now installs Chromium and its required operating-system packages with `install --with-deps` by
+default. The current user must be able to install system packages. Environments that already provide the
+browser dependencies can opt out with `PLAYWRIGHT_INSTALL_WITH_DEPS=false`.
 
 If the Playwright install task hangs or the browser is already installed, skip that step:
 
