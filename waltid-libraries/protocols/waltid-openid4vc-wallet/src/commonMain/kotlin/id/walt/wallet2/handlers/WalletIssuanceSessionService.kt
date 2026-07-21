@@ -62,6 +62,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -825,7 +826,23 @@ class WalletIssuanceSessionService(
     ): String {
         val methods = requireNotNull(configuration.cryptographicBindingMethodsSupported)
         val builder = JwtProofBuilder()
-        val proofs = if (methods.any { it is CryptographicBindingMethod.Jwk || it is CryptographicBindingMethod.CoseKey }) {
+        val didKeyId = resolveHolderDidKeyId(active)
+        val didMethod = didKeyId
+            ?.removePrefix("did:")
+            ?.substringBefore(':')
+        val supportsHolderDid = didMethod != null && methods.any {
+            it is CryptographicBindingMethod.Did && it.method == didMethod
+        }
+        // Prefer a DID only after proving that its verification method belongs to the selected key.
+        // This preserves the holder identity needed by W3C VC issuers without weakening key binding.
+        val proofs = if (supportsHolderDid) {
+            builder.buildJwtProof(
+                key = active.key,
+                audience = active.resolved.offer.credentialIssuer,
+                nonce = nonce,
+                keyId = didKeyId,
+            )
+        } else if (methods.any { it is CryptographicBindingMethod.Jwk || it is CryptographicBindingMethod.CoseKey }) {
             builder.buildJwtProof(
                 key = active.key,
                 audience = active.resolved.offer.credentialIssuer,
@@ -833,20 +850,46 @@ class WalletIssuanceSessionService(
                 includeJwk = true,
             )
         } else {
-            val didUrl = active.did?.takeIf { '#' in it }
-                ?: error("DID-bound credential proof requires a holder DID URL identifying the selected key")
-            val method = didUrl.removePrefix("did:").substringBefore(':')
-            require(methods.any { it is CryptographicBindingMethod.Did && it.method == method }) {
-                "Selected holder DID method is not supported"
-            }
-            builder.buildJwtProof(
-                key = active.key,
-                audience = active.resolved.offer.credentialIssuer,
-                nonce = nonce,
-                keyId = didUrl,
-            )
+            error("Issuer requires a DID that is bound to the selected holder key")
         }
         return proofs.jwt?.singleOrNull() ?: error("Credential proof builder returned no JWT")
+    }
+
+    private suspend fun resolveHolderDidKeyId(active: ActiveSession): String? {
+        val did = active.did ?: return null
+        val baseDid = did.substringBefore('#')
+        val requestedKeyId = did.takeIf { '#' in it }
+        val selectedJwk = active.key.getPublicKey().exportJWKObject()
+        val storedDid = wallet.didStore?.getDid(baseDid)
+
+        if (storedDid != null) {
+            val verificationMethods = storedDid.document["verificationMethod"]?.jsonArray ?: return null
+            for (method in verificationMethods) {
+                val methodObject = method.jsonObject
+                val methodId = methodObject["id"]?.jsonPrimitive?.contentOrNull ?: continue
+                if (requestedKeyId != null && methodId != requestedKeyId) continue
+                val publicKeyJwk = methodObject["publicKeyJwk"]?.jsonObject ?: continue
+                if (publicJwkMatches(publicKeyJwk, selectedJwk)) return methodId
+            }
+            return null
+        }
+
+        val staticDidMatches = wallet.staticDid?.substringBefore('#') == baseDid
+        val staticKeyJwk = wallet.staticKey?.getPublicKey()?.exportJWKObject()
+        val staticKeyMatches = staticKeyJwk != null && publicJwkMatches(staticKeyJwk, selectedJwk)
+        return did.takeIf { staticDidMatches && staticKeyMatches }
+    }
+
+    private fun publicJwkMatches(first: JsonObject, second: JsonObject): Boolean {
+        // Compare RFC JWK public members directly. Platform-backed keys and imported JWKs may
+        // calculate thumbprints through different providers even when their public keys are equal.
+        val fields = when (first["kty"]?.jsonPrimitive?.contentOrNull) {
+            "EC" -> listOf("kty", "crv", "x", "y")
+            "RSA" -> listOf("kty", "n", "e")
+            "OKP" -> listOf("kty", "crv", "x")
+            else -> return false
+        }
+        return fields.all { field -> first[field] != null && first[field] == second[field] }
     }
 
     private suspend fun fetchNonce(metadata: CredentialIssuerMetadata): NonceResult {
