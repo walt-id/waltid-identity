@@ -97,4 +97,10 @@ public sealed class WalletPersistenceException(
      */
     public class DatabaseKeyMissing(walletId: String) :
         WalletPersistenceException("Wallet '$walletId' database exists but its SDK-managed database key is missing")
+
+    /** A non-exportable legacy signing key cannot be moved into the provider extension access group. */
+    public class LegacyKeyRequiresCredentialReissuance(keyId: String) :
+        WalletPersistenceException(
+            "Wallet signing key '$keyId' is not extension-accessible; credentials bound to it must be reissued",
+        )
 }

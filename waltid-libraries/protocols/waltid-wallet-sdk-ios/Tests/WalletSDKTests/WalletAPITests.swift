@@ -533,6 +533,52 @@ final class WalletAPITests: XCTestCase {
 
         XCTAssertEqual(bridge.rejectCalls.first?.previewHandle, handle)
         XCTAssertEqual(String(describing: handle), "PresentationPreviewHandle(<redacted>)")
+    func testDigitalCredentialCapabilitiesReflectBridgeRuntimeSupport() async {
+        let bridge = FakeWalletCoreBridge()
+        bridge.digitalCredentialCapabilitiesResult = .init(
+            platform: "iOS IdentityDocumentServices",
+            platformAvailable: true,
+            minimumOSVersion: "iOS/iPadOS 26",
+            registrationAvailable: true,
+            capabilities: []
+        )
+
+        let wallet = Wallet(bridge: bridge)
+        let capabilities = await wallet.digitalCredentialCapabilities()
+        XCTAssertEqual(capabilities, bridge.digitalCredentialCapabilitiesResult)
+    }
+
+    func testAnnexCPreviewAndSubmissionForwardTwoPhaseRequestData() async throws {
+        let parsed = AnnexCParsedRequest(
+            documents: [.init(documentType: "org.iso.18013.5.1.mDL", namespaces: ["org.iso.18013.5.1": ["family_name"]])]
+        )
+        let bridge = FakeWalletCoreBridge()
+        bridge.annexCPreviewResult = .init(
+            requestID: "request-1",
+            verifiedOrigin: "https://verifier.example",
+            parsedRequest: parsed,
+            credentialOptions: [],
+            readerTrust: .unverified(reason: "raw request unavailable before consent")
+        )
+        bridge.digitalCredentialResponseResult = .init(protocolIdentifier: "org-iso-mdoc", dataJSON: #"{"response":"ciphertext"}"#)
+        let wallet = Wallet(bridge: bridge)
+
+        let preview = try await wallet.previewAnnexCPresentation(
+            parsedRequest: parsed,
+            verifiedOrigin: "https://verifier.example",
+            selectedRegistryEntryIDs: ["opaque-entry"]
+        )
+        let response = try await wallet.submitAnnexCPresentation(
+            requestID: preview.requestID,
+            verifiedOrigin: preview.verifiedOrigin,
+            deviceRequestBase64URL: "device-request",
+            encryptionInfoBase64URL: "encryption-info",
+            selectedCredentialOptions: []
+        )
+
+        XCTAssertEqual(bridge.annexCPreviewCalls.single?.selectedRegistryEntryIDs, ["opaque-entry"])
+        XCTAssertEqual(bridge.annexCSubmitCalls.single?.deviceRequestBase64URL, "device-request")
+        XCTAssertEqual(response, bridge.digitalCredentialResponseResult)
     }
 
     func testBridgeErrorsSurfaceAsWalletErrors() async {
@@ -764,6 +810,20 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         let errorDescription: String?
     }
 
+    struct AnnexCPreviewCall {
+        let parsedRequest: AnnexCParsedRequest
+        let verifiedOrigin: String
+        let selectedRegistryEntryIDs: [String]
+    }
+
+    struct AnnexCSubmitCall {
+        let requestID: String
+        let verifiedOrigin: String
+        let deviceRequestBase64URL: String
+        let encryptionInfoBase64URL: String
+        let selectedCredentialOptions: [PresentationCredentialSelection]
+    }
+
     var events: AsyncStream<WalletEvent>
     var error: WalletError?
     var bootstrapResult = WalletBootstrapResult(keyID: "key", did: "did:key:wallet")
@@ -784,6 +844,21 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     )
     var submitResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
     var rejectResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
+    var digitalCredentialCapabilitiesResult = DigitalCredentialCapabilities(
+        platform: "unavailable",
+        platformAvailable: false,
+        minimumOSVersion: "iOS 26",
+        registrationAvailable: false,
+        capabilities: []
+    )
+    var annexCPreviewResult = AnnexCPresentationPreview(
+        requestID: "request",
+        verifiedOrigin: "https://verifier.example",
+        parsedRequest: .init(documents: []),
+        credentialOptions: [],
+        readerTrust: .unverified(reason: "not configured")
+    )
+    var digitalCredentialResponseResult = DigitalCredentialResponse(protocolIdentifier: "org-iso-mdoc", dataJSON: "{}")
     private(set) var bootstrapCalls: [BootstrapCall] = []
     private(set) var resolvedOffers: [URL] = []
     private(set) var receiveCalls: [ReceiveCall] = []
@@ -794,6 +869,8 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     private(set) var previewCalls: [URL] = []
     private(set) var submitCalls: [SubmitCall] = []
     private(set) var rejectCalls: [RejectCall] = []
+    private(set) var annexCPreviewCalls: [AnnexCPreviewCall] = []
+    private(set) var annexCSubmitCalls: [AnnexCSubmitCall] = []
 
     init(events: [WalletEvent] = []) {
         self.events = AsyncStream { continuation in
@@ -966,4 +1043,39 @@ private func testOfferResolution(transactionCodeRequired: Bool) -> OfferResoluti
             )
             : nil
     )
+    func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
+        digitalCredentialCapabilitiesResult
+    }
+
+    func previewAnnexCPresentation(
+        parsedRequest: AnnexCParsedRequest,
+        verifiedOrigin: String,
+        selectedRegistryEntryIDs: [String]
+    ) async throws -> AnnexCPresentationPreview {
+        if let error { throw error }
+        annexCPreviewCalls.append(.init(
+            parsedRequest: parsedRequest,
+            verifiedOrigin: verifiedOrigin,
+            selectedRegistryEntryIDs: selectedRegistryEntryIDs
+        ))
+        return annexCPreviewResult
+    }
+
+    func submitAnnexCPresentation(
+        requestID: String,
+        verifiedOrigin: String,
+        deviceRequestBase64URL: String,
+        encryptionInfoBase64URL: String,
+        selectedCredentialOptions: [PresentationCredentialSelection]
+    ) async throws -> DigitalCredentialResponse {
+        if let error { throw error }
+        annexCSubmitCalls.append(.init(
+            requestID: requestID,
+            verifiedOrigin: verifiedOrigin,
+            deviceRequestBase64URL: deviceRequestBase64URL,
+            encryptionInfoBase64URL: encryptionInfoBase64URL,
+            selectedCredentialOptions: selectedCredentialOptions
+        ))
+        return digitalCredentialResponseResult
+    }
 }

@@ -33,6 +33,9 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
  * @property preferredLocales Ordered BCP 47 locale preferences used for progressive language-tag lookup.
  * When no preference matches, selection falls back to an unlocalized entry and then the first entry.
  * @property transactionDataProfiles Transaction data profiles this mobile wallet accepts in OpenID4VP requests.
+ * @property credentialRegistry Platform metadata registry. Platform factories install their native default when omitted.
+ * @property readerTrustEvaluator Application trust policy for verified ISO 18013-7 reader chains.
+ * @property crossProcessAccess Optional shared-container/keychain configuration for provider extensions.
  */
 public data class MobileWalletConfig(
     public val walletId: String = "default",
@@ -46,7 +49,23 @@ public data class MobileWalletConfig(
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    public val credentialRegistry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
+    public val readerTrustEvaluator: MobileWalletReaderTrustEvaluator = UnconfiguredMobileWalletReaderTrustEvaluator,
+    public val crossProcessAccess: MobileWalletCrossProcessAccess? = null,
 )
+
+/** Cross-process wallet access required by native document-provider extensions. */
+public data class MobileWalletCrossProcessAccess(
+    public val appGroupIdentifier: String,
+    public val keychainAccessGroup: String,
+    public val legacyKeyPolicy: MobileWalletLegacyKeyPolicy = MobileWalletLegacyKeyPolicy.REQUIRE_CREDENTIAL_REISSUANCE,
+)
+
+/** Existing non-exportable keys cannot be moved into another Keychain access group. */
+public enum class MobileWalletLegacyKeyPolicy {
+    /** Fail closed and require credentials bound to the legacy key to be reissued. */
+    REQUIRE_CREDENTIAL_REISSUANCE,
+}
 
 /**
  * Transaction data profile accepted by the mobile wallet.
@@ -205,6 +224,8 @@ private fun createSqlDelightMobileWallet(
         preferredLocales = config.preferredLocales,
         transactionDataProfiles = config.transactionDataProfiles,
         onEvent = config.onEvent,
+        credentialRegistry = config.credentialRegistry,
+        readerTrustEvaluator = config.readerTrustEvaluator,
         deleteLocalPersistence = deleteLocalPersistence,
     )
 }

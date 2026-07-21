@@ -12,11 +12,19 @@ public actual class MobileWalletFactory {
      * Creates an iOS mobile wallet using native SQLDelight storage and the default iOS platform key provider.
      */
     public actual suspend fun create(config: MobileWalletConfig): MobileWallet {
-        val driverFactory = DriverFactory()
+        val sharedAccess = config.crossProcessAccess
+        val driverFactory = DriverFactory().apply {
+            sharedAccess?.let { useAppGroup(it.appGroupIdentifier) }
+        }
+        val platformConfig = if (config.credentialRegistry === UnavailableMobileWalletCredentialRegistry) {
+            config.copy(
+                credentialRegistry = IosIdentityDocumentRegistry(sharedAccess?.appGroupIdentifier),
+            )
+        } else config
         return createEncryptedSqlDelightMobileWallet(
-            config = config,
-            managedDatabaseKeyProvider = IosDatabaseEncryptionKeyProvider(),
-            platformKeyProvider = IosPlatformKeyProvider(),
+            config = platformConfig,
+            managedDatabaseKeyProvider = IosDatabaseEncryptionKeyProvider(sharedAccess?.keychainAccessGroup),
+            platformKeyProvider = IosPlatformKeyProvider(accessGroup = sharedAccess?.keychainAccessGroup),
             openEncryptedDriver = driverFactory::createEncryptedDriver,
             deleteDatabase = driverFactory::deleteDatabase,
         )

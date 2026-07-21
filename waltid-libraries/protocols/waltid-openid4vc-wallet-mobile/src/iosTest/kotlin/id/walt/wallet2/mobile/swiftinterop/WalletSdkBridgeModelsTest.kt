@@ -3,10 +3,12 @@ package id.walt.wallet2.mobile.swiftinterop
 import id.walt.wallet2.handlers.PreviewSessionException
 import id.walt.wallet2.handlers.PreviewSessionFailureReason
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
+import id.walt.wallet2.mobile.MobileWalletLegacyKeyPolicy
 import kotlinx.coroutines.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertFailsWith
 
 class WalletSdkBridgeModelsTest {
 
@@ -58,5 +60,24 @@ class WalletSdkBridgeModelsTest {
 
         assertIs<WalletBridgeResult.Failure>(failure)
         assertEquals(WalletBridgeErrorCategory.network, failure.error.category)
+    }
+
+    @Test
+    fun bridgeRequiresCompleteCrossProcessConfigurationAndMapsFailClosedMigrationPolicy() {
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeConfiguration(appGroupIdentifier = "group.example").toMobileWalletConfig()
+        }
+
+        val config = WalletBridgeConfiguration(
+            appGroupIdentifier = "group.example",
+            keychainAccessGroup = "TEAM.example",
+        ).toMobileWalletConfig()
+
+        assertEquals("group.example", config.crossProcessAccess?.appGroupIdentifier)
+        assertEquals("TEAM.example", config.crossProcessAccess?.keychainAccessGroup)
+        assertEquals(
+            MobileWalletLegacyKeyPolicy.REQUIRE_CREDENTIAL_REISSUANCE,
+            config.crossProcessAccess?.legacyKeyPolicy,
+        )
     }
 }
