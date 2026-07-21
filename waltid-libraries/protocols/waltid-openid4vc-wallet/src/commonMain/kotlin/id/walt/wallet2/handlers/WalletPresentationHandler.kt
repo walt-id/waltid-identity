@@ -4,6 +4,7 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto.utils.UuidUtils
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatchException
 import id.walt.dcql.DcqlMatcher
@@ -15,6 +16,7 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier.openid.transactiondata.decodeList
+import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletSessionEvent
@@ -28,6 +30,9 @@ import id.waltid.openid4vp.wallet.PresentationRequestValidator
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
+import id.waltid.openid4vp.wallet.DcApiCredentialResponse
+import id.waltid.openid4vp.wallet.DcApiWallet
+import id.waltid.openid4vp.wallet.ResolvedDcApiRequest
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import id.waltid.openid4vp.wallet.response.ResponseEncryptionHandler
@@ -192,6 +197,20 @@ sealed interface PreviewPresentationResult {
     ) : PreviewPresentationResult
 }
 
+data class PreviewDcApiPresentationRequest(
+    val protocol: String,
+    val data: JsonObject,
+    val origin: String,
+)
+
+data class PreviewDcApiPresentationResult(
+    val requestId: String,
+    val resolvedRequest: ResolvedDcApiRequest,
+    val credentialOptions: List<PresentationCredentialOption>,
+    val credentialRequirements: List<PresentationCredentialRequirement>,
+    val transactionData: List<PresentationTransactionDataItem>,
+)
+
 data class PresentationCredentialRequirement(
     val options: List<List<String>>,
 )
@@ -253,6 +272,13 @@ data class RejectPresentationRequest(
     val errorDescription: String? = null,
 )
 
+data class SubmitDcApiPresentationRequest(
+    val requestId: String,
+    val selectedCredentialOptions: List<PresentationCredentialSelection>,
+    val selectedDisclosureOptions: List<PresentationDisclosureSelection>? = null,
+    val did: String? = null,
+)
+
 class MissingPresentationPreviewException :
     IllegalStateException("Presentation request preview expired or was not found; preview the request again before responding.")
 // ---------------------------------------------------------------------------
@@ -275,6 +301,13 @@ object WalletPresentationHandler {
     private const val MAX_PREVIEWED_AUTHORIZATION_REQUESTS = 16
     private val previewedAuthorizationRequests = LinkedHashMap<PresentationPreviewCacheKey, PreviewedPresentationRequest>()
     private val previewedAuthorizationRequestsMutex = Mutex()
+    private val previewedDcApiRequests = LinkedHashMap<String, PreviewedDcApiRequest>()
+    private val previewedDcApiRequestsMutex = Mutex()
+
+    private data class PreviewedDcApiRequest(
+        val walletId: String,
+        val request: ResolvedDcApiRequest,
+    )
 
     /**
      * Full presentation flow: resolve VP request → DCQL-match credentials
@@ -439,6 +472,65 @@ object WalletPresentationHandler {
         )
     }
 
+    suspend fun previewDcApiPresentation(
+        wallet: Wallet,
+        request: PreviewDcApiPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+    ): PreviewDcApiPresentationResult {
+        onEvent(WalletSessionEvent.presentation_request_parsed)
+        val resolvedRequest = DcApiWallet.resolveRequest(
+            protocol = request.protocol,
+            data = request.data,
+            origin = request.origin,
+            expectedRequestObjectAudience = wallet.requestObjectAudience,
+            x509TrustPolicy = wallet.requestObjectX509TrustPolicy,
+        )
+        val authorizationRequest = resolvedRequest.authorizationRequest
+        val query = requireNotNull(authorizationRequest.dcqlQuery)
+        val transactionDataItems = validateRequestTransactionData(
+            transactionData = authorizationRequest.transactionData,
+            typeRegistry = transactionDataTypeRegistry,
+            credentialQueriesById = query.credentials.associateBy { it.id },
+        )
+        val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
+        val matched = selectFromStores(wallet, query, useWalletCredentialIds = true)
+        onEvent(WalletSessionEvent.presentation_credentials_selected)
+        val requestId = rememberPreviewedDcApiRequest(wallet, resolvedRequest)
+
+        return PreviewDcApiPresentationResult(
+            requestId = requestId,
+            resolvedRequest = resolvedRequest,
+            credentialRequirements = query.requiredCredentialRequirements(),
+            credentialOptions = matched.flatMap { (queryId, results) ->
+                results.map { result ->
+                    val raw = result.credential as RawDcqlCredential
+                    val stored = storedById[raw.id]
+                        ?: error("Credential '${raw.id}' disappeared while building DC API presentation preview")
+                    PresentationCredentialOption(
+                        queryId = queryId,
+                        credentialId = stored.id,
+                        multiple = result.originalQuery.multiple,
+                        format = stored.credential.format,
+                        issuer = stored.credential.issuer,
+                        subject = stored.credential.subject,
+                        label = stored.label,
+                        credentialData = stored.credential.credentialData,
+                        disclosures = result.toPresentationDisclosures(),
+                    )
+                }
+            },
+            transactionData = transactionDataItems.map { decoded ->
+                PresentationTransactionDataItem(
+                    type = decoded.transactionData.type,
+                    credentialQueryIds = decoded.transactionData.credentialIds,
+                    rawJson = decoded.rawJson,
+                    details = decoded.details,
+                )
+            },
+        )
+    }
+
     suspend fun submitPresentation(
         wallet: Wallet,
         request: SubmitPresentationRequest,
@@ -534,6 +626,55 @@ object WalletPresentationHandler {
         return result.emitPresentationOutcome(onEvent)
     }
 
+    suspend fun submitDcApiPresentation(
+        wallet: Wallet,
+        request: SubmitDcApiPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+    ): DcApiCredentialResponse {
+        request.selectedCredentialOptions.requireValidPresentationCredentialSelection()
+        val resolvedRequest = consumePreviewedDcApiRequest(wallet, request.requestId)
+        val authorizationRequest = resolvedRequest.authorizationRequest
+        val key = wallet.resolveKey(keyId = null)
+            ?: error("No key available: wallet has no keyStores and no staticKey")
+        val did = request.did ?: wallet.defaultDid()
+        val selectedQueryIds = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.queryId }
+        validateSelectedTransactionDataCredentials(
+            authorizationRequest.transactionData.orEmpty(),
+            selectedQueryIds,
+        )
+        onEvent(WalletSessionEvent.presentation_request_parsed)
+
+        return WalletPresentFunctionality2.walletPresentDcApiHandling(
+            holderKey = key,
+            holderDid = did,
+            request = resolvedRequest,
+            selectCredentialsForQuery = { query ->
+                val requirements = query.requiredCredentialRequirements()
+                require(requirements.satisfiedBy(selectedQueryIds)) {
+                    "Selected credential option(s) do not satisfy required DC API credential query constraints"
+                }
+                val selected = selectFromStores(
+                    wallet = wallet,
+                    query = query,
+                    useWalletCredentialIds = true,
+                ).selectCredentialOptions(
+                    selectedCredentialOptions = request.selectedCredentialOptions,
+                    selectedDisclosureOptions = request.selectedDisclosureOptions,
+                )
+                require(requirements.satisfiedBy(selected.keys)) {
+                    "Selected credential option(s) do not match required DC API credential query constraints"
+                }
+                selected.also { onEvent(WalletSessionEvent.presentation_credentials_selected) }
+            },
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+        ).getOrElse { error ->
+            onEvent(WalletSessionEvent.presentation_failed)
+            throw error
+        }.also {
+            onEvent(WalletSessionEvent.presentation_completed)
+        }
+    }
     // ---------------------------------------------------------------------------
     // Isolated step handlers
     // ---------------------------------------------------------------------------
@@ -1005,6 +1146,27 @@ object WalletPresentationHandler {
             previewedAuthorizationRequests.remove(key)
             preview
         }
+
+    private suspend fun rememberPreviewedDcApiRequest(
+        wallet: Wallet,
+        request: ResolvedDcApiRequest,
+    ): String = previewedDcApiRequestsMutex.withLock {
+        if (previewedDcApiRequests.size >= MAX_PREVIEWED_AUTHORIZATION_REQUESTS) {
+            previewedDcApiRequests.remove(previewedDcApiRequests.keys.first())
+        }
+        val requestId = UuidUtils.randomUUIDString()
+        previewedDcApiRequests[requestId] = PreviewedDcApiRequest(wallet.id, request)
+        requestId
+    }
+
+    private suspend fun consumePreviewedDcApiRequest(
+        wallet: Wallet,
+        requestId: String,
+    ): ResolvedDcApiRequest = previewedDcApiRequestsMutex.withLock {
+        previewedDcApiRequests.remove(requestId)
+            ?.takeIf { it.walletId == wallet.id }
+            ?.request
+    } ?: throw MissingPresentationPreviewException()
 
     private fun presentationPreviewCacheKey(wallet: Wallet, requestUrl: Url): PresentationPreviewCacheKey =
         PresentationPreviewCacheKey(walletId = wallet.id, requestUrl = requestUrl.toString())

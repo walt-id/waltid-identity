@@ -2,6 +2,7 @@ package id.waltid.openid4vp.wallet
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.CredentialFormat
@@ -16,6 +17,9 @@ import io.ktor.http.Url
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -114,6 +118,23 @@ class WalletPresentFunctionality2Test {
             request,
             mapOf("identity" to listOf(identity), "address" to listOf(address)),
         )
+    }
+
+    @Test
+    fun dcApiHolderBindingAudienceIsEncodedInSdJwtKeyBindingJwt() = runTest {
+        val keyBindingJwt = WalletPresentFunctionality2.createKeyBindingJwt(
+            disclosed = "issuer-signed~",
+            nonce = "nonce-123",
+            audience = "origin:https://verifier.example",
+            selectedDisclosures = emptyList(),
+            holderKey = JWKKey.generate(KeyType.Ed25519),
+        )
+        val payload = Json.parseToJsonElement(
+            keyBindingJwt.split('.')[1].decodeFromBase64Url().decodeToString()
+        ).jsonObject
+
+        assertEquals("origin:https://verifier.example", payload["aud"]?.jsonPrimitive?.content)
+        assertEquals("nonce-123", payload["nonce"]?.jsonPrimitive?.content)
     }
 
     private fun match(queryId: String): DcqlMatcher.DcqlMatchResult {

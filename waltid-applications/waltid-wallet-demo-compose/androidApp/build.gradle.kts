@@ -62,7 +62,11 @@ android {
 dependencies {
     implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedLogic"))
     implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedUI"))
+    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
     implementation(identityLibs.androidx.activity.compose)
+    implementation(identityLibs.androidx.credentials.registry.provider)
+    implementation(identityLibs.kotlinx.coroutines.android)
+    implementation(identityLibs.kotlinx.serialization.json)
 
     androidTestImplementation(identityLibs.androidx.test.ext.junit)
     androidTestImplementation(identityLibs.androidx.test.runner)

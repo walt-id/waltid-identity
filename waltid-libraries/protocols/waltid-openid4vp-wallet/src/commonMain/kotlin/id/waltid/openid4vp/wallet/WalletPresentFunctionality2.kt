@@ -62,6 +62,7 @@ object WalletPresentFunctionality2 {
         holderDid: String?,
         typeRegistry: TransactionDataTypeRegistry,
         encryptionConfig: ResponseEncryptionHandler.EncryptionConfig?,
+        dcApiOrigin: String? = null,
     ): String {
         validateMatchedCredentialSelection(authorizationRequest, matchedData)
         val vpTokenMapContents = mutableMapOf<String, JsonArray>()
@@ -80,6 +81,7 @@ object WalletPresentFunctionality2 {
                             authorizationRequest = authorizationRequest,
                             holderKey = holderKey,
                             holderDid = holderDid ?: throw IllegalArgumentException("Missing DID for presentation"),
+                            holderBindingAudience = dcApiOrigin?.let { "origin:$it" },
                         )
 
                         resolvedFormat == WalletPresentationFormatRegistry.SupportedFormat.DC_SD_JWT -> SdJwtVcPresenter.presentSdJwtVc(
@@ -87,7 +89,8 @@ object WalletPresentFunctionality2 {
                             matchResult = matchResult,
                             authorizationRequest = authorizationRequest,
                             holderKey = holderKey,
-                            holderDid = holderDid
+                            holderDid = holderDid,
+                            holderBindingAudience = dcApiOrigin?.let { "origin:$it" },
                         )
 
                         resolvedFormat == WalletPresentationFormatRegistry.SupportedFormat.MSO_MDOC -> {
@@ -98,6 +101,7 @@ object WalletPresentFunctionality2 {
                                 holderKey = holderKey,
                                 typeRegistry = typeRegistry,
                                 encryptionKeyThumbprint = encryptionConfig?.verifierKeyThumbprint,
+                                dcApiOrigin = dcApiOrigin,
                             )
                         }
 
@@ -422,6 +426,7 @@ object WalletPresentFunctionality2 {
         holderDid: String?,
         transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
         encryptionConfig: ResponseEncryptionHandler.EncryptionConfig? = null,
+        dcApiOrigin: String? = null,
     ): String {
         val selectedEncryptionConfig = encryptionConfig ?: selectEncryptionConfig(authorizationRequest)
         return generateVpTokenForRequest(
@@ -431,6 +436,7 @@ object WalletPresentFunctionality2 {
             holderDid,
             transactionDataTypeRegistry,
             selectedEncryptionConfig,
+            dcApiOrigin,
         )
     }
 
@@ -444,10 +450,52 @@ object WalletPresentFunctionality2 {
         authorizationRequest: AuthorizationRequest,
         holderKey: Key,
         holderDid: String?,
+        holderBindingAudience: String? = null,
     ): String? = if (authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN) {
         log.trace { "Generating Self-Issued ID Token for vp_token id_token response type" }
-        SelfIssuedIdTokenBuilder.build(authorizationRequest, holderKey, holderDid)
+        SelfIssuedIdTokenBuilder.build(authorizationRequest, holderKey, holderDid, holderBindingAudience)
     } else null
+
+    /**
+     * Executes an OS-mediated OpenID4VP presentation and returns a DigitalCredential response.
+     *
+     * Unlike [walletPresentHandling], this entry point never performs redirects or HTTP direct-post
+     * transport. The operating-system adapter owns delivery of the returned value.
+     */
+    suspend fun walletPresentDcApiHandling(
+        holderKey: Key,
+        holderDid: String?,
+        request: ResolvedDcApiRequest,
+        selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+    ): Result<DcApiCredentialResponse> = runCatching {
+        val authorizationRequest = request.authorizationRequest
+        validateRequestTransactionData(
+            transactionData = authorizationRequest.transactionData,
+            typeRegistry = transactionDataTypeRegistry,
+            credentialQueriesById = authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
+        )
+        val credentials = selectCredentialsForQuery(
+            requireNotNull(authorizationRequest.dcqlQuery) { "Missing dcql_query for DC API Authorization Request" },
+        )
+        val encryptionConfig = selectEncryptionConfig(authorizationRequest)
+        val vpToken = buildVpToken(
+            authorizationRequest = authorizationRequest,
+            matchedCredentials = credentials,
+            holderKey = holderKey,
+            holderDid = holderDid,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+            encryptionConfig = encryptionConfig,
+            dcApiOrigin = request.origin,
+        )
+        val idToken = buildIdToken(
+            authorizationRequest = authorizationRequest,
+            holderKey = holderKey,
+            holderDid = holderDid,
+            holderBindingAudience = request.holderBindingAudience,
+        )
+        DcApiWallet.buildResponse(request, vpToken, idToken, encryptionConfig)
+    }
 
     /**
      * Step 3 - Send the authorization response to the verifier.

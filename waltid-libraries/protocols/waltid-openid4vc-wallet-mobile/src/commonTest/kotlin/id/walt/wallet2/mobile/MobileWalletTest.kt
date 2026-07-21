@@ -5,6 +5,7 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.crypto.keys.KeyType
+import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -35,6 +36,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class MobileWalletTest {
@@ -355,6 +357,93 @@ class MobileWalletTest {
         assertEquals(listOf(listOf("pid")), preview.credentialRequirements.single().options)
     }
 
+    @Test
+    fun digitalCredentialRegistryUsesStableOpaqueMetadataAndExcludesSdJwtInfrastructureClaims() = runTest {
+        val registry = RecordingMetadataRegistry()
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "credential-sensitive-local-id",
+                credential = SdJwtCredential(
+                    dmtype = CredentialDetectorTypes.SDJWTVCSubType.sdjwtvc,
+                    credentialData = buildJsonObject {
+                        put("vct", "https://credentials.example/pid")
+                        put("iss", "https://issuer.example")
+                        put("given_name", "Ada")
+                    },
+                    issuer = "https://issuer.example",
+                    subject = "did:key:subject",
+                    signature = null,
+                    signed = null,
+                ),
+                label = "PID",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "registry-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            keyGenerator = { error("Registry refresh must not generate keys") },
+            credentialRegistry = registry,
+        )
+
+        wallet.refreshDigitalCredentialRegistration()
+        wallet.refreshDigitalCredentialRegistration()
+
+        assertEquals(2, registry.replacements.size)
+        assertEquals(registry.replacements[0], registry.replacements[1])
+        val record = registry.replacements.last().second.single()
+        assertFalse(record.registryEntryId.contains("credential-sensitive-local-id"))
+        assertEquals("https://credentials.example/pid", record.type)
+        assertEquals(listOf(listOf("given_name")), record.fields.map { it.path })
+        assertFalse(record.fields.any { it.path.singleOrNull() == "iss" })
+    }
+
+    @Test
+    fun annexCParserNormalizesNamespacesAndPreviewRejectsParsedRawMismatchBeforeConsent() = runTest {
+        val wallet = MobileWallet(
+            walletId = "annex-c-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = RecordingCredentialStore(),
+            keyGenerator = { error("Parsing must not generate keys") },
+        )
+        val raw = DeviceRequest(
+            docType = "org.iso.18013.5.1.mDL",
+            requestedElements = mapOf("org.iso.18013.5.1" to listOf("given_name", "family_name")),
+        ).encodeToBase64Url()
+
+        val parsed = wallet.parseAnnexCDeviceRequest(raw)
+
+        assertEquals("org.iso.18013.5.1.mDL", parsed.documents.single().docType)
+        assertEquals(listOf("family_name", "given_name"), parsed.documents.single().namespaces.values.single())
+        assertFailsWith<IllegalArgumentException> {
+            wallet.previewAnnexCPresentation(
+                MobileWalletAnnexCRequest(
+                    parsedRequest = MobileWalletAnnexCParsedRequest(
+                        listOf(MobileWalletAnnexCDocumentRequest("eu.europa.ec.eudi.pid.1", emptyMap()))
+                    ),
+                    verifiedOrigin = "https://verifier.example",
+                    deviceRequestBase64Url = raw,
+                    encryptionInfoBase64Url = "not-reached",
+                )
+            )
+        }
+    }
+
+    @Test
+    fun capabilityAndMigrationModelsFailClosedByDefault() = runTest {
+        assertFalse(UnavailableMobileWalletCredentialRegistry.capabilities.platformAvailable)
+        assertFalse(UnavailableMobileWalletCredentialRegistry.capabilities.registrationAvailable)
+        assertIs<MobileWalletReaderTrust.Unverified>(
+            UnconfiguredMobileWalletReaderTrustEvaluator.evaluate(emptyList())
+        )
+        assertEquals(
+            MobileWalletLegacyKeyPolicy.REQUIRE_CREDENTIAL_REISSUANCE,
+            MobileWalletCrossProcessAccess("group.example", "TEAM.example").legacyKeyPolicy,
+        )
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun mobileWalletEventStreamDoesNotBackpressureSlowCollectors() = runTest {
@@ -392,6 +481,19 @@ class MobileWalletTest {
             DatabaseEncryptionKey("$walletId:$databaseName", ByteArray(32))
 
         override suspend fun deleteKey(walletId: String, databaseName: String) = Unit
+    }
+
+    private class RecordingMetadataRegistry : MobileWalletCredentialRegistry {
+        val replacements = mutableListOf<Pair<String, List<MobileWalletCredentialRegistryRecord>>>()
+        override val capabilities = UnavailableMobileWalletCredentialRegistry.capabilities
+
+        override suspend fun replace(
+            registryId: String,
+            records: List<MobileWalletCredentialRegistryRecord>,
+        ): MobileWalletCredentialRegistrationResult {
+            replacements += registryId to records
+            return MobileWalletCredentialRegistrationResult(true, records.size)
+        }
     }
 
     private class PreloadedKeyStore(private val keyInfo: WalletKeyInfo) : WalletKeyStore {

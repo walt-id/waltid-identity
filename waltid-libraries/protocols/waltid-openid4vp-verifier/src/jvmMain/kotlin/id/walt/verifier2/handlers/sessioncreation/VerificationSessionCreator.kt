@@ -16,6 +16,7 @@ import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequestInfo
+import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.mdoc.objects.deviceretrieval.UseCase
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
@@ -31,8 +32,6 @@ import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionDataStructure
 import id.walt.verifier2.data.*
-import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthentication
-import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthenticationAll
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
@@ -393,18 +392,13 @@ object VerificationSessionCreator {
 
                     // Generate readerAuth for EACH document requested (Per-Document Signature)
                     val signedDocRequests = initialDeviceRequest.docRequests.map { docReq ->
-                        val itemsRequestBytes = docReq.itemsRequest.serialized
-
-                        val readerAuthPayload = ReaderAuthentication(
-                            context = ReaderAuthentication.CONTEXT,
-                            sessionTranscript = sessionTranscript,
-                            itemsRequestBytes = itemsRequestBytes
-                        )
-
                         val readerAuthSignature = CoseSign1.createAndSignDetached(
                             protectedHeaders = protectedHeaders,
                             unprotectedHeaders = unprotectedHeaders,
-                            detachedPayload = coseCompliantCbor.encodeToByteArray(readerAuthPayload),
+                            detachedPayload = ReaderAuthenticationPayloads.forDocument(
+                                sessionTranscript,
+                                docReq.itemsRequest,
+                            ),
                             signer = coseSigner
                         )
 
@@ -413,19 +407,14 @@ object VerificationSessionCreator {
                     }
 
                     // Generate readerAuthAll for the entire set (Global Signature)
-                    val itemsRequestBytesAll = initialDeviceRequest.docRequests.map { it.itemsRequest.serialized }
-
-                    val readerAuthAllPayload = ReaderAuthenticationAll(
-                        context = ReaderAuthenticationAll.CONTEXT,
-                        sessionTranscript = sessionTranscript,
-                        itemsRequestBytesAll = itemsRequestBytesAll,
-                        docRequestsInfoBytes = deviceRequestInfo.serialized
-                    )
-
                     val readerAuthAllSignature = CoseSign1.createAndSignDetached(
                         protectedHeaders = protectedHeaders,
                         unprotectedHeaders = unprotectedHeaders,
-                        detachedPayload = coseCompliantCbor.encodeToByteArray(readerAuthAllPayload),
+                        detachedPayload = ReaderAuthenticationPayloads.forAllDocuments(
+                            sessionTranscript = sessionTranscript,
+                            itemsRequests = initialDeviceRequest.docRequests.map { it.itemsRequest },
+                            deviceRequestInfo = deviceRequestInfo,
+                        ),
                         signer = coseSigner
                     )
 

@@ -26,6 +26,9 @@ public struct WalletConfiguration: Sendable {
     /// Transaction data profiles this wallet accepts in OpenID4VP requests.
     public var transactionDataProfiles: [WalletTransactionDataProfile]
 
+    /// Shared app/extension storage and Keychain configuration for IdentityDocumentServices.
+    public var crossProcessAccess: WalletCrossProcessAccess?
+
     /// Creates wallet configuration.
     ///
     /// - Parameters:
@@ -51,7 +54,8 @@ public struct WalletConfiguration: Sendable {
         requestObjectTrustAnchorPEMCertificates: [String] = [],
         requestObjectEnableSystemTrustAnchors: Bool = false,
         requestObjectAudience: String = "https://self-issued.me/v2",
-        transactionDataProfiles: [WalletTransactionDataProfile] = []
+        transactionDataProfiles: [WalletTransactionDataProfile] = [],
+        crossProcessAccess: WalletCrossProcessAccess? = nil
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
@@ -61,6 +65,20 @@ public struct WalletConfiguration: Sendable {
         self.requestObjectEnableSystemTrustAnchors = requestObjectEnableSystemTrustAnchors
         self.requestObjectAudience = requestObjectAudience
         self.transactionDataProfiles = transactionDataProfiles
+        self.crossProcessAccess = crossProcessAccess
+    }
+}
+
+/// Shared storage required when the wallet is opened from an iOS document-provider extension.
+public struct WalletCrossProcessAccess: Equatable, Sendable {
+    public let appGroupIdentifier: String
+    public let keychainAccessGroup: String
+
+    public init(appGroupIdentifier: String, keychainAccessGroup: String) {
+        precondition(!appGroupIdentifier.isEmpty, "App Group identifier must not be empty")
+        precondition(!keychainAccessGroup.isEmpty, "Keychain access group must not be empty")
+        self.appGroupIdentifier = appGroupIdentifier
+        self.keychainAccessGroup = keychainAccessGroup
     }
 }
 

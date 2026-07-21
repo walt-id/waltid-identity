@@ -182,4 +182,40 @@ public actor Wallet {
             errorDescription: errorDescription
         )
     }
+
+    /// Returns the current IdentityDocumentServices capability snapshot.
+    public func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
+        bridge.digitalCredentialCapabilities()
+    }
+
+    /// Retains Apple's parsed Annex C request until the user consents to raw request access.
+    public func previewAnnexCPresentation(
+        parsedRequest: AnnexCParsedRequest,
+        verifiedOrigin: String,
+        selectedRegistryEntryIDs: [String] = []
+    ) async throws -> AnnexCPresentationPreview {
+        try await bridge.previewAnnexCPresentation(
+            parsedRequest: parsedRequest,
+            verifiedOrigin: verifiedOrigin,
+            selectedRegistryEntryIDs: selectedRegistryEntryIDs
+        )
+    }
+
+    /// Verifies the raw request against the retained preview and returns the HPKE response JSON.
+    public func submitAnnexCPresentation(
+        requestID: String,
+        verifiedOrigin: String,
+        deviceRequestBase64URL: String,
+        encryptionInfoBase64URL: String,
+        selectedCredentialOptions: [PresentationCredentialSelection]
+    ) async throws -> DigitalCredentialResponse {
+        try await bridge.submitAnnexCPresentation(
+            requestID: requestID,
+            verifiedOrigin: verifiedOrigin,
+            deviceRequestBase64URL: deviceRequestBase64URL,
+            encryptionInfoBase64URL: encryptionInfoBase64URL,
+            selectedCredentialOptions: selectedCredentialOptions
+        )
+    }
+
 }

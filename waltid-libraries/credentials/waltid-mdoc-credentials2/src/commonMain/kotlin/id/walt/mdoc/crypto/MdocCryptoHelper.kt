@@ -53,7 +53,7 @@ object MdocCryptoHelper {
     fun reconstructDcApiOid4vpSessionTranscript(context: MdocVerificationContext): SessionTranscript {
         // Step 1: Create the OpenID4VPHandoverInfo structure
         val handoverInfo = OpenID4VPDCAPIHandoverInfo(
-            origin = context.expectedAudience,
+            origin = requireNotNull(context.expectedAudience) { "Missing origin for DC API Session Transcript" },
             nonce = context.expectedNonce,
             jwkThumbprint = context.jwkThumbprint?.decodeFromBase64Url() // jwkThumbprint is null when not using JWE for the response
         )

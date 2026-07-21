@@ -21,7 +21,8 @@ object SdJwtVcPresenter {
         matchResult: DcqlMatcher.DcqlMatchResult,
         authorizationRequest: AuthorizationRequest,
         holderKey: Key,
-        holderDid: String?
+        holderDid: String?,
+        holderBindingAudience: String? = null,
     ): JsonPrimitive {
         val selectedClaimsMap = matchResult.selectedDisclosures
 
@@ -49,7 +50,7 @@ object SdJwtVcPresenter {
         val kbJwtString = createKeyBindingJwt(
             disclosed = disclosed,
             nonce = authorizationRequest.nonce!!,
-            audience = authorizationRequest.clientId,
+            audience = holderBindingAudience ?: authorizationRequest.clientId,
             selectedDisclosures = disclosuresToPresent,
             holderKey = holderKey,
             transactionData = filterTransactionDataForCredentialId(

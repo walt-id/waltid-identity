@@ -15,6 +15,7 @@ import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletKeys
 import id.walt.wallet2.mobile.MobileWalletKeyType
@@ -49,6 +50,8 @@ import kotlin.time.Instant
  * trust anchors are not supported for Request Object validation and `true` is rejected.
  * @property requestObjectAudience Expected Request Object audience.
  * @property transactionDataProfiles Transaction data profiles this wallet accepts.
+ * @property appGroupIdentifier Shared container used by the app and document-provider extension.
+ * @property keychainAccessGroup Shared Keychain access group used for database and signing keys.
  */
 public data class WalletBridgeConfiguration(
     public val walletId: String = "default",
@@ -60,11 +63,16 @@ public data class WalletBridgeConfiguration(
     public val requestObjectEnableSystemTrustAnchors: Boolean = false,
     public val requestObjectAudience: String = "https://self-issued.me/v2",
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    public val appGroupIdentifier: String? = null,
+    public val keychainAccessGroup: String? = null,
 )
 
 internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfig {
     require(!requestObjectEnableSystemTrustAnchors) {
         "iOS system trust anchors are not supported for OID4VP Request Object validation"
+    }
+    require((appGroupIdentifier == null) == (keychainAccessGroup == null)) {
+        "App Group and Keychain access group must be configured together"
     }
     val x509Trust = if (requestObjectTrustAnchorPemCertificates.isNotEmpty() || requestObjectEnableSystemTrustAnchors) {
         WalletX509TrustConfig(
@@ -82,6 +90,12 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
         requestObjectX509Trust = x509Trust,
         requestObjectAudience = requestObjectAudience,
         transactionDataProfiles = transactionDataProfiles,
+        crossProcessAccess = appGroupIdentifier?.let { appGroup ->
+            MobileWalletCrossProcessAccess(
+                appGroupIdentifier = appGroup,
+                keychainAccessGroup = requireNotNull(keychainAccessGroup),
+            )
+        },
     )
 }
 

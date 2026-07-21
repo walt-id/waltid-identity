@@ -37,7 +37,8 @@ object SelfIssuedIdTokenBuilder {
     suspend fun build(
         authorizationRequest: AuthorizationRequest,
         holderKey: Key,
-        holderDid: String?
+        holderDid: String?,
+        holderBindingAudience: String? = null,
     ): String {
         val publicKey = holderKey.getPublicKey()
 
@@ -68,7 +69,7 @@ object SelfIssuedIdTokenBuilder {
             // iss = sub per SIOPv2 §6: "this claim MUST be set to the value of the sub claim"
             put("iss", sub)
             put("sub", sub)
-            put("aud", JsonPrimitive(authorizationRequest.clientId))
+            put("aud", JsonPrimitive(holderBindingAudience ?: authorizationRequest.clientId))
             put("nonce", JsonPrimitive(authorizationRequest.nonce))
             put("iat", JsonPrimitive(now.epochSeconds))
             put("exp", JsonPrimitive(exp.epochSeconds))
@@ -79,7 +80,9 @@ object SelfIssuedIdTokenBuilder {
             }
         }
 
-        log.trace { "Building Self-Issued ID Token: sub=$sub, aud=${authorizationRequest.clientId}" }
+        log.trace {
+            "Building Self-Issued ID Token: sub=$sub, aud=${holderBindingAudience ?: authorizationRequest.clientId}"
+        }
 
         return holderKey.signJws(
             plaintext = payload.toString().encodeToByteArray(),
