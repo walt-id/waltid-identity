@@ -351,6 +351,106 @@ class WalletPresentationHandlerRequirementsTest {
             rejection.getUrl,
         )
     }
+    @Test
+    fun presentationPreviewIsWalletBoundAndDismissalDiscardsIt() = runTest {
+        val wallet = Wallet(id = "presentation-owner")
+        val otherWallet = Wallet(id = "presentation-other")
+        val handle = WalletPresentationHandler.rememberPreviewedAuthorizationRequest(
+            wallet = wallet,
+            preview = readyPreview(Url("openid4vp://authorize"), state = "owned"),
+        )
+
+        val crossWallet = assertFailsWith<PreviewSessionException> {
+            WalletPresentationHandler.discardPreview(otherWallet, handle)
+        }
+        assertEquals(PreviewSessionFailureReason.WRONG_WALLET, crossWallet.reason)
+
+        WalletPresentationHandler.discardPreview(wallet, handle)
+        val discarded = assertFailsWith<PreviewSessionException> {
+            WalletPresentationHandler.consumePreviewedAuthorizationRequest(wallet, handle)
+        }
+        assertEquals(PreviewSessionFailureReason.DISCARDED, discarded.reason)
+    }
+
+    @Test
+    fun rejectConsumesExactlySelectedPresentationPreview() = runTest {
+        val wallet = Wallet(id = "reject-selected-preview")
+        val first = WalletPresentationHandler.rememberPreviewedAuthorizationRequest(
+            wallet = wallet,
+            preview = readyPreview(Url("openid4vp://first"), state = "first"),
+        )
+        val second = WalletPresentationHandler.rememberPreviewedAuthorizationRequest(
+            wallet = wallet,
+            preview = readyPreview(Url("openid4vp://second"), state = "second"),
+        )
+
+        val result = WalletPresentationHandler.rejectPresentation(
+            wallet,
+            RejectPresentationRequest(previewHandle = first),
+        )
+
+        assertEquals("https://verifier.example/callback#error=access_denied&state=first", result.getUrl)
+        val consumed = assertFailsWith<PreviewSessionException> {
+            WalletPresentationHandler.rejectPresentation(
+                wallet,
+                RejectPresentationRequest(previewHandle = first),
+            )
+        }
+        assertEquals(PreviewSessionFailureReason.CONSUMED, consumed.reason)
+        assertEquals(
+            "second",
+            WalletPresentationHandler.consumePreviewedAuthorizationRequest(wallet, second)
+                .resolvedAuthorizationRequest.authorizationRequest.state,
+        )
+    }
+
+    @Test
+    fun submitConsumesPreviewEvenWhenLaterPresentationWorkFails() = runTest {
+        val wallet = Wallet(id = "submit-consumes")
+        val handle = WalletPresentationHandler.rememberPreviewedAuthorizationRequest(
+            wallet = wallet,
+            preview = readyPreview(Url("openid4vp://submit"), state = "submit"),
+        )
+        val request = SubmitPresentationRequest(
+            previewHandle = handle,
+            selectedCredentialOptions = listOf(
+                PresentationCredentialSelection(queryId = "pid", credentialId = "credential"),
+            ),
+        )
+
+        assertFailsWith<IllegalStateException> {
+            WalletPresentationHandler.submitPresentation(
+                wallet,
+                request,
+                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+            )
+        }
+        val consumed = assertFailsWith<PreviewSessionException> {
+            WalletPresentationHandler.submitPresentation(
+                wallet,
+                request,
+                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+            )
+        }
+        assertEquals(PreviewSessionFailureReason.CONSUMED, consumed.reason)
+    }
+
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    private fun resolvedRequest(state: String): ResolvedAuthorizationRequest =
+        ResolvedAuthorizationRequest.Plain(
+            AuthorizationRequest(
+                clientId = "redirect_uri:https://verifier.example/callback",
+                redirectUri = "https://verifier.example/callback",
+                responseMode = OpenID4VPResponseMode.FRAGMENT,
+                state = state,
+            )
+        )
+
+    private fun readyPreview(requestUrl: Url, state: String) =
+        WalletPresentationHandler.PreviewedPresentation.Ready(
+            requestUrl = requestUrl,
+            resolvedAuthorizationRequest = resolvedRequest(state),
+        )
 
     @Test
     fun mutableRequestUriContentRemainsBoundToReviewedPreview() = runTest {
