@@ -11,6 +11,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 private val issuancePreviewHandle = WalletDemoIssuancePreviewHandle("issuance-preview")
@@ -330,6 +331,8 @@ class WalletDemoControllerTest {
 
         assertEquals(listOf(issuancePreviewHandle), wallet.discardedIssuancePreviewHandles)
         assertEquals(null, controller.state.value.offerPreview)
+        val outcome = assertIs<WalletInteractionState.Success>(controller.state.value.interaction)
+        assertEquals(WalletInteractionSuccessOutcome.OfferDeclined, outcome.outcome)
     }
 
     @Test
@@ -360,7 +363,7 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun staleOfferResolutionCannotOverwriteIncomingDeepLink() = runTest {
+    fun replacementConfirmationPreventsStaleOfferResolutionFromWinning() = runTest {
         val resolutionGate = CompletableDeferred<Unit>()
         val wallet = FakeDemoWallet(
             offerResolution = offerPreview(transactionCode = textTransactionCode()),
@@ -374,18 +377,24 @@ class WalletDemoControllerTest {
         controller.previewOffer()
         runCurrent()
         controller.handleDeepLink(replacementOffer)
+        assertEquals(
+            WalletIncomingRequest(WalletInteractionKind.Receive, replacementOffer, WalletRequestSource.DeepLink),
+            controller.state.value.replacementRequest,
+        )
+        controller.replaceCurrentRequest()
         resolutionGate.complete(Unit)
         runCurrent()
 
         val state = controller.state.value
         assertEquals(replacementOffer, state.requestDrafts.offerUrl)
-        assertEquals(null, state.offerPreview)
-        assertEquals(WalletOperationState.Idle, state.operation)
+        assertEquals(issuancePreviewHandle, state.offerPreview?.previewHandle)
+        assertEquals(WalletOperationState.OfferPreview, state.operation)
+        assertEquals(2, wallet.resolveOfferCalls)
         assertEquals(0, wallet.receiveCalls)
     }
 
     @Test
-    fun staleOfferResolutionFailureCannotOverwriteIncomingDeepLink() = runTest {
+    fun replacementFailureBelongsToNewestIncomingDeepLink() = runTest {
         val resolutionGate = CompletableDeferred<Unit>()
         val wallet = FakeDemoWallet(
             resolveOfferGate = resolutionGate,
@@ -399,13 +408,14 @@ class WalletDemoControllerTest {
         controller.previewOffer()
         runCurrent()
         controller.handleDeepLink(replacementOffer)
+        controller.replaceCurrentRequest()
         resolutionGate.complete(Unit)
         runCurrent()
 
         val state = controller.state.value
         assertEquals(replacementOffer, state.requestDrafts.offerUrl)
-        assertEquals(WalletOperationState.Idle, state.operation)
-        assertFalse(state.isError)
+        assertTrue(state.operation is WalletOperationState.Failed)
+        assertTrue(state.interaction is WalletInteractionState.Failure)
     }
 
     @Test
@@ -488,7 +498,7 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun presentationDeepLinkDiscardsActiveIssuancePreview() = runTest {
+    fun presentationDeepLinkRequiresExplicitReplacementOfActiveOffer() = runTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         val controller = unlockedControllerWith(wallet, this)
 
@@ -500,10 +510,16 @@ class WalletDemoControllerTest {
         controller.handleDeepLink("openid4vp://verifier.example")
         runCurrent()
 
+        assertEquals(emptyList(), wallet.discardedIssuancePreviewHandles)
+        assertEquals(issuancePreviewHandle, controller.state.value.offerPreview?.previewHandle)
+        assertEquals(WalletInteractionKind.Present, controller.state.value.replacementRequest?.kind)
+
+        controller.replaceCurrentRequest()
+        runCurrent()
+
         assertEquals(listOf(issuancePreviewHandle), wallet.discardedIssuancePreviewHandles)
         assertEquals(null, controller.state.value.offerPreview)
         assertEquals(receiveResetKey + 1, controller.state.value.receiveNavigationResetKey)
-        assertFalse(controller.state.value.requestDrafts.transactionCodeRequired)
         assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
     }
 
@@ -641,7 +657,8 @@ class WalletDemoControllerTest {
             ignorePresentationSubmitCancellation = true,
             presentationPreview = WalletDemoPresentationPreview(
                 previewHandle = presentationPreviewHandle,
-                verifierName = null,
+                responseEncryption = WalletDemoResponseEncryption.NotRequired,
+                verifierMetadata = null,
                 clientId = null,
                 credentialOptions = listOf(
                     WalletDemoPresentationCredentialOption(
@@ -1107,19 +1124,18 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun handleDeepLinkRoutesCredentialOffersAndPresentationRequests() = runTest {
+    fun handleDeepLinkQueuesLatestRequestWhileWalletIsLocked() = runTest {
         val controller = controllerWith(FakeDemoWallet(), this)
         val offerUrl = "openid-credential-offer://example"
         val presentationUrl = "openid4vp://example"
 
         controller.handleDeepLink(offerUrl)
-        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
+        assertEquals(WalletInteractionKind.Receive, controller.state.value.pendingIncomingRequest?.kind)
         controller.handleDeepLink(presentationUrl)
-        assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
+        assertEquals(WalletInteractionKind.Present, controller.state.value.pendingIncomingRequest?.kind)
         controller.handleDeepLink("https://example.com/ignored")
 
-        assertEquals(offerUrl, controller.state.value.requestDrafts.offerUrl)
-        assertEquals(presentationUrl, controller.state.value.requestDrafts.presentationRequestUrl)
+        assertEquals(presentationUrl, controller.state.value.pendingIncomingRequest?.value)
     }
 
     @Test
@@ -1166,39 +1182,35 @@ class WalletDemoControllerTest {
         assertTrue(controller.state.value.presentationCompleted)
 
         val presentationResetKeyBeforeOfferLink = controller.state.value.presentationNavigationResetKey
+        controller.finishInteraction()
         controller.handleDeepLink(offerUrl)
+        runCurrent()
 
         assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
         assertEquals(offerUrl, controller.state.value.requestDrafts.offerUrl)
-        assertEquals(1, controller.state.value.receiveNavigationResetKey)
-        assertEquals(presentationResetKeyBeforeOfferLink + 1, controller.state.value.presentationNavigationResetKey)
         assertEquals(emptyList(), controller.state.value.lastReceivedCredentialIds)
         assertFalse(controller.state.value.receiveCompleted)
-        assertEquals(WalletOperationState.Idle, controller.state.value.operation)
-        assertTrue(controller.state.value.receiveUrlEntryEnabled)
-        assertTrue(controller.state.value.receiveActionEnabled)
-        assertEquals("Wallet ready", controller.state.value.statusText)
+        assertEquals(WalletOperationState.OfferPreview, controller.state.value.operation)
+        assertTrue(controller.state.value.interaction is WalletInteractionState.ReviewingOffer)
 
         val presentationResetKeyBeforePresentationLink = controller.state.value.presentationNavigationResetKey
         val receiveResetKeyBeforePresentationLink = controller.state.value.receiveNavigationResetKey
         controller.handleDeepLink(presentationUrl)
+        assertEquals(WalletInteractionKind.Present, controller.state.value.replacementRequest?.kind)
+        controller.replaceCurrentRequest()
+        runCurrent()
 
         assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
         assertEquals(presentationUrl, controller.state.value.requestDrafts.presentationRequestUrl)
         assertEquals(receiveResetKeyBeforePresentationLink + 1, controller.state.value.receiveNavigationResetKey)
         assertEquals(presentationResetKeyBeforePresentationLink + 1, controller.state.value.presentationNavigationResetKey)
-        assertEquals(null, controller.state.value.presentationPreview)
-        assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
+        assertEquals(presentationPreviewHandle, controller.state.value.presentationPreview?.previewHandle)
         assertFalse(controller.state.value.presentationCompleted)
         assertEquals(WalletOperationState.Idle, controller.state.value.operation)
-        assertTrue(controller.state.value.presentationUrlEntryEnabled)
-        assertTrue(controller.state.value.presentationPreviewActionEnabled)
-        assertEquals("Wallet ready", controller.state.value.statusText)
+        assertTrue(controller.state.value.interaction is WalletInteractionState.ReviewingPresentation)
 
         controller.handleDeepLink(presentationUrl)
-
-        assertEquals(receiveResetKeyBeforePresentationLink + 2, controller.state.value.receiveNavigationResetKey)
-        assertEquals(presentationResetKeyBeforePresentationLink + 2, controller.state.value.presentationNavigationResetKey)
+        assertEquals(presentationUrl, controller.state.value.replacementRequest?.value)
     }
 
     @Test
@@ -1419,6 +1431,69 @@ class WalletDemoControllerTest {
         )
     }
 
+    @Test
+    fun captureValidatesContentAndOffersSafeFlowSwitch() = runTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.startReceiveCapture()
+        assertEquals(
+            WalletInteractionState.Capturing(WalletInteractionKind.Receive),
+            controller.state.value.interaction,
+        )
+
+        controller.submitCapturedRequest("not a wallet request")
+        val invalidCapture = controller.state.value.interaction as WalletInteractionState.Capturing
+        assertTrue(invalidCapture.error?.contains("not a supported") == true)
+
+        controller.showManualEntry()
+        controller.submitCapturedRequest("openid4vp://verifier.example", WalletRequestSource.Manual)
+        assertTrue(controller.state.value.interaction is WalletInteractionState.WrongRequestType)
+
+        controller.switchToDetectedRequest()
+        runCurrent()
+
+        assertEquals(1, wallet.previewPresentationCalls)
+        assertTrue(controller.state.value.interaction is WalletInteractionState.ReviewingPresentation)
+    }
+
+    @Test
+    fun duplicateScannerCallbacksStartOneResolution() = runTest {
+        val resolutionGate = CompletableDeferred<Unit>()
+        val wallet = FakeDemoWallet(resolveOfferGate = resolutionGate)
+        val controller = unlockedControllerWith(wallet, this)
+        val offer = "openid-credential-offer://issuer.example"
+
+        controller.startReceiveCapture()
+        controller.submitCapturedRequest(offer)
+        controller.submitCapturedRequest(offer)
+        runCurrent()
+
+        assertEquals(1, wallet.resolveOfferCalls)
+        resolutionGate.complete(Unit)
+        runCurrent()
+        assertTrue(controller.state.value.interaction is WalletInteractionState.ReviewingOffer)
+    }
+
+    @Test
+    fun incomingRequestSurvivesLockAndResolvesAfterUnlock() = runTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val controller = unlockedControllerWith(wallet, this)
+        val request = "openid4vp://verifier.example"
+
+        controller.lock()
+        controller.handleDeepLink(request)
+        assertEquals(request, controller.state.value.pendingIncomingRequest?.value)
+
+        controller.updatePin("1234")
+        controller.submitPin()
+        runCurrent()
+
+        assertEquals(null, controller.state.value.pendingIncomingRequest)
+        assertEquals(request, controller.state.value.requestDrafts.presentationRequestUrl)
+        assertTrue(controller.state.value.interaction is WalletInteractionState.ReviewingPresentation)
+    }
+
     private fun controllerWith(
         wallet: DemoWallet,
         scope: TestScope,
@@ -1485,6 +1560,7 @@ private fun offerPreview(
         WalletDemoOfferedCredentialMetadata(
             configurationId = "ExampleCredential",
             format = "vc+sd-jwt",
+            scope = "example_credential",
             vct = "ExampleCredential",
             doctype = null,
             display = null,

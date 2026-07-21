@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.did.dids.DidService
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletCredentialClaimMetadata
 import id.walt.wallet2.mobile.MobileWalletIssuancePreviewHandle
@@ -23,14 +24,18 @@ internal class MobileDemoWallet(
     private val mobileWallet: MobileWallet,
     private val warning: String? = null,
 ) : DemoWallet {
-    override suspend fun bootstrap(): WalletDemoBootstrapResult =
-        mobileWallet.bootstrap().let { result ->
+    override suspend fun bootstrap(): WalletDemoBootstrapResult {
+        if ("key" !in DidService.resolverMethods || "jwk" !in DidService.resolverMethods) {
+            DidService.minimalInit()
+        }
+        return mobileWallet.bootstrap().let { result ->
             WalletDemoBootstrapResult(
                 keyId = result.keyId,
                 did = result.did,
                 warning = warning,
             )
         }
+    }
 
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         mobileWallet.credentials().map { credential ->
@@ -247,6 +252,7 @@ private fun MobileWalletOfferedCredentialMetadata.toDemoMetadata(): WalletDemoOf
     WalletDemoOfferedCredentialMetadata(
         configurationId = configurationId,
         format = format,
+        scope = scope,
         vct = vct,
         doctype = doctype,
         display = display?.toDemoMetadataDisplay(),

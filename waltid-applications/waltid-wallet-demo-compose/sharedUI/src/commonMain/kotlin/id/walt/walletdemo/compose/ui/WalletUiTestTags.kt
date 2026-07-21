@@ -3,6 +3,11 @@ package id.walt.walletdemo.compose.ui
 internal object WalletUiTestTags {
     val Status = tag("status")
     val CredentialsEmpty = tag("credentials", "empty")
+    val WalletHome = tag("home")
+    val HomeReceiveButton = tag("home", "receive")
+    val HomePresentButton = tag("home", "present")
+    val RequestCaptureSheet = tag("requestCaptureSheet")
+    val RequestManualInput = tag("requestManualInput")
     val CredentialDetailsScreen = tag("credentialDetailsScreen")
     val DetailsBack = tag("detailsBack")
     val Did = tag("did")

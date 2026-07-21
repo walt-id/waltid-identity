@@ -6,13 +6,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -35,6 +38,7 @@ internal fun OfferReviewSection(
     onTxCodeChange: (String) -> Unit,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
+    showActions: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val focusManager = LocalFocusManager.current
@@ -65,10 +69,15 @@ internal fun OfferReviewSection(
                 title = "Offered credentials",
                 modifier = Modifier.testTag(WalletUiTestTags.OfferCredentialsSection),
             ) {
-                preview.offeredCredentials.forEachIndexed { index, credential ->
-                    if (index > 0) HorizontalDivider()
-                    OfferedCredentialContent(credential)
-                }
+                var page by remember(preview.previewHandle.value) { mutableIntStateOf(0) }
+                OfferedCredentialContent(preview.offeredCredentials[page])
+                CarouselControls(
+                    page = page,
+                    pageCount = preview.offeredCredentials.size,
+                    itemName = "credential",
+                    onPrevious = { page -= 1 },
+                    onNext = { page += 1 },
+                )
             }
         }
 
@@ -116,21 +125,66 @@ internal fun OfferReviewSection(
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = onAccept,
-                enabled = acceptEnabled,
-                modifier = Modifier.testTag(WalletUiTestTags.OfferAcceptButton),
-            ) {
-                Text("Accept")
-            }
-            TextButton(
-                onClick = onDecline,
-                enabled = reviewEnabled,
-                modifier = Modifier.testTag(WalletUiTestTags.OfferDeclineButton),
-            ) {
-                Text("Decline")
-            }
+        if (showActions) {
+            OfferReviewActions(
+                acceptEnabled = acceptEnabled,
+                reviewEnabled = reviewEnabled,
+                onAccept = onAccept,
+                onDecline = onDecline,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun CarouselControls(
+    page: Int,
+    pageCount: Int,
+    itemName: String,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+) {
+    if (pageCount <= 1) return
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        TextButton(onClick = onPrevious, enabled = page > 0) { Text("Previous") }
+        Text(
+            "${page + 1} of $pageCount $itemName options",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(onClick = onNext, enabled = page < pageCount - 1) { Text("Next") }
+    }
+}
+
+@Composable
+internal fun OfferReviewActions(
+    acceptEnabled: Boolean,
+    reviewEnabled: Boolean,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Button(
+            onClick = onAccept,
+            enabled = acceptEnabled,
+            modifier = Modifier
+                .weight(1f)
+                .testTag(WalletUiTestTags.OfferAcceptButton),
+        ) {
+            Text("Add credential")
+        }
+        TextButton(
+            onClick = onDecline,
+            enabled = reviewEnabled,
+            modifier = Modifier.testTag(WalletUiTestTags.OfferDeclineButton),
+        ) {
+            Text("Decline offer")
         }
     }
 }
@@ -149,8 +203,11 @@ private fun OfferedCredentialContent(credential: WalletDemoOfferedCredentialMeta
             supportingText = credential.display?.description,
         )
         val details = listOf(
+            MetadataDetailItem("Configuration ID", credential.configurationId),
             MetadataDetailItem("Format", credential.format),
-            MetadataDetailItem("Type", credential.vct ?: credential.doctype),
+            MetadataDetailItem("Authorization scope", credential.scope),
+            MetadataDetailItem("SD-JWT VC type", credential.vct),
+            MetadataDetailItem("mdoc doctype", credential.doctype),
         ).filter { !it.value.isNullOrBlank() }
         if (details.isNotEmpty()) {
             MetadataRowDivider()

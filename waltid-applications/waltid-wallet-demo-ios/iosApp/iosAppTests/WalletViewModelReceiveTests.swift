@@ -41,6 +41,9 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertEqual(viewModel.receivedCredentials.map(\.id), ["credential-1"])
         XCTAssertEqual(viewModel.txCode, "")
         XCTAssertNil(viewModel.offerPreview?.transactionCode)
+        guard case .success(.receive, .credentialAdded, _) = viewModel.interactionState else {
+            return XCTFail("Expected credential-added terminal state")
+        }
     }
 
     func testChangingOfferClearsTransactionCodeState() async throws {
@@ -57,6 +60,23 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
         XCTAssertNil(viewModel.offerPreview?.transactionCode)
         XCTAssertEqual(viewModel.txCode, "")
+    }
+
+    func testDecliningOfferUsesAnHonestTerminalOutcome() async throws {
+        let client = TransactionCodeWalletClient()
+        let viewModel = WalletViewModel(walletClient: client)
+        try await waitUntil { viewModel.isReady }
+
+        viewModel.offerUrl = "openid-credential-offer://issuer.example"
+        viewModel.previewOffer()
+        try await waitUntil { viewModel.offerPreview != nil }
+        viewModel.declineOffer()
+
+        guard case .success(.receive, .offerDeclined, let message) = viewModel.interactionState else {
+            return XCTFail("Expected offer-declined terminal state")
+        }
+        XCTAssertEqual(message, "Credential offer declined")
+        XCTAssertNil(viewModel.offerPreview)
     }
 
     func testNumericTransactionCodeIsFilteredCappedAndValidated() async throws {
@@ -80,23 +100,28 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertTrue(viewModel.acceptOfferEnabled)
     }
 
-    func testStaleOfferResolutionCannotOverwriteIncomingDeepLink() async throws {
+    func testIncomingDeepLinkRequiresExplicitReplacementOfActiveRequest() async throws {
         let client = TransactionCodeWalletClient(resolveDelayNanoseconds: 100_000_000)
         let viewModel = WalletViewModel(walletClient: client)
         try await waitUntil { viewModel.isReady }
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example/original"
         viewModel.previewOffer()
-        viewModel.handleDeepLink(URL(string: "openid-credential-offer://issuer.example/replacement")!)
-        try await Task.sleep(nanoseconds: 200_000_000)
+        let replacementURL = URL(string: "openid-credential-offer://issuer.example/replacement")!
+        viewModel.handleDeepLink(replacementURL)
 
+        XCTAssertEqual(viewModel.offerUrl, "openid-credential-offer://issuer.example/original")
+        XCTAssertEqual(viewModel.replacementRequest?.url, replacementURL)
+
+        viewModel.replaceCurrentRequest()
+        try await waitUntil { viewModel.offerPreview != nil }
         XCTAssertEqual(viewModel.offerUrl, "openid-credential-offer://issuer.example/replacement")
-        XCTAssertNil(viewModel.offerPreview?.transactionCode)
+        XCTAssertNil(viewModel.replacementRequest)
         XCTAssertFalse(viewModel.isLoading)
         XCTAssertFalse(viewModel.isError)
     }
 
-    func testPresentationDeepLinkDiscardsActiveIssuancePreview() async throws {
+    func testReplacingIssuanceWithPresentationDiscardsPreview() async throws {
         let client = TransactionCodeWalletClient(startsWithCredential: true)
         let viewModel = WalletViewModel(walletClient: client)
         try await waitUntil { viewModel.isReady }
@@ -106,7 +131,13 @@ final class WalletViewModelReceiveTests: XCTestCase {
         try await waitUntil { viewModel.offerPreview != nil }
         let receiveResetKey = viewModel.receiveNavigationResetKey
 
-        viewModel.handleDeepLink(URL(string: "openid4vp://verifier.example")!)
+        let presentationURL = URL(string: "openid4vp://verifier.example")!
+        viewModel.handleDeepLink(presentationURL)
+
+        XCTAssertNotNil(viewModel.offerPreview)
+        XCTAssertEqual(viewModel.replacementRequest?.url, presentationURL)
+
+        viewModel.replaceCurrentRequest()
         try await waitUntilAsync {
             let handles = await client.discardedIssuancePreviewHandles
             return !handles.isEmpty
@@ -116,8 +147,42 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertEqual(discardedHandles, [IssuancePreviewHandle(value: "transaction-code-preview")])
         XCTAssertNil(viewModel.offerPreview)
         XCTAssertEqual(viewModel.receiveNavigationResetKey, receiveResetKey + 1)
-        XCTAssertFalse(viewModel.transactionCodeRequired)
+        XCTAssertTrue(viewModel.txCode.isEmpty)
         XCTAssertEqual(viewModel.selectedTab, .present)
+    }
+
+    func testCaptureRejectsWrongFlowUntilUserSwitches() async throws {
+        let client = TransactionCodeWalletClient(startsWithCredential: true)
+        let viewModel = WalletViewModel(walletClient: client)
+        try await waitUntil { viewModel.isReady }
+
+        viewModel.startReceiveCapture()
+        viewModel.submitCapturedRequest("openid4vp://verifier.example", source: .qr)
+
+        guard case .wrongRequestType(let expected, let request) = viewModel.interactionState else {
+            return XCTFail("Expected a recoverable wrong-flow state")
+        }
+        XCTAssertEqual(expected, .receive)
+        XCTAssertEqual(request.kind, .present)
+
+        viewModel.switchToDetectedRequest()
+        try await waitUntil { viewModel.presentationPreview != nil }
+        let previewCalls = await client.presentationPreviewCalls
+        XCTAssertEqual(previewCalls, 1)
+    }
+
+    func testDuplicateScannerCallbacksResolveOnlyOnce() async throws {
+        let client = TransactionCodeWalletClient(resolveDelayNanoseconds: 100_000_000)
+        let viewModel = WalletViewModel(walletClient: client)
+        try await waitUntil { viewModel.isReady }
+
+        viewModel.startReceiveCapture()
+        viewModel.submitCapturedRequest("openid-credential-offer://issuer.example", source: .qr)
+        viewModel.submitCapturedRequest("openid-credential-offer://issuer.example", source: .qr)
+        try await waitUntil { viewModel.offerPreview != nil }
+
+        let resolveCalls = await client.resolveCalls
+        XCTAssertEqual(resolveCalls, 1)
     }
 
     func testPresentationPreviewIsSingleFlight() async throws {
