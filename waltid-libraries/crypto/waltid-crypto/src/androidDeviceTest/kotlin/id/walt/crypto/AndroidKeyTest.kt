@@ -45,6 +45,17 @@ class AndroidKeyTest {
             assertFailsWith<IllegalStateException>("public platform key should not sign for $type") {
                 publicKey.signRaw("nope".encodeToByteArray())
             }
+
+            val publicKeyRepresentation = publicKey.getPublicKeyRepresentation()
+            when (type) {
+                KeyType.secp256r1 -> assertEquals(65, publicKeyRepresentation.size)
+                KeyType.secp384r1 -> assertEquals(97, publicKeyRepresentation.size)
+                KeyType.secp521r1 -> assertEquals(133, publicKeyRepresentation.size)
+                else -> Unit
+            }
+            if (type != KeyType.RSA) {
+                assertEquals(0x04, publicKeyRepresentation.first().toInt())
+            }
         }
     }
 
