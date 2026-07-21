@@ -17,6 +17,7 @@ import id.walt.issuer2.testsupport.createWalletFlowCredentialOffer
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.issuer2.testsupport.listSessions
 import id.walt.issuer2.testsupport.browser.Issuer2KeycloakAuthorizationDriver
+import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
@@ -319,10 +320,11 @@ class Issuer2AuthorizationCodeWalletFlowTest {
         installIssuer2WithConfigFiles()
         val client = apiClient()
 
+        val walletRedirectUri = "https://wallet.example/callback?dummy1=foo&dummy2=ipsum"
         val authorizationResponse = client.get("/openid4vci/authorize") {
             parameter("response_type", "code")
             parameter("client_id", "issuer2-wallet-test")
-            parameter("redirect_uri", "https://wallet.example/callback")
+            parameter("redirect_uri", walletRedirectUri)
             parameter("state", "offerless-state")
             parameter("scope", scenario.credentialConfigurationId)
         }
@@ -330,6 +332,10 @@ class Issuer2AuthorizationCodeWalletFlowTest {
         assertEquals(HttpStatusCode.Found, authorizationResponse.status, authorizationResponse.bodyAsText())
         val externalLoginRedirect = assertNotNull(authorizationResponse.headers[HttpHeaders.Location])
         assertTrue(externalLoginRedirect.contains("/openid4vci/external_login/"))
+        val authorizationRequestParameters = externalLoginRedirect
+            .substringAfter("/external_login/")
+            .decodeExternalLoginAuthorizationParameters()
+        assertEquals(listOf(walletRedirectUri), authorizationRequestParameters["redirect_uri"])
 
         val authorizationSession = client.listSessions().single { session ->
             session.profileId == scenario.profileId &&
