@@ -4,6 +4,7 @@ import id.walt.issuer2.controller.openapi.OpenId4VciRoutesDocs
 import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
+import id.walt.openid4vci.dpop.DPoPConstants
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.openid4vci.responses.credential.CredentialResponseBody
@@ -157,17 +158,21 @@ class OpenId4VciController(
             }
 
             post("credential", OpenId4VciRoutesDocs.credential()) {
-                val authHeader = call.request.headers[HttpHeaders.Authorization]
-                    ?: throw IllegalArgumentException("No Authorization header found")
-                val accessToken = when {
-                    authHeader.startsWith("Bearer ", ignoreCase = true) -> authHeader.substring(7)
-                    else -> throw IllegalArgumentException("Authorization header must start with Bearer")
-                }
+                val authorizationHeaders = call.request.headers.getAll(HttpHeaders.Authorization).orEmpty()
+                val dpopProofHeaderValues = call.request.headers.getAll(DPoPConstants.HEADER_NAME).orEmpty()
                 val response =
                     if (call.isEncryptedCredentialRequest()) {
-                        protocolService.processCredentialRequest(accessToken, call.receiveText())
+                        protocolService.processCredentialRequest(
+                            authorizationHeaders = authorizationHeaders,
+                            dpopProofHeaderValues = dpopProofHeaderValues,
+                            encryptedCredentialRequest = call.receiveText(),
+                        )
                     } else {
-                        protocolService.processCredentialRequest(accessToken, call.receive<JsonObject>())
+                        protocolService.processCredentialRequest(
+                            authorizationHeaders = authorizationHeaders,
+                            dpopProofHeaderValues = dpopProofHeaderValues,
+                            parameters = call.receive<JsonObject>(),
+                        )
                     }
                 call.respondCredentialResponse(response)
             }

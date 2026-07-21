@@ -19,6 +19,7 @@ import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.core.OAuth2Provider
@@ -36,7 +37,8 @@ import id.walt.openid4vci.responses.par.PushedAuthorizationResponseHttp
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
-import id.walt.openid4vci.tokens.access.AccessTokenContext
+import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
+import id.walt.openid4vci.tokens.access.parseAccessTokenAuthorization
 import id.walt.mdoc.objects.mso.Status as MdocStatus
 import id.walt.mdoc.objects.mso.Status.StatusListInfo as MdocStatusListInfo
 import io.ktor.http.encodeURLParameter
@@ -249,29 +251,54 @@ class OpenId4VciProtocolService(
         return oauth2Provider.writeAccessTokenResponse(updatedAccessTokenRequest, response)
     }
 
-    suspend fun processCredentialRequest(accessToken: String, parameters: JsonObject): CredentialResponseHttp {
+    suspend fun processCredentialRequest(
+        authorizationHeaders: List<String>,
+        dpopProofHeaderValues: List<String>,
+        parameters: JsonObject,
+    ): CredentialResponseHttp {
+        val authorization = parseCredentialAuthorization(authorizationHeaders)
+            ?: return invalidCredentialAuthorization()
         val parameterMap = parameters.toParametersMap()
-        return processCredentialRequest(accessToken) {
+        return processCredentialRequest(authorization.token) {
             oauth2Provider.createCredentialRequest(
                 parameters = parameterMap,
-                accessTokenContext = AccessTokenContext(
-                    token = accessToken,
+                accessTokenContext = CredentialAccessTokenContext(
+                    authorization = authorization,
                     expectedIssuer = metadataService.issuerBaseUrl(),
+                    dpopProofHeaderValues = dpopProofHeaderValues,
+                    credentialEndpointUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
                 ),
             )
         }
     }
 
-    suspend fun processCredentialRequest(accessToken: String, encryptedCredentialRequest: String): CredentialResponseHttp =
-        processCredentialRequest(accessToken) {
+    suspend fun processCredentialRequest(
+        authorizationHeaders: List<String>,
+        dpopProofHeaderValues: List<String>,
+        encryptedCredentialRequest: String,
+    ): CredentialResponseHttp {
+        val authorization = parseCredentialAuthorization(authorizationHeaders)
+            ?: return invalidCredentialAuthorization()
+        return processCredentialRequest(authorization.token) {
             oauth2Provider.createCredentialRequest(
                 encryptedCredentialRequest = encryptedCredentialRequest,
-                accessTokenContext = AccessTokenContext(
-                    token = accessToken,
+                accessTokenContext = CredentialAccessTokenContext(
+                    authorization = authorization,
                     expectedIssuer = metadataService.issuerBaseUrl(),
+                    dpopProofHeaderValues = dpopProofHeaderValues,
+                    credentialEndpointUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
                 ),
             )
         }
+    }
+
+    private fun parseCredentialAuthorization(authorizationHeaders: List<String>) =
+        runCatching { parseAccessTokenAuthorization(authorizationHeaders) }.getOrNull()
+
+    private fun invalidCredentialAuthorization(): CredentialResponseHttp =
+        oauth2Provider.writeCredentialError(
+            OAuthError(CredentialErrorCodes.INVALID_TOKEN, "Credential request has invalid authorization credentials"),
+        )
 
     private suspend fun processCredentialRequest(
         accessToken: String,
