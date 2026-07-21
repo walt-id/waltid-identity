@@ -418,6 +418,19 @@ class WalletIssuanceSessionService(
         return if (removed) WalletIssuanceOutcome.Cancelled(sessionId) else invalidSession(sessionId)
     }
 
+    /** Invalidates and removes every active and deferred issuance continuation. */
+    suspend fun clearSessions() {
+        withContext(NonCancellable) {
+            mutex.withLock {
+                sessions.clear()
+                deferred.clear()
+            }
+            sessionStore?.let { store ->
+                store.list().forEach { store.remove(it.id) }
+            }
+        }
+    }
+
     /** Polls one deferred result while preserving its access material inside the engine. */
     suspend fun resumeDeferred(deferredCredentialId: String): WalletIssuanceOutcome {
         val record = try {
@@ -1136,9 +1149,10 @@ class WalletIssuanceSessionService(
         try {
             persistActive(active)
         } catch (error: CancellationException) {
+            invalidateActiveSessionBestEffort(sessionId)
             throw error
         } catch (error: Exception) {
-            mutex.withLock { active.state = expected }
+            invalidateActiveSessionBestEffort(sessionId)
             throw IssuanceStageException(WalletIssuanceErrorCode.STORAGE, error)
         }
         return active
@@ -1146,12 +1160,17 @@ class WalletIssuanceSessionService(
 
     private suspend fun loadActive(sessionId: String): ActiveSession? {
         mutex.withLock { sessions[sessionId] }?.let { return it }
-        val record = sessionStore?.get(activeRecordId(sessionId)) ?: return null
+        val store = sessionStore ?: return null
+        val record = store.get(activeRecordId(sessionId)) ?: return null
         require(record.kind == WalletIssuanceSessionRecordKind.ACTIVE_SESSION && record.sessionId == sessionId) {
             "Stored issuance session binding is invalid"
         }
         val persisted = json.decodeFromString<PersistedActiveSession>(record.payload)
         require(persisted.public.id == sessionId) { "Stored issuance session identifier is invalid" }
+        if (persisted.state == SessionState.PROCESSING) {
+            invalidateActiveSessionBestEffort(sessionId)
+            return null
+        }
 
         val offer = json.decodeFromString<CredentialOffer>(persisted.offer)
         val issuerMetadata = json.decodeFromString<CredentialIssuerMetadata>(persisted.issuerMetadata)
@@ -1383,6 +1402,17 @@ class WalletIssuanceSessionService(
     private suspend fun removeSession(sessionId: String) {
         mutex.withLock { sessions.remove(sessionId) }
         removePersistedActive(sessionId)
+    }
+
+    private suspend fun invalidateActiveSessionBestEffort(sessionId: String) {
+        withContext(NonCancellable) {
+            mutex.withLock { sessions.remove(sessionId) }
+            try {
+                removePersistedActive(sessionId)
+            } catch (_: Exception) {
+                // A retained PROCESSING marker is rejected when the session is next loaded.
+            }
+        }
     }
 
     private suspend fun restoreSession(active: ActiveSession, state: SessionState) {
