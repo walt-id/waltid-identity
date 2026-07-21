@@ -19,6 +19,7 @@ dependencies {
 
     // Exposed/SQL persistence — optional, plugged in via OSSWallet2Service.walletStore
     api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-server"))
+    runtimeOnly(identityLibs.postgresql)
 
     // Service commons (ServiceMain, ServiceFeatureCatalog, WaltConfig, etc.)
     api(project(":waltid-services:waltid-service-commons"))

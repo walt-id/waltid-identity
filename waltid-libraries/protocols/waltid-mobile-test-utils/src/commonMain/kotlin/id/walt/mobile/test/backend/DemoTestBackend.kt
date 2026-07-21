@@ -151,6 +151,14 @@ object DemoTestBackend {
         return createVerifierSession(scenario.verifierCredentialQuery, encryptedResponse)
     }
 
+    suspend fun createResponseBoundVerifierSession(scenario: CredentialScenario): VerifierSession {
+        return createVerifierSession(
+            credentialQuery = scenario.verifierCredentialQuery,
+            transactionData = emptyList(),
+            bindClientIdToResponseUri = true,
+        )
+    }
+
     suspend fun createVerifierSession(
         credentialQuery: JsonObject,
         encryptedResponse: Boolean = false,
@@ -199,15 +207,18 @@ object DemoTestBackend {
     private suspend fun createVerifierSession(
         credentialQuery: JsonObject,
         transactionData: List<JsonObject>,
-        encryptedResponse: Boolean,
+        encryptedResponse: Boolean = false,
+        bindClientIdToResponseUri: Boolean = false,
     ): VerifierSession {
-        val sessionId = Uuid.random().toString()
-        val responseUri = "$VERIFIER_BASE_URL/verification-session/$sessionId/response"
+        val requestedSessionId = Uuid.random().toString().takeIf { bindClientIdToResponseUri }
         val payload = buildJsonObject {
             put("flow_type", "cross_device")
             putJsonObject("core_flow") {
-                put("sessionId", sessionId)
-                put("clientId", "redirect_uri:$responseUri")
+                requestedSessionId?.let { sessionId ->
+                    val responseUri = "$VERIFIER_BASE_URL/verification-session/$sessionId/response"
+                    put("sessionId", sessionId)
+                    put("clientId", "redirect_uri:$responseUri")
+                }
                 if (encryptedResponse) put("encrypted_response", true)
                 putJsonObject("dcql_query") {
                     putJsonArray("credentials") {
@@ -228,19 +239,17 @@ object DemoTestBackend {
             url = "$VERIFIER_BASE_URL/verification-session/create",
             body = payload,
         )
-        val responseSessionId = response["sessionId"]?.jsonPrimitive?.contentOrNull
+        val sessionId = response["sessionId"]?.jsonPrimitive?.contentOrNull
             ?: error("Missing sessionId in public demo verifier2 response: $response")
-        check(responseSessionId == sessionId) {
-            "Public demo verifier2 changed the requested session ID: requested=$sessionId, response=$responseSessionId"
+        check(requestedSessionId == null || requestedSessionId == sessionId) {
+            "Public demo verifier2 did not preserve the requested session ID"
         }
-        // This fixture creates an unsigned session. Use the fully encoded Authorization Request;
-        // the bootstrap request_uri endpoint is a Request Object endpoint and must not return the
-        // public demo's unsigned application/json response as though it were a JAR JWT.
-        val authorizationRequestUri = response["fullAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
+        val authorizationRequestUri = response["bootstrapAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
             ?: response["authorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
+            ?: response["fullAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
             ?: error("Missing inline authorization request URL in public demo verifier2 response: $response")
 
-        return VerifierSession(responseSessionId, authorizationRequestUri)
+        return VerifierSession(sessionId, authorizationRequestUri)
     }
 
     private fun paymentAuthorizationTransactionData(
@@ -293,6 +302,39 @@ object DemoTestBackend {
                     "SUCCESSFUL" -> return
                     "FAILED", "ERROR", "EXPIRED" -> error("public demo verifier2 reported $status for session $sessionId: $body")
                 }
+            }
+
+            delay(2_000.milliseconds)
+        }
+    }
+
+    suspend fun waitForVerifierFailure(
+        sessionId: String,
+        expectedError: String,
+        timeoutMs: Long = 90_000,
+    ): JsonObject {
+        val mark = TimeSource.Monotonic.markNow()
+        while (true) {
+            if (mark.elapsedNow() > timeoutMs.milliseconds) {
+                error("public demo verifier2 did not report $expectedError within ${timeoutMs}ms for session $sessionId")
+            }
+
+            val info = verifierSessionInfo(sessionId)
+            val status = info["status"]?.jsonPrimitive?.contentOrNull
+                ?: info["session"]?.jsonObject?.get("status")?.jsonPrimitive?.contentOrNull
+            when (status?.uppercase()) {
+                "FAILED" -> {
+                    val failure = info["failure"]?.jsonObject
+                        ?: error("public demo verifier2 omitted failure details for session $sessionId: $info")
+                    val actualError = failure["error"]?.jsonPrimitive?.contentOrNull
+                    check(actualError == expectedError) {
+                        "public demo verifier2 reported $actualError instead of $expectedError for session $sessionId: $info"
+                    }
+                    return info
+                }
+
+                "SUCCESSFUL", "ERROR", "EXPIRED" ->
+                    error("public demo verifier2 reported $status instead of $expectedError for session $sessionId: $info")
             }
 
             delay(2_000.milliseconds)

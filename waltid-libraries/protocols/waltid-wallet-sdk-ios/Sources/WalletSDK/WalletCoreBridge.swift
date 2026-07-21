@@ -10,13 +10,18 @@ protocol WalletCoreBridge: Sendable {
     func credentials() async throws -> [Credential]
     func deleteLocalData() async throws
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
-    func previewPresentation(request: URL) async throws -> PresentationPreview
+    func previewPresentation(request: URL) async throws -> PresentationPreviewResult
     func submitPresentation(
         request: URL,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         did: String?,
         runPolicies: Bool?
+    ) async throws -> PresentationResult
+    func rejectPresentation(
+        request: URL,
+        error: PresentationErrorCode?,
+        errorDescription: String?
     ) async throws -> PresentationResult
 }
 
@@ -63,7 +68,7 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         throw unavailableError()
     }
 
-    func previewPresentation(request: URL) async throws -> PresentationPreview {
+    func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         throw unavailableError()
     }
 
@@ -73,6 +78,14 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         did: String?,
         runPolicies: Bool?
+    ) async throws -> PresentationResult {
+        throw unavailableError()
+    }
+
+    func rejectPresentation(
+        request: URL,
+        error: PresentationErrorCode?,
+        errorDescription: String?
     ) async throws -> PresentationResult {
         throw unavailableError()
     }

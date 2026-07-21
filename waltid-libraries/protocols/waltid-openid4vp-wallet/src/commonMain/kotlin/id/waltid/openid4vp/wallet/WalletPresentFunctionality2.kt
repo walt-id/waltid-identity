@@ -202,7 +202,7 @@ object WalletPresentFunctionality2 {
         error: String,
         errorDescription: String? = null,
     ): Result<WalletPresentResult> = runCatching {
-        val responseMode = authorizationRequest.responseMode ?: inferResponseMode(authorizationRequest)
+        val responseMode = authorizationRequest.walletResponseMode()
         val errorParameters = buildErrorResponseParameters(authorizationRequest, error, errorDescription)
         val redirectUri = authorizationRequest.redirectUri
         val responseUri = authorizationRequest.responseUri
@@ -241,25 +241,31 @@ object WalletPresentFunctionality2 {
         }
     }
 
-    private fun inferResponseMode(authorizationRequest: AuthorizationRequest): OpenID4VPResponseMode? {
-        val responseType = authorizationRequest.responseType?.responseType
-        return when {
-            responseType == null -> null
-            "vp_token" in responseType && "code" !in responseType -> OpenID4VPResponseMode.FRAGMENT
-            "code" in responseType -> OpenID4VPResponseMode.QUERY
-            else -> null
-        }
-    }
-
     private fun buildErrorResponseParameters(
         authorizationRequest: AuthorizationRequest,
         error: String,
         errorDescription: String?,
-    ): Parameters = ParametersBuilder().apply {
-        append("error", error)
-        errorDescription?.let { append("error_description", it) }
-        authorizationRequest.state?.let { append("state", it) }
-    }.build()
+    ): Parameters {
+        requireOAuthErrorValue("error", error)
+        errorDescription?.let { requireOAuthErrorValue("error_description", it) }
+
+        return ParametersBuilder().apply {
+            append("error", error)
+            errorDescription?.let { append("error_description", it) }
+            authorizationRequest.state?.let { append("state", it) }
+        }.build()
+    }
+
+    private fun requireOAuthErrorValue(parameter: String, value: String) {
+        require(value.isNotEmpty() && value.all(::isOAuthErrorCharacter)) {
+            "$parameter must contain only RFC 6749 error-response characters"
+        }
+    }
+
+    private fun isOAuthErrorCharacter(character: Char): Boolean =
+        character.code in 0x20..0x21 ||
+            character.code in 0x23..0x5B ||
+            character.code in 0x5D..0x7E
 
     private suspend fun postFormResponse(
         responseUri: String,
@@ -637,61 +643,60 @@ object WalletPresentFunctionality2 {
         log.trace { "Wallet presentation will use key $holderKey, and did $holderDid" }
 
         // Step 1: Resolve AuthorizationRequest.
-        val authorizationRequest: AuthorizationRequest = resolvedAuthorizationRequest
-            ?.authorizationRequest
-            ?: try {
-                resolveAuthorizationRequestObject(
-                    presentationRequestUrl,
-                    unsignedRequestObjectPolicy,
-                    expectedRequestObjectAudience,
-                    x509TrustPolicy,
-                )
-                    .authorizationRequest
-                    .also(::validateAuthorizationRequest)
-            } catch (error: AuthorizationRequestResolver.SignedAuthorizationRequestValidationException) {
-                legacyFallbackResult(presentationRequestUrl, legacyFallbackCallback, error)
-                    ?.let { return Result.success(it) }
-                throw error
-            } catch (error: IllegalArgumentException) {
-                val fallbackResponse = runCatching { legacyFallbackCallback?.invoke(presentationRequestUrl) }
-                    .getOrNull()
-                    ?.getOrNull()
-                if (fallbackResponse != null) {
-                    return Result.success(
-                        WalletPresentResult(
-                            transmissionSuccess = true,
-                            verifierResponse = fallbackResponse,
-                        )
+        val resolvedRequest = resolvedAuthorizationRequest ?: try {
+            resolveAuthorizationRequestObject(
+                presentationRequestUrl,
+                unsignedRequestObjectPolicy,
+                expectedRequestObjectAudience,
+                x509TrustPolicy,
+            )
+        } catch (error: AuthorizationRequestResolver.SignedAuthorizationRequestValidationException) {
+            legacyFallbackResult(presentationRequestUrl, legacyFallbackCallback, error)
+                ?.let { return Result.success(it) }
+            throw error
+        } catch (error: IllegalArgumentException) {
+            val fallbackResponse = runCatching { legacyFallbackCallback?.invoke(presentationRequestUrl) }
+                .getOrNull()
+                ?.getOrNull()
+            if (fallbackResponse != null) {
+                return Result.success(
+                    WalletPresentResult(
+                        transmissionSuccess = true,
+                        verifierResponse = fallbackResponse,
                     )
-                }
-                throw error
+                )
             }
+            throw error
+        }
+        val authorizationRequest = resolvedRequest.authorizationRequest
 
         log.trace { "Wallet will try to present to AuthorizationRequest: $authorizationRequest" }
 
-        validateRequestTransactionData(
-            transactionData = authorizationRequest.transactionData,
-            typeRegistry = transactionDataTypeRegistry,
-            credentialQueriesById = authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
+        val validation = PresentationRequestValidator.validate(
+            resolvedRequest = resolvedRequest,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+            formatCapabilities = WalletPresentationFormatRegistry.capabilitiesFromKeyTypes(setOf(holderKey.keyType)),
         )
-        if (authorizationRequest.redirectUri != null && authorizationRequest.responseUri != null) {
-            throw IllegalArgumentException(
-                "redirect_uri and response_uri are mutually exclusive; both cannot be present in the same request"
-            )
+        if (validation is PresentationRequestValidationResult.Invalid) {
+            return walletRejectHandling(authorizationRequest, validation.error.code)
         }
-        require(
-            authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN ||
-                    authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN
-        ) {
-            "Unsupported response_type '${authorizationRequest.responseType}': " +
-                    "only 'vp_token' and 'vp_token id_token' are supported."
-        }
+        val validatedTransactionData = (validation as PresentationRequestValidationResult.Valid).transactionData
 
         // Step 2: Select credentials via the caller-supplied lambda.
-        val credentials = selectCredentialsForQuery(
-            authorizationRequest.dcqlQuery ?: throw IllegalArgumentException("Missing dcql_query for AuthorizationRequest"),
-        )
+        val query = requireNotNull(authorizationRequest.dcqlQuery)
+        val credentials = selectCredentialsForQuery(query)
         log.trace { "Auto-selected credential count: ${credentials.mapValues { it.value.count() }}" }
+        val availabilityError = PresentationRequestValidator.validateTransactionDataCredentialAvailability(
+            transactionData = validatedTransactionData,
+            availableCredentialQueryIds = credentials.filterValues { it.isNotEmpty() }.keys,
+        ) ?: PresentationRequestValidator.validateCredentialAvailability(
+            query = query,
+            availableCredentialQueryIds = credentials.filterValues { it.isNotEmpty() }.keys,
+        )
+        availabilityError?.let { error ->
+            PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedRequest)
+            return walletRejectHandling(authorizationRequest, error.code)
+        }
 
         // Apply holder policies.
         if (holderPoliciesToRun != null) {

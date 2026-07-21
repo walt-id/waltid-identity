@@ -2,11 +2,11 @@ package id.waltid.openid4vp.wallet
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
+import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
@@ -19,6 +19,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalSerializationApi::class)
 class WalletPresentFunctionality2Test {
@@ -33,6 +34,7 @@ class WalletPresentFunctionality2Test {
             ),
             resolvedAuthorizationRequest = ResolvedAuthorizationRequest.Plain(
                 AuthorizationRequest(
+                    clientId = "redirect_uri:https://wallet.example/callback",
                     responseMode = OpenID4VPResponseMode.FRAGMENT,
                     redirectUri = "https://wallet.example/callback",
                     nonce = "nonce-from-preview",
@@ -45,7 +47,46 @@ class WalletPresentFunctionality2Test {
             transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
         ).getOrThrow()
 
-        assertEquals("https://wallet.example/callback#vp_token=%7B%7D", result.getUrl)
+        assertEquals("https://wallet.example/callback#error=invalid_request", result.getUrl)
+    }
+
+    @Test
+    fun postSelectionRejectionRequiresBoundPlainResponseDestination() = runTest {
+        var credentialsSelected = false
+        val failure = assertFailsWith<IllegalArgumentException> {
+            WalletPresentFunctionality2.walletPresentHandling(
+                holderKey = JWKKey.generate(KeyType.Ed25519),
+                holderDid = "did:example:holder",
+                presentationRequestUrl = Url("openid4vp://authorize"),
+                resolvedAuthorizationRequest = ResolvedAuthorizationRequest.Plain(
+                    AuthorizationRequest(
+                        clientId = "unbound-client",
+                        responseMode = OpenID4VPResponseMode.FRAGMENT,
+                        redirectUri = "https://attacker.example/collect",
+                        nonce = "nonce-from-preview",
+                        dcqlQuery = DcqlQuery(
+                            credentials = listOf(
+                                CredentialQuery(
+                                    id = "pid",
+                                    format = CredentialFormat.DC_SD_JWT,
+                                    meta = NoMeta,
+                                )
+                            )
+                        ),
+                    )
+                ),
+                selectCredentialsForQuery = {
+                    credentialsSelected = true
+                    emptyMap()
+                },
+                holderPoliciesToRun = null,
+                runPolicies = null,
+                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+            ).getOrThrow()
+        }
+
+        assertTrue(credentialsSelected)
+        assertTrue(failure.message.orEmpty().contains("must bind client_id"))
     }
 
     @Test
