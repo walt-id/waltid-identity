@@ -589,10 +589,23 @@ class DefaultOAuth2Provider(
 
     override fun writeCredentialError(error: OAuthError): CredentialResponseHttp =
         CredentialResponseHttp(
-            status = 400,
+            status = when (error.error) {
+                CredentialErrorCodes.INVALID_TOKEN,
+                OAuthErrorCodes.INVALID_DPOP_PROOF -> 401
+
+                else -> 400
+            },
             payload = buildMap {
                 put("error", JsonPrimitive(error.error))
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
+            },
+            headers = when (error.error) {
+                CredentialErrorCodes.INVALID_TOKEN,
+                OAuthErrorCodes.INVALID_DPOP_PROOF -> mapOf(
+                    WWW_AUTHENTICATE_HEADER to dpopAuthenticationChallenge(error),
+                )
+
+                else -> emptyMap()
             },
         )
 
