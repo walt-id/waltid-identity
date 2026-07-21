@@ -47,14 +47,11 @@ export VERIFIER_NGROK_URL="https://YOUR-NGROK.ngrok-free.app"
 
 ## Test Status Summary
 
-### VCI Issuer (handover snapshot, 2026-07-14)
+### VCI Issuer
 
-The active issuer2 handover profile is the base issuer conformance plan:
-
-- Test plan: `oid4vci-1_0-issuer-test-plan`
-- Variant: `sender_constrain=dpop`, `client_auth_type=client_attestation`, `vci_authorization_code_flow_variant=wallet_initiated`, `vci_grant_type=pre-authorized_code`, `credential_format=sd_jwt_vc`, `authorization_request_type=simple`, `fapi_request_method=unsigned`, `fapi_profile=vci`, `fapi_response_mode=plain_response`
-- Config: issuer URL, credential configuration ID, client-attestation issuer, attester JWKS, DPoP client JWKS, and issuer2-generated credential offers delivered per issuer-flow module
-- Status: observed passing in the local handover environment. Re-run before treating this as a CI or release signal.
+The issuer2 runner targets `oid4vci-1_0-issuer-test-plan` through the generated
+VCI matrix. It supports selecting individual variants or filtering matrix axes,
+and records module results under `build/reports/openid4vci-issuer-matrix`.
 
 Details: [docs/VCI-ISSUER.md](docs/VCI-ISSUER.md)
 
@@ -87,7 +84,7 @@ Details: [docs/VCI-ISSUER.md](docs/VCI-ISSUER.md)
 
 | Interface | Baseline | HAIP | Key Difference |
 |-----------|----------|------|----------------|
-| **VCI Issuer** | `pre-authorized_code` + `client_attestation` | `authorization_code` + `private_key_jwt` | Grant/auth profile |
+| **VCI Issuer** | Base `vci` issuer matrix | Not included | Matrix axes select grant, authentication, and credential format |
 | **VP Verifier** | `x509_san_dns` | `x509_hash` | Client ID scheme |
 
 **Baseline:** Automated functional testing
@@ -204,8 +201,6 @@ VACJ445Tx9FAuQIhAN6yqTj1u30N51FsULyrdbwXRgBRo7CgE1CZC9ejeD1E
 }
 ```
 
-The current handover intentionally preserves the variant values that passed locally, including `wallet_initiated` and `pre-authorized_code`. Do not change them to alternate conformance-suite enum spellings without re-running the same issuer2 test plan.
-
 Do not include local runtime artifacts such as `mongo/` or a locally mutated `conformance-truststore.jks` in a clean handover commit.
 
 ## VCI Issuer Variant Matrix
@@ -229,7 +224,7 @@ The generated matrix is constrained to the combinations accepted by the base iss
 - `pre_authorization_code` is generated only with `issuer_initiated`
 - `openid` and `fapi_response_mode` are not generated as matrix axes because the conformance suite marks them as not applicable for `fapi_profile=vci`
 
-The matrix uses the conformance-suite enum spelling `pre_authorization_code`. `OPENID4VCI_CONFORMANCE_MATRIX=legacy` keeps the previous handover variant string `pre-authorized_code`.
+The matrix uses the conformance-suite enum spelling `pre_authorization_code`.
 
 The runner records unsupported or not-yet-wired combinations instead of hiding them:
 
@@ -279,15 +274,14 @@ export OPENID4VCI_CONFORMANCE_MODULES="oid4vci-1_0-issuer-happy-flow,oid4vci-1_0
 # Static transaction code for pre-authorized happy-flow modules
 export OPENID4VCI_CONFORMANCE_STATIC_TX_CODE="493536"
 
-# Make Gradle fail when variants are blocked, suite-invalid, or failed
-export OPENID4VCI_CONFORMANCE_STRICT=true
+# Executed matrices fail by default unless every selected variant passes.
+# Explicitly disable strict mode only for exploratory runs.
+export OPENID4VCI_CONFORMANCE_STRICT=false
 
 # Override report location and test timeout
 export OPENID4VCI_CONFORMANCE_REPORT_DIR="$PWD/build/issuer-conformance"
 export OPENID4VCI_CONFORMANCE_TIMEOUT_MINUTES=480
 
-# Previous handover profile, including the old HAIP attempt
-export OPENID4VCI_CONFORMANCE_MATRIX=legacy
 ```
 
 For progressive conformance work, run the full matrix in exploration mode first, review `summary.md`, then cherry-pick one blocked or failed variant family with the filter variables while adding issuer2 support.
