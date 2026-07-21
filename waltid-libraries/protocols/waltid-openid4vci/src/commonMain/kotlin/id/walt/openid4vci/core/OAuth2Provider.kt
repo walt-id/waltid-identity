@@ -103,6 +103,7 @@ interface OAuth2Provider {
         parameters: Map<String, List<String>>,
         headers: Map<String, List<String>>,
         session: Session? = null,
+        tokenEndpointUri: String? = null,
     ): AccessTokenRequestResult
 
     suspend fun createAccessTokenResponse(

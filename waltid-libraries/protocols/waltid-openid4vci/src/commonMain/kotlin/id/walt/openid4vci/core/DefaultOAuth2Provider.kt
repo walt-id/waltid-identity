@@ -10,6 +10,8 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationResult
 import id.walt.openid4vci.clientauth.ClientAuthenticationService
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolution
 import id.walt.openid4vci.clientauth.isAnonymousPreAuthorizedCodeTokenRequest
+import id.walt.openid4vci.dpop.DPoPConstants
+import id.walt.openid4vci.dpop.DPoPProofVerificationRequest
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
@@ -42,9 +44,12 @@ import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.crypto.keys.Key
 import id.walt.mdoc.objects.mso.Status
-import id.walt.openid4vci.tokens.access.AccessTokenContext
+import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
+import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
+import id.walt.openid4vci.tokens.access.dpopJwkThumbprint
 import id.walt.sdjwt.SDMap
 import id.walt.x509.CertificateDer
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -272,7 +277,8 @@ class DefaultOAuth2Provider(
     override suspend fun createAccessTokenRequest(
         parameters: Map<String, List<String>>,
         headers: Map<String, List<String>>,
-        session: Session?
+        session: Session?,
+        tokenEndpointUri: String?,
     ): AccessTokenRequestResult {
         if (config.clientAuthenticationServiceResolver == null &&
             isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers) &&
@@ -311,8 +317,59 @@ class DefaultOAuth2Provider(
             authenticatedClient = authenticatedClient,
         )
 
-        return validationResult
+        return when (validationResult) {
+            is AccessTokenRequestResult.Success -> bindTokenRequestToDPoP(
+                result = validationResult,
+                headers = headers,
+                tokenEndpointUri = tokenEndpointUri,
+            )
+
+            is AccessTokenRequestResult.Failure -> validationResult
+        }
     }
+
+    private suspend fun bindTokenRequestToDPoP(
+        result: AccessTokenRequestResult.Success,
+        headers: Map<String, List<String>>,
+        tokenEndpointUri: String?,
+    ): AccessTokenRequestResult {
+        val proofHeaders = headers.entries
+            .asSequence()
+            .filter { (name, _) -> name.equals(DPoPConstants.HEADER_NAME, ignoreCase = true) }
+            .flatMap { (_, values) -> values.asSequence() }
+            .toList()
+        if (proofHeaders.isEmpty()) return result
+        if (proofHeaders.size != 1 || proofHeaders.single().isBlank()) {
+            return invalidDPoPTokenRequest("Token request must contain exactly one DPoP proof")
+        }
+
+        val verifier = config.dpopProofVerifier
+            ?: return invalidDPoPTokenRequest("DPoP proof verification is not configured")
+        val targetUri = tokenEndpointUri?.takeIf { it.isNotBlank() }
+            ?: return invalidDPoPTokenRequest("Token endpoint URI is required for DPoP verification")
+
+        return try {
+            val verified = verifier.verify(
+                DPoPProofVerificationRequest(
+                    proofJwt = proofHeaders.single(),
+                    method = HTTP_POST,
+                    targetUri = targetUri,
+                ),
+            )
+            AccessTokenRequestResult.Success(
+                result.request.withDpopJwkThumbprint(verified.jwkThumbprint),
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            invalidDPoPTokenRequest(e.message ?: "Invalid DPoP proof")
+        }
+    }
+
+    private fun invalidDPoPTokenRequest(description: String): AccessTokenRequestResult.Failure =
+        AccessTokenRequestResult.Failure(
+            OAuthError(OAuthErrorCodes.INVALID_DPOP_PROOF, description),
+        )
 
     private fun canSkipTokenClientAuthentication(
         parameters: Map<String, List<String>>,
@@ -433,6 +490,8 @@ class DefaultOAuth2Provider(
     }
 
     private companion object {
+        const val HTTP_POST = "POST"
+        const val WWW_AUTHENTICATE_HEADER = "WWW-Authenticate"
         val TOKEN_RESPONSE_HEADERS = mapOf(
             "Cache-Control" to "no-store",
             "Pragma" to "no-cache",
