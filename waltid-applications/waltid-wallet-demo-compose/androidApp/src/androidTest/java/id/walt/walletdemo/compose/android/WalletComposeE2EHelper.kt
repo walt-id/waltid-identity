@@ -185,21 +185,32 @@ internal object WalletComposeE2EHelper {
             fail("$message. Claim row $tag not found.\n${visibleUiSnapshot(device)}")
             return
         }
-        val visibleTexts = node.flatten()
-            .mapNotNull { it.text?.trim()?.takeIf(String::isNotEmpty) }
-        val missingValues = expectedValues.filter { expected -> expected !in visibleTexts }
-        if (label !in visibleTexts || missingValues.isNotEmpty()) {
-            fail(
-                """
-                    $message.
-                    claim=$tag
-                    expectedLabel=$label
-                    expectedValues=$expectedValues
-                    visibleTexts=$visibleTexts
-                    ${visibleUiSnapshot(device)}
-                """.trimIndent()
-            )
+        var visibleTexts = node.visibleTexts()
+        fun expectedContentIsVisible(): Boolean =
+            label in visibleTexts && expectedValues.all { expected -> expected in visibleTexts }
+
+        if (expectedContentIsVisible()) return
+        repeat(6) {
+            device.scrollDown()
+            findVisibleResource(device, tag)?.let { visibleTexts = it.visibleTexts() }
+            if (expectedContentIsVisible()) return
         }
+        repeat(12) {
+            device.scrollUp()
+            findVisibleResource(device, tag)?.let { visibleTexts = it.visibleTexts() }
+            if (expectedContentIsVisible()) return
+        }
+
+        fail(
+            """
+                $message.
+                claim=$tag
+                expectedLabel=$label
+                expectedValues=$expectedValues
+                visibleTexts=$visibleTexts
+                ${visibleUiSnapshot(device)}
+            """.trimIndent()
+        )
     }
 
     fun waitForResource(device: UiDevice, tag: String, timeoutMs: Long): UiObject2? {
@@ -354,6 +365,9 @@ internal object WalletComposeE2EHelper {
 
     private fun UiObject2.flatten(): List<UiObject2> =
         listOf(this) + runCatching { children.flatMap { it.flatten() } }.getOrDefault(emptyList())
+
+    private fun UiObject2.visibleTexts(): List<String> =
+        flatten().mapNotNull { it.text?.trim()?.takeIf(String::isNotEmpty) }
 
     private fun UiObject2.snapshotIdentity(): String =
         runCatching {
