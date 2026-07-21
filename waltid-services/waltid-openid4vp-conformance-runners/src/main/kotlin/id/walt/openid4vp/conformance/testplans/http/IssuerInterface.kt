@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance.testplans.http
 
+import id.walt.openid4vp.conformance.testplans.runner.req.CredentialOfferAuthMethod
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -12,9 +13,9 @@ import kotlinx.serialization.json.Json
 
 /**
  * HTTP client for walt.id issuer-api2 management endpoints.
- * Used to create credential offers for pre-authorized code conformance tests.
+ * Used to create credential offers for issuer-initiated conformance tests.
  */
-class IssuerInterface(private val issuerBaseUrl: String) {
+class IssuerInterface(private val issuerBaseUrl: String) : AutoCloseable {
 
     private val httpClient = HttpClient {
         install(ContentNegotiation) {
@@ -26,17 +27,20 @@ class IssuerInterface(private val issuerBaseUrl: String) {
         }
     }
 
-    /**
-     * Create a pre-authorized credential offer.
-     */
-    suspend fun createCredentialOffer(profileId: String, staticTxCode: String? = null): CredentialOfferResponse {
+    /** Create a credential offer using the authentication method required by the variant. */
+    suspend fun createCredentialOffer(
+        profileId: String,
+        authMethod: CredentialOfferAuthMethod,
+        staticTxCode: String? = null,
+    ): CredentialOfferResponse {
+        val preAuthorizedTxCode = staticTxCode.takeIf { authMethod == CredentialOfferAuthMethod.PRE_AUTHORIZED }
         val response = httpClient.post("$issuerBaseUrl/issuer2/credential-offers") {
             contentType(ContentType.Application.Json)
             setBody(CredentialOfferRequest(
                 profileId = profileId,
-                authMethod = "PRE_AUTHORIZED",
-                txCode = staticTxCode?.toTxCodeMetadata(),
-                txCodeValue = staticTxCode,
+                authMethod = authMethod,
+                txCode = preAuthorizedTxCode?.toTxCodeMetadata(),
+                txCodeValue = preAuthorizedTxCode,
             ))
         }
         return response.body()
@@ -50,7 +54,7 @@ class IssuerInterface(private val issuerBaseUrl: String) {
         return response.body()
     }
 
-    fun close() {
+    override fun close() {
         httpClient.close()
     }
 }
@@ -58,7 +62,7 @@ class IssuerInterface(private val issuerBaseUrl: String) {
 @Serializable
 data class CredentialOfferRequest(
     val profileId: String,
-    val authMethod: String,
+    val authMethod: CredentialOfferAuthMethod,
     val txCode: TxCode? = null,
     val txCodeValue: String? = null,
 )

@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance.testplans.plans.vci.issuer
 
+import id.walt.openid4vp.conformance.testplans.runner.req.CredentialOfferAuthMethod
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -34,8 +35,13 @@ data class IssuerVariant(
             credentialEncryption.toIdPart(),
         ).joinToString("-")
 
-    val requiresCredentialOffer: Boolean
-        get() = authorizationCodeFlowVariant == "issuer_initiated" || grantType == "pre_authorization_code"
+    val credentialOfferAuthMethod: CredentialOfferAuthMethod?
+        get() = when {
+            authorizationCodeFlowVariant != "issuer_initiated" -> null
+            grantType == "pre_authorization_code" -> CredentialOfferAuthMethod.PRE_AUTHORIZED
+            grantType == "authorization_code" -> CredentialOfferAuthMethod.AUTHORIZED
+            else -> error("Unsupported OpenID4VCI grant type: $grantType")
+        }
 
     val description: String
         get() = listOf(
@@ -157,7 +163,7 @@ data class IssuerVariantSelection(
     val requestMethods: Set<String> = emptySet(),
     val credentialEncryptions: Set<String> = emptySet(),
     val discoveryOnly: Boolean = false,
-    val strictResults: Boolean = false,
+    val strictResults: Boolean = true,
     val reportDir: String = "build/reports/openid4vci-issuer-matrix",
 ) {
     fun select(variants: List<IssuerVariant>): List<IssuerVariant> {
@@ -194,7 +200,11 @@ data class IssuerVariantSelection(
             credentialEncryptions = csv("OPENID4VCI_CONFORMANCE_FILTER_CREDENTIAL_ENCRYPTION"),
             discoveryOnly = bool("OPENID4VCI_CONFORMANCE_DISCOVERY_ONLY") ||
                 env("OPENID4VCI_CONFORMANCE_MATRIX")?.equals("discovery", ignoreCase = true) == true,
-            strictResults = bool("OPENID4VCI_CONFORMANCE_STRICT") || bool("OPENID4VCI_CONFORMANCE_CERTIFICATION_MODE"),
+            strictResults = if (bool("OPENID4VCI_CONFORMANCE_CERTIFICATION_MODE")) {
+                true
+            } else {
+                optionalBool("OPENID4VCI_CONFORMANCE_STRICT") ?: true
+            },
             reportDir = env("OPENID4VCI_CONFORMANCE_REPORT_DIR") ?: "build/reports/openid4vci-issuer-matrix",
         )
 
@@ -208,6 +218,16 @@ data class IssuerVariantSelection(
         private fun bool(name: String): Boolean = env(name)
             ?.let { it.equals("true", ignoreCase = true) || it == "1" || it.equals("yes", ignoreCase = true) }
             ?: false
+
+        private fun optionalBool(name: String): Boolean? = env(name)?.let { value ->
+            when {
+                value.equals("true", ignoreCase = true) || value == "1" ||
+                    value.equals("yes", ignoreCase = true) || value.equals("on", ignoreCase = true) -> true
+                value.equals("false", ignoreCase = true) || value == "0" ||
+                    value.equals("no", ignoreCase = true) || value.equals("off", ignoreCase = true) -> false
+                else -> error("Unsupported $name value '$value'. Expected true or false.")
+            }
+        }
 
         private fun env(name: String): String? = System.getenv(name)?.ifBlank { null }
     }
@@ -241,7 +261,6 @@ data class IssuerVariantRunResult(
     val variant: JsonObject,
     val status: IssuerVariantRunStatus,
     val planId: String? = null,
-    val credentialOfferUri: String? = null,
     val modules: List<IssuerVariantModuleRunResult> = emptyList(),
     val error: String? = null,
 )

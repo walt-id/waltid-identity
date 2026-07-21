@@ -5,6 +5,12 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
+@Serializable
+enum class CredentialOfferAuthMethod {
+    PRE_AUTHORIZED,
+    AUTHORIZED,
+}
+
 /**
  * Configuration for OpenID4VCI Issuer test plans.
  *
@@ -26,11 +32,6 @@ data class IssuerTestPlanConfiguration(
     val testPlanCreationConfiguration: JsonObject,
 
     /**
-     * Variant JSON string shared by all test modules in this plan.
-     */
-    val moduleVariant: String = "",
-
-    /**
      * The URL of the issuer being tested.
      */
     val issuerUrl: String,
@@ -42,9 +43,10 @@ data class IssuerTestPlanConfiguration(
     val skippableModules: Set<String> = emptySet(),
 
     /**
-     * Whether this test plan requires issuer-initiated credential offers.
+     * Authentication method for issuer-initiated credential offers, or null when
+     * the wallet starts without an offer.
      */
-    val requiresPreAuthorizedOffer: Boolean = false,
+    val credentialOfferAuthMethod: CredentialOfferAuthMethod? = null,
 
     /**
      * Profile ID to use when creating credential offers.
@@ -56,27 +58,12 @@ data class IssuerTestPlanConfiguration(
      */
     val staticTxCode: String? = null,
 ) {
-    /**
-     * Create a new configuration with the configured static tx_code added.
-     */
-    fun withStaticTxCode(): JsonObject = withVciConfiguration()
-
-    /**
-     * Create a new configuration with a credential offer URI added.
-     */
-    fun withCredentialOffer(credentialOfferUri: String): JsonObject =
-        withVciConfiguration("credential_offer_uri" to credentialOfferUri)
-
-    private fun withVciConfiguration(vararg values: Pair<String, String>): JsonObject {
+    /** Create the suite configuration with the configured static tx_code. */
+    fun withStaticTxCode(): JsonObject {
+        val txCode = staticTxCode?.takeIf { it.isNotBlank() } ?: return testPlanCreationConfiguration
         val mutableConfig = testPlanCreationConfiguration.toMutableMap()
-
         val vciConfig = (mutableConfig["vci"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
-        values.forEach { (name, value) ->
-            vciConfig[name] = JsonPrimitive(value)
-        }
-        staticTxCode?.takeIf { it.isNotBlank() }?.let {
-            vciConfig["static_tx_code"] = JsonPrimitive(it)
-        }
+        vciConfig["static_tx_code"] = JsonPrimitive(txCode)
         mutableConfig["vci"] = kotlinx.serialization.json.JsonObject(vciConfig)
 
         return kotlinx.serialization.json.JsonObject(mutableConfig)

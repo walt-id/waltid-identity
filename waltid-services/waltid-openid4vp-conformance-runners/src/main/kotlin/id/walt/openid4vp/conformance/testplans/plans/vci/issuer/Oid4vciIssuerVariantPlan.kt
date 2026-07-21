@@ -21,7 +21,7 @@ class Oid4vciIssuerVariantPlan(
     private val authorizationServer: String? = null,
     private val credentialProofTypeHint: String? = null,
     private val staticTxCode: String? = null,
-) : IssuerTestPlan {
+) {
 
     // Client keys for DPoP and private_key_jwt tests.
     // language=JSON
@@ -63,7 +63,7 @@ class Oid4vciIssuerVariantPlan(
     private val client2JwksJson = Json.decodeFromString<JsonObject>(client2Jwks)
     private val moduleVariant = variant.toJsonObject().toString()
 
-    override val config = IssuerTestPlanConfiguration(
+    val config = IssuerTestPlanConfiguration(
         testPlanCreationUrl = {
             append("planName", "oid4vci-1_0-issuer-test-plan")
             append("variant", moduleVariant)
@@ -91,10 +91,9 @@ class Oid4vciIssuerVariantPlan(
             }
             put("description", variant.description)
         },
-        moduleVariant = moduleVariant,
         issuerUrl = issuerUrl,
         skippableModules = setOf("oid4vci-1_0-issuer-metadata-test-signed"),
-        requiresPreAuthorizedOffer = variant.requiresCredentialOffer,
+        credentialOfferAuthMethod = variant.credentialOfferAuthMethod,
         credentialProfileId = deriveIssuerCredentialProfileId(credentialConfigurationId),
         staticTxCode = staticTxCode,
     )
