@@ -587,6 +587,9 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testPresentationModelValidationRejectsInvalidStates() {
+        XCTAssertFalse(PresentationRequestContext.hasValidClientID(" "))
+        XCTAssertTrue(PresentationRequestContext.hasValidClientID("https://verifier.example"))
+
         XCTAssertFalse(PresentationCredentialRequirement.hasValidOptions([]))
         XCTAssertFalse(PresentationCredentialRequirement.hasValidOptions([[]]))
         XCTAssertFalse(PresentationCredentialRequirement.hasValidOptions([[" "]]))

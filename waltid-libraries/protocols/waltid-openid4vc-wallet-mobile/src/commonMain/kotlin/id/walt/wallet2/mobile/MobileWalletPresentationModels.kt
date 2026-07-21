@@ -52,18 +52,24 @@ public data class MobileWalletPresentationPreviewHandle(val value: String) {
 
  * Partial request context retained when an OpenID4VP request is invalid.
  *
- * Invalid requests may fail before required authorization parameters have been resolved, so
- * [nonce] remains nullable here. A ready preview instead exposes the validated,
- * non-null values through [MobileWalletPresentationRequestInfo].
+ * A reportable invalid request has a validated, non-blank [clientId]. Its [nonce] remains nullable
+ * because a missing nonce can itself be the validation error. A ready preview instead exposes a
+ * validated, non-null nonce through [MobileWalletPresentationRequestInfo].
  */
 public data class MobileWalletPresentationRequestContext(
-    val clientId: String?,
+    val clientId: String,
     val verifierMetadata: MobileWalletVerifierMetadata?,
     val responseUri: String?,
     val state: String?,
     val nonce: String?,
     val responseEncryption: MobileWalletResponseEncryption,
-)
+) {
+    init {
+        require(clientId.isNotBlank()) {
+            "A reportable presentation request client ID must not be blank."
+        }
+    }
+}
 
 /**
  * A required presentation credential-query combination.

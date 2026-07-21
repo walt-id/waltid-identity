@@ -734,7 +734,9 @@ private fun AuthorizationRequest.toMobileRequestContext(
     preferredLocales: List<String>,
 ): MobileWalletPresentationRequestContext =
     MobileWalletPresentationRequestContext(
-        clientId = clientId,
+        clientId = requireNotNull(clientId) {
+            "A reportable invalid presentation request must contain client_id."
+        },
         verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
         responseUri = responseUri,
         state = state,

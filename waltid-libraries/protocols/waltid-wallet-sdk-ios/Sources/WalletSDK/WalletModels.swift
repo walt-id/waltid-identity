@@ -1153,12 +1153,13 @@ public struct PresentationCredentialRequirement: Equatable, Sendable {
 
 /// Partial request context retained when an OpenID4VP request is invalid.
 ///
-/// Invalid requests may fail before required authorization parameters have been
-/// resolved. A ready preview instead exposes validated, non-optional values
+/// A reportable invalid request has a validated, non-blank client identifier.
+/// Its nonce remains optional because a missing nonce can itself be the
+/// validation error. A ready preview exposes a validated, non-optional nonce
 /// through ``PresentationRequestInfo``.
 public struct PresentationRequestContext: Equatable, Sendable {
-    /// OpenID4VP client identifier when available.
-    public let clientID: String?
+    /// Validated OpenID4VP client identifier.
+    public let clientID: String
 
     /// Typed metadata supplied by the OpenID4VP verifier when available.
     public let verifierMetadata: VerifierMetadata?
@@ -1177,19 +1178,27 @@ public struct PresentationRequestContext: Equatable, Sendable {
 
     /// Creates partial presentation request context.
     public init(
-        clientID: String? = nil,
+        clientID: String,
         verifierMetadata: VerifierMetadata? = nil,
         responseURI: URL? = nil,
         state: String? = nil,
         nonce: String? = nil,
         responseEncryption: PresentationResponseEncryption = .notRequired
     ) {
+        precondition(
+            Self.hasValidClientID(clientID),
+            "A reportable presentation request must contain a non-blank client ID."
+        )
         self.clientID = clientID
         self.verifierMetadata = verifierMetadata
         self.responseURI = responseURI
         self.state = state
         self.nonce = nonce
         self.responseEncryption = responseEncryption
+    }
+
+    static func hasValidClientID(_ clientID: String) -> Bool {
+        isNonBlank(clientID)
     }
 }
 
