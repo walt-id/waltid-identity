@@ -12,6 +12,9 @@ import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
+import id.walt.wallet2.handlers.WalletIssuanceSessionRecordKind
+import id.walt.wallet2.handlers.WalletIssuanceSessionStore
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
@@ -148,11 +151,28 @@ class MobileWalletTest {
         val keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1"))
         val didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap())))
         val credentialStore = RecordingCredentialStore()
+        val issuanceSessionStore = RecordingIssuanceSessionStore(
+            WalletIssuanceSessionRecord(
+                id = "active:session-1",
+                sessionId = "session-1",
+                kind = WalletIssuanceSessionRecordKind.ACTIVE_SESSION,
+                payload = "<encrypted>",
+                updatedAtEpochMilliseconds = 1L,
+            ),
+            WalletIssuanceSessionRecord(
+                id = "deferred:credential-1",
+                sessionId = "session-1",
+                kind = WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL,
+                payload = "<encrypted>",
+                updatedAtEpochMilliseconds = 2L,
+            ),
+        )
         val wallet = MobileWallet(
             walletId = "custom-wallet",
             keyStore = keyStore,
             didStore = didStore,
             credentialStore = credentialStore,
+            issuanceSessionStore = issuanceSessionStore,
             keyGenerator = { error("deleteWallet should not generate a key") },
         )
 
@@ -161,6 +181,7 @@ class MobileWalletTest {
         assertEquals(listOf("custom-key"), keyStore.removedKeyIds)
         assertEquals(listOf("did:key:custom"), didStore.removedDids)
         assertEquals(emptyList(), credentialStore.removedCredentialIds)
+        assertTrue(issuanceSessionStore.records.isEmpty())
     }
 
     @Test
@@ -464,5 +485,18 @@ class MobileWalletTest {
             removedCredentialIds += id
             return true
         }
+    }
+
+    private class RecordingIssuanceSessionStore(
+        vararg records: WalletIssuanceSessionRecord,
+    ) : WalletIssuanceSessionStore {
+        val records = records.associateByTo(linkedMapOf()) { it.id }
+
+        override suspend fun get(id: String): WalletIssuanceSessionRecord? = records[id]
+        override suspend fun list(): List<WalletIssuanceSessionRecord> = records.values.toList()
+        override suspend fun put(record: WalletIssuanceSessionRecord) {
+            records[record.id] = record
+        }
+        override suspend fun remove(id: String): Boolean = records.remove(id) != null
     }
 }

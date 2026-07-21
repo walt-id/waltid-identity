@@ -596,12 +596,15 @@ public class MobileWallet internal constructor(
     /**
      * Deletes local wallet material owned by this mobile wallet instance.
      *
-     * The active key, credential, and DID stores receive store-level remove calls. The wallet then closes
-     * and deletes the encrypted local database and deletes the configured database key.
+     * Active issuance continuations are invalidated before the key, credential, and DID stores receive
+     * store-level remove calls. The wallet then closes and deletes the encrypted local database and deletes
+     * the configured database key.
      */
     public suspend fun deleteWallet() {
         WalletIssuanceHandler.clearPreviews(wallet)
         WalletPresentationHandler.clearPreviews(wallet)
+        issuanceSessions.clearSessions()
+        legacyIssuanceMutex.withLock { legacyIssuanceSessions.clear() }
         keyStore.listKeys().toList().forEach { key ->
             keyStore.removeKey(key.keyId)
         }
