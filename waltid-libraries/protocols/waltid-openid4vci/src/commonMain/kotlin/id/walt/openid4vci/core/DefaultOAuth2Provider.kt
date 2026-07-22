@@ -591,23 +591,10 @@ class DefaultOAuth2Provider(
 
     override fun writeCredentialError(error: CredentialError): CredentialResponseHttp =
         CredentialResponseHttp(
-            status = when (error.error) {
-                CredentialErrorCodes.INVALID_TOKEN,
-                OAuthErrorCodes.INVALID_DPOP_PROOF -> 401
-
-                else -> 400
-            },
+            status = 400,
             payload = buildMap {
                 put("error", JsonPrimitive(error.error))
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
-            },
-            headers = when (error.error) {
-                CredentialErrorCodes.INVALID_TOKEN,
-                OAuthErrorCodes.INVALID_DPOP_PROOF -> mapOf(
-                    WWW_AUTHENTICATE_HEADER to dpopAuthenticationChallenge(error),
-                )
-
-                else -> emptyMap()
             },
         )
 
@@ -616,8 +603,9 @@ class DefaultOAuth2Provider(
 
     override fun writeCredentialError(error: OAuthError): CredentialResponseHttp =
         CredentialResponseHttp(
-            status = oauthJsonErrorStatus(error),
+            status = credentialOAuthJsonErrorStatus(error),
             payload = oauthErrorPayload(error),
+            headers = credentialOAuthErrorHeaders(error),
         )
 
     override fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp =
@@ -650,7 +638,7 @@ class DefaultOAuth2Provider(
 
     private suspend fun verifyCredentialAccessToken(
         accessTokenContext: CredentialAccessTokenContext?,
-    ): CredentialRequestResult.Failure? {
+    ): CredentialRequestResult.OAuthFailure? {
         if (accessTokenContext == null) return null
         val verifier = config.accessTokenVerifier
             ?: return CredentialRequestResult.OAuthFailure(
@@ -673,7 +661,7 @@ class DefaultOAuth2Provider(
     private suspend fun verifyCredentialAccessTokenBinding(
         context: CredentialAccessTokenContext,
         claims: JsonObject,
-    ): CredentialRequestResult.Failure? {
+    ): CredentialRequestResult.OAuthFailure? {
         val boundJwkThumbprint = claims.dpopJwkThumbprint()
 
         if (boundJwkThumbprint == null) {
@@ -714,17 +702,16 @@ class DefaultOAuth2Provider(
             null
         } else {
             invalidCredentialAccessToken("Invalid DPoP key binding")
-            CredentialRequestResult.OAuthFailure(OAuthError(OAuthErrorCodes.INVALID_TOKEN, e.message))
         }
     }
 
-    private fun invalidCredentialAccessToken(description: String): CredentialRequestResult.Failure =
-        CredentialRequestResult.Failure(
-            OAuthError(CredentialErrorCodes.INVALID_TOKEN, description),
+    private fun invalidCredentialAccessToken(description: String): CredentialRequestResult.OAuthFailure =
+        CredentialRequestResult.OAuthFailure(
+            OAuthError(OAuthErrorCodes.INVALID_TOKEN, description),
         )
 
-    private fun invalidCredentialDPoPProof(description: String): CredentialRequestResult.Failure =
-        CredentialRequestResult.Failure(
+    private fun invalidCredentialDPoPProof(description: String): CredentialRequestResult.OAuthFailure =
+        CredentialRequestResult.OAuthFailure(
             OAuthError(OAuthErrorCodes.INVALID_DPOP_PROOF, description),
         )
 
@@ -853,6 +840,22 @@ class DefaultOAuth2Provider(
         buildMap {
             put("error", JsonPrimitive(error.error))
             error.description?.let { put("error_description", JsonPrimitive(it)) }
+        }
+
+    private fun credentialOAuthJsonErrorStatus(error: OAuthError): Int =
+        when (error.error) {
+            OAuthErrorCodes.INVALID_DPOP_PROOF -> 401
+            else -> oauthJsonErrorStatus(error)
+        }
+
+    private fun credentialOAuthErrorHeaders(error: OAuthError): Map<String, String> =
+        when (error.error) {
+            OAuthErrorCodes.INVALID_TOKEN,
+            OAuthErrorCodes.INVALID_DPOP_PROOF -> mapOf(
+                WWW_AUTHENTICATE_HEADER to dpopAuthenticationChallenge(error),
+            )
+
+            else -> emptyMap()
         }
 
     private fun oauthJsonErrorStatus(error: OAuthError): Int =
