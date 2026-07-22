@@ -229,7 +229,7 @@ class TokenRequestBuilder(
                 "Token request failed - Status: ${response.status.value} ${response.status.description}, " +
                 "Response body: ${errorBody.take(200)}${if (errorBody.length > 200) "..." else ""}"
             }
-            throw Exception("Token request failed. Status: ${response.status}, Body: $errorBody")
+            throw IllegalArgumentException("Token request failed. Status: ${response.status}, Body: $errorBody")
         }
 
         log.trace { "Received successful token response (${response.status.value}), parsing" }
