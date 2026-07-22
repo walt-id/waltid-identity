@@ -28,6 +28,7 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.createTestConfig
+import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
@@ -273,7 +274,8 @@ class TokenIssuerTest {
             )
         )
 
-        assertTrue(result is CredentialRequestResult.Failure)
+        assertTrue(result is CredentialRequestResult.OAuthFailure)
+        assertEquals(OAuthErrorCodes.INVALID_TOKEN, result.error.error)
     }
 
     private fun resolveCurrentKey(currentKey: ThreadLocal<Key?>): Key =

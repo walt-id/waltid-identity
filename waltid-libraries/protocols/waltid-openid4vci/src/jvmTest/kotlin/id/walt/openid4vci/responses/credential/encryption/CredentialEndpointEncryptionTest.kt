@@ -44,7 +44,7 @@ class CredentialEndpointEncryptionTest {
         )
 
         assertTrue(result is CredentialRequestResult.Failure)
-        assertEquals("invalid_request", result.error.error)
+        assertEquals(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, result.error.error)
         assertEquals(
             "credential_response_encryption requires an encrypted Credential Request",
             result.error.description,
@@ -106,7 +106,7 @@ class CredentialEndpointEncryptionTest {
         )
 
         assertTrue(requestResult is CredentialRequestResult.Failure)
-        assertEquals(CredentialErrorCodes.ENCRYPTION_NOT_SUPPORTED, requestResult.error.error)
+        assertEquals(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, requestResult.error.error)
         assertEquals("credential request encryption is not supported", requestResult.error.description)
     }
 
