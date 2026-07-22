@@ -237,7 +237,7 @@ final class WalletE2EUI {
         let doneButton = app.toolbars.buttons["Done"]
         if doneButton.exists && doneButton.isHittable {
             doneButton.tap()
-        } else if let focusedElement {
+        } else if let focusedElement, hasKeyboardFocus(in: focusedElement) {
             focusedElement.typeText(XCUIKeyboardKey.return.rawValue)
         } else {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()

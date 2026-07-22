@@ -64,7 +64,7 @@ data class Wallet(
     /**
      * Policy for handling unsigned OID4VP authorization requests.
      * Defaults to REQUIRE_SIGNED for production-grade security.
-     * Use ALLOW_UNSIGNED or WARN_ON_UNSIGNED only for testing or legacy interoperability.
+     * Use ALLOW_UNSIGNED only for testing or legacy interoperability.
      */
     val unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
         AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,

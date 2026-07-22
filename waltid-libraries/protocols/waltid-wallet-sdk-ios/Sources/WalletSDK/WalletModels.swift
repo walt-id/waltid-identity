@@ -26,6 +26,9 @@ public struct WalletConfiguration: Sendable {
     /// Transaction data profiles this wallet accepts in OpenID4VP requests.
     public var transactionDataProfiles: [WalletTransactionDataProfile]
 
+    /// Ordered BCP 47 locale preferences used to select protocol display metadata.
+    public var preferredLocales: [String]
+
     /// Creates wallet configuration.
     ///
     /// - Parameters:
@@ -43,6 +46,8 @@ public struct WalletConfiguration: Sendable {
     ///   - requestObjectAudience: Expected audience of signed OID4VP Request Objects.
     ///   - transactionDataProfiles: OpenID4VP transaction data profiles this
     ///     wallet accepts before previewing or submitting a presentation.
+    ///   - preferredLocales: Ordered BCP 47 locale preferences used for issuer,
+    ///     credential, and verifier display metadata.
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
@@ -51,7 +56,8 @@ public struct WalletConfiguration: Sendable {
         requestObjectTrustAnchorPEMCertificates: [String] = [],
         requestObjectEnableSystemTrustAnchors: Bool = false,
         requestObjectAudience: String = "https://self-issued.me/v2",
-        transactionDataProfiles: [WalletTransactionDataProfile] = []
+        transactionDataProfiles: [WalletTransactionDataProfile] = [],
+        preferredLocales: [String] = Locale.preferredLanguages
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
@@ -61,6 +67,7 @@ public struct WalletConfiguration: Sendable {
         self.requestObjectEnableSystemTrustAnchors = requestObjectEnableSystemTrustAnchors
         self.requestObjectAudience = requestObjectAudience
         self.transactionDataProfiles = transactionDataProfiles
+        self.preferredLocales = preferredLocales
     }
 }
 
@@ -500,31 +507,230 @@ public struct WalletAttestationConfiguration: Equatable, Sendable {
     }
 }
 
-/// Result of resolving an OpenID4VCI credential offer before issuance.
-public struct OfferResolution: Equatable, Sendable {
-    /// Whether the app must collect a transaction code from the user.
-    public let transactionCodeRequired: Bool
+/// Display metadata normalized from issuer, credential, or verifier protocol metadata.
+///
+/// URI values are untrusted protocol input. Rendering them does not establish
+/// issuer or verifier trust.
+public struct MetadataDisplay: Equatable, Sendable {
+    /// Best localized display name.
+    public let name: String?
+    /// BCP 47 language tag associated with the selected display entry.
+    public let locale: String?
+    /// Issuer- or verifier-provided logo URI.
+    public let logoURI: String?
+    /// Accessible alternative text for the logo.
+    public let logoAltText: String?
+    /// Human-readable description.
+    public let description: String?
+    /// Suggested credential background color.
+    public let backgroundColor: String?
+    /// Suggested credential background image URI.
+    public let backgroundImageURI: String?
+    /// Suggested credential text color.
+    public let textColor: String?
 
-    /// Issuer identifier (URL) from the credential offer.
-    public let credentialIssuer: String
-
-    /// Credential configuration IDs advertised in the offer.
-    public let offeredCredentials: [String]
-
-    /// Creates a credential-offer resolution result.
+    /// Creates normalized protocol display metadata.
     ///
     /// - Parameters:
-    ///   - transactionCodeRequired: Whether the app must collect a transaction code.
-    ///   - credentialIssuer: Issuer identifier from the credential offer.
-    ///   - offeredCredentials: Credential configuration identifiers advertised by the offer.
+    ///   - name: Best localized human-readable name.
+    ///   - locale: BCP 47 language tag for the selected display entry.
+    ///   - logoURI: Issuer- or verifier-provided logo URI.
+    ///   - logoAltText: Accessible alternative text for the logo.
+    ///   - description: Human-readable credential description.
+    ///   - backgroundColor: Suggested credential background color.
+    ///   - backgroundImageURI: Suggested credential background image URI.
+    ///   - textColor: Suggested credential text color.
     public init(
-        transactionCodeRequired: Bool,
-        credentialIssuer: String,
-        offeredCredentials: [String]
+        name: String?,
+        locale: String?,
+        logoURI: String?,
+        logoAltText: String?,
+        description: String? = nil,
+        backgroundColor: String? = nil,
+        backgroundImageURI: String? = nil,
+        textColor: String? = nil
     ) {
-        self.transactionCodeRequired = transactionCodeRequired
+        self.name = name
+        self.locale = locale
+        self.logoURI = logoURI
+        self.logoAltText = logoAltText
+        self.description = description
+        self.backgroundColor = backgroundColor
+        self.backgroundImageURI = backgroundImageURI
+        self.textColor = textColor
+    }
+}
+
+/// Typed credential issuer metadata shown during offer review.
+public struct IssuerMetadata: Equatable, Sendable {
+    /// Canonical credential issuer identifier.
+    public let credentialIssuer: String
+    /// Best localized issuer display entry.
+    public let display: MetadataDisplay?
+
+    /// Creates typed issuer metadata.
+    ///
+    /// - Parameters:
+    ///   - credentialIssuer: Canonical credential issuer identifier.
+    ///   - display: Best localized issuer display entry.
+    public init(credentialIssuer: String, display: MetadataDisplay?) {
         self.credentialIssuer = credentialIssuer
+        self.display = display
+    }
+}
+
+/// Display metadata for one claim declared by an offered credential configuration.
+public struct CredentialClaimMetadata: Equatable, Sendable {
+    /// Claim path relative to the credential root.
+    public let path: [String]
+    /// Whether the issuer declares the claim as always included.
+    public let mandatory: Bool?
+    /// Best localized human-readable claim name.
+    public let displayName: String?
+
+    /// Creates claim metadata declared by a credential configuration.
+    ///
+    /// - Parameters:
+    ///   - path: Claim path relative to the credential root.
+    ///   - mandatory: Whether the issuer declares the claim as always included.
+    ///   - displayName: Best localized human-readable claim name.
+    public init(path: [String], mandatory: Bool?, displayName: String?) {
+        self.path = path
+        self.mandatory = mandatory
+        self.displayName = displayName
+    }
+}
+
+/// Typed metadata for one credential configuration referenced by an offer.
+public struct OfferedCredentialMetadata: Equatable, Sendable {
+    /// Credential configuration identifier referenced by the offer.
+    public let configurationID: String
+    /// OpenID4VCI credential format.
+    public let format: String
+    /// Authorization scope associated with the configuration.
+    public let scope: String?
+    /// SD-JWT VC type identifier when present.
+    public let vct: String?
+    /// ISO mdoc document type when present.
+    public let doctype: String?
+    /// Best localized credential display entry.
+    public let display: MetadataDisplay?
+    /// Claims declared by the credential configuration.
+    public let claims: [CredentialClaimMetadata]
+
+    /// Creates typed metadata for an offered credential configuration.
+    ///
+    /// - Parameters:
+    ///   - configurationID: Credential configuration identifier referenced by the offer.
+    ///   - format: OpenID4VCI credential format.
+    ///   - scope: Authorization scope associated with the configuration.
+    ///   - vct: SD-JWT VC type identifier when present.
+    ///   - doctype: ISO mdoc document type when present.
+    ///   - display: Best localized credential display entry.
+    ///   - claims: Claims declared by the credential configuration.
+    public init(
+        configurationID: String,
+        format: String,
+        scope: String?,
+        vct: String?,
+        doctype: String?,
+        display: MetadataDisplay?,
+        claims: [CredentialClaimMetadata]
+    ) {
+        self.configurationID = configurationID
+        self.format = format
+        self.scope = scope
+        self.vct = vct
+        self.doctype = doctype
+        self.display = display
+        self.claims = claims
+    }
+}
+
+/// Input modes defined for an OpenID4VCI transaction code.
+public enum TransactionCodeInputMode: Equatable, Sendable {
+    /// ASCII decimal digits only.
+    case numeric
+    /// General text input.
+    case text
+}
+
+/// Transaction-code metadata used to collect issuer-delivered input.
+public struct TransactionCodeRequirement: Equatable, Sendable {
+    /// Permitted input character class.
+    public let inputMode: TransactionCodeInputMode
+    /// Exact expected character count when supplied by the issuer.
+    public let length: Int?
+    /// Issuer-provided guidance for obtaining or entering the code.
+    public let description: String?
+
+    /// Creates a transaction-code input requirement.
+    ///
+    /// - Parameters:
+    ///   - inputMode: Permitted input character class.
+    ///   - length: Exact expected character count when supplied by the issuer.
+    ///   - description: Issuer-provided guidance for obtaining or entering the code.
+    public init(inputMode: TransactionCodeInputMode, length: Int?, description: String?) {
+        self.inputMode = inputMode
+        self.length = length
+        self.description = description
+    }
+}
+
+/// Result of resolving and retaining an OpenID4VCI credential offer for review.
+public struct OfferResolution: Equatable, Sendable {
+    /// Typed issuer metadata selected for the configured locale preferences.
+    public let issuer: IssuerMetadata
+    /// Typed metadata for every credential configuration in the offer.
+    public let offeredCredentials: [OfferedCredentialMetadata]
+    /// Input requirement when the offer requires a separately delivered code.
+    public let transactionCode: TransactionCodeRequirement?
+
+    /// Creates an offer resolution retained for review and subsequent acceptance.
+    ///
+    /// - Parameters:
+    ///   - issuer: Typed issuer metadata selected for the configured locales.
+    ///   - offeredCredentials: Metadata for every credential configuration in the offer.
+    ///   - transactionCode: Input requirement when a separately delivered code is required.
+    public init(
+        issuer: IssuerMetadata,
+        offeredCredentials: [OfferedCredentialMetadata],
+        transactionCode: TransactionCodeRequirement?
+    ) {
+        self.issuer = issuer
         self.offeredCredentials = offeredCredentials
+        self.transactionCode = transactionCode
+    }
+}
+
+/// Typed OpenID4VP verifier metadata shown during presentation review.
+public struct VerifierMetadata: Equatable, Sendable {
+    /// Best localized verifier display entry.
+    public let display: MetadataDisplay?
+    /// Verifier information page URI.
+    public let clientURI: String?
+    /// Verifier privacy policy URI.
+    public let policyURI: String?
+    /// Verifier terms-of-service URI.
+    public let termsOfServiceURI: String?
+
+    /// Creates typed verifier metadata supplied by an OpenID4VP request.
+    ///
+    /// - Parameters:
+    ///   - display: Best localized verifier name and logo.
+    ///   - clientURI: Verifier information-page URI.
+    ///   - policyURI: Verifier privacy-policy URI.
+    ///   - termsOfServiceURI: Verifier terms-of-service URI.
+    public init(
+        display: MetadataDisplay?,
+        clientURI: String?,
+        policyURI: String?,
+        termsOfServiceURI: String?
+    ) {
+        self.display = display
+        self.clientURI = clientURI
+        self.policyURI = policyURI
+        self.termsOfServiceURI = termsOfServiceURI
     }
 }
 
@@ -738,13 +944,58 @@ public struct PresentationCredentialRequirement: Equatable, Sendable {
     }
 }
 
-/// Verifier and transaction metadata extracted from a presentation request.
+/// Response encryption selected for an OpenID4VP presentation request.
+public enum PresentationResponseEncryption: Equatable, Sendable {
+    /// The reviewed request does not require an encrypted authorization response.
+    case notRequired
+
+    /// The reviewed request requires an encrypted authorization response.
+    case required(ResponseEncryptionDetails)
+}
+
+/// Algorithms and verifier key identity selected for response encryption.
+///
+/// These values describe response protection and do not establish verifier trust.
+public struct ResponseEncryptionDetails: Equatable, Sendable {
+    /// JWE `alg` value selected by the protocol implementation.
+    public let keyManagementAlgorithm: String
+
+    /// JWE `enc` value selected by the protocol implementation.
+    public let contentEncryptionAlgorithm: String
+
+    /// Verifier-provided identifier of the selected encryption key.
+    public let verifierKeyID: String?
+
+    /// RFC 7638 thumbprint of the selected verifier encryption key.
+    public let verifierKeyThumbprint: String
+
+    /// Creates response-encryption details.
+    ///
+    /// - Parameters:
+    ///   - keyManagementAlgorithm: JWE `alg` value selected for the response.
+    ///   - contentEncryptionAlgorithm: JWE `enc` value selected for the response.
+    ///   - verifierKeyID: Verifier-provided identifier of the selected public key.
+    ///   - verifierKeyThumbprint: RFC 7638 thumbprint of the selected public key.
+    public init(
+        keyManagementAlgorithm: String,
+        contentEncryptionAlgorithm: String,
+        verifierKeyID: String?,
+        verifierKeyThumbprint: String
+    ) {
+        self.keyManagementAlgorithm = keyManagementAlgorithm
+        self.contentEncryptionAlgorithm = contentEncryptionAlgorithm
+        self.verifierKeyID = verifierKeyID
+        self.verifierKeyThumbprint = verifierKeyThumbprint
+    }
+}
+
+/// Verifier, transaction, and response-protection metadata extracted from a presentation request.
 public struct PresentationRequestInfo: Equatable, Sendable {
     /// OpenID4VP client identifier.
     public let clientID: String?
 
-    /// Human-readable verifier name from client metadata when available.
-    public let verifierName: String?
+    /// Typed metadata supplied by the OpenID4VP verifier when available.
+    public let verifierMetadata: VerifierMetadata?
 
     /// Response URI used for direct-post responses when available.
     public let responseURI: URL?
@@ -754,6 +1005,9 @@ public struct PresentationRequestInfo: Equatable, Sendable {
 
     /// OpenID nonce value.
     public let nonce: String?
+
+    /// Response-encryption state selected for this request.
+    public let responseEncryption: PresentationResponseEncryption
 
     /// Serialized OpenID4VP response mode requested by the verifier.
     public let responseMode: String?
@@ -765,28 +1019,29 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     ///
     /// - Parameters:
     ///   - clientID: OpenID4VP client identifier from the request.
-    ///   - verifierName: Human-readable verifier name from client metadata
-    ///     when available.
+    ///   - verifierMetadata: Typed metadata supplied by the verifier.
     ///   - responseURI: Direct-post response URI when available.
     ///   - state: OpenID state value from the request.
     ///   - nonce: OpenID nonce value from the request.
-    ///   - responseMode: Serialized OpenID4VP response mode requested by the
-    ///     verifier.
+    ///   - responseEncryption: Response-encryption state selected for the request.
+    ///   - responseMode: Serialized OpenID4VP response mode requested by the verifier.
     ///   - transactionData: Decoded transaction data attached to the request.
     public init(
         clientID: String? = nil,
-        verifierName: String? = nil,
+        verifierMetadata: VerifierMetadata? = nil,
         responseURI: URL? = nil,
         state: String? = nil,
         nonce: String? = nil,
+        responseEncryption: PresentationResponseEncryption,
         responseMode: String? = nil,
         transactionData: [PresentationTransactionData] = []
     ) {
         self.clientID = clientID
-        self.verifierName = verifierName
+        self.verifierMetadata = verifierMetadata
         self.responseURI = responseURI
         self.state = state
         self.nonce = nonce
+        self.responseEncryption = responseEncryption
         self.responseMode = responseMode
         self.transactionData = transactionData
     }

@@ -16,7 +16,7 @@ struct PresentationReviewView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            VerifierDetailsView(request: preview.request)
+            VerifierReviewSections(request: preview.request)
 
             Text("Select credentials to share")
                 .font(.subheadline.weight(.semibold))
@@ -129,7 +129,6 @@ private struct PresentationDisclosureListView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color(.secondarySystemBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-                .accessibilityIdentifier(WalletAccessibilityID.presentationDisclosure(selection.id))
             }
         }
     }
