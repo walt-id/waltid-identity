@@ -865,6 +865,7 @@ public struct PresentationPreviewError: Equatable, Sendable {
     /// Creates a presentation preview error.
     ///
     /// - Parameters:
+    ///   - previewHandle: Opaque handle required to reject or discard this reviewed request.
     ///   - request: Validated response destination and request context shown before responding.
     ///   - code: OpenID4VP or OAuth authorization error code selected by the wallet.
     ///   - message: Local diagnostic that is not sent to the verifier automatically.

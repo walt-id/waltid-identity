@@ -26,6 +26,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.v2.runComposeUiTest
 import id.walt.walletdemo.compose.logic.DemoPinStore
 import id.walt.walletdemo.compose.logic.DemoWallet
@@ -373,6 +374,7 @@ class WalletDemoAppTestScenarios {
 
     fun invalidPresentationCanBeDismissedLocallyOrReportedToVerifier() = runComposeUiTest {
         val error = WalletDemoPresentationError(
+            previewHandle = samplePresentationPreview.previewHandle,
             verifierMetadata = samplePresentationPreview.verifierMetadata,
             clientId = samplePresentationPreview.clientId,
             responseEncryption = samplePresentationPreview.responseEncryption,
@@ -408,7 +410,7 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationError == null }
 
         assertEquals(null, wallet.rejectedRequestUrl)
-        onNodeWithTag(WalletUiTestTags.PresentationInput).assertIsEnabled().performTextInput("openid4vp://invalid")
+        onNodeWithTag(WalletUiTestTags.PresentationInput).assertIsEnabled().performTextReplacement("openid4vp://invalid")
         onNodeWithTag(WalletUiTestTags.PresentButton).performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationError == error }
         onNodeWithTag(WalletUiTestTags.PresentationErrorNotifyButton).performScrollTo().performClick()
@@ -466,8 +468,8 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.tab.present").performClick()
         onNodeWithTag("wallet.status").assertTextContains("Presentation sent")
         onNodeWithTag("wallet.presentationInput").assertIsNotEnabled()
-        assertPresentationNewActionPrecedesReadOnlyReview()
-        onNodeWithTag(WalletUiTestTags.credentialCard(samplePresentationCredentialOption.selection.id)).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationNewButton).performScrollTo().assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.PresentationReview).assertCountEquals(0)
         onAllNodesWithTag("wallet.presentationSubmitButton").assertCountEquals(0)
         onAllNodesWithTag("wallet.presentationRejectButton").assertCountEquals(0)
         onNodeWithTag("wallet.presentationNewButton").performScrollTo().performClick()
@@ -880,28 +882,6 @@ class WalletDemoAppTestScenarios {
         onNodeWithText("nonce-456").performScrollTo().assertIsDisplayed()
     }
 
-    private fun ComposeUiTest.assertPresentationNewActionPrecedesReadOnlyReview() {
-        val presentTabLandmarkTags = onAllNodes(
-            matcher = hasAnyAncestor(hasTestTag("wallet.presentTabContent")) and (
-                hasTestTag("wallet.presentationNewButton") or
-                    hasTestTag("wallet.presentationReview")
-                ),
-            useUnmergedTree = true,
-        )
-            .fetchSemanticsNodes()
-            .mapNotNull { it.config.getOrElseNullable(SemanticsProperties.TestTag) { null } }
-
-        val newActionIndex = presentTabLandmarkTags.indexOf("wallet.presentationNewButton")
-        val reviewIndex = presentTabLandmarkTags.indexOf("wallet.presentationReview")
-
-        assertTrue(newActionIndex >= 0, "New presentation action is missing: $presentTabLandmarkTags")
-        assertTrue(reviewIndex >= 0, "Read-only presentation review is missing: $presentTabLandmarkTags")
-        assertTrue(
-            newActionIndex < reviewIndex,
-            "New presentation action should precede the read-only review so starting over stays easy: $presentTabLandmarkTags",
-        )
-    }
-
     companion object {
         val sampleCredential = WalletDemoCredential(
             id = "cred-1",
@@ -1045,6 +1025,7 @@ private class FakeDemoWallet(
     var presentedRequestUrl: String? = null
     var previewedRequestUrl: String? = null
     var submittedRequestUrl: String? = null
+    var rejectedRequestUrl: String? = null
     private val issuanceSources = mutableMapOf<WalletDemoIssuancePreviewHandle, String>()
     private val presentationSources = mutableMapOf<WalletDemoPresentationPreviewHandle, String>()
 
@@ -1115,8 +1096,8 @@ private class FakeDemoWallet(
     override suspend fun rejectPresentation(
         previewHandle: WalletDemoPresentationPreviewHandle,
     ): WalletDemoOperationResult {
-        submittedRequestUrl = presentationSources[previewHandle]
-        return presentationResult
+        rejectedRequestUrl = presentationSources[previewHandle]
+        return WalletDemoOperationResult.Success("Presentation declined")
     }
 
     override suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle) {
