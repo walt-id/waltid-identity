@@ -13,6 +13,7 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.handlers.PreviewSessionException
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletKeys
@@ -502,6 +503,7 @@ public data class WalletBridgeError(
             val category = when (throwable) {
                 is CancellationException -> WalletBridgeErrorCategory.cancelled
                 is IllegalArgumentException -> WalletBridgeErrorCategory.invalidInput
+                is PreviewSessionException -> WalletBridgeErrorCategory.invalidInput
                 is WalletPersistenceException -> WalletBridgeErrorCategory.storage
                 else -> WalletBridgeErrorCategory.internalFailure
             }

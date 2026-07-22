@@ -7,22 +7,25 @@ protocol WalletCoreBridge: Sendable {
     func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult
     func resolveOffer(offer: URL) async throws -> OfferResolution
     func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String]
+    func receive(previewHandle: IssuancePreviewHandle, txCode: String?, clientID: String) async throws -> [String]
+    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws
     func credentials() async throws -> [Credential]
     func deleteLocalData() async throws
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult
     func submitPresentation(
-        request: URL,
+        previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         did: String?,
         runPolicies: Bool?
     ) async throws -> PresentationResult
     func rejectPresentation(
-        request: URL,
+        previewHandle: PresentationPreviewHandle,
         error: PresentationErrorCode?,
         errorDescription: String?
     ) async throws -> PresentationResult
+    func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws
 }
 
 @available(macOS 10.15, *)
@@ -56,6 +59,14 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         throw unavailableError()
     }
 
+    func receive(previewHandle: IssuancePreviewHandle, txCode: String?, clientID: String) async throws -> [String] {
+        throw unavailableError()
+    }
+
+    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
+        throw unavailableError()
+    }
+
     func credentials() async throws -> [Credential] {
         throw unavailableError()
     }
@@ -73,7 +84,7 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     }
 
     func submitPresentation(
-        request: URL,
+        previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         did: String?,
@@ -83,13 +94,16 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     }
 
     func rejectPresentation(
-        request: URL,
+        previewHandle: PresentationPreviewHandle,
         error: PresentationErrorCode?,
         errorDescription: String?
     ) async throws -> PresentationResult {
         throw unavailableError()
     }
 
+    func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
+        throw unavailableError()
+    }
     private func unavailableError() -> WalletError {
         .internalFailure("WalletCore is only available when the iOS XCFramework is linked.")
     }

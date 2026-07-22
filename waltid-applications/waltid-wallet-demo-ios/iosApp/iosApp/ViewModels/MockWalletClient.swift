@@ -14,9 +14,10 @@ actor MockWalletClient: WalletClient {
     private let transactionCodeRequired: Bool
     private let presentationPreviewResultOverride: PresentationPreviewResult?
     private let rejectionResult: PresentationResult
-    private(set) var rejectedRequestURLs: [URL] = []
     private let responseEncryptionRequired: Bool
     private let mdocMetadata: Bool
+    private(set) var rejectedPresentationPreviewHandles: [PresentationPreviewHandle] = []
+    private(set) var discardedPresentationPreviewHandles: [PresentationPreviewHandle] = []
 
     init(
         storedCredentials: [Credential] = [],
@@ -51,6 +52,7 @@ actor MockWalletClient: WalletClient {
     func resolveOffer(offer: URL) async throws -> OfferResolution {
         try await delayOperation()
         return OfferResolution(
+            previewHandle: IssuancePreviewHandle(value: "mock-issuance-preview"),
             issuer: IssuerMetadata(
                 credentialIssuer: "https://issuer.example",
                 display: MetadataDisplay(
@@ -67,11 +69,13 @@ actor MockWalletClient: WalletClient {
         )
     }
 
-    func receive(offer: URL, txCode: String?) async throws -> [String] {
+    func receive(previewHandle: IssuancePreviewHandle, txCode: String?) async throws -> [String] {
         try await delayOperation()
         storedCredentials = [mdocMetadata ? Self.photoIDCredential : Self.sampleCredential]
         return storedCredentials.map(\.id)
     }
+
+    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {}
 
     func present(request: URL, did: String?) async throws -> PresentationResult {
         try await delayOperation()
@@ -85,6 +89,7 @@ actor MockWalletClient: WalletClient {
         }
         return .ready(
             PresentationPreview(
+                previewHandle: PresentationPreviewHandle(value: "mock-presentation-preview"),
                 request: previewRequestInfo,
                 credentialOptions: duplicatePresentationOptions ? Self.duplicateOptions : [Self.defaultOption],
                 credentialRequirements: [
@@ -95,7 +100,7 @@ actor MockWalletClient: WalletClient {
     }
 
     func submitPresentation(
-        request: URL,
+        previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
@@ -104,10 +109,14 @@ actor MockWalletClient: WalletClient {
         return .transmitted(.succeeded(verifierResponseJSON: "{}"))
     }
 
-    func rejectPresentation(request: URL) async throws -> PresentationResult {
+    func rejectPresentation(previewHandle: PresentationPreviewHandle) async throws -> PresentationResult {
         try await delayOperation()
-        rejectedRequestURLs.append(request)
+        rejectedPresentationPreviewHandles.append(previewHandle)
         return rejectionResult
+    }
+
+    func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
+        discardedPresentationPreviewHandles.append(previewHandle)
     }
 
     private func delayOperation() async throws {

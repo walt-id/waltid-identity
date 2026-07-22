@@ -26,6 +26,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.v2.runComposeUiTest
 import id.walt.walletdemo.compose.logic.DemoPinStore
 import id.walt.walletdemo.compose.logic.DemoWallet
@@ -37,6 +38,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoCredentialClaimMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoIssuerMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
+import id.walt.walletdemo.compose.logic.WalletDemoIssuancePreviewHandle
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
 import id.walt.walletdemo.compose.logic.WalletDemoOfferedCredentialMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialOption
@@ -47,6 +49,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelectio
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationError
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreview
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreviewResult
+import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreviewHandle
 import id.walt.walletdemo.compose.logic.WalletDemoResponseEncryption
 import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeInputMode
 import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeRequirement
@@ -371,6 +374,7 @@ class WalletDemoAppTestScenarios {
 
     fun invalidPresentationCanBeDismissedLocallyOrReportedToVerifier() = runComposeUiTest {
         val error = WalletDemoPresentationError(
+            previewHandle = samplePresentationPreview.previewHandle,
             verifierMetadata = samplePresentationPreview.verifierMetadata,
             clientId = samplePresentationPreview.clientId,
             responseEncryption = samplePresentationPreview.responseEncryption,
@@ -406,7 +410,7 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationError == null }
 
         assertEquals(null, wallet.rejectedRequestUrl)
-        onNodeWithTag(WalletUiTestTags.PresentationInput).assertIsEnabled().performTextInput("openid4vp://invalid")
+        onNodeWithTag(WalletUiTestTags.PresentationInput).assertIsEnabled().performTextReplacement("openid4vp://invalid")
         onNodeWithTag(WalletUiTestTags.PresentButton).performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationError == error }
         onNodeWithTag(WalletUiTestTags.PresentationErrorNotifyButton).performScrollTo().performClick()
@@ -464,8 +468,8 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.tab.present").performClick()
         onNodeWithTag("wallet.status").assertTextContains("Presentation sent")
         onNodeWithTag("wallet.presentationInput").assertIsNotEnabled()
-        assertPresentationNewActionPrecedesReadOnlyReview()
-        onNodeWithTag(WalletUiTestTags.credentialCard(samplePresentationCredentialOption.selection.id)).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationNewButton).performScrollTo().assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.PresentationReview).assertCountEquals(0)
         onAllNodesWithTag("wallet.presentationSubmitButton").assertCountEquals(0)
         onAllNodesWithTag("wallet.presentationRejectButton").assertCountEquals(0)
         onNodeWithTag("wallet.presentationNewButton").performScrollTo().performClick()
@@ -878,28 +882,6 @@ class WalletDemoAppTestScenarios {
         onNodeWithText("nonce-456").performScrollTo().assertIsDisplayed()
     }
 
-    private fun ComposeUiTest.assertPresentationNewActionPrecedesReadOnlyReview() {
-        val presentTabLandmarkTags = onAllNodes(
-            matcher = hasAnyAncestor(hasTestTag("wallet.presentTabContent")) and (
-                hasTestTag("wallet.presentationNewButton") or
-                    hasTestTag("wallet.presentationReview")
-                ),
-            useUnmergedTree = true,
-        )
-            .fetchSemanticsNodes()
-            .mapNotNull { it.config.getOrElseNullable(SemanticsProperties.TestTag) { null } }
-
-        val newActionIndex = presentTabLandmarkTags.indexOf("wallet.presentationNewButton")
-        val reviewIndex = presentTabLandmarkTags.indexOf("wallet.presentationReview")
-
-        assertTrue(newActionIndex >= 0, "New presentation action is missing: $presentTabLandmarkTags")
-        assertTrue(reviewIndex >= 0, "Read-only presentation review is missing: $presentTabLandmarkTags")
-        assertTrue(
-            newActionIndex < reviewIndex,
-            "New presentation action should precede the read-only review so starting over stays easy: $presentTabLandmarkTags",
-        )
-    }
-
     companion object {
         val sampleCredential = WalletDemoCredential(
             id = "cred-1",
@@ -925,6 +907,7 @@ class WalletDemoAppTestScenarios {
         )
 
         val samplePresentationPreview = WalletDemoPresentationPreview(
+            previewHandle = WalletDemoPresentationPreviewHandle("sample-presentation-preview"),
             verifierMetadata = WalletDemoVerifierMetadata(
                 display = WalletDemoMetadataDisplay(
                     name = "Example Verifier",
@@ -1043,6 +1026,8 @@ private class FakeDemoWallet(
     var previewedRequestUrl: String? = null
     var submittedRequestUrl: String? = null
     var rejectedRequestUrl: String? = null
+    private val issuanceSources = mutableMapOf<WalletDemoIssuancePreviewHandle, String>()
+    private val presentationSources = mutableMapOf<WalletDemoPresentationPreviewHandle, String>()
 
     override suspend fun bootstrap(): WalletDemoBootstrapResult {
         bootstrapCalls += 1
@@ -1051,8 +1036,11 @@ private class FakeDemoWallet(
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 
-    override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview =
-        WalletDemoOfferPreview(
+    override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview {
+        val handle = WalletDemoIssuancePreviewHandle("fake-issuance-preview-${issuanceSources.size}")
+        issuanceSources[handle] = offerUrl
+        return WalletDemoOfferPreview(
+            previewHandle = handle,
             issuer = WalletDemoIssuerMetadata(
                 credentialIssuer = "https://issuer.example",
                 display = WalletDemoMetadataDisplay(
@@ -1070,12 +1058,17 @@ private class FakeDemoWallet(
                 )
             },
         )
+    }
 
-    override suspend fun receive(offerUrl: String, txCode: String?): List<String> {
-        receivedOfferUrl = offerUrl
+    override suspend fun receive(previewHandle: WalletDemoIssuancePreviewHandle, txCode: String?): List<String> {
+        receivedOfferUrl = issuanceSources[previewHandle]
         receiveGate?.await()
         credentialsAfterReceive?.let { credentials = it }
         return receivedCredentialIds
+    }
+
+    override suspend fun discardIssuancePreview(previewHandle: WalletDemoIssuancePreviewHandle) {
+        issuanceSources.remove(previewHandle)
     }
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult {
@@ -1086,21 +1079,28 @@ private class FakeDemoWallet(
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult {
         previewedRequestUrl = requestUrl
         previewGate?.await()
+        presentationSources[presentationPreview.previewHandle] = requestUrl
         return presentationPreviewResult ?: WalletDemoPresentationPreviewResult.Ready(presentationPreview)
     }
 
     override suspend fun submitPresentation(
-        requestUrl: String,
+        previewHandle: WalletDemoPresentationPreviewHandle,
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String?,
     ): WalletDemoOperationResult {
-        submittedRequestUrl = requestUrl
+        submittedRequestUrl = presentationSources[previewHandle]
         return presentationResult
     }
 
-    override suspend fun rejectPresentation(requestUrl: String): WalletDemoOperationResult {
-        rejectedRequestUrl = requestUrl
+    override suspend fun rejectPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+    ): WalletDemoOperationResult {
+        rejectedRequestUrl = presentationSources[previewHandle]
         return WalletDemoOperationResult.Success("Presentation declined")
+    }
+
+    override suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle) {
+        presentationSources.remove(previewHandle)
     }
 }
