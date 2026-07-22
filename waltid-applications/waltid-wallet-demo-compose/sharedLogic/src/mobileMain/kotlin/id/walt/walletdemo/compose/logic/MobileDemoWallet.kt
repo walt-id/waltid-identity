@@ -136,7 +136,7 @@ internal class MobileDemoWallet(
                         state = result.request.state,
                         nonce = result.request.nonce,
                         responseEncryption = result.request.responseEncryption.toDemoResponseEncryption(),
-                        transactionData = result.request.transactionData.toDemoTransactionDataGroups(),
+                        transactionData = emptyList(),
                         errorCode = result.errorCode.errorCode,
                         message = result.message,
                     )
