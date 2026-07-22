@@ -399,7 +399,7 @@ object WalletIssuanceHandler {
         val key = wallet.resolveKey(request.key, request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, no inline key, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
-        val metadata = request.metadata
+        val requestMetadata = request.metadata
 
         val clientConfig = ClientConfiguration(
             clientId = request.clientId,
@@ -424,6 +424,9 @@ object WalletIssuanceHandler {
         val asMetadata = resolvedOffer.authorizationServerMetadata
         log.trace { "Resolved offer: issuer=${offer.credentialIssuer}, configIds=${offer.credentialConfigurationIds}" }
         onEvent(WalletSessionEvent.issuance_offer_resolved)
+
+        // Merge issuer display metadata with request metadata
+        val metadata = mergeIssuerDisplayMetadata(issuerMetadata, requestMetadata)
 
         log.debug { "Offer contains ${offeredCredentials.size} credential(s)" }
 
@@ -814,6 +817,35 @@ object WalletIssuanceHandler {
             addedAt = Clock.System.now(),
             metadata = metadata,
         ).also { addCredential(it) }
+    }
+
+    /**
+     * Merges issuer display metadata from the credential issuer metadata into the request metadata.
+     * The issuer display information is stored under the "issuerDisplay" key as a JSON array.
+     */
+    private fun mergeIssuerDisplayMetadata(
+        issuerMetadata: CredentialIssuerMetadata,
+        requestMetadata: JsonObject? = null
+    ): JsonObject? {
+        val issuerDisplayArray = issuerMetadata.display?.takeIf { it.isNotEmpty() }?.let { displays ->
+            JsonArray(displays.map { display ->
+                buildJsonObject {
+                    display.name?.let { put("name", it) }
+                    display.locale?.let { put("locale", it) }
+                    display.logo?.let { logo ->
+                        put("logo", buildJsonObject {
+                            put("uri", logo.uri)
+                            logo.altText?.let { put("alt_text", it) }
+                        })
+                    }
+                }
+            })
+        } ?: return requestMetadata
+
+        val baseMetadata = requestMetadata ?: JsonObject(emptyMap())
+        return JsonObject(baseMetadata.toMutableMap().apply {
+            put("issuerDisplay", issuerDisplayArray)
+        })
     }
 
     private suspend fun buildTokenEndpointAttestationHeaders(
