@@ -35,7 +35,7 @@ jobs:
   version:
     uses: walt-id/waltid-identity/.github/workflows/version.yml@6bb27c98fb66d9525dcc5ed8b0e703ff07a18c4a
   gradle-build:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@6bb27c98fb66d9525dcc5ed8b0e703ff07a18c4a
+    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@0601e9b457f63238dfbc2a9a4fa54b7b1aee0a9d
     secrets: inherit
     needs:
       - android-eligibility
