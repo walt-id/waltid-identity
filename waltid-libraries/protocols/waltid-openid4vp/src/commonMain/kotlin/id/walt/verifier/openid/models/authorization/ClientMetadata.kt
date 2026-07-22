@@ -44,6 +44,14 @@ data class ClientMetadata(
     @SerialName("encrypted_response_enc_values_supported")
     val encryptedResponseEncValuesSupported: List<String>? = null,
 
+    /** REQUIRED by SIOPv2 when the Verifier requests a Self-Issued ID Token. */
+    @SerialName("subject_syntax_types_supported")
+    val subjectSyntaxTypesSupported: List<String>? = null,
+
+    /** OPTIONAL JWS algorithm required for a Self-Issued ID Token response. */
+    @SerialName("id_token_signed_response_alg")
+    val idTokenSignedResponseAlg: String? = null,
+
     /**
      * OPTIONAL. Human-readable name of the client (Verifier).
      * Supports internationalization via language tags per RFC 7591.
@@ -143,6 +151,7 @@ data class ClientMetadata(
  * Language-tagged fields follow the pattern: `field_name#language-tag` (e.g., `client_name#fr-FR`).
  * The language tag is separated from the field name by a `#` character.
  */
+@OptIn(ExperimentalSerializationApi::class)
 object ClientMetadataSerializer : KSerializer<ClientMetadata> {
     // Fields that support internationalization per RFC 7591
     private val i18nFields = setOf("client_name", "logo_uri", "tos_uri", "policy_uri", "client_uri")
@@ -151,13 +160,17 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
     private val regularFields = setOf(
         "jwks",
         "vp_formats_supported",
-        "encrypted_response_enc_values_supported"
+        "encrypted_response_enc_values_supported",
+        "subject_syntax_types_supported",
+        "id_token_signed_response_alg",
     )
 
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("ClientMetadata") {
         element<JsonObject?>("jwks", isOptional = true)
         element<Map<String, JsonObject>?>("vp_formats_supported", isOptional = true)
         element<List<String>?>("encrypted_response_enc_values_supported", isOptional = true)
+        element<List<String>?>("subject_syntax_types_supported", isOptional = true)
+        element<String?>("id_token_signed_response_alg", isOptional = true)
         element<String?>("client_name", isOptional = true)
         element<String?>("logo_uri", isOptional = true)
         element<String?>("tos_uri", isOptional = true)
@@ -176,6 +189,9 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
         val vpFormatsSupported = json["vp_formats_supported"]?.jsonObject?.mapValues { it.value.jsonObject }
         val encryptedResponseEncValuesSupported = json["encrypted_response_enc_values_supported"]
             ?.jsonArray?.map { it.jsonPrimitive.content }
+        val subjectSyntaxTypesSupported = json["subject_syntax_types_supported"]
+            ?.jsonArray?.map { it.jsonPrimitive.content }
+        val idTokenSignedResponseAlg = json["id_token_signed_response_alg"]?.jsonPrimitive?.content
 
         // Extract base i18n fields (without language tags)
         val clientName = (json["client_name"] as? JsonPrimitive)?.takeIf { it.isString }?.content
@@ -237,6 +253,8 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
             jwks = jwks,
             vpFormatsSupported = vpFormatsSupported,
             encryptedResponseEncValuesSupported = encryptedResponseEncValuesSupported,
+            subjectSyntaxTypesSupported = subjectSyntaxTypesSupported,
+            idTokenSignedResponseAlg = idTokenSignedResponseAlg,
             clientName = clientName,
             clientNameI18n = clientNameI18n,
             logoUri = logoUri,
@@ -259,6 +277,8 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
             value.jwks?.let { put("jwks", Json.encodeToJsonElement(it)) }
             value.vpFormatsSupported?.let { put("vp_formats_supported", Json.encodeToJsonElement(it)) }
             value.encryptedResponseEncValuesSupported?.let { put("encrypted_response_enc_values_supported", Json.encodeToJsonElement(it)) }
+            value.subjectSyntaxTypesSupported?.let { put("subject_syntax_types_supported", Json.encodeToJsonElement(it)) }
+            value.idTokenSignedResponseAlg?.let { put("id_token_signed_response_alg", it) }
 
             // Base i18n fields (without language tags)
             value.clientName?.let { put("client_name", it) }

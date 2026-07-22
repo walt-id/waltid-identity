@@ -2,6 +2,9 @@ package id.walt.wallet2.server
 
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.keys.StorableKey
+import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDescriptor
@@ -14,6 +17,8 @@ import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import io.ktor.http.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+
+private val walletCrypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
 
 /**
  * Factory for creating named store instances.
@@ -108,6 +113,7 @@ interface WalletResolver {
             staticDid = wallet.staticDid,
             defaultKeyId = wallet.defaultKeyId,
             defaultDidId = wallet.defaultDidId,
+            crypto2StaticKey = (wallet.attachedStaticCrypto2Key() as? StorableKey)?.storedKey,
         )
         walletStore.saveDescriptor(descriptor)
     }
@@ -128,14 +134,20 @@ interface WalletResolver {
 
     suspend fun resolveKeyStore(storeId: String): WalletKeyStore? = null
     suspend fun storeKeyStore(storeId: String, store: WalletKeyStore) {}
+    suspend fun createKeyStore(storeId: String): WalletKeyStore =
+        InMemoryKeyStore().also { storeKeyStore(storeId, it) }
     fun listKeyStoreIds(): Flow<String> = emptyFlow()
 
     suspend fun resolveCredentialStore(storeId: String): WalletCredentialStore? = null
     suspend fun storeCredentialStore(storeId: String, store: WalletCredentialStore) {}
+    suspend fun createCredentialStore(storeId: String): WalletCredentialStore =
+        InMemoryCredentialStore().also { storeCredentialStore(storeId, it) }
     fun listCredentialStoreIds(): Flow<String> = emptyFlow()
 
     suspend fun resolveDidStore(storeId: String): WalletDidStore? = null
     suspend fun storeDidStore(storeId: String, store: WalletDidStore) {}
+    suspend fun createDidStore(storeId: String): WalletDidStore =
+        InMemoryDidStore().also { storeDidStore(storeId, it) }
     fun listDidStoreIds(): Flow<String> = emptyFlow()
 
     // ---------------------------------------------------------------------------
@@ -167,7 +179,11 @@ interface WalletResolver {
             staticDid = descriptor.staticDid,
             defaultKeyId = descriptor.defaultKeyId,
             defaultDidId = descriptor.defaultDidId,
-        )
+        ).also { wallet ->
+            descriptor.crypto2StaticKey?.let { storedKey ->
+                wallet.attachStaticCrypto2Key(walletCrypto2Runtime.restore(storedKey))
+            }
+        }
     }
 
     /** Resolves the registered storeId for a given store instance, if any. */

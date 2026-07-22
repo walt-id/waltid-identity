@@ -71,7 +71,7 @@ object KeyManager {
         val function = keyTypeGeneration[generationRequest.backend] ?: throw KeyBackendNotSupportedException(
             generationRequest.backend
         )
-        log.debug { "Creating key with generation request: $generationRequest" }
+        log.debug(generationRequest::safeLogDescription)
 
         return function.invoke(generationRequest)
     }
@@ -104,5 +104,8 @@ object KeyManager {
         resolveSerializedKeyBlocking(json = Json.parseToJsonElement(jsonString).jsonObject)
 
 }
+
+internal fun KeyGenerationRequest.safeLogDescription(): String =
+    "Creating $keyType key with backend $backend" + name?.let { " and name $it" }.orEmpty()
 
 expect fun resolveSerializedKeyBlocking(json: JsonObject): Key

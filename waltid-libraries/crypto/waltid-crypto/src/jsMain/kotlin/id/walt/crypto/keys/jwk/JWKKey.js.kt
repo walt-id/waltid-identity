@@ -117,6 +117,7 @@ actual class JWKKey actual constructor(
     @JsPromise
     @JsExport.Ignore
     actual override suspend fun exportPEM(): String {
+        init()
         return when {
             hasPrivateKey -> PromiseUtils.await(jose.exportPKCS8(_internalKey))
             else -> PromiseUtils.await(jose.exportSPKI(_internalKey))
@@ -135,8 +136,9 @@ actual class JWKKey actual constructor(
             KeyType.secp521r1 -> js("{ name: 'ECDSA', namedCurve: 'P-521' }")
 
             // For RSA, it's an object with name and hash
-            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 ->
-                js("{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }")
+            KeyType.RSA -> js("{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }")
+            KeyType.RSA3072 -> js("{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-384' }")
+            KeyType.RSA4096 -> js("{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' }")
 
             else -> throw IllegalArgumentException("Unsupported key type for Web Crypto: $keyType")
         }
@@ -221,6 +223,7 @@ actual class JWKKey actual constructor(
     @JsExport.Ignore
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         check(hasPrivateKey) { "No private key is attached to this key!" }
+        init()
 
         val protectedHeader = json("alg" to keyType.jwsAlg)
         headers.forEach { (name, value) ->
@@ -239,45 +242,6 @@ actual class JWKKey actual constructor(
         return JSON.parse<dynamic>(serialized)
     }
 
-    private data class WebCryptoParams(val importAlgorithm: dynamic, val signAlgorithm: dynamic)
-
-
-    private fun getVerificationWebCryptoParams(): WebCryptoParams {
-        return when (keyType) {
-            KeyType.secp256r1 -> WebCryptoParams(
-                importAlgorithm = js("{ name: 'ECDSA', namedCurve: 'P-256' }"),
-                signAlgorithm = js("{ name: 'ECDSA', hash: 'SHA-256' }")
-            )
-
-            KeyType.secp384r1 -> WebCryptoParams(
-                importAlgorithm = js("{ name: 'ECDSA', namedCurve: 'P-384' }"),
-                signAlgorithm = js("{ name: 'ECDSA', hash: 'SHA-384' }")
-            )
-
-            KeyType.secp521r1 -> WebCryptoParams(
-                importAlgorithm = js("{ name: 'ECDSA', namedCurve: 'P-521' }"),
-                signAlgorithm = js("{ name: 'ECDSA', hash: 'SHA-512' }")
-            )
-
-            KeyType.RSA -> WebCryptoParams(
-                importAlgorithm = js("{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }"),
-                signAlgorithm = js("{ name: 'RSASSA-PKCS1-v1_5' }")
-            )
-
-            KeyType.RSA3072 -> WebCryptoParams(
-                importAlgorithm = js("{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-384' }"),
-                signAlgorithm = js("{ name: 'RSASSA-PKCS1-v1_5' }")
-            )
-
-            KeyType.RSA4096 -> WebCryptoParams(
-                importAlgorithm = js("{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' }"),
-                signAlgorithm = js("{ name: 'RSASSA-PKCS1-v1_5' }")
-            )
-
-            else -> throw IllegalArgumentException("Unsupported algorithm for Javascript verification: $keyType")
-        }
-    }
-
     @JsPromise
     @JsExport.Ignore
     actual override suspend fun verifyRaw(
@@ -285,60 +249,19 @@ actual class JWKKey actual constructor(
         detachedPlaintext: ByteArray?,
         customSignatureAlgorithm: String?
     ): Result<ByteArray> {
-        /*runCatching {
-            require(detachedPlaintext != null) { "Detached plaintext cannot be null." }
-
-            // Assume a method exists to get the public key in PEM format.
-            val pemString = exportPEM()
-
-            // 1. Parse the public key from PEM format to a raw binary ArrayBuffer.
-            val publicKeyData = parsePemToBinary(pemString)
-
-            // 2. Get the algorithm parameters required by the Web Crypto API.
-            val jwsAlgorithm = keyType.jwsAlg
-            val cryptoParams = getVerificationWebCryptoParams()
-
-            // 3. Import the public key to create a CryptoKey object for verification.
-            val cryptoKey = WebCrypto.subtle.importKey(
-                "spki",              // Public key format for public keys
-                publicKeyData,       // The raw key data
-                cryptoParams.importAlgorithm,
-                true,
-                arrayOf("verify")    // Specify that this key will be used for verification.
-            ).await()
-
-            // 4. IMPORTANT: Ensure the signature is in the IEEE P1363 format required by `subtle.verify`.
-            val p1363Signature = convertDERtoIEEEP1363(signed)
-            val signatureBuffer = (p1363Signature as Int8Array).buffer
-
-            // 5. Call `subtle.verify` with the key, signature, and original data.
-            val isValid = WebCrypto.subtle.verify(
-                cryptoParams.signAlgorithm,
-                cryptoKey,
-                signatureBuffer,
-                Uint8Array(detachedPlaintext.toTypedArray())
-            ).await()
-
-            // 6. Check the result and return the plaintext or throw an exception.
-            if (isValid) {
-                detachedPlaintext
-            } else {
-                throw IllegalArgumentException("Signature verification failed.")
-            }*/
-
-
         return runCatching {
+            requireNotNull(detachedPlaintext) { "Detached plaintext is required for verification" }
             val verified = crypto.verify(
                 when (keyType) {
                     KeyType.Ed25519 -> null
-                    else -> "sha256"
+                    else -> keyType.signatureDigestName.lowercase().replace("-", "")
                 },
-                detachedPlaintext ?: signed,
+                detachedPlaintext,
                 getPublicKey().exportPEM(),
                 signed
             )
             if (verified) {
-                "true".toByteArray()
+                detachedPlaintext
             } else {
                 throw IllegalArgumentException("Signature verification failed")
             }
@@ -352,8 +275,8 @@ actual class JWKKey actual constructor(
      */
     @JsPromise
     @JsExport.Ignore
-    actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> =
-        runCatching {
+    actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> = runCatching {
+            init()
             Json.parseToJsonElement(
                 PromiseUtils.await(jose.compactVerify(signedJws, _internalKey)).payload.toByteArray().decodeToString()
             ).jsonObject
@@ -403,6 +326,7 @@ actual class JWKKey actual constructor(
 
     actual override val keyType: KeyType
         get() {
+            if (!this::_internalKey.isInitialized) return keyTypeFromJwk()
             val k = _internalKey.asDynamic()
             return when {
                 k.asymmetricKeyType != undefined -> { // KeyObject (node)
@@ -447,8 +371,27 @@ actual class JWKKey actual constructor(
         }
 
     actual override val hasPrivateKey: Boolean
-        get() = check(this::_internalKey.isInitialized) { "_internalKey of JWKKey.js.kt is not initialized (tried to to private key operation?) - has init() be called on key?" }
-            .run { _internalKey.type == "private" }
+        get() = if (this::_internalKey.isInitialized) {
+            _internalKey.type == "private"
+        } else {
+            val key = _internalJwk.asDynamic()
+            key.d != undefined || key.k != undefined
+        }
+
+    private fun keyTypeFromJwk(): KeyType {
+        val key = _internalJwk.asDynamic()
+        return when (key.kty as String) {
+            "EC" -> KeyTypes.getKeyTypeByJwkId("EC", key.crv as String)
+            "OKP" -> KeyTypes.getKeyTypeByJwkId("OKP", key.crv as String)
+            "RSA" -> when (Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL).decode(key.n as String).size) {
+                256 -> KeyType.RSA
+                384 -> KeyType.RSA3072
+                512 -> KeyType.RSA4096
+                else -> throw IllegalArgumentException("Unsupported RSA modulus length")
+            }
+            else -> throw IllegalArgumentException("Unsupported JWK key type: ${key.kty}")
+        }
+    }
 
 
     @JsPromise

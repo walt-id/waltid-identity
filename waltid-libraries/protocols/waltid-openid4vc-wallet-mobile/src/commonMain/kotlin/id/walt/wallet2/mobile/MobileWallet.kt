@@ -4,8 +4,11 @@ package id.walt.wallet2.mobile
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
+import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
@@ -27,9 +30,12 @@ import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import io.ktor.http.Url
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -45,6 +51,11 @@ import kotlinx.serialization.json.contentOrNull
 public data class MobileWalletBootstrapResult(
     public val keyId: String,
     public val did: String,
+)
+
+internal class MobileWalletCrypto2Bootstrap(
+    val generateAndPersistKey: suspend (MobileWalletKeyType) -> Crypto2Key,
+    val didService: Crypto2DidService,
 )
 
 /**
@@ -129,9 +140,11 @@ public class MobileWallet internal constructor(
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
     private val keyGenerator: suspend (KeyType) -> Key,
+    private val crypto2Bootstrap: MobileWalletCrypto2Bootstrap? = null,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     attestationConfig: WalletAttestationConfig? = null,
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    private val clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {
@@ -180,14 +193,67 @@ public class MobileWallet internal constructor(
             require(existingKeys.isNotEmpty()) {
                 "Wallet '${wallet.id}' has persisted DIDs but no persisted keys"
             }
+            val existingKey = existingKeys.first()
+            val keyAvailable = keyStore.getCrypto2Key(existingKey.keyId) != null ||
+                keyStore.getKeyMaterial(existingKey.keyId)?.let {
+                    it.crypto2Key != null || it.legacyKey != null
+                } == true
+            require(keyAvailable) {
+                "Wallet '${wallet.id}' persisted key '${existingKey.keyId}' is unavailable"
+            }
             return MobileWalletBootstrapResult(
-                keyId = existingKeys.first().keyId,
+                keyId = existingKey.keyId,
                 did = existingDids.first().did,
             )
         }
 
         val effectiveKeyType = keyType ?: defaultKeyType
-        val key = keyGenerator(effectiveKeyType.toKeyType())
+        return crypto2Bootstrap?.let { bootstrap ->
+            bootstrapCrypto2(effectiveKeyType, didMethod, bootstrap)
+        } ?: bootstrapLegacy(effectiveKeyType, didMethod)
+    }
+
+    private suspend fun bootstrapCrypto2(
+        keyType: MobileWalletKeyType,
+        didMethod: String,
+        bootstrap: MobileWalletCrypto2Bootstrap,
+    ): MobileWalletBootstrapResult {
+        val normalizedMethod = didMethod.lowercase()
+        val options = when (normalizedMethod) {
+            "key" -> DidKeyCreateOptions()
+            "jwk" -> DidJwkCreateOptions()
+            else -> throw IllegalArgumentException(
+                "Crypto2 mobile bootstrap supports only did:key and did:jwk; " +
+                    "configure MobileWalletKeys to explicitly use legacy DID compatibility"
+            )
+        }
+        val key = bootstrap.generateAndPersistKey(keyType)
+        try {
+            val didResult = bootstrap.didService.registerByKey(normalizedMethod, key, options)
+            didStore.addDid(
+                WalletDidEntry(
+                    did = didResult.did,
+                    document = didResult.didDocument.toJsonObject(),
+                )
+            )
+            return MobileWalletBootstrapResult(keyId = key.id.value, did = didResult.did)
+        } catch (cause: Throwable) {
+            try {
+                withContext(NonCancellable) {
+                    check(keyStore.removeKey(key.id.value)) { "Failed to remove crypto2 key after DID bootstrap failure" }
+                }
+            } catch (cleanupFailure: Throwable) {
+                cause.addSuppressed(cleanupFailure)
+            }
+            throw cause
+        }
+    }
+
+    private suspend fun bootstrapLegacy(
+        keyType: MobileWalletKeyType,
+        didMethod: String,
+    ): MobileWalletBootstrapResult {
+        val key = keyGenerator(keyType.toKeyType())
         val keyId = keyStore.addKey(key)
         val didResult = registerDidByKey(didMethod, key)
 
@@ -298,7 +364,7 @@ public class MobileWallet internal constructor(
         did: String? = null,
         runPolicies: Boolean? = null,
     ): MobileWalletPresentationResult {
-        val result = WalletPresentationHandler.presentCredential(
+        val result = WalletPresentationHandler.presentCredentialWithTrust(
             wallet = wallet,
             request = PresentCredentialRequest(
                 requestUrl = Url(requestUrl.trim()),
@@ -306,6 +372,7 @@ public class MobileWallet internal constructor(
                 runPolicies = runPolicies,
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
             onEvent = ::emitSessionEvent,
         )
 
@@ -322,12 +389,13 @@ public class MobileWallet internal constructor(
      * Resolves and previews an OpenID4VP presentation request without submitting credentials.
      */
     public suspend fun previewPresentation(requestUrl: String): MobileWalletPresentationPreview {
-        val result = WalletPresentationHandler.previewPresentation(
+        val result = WalletPresentationHandler.previewPresentationWithTrust(
             wallet = wallet,
             request = PreviewPresentationRequest(
                 requestUrl = Url(requestUrl.trim()),
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
             onEvent = ::emitSessionEvent,
         )
 

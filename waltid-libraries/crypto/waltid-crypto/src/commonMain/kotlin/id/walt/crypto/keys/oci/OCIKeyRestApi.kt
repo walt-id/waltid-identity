@@ -135,7 +135,7 @@ class OCIKeyRestApi(
     @JsExport.Ignore
     override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         return retry {
-            val encodedMessage: String = SHA256().digest(plaintext).encodeBase64()
+            val encodedMessage = keyType.digestForSignature(plaintext).encodeBase64()
 
             val requestBody = JsonObject(
                 mapOf(
@@ -201,9 +201,10 @@ class OCIKeyRestApi(
         val requestBody = JsonObject(
             mapOf(
                 "keyId" to JsonPrimitive(id),
-                "message" to JsonPrimitive(detachedPlaintext.encodeBase64()),
+                "message" to JsonPrimitive(keyType.digestForSignature(detachedPlaintext).encodeBase64()),
                 "signature" to JsonPrimitive(signed.encodeBase64()),
-                "signingAlgorithm" to JsonPrimitive(ociSigningAlgorithm)
+                "signingAlgorithm" to JsonPrimitive(ociSigningAlgorithm),
+                "messageType" to JsonPrimitive("DIGEST"),
             )
         ).toString()
 
@@ -522,5 +523,4 @@ private suspend fun <T> retry(retriesLeft: Int = 3, currentTry: Int = 1, block: 
                 else -> retry(retriesLeft - 1, currentTry + 1, block)
             }
         })
-
 

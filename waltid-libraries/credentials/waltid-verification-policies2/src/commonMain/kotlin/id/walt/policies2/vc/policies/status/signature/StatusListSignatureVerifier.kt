@@ -2,23 +2,53 @@ package id.walt.policies2.vc.policies.status.signature
 
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
+import id.walt.cose.Cose
 import id.walt.cose.coseCompliantCbor
-import id.walt.cose.toCoseVerifier
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.did.dids.DidService
+import id.walt.cose.verify
+import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
+import id.walt.credentials.keyresolver.ResolvedJwtVerificationKey
+import id.walt.credentials.formats.DigitalCredential
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.did.dids.DidUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlin.io.encoding.Base64
+
+data class VerifiedStatusList<T>(
+    val payload: T,
+    val signer: ResolvedJwtVerificationKey,
+)
+
+data class StatusListSignerAuthorizationRequest(
+    val referencedCredential: DigitalCredential,
+    val statusListUri: String,
+    val signer: ResolvedJwtVerificationKey,
+)
+
+fun interface StatusListSignerAuthorizer {
+    suspend fun authorize(request: StatusListSignerAuthorizationRequest): Boolean
+}
 
 @OptIn(ExperimentalSerializationApi::class)
-class StatusListSignatureVerifier {
+class StatusListSignatureVerifier(
+    allowUntrustedInlineJwk: Boolean = false,
+    private val keyResolver: Crypto2JwtKeyResolver = Crypto2JwtKeyResolver(
+        allowInlineJwk = allowUntrustedInlineJwk,
+    ),
+    private val allowedJwtAlgorithms: Set<JwsAlgorithm> = JwsAlgorithm.entries.toSet(),
+    private val allowedCoseAlgorithms: Set<Int> = DEFAULT_COSE_ALGORITHMS,
+) {
     
     private val logger = KotlinLogging.logger {}
     
@@ -28,23 +58,33 @@ class StatusListSignatureVerifier {
      * @param jwt The JWT string to verify
      * @return Result containing the verified payload as JsonObject, or failure with exception
      */
-    suspend fun verifyJwt(jwt: String): Result<JsonObject> = runCatching {
+    suspend fun verifyJwt(jwt: String): Result<JsonObject> =
+        verifyJwtWithSigner(jwt).map(VerifiedStatusList<JsonObject>::payload)
+
+    suspend fun verifyJwtWithSigner(jwt: String): Result<VerifiedStatusList<JsonObject>> = resultOfSuspend {
         logger.debug { "Verifying JWT status list signature" }
-        
-        val jwsParts = jwt.decodeJws()
-        val header = jwsParts.header
-        
-        val key = resolveKeyFromJwtHeader(header).getOrElse { 
-            throw KeyResolutionFailedException("Failed to resolve signing key from JWT header: ${it.message}")
+
+        val decoded = try {
+            CompactJws.decodeUnverified(jwt)
+        } catch (cause: Throwable) {
+            throw SignatureInvalidException("Invalid JWT structure: ${cause.message}")
         }
-        
-        logger.debug { "Resolved key for JWT verification: ${key.keyType}" }
-        
-        key.verifyJws(jwt).getOrElse {
-            throw SignatureInvalidException("JWT signature verification failed: ${it.message}")
+        val payload = try {
+            Json.parseToJsonElement(decoded.payload.decodeToString()) as? JsonObject
+                ?: throw IllegalArgumentException("JWT payload must be a JSON object")
+        } catch (cause: Throwable) {
+            throw SignatureInvalidException("Invalid JWT payload: ${cause.message}")
         }
-        
-        jwsParts.payload
+        val resolved = resolveKeyFromJwtHeader(decoded.protectedHeader, payload)
+        logger.debug { "Resolved crypto2 key for JWT verification: ${resolved.key.spec}" }
+        try {
+            CompactJws.verify(jwt, resolved.key, allowedJwtAlgorithms)
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (cause: Throwable) {
+            throw SignatureInvalidException("JWT signature verification failed: ${cause.message}")
+        }
+        VerifiedStatusList(payload, resolved)
     }
     
     /**
@@ -53,25 +93,30 @@ class StatusListSignatureVerifier {
      * @param cwtBytes The CWT as raw bytes (not hex encoded)
      * @return Result containing the verified payload as ByteArray, or failure with exception
      */
-    suspend fun verifyCwt(cwtBytes: ByteArray): Result<ByteArray> = runCatching {
+    suspend fun verifyCwt(cwtBytes: ByteArray): Result<ByteArray> =
+        verifyCwtWithSigner(cwtBytes).map(VerifiedStatusList<ByteArray>::payload)
+
+    suspend fun verifyCwtWithSigner(cwtBytes: ByteArray): Result<VerifiedStatusList<ByteArray>> = resultOfSuspend {
         logger.debug { "Verifying CWT status list signature" }
         
-        val coseSign1 = CoseSign1.fromTagged(cwtBytes)
-        
-        val key = resolveKeyFromCoseHeaders(coseSign1).getOrElse {
-            throw KeyResolutionFailedException("Failed to resolve signing key from CWT headers: ${it.message}")
+        val coseSign1 = try {
+            CoseSign1.fromTagged(cwtBytes)
+        } catch (cause: Throwable) {
+            throw SignatureInvalidException("Invalid CWT structure: ${cause.message}")
         }
         
-        logger.debug { "Resolved key for CWT verification: ${key.keyType}" }
-        
-        val verifier = key.toCoseVerifier()
-        val isValid = coseSign1.verify(verifier)
+        val resolved = resolveKeyFromCoseHeaders(coseSign1)
+        logger.debug { "Resolved crypto2 key for CWT verification: ${resolved.key.spec}" }
+        val isValid = coseSign1.verify(resolved.key, allowedCoseAlgorithms)
         
         if (!isValid) {
             throw SignatureInvalidException("CWT signature verification failed")
         }
         
-        coseSign1.payload ?: throw SignatureInvalidException("CWT has no payload")
+        VerifiedStatusList(
+            coseSign1.payload ?: throw SignatureInvalidException("CWT has no payload"),
+            resolved,
+        )
     }
     
     /**
@@ -80,7 +125,7 @@ class StatusListSignatureVerifier {
      * @param cwtHex The CWT as hex-encoded string
      * @return Result containing the verified payload as ByteArray, or failure with exception
      */
-    suspend fun verifyCwtFromHex(cwtHex: String): Result<ByteArray> = runCatching {
+    suspend fun verifyCwtFromHex(cwtHex: String): Result<ByteArray> = resultOfSuspend {
         val cwtBytes = cwtHex.hexToByteArray()
         verifyCwt(cwtBytes).getOrThrow()
     }
@@ -92,32 +137,20 @@ class StatusListSignatureVerifier {
      * 2. kid header with DID URL - resolve via DID service
      * 3. jwk header - import directly
      */
-    private suspend fun resolveKeyFromJwtHeader(header: JsonObject): Result<Key> = runCatching {
-        // Try x5c first (X.509 certificate chain)
-        header["x5c"]?.jsonArray?.let { x5cArray ->
-            return@runCatching resolveKeyFromX5c(x5cArray)
-        }
-        
-        // Try kid with DID URL
-        header["kid"]?.jsonPrimitive?.content?.let { kid ->
-            if (DidUtils.isDidUrl(kid)) {
-                logger.debug { "Resolving key from DID: $kid" }
-                val didWithoutFragment = kid.substringBefore("#")
-                return@runCatching DidService.resolveToKey(didWithoutFragment).getOrElse {
-                    throw KeyResolutionFailedException("Failed to resolve DID $kid: ${it.message}")
-                }
-            }
-        }
-        
-        // Try jwk header
-        header["jwk"]?.let { jwkElement ->
-            logger.debug { "Importing key from jwk header" }
-            return@runCatching JWKKey.importJWK(jwkElement.toString()).getOrElse {
-                throw KeyResolutionFailedException("Failed to import JWK from header: ${it.message}")
-            }
-        }
-        
-        throw KeyResolutionFailedException("No resolvable key information in JWT header (expected x5c, kid with DID, or jwk)")
+    private suspend fun resolveKeyFromJwtHeader(
+        header: JsonObject,
+        payload: JsonObject,
+    ): ResolvedJwtVerificationKey {
+        val keyId = header["kid"]?.jsonPrimitive?.contentOrNull
+        val payloadForResolution = if (
+            payload["iss"] == null && payload["issuer"] == null && keyId != null && DidUtils.isDidUrl(keyId)
+        ) {
+            JsonObject(payload + ("iss" to JsonPrimitive(keyId.substringBefore('#'))))
+        } else payload
+        return keyResolver.resolveFromJwt(header, payloadForResolution) // see Crypto2JwtKeyResolver
+        ?: throw KeyResolutionFailedException(
+            "No resolvable key information in JWT header (expected trusted issuer, x5c, or explicitly enabled jwk)"
+        )
     }
     
     /**
@@ -129,7 +162,7 @@ class StatusListSignatureVerifier {
      * 
      * Note: ISO 18013-5 Second Edition mandates x5chain in protected headers.
      */
-    private suspend fun resolveKeyFromCoseHeaders(coseSign1: CoseSign1): Result<Key> = runCatching {
+    private suspend fun resolveKeyFromCoseHeaders(coseSign1: CoseSign1): ResolvedJwtVerificationKey {
         // Decode protected headers
         val protectedHeaders = coseCompliantCbor.decodeFromByteArray<CoseHeaders>(coseSign1.protected)
         
@@ -137,10 +170,9 @@ class StatusListSignatureVerifier {
         protectedHeaders.x5chain?.let { x5chain ->
             if (x5chain.isNotEmpty()) {
                 logger.debug { "Resolving key from x5chain in PROTECTED headers (ISO 18013-5 compliant)" }
-                val leafCertBytes = x5chain.first().rawBytes
-                return@runCatching JWKKey.importFromDerCertificate(leafCertBytes).getOrElse {
-                    throw KeyResolutionFailedException("Failed to import key from x5chain: ${it.message}")
-                }
+                return resolveKeyFromX5c(
+                    JsonArray(x5chain.map { JsonPrimitive(Base64.Default.encode(it.rawBytes)) })
+                )
             }
         }
         
@@ -150,9 +182,10 @@ class StatusListSignatureVerifier {
             if (DidUtils.isDidUrl(kid)) {
                 logger.debug { "Resolving key from DID in CWT kid (protected): $kid" }
                 val didWithoutFragment = kid.substringBefore("#")
-                return@runCatching DidService.resolveToKey(didWithoutFragment).getOrElse {
-                    throw KeyResolutionFailedException("Failed to resolve DID $kid: ${it.message}")
-                }
+                return keyResolver.resolveFromJwt(
+                    jwtHeader = buildJsonObject { put("kid", kid) },
+                    jwtPayload = buildJsonObject { put("iss", didWithoutFragment) },
+                ) ?: throw KeyResolutionFailedException("Failed to resolve DID $kid")
             }
         }
         
@@ -163,21 +196,43 @@ class StatusListSignatureVerifier {
      * Imports a key from an x5c certificate chain.
      * Uses the leaf certificate (first in the chain).
      */
-    private suspend fun resolveKeyFromX5c(x5cArray: JsonArray): Key {
+    private suspend fun resolveKeyFromX5c(x5cArray: JsonArray): ResolvedJwtVerificationKey {
         if (x5cArray.isEmpty()) {
             throw KeyResolutionFailedException("x5c array is empty")
         }
         
-        val leafCertBase64 = x5cArray.first().jsonPrimitive.content
         logger.debug { "Importing key from x5c leaf certificate" }
-        
-        return JWKKey.importDERorPEM(leafCertBase64).getOrElse {
-            throw KeyResolutionFailedException("Failed to import key from x5c certificate: ${it.message}")
-        }
+        return keyResolver.resolveFromJwt(
+            jwtHeader = buildJsonObject { put("x5c", x5cArray) },
+            jwtPayload = buildJsonObject { },
+        ) ?: throw KeyResolutionFailedException("Failed to import key from x5c certificate")
     }
     
     private fun String.hexToByteArray(): ByteArray {
         check(length % 2 == 0) { "Hex string must have even length" }
         return chunked(2).map { it.toInt(16).toByte() }.toByteArray()
     }
+
+    companion object {
+        private val DEFAULT_COSE_ALGORITHMS = setOf(
+            Cose.Algorithm.ES256,
+            Cose.Algorithm.ES384,
+            Cose.Algorithm.ES512,
+            Cose.Algorithm.EdDSA,
+            Cose.Algorithm.PS256,
+            Cose.Algorithm.PS384,
+            Cose.Algorithm.PS512,
+            Cose.Algorithm.RS256,
+            Cose.Algorithm.RS384,
+            Cose.Algorithm.RS512,
+        )
+    }
+}
+
+private suspend fun <T> resultOfSuspend(block: suspend () -> T): Result<T> = try {
+    Result.success(block())
+} catch (cause: CancellationException) {
+    throw cause
+} catch (cause: Throwable) {
+    Result.failure(cause)
 }

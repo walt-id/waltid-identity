@@ -9,6 +9,7 @@ import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.io.File
+import java.sql.SQLException
 
 private val log = KotlinLogging.logger {}
 
@@ -81,15 +82,64 @@ fun initWallet2Database(
         minimumIdle = config.minimumIdle
         isAutoCommit = false
         transactionIsolation = "TRANSACTION_SERIALIZABLE"
+        if (config.jdbcUrl.startsWith("jdbc:sqlite:")) {
+            connectionInitSql = "PRAGMA busy_timeout=30000"
+        }
         validate()
     }
 
     val db = Database.connect(HikariDataSource(hikari))
 
-    transaction(db) {
-        SchemaUtils.createMissingTablesAndColumns(*Wallet2Tables.ALL)
-        log.info { "wallet2 schema ready" }
+    synchronized(schemaMigrationLock) {
+        createOrMigrateSchema(db, config.jdbcUrl)
     }
 
     return db
 }
+
+private fun createOrMigrateSchema(db: Database, jdbcUrl: String) {
+    repeat(SCHEMA_MIGRATION_ATTEMPTS) { attempt ->
+        try {
+            transaction(db) {
+                if (jdbcUrl.startsWith("jdbc:postgresql:")) {
+                    exec("SELECT pg_advisory_xact_lock($SCHEMA_MIGRATION_LOCK_ID)")
+                }
+                SchemaUtils.createMissingTablesAndColumns(*Wallet2Tables.ALL)
+            }
+            log.info { "wallet2 schema ready" }
+            return
+        } catch (cause: Exception) {
+            if (attempt == SCHEMA_MIGRATION_ATTEMPTS - 1 || !cause.isRetryableSchemaRace()) throw cause
+            Thread.sleep(SCHEMA_MIGRATION_RETRY_MILLIS * (attempt + 1))
+        }
+    }
+}
+
+private fun Throwable.isRetryableSchemaRace(): Boolean {
+    var current: Throwable? = this
+    while (current != null) {
+        if (current is SQLException) {
+            if (current.sqlState in setOf("40001", "40P01", "42701", "55P03")) return true
+            val message = current.message.orEmpty().lowercase()
+            if (listOf(
+                    "already exists",
+                    "duplicate column",
+                    "database is locked",
+                    "database is busy",
+                    "schema is locked",
+                    "table is locked",
+                    "no transaction is active",
+                ).any(message::contains)
+            ) {
+                return true
+            }
+        }
+        current = current.cause
+    }
+    return false
+}
+
+private const val SCHEMA_MIGRATION_ATTEMPTS = 5
+private const val SCHEMA_MIGRATION_RETRY_MILLIS = 100L
+private const val SCHEMA_MIGRATION_LOCK_ID = 0x57414c5432L
+private val schemaMigrationLock = Any()

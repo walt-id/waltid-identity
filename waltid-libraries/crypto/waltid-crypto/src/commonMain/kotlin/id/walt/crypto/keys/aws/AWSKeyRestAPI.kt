@@ -121,10 +121,7 @@ class AWSKeyRestAPI(
     @JsPromise
     @JsExport.Ignore
     override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
-        if (!awsSigningAlgorithm.endsWith("_SHA_256")) {
-            throw SigningException("failed to sign - unsupported hashing algorithm: $awsSigningAlgorithm")
-        }
-        val digestedMessage = sha256(plaintext)
+        val digestedMessage = keyType.digestForSignature(plaintext)
 
         val body = """
 {
@@ -194,8 +191,7 @@ class AWSKeyRestAPI(
         val messageToVerify =
             detachedPlaintext ?: return Result.failure(IllegalArgumentException("Detached plaintext is required for verification"))
 
-        // Calculate SHA-256 hash to handle payloads larger than 4KB
-        val digestedMessage = sha256(messageToVerify)
+        val digestedMessage = keyType.digestForSignature(messageToVerify)
 
         val body = """
 {
@@ -227,10 +223,11 @@ class AWSKeyRestAPI(
             }
             setBody(body) // Set the JSON body
         }.awsJsonDataBody("verify")
-        return Result.success(
-            verification["SignatureValid"]?.jsonPrimitive?.content?.decodeFromBase64()
-                ?: throw VerificationException("failed to verify")
-        )
+        return if (verification["SignatureValid"]?.jsonPrimitive?.boolean == true) {
+            Result.success(messageToVerify)
+        } else {
+            Result.failure(VerificationException("Signature is not valid"))
+        }
     }
 
     @JvmBlocking
@@ -470,7 +467,6 @@ ${sha256Hex(canonicalRequest)}
                     append("X-aws-ec2-metadata-token-ttl-seconds", ttlSeconds.toString())
                 }
             }
-            logger.trace { "AWS TOKEN: $token" }
             return token.bodyAsText()
         }
 
@@ -680,4 +676,3 @@ $public
 
     }
 }
-

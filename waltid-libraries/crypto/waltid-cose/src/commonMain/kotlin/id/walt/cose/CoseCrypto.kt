@@ -16,6 +16,7 @@ fun interface CoseVerifier {
 }
 
 /** Adapts your [Key] to a [CoseSigner]. */
+@Deprecated("Use the crypto2 Key.toCoseSigner(Int) overload.")
 fun Key.toCoseSigner(algorithm: String? = null): CoseSigner {
     require(this.hasPrivateKey) { "Key must have a private part to be used as a signer." }
     return CoseSigner { dataToSign ->
@@ -40,6 +41,7 @@ private fun toCustomSignatureScheme(algorithm: String?) =
 
 
 /** Adapt [Key] to a [CoseVerifier]. */
+@Deprecated("Use the crypto2 Key.toCoseVerifier(Int) overload.")
 fun Key.toCoseVerifier(algorithm: String? = null): CoseVerifier =
     CoseVerifier { data, signature ->
         var signature = signature
@@ -51,6 +53,7 @@ fun Key.toCoseVerifier(algorithm: String? = null): CoseVerifier =
     }
 
 /** Map [KeyType] to a standard COSE Algorithm ID. */
+@Deprecated("Use KeySpec.defaultCoseSignatureAlgorithm() with a crypto2 key specification.")
 fun KeyType.toCoseAlgorithm(): Int? = when (this) {
     KeyType.Ed25519 -> Cose.Algorithm.EdDSA
     KeyType.secp256k1 -> Cose.Algorithm.ES256K

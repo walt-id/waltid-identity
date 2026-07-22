@@ -3,6 +3,8 @@ package id.walt.policies2.vp.policies
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 /*sealed class VPVerificationRequest {
     abstract val base: BaseVerificationSessionContext
@@ -25,6 +27,7 @@ data class VerificationSessionContext(
     val jwkThumbprint: String?,
     val customData: JsonObject? = null,
     val isAnnexC: Boolean,
+    val verificationTime: Instant = Clock.System.now(),
 
     /**
      * Base64url-encoded transaction data items from the authorization request's `transaction_data`

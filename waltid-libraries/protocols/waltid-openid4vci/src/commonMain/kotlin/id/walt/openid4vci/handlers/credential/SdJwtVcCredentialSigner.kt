@@ -4,7 +4,10 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.did.dids.DidService
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.credentials.keyresolver.resolvers.DidKeyResolver
 import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.requests.credential.CredentialRequest
@@ -33,6 +36,7 @@ import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.jsonObject
 
 object SdJwtVcCredentialSigner {
+    @Deprecated("Use the Crypto2Key overload")
     suspend fun generateSdJwtVC(
         credentialRequest: CredentialRequest,
         credentialData: JsonObject,
@@ -45,26 +49,63 @@ object SdJwtVcCredentialSigner {
         display: List<CredentialDisplay>? = null,
         sdJwtTypeHeader: String? = null,
         sdJwtCredentialClaims: JsonObject? = null,
+    ): String = generateSdJwtVC(
+        credentialRequest = credentialRequest,
+        credentialData = credentialData,
+        issuerSigningKey = IssuerSigningKey.Legacy(issuerKey),
+        issuerId = issuerId,
+        vct = vct,
+        selectiveDisclosure = selectiveDisclosure,
+        dataMapping = dataMapping,
+        x5Chain = x5Chain,
+        display = display,
+        sdJwtTypeHeader = sdJwtTypeHeader,
+        sdJwtCredentialClaims = sdJwtCredentialClaims,
+    )
+
+    suspend fun generateSdJwtVC(
+        credentialRequest: CredentialRequest,
+        credentialData: JsonObject,
+        issuerKey: Crypto2Key,
+        algorithm: JwsAlgorithm,
+        issuerId: String,
+        vct: String,
+        selectiveDisclosure: SDMap? = null,
+        dataMapping: JsonObject? = null,
+        x5Chain: List<CertificateDer>? = null,
+        display: List<CredentialDisplay>? = null,
+        sdJwtTypeHeader: String? = null,
+        sdJwtCredentialClaims: JsonObject? = null,
+    ): String = generateSdJwtVC(
+        credentialRequest = credentialRequest,
+        credentialData = credentialData,
+        issuerSigningKey = IssuerSigningKey.Crypto2(issuerKey, algorithm),
+        issuerId = issuerId,
+        vct = vct,
+        selectiveDisclosure = selectiveDisclosure,
+        dataMapping = dataMapping,
+        x5Chain = x5Chain,
+        display = display,
+        sdJwtTypeHeader = sdJwtTypeHeader,
+        sdJwtCredentialClaims = sdJwtCredentialClaims,
+    )
+
+    private suspend fun generateSdJwtVC(
+        credentialRequest: CredentialRequest,
+        credentialData: JsonObject,
+        issuerSigningKey: IssuerSigningKey,
+        issuerId: String,
+        vct: String,
+        selectiveDisclosure: SDMap?,
+        dataMapping: JsonObject?,
+        x5Chain: List<CertificateDer>?,
+        display: List<CredentialDisplay>?,
+        sdJwtTypeHeader: String?,
+        sdJwtCredentialClaims: JsonObject?,
     ): String {
         val proofHeader = credentialRequest.proofs?.jwt?.let { JwtUtils.parseJWTHeader(it.first()) }
             ?: throw IllegalArgumentException("Missing JWT proof in proofs")
-
-        val holderKey = when {
-
-            JWT_HEADER_JWK in proofHeader -> {
-                val holderJwk = requireNotNull(proofHeader[JWT_HEADER_JWK])
-                JWKKey.importJWK(holderJwk.toString()).getOrThrow()
-            }
-
-            JWT_HEADER_KID in proofHeader -> {
-                val holderKid = requireNotNull(proofHeader[JWT_HEADER_KID]?.jsonPrimitive).content
-                require(DidUtils.isDidUrl(holderKid))
-                DidService.resolveToKey(holderKid.substringBefore("#")).getOrThrow()
-
-            }
-
-            else -> throw IllegalArgumentException("Proof JWT header must contain kid or jwk claim")
-        }
+        val holderKeyJson = resolveHolderJwk(proofHeader)
 
         val holderDid = proofHeader[JWT_HEADER_KID]?.jsonPrimitive?.content.let {
             if (!it.isNullOrEmpty() && DidUtils.isDidUrl(it)) it.substringBefore("#") else null
@@ -94,10 +135,6 @@ object SdJwtVcCredentialSigner {
             disclosureMap = selectiveDisclosure ?: SDMap(mapOf())
         )
 
-        val holderKeyJson = holderKey.exportJWKObject().plus(
-            JWT_HEADER_KID to holderKey.getKeyId().toJsonElement()
-        ).toJsonObject()
-
         val defaultPayloadProperties = defaultPayloadProperties(
             issuerId = issuerId,
             cnf = buildJsonObject {
@@ -120,11 +157,15 @@ object SdJwtVcCredentialSigner {
 
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
 
+        val issuerKid = when (issuerSigningKey) {
+            is IssuerSigningKey.Legacy -> getKidHeader(issuerSigningKey.key, issuerDid)
+            is IssuerSigningKey.Crypto2 -> getKidHeader(issuerSigningKey.key, issuerDid)
+        }
         val headers = mapOf(
-            JWT_HEADER_KID to getKidHeader(issuerKey, issuerDid),
-            JWT_HEADER_TYPE to (sdJwtTypeHeader ?: SD_JWT_VC_TYPE_HEADER)
+            JWT_HEADER_KID to JsonPrimitive(issuerKid),
+            JWT_HEADER_TYPE to JsonPrimitive(sdJwtTypeHeader ?: SD_JWT_VC_TYPE_HEADER),
         ).plus(x5Chain?.let {
-            mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert -> cert.bytes.toByteArray().encodeToBase64().toJsonElement() }))
+            mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert -> JsonPrimitive(cert.bytes.toByteArray().encodeToBase64()) }))
         } ?: mapOf())
 
         val finalSdPayload = SDPayload.createSDPayload(
@@ -132,10 +173,16 @@ object SdJwtVcCredentialSigner {
             undisclosedPayload = undisclosedPayload
         )
 
-        val jwt = issuerKey.signJws(
-            plaintext = finalSdPayload.undisclosedPayload.toString().encodeToByteArray(),
-            headers = headers.mapValues { it.value.toJsonElement() }
-        )
+        val signable = finalSdPayload.undisclosedPayload.toString().encodeToByteArray()
+        val jwt = when (issuerSigningKey) {
+            is IssuerSigningKey.Legacy -> issuerSigningKey.key.signJws(signable, headers)
+            is IssuerSigningKey.Crypto2 -> CompactJws.sign(
+                payload = signable,
+                key = issuerSigningKey.key,
+                algorithm = issuerSigningKey.algorithm,
+                protectedHeader = JsonObject(headers),
+            )
+        }
 
         val sdJwtVC = SDJwtVC(
             sdJwt = SDJwt.createFromSignedJwt(
@@ -145,6 +192,29 @@ object SdJwtVcCredentialSigner {
         )
 
         return sdJwtVC.toString().plus(SEPARATOR_STR)
+    }
+
+    private suspend fun resolveHolderJwk(proofHeader: JsonObject): JsonObject {
+        val holderKey = when {
+            JWT_HEADER_JWK in proofHeader ->
+                JWKKey.importJWK(requireNotNull(proofHeader[JWT_HEADER_JWK]).toString()).getOrThrow().getPublicKey()
+
+            JWT_HEADER_KID in proofHeader -> {
+                val holderKid = requireNotNull(proofHeader[JWT_HEADER_KID]?.jsonPrimitive).content
+                require(DidUtils.isDidUrl(holderKid))
+                DidKeyResolver.resolveKeyFromDid(holderKid.substringBefore("#"), holderKid)
+            }
+
+            else -> throw IllegalArgumentException("Proof JWT header must contain kid or jwk claim")
+        }
+        return holderKey.exportJWKObject().plus(
+            JWT_HEADER_KID to holderKey.getKeyId().toJsonElement(),
+        ).toJsonObject()
+    }
+
+    private sealed interface IssuerSigningKey {
+        data class Legacy(val key: Key) : IssuerSigningKey
+        data class Crypto2(val key: Crypto2Key, val algorithm: JwsAlgorithm) : IssuerSigningKey
     }
 
     private const val JWT_HEADER_KID = "kid"

@@ -27,6 +27,8 @@ kotlin {
 
             // walt.id
             api(project(":waltid-libraries:crypto:waltid-crypto"))
+            api(project(":waltid-libraries:crypto:waltid-crypto2"))
+            implementation(project(":waltid-libraries:crypto:waltid-jose"))
             api(project(":waltid-libraries:waltid-did"))
             api(project(":waltid-libraries:web:waltid-web-data-fetching"))
             implementation(project(":waltid-libraries:crypto:waltid-x509"))

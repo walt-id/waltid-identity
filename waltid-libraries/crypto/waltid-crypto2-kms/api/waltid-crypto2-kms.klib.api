@@ -1,0 +1,365 @@
+// Klib ABI Dump
+// Targets: [js, linuxArm64, linuxX64, macosArm64, macosX64, mingwX64]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <id.walt.crypto2:waltid-crypto2-kms>
+final enum class id.walt.crypto2.kms.oci/OciProtectionMode : kotlin/Enum<id.walt.crypto2.kms.oci/OciProtectionMode> { // id.walt.crypto2.kms.oci/OciProtectionMode|null[0]
+    enum entry HSM // id.walt.crypto2.kms.oci/OciProtectionMode.HSM|null[0]
+    enum entry SOFTWARE // id.walt.crypto2.kms.oci/OciProtectionMode.SOFTWARE|null[0]
+
+    final val entries // id.walt.crypto2.kms.oci/OciProtectionMode.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.crypto2.kms.oci/OciProtectionMode> // id.walt.crypto2.kms.oci/OciProtectionMode.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.crypto2.kms.oci/OciProtectionMode // id.walt.crypto2.kms.oci/OciProtectionMode.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.crypto2.kms.oci/OciProtectionMode> // id.walt.crypto2.kms.oci/OciProtectionMode.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.crypto2.kms.oci/OciProtectionMode.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.kms.oci/OciProtectionMode> // id.walt.crypto2.kms.oci/OciProtectionMode.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.crypto2.kms.oci/OciProtectionMode.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+abstract fun interface id.walt.crypto2.kms.aws/AwsCredentialResolver { // id.walt.crypto2.kms.aws/AwsCredentialResolver|null[0]
+    abstract suspend fun resolve(id.walt.crypto2.kms/CredentialReference): id.walt.crypto2.kms.aws/AwsCredentials // id.walt.crypto2.kms.aws/AwsCredentialResolver.resolve|resolve(id.walt.crypto2.kms.CredentialReference){}[0]
+}
+
+abstract fun interface id.walt.crypto2.kms.azure/AzureAccessTokenProvider { // id.walt.crypto2.kms.azure/AzureAccessTokenProvider|null[0]
+    abstract suspend fun getAccessToken(id.walt.crypto2.kms.azure/AzureKeyVaultOptions): kotlin/String // id.walt.crypto2.kms.azure/AzureAccessTokenProvider.getAccessToken|getAccessToken(id.walt.crypto2.kms.azure.AzureKeyVaultOptions){}[0]
+}
+
+abstract fun interface id.walt.crypto2.kms.azure/AzureCredentialResolver { // id.walt.crypto2.kms.azure/AzureCredentialResolver|null[0]
+    abstract suspend fun resolve(id.walt.crypto2.kms/CredentialReference): id.walt.crypto2.kms.azure/AzureClientSecretCredential // id.walt.crypto2.kms.azure/AzureCredentialResolver.resolve|resolve(id.walt.crypto2.kms.CredentialReference){}[0]
+}
+
+abstract fun interface id.walt.crypto2.kms.oci/OciCredentialResolver { // id.walt.crypto2.kms.oci/OciCredentialResolver|null[0]
+    abstract suspend fun resolve(id.walt.crypto2.kms/CredentialReference): id.walt.crypto2.kms.oci/OciApiKeyCredential // id.walt.crypto2.kms.oci/OciCredentialResolver.resolve|resolve(id.walt.crypto2.kms.CredentialReference){}[0]
+}
+
+abstract fun interface id.walt.crypto2.kms.vault/VaultCredentialResolver { // id.walt.crypto2.kms.vault/VaultCredentialResolver|null[0]
+    abstract suspend fun resolve(id.walt.crypto2.kms/CredentialReference): id.walt.crypto2.kms.vault/VaultCredential // id.walt.crypto2.kms.vault/VaultCredentialResolver.resolve|resolve(id.walt.crypto2.kms.CredentialReference){}[0]
+}
+
+sealed interface id.walt.crypto2.kms.vault/VaultCredential { // id.walt.crypto2.kms.vault/VaultCredential|null[0]
+    final class AppRole : id.walt.crypto2.kms.vault/VaultCredential { // id.walt.crypto2.kms.vault/VaultCredential.AppRole|null[0]
+        constructor <init>(kotlin/String, kotlin/String, kotlin/String = ...) // id.walt.crypto2.kms.vault/VaultCredential.AppRole.<init>|<init>(kotlin.String;kotlin.String;kotlin.String){}[0]
+
+        final val mount // id.walt.crypto2.kms.vault/VaultCredential.AppRole.mount|{}mount[0]
+            final fun <get-mount>(): kotlin/String // id.walt.crypto2.kms.vault/VaultCredential.AppRole.mount.<get-mount>|<get-mount>(){}[0]
+        final val roleId // id.walt.crypto2.kms.vault/VaultCredential.AppRole.roleId|{}roleId[0]
+            final fun <get-roleId>(): kotlin/String // id.walt.crypto2.kms.vault/VaultCredential.AppRole.roleId.<get-roleId>|<get-roleId>(){}[0]
+        final val secretId // id.walt.crypto2.kms.vault/VaultCredential.AppRole.secretId|{}secretId[0]
+            final fun <get-secretId>(): kotlin/String // id.walt.crypto2.kms.vault/VaultCredential.AppRole.secretId.<get-secretId>|<get-secretId>(){}[0]
+    }
+
+    final class Token : id.walt.crypto2.kms.vault/VaultCredential { // id.walt.crypto2.kms.vault/VaultCredential.Token|null[0]
+        constructor <init>(kotlin/String) // id.walt.crypto2.kms.vault/VaultCredential.Token.<init>|<init>(kotlin.String){}[0]
+
+        final val value // id.walt.crypto2.kms.vault/VaultCredential.Token.value|{}value[0]
+            final fun <get-value>(): kotlin/String // id.walt.crypto2.kms.vault/VaultCredential.Token.value.<get-value>|<get-value>(){}[0]
+    }
+
+    final class UserPassword : id.walt.crypto2.kms.vault/VaultCredential { // id.walt.crypto2.kms.vault/VaultCredential.UserPassword|null[0]
+        constructor <init>(kotlin/String, kotlin/String, kotlin/String = ...) // id.walt.crypto2.kms.vault/VaultCredential.UserPassword.<init>|<init>(kotlin.String;kotlin.String;kotlin.String){}[0]
+
+        final val mount // id.walt.crypto2.kms.vault/VaultCredential.UserPassword.mount|{}mount[0]
+            final fun <get-mount>(): kotlin/String // id.walt.crypto2.kms.vault/VaultCredential.UserPassword.mount.<get-mount>|<get-mount>(){}[0]
+        final val password // id.walt.crypto2.kms.vault/VaultCredential.UserPassword.password|{}password[0]
+            final fun <get-password>(): kotlin/String // id.walt.crypto2.kms.vault/VaultCredential.UserPassword.password.<get-password>|<get-password>(){}[0]
+        final val username // id.walt.crypto2.kms.vault/VaultCredential.UserPassword.username|{}username[0]
+            final fun <get-username>(): kotlin/String // id.walt.crypto2.kms.vault/VaultCredential.UserPassword.username.<get-username>|<get-username>(){}[0]
+    }
+}
+
+final class id.walt.crypto2.kms.aws/AwsCredentials { // id.walt.crypto2.kms.aws/AwsCredentials|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String? = ...) // id.walt.crypto2.kms.aws/AwsCredentials.<init>|<init>(kotlin.String;kotlin.String;kotlin.String?){}[0]
+
+    final val accessKeyId // id.walt.crypto2.kms.aws/AwsCredentials.accessKeyId|{}accessKeyId[0]
+        final fun <get-accessKeyId>(): kotlin/String // id.walt.crypto2.kms.aws/AwsCredentials.accessKeyId.<get-accessKeyId>|<get-accessKeyId>(){}[0]
+    final val secretAccessKey // id.walt.crypto2.kms.aws/AwsCredentials.secretAccessKey|{}secretAccessKey[0]
+        final fun <get-secretAccessKey>(): kotlin/String // id.walt.crypto2.kms.aws/AwsCredentials.secretAccessKey.<get-secretAccessKey>|<get-secretAccessKey>(){}[0]
+    final val sessionToken // id.walt.crypto2.kms.aws/AwsCredentials.sessionToken|{}sessionToken[0]
+        final fun <get-sessionToken>(): kotlin/String? // id.walt.crypto2.kms.aws/AwsCredentials.sessionToken.<get-sessionToken>|<get-sessionToken>(){}[0]
+}
+
+final class id.walt.crypto2.kms.aws/AwsKmsKeyProvider : id.walt.crypto2.providers/ManagedKeyProvider { // id.walt.crypto2.kms.aws/AwsKmsKeyProvider|null[0]
+    constructor <init>(io.ktor.client/HttpClient, id.walt.crypto2.kms.aws/AwsCredentialResolver, kotlin/Function0<kotlin.time/Instant> = ...) // id.walt.crypto2.kms.aws/AwsKmsKeyProvider.<init>|<init>(io.ktor.client.HttpClient;id.walt.crypto2.kms.aws.AwsCredentialResolver;kotlin.Function0<kotlin.time.Instant>){}[0]
+
+    final val id // id.walt.crypto2.kms.aws/AwsKmsKeyProvider.id|{}id[0]
+        final fun <get-id>(): id.walt.crypto2.keys/ProviderId // id.walt.crypto2.kms.aws/AwsKmsKeyProvider.id.<get-id>|<get-id>(){}[0]
+
+    final suspend fun generate(id.walt.crypto2.providers/GenerateManagedKeyRequest): id.walt.crypto2.keys/ManagedKey // id.walt.crypto2.kms.aws/AwsKmsKeyProvider.generate|generate(id.walt.crypto2.providers.GenerateManagedKeyRequest){}[0]
+    final suspend fun restore(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.keys/ManagedKey // id.walt.crypto2.kms.aws/AwsKmsKeyProvider.restore|restore(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+
+    final object Companion { // id.walt.crypto2.kms.aws/AwsKmsKeyProvider.Companion|null[0]
+        final val ID // id.walt.crypto2.kms.aws/AwsKmsKeyProvider.Companion.ID|{}ID[0]
+            final fun <get-ID>(): id.walt.crypto2.keys/ProviderId // id.walt.crypto2.kms.aws/AwsKmsKeyProvider.Companion.ID.<get-ID>|<get-ID>(){}[0]
+
+        final suspend fun storedKeyForExisting(id.walt.crypto2.keys/KeyId, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.kms.aws/AwsKmsOptions, kotlin/String, id.walt.crypto2.keys/EncodedKey.SpkiDer, kotlin.collections/Map<kotlin/String, kotlin/String> = ...): id.walt.crypto2.keys/StoredKey.Managed // id.walt.crypto2.kms.aws/AwsKmsKeyProvider.Companion.storedKeyForExisting|storedKeyForExisting(id.walt.crypto2.keys.KeyId;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.kms.aws.AwsKmsOptions;kotlin.String;id.walt.crypto2.keys.EncodedKey.SpkiDer;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+    }
+}
+
+final class id.walt.crypto2.kms.aws/AwsKmsOptions { // id.walt.crypto2.kms.aws/AwsKmsOptions|null[0]
+    constructor <init>(kotlin/String, id.walt.crypto2.kms/CredentialReference, kotlin/String? = ...) // id.walt.crypto2.kms.aws/AwsKmsOptions.<init>|<init>(kotlin.String;id.walt.crypto2.kms.CredentialReference;kotlin.String?){}[0]
+
+    final val credentialReference // id.walt.crypto2.kms.aws/AwsKmsOptions.credentialReference|{}credentialReference[0]
+        final fun <get-credentialReference>(): id.walt.crypto2.kms/CredentialReference // id.walt.crypto2.kms.aws/AwsKmsOptions.credentialReference.<get-credentialReference>|<get-credentialReference>(){}[0]
+    final val endpoint // id.walt.crypto2.kms.aws/AwsKmsOptions.endpoint|{}endpoint[0]
+        final fun <get-endpoint>(): kotlin/String? // id.walt.crypto2.kms.aws/AwsKmsOptions.endpoint.<get-endpoint>|<get-endpoint>(){}[0]
+    final val region // id.walt.crypto2.kms.aws/AwsKmsOptions.region|{}region[0]
+        final fun <get-region>(): kotlin/String // id.walt.crypto2.kms.aws/AwsKmsOptions.region.<get-region>|<get-region>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.crypto2.kms.aws/AwsKmsOptions.component1|component1(){}[0]
+    final fun component2(): id.walt.crypto2.kms/CredentialReference // id.walt.crypto2.kms.aws/AwsKmsOptions.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // id.walt.crypto2.kms.aws/AwsKmsOptions.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., id.walt.crypto2.kms/CredentialReference = ..., kotlin/String? = ...): id.walt.crypto2.kms.aws/AwsKmsOptions // id.walt.crypto2.kms.aws/AwsKmsOptions.copy|copy(kotlin.String;id.walt.crypto2.kms.CredentialReference;kotlin.String?){}[0]
+    final fun encode(): id.walt.crypto2.serialization/BinaryData // id.walt.crypto2.kms.aws/AwsKmsOptions.encode|encode(){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.kms.aws/AwsKmsOptions.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.kms.aws/AwsKmsOptions.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.kms.aws/AwsKmsOptions.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.crypto2.kms.aws/AwsKmsOptions> { // id.walt.crypto2.kms.aws/AwsKmsOptions.$serializer|null[0]
+        final val descriptor // id.walt.crypto2.kms.aws/AwsKmsOptions.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.crypto2.kms.aws/AwsKmsOptions.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.crypto2.kms.aws/AwsKmsOptions.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.crypto2.kms.aws/AwsKmsOptions // id.walt.crypto2.kms.aws/AwsKmsOptions.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.crypto2.kms.aws/AwsKmsOptions) // id.walt.crypto2.kms.aws/AwsKmsOptions.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.crypto2.kms.aws.AwsKmsOptions){}[0]
+    }
+
+    final object Companion { // id.walt.crypto2.kms.aws/AwsKmsOptions.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.kms.aws/AwsKmsOptions> // id.walt.crypto2.kms.aws/AwsKmsOptions.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class id.walt.crypto2.kms.azure/AzureClientSecretCredential { // id.walt.crypto2.kms.azure/AzureClientSecretCredential|null[0]
+    constructor <init>(kotlin/String, kotlin/String) // id.walt.crypto2.kms.azure/AzureClientSecretCredential.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+    final val clientId // id.walt.crypto2.kms.azure/AzureClientSecretCredential.clientId|{}clientId[0]
+        final fun <get-clientId>(): kotlin/String // id.walt.crypto2.kms.azure/AzureClientSecretCredential.clientId.<get-clientId>|<get-clientId>(){}[0]
+    final val clientSecret // id.walt.crypto2.kms.azure/AzureClientSecretCredential.clientSecret|{}clientSecret[0]
+        final fun <get-clientSecret>(): kotlin/String // id.walt.crypto2.kms.azure/AzureClientSecretCredential.clientSecret.<get-clientSecret>|<get-clientSecret>(){}[0]
+}
+
+final class id.walt.crypto2.kms.azure/AzureClientSecretTokenProvider : id.walt.crypto2.kms.azure/AzureAccessTokenProvider { // id.walt.crypto2.kms.azure/AzureClientSecretTokenProvider|null[0]
+    constructor <init>(io.ktor.client/HttpClient, id.walt.crypto2.kms.azure/AzureCredentialResolver, kotlin/Function0<kotlin.time/Instant> = ...) // id.walt.crypto2.kms.azure/AzureClientSecretTokenProvider.<init>|<init>(io.ktor.client.HttpClient;id.walt.crypto2.kms.azure.AzureCredentialResolver;kotlin.Function0<kotlin.time.Instant>){}[0]
+
+    final suspend fun getAccessToken(id.walt.crypto2.kms.azure/AzureKeyVaultOptions): kotlin/String // id.walt.crypto2.kms.azure/AzureClientSecretTokenProvider.getAccessToken|getAccessToken(id.walt.crypto2.kms.azure.AzureKeyVaultOptions){}[0]
+}
+
+final class id.walt.crypto2.kms.azure/AzureKeyVaultKeyProvider : id.walt.crypto2.providers/ManagedKeyProvider { // id.walt.crypto2.kms.azure/AzureKeyVaultKeyProvider|null[0]
+    constructor <init>(io.ktor.client/HttpClient, id.walt.crypto2.kms.azure/AzureAccessTokenProvider) // id.walt.crypto2.kms.azure/AzureKeyVaultKeyProvider.<init>|<init>(io.ktor.client.HttpClient;id.walt.crypto2.kms.azure.AzureAccessTokenProvider){}[0]
+    constructor <init>(io.ktor.client/HttpClient, id.walt.crypto2.kms.azure/AzureCredentialResolver) // id.walt.crypto2.kms.azure/AzureKeyVaultKeyProvider.<init>|<init>(io.ktor.client.HttpClient;id.walt.crypto2.kms.azure.AzureCredentialResolver){}[0]
+
+    final val id // id.walt.crypto2.kms.azure/AzureKeyVaultKeyProvider.id|{}id[0]
+        final fun <get-id>(): id.walt.crypto2.keys/ProviderId // id.walt.crypto2.kms.azure/AzureKeyVaultKeyProvider.id.<get-id>|<get-id>(){}[0]
+
+    final suspend fun generate(id.walt.crypto2.providers/GenerateManagedKeyRequest): id.walt.crypto2.keys/ManagedKey // id.walt.crypto2.kms.azure/AzureKeyVaultKeyProvider.generate|generate(id.walt.crypto2.providers.GenerateManagedKeyRequest){}[0]
+    final suspend fun restore(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.keys/ManagedKey // id.walt.crypto2.kms.azure/AzureKeyVaultKeyProvider.restore|restore(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+
+    final object Companion { // id.walt.crypto2.kms.azure/AzureKeyVaultKeyProvider.Companion|null[0]
+        final val ID // id.walt.crypto2.kms.azure/AzureKeyVaultKeyProvider.Companion.ID|{}ID[0]
+            final fun <get-ID>(): id.walt.crypto2.keys/ProviderId // id.walt.crypto2.kms.azure/AzureKeyVaultKeyProvider.Companion.ID.<get-ID>|<get-ID>(){}[0]
+
+        final fun storedKeyForExisting(id.walt.crypto2.keys/KeyId, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.kms.azure/AzureKeyVaultOptions, kotlin/String, id.walt.crypto2.keys/EncodedKey.Jwk, kotlin.collections/Map<kotlin/String, kotlin/String> = ...): id.walt.crypto2.keys/StoredKey.Managed // id.walt.crypto2.kms.azure/AzureKeyVaultKeyProvider.Companion.storedKeyForExisting|storedKeyForExisting(id.walt.crypto2.keys.KeyId;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.kms.azure.AzureKeyVaultOptions;kotlin.String;id.walt.crypto2.keys.EncodedKey.Jwk;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+    }
+}
+
+final class id.walt.crypto2.kms.azure/AzureKeyVaultOptions { // id.walt.crypto2.kms.azure/AzureKeyVaultOptions|null[0]
+    constructor <init>(kotlin/String, kotlin/String, id.walt.crypto2.kms/CredentialReference, kotlin/String? = ..., kotlin/String = ...) // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.<init>|<init>(kotlin.String;kotlin.String;id.walt.crypto2.kms.CredentialReference;kotlin.String?;kotlin.String){}[0]
+
+    final val authorityUrl // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.authorityUrl|{}authorityUrl[0]
+        final fun <get-authorityUrl>(): kotlin/String // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.authorityUrl.<get-authorityUrl>|<get-authorityUrl>(){}[0]
+    final val credentialReference // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.credentialReference|{}credentialReference[0]
+        final fun <get-credentialReference>(): id.walt.crypto2.kms/CredentialReference // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.credentialReference.<get-credentialReference>|<get-credentialReference>(){}[0]
+    final val keyName // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.keyName|{}keyName[0]
+        final fun <get-keyName>(): kotlin/String? // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.keyName.<get-keyName>|<get-keyName>(){}[0]
+    final val keyVaultUrl // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.keyVaultUrl|{}keyVaultUrl[0]
+        final fun <get-keyVaultUrl>(): kotlin/String // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.keyVaultUrl.<get-keyVaultUrl>|<get-keyVaultUrl>(){}[0]
+    final val tenantId // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.tenantId|{}tenantId[0]
+        final fun <get-tenantId>(): kotlin/String // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.tenantId.<get-tenantId>|<get-tenantId>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.component2|component2(){}[0]
+    final fun component3(): id.walt.crypto2.kms/CredentialReference // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.component4|component4(){}[0]
+    final fun component5(): kotlin/String // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.component5|component5(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., id.walt.crypto2.kms/CredentialReference = ..., kotlin/String? = ..., kotlin/String = ...): id.walt.crypto2.kms.azure/AzureKeyVaultOptions // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.copy|copy(kotlin.String;kotlin.String;id.walt.crypto2.kms.CredentialReference;kotlin.String?;kotlin.String){}[0]
+    final fun encode(): id.walt.crypto2.serialization/BinaryData // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.encode|encode(){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.crypto2.kms.azure/AzureKeyVaultOptions> { // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.$serializer|null[0]
+        final val descriptor // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.crypto2.kms.azure/AzureKeyVaultOptions // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.crypto2.kms.azure/AzureKeyVaultOptions) // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.crypto2.kms.azure.AzureKeyVaultOptions){}[0]
+    }
+
+    final object Companion { // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.kms.azure/AzureKeyVaultOptions> // id.walt.crypto2.kms.azure/AzureKeyVaultOptions.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class id.walt.crypto2.kms.oci/OciApiKeyCredential { // id.walt.crypto2.kms.oci/OciApiKeyCredential|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String) // id.walt.crypto2.kms.oci/OciApiKeyCredential.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String){}[0]
+
+    final val fingerprint // id.walt.crypto2.kms.oci/OciApiKeyCredential.fingerprint|{}fingerprint[0]
+        final fun <get-fingerprint>(): kotlin/String // id.walt.crypto2.kms.oci/OciApiKeyCredential.fingerprint.<get-fingerprint>|<get-fingerprint>(){}[0]
+    final val keyId // id.walt.crypto2.kms.oci/OciApiKeyCredential.keyId|{}keyId[0]
+        final fun <get-keyId>(): kotlin/String // id.walt.crypto2.kms.oci/OciApiKeyCredential.keyId.<get-keyId>|<get-keyId>(){}[0]
+    final val privateKeyPem // id.walt.crypto2.kms.oci/OciApiKeyCredential.privateKeyPem|{}privateKeyPem[0]
+        final fun <get-privateKeyPem>(): kotlin/String // id.walt.crypto2.kms.oci/OciApiKeyCredential.privateKeyPem.<get-privateKeyPem>|<get-privateKeyPem>(){}[0]
+    final val tenancyOcid // id.walt.crypto2.kms.oci/OciApiKeyCredential.tenancyOcid|{}tenancyOcid[0]
+        final fun <get-tenancyOcid>(): kotlin/String // id.walt.crypto2.kms.oci/OciApiKeyCredential.tenancyOcid.<get-tenancyOcid>|<get-tenancyOcid>(){}[0]
+    final val userOcid // id.walt.crypto2.kms.oci/OciApiKeyCredential.userOcid|{}userOcid[0]
+        final fun <get-userOcid>(): kotlin/String // id.walt.crypto2.kms.oci/OciApiKeyCredential.userOcid.<get-userOcid>|<get-userOcid>(){}[0]
+}
+
+final class id.walt.crypto2.kms.oci/OciKmsKeyProvider : id.walt.crypto2.providers/ManagedKeyProvider { // id.walt.crypto2.kms.oci/OciKmsKeyProvider|null[0]
+    constructor <init>(io.ktor.client/HttpClient, id.walt.crypto2.kms.oci/OciCredentialResolver, kotlin/Function0<kotlin.time/Instant> = ...) // id.walt.crypto2.kms.oci/OciKmsKeyProvider.<init>|<init>(io.ktor.client.HttpClient;id.walt.crypto2.kms.oci.OciCredentialResolver;kotlin.Function0<kotlin.time.Instant>){}[0]
+
+    final val id // id.walt.crypto2.kms.oci/OciKmsKeyProvider.id|{}id[0]
+        final fun <get-id>(): id.walt.crypto2.keys/ProviderId // id.walt.crypto2.kms.oci/OciKmsKeyProvider.id.<get-id>|<get-id>(){}[0]
+
+    final suspend fun generate(id.walt.crypto2.providers/GenerateManagedKeyRequest): id.walt.crypto2.keys/ManagedKey // id.walt.crypto2.kms.oci/OciKmsKeyProvider.generate|generate(id.walt.crypto2.providers.GenerateManagedKeyRequest){}[0]
+    final suspend fun restore(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.keys/ManagedKey // id.walt.crypto2.kms.oci/OciKmsKeyProvider.restore|restore(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+    final suspend fun storedKeyForExisting(id.walt.crypto2.keys/KeyId, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.kms.oci/OciKmsOptions, kotlin/String, kotlin.collections/Map<kotlin/String, kotlin/String> = ...): id.walt.crypto2.keys/StoredKey.Managed // id.walt.crypto2.kms.oci/OciKmsKeyProvider.storedKeyForExisting|storedKeyForExisting(id.walt.crypto2.keys.KeyId;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.kms.oci.OciKmsOptions;kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+
+    final object Companion { // id.walt.crypto2.kms.oci/OciKmsKeyProvider.Companion|null[0]
+        final val ID // id.walt.crypto2.kms.oci/OciKmsKeyProvider.Companion.ID|{}ID[0]
+            final fun <get-ID>(): id.walt.crypto2.keys/ProviderId // id.walt.crypto2.kms.oci/OciKmsKeyProvider.Companion.ID.<get-ID>|<get-ID>(){}[0]
+    }
+}
+
+final class id.walt.crypto2.kms.oci/OciKmsOptions { // id.walt.crypto2.kms.oci/OciKmsOptions|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, id.walt.crypto2.kms/CredentialReference, id.walt.crypto2.kms.oci/OciProtectionMode = ...) // id.walt.crypto2.kms.oci/OciKmsOptions.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;id.walt.crypto2.kms.CredentialReference;id.walt.crypto2.kms.oci.OciProtectionMode){}[0]
+
+    final val compartmentOcid // id.walt.crypto2.kms.oci/OciKmsOptions.compartmentOcid|{}compartmentOcid[0]
+        final fun <get-compartmentOcid>(): kotlin/String // id.walt.crypto2.kms.oci/OciKmsOptions.compartmentOcid.<get-compartmentOcid>|<get-compartmentOcid>(){}[0]
+    final val credentialReference // id.walt.crypto2.kms.oci/OciKmsOptions.credentialReference|{}credentialReference[0]
+        final fun <get-credentialReference>(): id.walt.crypto2.kms/CredentialReference // id.walt.crypto2.kms.oci/OciKmsOptions.credentialReference.<get-credentialReference>|<get-credentialReference>(){}[0]
+    final val cryptoEndpoint // id.walt.crypto2.kms.oci/OciKmsOptions.cryptoEndpoint|{}cryptoEndpoint[0]
+        final fun <get-cryptoEndpoint>(): kotlin/String // id.walt.crypto2.kms.oci/OciKmsOptions.cryptoEndpoint.<get-cryptoEndpoint>|<get-cryptoEndpoint>(){}[0]
+    final val managementEndpoint // id.walt.crypto2.kms.oci/OciKmsOptions.managementEndpoint|{}managementEndpoint[0]
+        final fun <get-managementEndpoint>(): kotlin/String // id.walt.crypto2.kms.oci/OciKmsOptions.managementEndpoint.<get-managementEndpoint>|<get-managementEndpoint>(){}[0]
+    final val protectionMode // id.walt.crypto2.kms.oci/OciKmsOptions.protectionMode|{}protectionMode[0]
+        final fun <get-protectionMode>(): id.walt.crypto2.kms.oci/OciProtectionMode // id.walt.crypto2.kms.oci/OciKmsOptions.protectionMode.<get-protectionMode>|<get-protectionMode>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.crypto2.kms.oci/OciKmsOptions.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.crypto2.kms.oci/OciKmsOptions.component2|component2(){}[0]
+    final fun component3(): kotlin/String // id.walt.crypto2.kms.oci/OciKmsOptions.component3|component3(){}[0]
+    final fun component4(): id.walt.crypto2.kms/CredentialReference // id.walt.crypto2.kms.oci/OciKmsOptions.component4|component4(){}[0]
+    final fun component5(): id.walt.crypto2.kms.oci/OciProtectionMode // id.walt.crypto2.kms.oci/OciKmsOptions.component5|component5(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., id.walt.crypto2.kms/CredentialReference = ..., id.walt.crypto2.kms.oci/OciProtectionMode = ...): id.walt.crypto2.kms.oci/OciKmsOptions // id.walt.crypto2.kms.oci/OciKmsOptions.copy|copy(kotlin.String;kotlin.String;kotlin.String;id.walt.crypto2.kms.CredentialReference;id.walt.crypto2.kms.oci.OciProtectionMode){}[0]
+    final fun encode(): id.walt.crypto2.serialization/BinaryData // id.walt.crypto2.kms.oci/OciKmsOptions.encode|encode(){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.kms.oci/OciKmsOptions.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.kms.oci/OciKmsOptions.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.kms.oci/OciKmsOptions.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.crypto2.kms.oci/OciKmsOptions> { // id.walt.crypto2.kms.oci/OciKmsOptions.$serializer|null[0]
+        final val descriptor // id.walt.crypto2.kms.oci/OciKmsOptions.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.crypto2.kms.oci/OciKmsOptions.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.crypto2.kms.oci/OciKmsOptions.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.crypto2.kms.oci/OciKmsOptions // id.walt.crypto2.kms.oci/OciKmsOptions.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.crypto2.kms.oci/OciKmsOptions) // id.walt.crypto2.kms.oci/OciKmsOptions.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.crypto2.kms.oci.OciKmsOptions){}[0]
+    }
+
+    final object Companion { // id.walt.crypto2.kms.oci/OciKmsOptions.Companion|null[0]
+        final val $childSerializers // id.walt.crypto2.kms.oci/OciKmsOptions.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.kms.oci/OciKmsOptions> // id.walt.crypto2.kms.oci/OciKmsOptions.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class id.walt.crypto2.kms.vault/VaultTransitKeyProvider : id.walt.crypto2.providers/ManagedKeyProvider { // id.walt.crypto2.kms.vault/VaultTransitKeyProvider|null[0]
+    constructor <init>(io.ktor.client/HttpClient, id.walt.crypto2.kms.vault/VaultCredentialResolver) // id.walt.crypto2.kms.vault/VaultTransitKeyProvider.<init>|<init>(io.ktor.client.HttpClient;id.walt.crypto2.kms.vault.VaultCredentialResolver){}[0]
+
+    final val id // id.walt.crypto2.kms.vault/VaultTransitKeyProvider.id|{}id[0]
+        final fun <get-id>(): id.walt.crypto2.keys/ProviderId // id.walt.crypto2.kms.vault/VaultTransitKeyProvider.id.<get-id>|<get-id>(){}[0]
+
+    final suspend fun generate(id.walt.crypto2.providers/GenerateManagedKeyRequest): id.walt.crypto2.keys/ManagedKey // id.walt.crypto2.kms.vault/VaultTransitKeyProvider.generate|generate(id.walt.crypto2.providers.GenerateManagedKeyRequest){}[0]
+    final suspend fun restore(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.keys/ManagedKey // id.walt.crypto2.kms.vault/VaultTransitKeyProvider.restore|restore(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+
+    final object Companion { // id.walt.crypto2.kms.vault/VaultTransitKeyProvider.Companion|null[0]
+        final val ID // id.walt.crypto2.kms.vault/VaultTransitKeyProvider.Companion.ID|{}ID[0]
+            final fun <get-ID>(): id.walt.crypto2.keys/ProviderId // id.walt.crypto2.kms.vault/VaultTransitKeyProvider.Companion.ID.<get-ID>|<get-ID>(){}[0]
+
+        final suspend fun storedKeyForExisting(id.walt.crypto2.keys/KeyId, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.kms.vault/VaultTransitOptions, kotlin/String, kotlin/Int, id.walt.crypto2.keys/EncodedKey.SpkiDer, kotlin.collections/Map<kotlin/String, kotlin/String> = ...): id.walt.crypto2.keys/StoredKey.Managed // id.walt.crypto2.kms.vault/VaultTransitKeyProvider.Companion.storedKeyForExisting|storedKeyForExisting(id.walt.crypto2.keys.KeyId;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.kms.vault.VaultTransitOptions;kotlin.String;kotlin.Int;id.walt.crypto2.keys.EncodedKey.SpkiDer;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+    }
+}
+
+final class id.walt.crypto2.kms.vault/VaultTransitOptions { // id.walt.crypto2.kms.vault/VaultTransitOptions|null[0]
+    constructor <init>(kotlin/String, id.walt.crypto2.kms/CredentialReference, kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ...) // id.walt.crypto2.kms.vault/VaultTransitOptions.<init>|<init>(kotlin.String;id.walt.crypto2.kms.CredentialReference;kotlin.String;kotlin.String?;kotlin.String?){}[0]
+
+    final val apiBaseUrl // id.walt.crypto2.kms.vault/VaultTransitOptions.apiBaseUrl|{}apiBaseUrl[0]
+        final fun <get-apiBaseUrl>(): kotlin/String // id.walt.crypto2.kms.vault/VaultTransitOptions.apiBaseUrl.<get-apiBaseUrl>|<get-apiBaseUrl>(){}[0]
+    final val credentialReference // id.walt.crypto2.kms.vault/VaultTransitOptions.credentialReference|{}credentialReference[0]
+        final fun <get-credentialReference>(): id.walt.crypto2.kms/CredentialReference // id.walt.crypto2.kms.vault/VaultTransitOptions.credentialReference.<get-credentialReference>|<get-credentialReference>(){}[0]
+    final val keyName // id.walt.crypto2.kms.vault/VaultTransitOptions.keyName|{}keyName[0]
+        final fun <get-keyName>(): kotlin/String? // id.walt.crypto2.kms.vault/VaultTransitOptions.keyName.<get-keyName>|<get-keyName>(){}[0]
+    final val namespace // id.walt.crypto2.kms.vault/VaultTransitOptions.namespace|{}namespace[0]
+        final fun <get-namespace>(): kotlin/String? // id.walt.crypto2.kms.vault/VaultTransitOptions.namespace.<get-namespace>|<get-namespace>(){}[0]
+    final val transitMount // id.walt.crypto2.kms.vault/VaultTransitOptions.transitMount|{}transitMount[0]
+        final fun <get-transitMount>(): kotlin/String // id.walt.crypto2.kms.vault/VaultTransitOptions.transitMount.<get-transitMount>|<get-transitMount>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.crypto2.kms.vault/VaultTransitOptions.component1|component1(){}[0]
+    final fun component2(): id.walt.crypto2.kms/CredentialReference // id.walt.crypto2.kms.vault/VaultTransitOptions.component2|component2(){}[0]
+    final fun component3(): kotlin/String // id.walt.crypto2.kms.vault/VaultTransitOptions.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // id.walt.crypto2.kms.vault/VaultTransitOptions.component4|component4(){}[0]
+    final fun component5(): kotlin/String? // id.walt.crypto2.kms.vault/VaultTransitOptions.component5|component5(){}[0]
+    final fun copy(kotlin/String = ..., id.walt.crypto2.kms/CredentialReference = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ...): id.walt.crypto2.kms.vault/VaultTransitOptions // id.walt.crypto2.kms.vault/VaultTransitOptions.copy|copy(kotlin.String;id.walt.crypto2.kms.CredentialReference;kotlin.String;kotlin.String?;kotlin.String?){}[0]
+    final fun encode(): id.walt.crypto2.serialization/BinaryData // id.walt.crypto2.kms.vault/VaultTransitOptions.encode|encode(){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.kms.vault/VaultTransitOptions.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.kms.vault/VaultTransitOptions.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.kms.vault/VaultTransitOptions.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.crypto2.kms.vault/VaultTransitOptions> { // id.walt.crypto2.kms.vault/VaultTransitOptions.$serializer|null[0]
+        final val descriptor // id.walt.crypto2.kms.vault/VaultTransitOptions.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.crypto2.kms.vault/VaultTransitOptions.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.crypto2.kms.vault/VaultTransitOptions.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.crypto2.kms.vault/VaultTransitOptions // id.walt.crypto2.kms.vault/VaultTransitOptions.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.crypto2.kms.vault/VaultTransitOptions) // id.walt.crypto2.kms.vault/VaultTransitOptions.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.crypto2.kms.vault.VaultTransitOptions){}[0]
+    }
+
+    final object Companion { // id.walt.crypto2.kms.vault/VaultTransitOptions.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.kms.vault/VaultTransitOptions> // id.walt.crypto2.kms.vault/VaultTransitOptions.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class id.walt.crypto2.kms/KmsProviderException : kotlin/Exception { // id.walt.crypto2.kms/KmsProviderException|null[0]
+    constructor <init>(kotlin/String, kotlin/Throwable? = ...) // id.walt.crypto2.kms/KmsProviderException.<init>|<init>(kotlin.String;kotlin.Throwable?){}[0]
+}
+
+final value class id.walt.crypto2.kms/CredentialReference { // id.walt.crypto2.kms/CredentialReference|null[0]
+    constructor <init>(kotlin/String) // id.walt.crypto2.kms/CredentialReference.<init>|<init>(kotlin.String){}[0]
+
+    final val value // id.walt.crypto2.kms/CredentialReference.value|{}value[0]
+        final fun <get-value>(): kotlin/String // id.walt.crypto2.kms/CredentialReference.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.kms/CredentialReference.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.kms/CredentialReference.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.kms/CredentialReference.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.crypto2.kms/CredentialReference> { // id.walt.crypto2.kms/CredentialReference.$serializer|null[0]
+        final val descriptor // id.walt.crypto2.kms/CredentialReference.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.crypto2.kms/CredentialReference.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.crypto2.kms/CredentialReference.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.crypto2.kms/CredentialReference // id.walt.crypto2.kms/CredentialReference.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.crypto2.kms/CredentialReference) // id.walt.crypto2.kms/CredentialReference.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.crypto2.kms.CredentialReference){}[0]
+    }
+
+    final object Companion { // id.walt.crypto2.kms/CredentialReference.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.kms/CredentialReference> // id.walt.crypto2.kms/CredentialReference.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final suspend fun id.walt.crypto2.kms/digest(kotlin/ByteArray, id.walt.crypto2.algorithms/DigestAlgorithm): id.walt.crypto2.algorithms/DigestValue // id.walt.crypto2.kms/digest|digest(kotlin.ByteArray;id.walt.crypto2.algorithms.DigestAlgorithm){}[0]

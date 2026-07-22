@@ -24,9 +24,12 @@ kotlin {
             implementation(identityLibs.korlibs.encoding)
             implementation(identityLibs.oshai.kotlinlogging)
             api(project(":waltid-libraries:crypto:waltid-crypto"))
+            api(project(":waltid-libraries:crypto:waltid-crypto2"))
+            api(project(":waltid-libraries:crypto:waltid-jose"))
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
+            implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmMain.dependencies {
             implementation(identityLibs.nimbus.jose.jwt)

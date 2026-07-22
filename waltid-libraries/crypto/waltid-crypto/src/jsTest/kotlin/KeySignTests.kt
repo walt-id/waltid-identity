@@ -3,6 +3,7 @@ import io.ktor.util.*
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 
 class KeySignTests {
     @Test
@@ -24,11 +25,13 @@ class KeySignTests {
         val privateKeyResult = JWKKey.importJWK(privateKeyJsonString)
         val privateKey = privateKeyResult.getOrThrow()
 
-        val res = privateKey.signRaw("Hello world!".toByteArray())
+        val plaintext = "Hello world!".toByteArray()
+        val res = privateKey.signRaw(plaintext)
         println((res.encodeBase64()))
 
-        val res2 = privateKey.verifyRaw(res, "Hello world!".toByteArray())
+        val res2 = privateKey.verifyRaw(res, plaintext)
         val res2Result = res2.getOrThrow()
+        assertContentEquals(plaintext, res2Result)
         println(res2Result.decodeToString())
     }
 }

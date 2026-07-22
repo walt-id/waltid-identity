@@ -67,7 +67,7 @@ There are 2 options available for each function:
     - uni-registrar - https://uniregistrar.io
     - uni-resolver - https://dev.uniresolver.io
 
-For the cryptographic part, _**walt.id did**_ library relies on _**walt.id crypto**_ library.
+For cryptographic operations, _**walt.id did**_ exposes crypto2-first resolution APIs. The v1 key APIs remain available as deprecated compatibility APIs.
 
 The top-level interface to access the registrar / resolver functions is provided
 by the `DidService` singleton.
@@ -116,6 +116,8 @@ val didResult = DidService.registerByKey(
 )
 ```
 
+`DidService.registerByKey` and `Crypto2DidService.registerByKey` accept crypto2 keys for built-in `did:key` and `did:jwk` registration. Registration uses only `publicKeyExporter`; private material and managed-provider identity remain with the original key. The default `did:key` encoding supports Ed25519, P-256/P-384/P-521, secp256k1, and RSA public representations. Other crypto2 specs require `DidKeyCreateOptions(useJwkJcsPub = true)`.
+
 #### DID Document Configuration
 Register a DID by having more fine-grained control over the contents of the DID Document that will be produced. This approach allows users to specify multiple keys (verification methods) for different purposes (verification relationships), define services and various use-case-specific (custom) properties.
 
@@ -163,21 +165,21 @@ val didDocumentResult = DidService.resolve("did:web:example.com")
 val document = didDocumentResult.getOrNull()
 ```
 
-Resolve the DID url to its public Key:
+Resolve the DID URL to its crypto2 verification keys:
 
 ```kotlin
 val did =
     "did:key:zmYg9bgKmRiCqTTd9MA1ufVE9tfzUptwQp4GMRxptXquJWw4Uj5cqKBi2vyiwwxC3v7ixvJ8SB9DvDdrK7UemySWDPhvHhUcZ7pgtZtFchLtzK4YC"
-val keyResult = DidService.resolveToKey(did = did)
-val key = keyResult.getOrNull()
+val keyResult = Crypto2DidService.resolveToKeys(did)
+val keys = keyResult.getOrNull()
 ```
 
 Both calls return the result using the _operation result pattern_,
 the data being wrapped by the `Result` object. This allows checking for
 a successful operation and handling the result accordingly.
 
-The DID Document data is represented as `JsonObject`. The key data is
-represented as **_walt.id crypto_** `Key`.
+The DID Document data is represented as `JsonObject`. Key data is represented as crypto2 `Key`.
+`publicKeyJwk` methods are restored directly with crypto2. Legacy raw and multibase verification material is currently normalized to a public JWK through the v1 `KeyMaterial` compatibility path because crypto2 does not yet provide raw/multibase public-key decoding.
 
 ## Local DID operations implemented natively
 

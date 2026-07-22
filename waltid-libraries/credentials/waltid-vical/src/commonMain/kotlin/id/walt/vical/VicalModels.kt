@@ -3,6 +3,15 @@
 package id.walt.vical
 
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.x509.CertificateDer
+import id.walt.x509.crypto2PublicJwk
 import id.walt.vical.serializers.VicalInstantSerializer
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -32,7 +41,9 @@ data class VicalData(
     @SerialName("nextUpdate") val nextUpdate: Instant? = null,
     @SerialName("certificateInfos") val certificateInfos: List<CertificateInfo>,
 ) {
+    @Deprecated("Use getAllAllowedCrypto2Issuers()")
     suspend fun getAllAllowedIssuers() = certificateInfos.associateWith { it.getKey() }
+    suspend fun getAllAllowedCrypto2Issuers() = certificateInfos.associateWith { it.getCrypto2Key() }
 
     override fun toString(): String =
         """
@@ -94,7 +105,14 @@ data class CertificateInfo(
     @Serializable(with = VicalInstantSerializer::class)
     @SerialName("notAfter") val notAfter: Instant? = null,
 ) {
+    @Deprecated("Use getCrypto2Key()")
     suspend fun getKey() = JWKKey.importFromDerCertificate(certificate)
+
+    suspend fun getCrypto2Key(): Crypto2Key {
+        val jwk = CertificateDer(certificate).crypto2PublicJwk()
+        val stored = jwk.toStoredSoftwareKey(KeyId(Jwk.sha256Thumbprint(jwk)), setOf(KeyUsage.VERIFY))
+        return crypto2Runtime.restore(stored)
+    }
 
     // Auto-generated equals/hashCode are not sufficient for ByteArray properties.
     override fun equals(other: Any?): Boolean {
@@ -158,6 +176,10 @@ data class CertificateInfo(
             |    Not after: $notAfter
             |--- End of VICAL Certificate Entry ---
             """.trimMargin()
+
+    companion object {
+        private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    }
 }
 
 @Serializable
@@ -171,5 +193,3 @@ data class VicalValidationRequest(val verificationKey: JsonObject, val vicalBase
 
 @Serializable
 data class VicalValidationResponse(val vicalValid: Boolean, val vicalBase64: String? = null)
-
-

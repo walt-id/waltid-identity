@@ -14,6 +14,10 @@ import kotlin.time.Duration.Companion.hours
  * a live [id.walt.crypto.keys.Key] via [DirectSerializedKey], so the config is
  * type-safe and no manual JSON parsing is required at startup.
  *
+ * [signingStoredKey], when set, is preferred and must describe the same key. Without it,
+ * [signingKey] is migrated to crypto2 in memory. Startup never rewrites `auth.conf`, and
+ * malformed or mismatched StoredKey values fail instead of falling back.
+ *
  * The same key must be deployed to every replica so that JWT tokens issued by one
  * instance are accepted by all others (HA-safe).
  *
@@ -24,6 +28,7 @@ import kotlin.time.Duration.Companion.hours
  * ```hocon
  * auth {
  *   signingKey = { type = "jwk", jwk = { kty = "EC", crv = "P-256", x = "...", y = "...", d = "..." } }
+ *   signingStoredKey = "{...encoded StoredKey...}"
  *   tokenExpiry = "PT24H"
  * }
  * ```
@@ -38,4 +43,9 @@ data class OSSWallet2AuthConfig(
     val signingKey: DirectSerializedKey,
     /** JWT token lifetime. Accepts ISO-8601 duration strings, e.g. "PT24H", "P7D". */
     val tokenExpiry: Duration = 24.hours,
-) : WaltConfig()
+    /** Preferred encoded crypto2 StoredKey sidecar for [signingKey]. */
+    val signingStoredKey: String? = null,
+) : WaltConfig() {
+    /** Preserves the JVM constructor descriptor from before the StoredKey field was added. */
+    constructor(signingKey: DirectSerializedKey, tokenExpiry: Duration) : this(signingKey, tokenExpiry, null)
+}

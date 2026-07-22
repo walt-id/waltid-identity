@@ -1,0 +1,87 @@
+public final class id/walt/crypto2/migration/v1/V1KeyMigration {
+	public static final field Companion Lid/walt/crypto2/migration/v1/V1KeyMigration$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/Map;Lid/walt/crypto2/migration/v1/V1PlatformKeyMigrator;)V
+	public synthetic fun <init> (Ljava/util/Map;Lid/walt/crypto2/migration/v1/V1PlatformKeyMigrator;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun migrate-1locDDc (Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun migrate-1locDDc (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun migrateMobileReference (Lid/walt/crypto2/migration/v1/V1MobileKeyReference;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/migration/v1/V1KeyMigration$Companion {
+}
+
+public abstract class id/walt/crypto2/migration/v1/V1KeyMigrationException : java/lang/IllegalArgumentException {
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class id/walt/crypto2/migration/v1/V1KeyMigrationException$MissingKeyMaterial : id/walt/crypto2/migration/v1/V1KeyMigrationException {
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class id/walt/crypto2/migration/v1/V1KeyMigrationException$MissingManagedMigrator : id/walt/crypto2/migration/v1/V1KeyMigrationException {
+	public fun <init> (Ljava/lang/String;)V
+}
+
+public final class id/walt/crypto2/migration/v1/V1KeyMigrationException$MissingPlatformMigrator : id/walt/crypto2/migration/v1/V1KeyMigrationException {
+	public fun <init> (Lid/walt/crypto2/migration/v1/V1MobilePlatform;)V
+}
+
+public abstract interface class id/walt/crypto2/migration/v1/V1ManagedKeyMigrator {
+	public abstract fun migrate (Lid/walt/crypto2/migration/v1/V1ManagedKeyRecord;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/migration/v1/V1ManagedKeyRecord {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lid/walt/crypto2/keys/KeySpec;Lkotlinx/serialization/json/JsonObject;Ljava/util/Set;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-1AhpoWA ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component4 ()Lid/walt/crypto2/keys/KeySpec;
+	public final fun component5 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component6 ()Ljava/util/Set;
+	public final fun copy-A3IiLVg (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lid/walt/crypto2/keys/KeySpec;Lkotlinx/serialization/json/JsonObject;Ljava/util/Set;)Lid/walt/crypto2/migration/v1/V1ManagedKeyRecord;
+	public static synthetic fun copy-A3IiLVg$default (Lid/walt/crypto2/migration/v1/V1ManagedKeyRecord;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lid/walt/crypto2/keys/KeySpec;Lkotlinx/serialization/json/JsonObject;Ljava/util/Set;ILjava/lang/Object;)Lid/walt/crypto2/migration/v1/V1ManagedKeyRecord;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-1AhpoWA ()Ljava/lang/String;
+	public final fun getPublicJwk ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getSource ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getSpec ()Lid/walt/crypto2/keys/KeySpec;
+	public final fun getType ()Ljava/lang/String;
+	public final fun getUsages ()Ljava/util/Set;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/migration/v1/V1MobileKeyReference {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lid/walt/crypto2/migration/v1/V1MobilePlatform;ZLjava/lang/String;Ljava/util/Set;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-1AhpoWA ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lid/walt/crypto2/migration/v1/V1MobilePlatform;
+	public final fun component4 ()Z
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/util/Set;
+	public final fun copy-A3IiLVg (Ljava/lang/String;Ljava/lang/String;Lid/walt/crypto2/migration/v1/V1MobilePlatform;ZLjava/lang/String;Ljava/util/Set;)Lid/walt/crypto2/migration/v1/V1MobileKeyReference;
+	public static synthetic fun copy-A3IiLVg$default (Lid/walt/crypto2/migration/v1/V1MobileKeyReference;Ljava/lang/String;Ljava/lang/String;Lid/walt/crypto2/migration/v1/V1MobilePlatform;ZLjava/lang/String;Ljava/util/Set;ILjava/lang/Object;)Lid/walt/crypto2/migration/v1/V1MobileKeyReference;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-1AhpoWA ()Ljava/lang/String;
+	public final fun getKeyMaterial ()Ljava/lang/String;
+	public final fun getKeyType ()Ljava/lang/String;
+	public final fun getPlatform ()Lid/walt/crypto2/migration/v1/V1MobilePlatform;
+	public final fun getPlatformBacked ()Z
+	public final fun getUsages ()Ljava/util/Set;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/migration/v1/V1MobilePlatform : java/lang/Enum {
+	public static final field ANDROID Lid/walt/crypto2/migration/v1/V1MobilePlatform;
+	public static final field IOS Lid/walt/crypto2/migration/v1/V1MobilePlatform;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/migration/v1/V1MobilePlatform;
+	public static fun values ()[Lid/walt/crypto2/migration/v1/V1MobilePlatform;
+}
+
+public abstract interface class id/walt/crypto2/migration/v1/V1PlatformKeyMigrator {
+	public abstract fun migrate (Lid/walt/crypto2/migration/v1/V1MobileKeyReference;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+

@@ -3,12 +3,24 @@ package id.walt.wallet2.persistence.keys
 import id.walt.crypto.AndroidKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.ManagedKey
+import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.providers.GenerateManagedKeyRequest
+import id.walt.crypto2.signum.AndroidSignumKeyBackend
+import id.walt.crypto2.signum.SignumKeyPolicy
+import id.walt.crypto2.signum.SignumKeyOptions
+import id.walt.crypto2.signum.SignumManagedKeyProvider
+import id.walt.crypto2.keys.Key as Crypto2Key
 import kotlin.uuid.Uuid
 
 /**
  * [PlatformKeyProvider] implementation backed by Android KeyStore.
  */
-public class AndroidPlatformKeyProvider : PlatformKeyProvider {
+public class AndroidPlatformKeyProvider : PlatformKeyProvider, Crypto2PlatformKeyProvider {
+    private val signumProvider = SignumManagedKeyProvider(AndroidSignumKeyBackend())
 
     /**
      * Android platform-backed key types supported by this provider.
@@ -27,6 +39,43 @@ public class AndroidPlatformKeyProvider : PlatformKeyProvider {
         } else {
             AndroidKey.Software.create(options)
         }
+    }
+
+    override fun isPlatformBacked(key: Key): Boolean = key is AndroidKey.Platform
+
+    override suspend fun generateManagedKey(
+        id: KeyId,
+        spec: KeySpec,
+        usages: Set<KeyUsage>,
+        policy: SignumKeyPolicy?,
+    ): ManagedKey = signumProvider.generate(
+        GenerateManagedKeyRequest(
+            id = id,
+            spec = spec,
+            usages = usages,
+            providerOptions = SignumKeyOptions(policy = policy ?: SignumKeyPolicy()).encode(),
+        )
+    )
+
+    override suspend fun migratePlatformKey(
+        id: KeyId,
+        keyType: KeyType,
+        usages: Set<KeyUsage>,
+    ): StoredKey.Managed {
+        return signumProvider.storedKeyForExisting(
+            id = id,
+            spec = keyType.toCrypto2KeySpec(),
+            usages = usages,
+            alias = id.value,
+            policy = SignumKeyPolicy(),
+        )
+    }
+
+    override suspend fun restoreManagedKey(stored: StoredKey.Managed): Crypto2Key =
+        signumProvider.restore(stored)
+
+    override suspend fun deleteManagedKey(stored: StoredKey.Managed) {
+        signumProvider.delete(stored, expectedAlias = stored.id.value)
     }
 
     /**

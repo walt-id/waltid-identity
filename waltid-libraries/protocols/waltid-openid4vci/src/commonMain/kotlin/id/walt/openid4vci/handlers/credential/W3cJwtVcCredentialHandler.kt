@@ -5,6 +5,8 @@ import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
+import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialEndpointHandler
+import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
@@ -17,13 +19,14 @@ import id.walt.sdjwt.SDMap
 import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.coroutines.CancellationException
 import kotlin.time.Instant
 
 /**
  * W3C JWT VC credential response handler.
  * Supports JWT VC formats (jwt_vc_json, jwt_vc).
  */
-class W3cJwtVcCredentialHandler : CredentialEndpointHandler {
+class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpointHandler {
     private companion object {
         val supportedFormats = setOf(
             CredentialFormat.JWT_VC_JSON,
@@ -31,6 +34,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler {
         )
     }
 
+    @Deprecated("Use the Crypto2CredentialSigningKey overload")
     override suspend fun sign(
         request: CredentialRequest,
         configuration: CredentialConfiguration,
@@ -46,6 +50,53 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler {
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+    ): CredentialResponseResult = sign(configuration) {
+        W3cJwtVcCredentialSigner.generateW3CJwtVC(
+            credentialRequest = request,
+            credentialData = credentialData,
+            issuerId = issuerId,
+            issuerKey = issuerKey,
+            selectiveDisclosure = selectiveDisclosure,
+            dataMapping = dataMapping,
+            x5Chain = x5Chain,
+            display = display,
+            w3cVersion = w3cVersion,
+        )
+    }
+
+    override suspend fun sign(
+        request: CredentialRequest,
+        configuration: CredentialConfiguration,
+        issuerKey: Crypto2CredentialSigningKey,
+        issuerId: String,
+        credentialData: JsonObject,
+        dataMapping: JsonObject?,
+        selectiveDisclosure: SDMap?,
+        x5Chain: List<CertificateDer>?,
+        display: List<CredentialDisplay>?,
+        w3cVersion: String?,
+        mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
+        credentialStatus: Status?,
+        validFrom: Instant?,
+        validUntil: Instant?,
+    ): CredentialResponseResult = sign(configuration) {
+        W3cJwtVcCredentialSigner.generateW3CJwtVC(
+            credentialRequest = request,
+            credentialData = credentialData,
+            issuerId = issuerId,
+            issuerKey = issuerKey.key,
+            algorithm = issuerKey.requireJwsAlgorithm(),
+            selectiveDisclosure = selectiveDisclosure,
+            dataMapping = dataMapping,
+            x5Chain = x5Chain,
+            display = display,
+            w3cVersion = w3cVersion,
+        )
+    }
+
+    private suspend fun sign(
+        configuration: CredentialConfiguration,
+        issue: suspend () -> String,
     ): CredentialResponseResult {
         return try {
             if (configuration.format !in supportedFormats) {
@@ -57,17 +108,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler {
                 )
             }
 
-            val jwtVc = W3cJwtVcCredentialSigner.generateW3CJwtVC(
-                credentialRequest = request,
-                credentialData = credentialData,
-                issuerId = issuerId,
-                issuerKey = issuerKey,
-                selectiveDisclosure = selectiveDisclosure,
-                dataMapping = dataMapping,
-                x5Chain = x5Chain,
-                display = display,
-                w3cVersion = w3cVersion,
-            )
+            val jwtVc = issue()
 
             CredentialResponseResult.Success(
                 CredentialResponse(
@@ -76,6 +117,8 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler {
                     ),
                 )
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             CredentialResponseResult.Failure(OAuthError("invalid_request", e.message))
         }

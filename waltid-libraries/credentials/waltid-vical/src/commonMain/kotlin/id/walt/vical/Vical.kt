@@ -1,6 +1,7 @@
 package id.walt.vical
 
 import id.walt.cose.*
+import id.walt.crypto2.keys.Key
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromByteArray
@@ -31,6 +32,11 @@ data class Vical(
         // The external_aad is an empty byte string for VICAL as per the spec.
         return coseSign1.verify(verifier, externalAad = byteArrayOf())
     }
+
+    suspend fun verify(
+        key: Key,
+        allowedAlgorithms: Set<Int>,
+    ): Boolean = coseSign1.verify(key, allowedAlgorithms)
 
     fun getCertificateChain() = coseSign1.unprotected.x5chain
 
@@ -90,6 +96,17 @@ data class Vical(
             )
             return Vical(cose, vicalData)
         }
+
+        suspend fun createAndSign(
+            vicalData: VicalData,
+            key: Key,
+            algorithmId: Int,
+            signerCertificateChain: List<CoseCertificate>,
+        ): Vical = createAndSign(
+            vicalData = vicalData,
+            signer = key.toCoseSigner(algorithmId),
+            algorithmId = algorithmId,
+            signerCertificateChain = signerCertificateChain,
+        )
     }
 }
-

@@ -5,6 +5,13 @@ import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
@@ -13,6 +20,8 @@ import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.elements.NamespacedIssuerSignedListSerializer
 import id.walt.mdoc.objects.mso.MobileSecurityObject
+import id.walt.x509.CertificateDer
+import id.walt.x509.crypto2PublicJwk
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
@@ -23,6 +32,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.put
 import kotlin.io.encoding.Base64
 
 /**
@@ -95,21 +105,23 @@ data class IssuerSigned private constructor(
         }
     }
 
+    @Deprecated("Use ParsedIssuerAuthCrypto2")
     data class ParsedIssuerAuth(
         val x5c: List<String>,
         val signerKey: Key,
     )
 
+    data class ParsedIssuerAuthCrypto2(
+        val x5c: List<String>,
+        val signerKey: Crypto2Key,
+    )
+
+    @Deprecated("Use getParsedIssuerAuthCrypto2()")
     @OptIn(ExperimentalSerializationApi::class)
     suspend fun getParsedIssuerAuth(): ParsedIssuerAuth {
         // Per ISO 18013-5 §9.1.2.4: x5chain SHALL be in the unprotected header.
         // Readers SHOULD also support x5chain in the protected header (for backwards compat / future).
-        val containedX5c = issuerAuth.unprotected.x5chain
-            ?: runCatching {
-                // Fall back to protected header if unprotected has no x5chain
-                coseCompliantCbor.decodeFromByteArray<CoseHeaders>(issuerAuth.protected).x5chain
-            }.getOrNull()
-        requireNotNull(containedX5c) { "Missing x5c X509 certificate chain in Mdocs credential" }
+        val containedX5c = containedX5c()
 
         val convertedX5c = containedX5c.map { Base64.encode(it.rawBytes) }
 
@@ -121,9 +133,35 @@ data class IssuerSigned private constructor(
         return ParsedIssuerAuth(x5c = convertedX5c, signerKey = signerKey)
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
+    suspend fun getParsedIssuerAuthCrypto2(): ParsedIssuerAuthCrypto2 {
+        val containedX5c = containedX5c()
+        val convertedX5c = containedX5c.map { Base64.encode(it.rawBytes) }
+        val signerCertificate = containedX5c.firstOrNull()
+            ?: throw IllegalArgumentException("Contained x5c X509 certificate chain in Mdocs credentials is empty (no signer element)")
+        val publicJwk = CertificateDer(signerCertificate.rawBytes).crypto2PublicJwk()
+        val stored = publicJwk.toStoredSoftwareKey(
+            KeyId(Jwk.sha256Thumbprint(publicJwk)),
+            setOf(KeyUsage.VERIFY),
+        )
+        return ParsedIssuerAuthCrypto2(
+            x5c = convertedX5c,
+            signerKey = crypto2Runtime.restore(stored),
+        )
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun containedX5c() = issuerAuth.unprotected.x5chain
+        ?: runCatching {
+            // Fall back to protected header if unprotected has no x5chain
+            coseCompliantCbor.decodeFromByteArray<CoseHeaders>(issuerAuth.protected).x5chain
+        }.getOrNull()
+        ?: throw IllegalArgumentException("Missing x5c X509 certificate chain in Mdocs credential")
+
 
     companion object {
         val log = KotlinLogging.logger {  }
+        private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
 
         /**
          * The primary factory method for creating an [IssuerSigned] instance.
@@ -143,5 +181,14 @@ data class IssuerSigned private constructor(
             }.toMap(),
             issuerAuth = issuerAuth
         )
+
+        /**
+         * Creates an [IssuerSigned] using existing namespace wrappers so received
+         * `IssuerSignedItemBytes` survive selective disclosure without re-encoding.
+         */
+        fun fromIssuerSignedLists(
+            namespaces: Map<String, IssuerSignedList>,
+            issuerAuth: CoseSign1,
+        ): IssuerSigned = IssuerSigned(namespaces = namespaces, issuerAuth = issuerAuth)
     }
 }

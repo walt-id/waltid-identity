@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        phase: [wallet-mobile, compose-demo, enterprise-mobile]
+        phase: [crypto2-signum, wallet-mobile, compose-demo, enterprise-mobile]
     env:
       MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
       MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}

@@ -26,7 +26,6 @@ kotlin {
         val jvmIosMain by creating {
             dependsOn(commonMain.get())
             dependencies {
-                implementation(identityLibs.signum.indispensable)
                 implementation(identityLibs.signum.supreme)
             }
         }
@@ -37,11 +36,14 @@ kotlin {
 
         commonMain.dependencies {
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+            api(project(":waltid-libraries:crypto:waltid-crypto2"))
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.io.core)
             implementation(identityLibs.kotlinx.io.bytestring)
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.whyoleg.cryptography.random)
+            implementation(identityLibs.signum.indispensable)
+            implementation(identityLibs.signum.indispensable.josef)
 
         }
         commonTest.dependencies {
@@ -69,9 +71,6 @@ kotlin {
 
             implementation(identityLibs.bouncycastle.prov)
             implementation(identityLibs.nimbus.jose.jwt)
-        }
-        jsMain.dependencies {
-            implementation(identityLibs.signum.indispensable)
         }
         jsTest.dependencies {
             implementation(kotlin("test-js"))

@@ -4,6 +4,12 @@ set -euo pipefail
 phase="${1:?Android device test phase is required}"
 
 case "$phase" in
+  crypto2-signum)
+    script="./waltid-identity/.github/scripts/mobile-ci/run-android-crypto2-signum-tests.sh"
+    emulator_options="-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
+    report_paths="waltid-identity/waltid-libraries/crypto/waltid-crypto2-signum/build/outputs/androidTest-results/**/*.xml"
+    artifact_paths=$'waltid-identity/waltid-libraries/crypto/waltid-crypto2-signum/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/crypto/waltid-crypto2-signum/build/outputs/androidTest-results/**'
+    ;;
   wallet-mobile)
     script="./waltid-identity/.github/scripts/mobile-ci/run-android-wallet-mobile-tests.sh"
     emulator_options="-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"

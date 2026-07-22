@@ -41,7 +41,10 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-dcql"))
             implementation(project(":waltid-libraries:credentials:waltid-verification-policies2"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
-            implementation(project(":waltid-libraries:crypto:waltid-x509"))
+            implementation(project(":waltid-libraries:credentials:waltid-credential-key-resolver"))
+            implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
+            implementation(project(":waltid-libraries:crypto:waltid-jose"))
+            api(project(":waltid-libraries:crypto:waltid-x509"))
             implementation(project(":waltid-libraries:web:waltid-ktor-notifications-core"))
             implementation(project(":waltid-libraries:waltid-did"))
         }

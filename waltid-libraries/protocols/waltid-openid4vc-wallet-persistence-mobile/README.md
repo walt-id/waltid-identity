@@ -99,9 +99,9 @@ The mobile facade opens encrypted databases by default and keeps managed databas
 
 The mobile schema includes the following tables:
 
-- `wallet2_keys` — Stored keys
-- `wallet2_credentials` — Stored credentials
-- `wallet2_dids` — Stored DIDs
+- `key_references` - Platform aliases, software key material, and versioned crypto2 descriptors
+- `credentials` - Stored credentials
+- `dids` - Stored DIDs
 
 Schema creation and migration are managed by SQLDelight on the target platform driver.
 

@@ -1,0 +1,323 @@
+package id.walt.x509.iso
+
+import at.asitplus.signum.indispensable.CryptoPublicKey
+import at.asitplus.signum.indispensable.CryptoSignature
+import at.asitplus.signum.indispensable.X509SignatureAlgorithm
+import at.asitplus.signum.indispensable.asn1.Asn1Element
+import at.asitplus.signum.indispensable.asn1.Asn1Primitive
+import at.asitplus.signum.indispensable.asn1.Asn1String
+import at.asitplus.signum.indispensable.asn1.Asn1Time
+import at.asitplus.signum.indispensable.asn1.ObjectIdentifier
+import at.asitplus.signum.indispensable.asn1.encoding.Asn1
+import at.asitplus.signum.indispensable.pki.AttributeTypeAndValue
+import at.asitplus.signum.indispensable.pki.RelativeDistinguishedName
+import at.asitplus.signum.indispensable.pki.SubjectAltNameImplicitTags
+import at.asitplus.signum.indispensable.pki.TbsCertificate
+import at.asitplus.signum.indispensable.pki.X509Certificate
+import at.asitplus.signum.indispensable.pki.X509CertificateExtension
+import id.walt.crypto.utils.ShaUtils
+import id.walt.x509.CertificateDer
+import id.walt.x509.X509DistinguishedName
+import id.walt.x509.X509KeyUsage
+import id.walt.x509.X509SubjectAlternativeNames
+import id.walt.x509.X509ValidityPeriod
+import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
+import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
+import kotlinx.io.bytestring.ByteString
+
+internal suspend fun buildSignumX509CertificateDer(
+    serialNumber: ByteString,
+    issuerName: List<RelativeDistinguishedName>,
+    subjectName: List<RelativeDistinguishedName>,
+    validityPeriod: X509ValidityPeriod,
+    subjectPublicKey: CryptoPublicKey,
+    signatureAlgorithm: X509SignatureAlgorithm,
+    extensions: List<X509CertificateExtension>,
+    sign: suspend (ByteArray) -> CryptoSignature,
+): CertificateDer {
+    val tbsCertificate = TbsCertificate(
+        serialNumber = serialNumber.toByteArray(),
+        signatureAlgorithm = signatureAlgorithm,
+        issuerName = issuerName,
+        validFrom = Asn1Time(validityPeriod.notBefore),
+        validUntil = Asn1Time(validityPeriod.notAfter),
+        subjectName = subjectName,
+        publicKey = subjectPublicKey,
+        extensions = extensions,
+    )
+    return CertificateDer(
+        X509Certificate(
+            tbsCertificate = tbsCertificate,
+            signatureAlgorithm = signatureAlgorithm,
+            signature = sign(tbsCertificate.encodeToDer()),
+        ).encodeToDer()
+    )
+}
+
+internal fun IACAPrincipalName.toSignumName(): List<RelativeDistinguishedName> =
+    buildSignumName(
+        country = country,
+        commonName = commonName,
+        stateOrProvinceName = stateOrProvinceName,
+        organizationName = organizationName,
+    )
+
+internal fun DocumentSignerPrincipalName.toSignumName(): List<RelativeDistinguishedName> =
+    buildSignumName(
+        country = country,
+        commonName = commonName,
+        stateOrProvinceName = stateOrProvinceName,
+        organizationName = organizationName,
+        localityName = localityName,
+    )
+
+internal fun X509DistinguishedName.toSignumName(): List<RelativeDistinguishedName> =
+    buildSignumName(
+        country = country,
+        commonName = commonName,
+        stateOrProvinceName = stateOrProvinceName,
+        organizationName = organizationName,
+        localityName = localityName,
+        organizationalUnitName = organizationalUnitName,
+    )
+
+internal fun subjectKeyIdentifierExtension(publicKey: CryptoPublicKey): X509CertificateExtension =
+    extension(
+        oid = "2.5.29.14",
+        critical = false,
+        value = Asn1.OctetString(publicKey.subjectKeyIdentifier()),
+    )
+
+internal fun authorityKeyIdentifierExtension(publicKey: CryptoPublicKey): X509CertificateExtension =
+    extension(
+        oid = "2.5.29.35",
+        critical = false,
+        value = Asn1.Sequence {
+            +(Asn1.OctetString(publicKey.subjectKeyIdentifier()) withImplicitTag 0uL)
+        },
+    )
+
+internal fun basicConstraintsExtension(
+    isCa: Boolean,
+    pathLengthConstraint: Int? = null,
+): X509CertificateExtension =
+    extension(
+        oid = "2.5.29.19",
+        critical = true,
+        value = Asn1.Sequence {
+            if (isCa) +Asn1.Bool(true)
+            pathLengthConstraint?.let { +Asn1.Int(it) }
+        },
+    )
+
+internal fun keyUsageExtension(usages: Set<X509KeyUsage>): X509CertificateExtension =
+    extension(
+        oid = "2.5.29.15",
+        critical = true,
+        value = Asn1.BitString(usages.toKeyUsageBytes()),
+    )
+
+internal fun issuerAlternativeNameExtension(
+    issuerAlternativeName: IssuerAlternativeName,
+): X509CertificateExtension =
+    extension(
+        oid = "2.5.29.18",
+        critical = false,
+        value = Asn1.Sequence {
+            issuerAlternativeName.email?.let {
+                +Asn1Primitive(SubjectAltNameImplicitTags.rfc822Name, it.encodeToByteArray())
+            }
+            issuerAlternativeName.uri?.let {
+                +Asn1Primitive(SubjectAltNameImplicitTags.uniformResourceIdentifier, it.encodeToByteArray())
+            }
+        },
+    )
+
+internal fun subjectAlternativeNamesExtension(
+    subjectAlternativeNames: X509SubjectAlternativeNames,
+): X509CertificateExtension =
+    extension(
+        oid = "2.5.29.17",
+        critical = false,
+        value = Asn1.Sequence {
+            subjectAlternativeNames.emails.forEach {
+                +Asn1Primitive(SubjectAltNameImplicitTags.rfc822Name, it.encodeToByteArray())
+            }
+            subjectAlternativeNames.dnsNames.forEach {
+                +Asn1Primitive(SubjectAltNameImplicitTags.dNSName, it.encodeToByteArray())
+            }
+            subjectAlternativeNames.uris.forEach {
+                +Asn1Primitive(SubjectAltNameImplicitTags.uniformResourceIdentifier, it.encodeToByteArray())
+            }
+            subjectAlternativeNames.ipAddresses.forEach {
+                +Asn1Primitive(SubjectAltNameImplicitTags.iPAddress, it.toIpAddressBytes())
+            }
+        },
+    )
+
+internal fun extendedKeyUsageExtension(
+    oids: Set<String>,
+    critical: Boolean = true,
+): X509CertificateExtension =
+    extension(
+        oid = "2.5.29.37",
+        critical = critical,
+        value = Asn1.Sequence {
+            oids.forEach { +ObjectIdentifier(it) }
+        },
+    )
+
+internal fun crlDistributionPointExtension(uri: String): X509CertificateExtension =
+    extension(
+        oid = "2.5.29.31",
+        critical = false,
+        value = Asn1.Sequence {
+            +Asn1.Sequence {
+                +Asn1.ExplicitlyTagged(0uL) {
+                    +(Asn1.Sequence {
+                        +Asn1Primitive(
+                            SubjectAltNameImplicitTags.uniformResourceIdentifier,
+                            uri.encodeToByteArray(),
+                        )
+                    } withImplicitTag 0uL)
+                }
+            }
+        },
+    )
+
+private fun extension(
+    oid: String,
+    critical: Boolean,
+    value: Asn1Element,
+): X509CertificateExtension =
+    X509CertificateExtension(
+        oid = ObjectIdentifier(oid),
+        critical = critical,
+        value = Asn1.OctetStringEncapsulating {
+            +value
+        },
+    )
+
+private fun buildSignumName(
+    country: String? = null,
+    commonName: String? = null,
+    stateOrProvinceName: String? = null,
+    organizationName: String? = null,
+    localityName: String? = null,
+    organizationalUnitName: String? = null,
+): List<RelativeDistinguishedName> = buildList {
+    country?.let {
+        add(RelativeDistinguishedName(AttributeTypeAndValue.Country(Asn1String.Printable(it))))
+    }
+    commonName?.let {
+        add(RelativeDistinguishedName(AttributeTypeAndValue.CommonName(Asn1String.UTF8(it))))
+    }
+    stateOrProvinceName?.let {
+        add(RelativeDistinguishedName(AttributeTypeAndValue.Other(ObjectIdentifier("2.5.4.8"), Asn1String.UTF8(it))))
+    }
+    organizationName?.let {
+        add(RelativeDistinguishedName(AttributeTypeAndValue.Organization(Asn1String.UTF8(it))))
+    }
+    localityName?.let {
+        add(RelativeDistinguishedName(AttributeTypeAndValue.Other(ObjectIdentifier("2.5.4.7"), Asn1String.UTF8(it))))
+    }
+    organizationalUnitName?.let {
+        add(RelativeDistinguishedName(AttributeTypeAndValue.OrganizationalUnit(Asn1String.UTF8(it))))
+    }
+}
+
+private fun CryptoPublicKey.subjectKeyIdentifier(): ByteArray =
+    ShaUtils.sha1(iosEncoded)
+
+private fun Set<X509KeyUsage>.toKeyUsageBytes(): ByteArray {
+    val bitIndexes = map { it.keyUsageBitIndex() }
+    val bytes = ByteArray(bitIndexes.maxOrNull()?.div(8)?.plus(1) ?: 1)
+    bitIndexes.forEach { bitIndex ->
+        val byteIndex = bitIndex / 8
+        bytes[byteIndex] = (bytes[byteIndex].toInt() or (0x80 ushr (bitIndex % 8))).toByte()
+    }
+    return bytes
+}
+
+private fun X509KeyUsage.keyUsageBitIndex(): Int =
+    when (this) {
+        X509KeyUsage.DigitalSignature -> 0
+        X509KeyUsage.NonRepudiation -> 1
+        X509KeyUsage.KeyEncipherment -> 2
+        X509KeyUsage.DataEncipherment -> 3
+        X509KeyUsage.KeyAgreement -> 4
+        X509KeyUsage.KeyCertSign -> 5
+        X509KeyUsage.CRLSign -> 6
+        X509KeyUsage.EncipherOnly -> 7
+        X509KeyUsage.DecipherOnly -> 8
+    }
+
+private fun String.toIpAddressBytes(): ByteArray =
+    if (":" in this) toIpv6Bytes() else toIpv4Bytes()
+
+private fun String.toIpv4Bytes(): ByteArray {
+    val octets = split(".")
+    require(octets.size == 4) {
+        "Invalid IPv4 subject alternative name: $this"
+    }
+    return ByteArray(4) { index ->
+        octets[index].toUByteStrict("IPv4", this).toByte()
+    }
+}
+
+private fun String.toIpv6Bytes(): ByteArray {
+    require(countOccurrences("::") <= 1) {
+        "Invalid IPv6 subject alternative name: $this"
+    }
+    val parts = split("::", limit = 2)
+    val head = parts[0].toIpv6Groups()
+    val tail = parts.getOrNull(1)?.toIpv6Groups().orEmpty()
+    val groups = if (parts.size == 2) {
+        val zeroGroupCount = 8 - head.size - tail.size
+        require(zeroGroupCount >= 1) {
+            "Invalid IPv6 subject alternative name: $this"
+        }
+        head + List(zeroGroupCount) { 0 } + tail
+    } else {
+        head
+    }
+    require(groups.size == 8) {
+        "Invalid IPv6 subject alternative name: $this"
+    }
+    return ByteArray(16) { index ->
+        val group = groups[index / 2]
+        if (index % 2 == 0) (group ushr 8).toByte() else group.toByte()
+    }
+}
+
+private fun String.toIpv6Groups(): List<Int> {
+    if (isEmpty()) return emptyList()
+    return split(":").flatMap { group ->
+        if ("." in group) {
+            val ipv4 = group.toIpv4Bytes()
+            listOf(
+                ((ipv4[0].toInt() and 0xff) shl 8) or (ipv4[1].toInt() and 0xff),
+                ((ipv4[2].toInt() and 0xff) shl 8) or (ipv4[3].toInt() and 0xff),
+            )
+        } else {
+            require(group.length in 1..4) {
+                "Invalid IPv6 subject alternative name group: $group"
+            }
+            listOf(group.toInt(16))
+        }
+    }
+}
+
+private fun String.toUByteStrict(addressType: String, address: String): UByte {
+    require(isNotEmpty() && all { it.isDigit() }) {
+        "Invalid $addressType subject alternative name: $address"
+    }
+    val value = toInt()
+    require(value in 0..255) {
+        "Invalid $addressType subject alternative name: $address"
+    }
+    return value.toUByte()
+}
+
+private fun String.countOccurrences(needle: String): Int =
+    windowed(needle.length).count { it == needle }

@@ -3,7 +3,8 @@ CREATE TABLE key_references (
     key_type TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     is_platform_backed INTEGER NOT NULL DEFAULT 1,
-    key_material TEXT
+    key_material TEXT,
+    crypto2_stored_key TEXT
 );
 
 selectAll:
@@ -13,8 +14,18 @@ selectByKeyId:
 SELECT * FROM key_references WHERE key_id = ?;
 
 insert:
-INSERT OR REPLACE INTO key_references (key_id, key_type, created_at, is_platform_backed, key_material)
-VALUES (?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO key_references (
+    key_id,
+    key_type,
+    created_at,
+    is_platform_backed,
+    key_material,
+    crypto2_stored_key
+)
+VALUES (?, ?, ?, ?, ?, ?);
+
+updateCrypto2StoredKey:
+UPDATE key_references SET crypto2_stored_key = ? WHERE key_id = ?;
 
 deleteByKeyId:
 DELETE FROM key_references WHERE key_id = ?;
