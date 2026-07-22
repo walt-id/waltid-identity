@@ -257,7 +257,34 @@ object WalletPresentationHandler {
         wallet: Wallet,
         request: PresentCredentialRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
+    ): WalletPresentResult = presentCredential(
+        wallet, request, onEvent, TransactionDataTypeRegistry(), beforeCredentialsUsed = {},
+    )
+
+    suspend fun presentCredential(
+        wallet: Wallet,
+        request: PresentCredentialRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
+        beforeCredentialsUsed: suspend (Int) -> Unit,
+    ): WalletPresentResult = presentCredential(
+        wallet, request, onEvent, TransactionDataTypeRegistry(), beforeCredentialsUsed,
+    )
+
+    suspend fun presentCredential(
+        wallet: Wallet,
+        request: PresentCredentialRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
+    ): WalletPresentResult = presentCredential(
+        wallet, request, onEvent, transactionDataTypeRegistry, beforeCredentialsUsed = {},
+    )
+
+    suspend fun presentCredential(
+        wallet: Wallet,
+        request: PresentCredentialRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        beforeCredentialsUsed: suspend (Int) -> Unit,
     ): WalletPresentResult {
         val key = wallet.resolveKey(keyId = request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
@@ -282,6 +309,7 @@ object WalletPresentationHandler {
             holderPoliciesToRun = null,
             runPolicies = request.runPolicies,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
+            beforeCredentialsUsed = beforeCredentialsUsed,
         )
 
         return result.emitPresentationOutcome(onEvent)
@@ -294,7 +322,34 @@ object WalletPresentationHandler {
         wallet: Wallet,
         request: PresentCredentialIsolatedRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
+    ): WalletPresentResult = presentCredentialIsolated(
+        wallet, request, onEvent, TransactionDataTypeRegistry(), beforeCredentialsUsed = {},
+    )
+
+    suspend fun presentCredentialIsolated(
+        wallet: Wallet,
+        request: PresentCredentialIsolatedRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
+        beforeCredentialsUsed: suspend (Int) -> Unit,
+    ): WalletPresentResult = presentCredentialIsolated(
+        wallet, request, onEvent, TransactionDataTypeRegistry(), beforeCredentialsUsed,
+    )
+
+    suspend fun presentCredentialIsolated(
+        wallet: Wallet,
+        request: PresentCredentialIsolatedRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
+    ): WalletPresentResult = presentCredentialIsolated(
+        wallet, request, onEvent, transactionDataTypeRegistry, beforeCredentialsUsed = {},
+    )
+
+    suspend fun presentCredentialIsolated(
+        wallet: Wallet,
+        request: PresentCredentialIsolatedRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        beforeCredentialsUsed: suspend (Int) -> Unit,
     ): WalletPresentResult {
         val key = wallet.resolveKey(keyId = request.keyId)
             ?: error("No key available for isolated presentation")
@@ -317,6 +372,7 @@ object WalletPresentationHandler {
             holderPoliciesToRun = null,
             runPolicies = null,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
+            beforeCredentialsUsed = beforeCredentialsUsed,
         )
 
         return result.emitPresentationOutcome(onEvent)

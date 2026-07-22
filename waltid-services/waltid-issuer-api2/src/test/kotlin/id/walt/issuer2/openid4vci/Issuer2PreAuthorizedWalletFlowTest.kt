@@ -1,6 +1,8 @@
 package id.walt.issuer2.openid4vci
 
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
+import id.walt.issuer2.domain.IssuanceSessionStatus
+import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
 import id.walt.issuer2.testsupport.credentialRequest
 import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
 import id.walt.issuer2.testsupport.Issuer2TxCodeMode
@@ -16,6 +18,7 @@ import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
 import id.walt.issuer2.testsupport.createCredentialOffer
 import id.walt.issuer2.testsupport.createIssuer2ClientAttestationTestMaterial
 import id.walt.issuer2.testsupport.createWalletFlowCredentialOffer
+import id.walt.issuer2.testsupport.getSession
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.issuer2.testsupport.referencedOfferUri
 import id.walt.openid4vci.offers.AuthenticationMethod
@@ -28,10 +31,16 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -88,6 +97,19 @@ class Issuer2PreAuthorizedWalletFlowTest {
         assertEquals(HttpStatusCode.OK, credentialResponse.status, credentialResponse.bodyAsText())
         assertJwtVcJsonCredentialPayload(credentialResponse.body<JsonObject>())
         assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
+
+        val replay = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
+            bearerAuth(tokenResponse.access_token)
+            contentType(ContentType.Application.Json)
+            setBody(
+                credentialRequest(
+                    credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+                    proofs = proofs,
+                )
+            )
+        }
+        assertEquals(HttpStatusCode.BadRequest, replay.status, replay.bodyAsText())
+        assertFalse("credentials" in replay.body<JsonObject>())
     }
 
     @Test
@@ -131,6 +153,111 @@ class Issuer2PreAuthorizedWalletFlowTest {
             ),
         )
         assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
+    }
+
+    @Test
+    fun rejectedProofKeyReturnsNoCredentialAndLeavesSessionOpen() = testApplication {
+        var acceptedPublicJwk: JsonObject? = null
+        installIssuer2WithConfigFiles(
+            credentialProofKeyAcceptance = CredentialProofKeyAcceptance { _, publicJwk ->
+                acceptedPublicJwk = publicJwk
+                false
+            }
+        )
+        val client = apiClient()
+        val walletFlow = Issuer2WalletFlowDriver(client)
+        val createdOffer = client.createWalletFlowCredentialOffer(
+            scenario = Issuer2CredentialScenarios.identitySdJwt,
+            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            txCodeMode = Issuer2TxCodeMode.NONE,
+        )
+        val resolvedOffer = walletFlow.resolve(createdOffer)
+        val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
+        val proofs = walletFlow.buildJwtProofs(resolvedOffer.issuerMetadata, includeDidInProof = false)
+
+        val response = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
+            bearerAuth(tokenResponse.access_token)
+            contentType(ContentType.Application.Json)
+            setBody(
+                credentialRequest(
+                    credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+                    proofs = proofs,
+                )
+            )
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+        val responseBody = response.body<JsonObject>()
+        assertEquals("invalid_proof", responseBody["error"]?.jsonPrimitive?.content)
+        assertFalse("credentials" in responseBody)
+        val publicJwk = assertNotNull(acceptedPublicJwk)
+        assertTrue(setOf("d", "p", "q", "dp", "dq", "qi", "oth").none { it in publicJwk })
+        val session = client.getSession(createdOffer.offerId)
+        assertEquals(IssuanceSessionStatus.ACTIVE, session.status)
+        assertFalse(session.isClosed)
+    }
+
+    @Test
+    fun concurrentCredentialRequestsClaimSessionOnce() = testApplication {
+        val acceptanceStarted = CompletableDeferred<Unit>()
+        val releaseAcceptance = CompletableDeferred<Unit>()
+        val acceptanceCalls = AtomicInteger()
+        installIssuer2WithConfigFiles(
+            credentialProofKeyAcceptance = CredentialProofKeyAcceptance { _, _ ->
+                if (acceptanceCalls.incrementAndGet() == 1) {
+                    acceptanceStarted.complete(Unit)
+                    releaseAcceptance.await()
+                }
+                true
+            }
+        )
+        val client = apiClient()
+        val walletFlow = Issuer2WalletFlowDriver(client)
+        val createdOffer = client.createWalletFlowCredentialOffer(
+            scenario = Issuer2CredentialScenarios.identitySdJwt,
+            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            txCodeMode = Issuer2TxCodeMode.NONE,
+        )
+        val resolvedOffer = walletFlow.resolve(createdOffer)
+        val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
+        val requestBody = credentialRequest(
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+            proofs = walletFlow.buildJwtProofs(resolvedOffer.issuerMetadata, includeDidInProof = false),
+        )
+
+        suspend fun requestCredential() = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
+            bearerAuth(tokenResponse.access_token)
+            contentType(ContentType.Application.Json)
+            setBody(requestBody)
+        }
+
+        val responses = coroutineScope {
+            val first = async { requestCredential() }
+            acceptanceStarted.await()
+            val second = try {
+                requestCredential()
+            } finally {
+                releaseAcceptance.complete(Unit)
+            }
+            listOf(first.await(), second)
+        }
+
+        val successful = responses.single { it.status == HttpStatusCode.OK }
+        assertSdJwtVcCredentialPayload(
+            credentialPayload = successful.body(),
+            expectedVctSuffix = "/${Issuer2CredentialScenarios.identitySdJwt.credentialConfigurationId}",
+            expectedDisclosureKeys = setOf("birthdate"),
+            expectedClaims = mapOf(
+                "family_name" to "Doe",
+                "given_name" to "John",
+            ),
+        )
+        val rejected = responses.single { it.status == HttpStatusCode.BadRequest }
+        assertFalse("credentials" in rejected.body<JsonObject>())
+        assertEquals(1, acceptanceCalls.get())
+        val session = client.getSession(createdOffer.offerId)
+        assertEquals(IssuanceSessionStatus.SUCCESSFUL, session.status)
+        assertTrue(session.isClosed)
     }
 
     @Test

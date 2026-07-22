@@ -265,13 +265,18 @@ object WalletPresentFunctionality2 {
         parameters: Parameters,
     ): WalletPresentResult {
         val response = webPostToken.sendForm(responseUri, parameters)
-        val responseBody = response.bodyAsText()
-        val responseBodyJson = Json.parseToJsonElement(responseBody).jsonObject
+        return directPostResult(response.status.isSuccess(), response.bodyAsText())
+    }
+
+    internal fun directPostResult(success: Boolean, responseBody: String): WalletPresentResult {
+        val responseBodyJson = responseBody.takeIf(String::isNotBlank)
+            ?.let { body -> runCatching { Json.parseToJsonElement(body) }.getOrElse { JsonPrimitive(body) } }
+            ?: JsonObject(emptyMap())
 
         return WalletPresentResult(
-            transmissionSuccess = response.status.isSuccess(),
+            transmissionSuccess = success,
             verifierResponse = responseBodyJson,
-            redirectTo = responseBodyJson["redirect_uri"]?.jsonPrimitive?.content,
+            redirectTo = (responseBodyJson as? JsonObject)?.get("redirect_uri")?.jsonPrimitive?.content,
         )
     }
 
@@ -608,6 +613,33 @@ object WalletPresentFunctionality2 {
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
 
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
+    ): Result<WalletPresentResult> = walletPresentHandling(
+        holderKey = holderKey,
+        holderDid = holderDid,
+        presentationRequestUrl = presentationRequestUrl,
+        selectCredentialsForQuery = selectCredentialsForQuery,
+        holderPoliciesToRun = holderPoliciesToRun,
+        runPolicies = runPolicies,
+        transactionDataTypeRegistry = transactionDataTypeRegistry,
+        legacyFallbackCallback = legacyFallbackCallback,
+        unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+        resolvedAuthorizationRequest = resolvedAuthorizationRequest,
+        beforeCredentialsUsed = {},
+    )
+
+    suspend fun walletPresentHandling(
+        holderKey: Key,
+        holderDid: String?,
+        presentationRequestUrl: Url,
+        selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+        holderPoliciesToRun: Flow<HolderPolicy>?,
+        runPolicies: Boolean?,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+        resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
+        beforeCredentialsUsed: suspend (Int) -> Unit,
     ): Result<WalletPresentResult> {
         log.trace { "- Start of Wallet Present Handling -" }
         log.trace { "Wallet presentation will use key $holderKey, and did $holderDid" }
@@ -690,6 +722,9 @@ object WalletPresentFunctionality2 {
             }
         }
 
+        val credentialCount = distinctCredentialCount(credentials)
+        if (credentialCount > 0) beforeCredentialsUsed(credentialCount)
+
         // Step 3: Build VP token (and optional ID token for SIOPv2).
         val vpToken = buildVpToken(authorizationRequest, credentials, holderKey, holderDid, transactionDataTypeRegistry)
         val idToken = buildIdToken(authorizationRequest, holderKey, holderDid)
@@ -697,6 +732,10 @@ object WalletPresentFunctionality2 {
         // Step 4: Send response.
         return sendAuthorizationResponse(authorizationRequest, vpToken, idToken)
     }
+
+    internal fun distinctCredentialCount(
+        credentials: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+    ): Int = credentials.values.flatten().distinctBy { it.credential.id }.size
 
     /**
      * Creates a Key Binding JWT for SD-JWT presentations.

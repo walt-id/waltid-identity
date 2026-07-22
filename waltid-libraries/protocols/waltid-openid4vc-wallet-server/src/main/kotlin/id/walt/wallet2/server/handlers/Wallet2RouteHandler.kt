@@ -678,6 +678,7 @@ object Wallet2RouteHandler {
                             WalletPresentationHandler.presentCredential(
                                 wallet = wallet,
                                 request = req,
+                                onEvent = {},
                                 transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
                             )
                         )
@@ -694,6 +695,7 @@ object Wallet2RouteHandler {
                             WalletPresentationHandler.presentCredentialIsolated(
                                 wallet = wallet,
                                 request = req,
+                                onEvent = {},
                                 transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
                             )
                         )

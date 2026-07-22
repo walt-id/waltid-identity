@@ -17,6 +17,10 @@ class IssuanceSessionService(
 
     suspend fun getSessionOrNull(sessionId: String): IssuanceSession? = repository.get(sessionId)
 
+    suspend fun removeSession(sessionId: String) = repository.remove(sessionId)
+
+    suspend fun claimSession(sessionId: String): IssuanceSession? = repository.take(sessionId)
+
     suspend fun listSessions(): List<IssuanceSession> = repository.list()
 
     suspend fun findByExternalAuthorizationState(state: String): IssuanceSession? =

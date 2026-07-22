@@ -427,7 +427,7 @@ function closeModal() {
 }
 
 const MMSDK = new MetaMaskSDK({
-  dappMetadata: {name: "Walt.id Web Wallet", url: window.location.href},
+  dappMetadata: {name: "walt.id Web Wallet", url: window.location.href},
   injectProvider: true
 });
 

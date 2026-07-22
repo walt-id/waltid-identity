@@ -375,7 +375,7 @@ class Issuer2CredentialStatusIntegrationTest {
                         put("family_name_unicode", "Doe")
                         put("birth_date", "2003-12-21")
                         put("issuance_date", "2025-12-13")
-                        put("issuing_authority_unicode", "Walt.id Issuer")
+                        put("issuing_authority_unicode", "walt.id Issuer")
                         put("expiry_date", "2026-12-13")
                         put("portrait", "AQIDBAUGBwgJCgsMDQ4P")
                     }
@@ -424,7 +424,7 @@ class Issuer2CredentialStatusIntegrationTest {
                         put("family_name_unicode", "Doe")
                         put("birth_date", "2003-12-21")
                         put("issuance_date", "2025-12-13")
-                        put("issuing_authority_unicode", "Walt.id Issuer")
+                        put("issuing_authority_unicode", "walt.id Issuer")
                         put("expiry_date", "2026-12-13")
                         put("portrait", "AQIDBAUGBwgJCgsMDQ4P")
                     }

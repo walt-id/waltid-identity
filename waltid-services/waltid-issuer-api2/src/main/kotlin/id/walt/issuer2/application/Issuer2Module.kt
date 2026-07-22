@@ -17,12 +17,17 @@ import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.openid4vci.MetadataService
+import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
+import id.walt.issuer2.service.openid4vci.CredentialProofKeyCommitment
+import id.walt.issuer2.service.openid4vci.CredentialNonceService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 
-class Issuer2Module(
+class Issuer2Module @JvmOverloads constructor(
     serviceConfig: Issuer2ServiceConfig,
     metadataConfig: Issuer2MetadataConfig,
     profilesConfig: Issuer2ProfilesConfig,
+    credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null,
+    credentialProofKeyCommitment: CredentialProofKeyCommitment? = null,
 ) {
     private val issuanceSessionRepository = ConfiguredIssuanceSessionRepository()
     private val authorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
@@ -30,6 +35,7 @@ class Issuer2Module(
     private val parRepository = ConfiguredPARRepository()
     private val refreshTokenRepository = ConfiguredRefreshTokenRepository()
     private val notificationService = IssuanceNotificationService()
+    private val credentialNonceService = CredentialNonceService()
 
     private val openId4VciModule = OpenId4VciModule.create(
         config = serviceConfig,
@@ -57,7 +63,7 @@ class Issuer2Module(
             openId4VciModule.preAuthorizedCodeIssuer.anonymousAccessSupported,
     )
 
-    private val credentialOfferService = CredentialOfferService(
+    val credentialOfferService = CredentialOfferService(
         profileService = credentialProfileService,
         sessionService = issuanceSessionService,
         preAuthorizedCodeIssuer = openId4VciModule.preAuthorizedCodeIssuer,
@@ -71,6 +77,9 @@ class Issuer2Module(
         profileService = credentialProfileService,
         metadataService = metadataService,
         notificationService = notificationService,
+        credentialProofKeyAcceptance = credentialProofKeyAcceptance,
+        credentialProofKeyCommitment = credentialProofKeyCommitment,
+        credentialNonceService = credentialNonceService,
     )
 
     val managementController = Issuer2ManagementController(
@@ -86,11 +95,13 @@ class Issuer2Module(
     )
 
     companion object {
-        fun load(): Issuer2Module =
+        @JvmOverloads
+        fun load(credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null): Issuer2Module =
             Issuer2Module(
                 serviceConfig = ConfigManager.getConfig(),
                 metadataConfig = ConfigManager.getConfig(),
                 profilesConfig = ConfigManager.getConfig(),
+                credentialProofKeyAcceptance = credentialProofKeyAcceptance,
             )
     }
 }

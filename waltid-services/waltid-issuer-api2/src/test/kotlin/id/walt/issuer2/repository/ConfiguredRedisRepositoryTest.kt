@@ -57,15 +57,19 @@ class ConfiguredRedisRepositoryTest {
 
         try {
             sessionRepository.save(session)
-            assertEquals(session, sessionRepository.get(session.sessionId))
+            val restartedSessionRepository = ConfiguredIssuanceSessionRepository()
+            assertEquals(session, restartedSessionRepository.get(session.sessionId))
+            assertEquals(session, restartedSessionRepository.take(session.sessionId))
+            assertNull(sessionRepository.take(session.sessionId))
 
             authorizationCodeRepository.save(authorizationCode)
             assertEquals(authorizationCode, authorizationCodeRepository.consume(authorizationCode.code))
             assertNull(authorizationCodeRepository.consume(authorizationCode.code))
 
             preAuthorizedCodeRepository.save(preAuthorizedCode)
-            assertEquals(preAuthorizedCode, preAuthorizedCodeRepository.get(preAuthorizedCode.code))
-            assertEquals(preAuthorizedCode, preAuthorizedCodeRepository.consume(preAuthorizedCode.code))
+            val restartedPreAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository()
+            assertEquals(preAuthorizedCode, restartedPreAuthorizedCodeRepository.get(preAuthorizedCode.code))
+            assertEquals(preAuthorizedCode, restartedPreAuthorizedCodeRepository.consume(preAuthorizedCode.code))
             assertNull(preAuthorizedCodeRepository.get(preAuthorizedCode.code))
 
             parRepository.save(pushedAuthorizationRequest)
