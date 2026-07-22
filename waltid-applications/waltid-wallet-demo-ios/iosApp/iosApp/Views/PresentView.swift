@@ -152,7 +152,7 @@ private struct PresentationErrorView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("This request cannot be completed")
                 .font(.headline)
-            VerifierDetailsView(request: error.request)
+            VerifierReviewSections(request: error.request)
             Text(error.message)
             Text("OpenID4VP error: \(error.code.rawValue)")
                 .font(.caption)

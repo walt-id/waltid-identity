@@ -31,6 +31,7 @@ import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
+import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
@@ -74,19 +75,6 @@ public data class MobileWalletCredential(
     public val label: String?,
     public val addedAt: String?,
     public val credentialDataJson: String,
-)
-
-/**
- * Result of resolving an OpenID4VCI credential offer before issuance.
- *
- * @property transactionCodeRequired Whether the app must collect a transaction code from the user.
- */
-public data class MobileWalletOfferResolution(
-    public val transactionCodeRequired: Boolean,
-    /** Issuer identifier (URL) from the credential offer. */
-    public val credentialIssuer: String,
-    /** Credential configuration IDs advertised in the offer. */
-    public val offeredCredentials: List<String>,
 )
 
 /**
@@ -163,6 +151,7 @@ public class MobileWallet internal constructor(
     private val keyGenerator: suspend (KeyType) -> Key,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     attestationConfig: WalletAttestationConfig? = null,
+    private val preferredLocales: List<String> = emptyList(),
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
@@ -258,13 +247,7 @@ public class MobileWallet internal constructor(
         WalletIssuanceHandler.previewOffer(
             wallet = wallet,
             request = ResolveOfferRequest(offerUrl = Url(offerUrl.trim())),
-        ).let { result ->
-            MobileWalletOfferResolution(
-                transactionCodeRequired = result.txCodeRequired,
-                credentialIssuer = result.credentialIssuer,
-                offeredCredentials = result.offeredCredentials,
-            )
-        }
+        ).toMobileOfferResolution(preferredLocales)
 
     /**
      * Receives credentials from an OpenID4VCI credential offer.
@@ -362,7 +345,7 @@ public class MobileWallet internal constructor(
         return when (result) {
             is PreviewPresentationResult.Invalid ->
                 MobileWalletPresentationPreviewResult.Invalid(
-                    request = result.authorizationRequest.toMobileRequestInfo(),
+                    request = result.authorizationRequest.toMobileRequestInfo(preferredLocales),
                     errorCode = result.error.code.toMobileErrorCode(),
                     message = result.error.message,
                 )
@@ -382,7 +365,11 @@ public class MobileWallet internal constructor(
                 }
                 MobileWalletPresentationPreviewResult.Ready(
                     MobileWalletPresentationPreview(
-                        request = result.authorizationRequest.toMobileRequestInfo(transactionData),
+                        request = result.authorizationRequest.toMobileRequestInfo(
+                            preferredLocales = preferredLocales,
+                            responseEncryption = result.responseEncryption,
+                            transactionData = transactionData,
+                        ),
                         credentialOptions = result.credentialOptions.map { it.toMobileCredentialOption() },
                         credentialRequirements = result.credentialRequirements.map { it.toMobileCredentialRequirement() },
                     )
@@ -548,15 +535,20 @@ internal fun WalletPresentResult.toMobilePresentationResult(): MobileWalletPrese
     }
 
 private fun AuthorizationRequest.toMobileRequestInfo(
+    preferredLocales: List<String>,
+    responseEncryption: ResponseEncryption.Metadata? = null,
     transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
-): MobileWalletPresentationRequestInfo = MobileWalletPresentationRequestInfo(
-    clientId = clientId,
-    verifierName = clientMetadata?.clientName,
-    responseUri = responseUri,
-    state = state,
-    nonce = nonce,
-    transactionData = transactionData,
-)
+): MobileWalletPresentationRequestInfo {
+    return MobileWalletPresentationRequestInfo(
+        clientId = clientId,
+        verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
+        responseUri = responseUri,
+        state = state,
+        nonce = nonce,
+        responseEncryption = responseEncryption.toMobileResponseEncryption(),
+        transactionData = transactionData,
+    )
+}
 
 private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {
     WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED -> MobileWalletPresentationErrorCode.accessDenied

@@ -18,6 +18,20 @@ let previewResult = try await wallet.previewPresentation(request: authorizationR
 let result: PresentationResult
 switch previewResult {
 case .ready(let preview):
+    if let verifierName = preview.request.verifierMetadata?.display?.name {
+        showVerifierName(verifierName)
+    }
+    switch preview.request.responseEncryption {
+    case .notRequired:
+        showPlainResponseNotice()
+    case .required(let details):
+        showEncryptedResponseNotice(
+            algorithm: details.keyManagementAlgorithm,
+            contentEncryption: details.contentEncryptionAlgorithm,
+            verifierKeyID: details.verifierKeyID,
+            verifierKeyThumbprint: details.verifierKeyThumbprint
+        )
+    }
     result = try await wallet.submitPresentation(
         request: authorizationRequestURL,
         selectedCredentialOptions: preview.credentialOptions.map(\.selection),
@@ -77,6 +91,10 @@ case .transmitted(.failed):
     showRejectionFailure()
 }
 ```
+
+``PresentationResponseEncryption`` describes protection of the authorization
+response selected for the reviewed request. Its verifier key identifier and
+thumbprint are technical identity details, not evidence that the verifier is trusted.
 
 > Note: ``Wallet/present(request:did:runPolicies:)`` still exists for immediate
 > submission after the app has already handled request review and user consent.
