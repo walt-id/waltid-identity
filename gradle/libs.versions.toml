@@ -66,7 +66,7 @@ url-encoder = "1.6.0"
 java-json-canonicalization = "1.1"
 
 # JVM-only: crypto providers
-java-cose = "1.1.1-WALT-SNAPSHOT"
+java-cose = "1.1.1-WALTID-SNAPSHOT"
 aws-kms = "1.6.97"
 azure-identity = "1.18.4"
 azure-keyvault-keys = "4.11.0"
