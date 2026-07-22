@@ -55,6 +55,12 @@ public data class MobileWalletPresentationPreviewHandle(val value: String) {
  * A reportable invalid request has a validated, non-blank [clientId]. Its [nonce] remains nullable
  * because a missing nonce can itself be the validation error. A ready preview instead exposes a
  * validated, non-null nonce through [MobileWalletPresentationRequestInfo].
+ *
+ * @property clientId Required OpenID4VP `client_id` value identifying the verifier.
+ * @property verifierName Human-readable verifier name derived from request metadata or the client identifier, when available.
+ * @property responseUri Verifier response URI to which the wallet would submit the presentation or error, when provided.
+ * @property state OpenID4VP state value supplied by the verifier, when provided.
+ * @property nonce OpenID4VP nonce value supplied by the verifier, when provided. May be null if the missing nonce is the validation error.
  */
 public data class MobileWalletPresentationRequestContext(
     val clientId: String,
