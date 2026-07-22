@@ -259,19 +259,21 @@ class MobileWalletTest {
         assertFailsWith<IllegalArgumentException> {
             MobileWalletPresentationRequestContext(
                 clientId = " ",
-                verifierName = null,
+                verifierMetadata = null,
                 responseUri = null,
                 state = null,
                 nonce = null,
+                responseEncryption = MobileWalletResponseEncryption.NotRequired,
             )
         }
 
         val context = MobileWalletPresentationRequestContext(
             clientId = "https://verifier.example",
-            verifierName = null,
+            verifierMetadata = null,
             responseUri = null,
             state = null,
             nonce = null,
+            responseEncryption = MobileWalletResponseEncryption.NotRequired,
         )
         assertEquals("https://verifier.example", context.clientId)
         assertEquals(null, context.nonce)
