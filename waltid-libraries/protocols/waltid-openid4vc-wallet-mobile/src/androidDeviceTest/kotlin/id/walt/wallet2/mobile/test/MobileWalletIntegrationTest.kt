@@ -435,9 +435,9 @@ class MobileWalletIntegrationTest {
         prefix: String,
         transactionDataProfiles: List<MobileWalletTransactionDataProfile> = DEMO_TRANSACTION_DATA_PROFILES,
         requestObjectX509Trust: WalletX509TrustConfig? = null,
-        // Demo backend returns unsigned requests; allow them for these tests
+        // Demo sessions use direct redirect_uri-bound requests; keep Request Objects fail-closed.
         unsignedRequestPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
     ) = MobileWalletConfig(
         walletId = "android-demo-$prefix-${UUID.randomUUID()}",
         requestObjectX509Trust = requestObjectX509Trust,

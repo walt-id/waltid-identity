@@ -141,8 +141,7 @@ public final class DemoBackend {
     public func createResponseBoundVerifierSession(scenario: DemoCredentialScenario) async throws -> DemoVerifierSession {
         try await createVerifierSession(
             scenario: scenario,
-            transactionData: [],
-            bindClientIDToResponseURI: true
+            transactionData: []
         )
     }
 
@@ -186,26 +185,23 @@ public final class DemoBackend {
     private func createVerifierSession(
         scenario: DemoCredentialScenario,
         transactionData: [[String: Any]],
-        encryptedResponse: Bool = false,
-        bindClientIDToResponseURI: Bool = false
+        encryptedResponse: Bool = false
     ) async throws -> DemoVerifierSession {
         let endpoint = Self.verifierBaseURL
             .appendingPathComponent("verification-session")
             .appendingPathComponent("create")
-        let requestedSessionID = bindClientIDToResponseURI ? UUID().uuidString.lowercased() : nil
+        let requestedSessionID = UUID().uuidString.lowercased()
         var coreFlow: [String: Any] = [
             "dcql_query": [
                 "credentials": [scenario.verifierCredentialQuery],
             ],
         ]
-        if let requestedSessionID {
-            let responseURI = Self.verifierBaseURL
-                .appendingPathComponent("verification-session")
-                .appendingPathComponent(requestedSessionID)
-                .appendingPathComponent("response")
-            coreFlow["sessionId"] = requestedSessionID
-            coreFlow["clientId"] = "redirect_uri:\(responseURI.absoluteString)"
-        }
+        let responseURI = Self.verifierBaseURL
+            .appendingPathComponent("verification-session")
+            .appendingPathComponent(requestedSessionID)
+            .appendingPathComponent("response")
+        coreFlow["sessionId"] = requestedSessionID
+        coreFlow["clientId"] = "redirect_uri:\(responseURI.absoluteString)"
         if encryptedResponse {
             coreFlow["encrypted_response"] = true
         }
@@ -231,21 +227,19 @@ public final class DemoBackend {
                 userInfo: [NSLocalizedDescriptionKey: "Missing sessionId in public demo verifier2 response: \(response)"]
             )
         }
-        guard requestedSessionID == nil || requestedSessionID == responseSessionID else {
+        guard requestedSessionID == responseSessionID else {
             throw NSError(
                 domain: "WalletE2E",
                 code: 308,
                 userInfo: [NSLocalizedDescriptionKey: "Public demo verifier2 did not preserve the requested session ID"]
             )
         }
-        let requestURL = response["bootstrapAuthorizationRequestUrl"] as? String
-            ?? response["authorizationRequestUrl"] as? String
-            ?? response["fullAuthorizationRequestUrl"] as? String
+        let requestURL = response["fullAuthorizationRequestUrl"] as? String ?? response["authorizationRequestUrl"] as? String
         guard let requestURL, !requestURL.isEmpty else {
             throw NSError(
                 domain: "WalletE2E",
                 code: 302,
-                userInfo: [NSLocalizedDescriptionKey: "Missing inline authorization request URL in public demo verifier2 response: \(response)"]
+                userInfo: [NSLocalizedDescriptionKey: "Missing authorization request URL in public demo verifier2 response: \(response)"]
             )
         }
 

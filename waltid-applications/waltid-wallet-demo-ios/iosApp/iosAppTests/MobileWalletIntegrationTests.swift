@@ -254,7 +254,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
             encryptedResponse: true
         )
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
-        let preview = try await wallet.previewPresentation(request: presentationURL)
+        let previewResult = try await wallet.previewPresentation(request: presentationURL)
+        let preview = try requireReadyPreview(previewResult)
         XCTAssertEqual(preview.request.responseMode, "direct_post.jwt")
         guard case .required = preview.encryption else {
             return XCTFail("Expected encrypted response metadata: \(preview.encryption)")
@@ -267,7 +268,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
             selectedCredentialOptions: preview.credentialOptions.map(\.selection),
             did: bootstrapResult.did
         )
-        XCTAssertTrue(result.success, "Encrypted demo EUDI PID mdoc presentation should succeed: \(result)")
+        assertTransmittedSuccess(result, "Encrypted demo EUDI PID mdoc presentation should succeed: \(result)")
         try await DemoBackend.shared.waitForVerifierSuccess(
             sessionID: session.sessionID,
             timeoutSeconds: verifierPollingTimeout
@@ -557,6 +558,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
             URLQueryItem(name: "response_type", value: "vp_token"),
             URLQueryItem(name: "response_mode", value: "fragment"),
             URLQueryItem(name: "redirect_uri", value: "https://verifier.example/callback"),
+            URLQueryItem(name: "client_metadata", value: "{}"),
             URLQueryItem(name: "nonce", value: "nonce"),
             URLQueryItem(name: "state", value: "state-123"),
             URLQueryItem(name: "dcql_query", value: String(decoding: dcqlQuery, as: UTF8.self)),

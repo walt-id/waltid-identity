@@ -155,7 +155,6 @@ object DemoTestBackend {
         return createVerifierSession(
             credentialQuery = scenario.verifierCredentialQuery,
             transactionData = emptyList(),
-            bindClientIdToResponseUri = true,
         )
     }
 
@@ -208,17 +207,14 @@ object DemoTestBackend {
         credentialQuery: JsonObject,
         transactionData: List<JsonObject>,
         encryptedResponse: Boolean = false,
-        bindClientIdToResponseUri: Boolean = false,
     ): VerifierSession {
-        val requestedSessionId = Uuid.random().toString().takeIf { bindClientIdToResponseUri }
+        val requestedSessionId = Uuid.random().toString()
         val payload = buildJsonObject {
             put("flow_type", "cross_device")
             putJsonObject("core_flow") {
-                requestedSessionId?.let { sessionId ->
-                    val responseUri = "$VERIFIER_BASE_URL/verification-session/$sessionId/response"
-                    put("sessionId", sessionId)
-                    put("clientId", "redirect_uri:$responseUri")
-                }
+                val responseUri = "$VERIFIER_BASE_URL/verification-session/$requestedSessionId/response"
+                put("sessionId", requestedSessionId)
+                put("clientId", "redirect_uri:$responseUri")
                 if (encryptedResponse) put("encrypted_response", true)
                 putJsonObject("dcql_query") {
                     putJsonArray("credentials") {
@@ -241,13 +237,12 @@ object DemoTestBackend {
         )
         val sessionId = response["sessionId"]?.jsonPrimitive?.contentOrNull
             ?: error("Missing sessionId in public demo verifier2 response: $response")
-        check(requestedSessionId == null || requestedSessionId == sessionId) {
+        check(requestedSessionId == sessionId) {
             "Public demo verifier2 did not preserve the requested session ID"
         }
-        val authorizationRequestUri = response["bootstrapAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
+        val authorizationRequestUri = response["fullAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
             ?: response["authorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
-            ?: response["fullAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
-            ?: error("Missing inline authorization request URL in public demo verifier2 response: $response")
+            ?: error("Missing authorization request URL in public demo verifier2 response: $response")
 
         return VerifierSession(sessionId, authorizationRequestUri)
     }
