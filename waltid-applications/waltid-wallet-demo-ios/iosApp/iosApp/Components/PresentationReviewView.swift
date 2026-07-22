@@ -13,6 +13,7 @@ struct PresentationReviewView: View {
     let onCredentialSelected: (String) -> Void
     let onSubmit: () -> Void
     let onReject: () -> Void
+    let onCancel: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -67,7 +68,8 @@ struct PresentationReviewView: View {
                     selectionComplete: selectionComplete,
                     isLoading: isLoading,
                     onSubmit: onSubmit,
-                    onReject: onReject
+                    onReject: onReject,
+                    onCancel: onCancel
                 )
             }
         }
@@ -164,6 +166,7 @@ private struct PresentationReviewActionsView: View {
     let isLoading: Bool
     let onSubmit: () -> Void
     let onReject: () -> Void
+    let onCancel: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -173,7 +176,12 @@ private struct PresentationReviewActionsView: View {
                 .disabled(isLoading || !selectionComplete)
                 .accessibilityIdentifier(WalletAccessibilityID.presentationSubmitButton)
 
-            Button("Decline", action: onReject)
+            Button("Cancel review", action: onCancel)
+                .buttonStyle(.bordered)
+                .disabled(isLoading)
+                .accessibilityIdentifier(WalletAccessibilityID.presentationCancelButton)
+
+            Button("Reject", action: onReject)
                 .buttonStyle(.bordered)
                 .disabled(isLoading)
                 .accessibilityIdentifier(WalletAccessibilityID.presentationRejectButton)

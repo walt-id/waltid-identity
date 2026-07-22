@@ -15,6 +15,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         viewModel.previewOffer()
         viewModel.previewOffer()
         try await waitUntil { viewModel.offerPreview?.transactionCode != nil }
+        viewModel.previewOffer()
+        await Task.yield()
 
         let receiveCallsBeforeCode = await client.receiveCalls
         let resolveCalls = await client.resolveCalls
@@ -94,6 +96,99 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertFalse(viewModel.isError)
     }
 
+    func testPresentationDeepLinkDiscardsActiveIssuancePreview() async throws {
+        let client = TransactionCodeWalletClient(startsWithCredential: true)
+        let viewModel = WalletViewModel(walletClient: client)
+        try await waitUntil { viewModel.isReady }
+
+        viewModel.offerUrl = "openid-credential-offer://issuer.example"
+        viewModel.previewOffer()
+        try await waitUntil { viewModel.offerPreview != nil }
+        let receiveResetKey = viewModel.receiveNavigationResetKey
+
+        viewModel.handleDeepLink(URL(string: "openid4vp://verifier.example")!)
+        try await waitUntilAsync {
+            let handles = await client.discardedIssuancePreviewHandles
+            return !handles.isEmpty
+        }
+
+        let discardedHandles = await client.discardedIssuancePreviewHandles
+        XCTAssertEqual(discardedHandles, [IssuancePreviewHandle(value: "transaction-code-preview")])
+        XCTAssertNil(viewModel.offerPreview)
+        XCTAssertEqual(viewModel.receiveNavigationResetKey, receiveResetKey + 1)
+        XCTAssertEqual(viewModel.selectedTab, .present)
+    }
+
+    func testPresentationPreviewIsSingleFlight() async throws {
+        let client = TransactionCodeWalletClient(
+            startsWithCredential: true,
+            presentationPreviewDelayNanoseconds: 100_000_000
+        )
+        let viewModel = WalletViewModel(walletClient: client)
+        try await waitUntil { viewModel.isReady }
+
+        viewModel.presentationRequestUrl = "openid4vp://verifier.example"
+        viewModel.previewPresentation()
+        viewModel.previewPresentation()
+        try await waitUntil { viewModel.presentationPreview != nil }
+        viewModel.previewPresentation()
+        await Task.yield()
+
+        let previewCalls = await client.presentationPreviewCalls
+        XCTAssertEqual(previewCalls, 1)
+    }
+
+    func testStartingNewPresentationDiscardsLateResolvedPreview() async throws {
+        let client = TransactionCodeWalletClient(
+            startsWithCredential: true,
+            presentationPreviewDelayNanoseconds: 100_000_000
+        )
+        let viewModel = WalletViewModel(walletClient: client)
+        try await waitUntil { viewModel.isReady }
+
+        viewModel.presentationRequestUrl = "openid4vp://verifier.example"
+        viewModel.previewPresentation()
+        viewModel.startNewPresentationFlow()
+        try await waitUntilAsync {
+            let handles = await client.discardedPresentationPreviewHandles
+            return !handles.isEmpty
+        }
+
+        let discardedHandles = await client.discardedPresentationPreviewHandles
+        XCTAssertEqual(discardedHandles, [PresentationPreviewHandle(value: "transaction-code-presentation-preview")])
+        XCTAssertNil(viewModel.presentationPreview)
+        XCTAssertFalse(viewModel.isLoading)
+    }
+
+    func testPresentationActionsAreSingleFlightAndCannotOverwriteReset() async throws {
+        let client = TransactionCodeWalletClient(
+            startsWithCredential: true,
+            presentationActionDelayNanoseconds: 100_000_000
+        )
+        let viewModel = WalletViewModel(walletClient: client)
+        try await waitUntil { viewModel.isReady }
+
+        viewModel.presentationRequestUrl = "openid4vp://verifier.example"
+        viewModel.previewPresentation()
+        try await waitUntil { viewModel.presentationPreview != nil }
+
+        viewModel.submitPresentation()
+        viewModel.submitPresentation()
+        viewModel.rejectPresentation()
+        try await waitUntilAsync { await client.presentationSubmitCalls == 1 }
+
+        viewModel.startNewPresentationFlow()
+        try await Task.sleep(nanoseconds: 150_000_000)
+
+        let submitCalls = await client.presentationSubmitCalls
+        let rejectCalls = await client.presentationRejectCalls
+        XCTAssertEqual(submitCalls, 1)
+        XCTAssertEqual(rejectCalls, 0)
+        XCTAssertNil(viewModel.presentationPreview)
+        XCTAssertFalse(viewModel.isLoading)
+        XCTAssertEqual(viewModel.statusMessage, "Wallet ready")
+    }
+
     private func waitUntil(
         timeoutNanoseconds: UInt64 = 2_000_000_000,
         condition: @escaping @MainActor () -> Bool
@@ -107,15 +202,37 @@ final class WalletViewModelReceiveTests: XCTestCase {
             try await Task.sleep(nanoseconds: 10_000_000)
         }
     }
+
+    private func waitUntilAsync(
+        timeoutNanoseconds: UInt64 = 2_000_000_000,
+        condition: @escaping () async -> Bool
+    ) async throws {
+        let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+        while !(await condition()) {
+            guard DispatchTime.now().uptimeNanoseconds < deadline else {
+                XCTFail("Timed out waiting for wallet client state")
+                return
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+    }
 }
 
 private actor TransactionCodeWalletClient: WalletClient {
     private(set) var receiveCalls = 0
     private(set) var resolveCalls = 0
+    private(set) var presentationPreviewCalls = 0
+    private(set) var presentationSubmitCalls = 0
+    private(set) var presentationRejectCalls = 0
     private(set) var receivedTxCodes: [String] = []
+    private(set) var discardedIssuancePreviewHandles: [IssuancePreviewHandle] = []
+    private(set) var discardedPresentationPreviewHandles: [PresentationPreviewHandle] = []
     private var credentialIssued = false
     private let resolveDelayNanoseconds: UInt64
     private let transactionCode: TransactionCodeRequirement
+    private let startsWithCredential: Bool
+    private let presentationPreviewDelayNanoseconds: UInt64
+    private let presentationActionDelayNanoseconds: UInt64
 
     init(
         resolveDelayNanoseconds: UInt64 = 0,
@@ -123,10 +240,16 @@ private actor TransactionCodeWalletClient: WalletClient {
             inputMode: .text,
             length: nil,
             description: "Enter the code from the issuer"
-        )
+        ),
+        startsWithCredential: Bool = false,
+        presentationPreviewDelayNanoseconds: UInt64 = 0,
+        presentationActionDelayNanoseconds: UInt64 = 0
     ) {
         self.resolveDelayNanoseconds = resolveDelayNanoseconds
         self.transactionCode = transactionCode
+        self.startsWithCredential = startsWithCredential
+        self.presentationPreviewDelayNanoseconds = presentationPreviewDelayNanoseconds
+        self.presentationActionDelayNanoseconds = presentationActionDelayNanoseconds
     }
 
     func bootstrap() async throws -> WalletBootstrapResult {
@@ -134,7 +257,7 @@ private actor TransactionCodeWalletClient: WalletClient {
     }
 
     func credentials() async throws -> [Credential] {
-        credentialIssued ? [Self.credential] : []
+        startsWithCredential || credentialIssued ? [Self.credential] : []
     }
 
     func resolveOffer(offer: URL) async throws -> OfferResolution {
@@ -143,6 +266,7 @@ private actor TransactionCodeWalletClient: WalletClient {
             try? await Task.sleep(nanoseconds: resolveDelayNanoseconds)
         }
         return OfferResolution(
+            previewHandle: IssuancePreviewHandle(value: "transaction-code-preview"),
             issuer: IssuerMetadata(
                 credentialIssuer: "https://issuer.example",
                 display: MetadataDisplay(
@@ -167,11 +291,15 @@ private actor TransactionCodeWalletClient: WalletClient {
         )
     }
 
-    func receive(offer: URL, txCode: String?) async throws -> [String] {
+    func receive(previewHandle: IssuancePreviewHandle, txCode: String?) async throws -> [String] {
         receiveCalls += 1
         receivedTxCodes.append(txCode ?? "")
         credentialIssued = true
         return [Self.credential.id]
+    }
+
+    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
+        discardedIssuancePreviewHandles.append(previewHandle)
     }
 
     func present(request: URL, did: String?) async throws -> PresentationResult {
@@ -179,28 +307,53 @@ private actor TransactionCodeWalletClient: WalletClient {
     }
 
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
-        .ready(
+        presentationPreviewCalls += 1
+        if presentationPreviewDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: presentationPreviewDelayNanoseconds)
+        }
+        return .ready(
             PresentationPreview(
+                previewHandle: PresentationPreviewHandle(value: "transaction-code-presentation-preview"),
                 request: PresentationRequestInfo(
                     clientID: nil,
                     responseEncryption: .notRequired
                 ),
-                credentialOptions: []
+                credentialOptions: [
+                    PresentationCredentialOption(
+                        queryID: "pid",
+                        credentialID: Self.credential.id,
+                        format: Self.credential.format,
+                        issuer: Self.credential.issuer,
+                        subject: Self.credential.subject,
+                        label: Self.credential.label,
+                        credentialDataJSON: Self.credential.credentialDataJSON,
+                        disclosures: []
+                    )
+                ]
             )
         )
     }
 
     func submitPresentation(
-        request: URL,
+        previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
     ) async throws -> PresentationResult {
-        .transmitted(.succeeded(verifierResponseJSON: "{}"))
+        presentationSubmitCalls += 1
+        if presentationActionDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: presentationActionDelayNanoseconds)
+        }
+        return .transmitted(.succeeded(verifierResponseJSON: "{}"))
     }
 
-    func rejectPresentation(request: URL) async throws -> PresentationResult {
-        .transmitted(.succeeded(verifierResponseJSON: "{}"))
+    func rejectPresentation(previewHandle: PresentationPreviewHandle) async throws -> PresentationResult {
+        presentationRejectCalls += 1
+        return .transmitted(.succeeded(verifierResponseJSON: "{}"))
+    }
+
+    func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
+        discardedPresentationPreviewHandles.append(previewHandle)
     }
 
     private static let credential = Credential(

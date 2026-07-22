@@ -113,11 +113,13 @@ public data class MobileWalletTransactionCodeRequirement(
  * [MobileWallet.receive] reuses the retained resolution for the same wallet and offer, so the
  * metadata reviewed here and the offer accepted by the user belong to the same resolution.
  *
+ * @property previewHandle Opaque handle required to accept or discard this reviewed offer.
  * @property issuer Typed issuer metadata selected for the configured locale preferences.
  * @property offeredCredentials Metadata for every credential configuration referenced by the offer.
  * @property transactionCode Input requirement when the issuer requires a separately delivered code.
  */
 public data class MobileWalletOfferResolution(
+    public val previewHandle: MobileWalletIssuancePreviewHandle,
     public val issuer: MobileWalletIssuerMetadata,
     public val offeredCredentials: List<MobileWalletOfferedCredentialMetadata>,
     public val transactionCode: MobileWalletTransactionCodeRequirement?,
@@ -192,6 +194,7 @@ public sealed interface MobileWalletResponseEncryption {
 internal fun WalletOfferPreviewResult.toMobileOfferResolution(
     preferredLocales: List<String>,
 ): MobileWalletOfferResolution = MobileWalletOfferResolution(
+    previewHandle = MobileWalletIssuancePreviewHandle(previewHandle.value),
     issuer = MobileWalletIssuerMetadata(
         credentialIssuer = issuerMetadata.credentialIssuer,
         display = issuerMetadata.display.selectPreferred(preferredLocales)?.toMobileDisplay(),

@@ -48,7 +48,7 @@ val transactionCode = resolution.transactionCode?.let { requirement ->
         description = requirement.description,
     )
 }
-val credentialIds = wallet.receive(offerUrl, txCode = transactionCode)
+val credentialIds = wallet.receive(resolution.previewHandle, txCode = transactionCode)
 ```
 
 The resolution also contains localized, typed issuer and credential-configuration
