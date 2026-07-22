@@ -115,6 +115,12 @@ The JDBC driver is automatically inferred from the URL. Both source and target c
 - Target database will be initialized automatically (tables created if missing)
 - For PostgreSQL, ensure the database exists before running
 
+## Limitations
+
+The tool currently only works with W3C Verifiable Credentials. Support for IETF SD-JWTs and ISO mDocs is untested. 
+
+Feel free to test and contribute the missing functionality, or open an issue to request support.
+
 ## Related Libraries
 
 - **[waltid-openid4vc-wallet-persistence](../../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence)** — Target schema and store implementations
