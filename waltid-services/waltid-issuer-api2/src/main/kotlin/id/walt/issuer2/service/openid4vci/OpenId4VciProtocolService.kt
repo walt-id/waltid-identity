@@ -21,7 +21,6 @@ import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
-import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.core.OAuth2Provider
