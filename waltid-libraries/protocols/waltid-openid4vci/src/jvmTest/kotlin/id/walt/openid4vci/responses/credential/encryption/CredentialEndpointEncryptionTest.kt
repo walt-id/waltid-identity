@@ -11,6 +11,7 @@ import id.walt.openid4vci.createTestConfig
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
+import id.walt.openid4vci.requests.credential.encryption.CredentialResponseEncryptionParameters
 import id.walt.openid4vci.requests.credential.encryption.JweCredentialRequestDecryptor
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseBody
@@ -26,6 +27,7 @@ import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CredentialEndpointEncryptionTest {
@@ -97,6 +99,25 @@ class CredentialEndpointEncryptionTest {
     }
 
     @Test
+    fun `encrypted credential response omits kid when wallet JWK has no kid`() = runBlocking {
+        val walletKey = JWKKey.generate(KeyType.secp256r1, JwkKeyMeta("wallet-key"))
+        val walletJwkWithoutKid = encryptionPublicJwk(walletKey, includeKid = false)
+        val encryption = CredentialResponseEncryptionParameters(
+            jwk = walletJwkWithoutKid,
+            enc = CredentialEncryptionProfile.ENC_A128GCM,
+        )
+        val payload = buildJsonObject {
+            put("credentials", JsonPrimitive("issued-credential"))
+        }
+
+        val encryptedJwt = JweCredentialResponseEncryptor.encrypt(payload, encryption)
+        val parts = JweUtils.parseJWE(encryptedJwt, walletKey.exportJWK())
+
+        assertNull(parts.header["kid"])
+        assertEquals(payload, parts.payload)
+    }
+
+    @Test
     fun `encrypted credential request fails when request decryptor is not configured`() = runBlocking {
         val provider = buildOAuth2Provider(createTestConfig())
 
@@ -165,10 +186,14 @@ class CredentialEndpointEncryptionTest {
             put("enc", CredentialEncryptionProfile.ENC_A128GCM)
         }
 
-    private suspend fun encryptionPublicJwk(key: Key): JsonObject =
+    private suspend fun encryptionPublicJwk(key: Key, includeKid: Boolean = true): JsonObject =
         JsonObject(
             key.getPublicKey().exportJWKObject().toMutableMap().apply {
-                put("kid", JsonPrimitive(key.getKeyId()))
+                if (includeKid) {
+                    put("kid", JsonPrimitive(key.getKeyId()))
+                } else {
+                    remove("kid")
+                }
                 put("use", JsonPrimitive(CredentialEncryptionProfile.KEY_USE_ENC))
                 put("alg", JsonPrimitive(CredentialEncryptionProfile.ALG_ECDH_ES))
             }

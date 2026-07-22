@@ -10,6 +10,8 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationResult
 import id.walt.openid4vci.clientauth.ClientAuthenticationService
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolution
 import id.walt.openid4vci.clientauth.isAnonymousPreAuthorizedCodeTokenRequest
+import id.walt.openid4vci.dpop.DPoPConstants
+import id.walt.openid4vci.dpop.DPoPProofVerificationRequest
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
@@ -43,9 +45,12 @@ import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.crypto.keys.Key
 import id.walt.mdoc.objects.mso.Status
-import id.walt.openid4vci.tokens.access.AccessTokenContext
+import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
+import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
+import id.walt.openid4vci.tokens.access.dpopJwkThumbprint
 import id.walt.sdjwt.SDMap
 import id.walt.x509.CertificateDer
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -273,7 +278,8 @@ class DefaultOAuth2Provider(
     override suspend fun createAccessTokenRequest(
         parameters: Map<String, List<String>>,
         headers: Map<String, List<String>>,
-        session: Session?
+        session: Session?,
+        tokenEndpointUri: String?,
     ): AccessTokenRequestResult {
         if (config.clientAuthenticationServiceResolver == null &&
             isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers) &&
@@ -312,8 +318,59 @@ class DefaultOAuth2Provider(
             authenticatedClient = authenticatedClient,
         )
 
-        return validationResult
+        return when (validationResult) {
+            is AccessTokenRequestResult.Success -> bindTokenRequestToDPoP(
+                result = validationResult,
+                headers = headers,
+                tokenEndpointUri = tokenEndpointUri,
+            )
+
+            is AccessTokenRequestResult.Failure -> validationResult
+        }
     }
+
+    private suspend fun bindTokenRequestToDPoP(
+        result: AccessTokenRequestResult.Success,
+        headers: Map<String, List<String>>,
+        tokenEndpointUri: String?,
+    ): AccessTokenRequestResult {
+        val proofHeaders = headers.entries
+            .asSequence()
+            .filter { (name, _) -> name.equals(DPoPConstants.HEADER_NAME, ignoreCase = true) }
+            .flatMap { (_, values) -> values.asSequence() }
+            .toList()
+        if (proofHeaders.isEmpty()) return result
+        if (proofHeaders.size != 1 || proofHeaders.single().isBlank()) {
+            return invalidDPoPTokenRequest("Token request must contain exactly one DPoP proof")
+        }
+
+        val verifier = config.dpopProofVerifier
+            ?: return invalidDPoPTokenRequest("DPoP proof verification is not configured")
+        val targetUri = tokenEndpointUri?.takeIf { it.isNotBlank() }
+            ?: return invalidDPoPTokenRequest("Token endpoint URI is required for DPoP verification")
+
+        return try {
+            val verified = verifier.verify(
+                DPoPProofVerificationRequest(
+                    proofJwt = proofHeaders.single(),
+                    method = HTTP_POST,
+                    targetUri = targetUri,
+                ),
+            )
+            AccessTokenRequestResult.Success(
+                result.request.withDpopJwkThumbprint(verified.jwkThumbprint),
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            invalidDPoPTokenRequest(e.message ?: "Invalid DPoP proof")
+        }
+    }
+
+    private fun invalidDPoPTokenRequest(description: String): AccessTokenRequestResult.Failure =
+        AccessTokenRequestResult.Failure(
+            OAuthError(OAuthErrorCodes.INVALID_DPOP_PROOF, description),
+        )
 
     private fun canSkipTokenClientAuthentication(
         parameters: Map<String, List<String>>,
@@ -434,6 +491,8 @@ class DefaultOAuth2Provider(
     }
 
     private companion object {
+        const val HTTP_POST = "POST"
+        const val WWW_AUTHENTICATE_HEADER = "WWW-Authenticate"
         val TOKEN_RESPONSE_HEADERS = mapOf(
             "Cache-Control" to "no-store",
             "Pragma" to "no-cache",
@@ -443,7 +502,7 @@ class DefaultOAuth2Provider(
     override suspend fun createCredentialRequest(
         parameters: Map<String, List<String>>,
         session: Session?,
-        accessTokenContext: AccessTokenContext?
+        accessTokenContext: CredentialAccessTokenContext?
     ): CredentialRequestResult {
         verifyCredentialAccessToken(accessTokenContext)?.let { return it }
         return when (val result = config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())) {
@@ -467,7 +526,7 @@ class DefaultOAuth2Provider(
     override suspend fun createCredentialRequest(
         encryptedCredentialRequest: String,
         session: Session?,
-        accessTokenContext: AccessTokenContext?
+        accessTokenContext: CredentialAccessTokenContext?
     ): CredentialRequestResult {
         verifyCredentialAccessToken(accessTokenContext)?.let { return it }
         val decryptor = config.credentialRequestDecryptor
@@ -532,10 +591,23 @@ class DefaultOAuth2Provider(
 
     override fun writeCredentialError(error: CredentialError): CredentialResponseHttp =
         CredentialResponseHttp(
-            status = 400,
+            status = when (error.error) {
+                CredentialErrorCodes.INVALID_TOKEN,
+                OAuthErrorCodes.INVALID_DPOP_PROOF -> 401
+
+                else -> 400
+            },
             payload = buildMap {
                 put("error", JsonPrimitive(error.error))
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
+            },
+            headers = when (error.error) {
+                CredentialErrorCodes.INVALID_TOKEN,
+                OAuthErrorCodes.INVALID_DPOP_PROOF -> mapOf(
+                    WWW_AUTHENTICATE_HEADER to dpopAuthenticationChallenge(error),
+                )
+
+                else -> emptyMap()
             },
         )
 
@@ -576,23 +648,98 @@ class DefaultOAuth2Provider(
         )
     }
 
-    private suspend fun verifyCredentialAccessToken(accessTokenContext: AccessTokenContext?): CredentialRequestResult.OAuthFailure? {
+    private suspend fun verifyCredentialAccessToken(
+        accessTokenContext: CredentialAccessTokenContext?,
+    ): CredentialRequestResult.Failure? {
         if (accessTokenContext == null) return null
         val verifier = config.accessTokenVerifier
             ?: return CredentialRequestResult.OAuthFailure(
                 OAuthError(OAuthErrorCodes.SERVER_ERROR, "access token verifier not configured")
             )
         return try {
-            verifier.verify(
-                token = accessTokenContext.token,
+            val claims = verifier.verify(
+                token = accessTokenContext.authorization.token,
                 expectedIssuer = accessTokenContext.expectedIssuer,
                 expectedAudience = accessTokenContext.expectedAudience,
             )
-            null
+            verifyCredentialAccessTokenBinding(accessTokenContext, claims)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
+            invalidCredentialAccessToken(e.message ?: "Access token is invalid")
+        }
+    }
+
+    private suspend fun verifyCredentialAccessTokenBinding(
+        context: CredentialAccessTokenContext,
+        claims: JsonObject,
+    ): CredentialRequestResult.Failure? {
+        val boundJwkThumbprint = claims.dpopJwkThumbprint()
+
+        if (boundJwkThumbprint == null) {
+            return if (context.authorization.scheme == AccessTokenAuthorizationScheme.BEARER) {
+                null
+            } else {
+                invalidCredentialAccessToken("Access token is not DPoP-bound")
+            }
+        }
+
+        if (context.authorization.scheme != AccessTokenAuthorizationScheme.DPOP) {
+            return invalidCredentialAccessToken("DPoP-bound access token must use the DPoP authorization scheme")
+        }
+        if (context.dpopProofHeaderValues.size != 1 || context.dpopProofHeaderValues.single().isBlank()) {
+            return invalidCredentialDPoPProof("Credential request must contain exactly one DPoP proof")
+        }
+
+        val dpopVerifier = config.dpopProofVerifier
+            ?: return invalidCredentialDPoPProof("DPoP proof verification is not configured")
+        val targetUri = context.credentialEndpointUri?.takeIf { it.isNotBlank() }
+            ?: return invalidCredentialDPoPProof("Credential endpoint URI is required for DPoP verification")
+        val verified = try {
+            dpopVerifier.verify(
+                DPoPProofVerificationRequest(
+                    proofJwt = context.dpopProofHeaderValues.single(),
+                    method = HTTP_POST,
+                    targetUri = targetUri,
+                    accessToken = context.authorization.token,
+                ),
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return invalidCredentialDPoPProof(e.message ?: "Invalid DPoP proof")
+        }
+
+        return if (verified.jwkThumbprint == boundJwkThumbprint) {
+            null
+        } else {
+            invalidCredentialAccessToken("Invalid DPoP key binding")
             CredentialRequestResult.OAuthFailure(OAuthError(OAuthErrorCodes.INVALID_TOKEN, e.message))
         }
     }
+
+    private fun invalidCredentialAccessToken(description: String): CredentialRequestResult.Failure =
+        CredentialRequestResult.Failure(
+            OAuthError(CredentialErrorCodes.INVALID_TOKEN, description),
+        )
+
+    private fun invalidCredentialDPoPProof(description: String): CredentialRequestResult.Failure =
+        CredentialRequestResult.Failure(
+            OAuthError(OAuthErrorCodes.INVALID_DPOP_PROOF, description),
+        )
+
+    private fun dpopAuthenticationChallenge(error: OAuthError): String = buildString {
+        append(TOKEN_TYPE_DPOP)
+        append(" error=\"").append(error.error.escapeAuthenticationParameter()).append('"')
+        error.description?.let { description ->
+            append(", error_description=\"")
+                .append(description.escapeAuthenticationParameter())
+                .append('"')
+        }
+    }
+
+    private fun String.escapeAuthenticationParameter(): String =
+        replace("\\", "\\\\").replace("\"", "\\\"")
 
     private fun JsonObject.toParametersMap(): Map<String, List<String>> =
         entries.associate { (key, value) ->
