@@ -10,6 +10,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialMetadata
 import id.walt.openid4vci.metadata.issuer.IssuerDisplay
 import id.walt.openid4vci.offers.TxCode
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.wallet2.handlers.IssuancePreviewHandle
 import id.walt.wallet2.handlers.WalletOfferPreviewResult
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
@@ -55,6 +56,7 @@ class MobileWalletMetadataModelsTest {
         )
 
         val result = WalletOfferPreviewResult(
+            previewHandle = IssuancePreviewHandle("metadata-locale-preview"),
             issuerMetadata = issuer,
             offeredCredentials = listOf(
                 OfferedCredentialResolver.ResolvedCredentialOffer("pid", credential)
@@ -83,6 +85,7 @@ class MobileWalletMetadataModelsTest {
             credentialConfigurationsSupported = emptyMap(),
         )
         val preview = WalletOfferPreviewResult(
+            previewHandle = IssuancePreviewHandle("metadata-script-preview"),
             issuerMetadata = issuer,
             offeredCredentials = emptyList(),
             transactionCode = null,
@@ -101,6 +104,7 @@ class MobileWalletMetadataModelsTest {
     @Test
     fun localeLookupFallsBackToUnlocalizedThenFirstEntry() {
         fun resolve(display: List<IssuerDisplay>): String? = WalletOfferPreviewResult(
+            previewHandle = IssuancePreviewHandle("metadata-fallback-preview"),
             issuerMetadata = CredentialIssuerMetadata(
                 credentialIssuer = "https://issuer.example",
                 credentialEndpoint = "https://issuer.example/credential",

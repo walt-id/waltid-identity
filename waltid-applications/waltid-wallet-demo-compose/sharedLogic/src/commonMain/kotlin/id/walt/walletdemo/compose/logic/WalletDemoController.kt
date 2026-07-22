@@ -214,7 +214,6 @@ class WalletDemoController(
                         requestDrafts = it.requestDrafts.copy(
                             presentationRequestUrl = url,
                             txCode = "",
-                            transactionCodeRequired = false,
                         ),
                         offerPreview = null,
                         lastReceivedCredentialIds = emptyList(),

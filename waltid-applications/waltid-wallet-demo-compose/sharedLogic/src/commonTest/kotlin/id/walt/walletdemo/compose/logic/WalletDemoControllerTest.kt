@@ -503,7 +503,7 @@ class WalletDemoControllerTest {
         assertEquals(listOf(issuancePreviewHandle), wallet.discardedIssuancePreviewHandles)
         assertEquals(null, controller.state.value.offerPreview)
         assertEquals(receiveResetKey + 1, controller.state.value.receiveNavigationResetKey)
-        assertFalse(controller.state.value.requestDrafts.transactionCodeRequired)
+        assertEquals("", controller.state.value.requestDrafts.txCode)
         assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
     }
 
@@ -641,8 +641,9 @@ class WalletDemoControllerTest {
             ignorePresentationSubmitCancellation = true,
             presentationPreview = WalletDemoPresentationPreview(
                 previewHandle = presentationPreviewHandle,
-                verifierName = null,
+                verifierMetadata = null,
                 clientId = null,
+                responseEncryption = WalletDemoResponseEncryption.NotRequired,
                 credentialOptions = listOf(
                     WalletDemoPresentationCredentialOption(
                         queryId = "pid",
