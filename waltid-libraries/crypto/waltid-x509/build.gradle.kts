@@ -81,8 +81,11 @@ kotlin {
             dependsOn(jvmIosMain)
             dependencies {
                 implementation(identityLibs.signum.indispensable)
+                implementation(identityLibs.signum.supreme)
                 implementation(identityLibs.nimbus.jose.jwt)
                 implementation(identityLibs.kotlinx.coroutines.core)
+                implementation(identityLibs.bouncycastle.prov) //needs to be here to make intellij happy (and not in bouncy source set)
+                implementation(identityLibs.bouncycastle.pkix) //needs to be here to make intellij happy (and not in bouncy source set)
             }
         }
 
@@ -102,9 +105,6 @@ kotlin {
                 implementation(identityLibs.junit.jupiter.api)
                 implementation(identityLibs.junit.jupiter.engine)
                 implementation(identityLibs.junit.jupiter.params)
-
-                implementation(identityLibs.bouncycastle.prov)
-                implementation(identityLibs.nimbus.jose.jwt)
             }
         }
 
@@ -115,7 +115,6 @@ kotlin {
                 implementation(identityLibs.signum.indispensable)
             }
         }
-
 
         /*
 
@@ -131,15 +130,15 @@ kotlin {
                 }*/
     }
 
-    if (enableAndroidBuild) {
-        // Signum's Android artifacts bring jdk18on Bouncy Castle; this project
-        // already uses lts8on via the shared JVM/Android crypto stack.
-        configurations.all {
-            exclude(group = "org.bouncycastle", module = "bcprov-jdk18on")
-            exclude(group = "org.bouncycastle", module = "bcpkix-jdk18on")
-            exclude(group = "org.bouncycastle", module = "bcutil-jdk18on")
-        }
-    }
+//    if (enableAndroidBuild) {
+    // Signum's Android artifacts bring jdk18on Bouncy Castle; this project
+    // already uses lts8on via the shared JVM/Android crypto stack.
+    //      configurations.all {
+    //          exclude(group = "org.bouncycastle", module = "bcprov-jdk18on")
+    //          exclude(group = "org.bouncycastle", module = "bcpkix-jdk18on")
+    //          exclude(group = "org.bouncycastle", module = "bcutil-jdk18on")
+    //     }
+    // }
 }
 
 mavenPublishing {

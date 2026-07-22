@@ -11,7 +11,15 @@ internal class DnStringParser(val dnString: String) {
 
     var cursor = 0
     fun parse(): DistinguishedName {
-        return DistinguishedName(listOf(readRdnList()))
+        val dnList = mutableListOf<List<AttributeTypeAndValue>>()
+        dnList.add(readRdnList())
+        skipWhitespace()
+        while (!guessEnd()) {
+            expectString(",")
+            dnList.add(readRdnList())
+            skipWhitespace()
+        }
+        return DistinguishedName(dnList.toList())
     }
 
     private fun readRdnList(): List<AttributeTypeAndValue> {
@@ -113,6 +121,9 @@ internal class DnStringParser(val dnString: String) {
     private fun guessMinimumChars(minimumChars: Int): Boolean {
         return dnString.length - cursor >= minimumChars
     }
+
+    private fun guessEnd(): Boolean =
+        cursor == dnString.length
 
     companion object {
         val whitespaceRegex = Regex("\\s+", RegexOption.MULTILINE)

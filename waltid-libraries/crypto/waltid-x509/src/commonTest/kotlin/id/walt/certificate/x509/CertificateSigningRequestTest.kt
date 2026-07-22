@@ -5,11 +5,13 @@ import id.walt.certificate.x509.model.GeneralName
 import id.walt.crypto.keys.KeyType
 import id.walt.x509.*
 import kotlinx.coroutines.test.runTest
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class CertificateSigningRequestTest {
 
-    @Ignore
     @Test
     fun buildAndParseGenericCsrRoundTrip() = runTest {
         val key = createX509TestKey(KeyType.secp256r1)
@@ -21,7 +23,6 @@ class CertificateSigningRequestTest {
                 }
             }
         }
-
         val pem = csr.encodedPem
         assertTrue(pem.contains("BEGIN CERTIFICATE REQUEST"))
 
@@ -34,6 +35,8 @@ class CertificateSigningRequestTest {
                 ?.alternativeNames
                 ?.filter { it.type == GeneralName.NameType.dNSName }
                 ?.map { it.value })
+
+        println(pem)
     }
 
     // @Test

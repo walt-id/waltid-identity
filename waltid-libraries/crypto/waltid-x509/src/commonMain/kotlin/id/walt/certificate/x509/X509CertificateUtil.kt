@@ -9,10 +9,16 @@ import id.walt.crypto.keys.Key
 object X509CertificateUtil {
 
     fun parseCsrPem(pem: String): Pkcs10CertificateSigningRequest =
-        X509CertificateUtilDefaults.csrParser.parseCertificateSigningRequestPem(pem)
+        parseCsrPem(X509CertificateUtilDefaults, pem)
+
+    fun parseCsrPem(certificateServices: X509CertificateServices, pem: String): Pkcs10CertificateSigningRequest =
+        certificateServices.csrParser.parseCertificateSigningRequestPem(pem)
 
     fun parseCertificatePem(pem: String): X509Certificate =
-        X509CertificateUtilDefaults.certificateParser.parseCertificatePem(pem)
+        parseCertificatePem(X509CertificateUtilDefaults, pem)
+
+    fun parseCertificatePem(certificateServices: X509CertificateServices, pem: String): X509Certificate =
+        certificateServices.certificateParser.parseCertificatePem(pem)
 
     suspend fun createCsr(
         holderKey: Key,

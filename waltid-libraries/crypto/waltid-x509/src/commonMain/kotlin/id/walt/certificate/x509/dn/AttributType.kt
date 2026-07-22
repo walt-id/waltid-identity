@@ -26,6 +26,8 @@ data class AttributeType(
         printableString,
         ia5String,
         generalizedTime,
+        utf8String,
+        //TODO: all notSupported needs to be replaced with correct type
         notSupported
     }
 
@@ -58,14 +60,14 @@ data class AttributeType(
             AttributeType("1.3.36.8.3.14", Encoding.notSupported, listOf("nameAtBirth")),
 
             //2.5.4
-            AttributeType("2.5.4.3", Encoding.notSupported, listOf("cn", "commonName")),
+            AttributeType("2.5.4.3", Encoding.utf8String, listOf("cn", "commonName")),
             AttributeType("2.5.4.4", Encoding.notSupported, listOf("surname")),
             AttributeType("2.5.4.5", Encoding.printableString, listOf("serialNumber")),
             AttributeType("2.5.4.6", Encoding.printableString, listOf("c", "countryName")),
             AttributeType("2.5.4.7", Encoding.notSupported, listOf("l", "localityName")),
             AttributeType("2.5.4.8", Encoding.notSupported, listOf("st", "stateOrProvinceName")),
             AttributeType("2.5.4.9", Encoding.notSupported, listOf("street", "streetAddress")),
-            AttributeType("2.5.4.10", Encoding.notSupported, listOf("o", "organizationName")),
+            AttributeType("2.5.4.10", Encoding.utf8String, listOf("o", "organizationName")),
             AttributeType("2.5.4.11", Encoding.notSupported, listOf("ou", "organizationalUnitName")),
             AttributeType("2.5.4.12", Encoding.notSupported, listOf("t", "title")),
             AttributeType("2.5.4.13", Encoding.notSupported, listOf("description")),

@@ -19,6 +19,9 @@ private fun AttributeTypeAndValue.toSignumTypeAndValue(): SignumTypeAndValue {
 
     val value: SignumAsn1String = when (this.type.defaultEncoding) {
         AttributeType.Encoding.printableString -> SignumAsn1String.Printable(this.value)
+        AttributeType.Encoding.utf8String -> runCatching {
+            SignumAsn1String.Printable(this.value)
+        }.getOrElse { SignumAsn1String.UTF8(this.value) }
         else -> error("Unsupported attribute encoding ${this.type.defaultEncoding} for attribute '${this.type.name}' (${this.type.oid})")
     }
     return SignumTypeAndValue.Other(SignumOid(type.oid), value)
