@@ -10,6 +10,7 @@ class WalletDemoMetadataModelsTest {
         val credential = WalletDemoOfferedCredentialMetadata(
             configurationId = "org.iso.23220.photoid.1",
             format = "mso_mdoc",
+            scope = null,
             vct = null,
             doctype = "org.iso.23220.photoid.1",
             display = null,

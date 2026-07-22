@@ -93,6 +93,9 @@ final class WalletE2EUI {
     }
 
     func assertExists(identifierPrefix: String, timeout: TimeInterval = 20) {
+        if identifierPrefix == "wallet.credentialCard.", app.buttons["Done"].exists {
+            app.buttons["Done"].tap()
+        }
         let element = firstElement(identifierPrefix: identifierPrefix)
         XCTAssertTrue(element.waitForExistence(timeout: timeout), "Element not found with identifier prefix: \(identifierPrefix)")
     }
@@ -138,13 +141,37 @@ final class WalletE2EUI {
     func tapTab(label: String) {
         let tab = app.tabBars.buttons[label]
         dismissKeyboardIfPresent()
-        makeHittable(tab)
-        if tab.exists && tab.isHittable {
+        if tab.exists {
+            makeHittable(tab)
             tab.tap()
         } else {
-            tapTabCoordinate(label: label)
+            returnToWalletHome()
+            switch label {
+            case "Credentials":
+                break
+            case "Receive":
+                tapButton(identifier: "wallet.home.receive", fallbackLabel: "Receive")
+                tapButton(identifier: "wallet.manualEntry", fallbackLabel: "Enter link manually")
+            case "Present":
+                tapButton(identifier: "wallet.home.present", fallbackLabel: "Present")
+                tapButton(identifier: "wallet.manualEntry", fallbackLabel: "Enter link manually")
+            default:
+                XCTFail("Unknown wallet destination: \(label)")
+            }
         }
         XCTAssertTrue(waitForTabContent(label: label, timeout: 5), "Tab content did not become visible: \(label)")
+    }
+
+    private func returnToWalletHome() {
+        let done = app.buttons["Done"]
+        if done.exists && done.isHittable {
+            done.tap()
+        }
+        let cancel = app.buttons["Cancel"]
+        if !app.buttons["wallet.home.receive"].exists, cancel.exists, cancel.isHittable {
+            cancel.tap()
+        }
+        _ = app.buttons["wallet.home.receive"].waitForExistence(timeout: 5)
     }
 
     func replaceText(in element: XCUIElement, value: String) {
@@ -238,18 +265,19 @@ final class WalletE2EUI {
     private func tabContentVisible(label: String) -> Bool {
         switch label {
         case "Credentials":
-            return app.staticTexts["No credentials yet"].exists
+            return app.buttons["wallet.home.receive"].exists
+                && (app.staticTexts["No credentials yet"].exists
                 || app.staticTexts["Credential details"].exists
-                || firstHittableElement(identifierPrefix: "wallet.credentialCard.") != nil
+                || firstHittableElement(identifierPrefix: "wallet.credentialCard.") != nil)
         case "Receive":
             return textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL").isHittable
-                || app.staticTexts["Received credentials"].exists
+                || app.staticTexts["Add this credential?"].exists
                 || app.staticTexts["Credential details"].exists
         case "Present":
             return textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL").isHittable
-                || app.staticTexts["Review presentation request"].exists
+                || app.staticTexts["Share this information?"].exists
                 || app.staticTexts["Credential details"].exists
-                || app.buttons["wallet.presentationNewButton"].exists
+                || app.staticTexts["Request completed"].exists
         default:
             return false
         }

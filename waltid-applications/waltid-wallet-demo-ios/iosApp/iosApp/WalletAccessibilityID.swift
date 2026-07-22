@@ -2,6 +2,11 @@ import Foundation
 
 enum WalletAccessibilityID {
     static let status = identifier("status")
+    static let walletHome = identifier("home")
+    static let homeReceiveButton = identifier("home", "receive")
+    static let homePresentButton = identifier("home", "present")
+    static let requestCaptureSheet = identifier("requestCaptureSheet")
+    static let manualEntry = identifier("manualEntry")
     static let transactionDataProfilesWarning = identifier("transactionDataProfilesWarning")
     static let credentialsEmpty = identifier("credentials", "empty")
     static let credentialsTabContent = identifier("credentialsTabContent")
@@ -27,6 +32,8 @@ enum WalletAccessibilityID {
     static let presentationError = identifier("presentationError")
     static let presentationErrorNotifyButton = identifier("presentationErrorNotifyButton")
     static let presentationErrorDismissButton = identifier("presentationErrorDismissButton")
+    static let presentationCancelButton = identifier("presentationCancelButton")
+    static let presentationVerifier = identifier("presentationVerifier")
     static let presentationVerifierSection = identifier("presentationVerifierSection")
     static let presentationResponseProtectionSection = identifier("presentationResponseProtectionSection")
     static let presentationTechnicalDetailsSection = identifier("presentationTechnicalDetailsSection")

@@ -12,6 +12,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -39,8 +43,12 @@ internal fun PresentationReviewSection(
     onCredentialClick: (String) -> Unit,
     onSubmit: () -> Unit,
     onReject: () -> Unit,
+    onCancel: () -> Unit,
+    showActions: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
+    val optionsByQuery = preview.credentialOptions.groupBy { it.queryId }
+    val queryLabels = optionsByQuery.keys.mapIndexed { index, queryId -> queryId to "Request ${index + 1}" }.toMap()
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -55,64 +63,124 @@ internal fun PresentationReviewSection(
             fontWeight = FontWeight.SemiBold,
         )
 
-        preview.credentialOptions.forEach { option ->
-            val details = option.toCredentialDetails()
-            val credentialDisplay = details.toCardDisplayData()
-            val requestedDisclosureItems = option.toRequestedDisclosureGroup()?.items.orEmpty()
+        if (preview.credentialRequirements.isNotEmpty()) {
+            ReviewMetadataSection(title = "Required credential combinations") {
+                preview.credentialRequirements.forEachIndexed { index, requirement ->
+                    if (index > 0) HorizontalDivider()
+                    Text("Requirement ${index + 1}", style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        requirement.options.joinToString(separator = "  or  ") { option ->
+                            option.joinToString(separator = " + ") { queryId -> queryLabels[queryId] ?: queryId }
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
+        optionsByQuery.entries.forEachIndexed { queryIndex, (queryId, options) ->
+            var page by remember(preview.previewHandle.value, queryId) { mutableIntStateOf(0) }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag(WalletUiTestTags.presentationCredential(option.selection.id)),
+                    .testTag("presentation-query-$queryId"),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                if (!readOnly) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Checkbox(
-                            checked = option.selection in selectedCredentialOptions,
-                            onCheckedChange = { onToggleCredential(option.selection) },
-                            enabled = enabled,
-                            modifier = Modifier.testTag(WalletUiTestTags.presentationCredentialToggle(option.selection.id)),
-                        )
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(option.label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(credentialDisplay.issuer, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            option.subject?.let {
-                                Text("Subject: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Text(option.format, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-
-                CredentialCard(
-                    details = details,
-                    modifier = Modifier.padding(start = if (readOnly) 0.dp else 48.dp),
-                    onClick = { onCredentialClick(details.summary.id) },
+                Text(
+                    queryLabels[queryId] ?: "Request ${queryIndex + 1}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
                 )
-                if (option.disclosures.isNotEmpty()) {
-                    PresentationDisclosureList(
-                        option = option,
-                        credentialSelected = option.selection in selectedCredentialOptions,
-                        selectedDisclosureOptions = selectedDisclosureOptions,
-                        requestedDisclosureItems = requestedDisclosureItems,
-                        enabled = enabled,
-                        readOnly = readOnly,
-                        onToggleDisclosure = onToggleDisclosure,
-                    )
-                }
+                PresentationCredentialOptionContent(
+                    option = options[page],
+                    selectedCredentialOptions = selectedCredentialOptions,
+                    selectedDisclosureOptions = selectedDisclosureOptions,
+                    enabled = enabled,
+                    readOnly = readOnly,
+                    onToggleCredential = onToggleCredential,
+                    onToggleDisclosure = onToggleDisclosure,
+                    onCredentialClick = onCredentialClick,
+                )
+                CarouselControls(
+                    page = page,
+                    pageCount = options.size,
+                    itemName = "credential",
+                    onPrevious = { page -= 1 },
+                    onNext = { page += 1 },
+                )
                 HorizontalDivider()
             }
         }
 
-        if (!readOnly) {
-            ReviewActionsRow(
+        if (!readOnly && showActions) {
+            PresentationReviewActions(
                 enabled = enabled,
                 selectionComplete = selectionComplete,
                 onSubmit = onSubmit,
                 onReject = onReject,
+                onCancel = onCancel,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PresentationCredentialOptionContent(
+    option: WalletDemoPresentationCredentialOption,
+    selectedCredentialOptions: Set<WalletDemoPresentationCredentialSelection>,
+    selectedDisclosureOptions: Set<WalletDemoPresentationDisclosureSelection>,
+    enabled: Boolean,
+    readOnly: Boolean,
+    onToggleCredential: (WalletDemoPresentationCredentialSelection) -> Unit,
+    onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
+    onCredentialClick: (String) -> Unit,
+) {
+    val details = option.toCredentialDetails()
+    val credentialDisplay = details.toCardDisplayData()
+    val requestedDisclosureItems = option.toRequestedDisclosureGroup()?.items.orEmpty()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(WalletUiTestTags.presentationCredential(option.selection.id)),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (!readOnly) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Checkbox(
+                    checked = option.selection in selectedCredentialOptions,
+                    onCheckedChange = { onToggleCredential(option.selection) },
+                    enabled = enabled,
+                    modifier = Modifier.testTag(WalletUiTestTags.presentationCredentialToggle(option.selection.id)),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(option.label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Text(credentialDisplay.issuer, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    option.subject?.let {
+                        Text("Subject: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text(option.format, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        CredentialCard(
+            details = details,
+            modifier = Modifier.padding(start = if (readOnly) 0.dp else 48.dp),
+            onClick = { onCredentialClick(details.summary.id) },
+        )
+        if (option.disclosures.isNotEmpty()) {
+            PresentationDisclosureList(
+                option = option,
+                credentialSelected = option.selection in selectedCredentialOptions,
+                selectedDisclosureOptions = selectedDisclosureOptions,
+                requestedDisclosureItems = requestedDisclosureItems,
+                enabled = enabled,
+                readOnly = readOnly,
+                onToggleDisclosure = onToggleDisclosure,
             )
         }
     }
@@ -186,11 +254,12 @@ private fun PresentationDisclosureList(
 }
 
 @Composable
-private fun ReviewActionsRow(
+internal fun PresentationReviewActions(
     enabled: Boolean,
     selectionComplete: Boolean,
     onSubmit: () -> Unit,
     onReject: () -> Unit,
+    onCancel: () -> Unit,
 ) {
     Row(
         modifier = Modifier.testTag(WalletUiTestTags.PresentationActions),
@@ -208,7 +277,14 @@ private fun ReviewActionsRow(
             enabled = enabled,
             modifier = Modifier.testTag(WalletUiTestTags.PresentationRejectButton),
         ) {
-            Text("Decline")
+            Text("Reject")
+        }
+        TextButton(
+            onClick = onCancel,
+            enabled = enabled,
+            modifier = Modifier.testTag(WalletUiTestTags.PresentationCancelButton),
+        ) {
+            Text("Cancel review")
         }
     }
 }
