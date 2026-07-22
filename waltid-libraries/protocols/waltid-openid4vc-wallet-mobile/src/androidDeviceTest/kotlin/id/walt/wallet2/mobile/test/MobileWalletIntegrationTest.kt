@@ -18,6 +18,7 @@ import id.walt.wallet2.mobile.MobileWalletEncryptionInfo
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
 import id.walt.wallet2.mobile.MobileWalletPresentationPreview
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
@@ -430,9 +431,13 @@ class MobileWalletIntegrationTest {
         prefix: String,
         transactionDataProfiles: List<MobileWalletTransactionDataProfile> = DEMO_TRANSACTION_DATA_PROFILES,
         requestObjectX509Trust: WalletX509TrustConfig? = null,
+        // Demo backend returns unsigned requests; allow them for these tests
+        unsignedRequestPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
     ) = MobileWalletConfig(
         walletId = "android-demo-$prefix-${UUID.randomUUID()}",
         requestObjectX509Trust = requestObjectX509Trust,
+        unsignedRequestObjectPolicy = unsignedRequestPolicy,
         onEvent = { event -> println("WALLET EVENT: $event") },
         transactionDataProfiles = transactionDataProfiles,
     )

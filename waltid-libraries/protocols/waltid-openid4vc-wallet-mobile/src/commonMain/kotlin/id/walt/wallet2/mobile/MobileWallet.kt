@@ -16,8 +16,9 @@ import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.handlers.PresentCredentialRequest
-import id.walt.wallet2.handlers.PresentationCredentialOption
 import id.walt.wallet2.handlers.PresentationCredentialRequirement
+import id.walt.wallet2.handlers.PresentationCredentialOption
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.walt.wallet2.handlers.PresentationCredentialSelection
 import id.walt.wallet2.handlers.PresentationDisclosureSelection
 import id.walt.wallet2.handlers.PreviewPresentationRequest
@@ -167,6 +168,8 @@ public class MobileWallet internal constructor(
     attestationConfig: WalletAttestationConfig? = null,
     requestObjectX509Trust: WalletX509TrustConfig? = null,
     requestObjectAudience: String = "https://self-issued.me/v2",
+    unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
@@ -196,6 +199,7 @@ public class MobileWallet internal constructor(
         credentialStores = listOf(credentialStore),
         requestObjectX509TrustPolicy = requestObjectX509Trust?.toTrustPolicy(),
         requestObjectAudience = requestObjectAudience,
+        unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
     )
 
     /**

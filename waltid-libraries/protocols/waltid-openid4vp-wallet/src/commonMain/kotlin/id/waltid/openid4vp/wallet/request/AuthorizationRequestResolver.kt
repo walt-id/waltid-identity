@@ -376,9 +376,21 @@ object AuthorizationRequestResolver {
                 expectedRequestObjectAudience = expectedRequestObjectAudience,
                 x509TrustPolicy = x509TrustPolicy,
             )
-            contentType.match(ContentType.Application.Json) && !enforceFinalRequestObject -> {
-                val authorizationRequest = json.decodeFromString<AuthorizationRequest>(response.body)
-                ResolvedAuthorizationRequest.Plain(authorizationRequest)
+            contentType.match(ContentType.Application.Json) -> {
+                // JSON content type from request_uri indicates an unsigned request.
+                // Apply the unsigned request policy: reject if REQUIRE_SIGNED, allow otherwise.
+                when (unsignedRequestObjectPolicy) {
+                    UnsignedRequestObjectPolicy.REQUIRE_SIGNED -> {
+                        throw IllegalArgumentException(
+                            "Unsigned authorization request not allowed: received application/json " +
+                                "from request_uri but wallet policy requires signed requests (application/oauth-authz-req+jwt)"
+                        )
+                    }
+                    UnsignedRequestObjectPolicy.ALLOW_UNSIGNED -> {
+                        val authorizationRequest = json.decodeFromString<AuthorizationRequest>(response.body)
+                        ResolvedAuthorizationRequest.Plain(authorizationRequest)
+                    }
+                }
             }
             else -> throw IllegalArgumentException("Unsupported AuthorizationRequest content type: $contentType")
         }

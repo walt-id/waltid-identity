@@ -889,7 +889,7 @@ object WalletPresentationHandler {
         val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
         return AuthorizationRequestResolver.resolve(
             requestUrl = requestUrl,
-            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            unsignedRequestObjectPolicy = wallet.unsignedRequestObjectPolicy,
             expectedRequestObjectAudience = wallet.requestObjectAudience,
             x509TrustPolicy = wallet.requestObjectX509TrustPolicy,
             fetchRequestUri = { requestUri, requestUriMethod ->

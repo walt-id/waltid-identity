@@ -244,7 +244,7 @@ class AuthorizationRequestResolverJvmTest {
     }
 
     @Test
-    fun `request uri rejects wallet nonce mismatch and non JWT content type`() {
+    fun `request uri rejects wallet nonce mismatch and enforces signed request policy for JSON content`() {
         val requestUrl = URLBuilder("openid4vp://authorize").apply {
             parameters.append("client_id", "verifier2")
             parameters.append("request_uri", "https://verifier.example/request.jwt")
@@ -268,11 +268,12 @@ class AuthorizationRequestResolverJvmTest {
         }
         assertTrue(mismatch.message.orEmpty().contains("wallet_nonce mismatch"))
 
-        val wrongContentType = assertFailsWith<IllegalArgumentException> {
+        // When REQUIRE_SIGNED policy is set, JSON content type should be rejected
+        val rejectedWithSignedPolicy = assertFailsWith<IllegalArgumentException> {
             runBlocking {
                 AuthorizationRequestResolver.resolve(
                     requestUrl,
-                    AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                    AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
                 ) { _, _ ->
                     AuthorizationRequestResolver.RequestUriFetchResponse(
                         HttpStatusCode.OK,
@@ -282,7 +283,25 @@ class AuthorizationRequestResolverJvmTest {
                 }
             }
         }
-        assertTrue(wrongContentType.message.orEmpty().contains("Unsupported AuthorizationRequest content type"))
+        assertTrue(
+            rejectedWithSignedPolicy.message.orEmpty().contains("Unsigned authorization request not allowed"),
+            "Expected unsigned request rejection message, got: ${rejectedWithSignedPolicy.message}"
+        )
+
+        // When ALLOW_UNSIGNED policy is set, JSON content type should be accepted
+        val acceptedWithAllowPolicy = runBlocking {
+            AuthorizationRequestResolver.resolve(
+                requestUrl,
+                AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            ) { _, _ ->
+                AuthorizationRequestResolver.RequestUriFetchResponse(
+                    HttpStatusCode.OK,
+                    ContentType.Application.Json,
+                    "{}",
+                )
+            }
+        }
+        assertIs<ResolvedAuthorizationRequest.Plain>(acceptedWithAllowPolicy)
     }
 
     @Test
