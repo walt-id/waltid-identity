@@ -11,9 +11,12 @@ enum WalletAccessibilityID {
     static let receiveButton = identifier("receiveButton")
     static let receiveNewButton = identifier("receiveNewButton")
     static let receiveTabContent = identifier("receiveTabContent")
-    static let offerReview = identifier("offerReview")
     static let offerAcceptButton = identifier("offerAcceptButton")
     static let offerDeclineButton = identifier("offerDeclineButton")
+    static let offerIssuerSection = identifier("offerIssuerSection")
+    static let offerCredentialsSection = identifier("offerCredentialsSection")
+    static let offerSupportedClaims = identifier("offerSupportedClaims")
+    static let offerTransactionCodeSection = identifier("offerTransactionCodeSection")
     static let presentationInput = identifier("presentationInput")
     static let presentationScanButton = identifier("presentationScanButton")
     static let presentButton = identifier("presentButton")
@@ -24,7 +27,11 @@ enum WalletAccessibilityID {
     static let presentationError = identifier("presentationError")
     static let presentationErrorNotifyButton = identifier("presentationErrorNotifyButton")
     static let presentationErrorDismissButton = identifier("presentationErrorDismissButton")
+    static let presentationCancelButton = identifier("presentationCancelButton")
     static let presentationVerifier = identifier("presentationVerifier")
+    static let presentationVerifierSection = identifier("presentationVerifierSection")
+    static let presentationResponseProtectionSection = identifier("presentationResponseProtectionSection")
+    static let presentationTechnicalDetailsSection = identifier("presentationTechnicalDetailsSection")
     static let verifierTechnicalDetailsToggle = identifier("verifierTechnicalDetailsToggle")
     static let verifierTechnicalDetails = identifier("verifierTechnicalDetails")
 
@@ -38,6 +45,10 @@ enum WalletAccessibilityID {
 
     static func claimGroup(_ title: String) -> String {
         dynamicIdentifier("claimGroup", title)
+    }
+
+    static func claimGroupDisclosure(_ title: String) -> String {
+        dynamicIdentifier("claimGroupDisclosure", title)
     }
 
     static func credentialCard(_ id: String) -> String {
@@ -54,10 +65,6 @@ enum WalletAccessibilityID {
 
     static func presentationCredential(_ id: String) -> String {
         identifier("presentationCredential", id)
-    }
-
-    static func presentationDisclosure(_ id: String) -> String {
-        identifier("presentationDisclosure", id)
     }
 
     static func presentationDisclosureToggle(_ id: String) -> String {

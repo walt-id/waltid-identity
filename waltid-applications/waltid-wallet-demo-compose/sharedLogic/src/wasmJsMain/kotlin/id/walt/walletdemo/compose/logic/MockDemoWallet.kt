@@ -15,12 +15,33 @@ private class MockDemoWallet : DemoWallet {
 
     override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview =
         WalletDemoOfferPreview(
-            transactionCodeRequired = false,
-            credentialIssuer = "walt.id demo issuer",
-            offeredCredentials = listOf("MockCredential"),
+            previewHandle = WalletDemoIssuancePreviewHandle("mock-issuance-preview"),
+            issuer = WalletDemoIssuerMetadata(
+                credentialIssuer = "https://issuer.example",
+                display = WalletDemoMetadataDisplay(
+                    name = "walt.id demo issuer",
+                    logoUri = null,
+                    logoAltText = null,
+                ),
+            ),
+            offeredCredentials = listOf(
+                WalletDemoOfferedCredentialMetadata(
+                    configurationId = "MockCredential",
+                    format = "jwt_vc_json",
+                    vct = null,
+                    doctype = null,
+                    display = WalletDemoMetadataDisplay(
+                        name = "Mock credential",
+                        logoUri = null,
+                        logoAltText = null,
+                    ),
+                    claims = emptyList(),
+                )
+            ),
+            transactionCode = null,
         )
 
-    override suspend fun receive(offerUrl: String, txCode: String?): List<String> {
+    override suspend fun receive(previewHandle: WalletDemoIssuancePreviewHandle, txCode: String?): List<String> {
         credentials = listOf(
             WalletDemoCredential(
                 id = "mock-credential",
@@ -35,26 +56,42 @@ private class MockDemoWallet : DemoWallet {
         return credentials.map { it.id }
     }
 
+    override suspend fun discardIssuancePreview(previewHandle: WalletDemoIssuancePreviewHandle) = Unit
+
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
         WalletDemoOperationResult.Success("Mock presentation sent")
 
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult =
         WalletDemoPresentationPreviewResult.Ready(
             WalletDemoPresentationPreview(
-                verifierName = "Mock verifier",
+                previewHandle = WalletDemoPresentationPreviewHandle("mock-presentation-preview"),
+                responseEncryption = WalletDemoResponseEncryption.NotRequired,
+                verifierMetadata = WalletDemoVerifierMetadata(
+                    display = WalletDemoMetadataDisplay(
+                        name = "Mock verifier",
+                        logoUri = null,
+                        logoAltText = null,
+                    ),
+                    clientUri = null,
+                    policyUri = null,
+                    termsOfServiceUri = null,
+                ),
                 clientId = "mock-verifier",
                 credentialOptions = emptyList(),
-            )
+            ),
         )
 
     override suspend fun submitPresentation(
-        requestUrl: String,
+        previewHandle: WalletDemoPresentationPreviewHandle,
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String?,
     ): WalletDemoOperationResult =
         WalletDemoOperationResult.Success("Mock presentation sent")
 
-    override suspend fun rejectPresentation(requestUrl: String): WalletDemoOperationResult =
-        WalletDemoOperationResult.Success("Mock presentation declined")
+    override suspend fun rejectPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+    ): WalletDemoOperationResult = WalletDemoOperationResult.Success("Mock presentation rejected")
+
+    override suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle) = Unit
 }

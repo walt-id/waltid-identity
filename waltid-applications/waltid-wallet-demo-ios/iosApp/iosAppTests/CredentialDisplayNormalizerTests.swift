@@ -43,6 +43,188 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         }, false)
     }
 
+    func testRendersMdocAgeAttestationsWithoutAbsentClaims() throws {
+        let details = CredentialDisplayNormalizer.details(
+            id: "cred-1",
+            title: "Photo ID",
+            issuer: nil,
+            subject: nil,
+            format: "mso_mdoc",
+            addedAt: nil,
+            credentialDataJSON: """
+            {
+              "org.iso.23220.1": {
+                "given_name": "Erika",
+                "age_over_62": null,
+                "age_over_65": false,
+                "age_over_18": true,
+                "age_over_21": "yes"
+              },
+              "org.iso.23220.dtc.1": {
+                "version": null,
+                "sod": null,
+                "dg1": null
+              }
+            }
+            """
+        )
+
+        let age = try XCTUnwrap(details.groups.first { $0.title == "Age attestations" })
+        XCTAssertFalse(age.initiallyExpanded)
+        XCTAssertEqual(age.items.map(\.label), ["18 or older", "21 or older", "65 or older"])
+        XCTAssertEqual(age.items.map(\.value), [.bool(true), .text("Unsupported value"), .bool(false)])
+        XCTAssertFalse(details.groups.flatMap(\.items).contains { $0.path.id.contains("age_over_62") })
+        XCTAssertFalse(details.groups.contains { $0.title == "Travel document data" })
+        XCTAssertEqual(details.groups.first { $0.title == "Credential data" }?.initiallyExpanded, true)
+    }
+
+    func testSummarizesProvidedMdocTravelDocumentData() throws {
+        let details = CredentialDisplayNormalizer.details(
+            id: "cred-1",
+            title: "Photo ID",
+            issuer: nil,
+            subject: nil,
+            format: "mso_mdoc",
+            addedAt: nil,
+            credentialDataJSON: """
+            {
+              "org.iso.23220.dtc.1": {
+                "dtc_dg2": [1, 2, 3, 4],
+                "dtc_dg1": "machine-readable-zone",
+                "dtc_sod": [1, 2, 3],
+                "dg_content_info": [1, 2],
+                "dtc_version": "1.0"
+              }
+            }
+            """
+        )
+
+        let travel = try XCTUnwrap(details.groups.first { $0.title == "Travel document data" })
+        XCTAssertFalse(travel.initiallyExpanded)
+        XCTAssertEqual(
+            travel.items.map(\.label),
+            [
+                "Specification version",
+                "Document security object (SOD)",
+                "DG1: Machine-readable zone",
+                "DG2: Facial image",
+                "Document content information"
+            ]
+        )
+        XCTAssertEqual(
+            travel.items.map(\.value),
+            [
+                .text("1.0"),
+                .text("Available, 3 bytes"),
+                .text("Available"),
+                .text("Available, 4 bytes"),
+                .text("Available, 2 bytes")
+            ]
+        )
+    }
+
+    func testKeepsNullClaimsForNonMdocCredentials() {
+        let details = CredentialDisplayNormalizer.details(
+            id: "cred-1",
+            title: "PID",
+            issuer: nil,
+            subject: nil,
+            format: "dc+sd-jwt",
+            addedAt: nil,
+            credentialDataJSON: #"{"middle_name": null}"#
+        )
+
+        XCTAssertEqual(details.groups.single?.items.single?.value, .null)
+    }
+
+    func testDoesNotApplyMdocSemanticsOutsideStandardNamespaces() {
+        let details = CredentialDisplayNormalizer.details(
+            id: "cred-1",
+            title: "Example",
+            issuer: nil,
+            subject: nil,
+            format: "mso_mdoc",
+            addedAt: nil,
+            credentialDataJSON: #"{"example.namespace":{"age_over_18":true,"dg1":[1,2]}}"#
+        )
+
+        XCTAssertFalse(details.groups.contains { $0.title == "Age attestations" || $0.title == "Travel document data" })
+    }
+
+    func testGroupsAndSortsMdocOfferClaimsByUserFacingSemantics() {
+        let credential = OfferedCredentialMetadata(
+            configurationID: "org.iso.23220.photoid.1",
+            format: "mso_mdoc",
+            scope: nil,
+            vct: nil,
+            doctype: "org.iso.23220.photoid.1",
+            display: nil,
+            claims: [
+                CredentialClaimMetadata(
+                    path: ["org.iso.23220.1", "given_name"],
+                    mandatory: true,
+                    displayName: "Given name"
+                ),
+                CredentialClaimMetadata(
+                    path: ["org.iso.23220.1", "age_over_65"],
+                    mandatory: false,
+                    displayName: nil
+                ),
+                CredentialClaimMetadata(
+                    path: ["org.iso.23220.dtc.1", "dtc_dg2"],
+                    mandatory: nil,
+                    displayName: nil
+                ),
+                CredentialClaimMetadata(
+                    path: ["org.iso.23220.1", "age_over_18"],
+                    mandatory: true,
+                    displayName: nil
+                ),
+                CredentialClaimMetadata(
+                    path: ["org.iso.23220.dtc.1", "dtc_sod"],
+                    mandatory: true,
+                    displayName: nil
+                ),
+                CredentialClaimMetadata(
+                    path: ["org.iso.23220.dtc.1", "dtc_dg1"],
+                    mandatory: nil,
+                    displayName: nil
+                ),
+                CredentialClaimMetadata(
+                    path: ["org.iso.23220.dtc.1", "dtc_version"],
+                    mandatory: true,
+                    displayName: nil
+                )
+            ]
+        )
+
+        XCTAssertEqual(
+            credential.claimDisplayGroups,
+            [
+                OfferClaimDisplayGroup(
+                    title: "Credential claims",
+                    claims: [OfferClaimDisplay(label: "Given name", inclusion: "Always included")]
+                ),
+                OfferClaimDisplayGroup(
+                    title: "Age attestations",
+                    claims: [
+                        OfferClaimDisplay(label: "18 or older", inclusion: "Always included"),
+                        OfferClaimDisplay(label: "65 or older", inclusion: "May be included")
+                    ]
+                ),
+                OfferClaimDisplayGroup(
+                    title: "Travel document data",
+                    claims: [
+                        OfferClaimDisplay(label: "Specification version", inclusion: "Always included"),
+                        OfferClaimDisplay(label: "Document security object (SOD)", inclusion: "Always included"),
+                        OfferClaimDisplay(label: "DG1: Machine-readable zone", inclusion: "May be included"),
+                        OfferClaimDisplay(label: "DG2: Facial image", inclusion: "May be included")
+                    ]
+                )
+            ]
+        )
+    }
+
     func testSortsKnownClaimRowsByCredentialVocabularyInsteadOfIssuerJSONOrder() throws {
         let details = CredentialDisplayNormalizer.details(
             id: "cred-1",
@@ -656,6 +838,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
         let systemInfo = try XCTUnwrap(details.systemInfoGroup)
         XCTAssertEqual(systemInfo.title, "About this credential")
+        XCTAssertFalse(systemInfo.initiallyExpanded)
         XCTAssertEqual(systemInfo.items.map(\.path.id), [
             "system.added",
             "system.id",
@@ -695,6 +878,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
     func testTransactionDataGroupsRenderProfileAndDetailsReadably() throws {
         let request = PresentationRequestInfo(
+            responseEncryption: .notRequired,
             transactionData: [
                 PresentationTransactionData(
                     type: "org.waltid.transaction-data.payment-authorization",

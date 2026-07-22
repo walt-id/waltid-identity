@@ -1,5 +1,7 @@
 package id.walt.issuer2.openid4vci
 
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.testsupport.Issuer2BrowserTestServer
 import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
@@ -13,25 +15,36 @@ import id.walt.issuer2.testsupport.assertSdJwtVcCredentialPayload
 import id.walt.issuer2.testsupport.assertSessionStatus
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
 import id.walt.issuer2.testsupport.createCredentialOffer
+import id.walt.issuer2.testsupport.createIssuer2ClientAttestationTestMaterial
 import id.walt.issuer2.testsupport.createWalletFlowCredentialOffer
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.issuer2.testsupport.listSessions
 import id.walt.issuer2.testsupport.browser.Issuer2KeycloakAuthorizationDriver
+import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.IssuerStateMode
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.GenericHttpWalletAttestationProvider
 import id.waltid.openid4vci.wallet.attestation.PUBLIC_JWK_PLACEHOLDER
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
+import io.ktor.client.request.forms.FormDataContent
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.parameter
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Parameters
 import io.ktor.http.Url
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
@@ -319,10 +332,11 @@ class Issuer2AuthorizationCodeWalletFlowTest {
         installIssuer2WithConfigFiles()
         val client = apiClient()
 
+        val walletRedirectUri = "https://wallet.example/callback?dummy1=foo&dummy2=ipsum"
         val authorizationResponse = client.get("/openid4vci/authorize") {
             parameter("response_type", "code")
             parameter("client_id", "issuer2-wallet-test")
-            parameter("redirect_uri", "https://wallet.example/callback")
+            parameter("redirect_uri", walletRedirectUri)
             parameter("state", "offerless-state")
             parameter("scope", scenario.credentialConfigurationId)
         }
@@ -330,6 +344,10 @@ class Issuer2AuthorizationCodeWalletFlowTest {
         assertEquals(HttpStatusCode.Found, authorizationResponse.status, authorizationResponse.bodyAsText())
         val externalLoginRedirect = assertNotNull(authorizationResponse.headers[HttpHeaders.Location])
         assertTrue(externalLoginRedirect.contains("/openid4vci/external_login/"))
+        val authorizationRequestParameters = externalLoginRedirect
+            .substringAfter("/external_login/")
+            .decodeExternalLoginAuthorizationParameters()
+        assertEquals(listOf(walletRedirectUri), authorizationRequestParameters["redirect_uri"])
 
         val authorizationSession = client.listSessions().single { session ->
             session.profileId == scenario.profileId &&
@@ -341,6 +359,62 @@ class Issuer2AuthorizationCodeWalletFlowTest {
             listOf(scenario.credentialConfigurationId),
             authorizationSession.authorizationRequest?.get("scope"),
         )
+    }
+
+    @Test
+    fun parAuthorizationRequestPreservesRedirectUriQueryThroughExternalLogin() = testApplication {
+        val scenario = Issuer2CredentialScenarios.openBadgeCredential
+        val clientAttestation = createIssuer2ClientAttestationTestMaterial()
+        installIssuer2WithConfigFiles { config ->
+            config.copy(clientAuthenticationConfig = clientAttestation.clientAuthenticationConfig)
+        }
+        val client = apiClient()
+
+        val clientId = "issuer2-wallet-test"
+        val walletRedirectUri = "https://wallet.example/callback?dummy1=foo&dummy2=ipsum"
+        val authorizationServerIssuer = Json.parseToJsonElement(
+            client.get("/.well-known/oauth-authorization-server/openid4vci").bodyAsText()
+        ).jsonObject["issuer"]?.jsonPrimitive?.content
+        assertNotNull(authorizationServerIssuer)
+        val attestationHeaders = clientAttestation.attestationAssembler.buildAttestationHeaders(
+            instanceKey = JWKKey.generate(KeyType.secp256r1),
+            clientId = clientId,
+            audience = authorizationServerIssuer,
+        )
+        val parResponse = client.post("/openid4vci/par") {
+            header(ClientAttestationHeaders.CLIENT_ATTESTATION, attestationHeaders.attestationJwt)
+            header(ClientAttestationHeaders.CLIENT_ATTESTATION_POP, attestationHeaders.popJwt)
+            setBody(
+                FormDataContent(
+                    Parameters.build {
+                        append("response_type", "code")
+                        append("client_id", clientId)
+                        append("redirect_uri", walletRedirectUri)
+                        append("state", "par-state")
+                        append("scope", scenario.credentialConfigurationId)
+                    }
+                )
+            )
+        }
+
+        assertEquals(HttpStatusCode.Created, parResponse.status, parResponse.bodyAsText())
+        val requestUri = Json.parseToJsonElement(parResponse.bodyAsText())
+            .jsonObject["request_uri"]
+            ?.jsonPrimitive
+            ?.content
+        assertNotNull(requestUri)
+
+        val authorizationResponse = client.get("/openid4vci/authorize") {
+            parameter("client_id", clientId)
+            parameter("request_uri", requestUri)
+        }
+
+        assertEquals(HttpStatusCode.Found, authorizationResponse.status, authorizationResponse.bodyAsText())
+        val externalLoginRedirect = assertNotNull(authorizationResponse.headers[HttpHeaders.Location])
+        val authorizationRequestParameters = externalLoginRedirect
+            .substringAfter("/external_login/")
+            .decodeExternalLoginAuthorizationParameters()
+        assertEquals(listOf(walletRedirectUri), authorizationRequestParameters["redirect_uri"])
     }
 
     @Test

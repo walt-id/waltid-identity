@@ -78,9 +78,9 @@ let wallet = try await Wallet(
 
 let bootstrap = try await wallet.bootstrap(didMethod: "key")
 let resolution = try await wallet.resolveOffer(offer: credentialOfferURL)
-let transactionCode = resolution.transactionCodeRequired
-    ? userEnteredTransactionCode
-    : nil
+let transactionCode = resolution.transactionCode == nil
+    ? nil
+    : userEnteredTransactionCode
 let credentialIDs = try await wallet.receive(
     offer: credentialOfferURL,
     txCode: transactionCode
@@ -91,6 +91,10 @@ let presentation = try await wallet.present(
     did: bootstrap.did
 )
 ```
+
+`resolution.issuer` and `resolution.offeredCredentials` provide localized,
+typed metadata for the app's review UI. `WalletConfiguration` uses
+`Locale.preferredLanguages` by default and also accepts an explicit locale order.
 
 ## Local persistence
 

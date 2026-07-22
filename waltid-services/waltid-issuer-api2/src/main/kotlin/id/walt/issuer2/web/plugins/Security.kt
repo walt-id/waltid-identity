@@ -4,6 +4,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.issuer2.config.AuthenticationServiceConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
+import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
 import io.ktor.client.*
 import io.ktor.http.*
 import io.ktor.server.auth.*
@@ -66,7 +67,7 @@ private fun URLBuilder.appendForwardedIssuerState(request: ApplicationRequest) {
     }
 
     val issuerStateValues = try {
-        parseQueryString(internalAuthReq).getAll(FORWARDED_ISSUER_STATE_PARAMETER)
+        internalAuthReq.decodeExternalLoginAuthorizationParameters()[FORWARDED_ISSUER_STATE_PARAMETER]
     } catch (e: Exception) {
         logger.error("Failed to extract forwarded issuer state from internal auth request", e)
         return

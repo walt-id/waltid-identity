@@ -1,7 +1,7 @@
 # Presenting Credentials
 
 Use ``Wallet/previewPresentation(request:)`` and
-``Wallet/submitPresentation(request:selectedCredentialOptions:selectedDisclosureOptions:did:runPolicies:)``
+``Wallet/submitPresentation(previewHandle:selectedCredentialOptions:selectedDisclosureOptions:did:runPolicies:)``
 to review and answer an OpenID4VP authorization request with credentials from
 the local wallet.
 
@@ -18,15 +18,29 @@ let previewResult = try await wallet.previewPresentation(request: authorizationR
 let result: PresentationResult
 switch previewResult {
 case .ready(let preview):
+    if let verifierName = preview.request.verifierMetadata?.display?.name {
+        showVerifierName(verifierName)
+    }
+    switch preview.request.responseEncryption {
+    case .notRequired:
+        showPlainResponseNotice()
+    case .required(let details):
+        showEncryptedResponseNotice(
+            algorithm: details.keyManagementAlgorithm,
+            contentEncryption: details.contentEncryptionAlgorithm,
+            verifierKeyID: details.verifierKeyID,
+            verifierKeyThumbprint: details.verifierKeyThumbprint
+        )
+    }
     result = try await wallet.submitPresentation(
-        request: authorizationRequestURL,
+        previewHandle: preview.previewHandle,
         selectedCredentialOptions: preview.credentialOptions.map(\.selection),
         did: bootstrap.did
     )
 case .invalid(let error):
     showRequestError(error)
     // After user interaction, either dismiss locally or notify the verifier.
-    result = try await wallet.rejectPresentation(request: authorizationRequestURL)
+    result = try await wallet.rejectPresentation(previewHandle: error.previewHandle)
 }
 
 switch result {
@@ -52,14 +66,14 @@ succeeds, and surface delivery failures so the user can retry.
 
 ### Reject a Presentation Request
 
-Use ``Wallet/rejectPresentation(request:error:errorDescription:)`` after a preview.
+Use ``Wallet/rejectPresentation(previewHandle:error:errorDescription:)`` after a preview.
 For a valid request, omitting `error` sends `access_denied`. For an invalid preview,
 omitting `error` sends the error classified by the wallet. Handle its continuation
 exactly like a credential-bearing response:
 
 ```swift
 let result = try await wallet.rejectPresentation(
-    request: authorizationRequestURL
+    previewHandle: previewHandle
 )
 
 switch result {
@@ -77,6 +91,14 @@ case .transmitted(.failed):
     showRejectionFailure()
 }
 ```
+
+``PresentationResponseEncryption`` describes protection of the authorization
+response selected for the reviewed request. Its verifier key identifier and
+thumbprint are technical identity details, not evidence that the verifier is trusted.
+
+Submission and ``Wallet/rejectPresentation(previewHandle:error:errorDescription:)``
+consume the selected preview. A local dismissal should instead call
+``Wallet/discardPresentationPreview(_:)``.
 
 > Note: ``Wallet/present(request:did:runPolicies:)`` still exists for immediate
 > submission after the app has already handled request review and user consent.

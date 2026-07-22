@@ -107,6 +107,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
                             onCredentialClick = { detailsId -> presentBackStack.pushDetails(detailsId) },
                             onSubmit = controller::submitPresentation,
                             onReject = controller::rejectPresentation,
+                            onCancel = controller::cancelPresentationReview,
                         )
                     },
                 )

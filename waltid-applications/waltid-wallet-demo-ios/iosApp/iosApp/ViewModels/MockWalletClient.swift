@@ -5,7 +5,6 @@ actor MockWalletClient: WalletClient {
     enum VerifierStyle {
         case named
         case did
-        case x509SanDns
     }
 
     private var storedCredentials: [Credential]
@@ -15,7 +14,10 @@ actor MockWalletClient: WalletClient {
     private let transactionCodeRequired: Bool
     private let presentationPreviewResultOverride: PresentationPreviewResult?
     private let rejectionResult: PresentationResult
-    private(set) var rejectedRequestURLs: [URL] = []
+    private let responseEncryptionRequired: Bool
+    private let mdocMetadata: Bool
+    private(set) var rejectedPresentationPreviewHandles: [PresentationPreviewHandle] = []
+    private(set) var discardedPresentationPreviewHandles: [PresentationPreviewHandle] = []
 
     init(
         storedCredentials: [Credential] = [],
@@ -24,7 +26,9 @@ actor MockWalletClient: WalletClient {
         duplicatePresentationOptions: Bool = false,
         transactionCodeRequired: Bool = false,
         presentationPreviewResult: PresentationPreviewResult? = nil,
-        rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}"))
+        rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}")),
+        responseEncryptionRequired: Bool = true,
+        mdocMetadata: Bool = false
     ) {
         self.storedCredentials = storedCredentials
         self.operationDelayNanoseconds = operationDelayMilliseconds * 1_000_000
@@ -33,6 +37,8 @@ actor MockWalletClient: WalletClient {
         self.transactionCodeRequired = transactionCodeRequired
         self.presentationPreviewResultOverride = presentationPreviewResult
         self.rejectionResult = rejectionResult
+        self.responseEncryptionRequired = responseEncryptionRequired
+        self.mdocMetadata = mdocMetadata
     }
 
     func bootstrap() async throws -> WalletBootstrapResult {
@@ -46,17 +52,30 @@ actor MockWalletClient: WalletClient {
     func resolveOffer(offer: URL) async throws -> OfferResolution {
         try await delayOperation()
         return OfferResolution(
-            transactionCodeRequired: transactionCodeRequired,
-            credentialIssuer: "Example Issuer",
-            offeredCredentials: ["ExampleCredential"]
+            previewHandle: IssuancePreviewHandle(value: "mock-issuance-preview"),
+            issuer: IssuerMetadata(
+                credentialIssuer: "https://issuer.example",
+                display: MetadataDisplay(
+                    name: "Example Issuer",
+                    locale: "en",
+                    logoURI: nil,
+                    logoAltText: nil
+                )
+            ),
+            offeredCredentials: [mdocMetadata ? Self.photoIDMetadata : Self.exampleCredentialMetadata],
+            transactionCode: transactionCodeRequired
+                ? TransactionCodeRequirement(inputMode: .numeric, length: 6, description: "Enter the six-digit code")
+                : nil
         )
     }
 
-    func receive(offer: URL, txCode: String?) async throws -> [String] {
+    func receive(previewHandle: IssuancePreviewHandle, txCode: String?) async throws -> [String] {
         try await delayOperation()
-        storedCredentials = [Self.sampleCredential]
+        storedCredentials = [mdocMetadata ? Self.photoIDCredential : Self.sampleCredential]
         return storedCredentials.map(\.id)
     }
+
+    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {}
 
     func present(request: URL, did: String?) async throws -> PresentationResult {
         try await delayOperation()
@@ -70,6 +89,7 @@ actor MockWalletClient: WalletClient {
         }
         return .ready(
             PresentationPreview(
+                previewHandle: PresentationPreviewHandle(value: "mock-presentation-preview"),
                 request: previewRequestInfo,
                 credentialOptions: duplicatePresentationOptions ? Self.duplicateOptions : [Self.defaultOption],
                 credentialRequirements: [
@@ -80,7 +100,7 @@ actor MockWalletClient: WalletClient {
     }
 
     func submitPresentation(
-        request: URL,
+        previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
@@ -89,10 +109,14 @@ actor MockWalletClient: WalletClient {
         return .transmitted(.succeeded(verifierResponseJSON: "{}"))
     }
 
-    func rejectPresentation(request: URL) async throws -> PresentationResult {
+    func rejectPresentation(previewHandle: PresentationPreviewHandle) async throws -> PresentationResult {
         try await delayOperation()
-        rejectedRequestURLs.append(request)
+        rejectedPresentationPreviewHandles.append(previewHandle)
         return rejectionResult
+    }
+
+    func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
+        discardedPresentationPreviewHandles.append(previewHandle)
     }
 
     private func delayOperation() async throws {
@@ -103,10 +127,23 @@ actor MockWalletClient: WalletClient {
     private var previewRequestInfo: PresentationRequestInfo {
         PresentationRequestInfo(
             clientID: verifierClientID,
-            verifierName: verifierName,
+            verifierMetadata: verifierName.map {
+                VerifierMetadata(
+                    display: MetadataDisplay(
+                        name: $0,
+                        locale: "en",
+                        logoURI: nil,
+                        logoAltText: nil
+                    ),
+                    clientURI: "https://verifier.example",
+                    policyURI: "https://verifier.example/privacy",
+                    termsOfServiceURI: "https://verifier.example/terms"
+                )
+            },
             responseURI: URL(string: "https://verifier.example/response"),
             state: "state-123",
             nonce: "nonce-456",
+            responseEncryption: responseEncryption,
             transactionData: [Self.paymentAuthorizationTransactionData]
         )
     }
@@ -115,19 +152,85 @@ actor MockWalletClient: WalletClient {
         switch verifierStyle {
         case .named: return "https://verifier.example/client"
         case .did: return Self.didClientID
-        case .x509SanDns: return Self.x509SanDnsClientID
         }
+    }
+
+    private var responseEncryption: PresentationResponseEncryption {
+        guard responseEncryptionRequired else { return .notRequired }
+        return .required(
+            ResponseEncryptionDetails(
+                keyManagementAlgorithm: "ECDH-ES",
+                contentEncryptionAlgorithm: "A256GCM",
+                verifierKeyID: "verifier-key-1",
+                verifierKeyThumbprint: "thumbprint-1"
+            )
+        )
     }
 
     private var verifierName: String? {
         switch verifierStyle {
         case .named: return "Example Verifier"
-        case .did, .x509SanDns: return nil
+        case .did: return nil
         }
     }
 
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
-    private static let x509SanDnsClientID = "x509_san_dns:verifier.example"
+
+    private static let exampleCredentialMetadata = OfferedCredentialMetadata(
+        configurationID: "ExampleCredential",
+        format: "jwt_vc_json",
+        scope: nil,
+        vct: nil,
+        doctype: nil,
+        display: MetadataDisplay(
+            name: "Example credential",
+            locale: "en",
+            logoURI: nil,
+            logoAltText: nil
+        ),
+        claims: []
+    )
+
+    private static let photoIDMetadata = OfferedCredentialMetadata(
+        configurationID: "org.iso.23220.photoid.1",
+        format: "mso_mdoc",
+        scope: nil,
+        vct: nil,
+        doctype: "org.iso.23220.photoid.1",
+        display: MetadataDisplay(
+            name: "Photo ID",
+            locale: "en",
+            logoURI: nil,
+            logoAltText: nil
+        ),
+        claims: [
+            CredentialClaimMetadata(
+                path: ["org.iso.23220.1", "given_name"],
+                mandatory: true,
+                displayName: "Given name"
+            ),
+            CredentialClaimMetadata(
+                path: ["org.iso.23220.1", "age_over_18"],
+                mandatory: true,
+                displayName: nil
+            ),
+            CredentialClaimMetadata(
+                path: ["org.iso.23220.1", "age_over_65"],
+                mandatory: false,
+                displayName: nil
+            ),
+            CredentialClaimMetadata(
+                path: ["org.iso.23220.dtc.1", "dtc_dg1"],
+                mandatory: nil,
+                displayName: nil
+            ),
+            CredentialClaimMetadata(
+                path: ["org.iso.23220.dtc.1", "dtc_sod"],
+                mandatory: true,
+                displayName: nil
+            )
+        ]
+    )
     private static let samplePortraitDisclosureValueJSON = "[-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]"
 
     private static let paymentAuthorizationTransactionData = PresentationTransactionData(
@@ -220,6 +323,32 @@ actor MockWalletClient: WalletClient {
           },
           "portrait": {
             "elementValue": [-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]
+          }
+        }
+        """
+    )
+
+    private static let photoIDCredential = Credential(
+        id: "photo-id-1",
+        format: "mso_mdoc",
+        issuer: "Example Issuer",
+        subject: nil,
+        label: "Photo ID",
+        addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z"),
+        credentialDataJSON: """
+        {
+          "org.iso.23220.1": {
+            "given_name": "Erika",
+            "family_name": "Mustermann",
+            "age_over_18": true,
+            "age_over_62": null,
+            "age_over_65": false
+          },
+          "org.iso.23220.dtc.1": {
+            "dtc_version": "1.0",
+            "dtc_sod": [1, 2, 3],
+            "dtc_dg1": [1, 2, 3, 4],
+            "dtc_dg2": null
           }
         }
         """

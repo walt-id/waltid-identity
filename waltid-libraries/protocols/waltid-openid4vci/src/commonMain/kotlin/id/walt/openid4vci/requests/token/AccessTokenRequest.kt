@@ -23,6 +23,7 @@ interface AccessTokenRequest {
     val session: Session?
     val issClaim: String?
     val authenticatedClient: AuthenticatedClient?
+    val dpopJwkThumbprint: String?
 
     fun markGrantTypeHandled(grantType: String): AccessTokenRequest
     fun grantScopes(scopes: Collection<String>): AccessTokenRequest
@@ -33,4 +34,5 @@ interface AccessTokenRequest {
     fun withSession(session: Session?): AccessTokenRequest
     fun withIssuer(issClaim: String?): AccessTokenRequest
     fun withAuthenticatedClient(authenticatedClient: AuthenticatedClient?): AccessTokenRequest
+    fun withDpopJwkThumbprint(dpopJwkThumbprint: String?): AccessTokenRequest
 }

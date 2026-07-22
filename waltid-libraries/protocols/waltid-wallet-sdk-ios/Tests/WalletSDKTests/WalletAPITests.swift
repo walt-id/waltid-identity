@@ -2,6 +2,17 @@ import XCTest
 @testable import WalletSDK
 
 final class WalletAPITests: XCTestCase {
+    func testParsesKotlinInstantTimestampsWithOptionalFractionalSeconds() throws {
+        let wholeSeconds = try XCTUnwrap(parseWalletISO8601Date("2026-07-21T17:20:00Z"))
+        let fractionalSeconds = try XCTUnwrap(parseWalletISO8601Date("2026-07-21T17:20:00.123456Z"))
+
+        XCTAssertEqual(
+            fractionalSeconds.timeIntervalSinceReferenceDate,
+            wholeSeconds.addingTimeInterval(0.123456).timeIntervalSinceReferenceDate,
+            accuracy: 0.001
+        )
+    }
+
     func testPublicConfigurationUsesStableDefaults() {
         let configuration = WalletConfiguration()
 
@@ -14,6 +25,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertNil(configuration.persistence.stores.keys)
         XCTAssertNil(configuration.attestation)
         XCTAssertTrue(configuration.transactionDataProfiles.isEmpty)
+        XCTAssertEqual(configuration.preferredLocales, Locale.preferredLanguages)
     }
 
     func testPublicPersistenceConfigurationUsesEncryptedDefault() {
@@ -161,12 +173,14 @@ final class WalletAPITests: XCTestCase {
 
     func testPresentationPreviewModelsAreValueTypesAndEquatable() {
         let preview = PresentationPreview(
+            previewHandle: PresentationPreviewHandle(value: "presentation-preview-1"),
             request: .init(
                 clientID: "https://verifier.example",
-                verifierName: "Example Verifier",
+                verifierMetadata: testVerifierMetadata,
                 responseURI: URL(string: "https://verifier.example/direct-post"),
                 state: "state-1",
-                nonce: "nonce-1"
+                nonce: "nonce-1",
+                responseEncryption: .notRequired
             ),
             credentialOptions: [
                 .init(
@@ -195,6 +209,7 @@ final class WalletAPITests: XCTestCase {
         )
 
         acceptsSendable(preview)
+        XCTAssertEqual(preview.request.responseEncryption, .notRequired)
         XCTAssertEqual(preview.credentialOptions.single?.credentialID, "credential-1")
         XCTAssertEqual(preview.credentialOptions.single?.multiple, true)
         XCTAssertEqual(preview.credentialOptions.single?.selection, PresentationCredentialSelection(queryID: "pid", credentialID: "credential-1"))
@@ -239,11 +254,7 @@ final class WalletAPITests: XCTestCase {
     func testResolveOfferForwardsOfferAndReturnsResolution() async throws {
         let offer = URL(string: "openid-credential-offer://issuer.example")!
         let bridge = FakeWalletCoreBridge()
-        let resolution = OfferResolution(
-            transactionCodeRequired: true,
-            credentialIssuer: "https://issuer.example",
-            offeredCredentials: ["ExampleCredential"]
-        )
+        let resolution = testOfferResolution(transactionCodeRequired: true)
         bridge.offerResolutionResult = resolution
         let wallet = Wallet(bridge: bridge)
 
@@ -270,6 +281,19 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(bridge.receiveCalls.first?.offer, offer)
         XCTAssertEqual(bridge.receiveCalls.first?.txCode, "1234")
         XCTAssertEqual(bridge.receiveCalls.first?.clientID, "ios-client")
+    }
+
+    func testReceivePreviewedForwardsTypedHandle() async throws {
+        let handle = IssuancePreviewHandle(value: "issuance-preview-1")
+        let bridge = FakeWalletCoreBridge()
+        bridge.receiveResult = ["credential-1"]
+        let wallet = Wallet(bridge: bridge)
+
+        let result = try await wallet.receive(previewHandle: handle, txCode: "1234")
+
+        XCTAssertEqual(result, ["credential-1"])
+        XCTAssertEqual(bridge.previewedReceiveHandles, [handle])
+        XCTAssertEqual(String(describing: handle), "IssuancePreviewHandle(<redacted>)")
     }
 
     func testCredentialsReturnsWalletCredentials() async throws {
@@ -339,12 +363,21 @@ final class WalletAPITests: XCTestCase {
         let bridge = FakeWalletCoreBridge()
         bridge.previewResult = .ready(
             .init(
+                previewHandle: PresentationPreviewHandle(value: "presentation-preview-1"),
                 request: .init(
                     clientID: "https://verifier.example",
-                    verifierName: "Example Verifier",
+                    verifierMetadata: testVerifierMetadata,
                     responseURI: nil,
                     state: nil,
-                    nonce: "nonce-1"
+                    nonce: "nonce-1",
+                    responseEncryption: .required(
+                        ResponseEncryptionDetails(
+                            keyManagementAlgorithm: "ECDH-ES",
+                            contentEncryptionAlgorithm: "A256GCM",
+                            verifierKeyID: "verifier-key-1",
+                            verifierKeyThumbprint: "thumbprint-1"
+                        )
+                    )
                 ),
                 credentialOptions: [
                     .init(
@@ -369,6 +402,17 @@ final class WalletAPITests: XCTestCase {
             return XCTFail("Expected a ready preview")
         }
         XCTAssertEqual(preview.request.clientID, "https://verifier.example")
+        XCTAssertEqual(
+            preview.request.responseEncryption,
+            .required(
+                ResponseEncryptionDetails(
+                    keyManagementAlgorithm: "ECDH-ES",
+                    contentEncryptionAlgorithm: "A256GCM",
+                    verifierKeyID: "verifier-key-1",
+                    verifierKeyThumbprint: "thumbprint-1"
+                )
+            )
+        )
         XCTAssertEqual(preview.credentialOptions.single?.credentialID, "credential-1")
         XCTAssertEqual(preview.credentialOptions.single?.multiple, true)
         XCTAssertEqual(bridge.previewCalls, [request])
@@ -378,11 +422,13 @@ final class WalletAPITests: XCTestCase {
         let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
         let requestInfo = PresentationRequestInfo(
             clientID: "https://verifier.example",
-            verifierName: "Example Verifier"
+            verifierMetadata: testVerifierMetadata,
+            responseEncryption: .notRequired
         )
         let bridge = FakeWalletCoreBridge()
         bridge.previewResult = .invalid(
             .init(
+                previewHandle: PresentationPreviewHandle(value: "invalid-presentation-preview"),
                 request: requestInfo,
                 code: .invalidTransactionData,
                 message: "Unsupported transaction_data type"
@@ -395,6 +441,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(
             result,
             .invalid(.init(
+                previewHandle: PresentationPreviewHandle(value: "invalid-presentation-preview"),
                 request: requestInfo,
                 code: .invalidTransactionData,
                 message: "Unsupported transaction_data type"
@@ -404,12 +451,12 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testSubmitPresentationForwardsSelectionAndReturnsResult() async throws {
-        let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
+        let previewHandle = PresentationPreviewHandle(value: "presentation-preview-1")
         let bridge = FakeWalletCoreBridge()
         let wallet = Wallet(bridge: bridge)
 
         _ = try await wallet.submitPresentation(
-            request: request,
+            previewHandle: previewHandle,
             selectedCredentialOptions: [PresentationCredentialSelection(queryID: "pid", credentialID: "credential-1")],
             selectedDisclosureOptions: [PresentationDisclosureSelection(queryID: "pid", credentialID: "credential-1", path: "$.given_name")],
             did: "did:key:wallet",
@@ -417,7 +464,7 @@ final class WalletAPITests: XCTestCase {
         )
 
         XCTAssertEqual(bridge.submitCalls.count, 1)
-        XCTAssertEqual(bridge.submitCalls.first?.request, request)
+        XCTAssertEqual(bridge.submitCalls.first?.previewHandle, previewHandle)
         XCTAssertEqual(bridge.submitCalls.first?.selectedCredentialOptions, [PresentationCredentialSelection(queryID: "pid", credentialID: "credential-1")])
         XCTAssertEqual(bridge.submitCalls.first?.selectedDisclosureOptions, [PresentationDisclosureSelection(queryID: "pid", credentialID: "credential-1", path: "$.given_name")])
         XCTAssertEqual(bridge.submitCalls.first?.did, "did:key:wallet")
@@ -458,23 +505,34 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testRejectPresentationForwardsErrorDetailsAndReturnsResult() async throws {
-        let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
+        let handle = PresentationPreviewHandle(value: "presentation-preview-1")
         let bridge = FakeWalletCoreBridge()
         let responseURL = URL(string: "https://verifier.example/callback?error=access_denied")!
         bridge.rejectResult = .prepared(.openURL(responseURL))
         let wallet = Wallet(bridge: bridge)
 
         let result = try await wallet.rejectPresentation(
-            request: request,
+            previewHandle: handle,
             error: .accessDenied,
             errorDescription: "User declined"
         )
 
         XCTAssertEqual(bridge.rejectCalls.count, 1)
-        XCTAssertEqual(bridge.rejectCalls.first?.request, request)
+        XCTAssertEqual(bridge.rejectCalls.first?.previewHandle, handle)
         XCTAssertEqual(bridge.rejectCalls.first?.error, .accessDenied)
         XCTAssertEqual(bridge.rejectCalls.first?.errorDescription, "User declined")
         XCTAssertEqual(result, .prepared(.openURL(responseURL)))
+    }
+
+    func testRejectPresentationForwardsTypedHandle() async throws {
+        let handle = PresentationPreviewHandle(value: "presentation-preview-1")
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(bridge: bridge)
+
+        _ = try await wallet.rejectPresentation(previewHandle: handle)
+
+        XCTAssertEqual(bridge.rejectCalls.first?.previewHandle, handle)
+        XCTAssertEqual(String(describing: handle), "PresentationPreviewHandle(<redacted>)")
     }
 
     func testBridgeErrorsSurfaceAsWalletErrors() async {
@@ -639,7 +697,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     }
 
     struct SubmitCall {
-        let request: URL
+        let previewHandle: PresentationPreviewHandle
         let selectedCredentialOptions: [PresentationCredentialSelection]
         let selectedDisclosureOptions: [PresentationDisclosureSelection]?
         let did: String?
@@ -647,7 +705,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     }
 
     struct RejectCall {
-        let request: URL
+        let previewHandle: PresentationPreviewHandle
         let error: PresentationErrorCode?
         let errorDescription: String?
     }
@@ -655,22 +713,26 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     var events: AsyncStream<WalletEvent>
     var error: WalletError?
     var bootstrapResult = WalletBootstrapResult(keyID: "key", did: "did:key:wallet")
-    var offerResolutionResult = OfferResolution(
-        transactionCodeRequired: false,
-        credentialIssuer: "https://issuer.example",
-        offeredCredentials: ["ExampleCredential"]
-    )
+    var offerResolutionResult = testOfferResolution(transactionCodeRequired: false)
     var receiveResult: [String] = []
     var credentialsResult: [Credential] = []
     var presentResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
     var previewResult = PresentationPreviewResult.ready(
-        PresentationPreview(request: .init(clientID: nil), credentialOptions: [])
+        PresentationPreview(
+            previewHandle: PresentationPreviewHandle(value: "fake-presentation-preview"),
+            request: .init(
+                clientID: nil,
+                responseEncryption: .notRequired
+            ),
+            credentialOptions: []
+        )
     )
     var submitResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
     var rejectResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
     private(set) var bootstrapCalls: [BootstrapCall] = []
     private(set) var resolvedOffers: [URL] = []
     private(set) var receiveCalls: [ReceiveCall] = []
+    private(set) var previewedReceiveHandles: [IssuancePreviewHandle] = []
     private(set) var credentialsCallCount = 0
     private(set) var deleteLocalDataCallCount = 0
     private(set) var presentCalls: [PresentCall] = []
@@ -714,6 +776,16 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         return receiveResult
     }
 
+    func receive(previewHandle: IssuancePreviewHandle, txCode: String?, clientID: String) async throws -> [String] {
+        if let error { throw error }
+        previewedReceiveHandles.append(previewHandle)
+        return receiveResult
+    }
+
+    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
+        if let error { throw error }
+    }
+
     func credentials() async throws -> [Credential] {
         if let error {
             throw error
@@ -750,7 +822,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     }
 
     func submitPresentation(
-        request: URL,
+        previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         did: String?,
@@ -762,7 +834,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
 
         submitCalls.append(
             .init(
-                request: request,
+                previewHandle: previewHandle,
                 selectedCredentialOptions: selectedCredentialOptions,
                 selectedDisclosureOptions: selectedDisclosureOptions,
                 did: did,
@@ -773,7 +845,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     }
 
     func rejectPresentation(
-        request: URL,
+        previewHandle: PresentationPreviewHandle,
         error: PresentationErrorCode?,
         errorDescription: String?
     ) async throws -> PresentationResult {
@@ -783,11 +855,60 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
 
         rejectCalls.append(
             .init(
-                request: request,
+                previewHandle: previewHandle,
                 error: error,
                 errorDescription: errorDescription
             )
         )
         return rejectResult
     }
+
+    func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
+        if let error { throw error }
+    }
+}
+
+private let testVerifierMetadata = VerifierMetadata(
+    display: MetadataDisplay(
+        name: "Example Verifier",
+        locale: "en",
+        logoURI: nil,
+        logoAltText: nil
+    ),
+    clientURI: "https://verifier.example",
+    policyURI: "https://verifier.example/privacy",
+    termsOfServiceURI: "https://verifier.example/terms"
+)
+
+private func testOfferResolution(transactionCodeRequired: Bool) -> OfferResolution {
+    OfferResolution(
+        previewHandle: IssuancePreviewHandle(value: "test-issuance-preview"),
+        issuer: IssuerMetadata(
+            credentialIssuer: "https://issuer.example",
+            display: MetadataDisplay(
+                name: "Example Issuer",
+                locale: "en",
+                logoURI: nil,
+                logoAltText: nil
+            )
+        ),
+        offeredCredentials: [
+            OfferedCredentialMetadata(
+                configurationID: "ExampleCredential",
+                format: "vc+sd-jwt",
+                scope: nil,
+                vct: "ExampleCredential",
+                doctype: nil,
+                display: nil,
+                claims: []
+            )
+        ],
+        transactionCode: transactionCodeRequired
+            ? TransactionCodeRequirement(
+                inputMode: .numeric,
+                length: 6,
+                description: "Enter the six-digit code"
+            )
+            : nil
+    )
 }

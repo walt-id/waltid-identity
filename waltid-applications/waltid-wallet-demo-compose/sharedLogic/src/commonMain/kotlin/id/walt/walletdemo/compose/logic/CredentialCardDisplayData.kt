@@ -5,7 +5,7 @@ data class CredentialCardDisplayData(
     val title: String,
     val credentialType: String?,
     val format: String,
-    val issuer: String?,
+    val issuer: String,
     val holderName: String?,
     val validity: String?,
     val portrait: DisplayValue.Image?,
@@ -27,7 +27,7 @@ fun CredentialDetails.toCardDisplayData(): CredentialCardDisplayData {
         title = summary.label,
         credentialType = allItems.firstCredentialTypeText(),
         format = summary.format,
-        issuer = summary.issuer,
+        issuer = summary.issuer?.takeIf { it.isNotBlank() } ?: CredentialDisplayText.Unknown,
         holderName = holderName,
         validity = expiryDate?.let { CredentialDisplayText.expires(it) }
             ?: fallbackAddedDate?.let { CredentialDisplayText.added(it) },
