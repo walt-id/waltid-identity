@@ -19,7 +19,9 @@ struct WalletDemoApp: App {
                     operationDelayMilliseconds: delayMilliseconds,
                     verifierStyle: Self.mockVerifierStyle(environment: env),
                     duplicatePresentationOptions: env["E2E_MOCK_DUPLICATE_PRESENTATION_OPTIONS"] == "1",
-                    transactionCodeRequired: env["E2E_MOCK_TX_CODE_REQUIRED"] == "1"
+                    transactionCodeRequired: env["E2E_MOCK_TX_CODE_REQUIRED"] == "1",
+                    responseEncryptionRequired: env["E2E_MOCK_UNENCRYPTED_RESPONSE"] != "1",
+                    mdocMetadata: env["E2E_MOCK_MDOC_METADATA"] == "1"
                 )
             )
         }
@@ -52,9 +54,6 @@ struct WalletDemoApp: App {
     }
 
     private static func mockVerifierStyle(environment: [String: String]) -> MockWalletClient.VerifierStyle {
-        if environment["E2E_MOCK_DNS_VERIFIER"] == "1" {
-            return .x509SanDns
-        }
         if environment["E2E_MOCK_DID_VERIFIER"] == "1" {
             return .did
         }

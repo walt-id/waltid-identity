@@ -6,31 +6,49 @@ sealed interface WalletDemoPresentationPreviewResult {
 }
 
 data class WalletDemoPresentationError(
-    val verifier: VerifierDetails,
+    override val verifierMetadata: WalletDemoVerifierMetadata?,
+    override val clientId: String?,
+    override val responseUri: String? = null,
+    override val state: String? = null,
+    override val nonce: String? = null,
+    override val responseEncryption: WalletDemoResponseEncryption,
+    override val transactionData: List<ClaimGroup> = emptyList(),
     val errorCode: String,
     val message: String,
-)
+) : WalletDemoPresentationRequestInfo
+
+interface WalletDemoPresentationRequestInfo {
+    val verifierMetadata: WalletDemoVerifierMetadata?
+    val clientId: String?
+    val responseUri: String?
+    val state: String?
+    val nonce: String?
+    val responseEncryption: WalletDemoResponseEncryption
+    val transactionData: List<ClaimGroup>
+}
 
 data class WalletDemoPresentationPreview(
-    val verifierName: String?,
-    val clientId: String?,
-    val responseUri: String? = null,
-    val state: String? = null,
-    val nonce: String? = null,
-    val transactionData: List<ClaimGroup> = emptyList(),
+    override val verifierMetadata: WalletDemoVerifierMetadata?,
+    override val clientId: String?,
+    override val responseUri: String? = null,
+    override val state: String? = null,
+    override val nonce: String? = null,
+    override val responseEncryption: WalletDemoResponseEncryption,
+    override val transactionData: List<ClaimGroup> = emptyList(),
     val credentialOptions: List<WalletDemoPresentationCredentialOption>,
     val credentialRequirements: List<WalletDemoPresentationCredentialRequirement> = emptyList(),
-)
+) : WalletDemoPresentationRequestInfo
 
-data class VerifierDetails(
-    val name: String?,
-    val clientId: String?,
-    val responseUri: String? = null,
-    val state: String? = null,
-    val nonce: String? = null,
-    val transactionData: List<ClaimGroup> = emptyList(),
-    val trustStatus: String = CredentialDisplayText.Unknown,
-)
+sealed interface WalletDemoResponseEncryption {
+    data object NotRequired : WalletDemoResponseEncryption
+
+    data class Required(
+        val keyManagementAlgorithm: String,
+        val contentEncryptionAlgorithm: String,
+        val verifierKeyId: String?,
+        val verifierKeyThumbprint: String,
+    ) : WalletDemoResponseEncryption
+}
 
 data class WalletDemoPresentationCredentialRequirement(
     val options: List<List<String>>,
@@ -41,7 +59,7 @@ data class WalletDemoPresentationCredentialOption(
     val credentialId: String,
     val multiple: Boolean = false,
     val label: String,
-    val issuer: String,
+    val issuer: String?,
     val subject: String? = null,
     val format: String,
     val credentialDataJson: String,

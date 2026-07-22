@@ -123,7 +123,6 @@ class WalletDemoController(
                 requestDrafts = it.requestDrafts.copy(
                     offerUrl = value,
                     txCode = "",
-                    transactionCodeRequired = false,
                 ),
                 offerPreview = null,
                 lastReceivedCredentialIds = emptyList(),
@@ -135,7 +134,8 @@ class WalletDemoController(
 
     fun updateTxCode(value: String) {
         _state.update {
-            it.copy(requestDrafts = it.requestDrafts.copy(txCode = value))
+            val normalized = it.offerPreview?.transactionCode?.normalizeInput(value) ?: value
+            it.copy(requestDrafts = it.requestDrafts.copy(txCode = normalized))
         }
     }
 
@@ -162,7 +162,6 @@ class WalletDemoController(
                         requestDrafts = it.requestDrafts.copy(
                             offerUrl = url,
                             txCode = "",
-                            transactionCodeRequired = false,
                         ),
                         offerPreview = null,
                         lastReceivedCredentialIds = emptyList(),
@@ -204,7 +203,6 @@ class WalletDemoController(
                 requestDrafts = it.requestDrafts.copy(
                     offerUrl = "",
                     txCode = "",
-                    transactionCodeRequired = false,
                 ),
                 offerPreview = null,
                 lastReceivedCredentialIds = emptyList(),
@@ -245,9 +243,6 @@ class WalletDemoController(
                 if (!isCurrent(request)) return@launch
                 updateIfCurrent(request) {
                     it.copy(
-                        requestDrafts = it.requestDrafts.copy(
-                            transactionCodeRequired = resolution.transactionCodeRequired,
-                        ),
                         offerPreview = resolution,
                         operation = WalletOperationState.OfferPreview,
                     )
@@ -298,10 +293,7 @@ class WalletDemoController(
         _state.update {
             it.copy(
                 offerPreview = null,
-                requestDrafts = it.requestDrafts.copy(
-                    txCode = "",
-                    transactionCodeRequired = false,
-                ),
+                requestDrafts = it.requestDrafts.copy(txCode = ""),
                 operation = WalletOperationState.Succeeded(
                     message = WalletDisplayText.CredentialOfferDeclined,
                     tab = WalletDemoTab.Receive,
@@ -358,10 +350,7 @@ class WalletDemoController(
                     message = WalletDisplayText.receivedCredentials(displayableReceivedCredentialIds.size),
                     tab = WalletDemoTab.Receive,
                 ),
-                requestDrafts = it.requestDrafts.copy(
-                    txCode = "",
-                    transactionCodeRequired = false,
-                ),
+                requestDrafts = it.requestDrafts.copy(txCode = ""),
                 lastReceivedCredentialIds = displayableReceivedCredentialIds,
                 receiveCompleted = true,
             )

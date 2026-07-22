@@ -19,6 +19,7 @@ import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
 import id.walt.wallet2.mobile.MobileWalletPresentationPreview
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
+import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -100,7 +101,10 @@ class MobileWalletIntegrationTest {
 
         val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
         val resolution = client.resolveOffer(offer.offerUrl)
-        assertTrue(resolution.transactionCodeRequired, "EUDI offer should require a transaction code")
+        assertTrue(resolution.issuer.credentialIssuer.isNotBlank(), "Resolved issuer metadata should include its identifier")
+        assertTrue(resolution.offeredCredentials.isNotEmpty(), "Offer should resolve credential metadata")
+        assertTrue(resolution.offeredCredentials.all { it.configurationId.isNotBlank() && it.format.isNotBlank() })
+        assertNotNull(resolution.transactionCode, "EUDI offer should require a transaction code")
         val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
         assertTrue(credentialIds.isNotEmpty(), "Should receive at least one credential")
     }
@@ -452,6 +456,10 @@ class MobileWalletIntegrationTest {
         assertTrue(
             preview.credentialOptions.all { it.credentialId in credentialIds },
             "Preview should only offer credentials received in this test: received=$credentialIds, preview=$preview",
+        )
+        assertTrue(
+            preview.request.responseEncryption is MobileWalletResponseEncryption.Required,
+            "EUDI verifier should request an encrypted response: preview=$preview",
         )
 
         val result = client.submitPresentation(
