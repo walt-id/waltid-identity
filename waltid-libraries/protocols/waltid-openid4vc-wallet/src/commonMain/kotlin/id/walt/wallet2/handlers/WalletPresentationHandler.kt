@@ -578,6 +578,7 @@ object WalletPresentationHandler {
     ): AuthorizationRequest =
         WalletPresentFunctionality2.resolveAuthorizationRequest(
             presentationRequestUrl = request.requestUrl,
+            unsignedRequestObjectPolicy = wallet.unsignedRequestObjectPolicy,
             expectedRequestObjectAudience = wallet.requestObjectAudience,
             x509TrustPolicy = wallet.requestObjectX509TrustPolicy,
         )

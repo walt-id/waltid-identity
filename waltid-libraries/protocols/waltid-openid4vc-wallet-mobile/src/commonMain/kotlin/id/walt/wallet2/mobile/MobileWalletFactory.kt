@@ -28,7 +28,7 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
  * @property requestObjectAudience Static Discovery default, or the Wallet issuer for Dynamic Discovery.
  * @property unsignedRequestObjectPolicy Policy for handling unsigned OID4VP authorization requests.
  *           Defaults to REQUIRE_SIGNED for production-grade security.
- *           Use ALLOW_UNSIGNED or WARN_ON_UNSIGNED only for testing or legacy interoperability.
+ *           Use ALLOW_UNSIGNED only for testing or legacy interoperability.
  * @property onEvent Optional callback for observing wallet issuance and presentation session events.
  * @property preferredLocales Ordered BCP 47 locale preferences used for progressive language-tag lookup.
  * When no preference matches, selection falls back to an unlocalized entry and then the first entry.
