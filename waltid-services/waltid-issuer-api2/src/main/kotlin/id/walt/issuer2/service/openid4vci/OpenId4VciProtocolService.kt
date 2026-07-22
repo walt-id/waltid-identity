@@ -311,7 +311,7 @@ class OpenId4VciProtocolService(
 
     private fun invalidCredentialAuthorization(): CredentialResponseHttp =
         oauth2Provider.writeCredentialError(
-            OAuthError(CredentialErrorCodes.INVALID_TOKEN, "Credential request has invalid authorization credentials"),
+            OAuthError(OAuthErrorCodes.INVALID_TOKEN, "Credential request has invalid authorization credentials"),
         )
 
     private suspend fun processCredentialRequest(
