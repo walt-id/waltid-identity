@@ -3,8 +3,20 @@ name: Build on every push
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    paths-ignore: &docs-and-assets
+      - '**/*.md'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.webp'
+      - '**/*.svg'
+      - '**/*.ico'
+      - '**/LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - 'docs/**'
   push:
     branches: [main]
+    paths-ignore: *docs-and-assets
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
