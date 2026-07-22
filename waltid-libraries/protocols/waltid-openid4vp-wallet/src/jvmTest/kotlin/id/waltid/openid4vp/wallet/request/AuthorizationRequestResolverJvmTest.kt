@@ -1,7 +1,16 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.waltid.openid4vp.wallet.request
 
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.openid4vp.clientidprefix.ClientIdError
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.webdatafetching.WebDataFetcher
+import id.walt.x509.CertificateDer
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -16,9 +25,12 @@ import io.ktor.http.headersOf
 import io.ktor.http.parseQueryString
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,10 +59,7 @@ class AuthorizationRequestResolverJvmTest {
         val expectedClientIdPrefixes =
             listOf(
                 "redirect_uri",
-                "x509_san_dns",
-                "x509_hash",
                 "decentralized_identifier",
-                "verifier_attestation",
             )
         assertFalse("client_id_schemes_supported" in metadata)
         assertEquals(
@@ -60,6 +69,24 @@ class AuthorizationRequestResolverJvmTest {
         assertEquals(
             jsonObjectOf("dc+sd-jwt" to jsonObjectOf()),
             metadata.getValue("vp_formats_supported").jsonObject,
+        )
+    }
+
+    @Test
+    fun `wallet metadata advertises trust-dependent client id schemes only when configured`() {
+        val metadata = Json.parseToJsonElement(
+            AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                vpFormatsSupported = jsonObjectOf(),
+                trustConfiguration = ClientIdTrustConfiguration(
+                    x509TrustAnchors = listOf(CertificateDer(byteArrayOf(1))),
+                    trustedVerifierAttestationIssuers = setOf("did:example:attester"),
+                ),
+            )
+        ).jsonObject
+
+        assertEquals(
+            listOf("redirect_uri", "x509_san_dns", "x509_hash", "decentralized_identifier", "verifier_attestation"),
+            metadata.getValue("client_id_prefixes_supported").jsonArray.map { it.jsonPrimitive.content },
         )
     }
 
@@ -195,6 +222,58 @@ class AuthorizationRequestResolverJvmTest {
     }
 
     @Test
+    fun `pre-registered request object verifies against trusted metadata JWK`() = runBlocking {
+        val trustedKey = JWKKey.generate(KeyType.Ed25519)
+        val requestObject = signedRequestObject(trustedKey)
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier2")
+            parameters.append("request", requestObject)
+        }.build()
+
+        val resolved = AuthorizationRequestResolver.resolve(
+            requestUrl = requestUrl,
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            fetchRequestUri = { _, _ -> error("request_uri fetch should not be called") },
+            trustConfiguration = ClientIdTrustConfiguration(
+                preRegisteredClients = mapOf(
+                    "verifier2" to ClientMetadata(
+                        jwks = ClientMetadata.Jwks(listOf(trustedKey.getPublicKey().exportJWKObject())),
+                    )
+                ),
+            ),
+        )
+
+        assertIs<ResolvedAuthorizationRequest.WithRequestObject>(resolved)
+    }
+
+    @Test
+    fun `pre-registered request object rejects invalid signature`() = runBlocking {
+        val trustedKey = JWKKey.generate(KeyType.Ed25519)
+        val attackerKey = JWKKey.generate(KeyType.Ed25519)
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier2")
+            parameters.append("request", signedRequestObject(attackerKey))
+        }.build()
+
+        val error = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = requestUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+                fetchRequestUri = { _, _ -> error("request_uri fetch should not be called") },
+                trustConfiguration = ClientIdTrustConfiguration(
+                    preRegisteredClients = mapOf(
+                        "verifier2" to ClientMetadata(
+                            jwks = ClientMetadata.Jwks(listOf(trustedKey.getPublicKey().exportJWKObject())),
+                        )
+                    ),
+                ),
+            )
+        }
+
+        assertEquals(ClientIdError.InvalidSignature, error.clientIdError)
+    }
+
+    @Test
     fun `request uri post can omit optional wallet metadata`() {
         val parameters = parseQueryString(
             AuthorizationRequestResolver.buildRequestUriPostBody(
@@ -215,6 +294,14 @@ class AuthorizationRequestResolverJvmTest {
                 Base64.getUrlEncoder().withoutPadding().encodeToString(segment.toByteArray())
             } + "."
     }
+
+    private suspend fun signedRequestObject(key: Key): String = key.signJws(
+        buildJsonObject {
+            put("client_id", "verifier2")
+            put("nonce", "nonce-123")
+        }.toString().encodeToByteArray(),
+        mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
+    )
 
     private fun jsonObjectOf(vararg pairs: Pair<String, kotlinx.serialization.json.JsonElement>) =
         kotlinx.serialization.json.JsonObject(mapOf(*pairs))

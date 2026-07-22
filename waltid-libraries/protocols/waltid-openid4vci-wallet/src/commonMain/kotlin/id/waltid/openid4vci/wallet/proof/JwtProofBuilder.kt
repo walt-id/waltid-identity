@@ -2,11 +2,18 @@ package id.waltid.openid4vci.wallet.proof
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.crypto2.keys.toPublicJwk
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.prooftypes.Proofs
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.utils.io.core.*
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
@@ -17,7 +24,7 @@ private val log = KotlinLogging.logger {}
  * Builds JWT proofs of possession for OpenID4VCI credential requests.
  * Implements §7.2.1 of OpenID4VCI 1.0 specification (JWT Proof Type).
  */
-class JwtProofBuilder : ProofOfPossessionBuilder {
+class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilder {
 
     override val proofType: String = "jwt"
 
@@ -44,6 +51,7 @@ class JwtProofBuilder : ProofOfPossessionBuilder {
      * @param includeJwk Whether to include the public key as JWK in the header
      * @return Proofs object containing the JWT proof
      */
+    @Deprecated("Use the Crypto2Key overload")
     suspend fun buildJwtProof(
         key: Key,
         audience: String,
@@ -112,6 +120,49 @@ class JwtProofBuilder : ProofOfPossessionBuilder {
         )
     }
 
+    suspend fun buildJwtProof(
+        key: Crypto2Key,
+        algorithm: JwsAlgorithm,
+        audience: String,
+        nonce: String,
+        keyId: String? = null,
+        includeJwk: Boolean = false,
+    ): Proofs {
+        ProofBuilderUtils.validateProofParameters(audience, nonce)
+        val payload = buildJsonObject {
+            put("aud", audience)
+            put("iat", ProofBuilderUtils.currentTimestampSeconds())
+            put("nonce", nonce)
+        }
+        val bindingJwk = if (keyId == null) {
+            val exported = key.capabilities.publicKeyExporter?.exportPublicKey()
+                ?: throw IllegalArgumentException("Proof signing key does not support public-key export")
+            exported.toPublicJwk(key.spec)
+        } else null
+        val thumbprint = if (keyId == null && !includeJwk) {
+            Jwk.sha256Thumbprint(requireNotNull(bindingJwk))
+        } else null
+        val header = buildJsonObject {
+            put("typ", "openid4vci-proof+jwt")
+            when {
+                keyId != null -> put("kid", keyId)
+                includeJwk -> put("jwk", requireNotNull(bindingJwk).toJsonObject())
+                else -> put("kid", requireNotNull(thumbprint))
+            }
+        }
+        return Proofs(
+            jwt = listOf(
+                CompactJws.sign(
+                    payload = json.encodeToString(JsonObject.serializer(), payload).encodeToByteArray(),
+                    key = key,
+                    algorithm = algorithm,
+                    protectedHeader = header,
+                )
+            )
+        )
+    }
+
+    @Deprecated("Use the Crypto2Key overload")
     override suspend fun buildProof(
         key: Key,
         audience: String,
@@ -119,7 +170,7 @@ class JwtProofBuilder : ProofOfPossessionBuilder {
     ): Proofs {
         // Default: try to use DID if available, otherwise use JWK
         val keyId = key.getKeyId()
-        val useDid = keyId?.startsWith("did:") == true
+        val useDid = keyId.startsWith("did:")
 
         return if (useDid) {
             buildJwtProof(key, audience, nonce, keyId = keyId, includeJwk = false)
@@ -128,9 +179,24 @@ class JwtProofBuilder : ProofOfPossessionBuilder {
         }
     }
 
+    override suspend fun buildProof(
+        key: Crypto2Key,
+        algorithm: JwsAlgorithm,
+        audience: String,
+        nonce: String,
+    ): Proofs {
+        val keyId = key.id.value
+        return if (keyId.startsWith("did:")) {
+            buildJwtProof(key, algorithm, audience, nonce, keyId = keyId)
+        } else {
+            buildJwtProof(key, algorithm, audience, nonce, includeJwk = true)
+        }
+    }
+
     /**
      * Determines the appropriate binding method based on key and configuration
      */
+    @Deprecated("Binding is selected directly by the Crypto2Key proof overload")
     fun determineBindingMethod(key: Key, keyId: String?): CryptographicBindingMethod {
         return when {
             keyId?.startsWith("did:") == true -> CryptographicBindingMethod.fromValue("did")
@@ -138,3 +204,7 @@ class JwtProofBuilder : ProofOfPossessionBuilder {
         }
     }
 }
+
+private fun EncodedKey.Jwk.toJsonObject(): JsonObject =
+    Json.parseToJsonElement(data.toByteArray().decodeToString()) as? JsonObject
+        ?: throw IllegalArgumentException("Exported JWK must be a JSON object")

@@ -457,8 +457,11 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
 
                 val resp = presentationResult.getOrThrow()
                 println("Response: $resp")
-                assertTrue("Transmission success is false") { resp.transmissionSuccess == true }
-                assertTrue { resp.verifierResponse!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
+                assertTrue("Pre-final SD-JWT fixture must be rejected: $resp") { resp.transmissionSuccess == false }
+                assertTrue {
+                    resp.verifierResponse!!.jsonObject["error_description"]!!.jsonPrimitive.content
+                        .contains("sd_hash-check")
+                }
             }
 
 
@@ -476,31 +479,10 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
             // Check created session
             test("Check Verification Session after presentation") {
                 assertTrue { info2.attempted }
-                assertTrue { info2.status == Verification2Session.VerificationSessionStatus.SUCCESSFUL }
-
-                assertNotNull(info2.presentedCredentials)
-                assertEquals(info2.presentedCredentials!!.size, 1)
-                assertNotNull(info2.presentedCredentials!!["my_pid"])
-                assertTrue { info2.presentedCredentials!!["my_pid"]!!.size == 1 }
+                assertTrue { info2.status == Verification2Session.VerificationSessionStatus.FAILED }
 
             }
 
-            test("Policy results") {
-                println("Parsed policy results: ${info2.policyResults}")
-
-                info2.policyResults?.vcPolicies?.forEach {
-                    println("${it.policy.id}: ${it.success}")
-                }
-
-                assertNotNull(info2.policyResults)
-                assertTrue { info2.policyResults!!.overallSuccess }
-
-                assertTrue { info2.policyResults!!.vcPolicies.size == additionalSdjwtvcPolicies.vc_policies?.policies?.size }
-                assertTrue {
-                    info2.policyResults!!.vpPolicies["my_pid"]
-                        ?.get("dc+sd-jwt/transaction-data-hash-check")?.success == true
-                }
-            }
         }
     }
 

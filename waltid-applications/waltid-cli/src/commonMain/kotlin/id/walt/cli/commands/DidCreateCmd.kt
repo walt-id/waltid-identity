@@ -1,6 +1,10 @@
 package id.walt.cli.commands
 
-import com.github.ajalt.clikt.core.*
+import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
+import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.installMordantMarkdown
+import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.help
@@ -9,11 +13,15 @@ import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.clikt.parameters.types.path
 import com.github.ajalt.mordant.terminal.YesNoPrompt
-import id.walt.cli.util.*
-import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
-import id.walt.did.dids.registrar.dids.DidWebCreateOptions
+import id.walt.cli.util.DidMethod
+import id.walt.cli.util.DidUtil
+import id.walt.cli.util.KeyUtil
+import id.walt.cli.util.PrettyPrinter
+import id.walt.cli.util.WaltIdCmdHelpOptionMessage
+import id.walt.did.dids.registrar.dids.DidCreateOptions
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import java.net.URLEncoder
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
@@ -30,8 +38,6 @@ class DidCreateCmd : CliktCommand(
         waltid did create 
         waltid did create -k myKey.json
         waltid did create -m jwk
-        waltid did create -m web -wd example.com
-        waltid did create -m web -wd example.com -wp /alice/bob
     """.replace("\n", "  \n")
 
     init {
@@ -47,7 +53,7 @@ class DidCreateCmd : CliktCommand(
     val print: PrettyPrinter = PrettyPrinter(this)
 
     private val method by option("-m", "--method")
-        .help("The DID method to be used.")
+        .help("The native crypto2 DID method to use: key or jwk.")
         .enum<DidMethod>(ignoreCase = true)
         .default(DidMethod.KEY)
 
@@ -62,39 +68,24 @@ class DidCreateCmd : CliktCommand(
         .path()
         .help("File path to save the created DID Document (optional). If not specified, the did document will be saved at the <did>.json file.")
 
-    private val webDomain by option("-wd", "--web-domain")
-        .help("The domain name to use when creating a did:web (required in this case).")
-
-    private val webPath by option("-wp", "--web-path")
-        .help("The URL path to append when creating a did:web (optional).")
-        .default("")
-
     override fun run() {
         runBlocking {
             val key = KeyUtil(this@DidCreateCmd).getKey(keyFile)
 
-            val jwk = key.exportJWKPretty()
+            val jwk = KeyUtil.exportJwk(key, private = false)
 
-            print.green("DID Subject key to be used:")
+            print.green("DID subject public key (JWK):")
             print.box(jwk)
 
-            if (method == DidMethod.WEB) {
-                if (webDomain == null || webDomain == "")
-                    throw IllegalArgumentException("The web domain cannot be null or any empty string when creating a did:web.")
-            }
-
-            val result = if (useJwkJcsPub && method == DidMethod.KEY) {
-                DidUtil.createDid(method, key, DidKeyCreateOptions(key.keyType, useJwkJcsPub))
-            } else if (method == DidMethod.WEB) {
-                if (webDomain == null || webDomain == "")
-                    throw IllegalArgumentException("The web domain cannot be null or any empty string when creating a did:web.")
-                DidUtil.createDid(
-                    method,
-                    key,
-                    DidWebCreateOptions(domain = webDomain!!, path = webPath, keyType = key.keyType)
+            val result = DidUtil.createDid(
+                method,
+                key,
+                DidCreateOptions(
+                    method = method.name.lowercase(),
+                    config = if (method == DidMethod.KEY) mapOf("useJwkJcsPub" to JsonPrimitive(useJwkJcsPub))
+                    else emptyMap(),
                 )
-            } else
-                DidUtil.createDid(method, key)
+            )
 
             val outputFile = output ?: Path("${URLEncoder.encode(result.did, "UTF-8")}.json")
             if (outputFile.exists()

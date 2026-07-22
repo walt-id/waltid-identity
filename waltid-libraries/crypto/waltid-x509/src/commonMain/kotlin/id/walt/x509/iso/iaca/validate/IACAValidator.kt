@@ -6,6 +6,8 @@ import id.walt.x509.X509BasicConstraints
 import id.walt.x509.X509KeyUsage
 import id.walt.x509.X509V3ExtensionOID
 import id.walt.x509.X509ValidityPeriod
+import id.walt.x509.requireAbsoluteUri
+import id.walt.x509.requireHttpUrl
 import id.walt.x509.iso.*
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
@@ -112,9 +114,7 @@ class IACAValidator(
 
         if (config.crlDistributionPointUri) {
             data.crlDistributionPointUri?.let {
-                require(it.isNotBlank()) {
-                    "IACA CRL distribution point, when optionally specified, must not be blank."
-                }
+                requireHttpUrl(it, "IACA CRL distribution point URI")
             }
         }
 
@@ -175,6 +175,7 @@ class IACAValidator(
         require(!issAltName.email.isNullOrBlank() || !issAltName.uri.isNullOrBlank()) {
             "IACA issuer alternative name must have at least one of 'email' or 'uri' specified with a non-null, or blank value"
         }
+        issAltName.uri?.let { requireAbsoluteUri(it, "IACA issuer alternative name URI") }
     }
 
     private fun validateX509BasicConstraints(

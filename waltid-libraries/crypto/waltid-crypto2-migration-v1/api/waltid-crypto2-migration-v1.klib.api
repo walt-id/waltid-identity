@@ -1,0 +1,106 @@
+// Klib ABI Dump
+// Targets: [js, linuxArm64, linuxX64, macosArm64, macosX64, mingwX64]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <id.walt.crypto2:waltid-crypto2-migration-v1>
+final enum class id.walt.crypto2.migration.v1/V1MobilePlatform : kotlin/Enum<id.walt.crypto2.migration.v1/V1MobilePlatform> { // id.walt.crypto2.migration.v1/V1MobilePlatform|null[0]
+    enum entry ANDROID // id.walt.crypto2.migration.v1/V1MobilePlatform.ANDROID|null[0]
+    enum entry IOS // id.walt.crypto2.migration.v1/V1MobilePlatform.IOS|null[0]
+
+    final val entries // id.walt.crypto2.migration.v1/V1MobilePlatform.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.crypto2.migration.v1/V1MobilePlatform> // id.walt.crypto2.migration.v1/V1MobilePlatform.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.crypto2.migration.v1/V1MobilePlatform // id.walt.crypto2.migration.v1/V1MobilePlatform.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.crypto2.migration.v1/V1MobilePlatform> // id.walt.crypto2.migration.v1/V1MobilePlatform.values|values#static(){}[0]
+}
+
+abstract fun interface id.walt.crypto2.migration.v1/V1ManagedKeyMigrator { // id.walt.crypto2.migration.v1/V1ManagedKeyMigrator|null[0]
+    abstract suspend fun migrate(id.walt.crypto2.migration.v1/V1ManagedKeyRecord): id.walt.crypto2.keys/StoredKey.Managed // id.walt.crypto2.migration.v1/V1ManagedKeyMigrator.migrate|migrate(id.walt.crypto2.migration.v1.V1ManagedKeyRecord){}[0]
+}
+
+abstract fun interface id.walt.crypto2.migration.v1/V1PlatformKeyMigrator { // id.walt.crypto2.migration.v1/V1PlatformKeyMigrator|null[0]
+    abstract suspend fun migrate(id.walt.crypto2.migration.v1/V1MobileKeyReference): id.walt.crypto2.keys/StoredKey.Managed // id.walt.crypto2.migration.v1/V1PlatformKeyMigrator.migrate|migrate(id.walt.crypto2.migration.v1.V1MobileKeyReference){}[0]
+}
+
+final class id.walt.crypto2.migration.v1/V1KeyMigration { // id.walt.crypto2.migration.v1/V1KeyMigration|null[0]
+    constructor <init>(kotlin.collections/Map<kotlin/String, id.walt.crypto2.migration.v1/V1ManagedKeyMigrator> = ..., id.walt.crypto2.migration.v1/V1PlatformKeyMigrator? = ...) // id.walt.crypto2.migration.v1/V1KeyMigration.<init>|<init>(kotlin.collections.Map<kotlin.String,id.walt.crypto2.migration.v1.V1ManagedKeyMigrator>;id.walt.crypto2.migration.v1.V1PlatformKeyMigrator?){}[0]
+
+    final suspend fun migrate(id.walt.crypto2.keys/KeyId, kotlin/String, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>): id.walt.crypto2.keys/StoredKey // id.walt.crypto2.migration.v1/V1KeyMigration.migrate|migrate(id.walt.crypto2.keys.KeyId;kotlin.String;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>){}[0]
+    final suspend fun migrate(id.walt.crypto2.keys/KeyId, kotlinx.serialization.json/JsonObject, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>): id.walt.crypto2.keys/StoredKey // id.walt.crypto2.migration.v1/V1KeyMigration.migrate|migrate(id.walt.crypto2.keys.KeyId;kotlinx.serialization.json.JsonObject;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>){}[0]
+    final suspend fun migrateMobileReference(id.walt.crypto2.migration.v1/V1MobileKeyReference): id.walt.crypto2.keys/StoredKey // id.walt.crypto2.migration.v1/V1KeyMigration.migrateMobileReference|migrateMobileReference(id.walt.crypto2.migration.v1.V1MobileKeyReference){}[0]
+
+    final object Companion // id.walt.crypto2.migration.v1/V1KeyMigration.Companion|null[0]
+}
+
+final class id.walt.crypto2.migration.v1/V1ManagedKeyRecord { // id.walt.crypto2.migration.v1/V1ManagedKeyRecord|null[0]
+    constructor <init>(id.walt.crypto2.keys/KeyId, kotlin/String, kotlinx.serialization.json/JsonObject, id.walt.crypto2.keys/KeySpec?, kotlinx.serialization.json/JsonObject?, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>) // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.<init>|<init>(id.walt.crypto2.keys.KeyId;kotlin.String;kotlinx.serialization.json.JsonObject;id.walt.crypto2.keys.KeySpec?;kotlinx.serialization.json.JsonObject?;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>){}[0]
+
+    final val id // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.id|{}id[0]
+        final fun <get-id>(): id.walt.crypto2.keys/KeyId // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.id.<get-id>|<get-id>(){}[0]
+    final val publicJwk // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.publicJwk|{}publicJwk[0]
+        final fun <get-publicJwk>(): kotlinx.serialization.json/JsonObject? // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.publicJwk.<get-publicJwk>|<get-publicJwk>(){}[0]
+    final val source // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.source|{}source[0]
+        final fun <get-source>(): kotlinx.serialization.json/JsonObject // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.source.<get-source>|<get-source>(){}[0]
+    final val spec // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.spec|{}spec[0]
+        final fun <get-spec>(): id.walt.crypto2.keys/KeySpec? // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.spec.<get-spec>|<get-spec>(){}[0]
+    final val type // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.type|{}type[0]
+        final fun <get-type>(): kotlin/String // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.type.<get-type>|<get-type>(){}[0]
+    final val usages // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.usages|{}usages[0]
+        final fun <get-usages>(): kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage> // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.usages.<get-usages>|<get-usages>(){}[0]
+
+    final fun component1(): id.walt.crypto2.keys/KeyId // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.component2|component2(){}[0]
+    final fun component3(): kotlinx.serialization.json/JsonObject // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.component3|component3(){}[0]
+    final fun component4(): id.walt.crypto2.keys/KeySpec? // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.component4|component4(){}[0]
+    final fun component5(): kotlinx.serialization.json/JsonObject? // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.component5|component5(){}[0]
+    final fun component6(): kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage> // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.component6|component6(){}[0]
+    final fun copy(id.walt.crypto2.keys/KeyId = ..., kotlin/String = ..., kotlinx.serialization.json/JsonObject = ..., id.walt.crypto2.keys/KeySpec? = ..., kotlinx.serialization.json/JsonObject? = ..., kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage> = ...): id.walt.crypto2.migration.v1/V1ManagedKeyRecord // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.copy|copy(id.walt.crypto2.keys.KeyId;kotlin.String;kotlinx.serialization.json.JsonObject;id.walt.crypto2.keys.KeySpec?;kotlinx.serialization.json.JsonObject?;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.migration.v1/V1ManagedKeyRecord.toString|toString(){}[0]
+}
+
+final class id.walt.crypto2.migration.v1/V1MobileKeyReference { // id.walt.crypto2.migration.v1/V1MobileKeyReference|null[0]
+    constructor <init>(id.walt.crypto2.keys/KeyId, kotlin/String, id.walt.crypto2.migration.v1/V1MobilePlatform, kotlin/Boolean, kotlin/String?, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>) // id.walt.crypto2.migration.v1/V1MobileKeyReference.<init>|<init>(id.walt.crypto2.keys.KeyId;kotlin.String;id.walt.crypto2.migration.v1.V1MobilePlatform;kotlin.Boolean;kotlin.String?;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>){}[0]
+
+    final val id // id.walt.crypto2.migration.v1/V1MobileKeyReference.id|{}id[0]
+        final fun <get-id>(): id.walt.crypto2.keys/KeyId // id.walt.crypto2.migration.v1/V1MobileKeyReference.id.<get-id>|<get-id>(){}[0]
+    final val keyMaterial // id.walt.crypto2.migration.v1/V1MobileKeyReference.keyMaterial|{}keyMaterial[0]
+        final fun <get-keyMaterial>(): kotlin/String? // id.walt.crypto2.migration.v1/V1MobileKeyReference.keyMaterial.<get-keyMaterial>|<get-keyMaterial>(){}[0]
+    final val keyType // id.walt.crypto2.migration.v1/V1MobileKeyReference.keyType|{}keyType[0]
+        final fun <get-keyType>(): kotlin/String // id.walt.crypto2.migration.v1/V1MobileKeyReference.keyType.<get-keyType>|<get-keyType>(){}[0]
+    final val platform // id.walt.crypto2.migration.v1/V1MobileKeyReference.platform|{}platform[0]
+        final fun <get-platform>(): id.walt.crypto2.migration.v1/V1MobilePlatform // id.walt.crypto2.migration.v1/V1MobileKeyReference.platform.<get-platform>|<get-platform>(){}[0]
+    final val platformBacked // id.walt.crypto2.migration.v1/V1MobileKeyReference.platformBacked|{}platformBacked[0]
+        final fun <get-platformBacked>(): kotlin/Boolean // id.walt.crypto2.migration.v1/V1MobileKeyReference.platformBacked.<get-platformBacked>|<get-platformBacked>(){}[0]
+    final val usages // id.walt.crypto2.migration.v1/V1MobileKeyReference.usages|{}usages[0]
+        final fun <get-usages>(): kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage> // id.walt.crypto2.migration.v1/V1MobileKeyReference.usages.<get-usages>|<get-usages>(){}[0]
+
+    final fun component1(): id.walt.crypto2.keys/KeyId // id.walt.crypto2.migration.v1/V1MobileKeyReference.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.crypto2.migration.v1/V1MobileKeyReference.component2|component2(){}[0]
+    final fun component3(): id.walt.crypto2.migration.v1/V1MobilePlatform // id.walt.crypto2.migration.v1/V1MobileKeyReference.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // id.walt.crypto2.migration.v1/V1MobileKeyReference.component4|component4(){}[0]
+    final fun component5(): kotlin/String? // id.walt.crypto2.migration.v1/V1MobileKeyReference.component5|component5(){}[0]
+    final fun component6(): kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage> // id.walt.crypto2.migration.v1/V1MobileKeyReference.component6|component6(){}[0]
+    final fun copy(id.walt.crypto2.keys/KeyId = ..., kotlin/String = ..., id.walt.crypto2.migration.v1/V1MobilePlatform = ..., kotlin/Boolean = ..., kotlin/String? = ..., kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage> = ...): id.walt.crypto2.migration.v1/V1MobileKeyReference // id.walt.crypto2.migration.v1/V1MobileKeyReference.copy|copy(id.walt.crypto2.keys.KeyId;kotlin.String;id.walt.crypto2.migration.v1.V1MobilePlatform;kotlin.Boolean;kotlin.String?;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.migration.v1/V1MobileKeyReference.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.migration.v1/V1MobileKeyReference.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.migration.v1/V1MobileKeyReference.toString|toString(){}[0]
+}
+
+sealed class id.walt.crypto2.migration.v1/V1KeyMigrationException : kotlin/IllegalArgumentException { // id.walt.crypto2.migration.v1/V1KeyMigrationException|null[0]
+    final class MissingKeyMaterial : id.walt.crypto2.migration.v1/V1KeyMigrationException { // id.walt.crypto2.migration.v1/V1KeyMigrationException.MissingKeyMaterial|null[0]
+        constructor <init>(id.walt.crypto2.keys/KeyId) // id.walt.crypto2.migration.v1/V1KeyMigrationException.MissingKeyMaterial.<init>|<init>(id.walt.crypto2.keys.KeyId){}[0]
+    }
+
+    final class MissingManagedMigrator : id.walt.crypto2.migration.v1/V1KeyMigrationException { // id.walt.crypto2.migration.v1/V1KeyMigrationException.MissingManagedMigrator|null[0]
+        constructor <init>(kotlin/String) // id.walt.crypto2.migration.v1/V1KeyMigrationException.MissingManagedMigrator.<init>|<init>(kotlin.String){}[0]
+    }
+
+    final class MissingPlatformMigrator : id.walt.crypto2.migration.v1/V1KeyMigrationException { // id.walt.crypto2.migration.v1/V1KeyMigrationException.MissingPlatformMigrator|null[0]
+        constructor <init>(id.walt.crypto2.migration.v1/V1MobilePlatform) // id.walt.crypto2.migration.v1/V1KeyMigrationException.MissingPlatformMigrator.<init>|<init>(id.walt.crypto2.migration.v1.V1MobilePlatform){}[0]
+    }
+}

@@ -10,12 +10,10 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.did.dids.DidService
-import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import id.walt.ktorauthnz.sessions.AuthSessionStatus
-import id.walt.ktorauthnz.tokens.jwttoken.JwtTokenHandler
-import id.walt.wallet2.auth.OSSWallet2AccountStore
 import id.walt.wallet2.auth.RegisterRequest
+import id.walt.wallet2.auth.configureWallet2Auth
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import id.walt.wallet2.server.handlers.CreateWalletRequest
 import id.walt.ktorauthnz.auth.ktorAuthnz
@@ -63,7 +61,7 @@ class Wallet2AuthIntegrationTest {
         )
 
         // Reset the in-memory wallet store between tests so port reuse is safe
-        OSSWallet2Service.walletStore = id.walt.wallet2.stores.inmemory.InMemoryWalletStore()
+        OSSWallet2Service.configureInMemory()
 
         E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
@@ -81,22 +79,14 @@ class Wallet2AuthIntegrationTest {
                     "wallet-service",
                     OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port"))
                 )
-                // Preload so FeatureManager picks it up; the actual wiring happens in init below.
+                // Load this through configureWallet2Auth(), as production startup does.
                 ConfigManager.preloadConfig("auth", authConfig)
             },
-            init = {
-                DidService.minimalInit()
-                // Wire JwtTokenHandler directly - mirrors what configureWallet2Auth() does at runtime.
-                // The same key is used here so tokens issued by the test server are verifiable.
-                KtorAuthnzManager.accountStore = OSSWallet2AccountStore
-                KtorAuthnzManager.tokenHandler = JwtTokenHandler().apply {
-                    this.signingKey = signingKey
-                    verificationKey = signingKey
-                }
+            init = { DidService.minimalInit() },
+            module = {
+                val loadedAuthConfig = runBlocking { configureWallet2Auth() }
+                wallet2Module(withPlugins = false, authConfig = loadedAuthConfig)
             },
-            // wallet2Module is non-suspend; authConfig is passed in so registerWallet2AuthRoutes
-            // uses the configured tokenExpirySeconds without requiring another ConfigManager call.
-            module = { wallet2Module(withPlugins = false, authConfig = authConfig) }
         ) {
             val http = testHttpClient()
 
@@ -140,6 +130,18 @@ class Wallet2AuthIntegrationTest {
                     delta in (1.hours - tolerance)..(1.hours + tolerance),
                     "exp delta=$delta, expected ~1h (tokenExpiry=1h)"
                 )
+            }
+
+            testAndReturn("Named stores are not exposed in authenticated mode") {
+                http.get("/stores/keys") { bearerAuth(token) }
+                    .also { assertEquals(HttpStatusCode.NotFound, it.status) }
+            }
+
+            testAndReturn("Authenticated wallet cannot attach a global named store") {
+                http.post("/wallet") {
+                    bearerAuth(token)
+                    setBody(CreateWalletRequest(keyStoreIds = listOf("foreign-store")))
+                }.also { assertEquals(HttpStatusCode.BadRequest, it.status) }
             }
 
             // 4. Create wallet while authenticated → auto-linked to account
@@ -190,6 +192,19 @@ class Wallet2AuthIntegrationTest {
                 http.get("/wallet/$walletId") {
                     bearerAuth(token2)
                 }.also { assertEquals(HttpStatusCode.Forbidden, it.status) }
+            }
+            testAndReturn("Second account cannot link first account's wallet → 403") {
+                http.post("/auth/account/wallets/$walletId") {
+                    bearerAuth(token2)
+                }.also { assertEquals(HttpStatusCode.Forbidden, it.status) }
+            }
+            testAndReturn("Second account cannot delete first account's wallet → 403") {
+                http.delete("/wallet/$walletId") {
+                    bearerAuth(token2)
+                }.also { assertEquals(HttpStatusCode.Forbidden, it.status) }
+                http.get("/wallet/$walletId") {
+                    bearerAuth(token)
+                }.also { assertEquals(HttpStatusCode.OK, it.status) }
             }
 
             // 9. Logout returns 200 (JWTs are stateless; the token remains valid until exp)

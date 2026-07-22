@@ -4,11 +4,19 @@ import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.util.Base64URL
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.migration.v1.V1KeyMigration
+import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import kotlinx.serialization.json.jsonObject
 import org.bouncycastle.jce.ECNamedCurveTable
 import org.bouncycastle.util.encoders.Hex
 import java.math.BigInteger
 
 object TestResources {
+    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
 
 
     /**
@@ -36,5 +44,13 @@ object TestResources {
         // 5. Wrap in your JWKKey class
         return JWKKey(ecKey)
     }
+
+    suspend fun migrateToCrypto2(key: JWKKey) = runtime.restore(
+        V1KeyMigration().migrate(
+            recordId = KeyId(key.getKeyId()),
+            serialized = KeySerialization.serializeKeyToJson(key).jsonObject,
+            usages = setOf(KeyUsage.KEY_AGREEMENT),
+        )
+    )
 
 }

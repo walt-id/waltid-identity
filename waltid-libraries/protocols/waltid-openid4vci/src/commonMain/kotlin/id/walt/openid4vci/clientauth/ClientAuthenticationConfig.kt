@@ -1,8 +1,11 @@
+@file:Suppress("DEPRECATION")
+
 package id.walt.openid4vci.clientauth
 
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationKeyReferenceResolver
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
+import id.walt.openid4vci.clientauth.attestation.verifier.Crypto2ClientAttestationKeyReferenceResolver
 import id.walt.openid4vci.clientauth.attestation.verifier.toClientAttestationConfig
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -35,10 +38,11 @@ data class ClientAuthenticationConfig(
 
     suspend fun toClientAuthenticationServiceConfig(
         keyReferenceResolver: ClientAttestationKeyReferenceResolver? = null,
+        crypto2KeyReferenceResolver: Crypto2ClientAttestationKeyReferenceResolver? = null,
     ): ClientAuthenticationServiceConfig {
         val attestationMethod = clientAttestationMethod()
             ?.config
-            ?.toClientAttestationConfig(keyReferenceResolver)
+            ?.toClientAttestationConfig(keyReferenceResolver, crypto2KeyReferenceResolver)
             ?.toAuthenticationMethod()
             ?: return ClientAuthenticationServiceConfig()
 
@@ -51,6 +55,14 @@ data class ClientAuthenticationConfig(
             )
         )
     }
+
+    @Deprecated("Retained for binary compatibility", level = DeprecationLevel.HIDDEN)
+    suspend fun toClientAuthenticationServiceConfig(
+        keyReferenceResolver: ClientAttestationKeyReferenceResolver? = null,
+    ): ClientAuthenticationServiceConfig = toClientAuthenticationServiceConfig(
+        keyReferenceResolver = keyReferenceResolver,
+        crypto2KeyReferenceResolver = null,
+    )
 }
 
 @Serializable

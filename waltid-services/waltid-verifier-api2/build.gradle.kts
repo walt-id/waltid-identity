@@ -85,6 +85,8 @@ dependencies {
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier-openapi"))
     implementation(project(":waltid-libraries:protocols:waltid-18013-7-verifier"))
+    implementation(project(":waltid-libraries:crypto:waltid-jose"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
     implementation(project(":waltid-libraries:web:waltid-ktor-notifications"))
 }
 

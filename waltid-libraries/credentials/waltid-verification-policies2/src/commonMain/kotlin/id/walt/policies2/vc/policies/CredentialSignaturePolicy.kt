@@ -1,135 +1,67 @@
 package id.walt.policies2.vc.policies
 
+import id.walt.credentials.formats.Crypto2DigitalCredential
+import id.walt.credentials.formats.Crypto2VerificationAlgorithms
 import id.walt.credentials.formats.DigitalCredential
-import io.github.oshai.kotlinlogging.KotlinLogging
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.toPublicJwk
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.put
 
 @Serializable
 @SerialName("signature")
-class CredentialSignaturePolicy : CredentialVerificationPolicy2() {
+class CredentialSignaturePolicy(
+    private val allowedJwsAlgorithms: Set<String> = DEFAULT_JWS_ALGORITHMS,
+    private val allowedCoseAlgorithms: Set<Int> = DEFAULT_COSE_ALGORITHMS,
+) : CredentialVerificationPolicy2() {
     override val id = "signature"
 
     companion object {
-        private val log = KotlinLogging.logger { }
+        private val DEFAULT_JWS_ALGORITHMS = JwsAlgorithm.entries.mapTo(mutableSetOf(), JwsAlgorithm::identifier)
+        private val DEFAULT_COSE_ALGORITHMS = setOf(-7, -35, -36, -8, -37, -38, -39, -257, -258, -259)
     }
 
     override suspend fun verify(
         credential: DigitalCredential,
-        context: PolicyExecutionContext
-    ): Result<JsonObject> {
-        /* TODO: Cleanup and extend result messages and logging
-
-        val issuer = credential.issuer
-
-        val possibleKeys: List<Result<Key>> = when {
-            issuer != null && DidUtils.isDidUrl(issuer)
-                -> DidService.resolveToKeys(issuer).map { p ->
-                p.toList().map { Result.success(it) }
-            }.getOrElse { listOf(Result.failure(it)) }
-
-            credential.signature is JwtBasedSignature && (credential.signature as JwtBasedSignature).jwtHeader?.containsKey("x5c") == true -> {
-                val x5c = (credential.signature as JwtBasedSignature).jwtHeader!!["x5c"]!!.jsonArray
-                log.trace { "Found x5c: $x5c" }
-
-                 // TODO: Proper certificate chain parsing
-                x5c.map { x5cElem ->
-                    val pem = x5cToPemCertificate(x5cElem.jsonPrimitive.content)
-                    log.trace { "Handling converted x5c element: $pem" }
-                    JWKKey.importPEM(pem).mapCatching { importedPemKey ->
-                        JWKKey(importedPemKey.exportJWK(), credential.issuer)
-                    }
-                }
-
-            }
-
-            issuer != null && !DidUtils.isDidUrl(issuer) -> throw IllegalArgumentException("Issuer is not a DID: \"$issuer\"")
-            else -> throw IllegalArgumentException("Cannot determine any public key for issuer: \"$issuer\" - this is supposed to be some kind of DID, x5c certificate, etc.")
-        }
-
-        when {
-            possibleKeys.isEmpty() -> return Result.failure(IllegalArgumentException("Failed to find a key to verify credential signature against, for credential: $credential"))
-            possibleKeys.none { it.isSuccess } -> return Result.failure(IllegalArgumentException("All keys failed to parse, cannot verify credential signature, for credential: $credential, errors: ${possibleKeys.map { it.exceptionOrNull() }}"))
-        }
-
-        if (possibleKeys.isEmpty()) {
-            return Result.failure(
-                IllegalArgumentException(
-                    "Failed to find a key to verify credential signature against, for credential: $credential"
-                )
+        context: PolicyExecutionContext,
+    ): Result<JsonObject> = try {
+        val crypto2Credential = credential as? Crypto2DigitalCredential
+            ?: throw UnsupportedOperationException(
+                "Crypto2 signature verification is not supported for ${credential::class.simpleName}"
             )
-        }
-
-        val keys = possibleKeys.filter { it.isSuccess }.map { it.getOrThrow() }*/
-
-        // Use new generic getSignerKey method:
-        val signerKey = credential.getSignerKey() ?: return Result.failure(
-            IllegalArgumentException(
-                "Failed to retrieve issuer key to verify credential signature against, for credential: $credential",
+        val signerKey = crypto2Credential.getSignerCrypto2Key()
+            ?: throw IllegalArgumentException("Failed to resolve the credential signer key")
+        val verifiedData = crypto2Credential.verifyCrypto2(
+            signerKey,
+            Crypto2VerificationAlgorithms(
+                jws = allowedJwsAlgorithms.mapTo(mutableSetOf(), JwsAlgorithm::parse),
+                cose = allowedCoseAlgorithms,
+            ),
+        ).getOrThrow()
+        val exported = signerKey.capabilities.publicKeyExporter?.exportPublicKey()
+            ?: throw IllegalArgumentException("Verified crypto2 key is not exportable")
+        val jwk = exported.toPublicJwk(signerKey.spec)
+        Result.success(buildJsonObject {
+            put("verification_result", true)
+            put("signed_credential", JsonPrimitive(credential.signed))
+            put("credential_signature", Json.encodeToJsonElement(credential.signature))
+            put("verified_data", verifiedData)
+            put(
+                "successful_issuer_public_key",
+                Json.parseToJsonElement(jwk.data.toByteArray().decodeToString()),
             )
-        )
-
-        val verificationResult = credential.verify(signerKey)
-
-        if (verificationResult.isSuccess) {
-            return Result.success(buildJsonObject {
-                put("verification_result", JsonPrimitive(verificationResult.isSuccess))
-                // Signed form that was verified
-                put("signed_credential", JsonPrimitive(credential.signed))
-                put("credential_signature", Json.encodeToJsonElement(credential.signature))
-                put("verified_data", verificationResult.getOrNull() ?: JsonNull)
-                put("successful_issuer_public_key", signerKey.exportJWKObject())
-                put("successful_issuer_public_key_id", JsonPrimitive(signerKey.getKeyId()))
-
-                /*
-                if (failedVerificationResults.isNotEmpty()) {
-                    val failedMap = failedVerificationResults.associate { (key, result) -> key.getKeyId() to result.message }
-                    putJsonObject("previous_failed_verification_results") {
-                        failedMap.forEach { (keyId, errorMessage) ->
-                            put(keyId, JsonPrimitive(errorMessage))
-                        }
-                    }
-                }*/
-            })
-        }
-
-        /*
-                val failedVerificationResults = ArrayList<Pair<Key, Throwable>>()
-
-                keys.forEach { issuerPublicKeyEntry ->
-                    val verificationResult = credential.verify(issuerPublicKeyEntry)
-
-                    if (verificationResult.isSuccess) {
-                        return Result.success(buildJsonObject {
-                            put("verification_result", JsonPrimitive(verificationResult.isSuccess))
-                            // Signed form that was verified
-                            put("signed_credential", JsonPrimitive(credential.signed))
-                            put("credential_signature", Json.encodeToJsonElement(credential.signature))
-                            put("verified_data", verificationResult.getOrNull() ?: JsonNull)
-                            put("successful_issuer_public_key", issuerPublicKeyEntry.exportJWKObject())
-                            put("successful_issuer_public_key_id", JsonPrimitive(issuerPublicKeyEntry.getKeyId()))
-
-                            if (failedVerificationResults.isNotEmpty()) {
-                                val failedMap = failedVerificationResults.associate { (key, result) -> key.getKeyId() to result.message }
-                                putJsonObject("previous_failed_verification_results") {
-                                    failedMap.forEach { (keyId, errorMessage) ->
-                                        put(keyId, JsonPrimitive(errorMessage))
-                                    }
-                                }
-                            }
-                        })
-                    }
-
-                    failedVerificationResults += (issuerPublicKeyEntry to verificationResult.exceptionOrNull()!!)
-                }*/
-
-        // All keys failed:
-        return Result.failure(
-            IllegalArgumentException(
-                "Failed to verify credential signature, for credential: $credential",
-                //failedVerificationResults.last().second
-            )
-        )
+            put("successful_issuer_public_key_id", signerKey.id.value)
+        })
+    } catch (cause: CancellationException) {
+        throw cause
+    } catch (cause: Throwable) {
+        Result.failure(cause)
     }
 }

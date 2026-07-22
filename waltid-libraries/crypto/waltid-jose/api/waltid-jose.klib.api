@@ -1,0 +1,200 @@
+// Klib ABI Dump
+// Targets: [js, linuxArm64, linuxX64, macosArm64, macosX64, mingwX64, wasmJs]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <id.walt.crypto2:waltid-jose>
+final enum class id.walt.crypto2.jose/JweContentEncryption : kotlin/Enum<id.walt.crypto2.jose/JweContentEncryption> { // id.walt.crypto2.jose/JweContentEncryption|null[0]
+    enum entry A128GCM // id.walt.crypto2.jose/JweContentEncryption.A128GCM|null[0]
+    enum entry A256GCM // id.walt.crypto2.jose/JweContentEncryption.A256GCM|null[0]
+
+    final val entries // id.walt.crypto2.jose/JweContentEncryption.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.crypto2.jose/JweContentEncryption> // id.walt.crypto2.jose/JweContentEncryption.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val identifier // id.walt.crypto2.jose/JweContentEncryption.identifier|{}identifier[0]
+        final fun <get-identifier>(): kotlin/String // id.walt.crypto2.jose/JweContentEncryption.identifier.<get-identifier>|<get-identifier>(){}[0]
+    final val keySizeBytes // id.walt.crypto2.jose/JweContentEncryption.keySizeBytes|{}keySizeBytes[0]
+        final fun <get-keySizeBytes>(): kotlin/Int // id.walt.crypto2.jose/JweContentEncryption.keySizeBytes.<get-keySizeBytes>|<get-keySizeBytes>(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.crypto2.jose/JweContentEncryption // id.walt.crypto2.jose/JweContentEncryption.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.crypto2.jose/JweContentEncryption> // id.walt.crypto2.jose/JweContentEncryption.values|values#static(){}[0]
+
+    final object Companion { // id.walt.crypto2.jose/JweContentEncryption.Companion|null[0]
+        final fun parse(kotlin/String): id.walt.crypto2.jose/JweContentEncryption // id.walt.crypto2.jose/JweContentEncryption.Companion.parse|parse(kotlin.String){}[0]
+    }
+}
+
+final enum class id.walt.crypto2.jose/JwkOperation : kotlin/Enum<id.walt.crypto2.jose/JwkOperation> { // id.walt.crypto2.jose/JwkOperation|null[0]
+    enum entry DECRYPT // id.walt.crypto2.jose/JwkOperation.DECRYPT|null[0]
+    enum entry DERIVE_BITS // id.walt.crypto2.jose/JwkOperation.DERIVE_BITS|null[0]
+    enum entry DERIVE_KEY // id.walt.crypto2.jose/JwkOperation.DERIVE_KEY|null[0]
+    enum entry ENCRYPT // id.walt.crypto2.jose/JwkOperation.ENCRYPT|null[0]
+    enum entry SIGN // id.walt.crypto2.jose/JwkOperation.SIGN|null[0]
+    enum entry UNWRAP_KEY // id.walt.crypto2.jose/JwkOperation.UNWRAP_KEY|null[0]
+    enum entry VERIFY // id.walt.crypto2.jose/JwkOperation.VERIFY|null[0]
+    enum entry WRAP_KEY // id.walt.crypto2.jose/JwkOperation.WRAP_KEY|null[0]
+
+    final val entries // id.walt.crypto2.jose/JwkOperation.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.crypto2.jose/JwkOperation> // id.walt.crypto2.jose/JwkOperation.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val value // id.walt.crypto2.jose/JwkOperation.value|{}value[0]
+        final fun <get-value>(): kotlin/String // id.walt.crypto2.jose/JwkOperation.value.<get-value>|<get-value>(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.crypto2.jose/JwkOperation // id.walt.crypto2.jose/JwkOperation.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.crypto2.jose/JwkOperation> // id.walt.crypto2.jose/JwkOperation.values|values#static(){}[0]
+}
+
+final enum class id.walt.crypto2.jose/JwkUse : kotlin/Enum<id.walt.crypto2.jose/JwkUse> { // id.walt.crypto2.jose/JwkUse|null[0]
+    enum entry ENCRYPTION // id.walt.crypto2.jose/JwkUse.ENCRYPTION|null[0]
+    enum entry SIGNATURE // id.walt.crypto2.jose/JwkUse.SIGNATURE|null[0]
+
+    final val entries // id.walt.crypto2.jose/JwkUse.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.crypto2.jose/JwkUse> // id.walt.crypto2.jose/JwkUse.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val value // id.walt.crypto2.jose/JwkUse.value|{}value[0]
+        final fun <get-value>(): kotlin/String // id.walt.crypto2.jose/JwkUse.value.<get-value>|<get-value>(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.crypto2.jose/JwkUse // id.walt.crypto2.jose/JwkUse.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.crypto2.jose/JwkUse> // id.walt.crypto2.jose/JwkUse.values|values#static(){}[0]
+}
+
+final enum class id.walt.crypto2.jose/JwsAlgorithm : kotlin/Enum<id.walt.crypto2.jose/JwsAlgorithm> { // id.walt.crypto2.jose/JwsAlgorithm|null[0]
+    enum entry ED25519 // id.walt.crypto2.jose/JwsAlgorithm.ED25519|null[0]
+    enum entry ED448 // id.walt.crypto2.jose/JwsAlgorithm.ED448|null[0]
+    enum entry EDDSA // id.walt.crypto2.jose/JwsAlgorithm.EDDSA|null[0]
+    enum entry ES256 // id.walt.crypto2.jose/JwsAlgorithm.ES256|null[0]
+    enum entry ES256K // id.walt.crypto2.jose/JwsAlgorithm.ES256K|null[0]
+    enum entry ES384 // id.walt.crypto2.jose/JwsAlgorithm.ES384|null[0]
+    enum entry ES512 // id.walt.crypto2.jose/JwsAlgorithm.ES512|null[0]
+    enum entry PS256 // id.walt.crypto2.jose/JwsAlgorithm.PS256|null[0]
+    enum entry PS384 // id.walt.crypto2.jose/JwsAlgorithm.PS384|null[0]
+    enum entry PS512 // id.walt.crypto2.jose/JwsAlgorithm.PS512|null[0]
+    enum entry RS256 // id.walt.crypto2.jose/JwsAlgorithm.RS256|null[0]
+    enum entry RS384 // id.walt.crypto2.jose/JwsAlgorithm.RS384|null[0]
+    enum entry RS512 // id.walt.crypto2.jose/JwsAlgorithm.RS512|null[0]
+
+    final val entries // id.walt.crypto2.jose/JwsAlgorithm.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.crypto2.jose/JwsAlgorithm> // id.walt.crypto2.jose/JwsAlgorithm.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val identifier // id.walt.crypto2.jose/JwsAlgorithm.identifier|{}identifier[0]
+        final fun <get-identifier>(): kotlin/String // id.walt.crypto2.jose/JwsAlgorithm.identifier.<get-identifier>|<get-identifier>(){}[0]
+
+    final fun toSignatureAlgorithm(): id.walt.crypto2.algorithms/SignatureAlgorithm // id.walt.crypto2.jose/JwsAlgorithm.toSignatureAlgorithm|toSignatureAlgorithm(){}[0]
+    final fun valueOf(kotlin/String): id.walt.crypto2.jose/JwsAlgorithm // id.walt.crypto2.jose/JwsAlgorithm.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.crypto2.jose/JwsAlgorithm> // id.walt.crypto2.jose/JwsAlgorithm.values|values#static(){}[0]
+
+    final object Companion { // id.walt.crypto2.jose/JwsAlgorithm.Companion|null[0]
+        final val fullySpecified // id.walt.crypto2.jose/JwsAlgorithm.Companion.fullySpecified|{}fullySpecified[0]
+            final fun <get-fullySpecified>(): kotlin.collections/Set<id.walt.crypto2.jose/JwsAlgorithm> // id.walt.crypto2.jose/JwsAlgorithm.Companion.fullySpecified.<get-fullySpecified>|<get-fullySpecified>(){}[0]
+
+        final fun parse(kotlin/String): id.walt.crypto2.jose/JwsAlgorithm // id.walt.crypto2.jose/JwsAlgorithm.Companion.parse|parse(kotlin.String){}[0]
+    }
+}
+
+final class id.walt.crypto2.jose/DecryptedJwe { // id.walt.crypto2.jose/DecryptedJwe|null[0]
+    constructor <init>(kotlinx.serialization.json/JsonObject, kotlin/ByteArray, id.walt.crypto2.jose/JweContentEncryption) // id.walt.crypto2.jose/DecryptedJwe.<init>|<init>(kotlinx.serialization.json.JsonObject;kotlin.ByteArray;id.walt.crypto2.jose.JweContentEncryption){}[0]
+
+    final val contentEncryption // id.walt.crypto2.jose/DecryptedJwe.contentEncryption|{}contentEncryption[0]
+        final fun <get-contentEncryption>(): id.walt.crypto2.jose/JweContentEncryption // id.walt.crypto2.jose/DecryptedJwe.contentEncryption.<get-contentEncryption>|<get-contentEncryption>(){}[0]
+    final val plaintext // id.walt.crypto2.jose/DecryptedJwe.plaintext|{}plaintext[0]
+        final fun <get-plaintext>(): kotlin/ByteArray // id.walt.crypto2.jose/DecryptedJwe.plaintext.<get-plaintext>|<get-plaintext>(){}[0]
+    final val protectedHeader // id.walt.crypto2.jose/DecryptedJwe.protectedHeader|{}protectedHeader[0]
+        final fun <get-protectedHeader>(): kotlinx.serialization.json/JsonObject // id.walt.crypto2.jose/DecryptedJwe.protectedHeader.<get-protectedHeader>|<get-protectedHeader>(){}[0]
+
+    final fun component1(): kotlinx.serialization.json/JsonObject // id.walt.crypto2.jose/DecryptedJwe.component1|component1(){}[0]
+    final fun component2(): kotlin/ByteArray // id.walt.crypto2.jose/DecryptedJwe.component2|component2(){}[0]
+    final fun component3(): id.walt.crypto2.jose/JweContentEncryption // id.walt.crypto2.jose/DecryptedJwe.component3|component3(){}[0]
+    final fun copy(kotlinx.serialization.json/JsonObject = ..., kotlin/ByteArray = ..., id.walt.crypto2.jose/JweContentEncryption = ...): id.walt.crypto2.jose/DecryptedJwe // id.walt.crypto2.jose/DecryptedJwe.copy|copy(kotlinx.serialization.json.JsonObject;kotlin.ByteArray;id.walt.crypto2.jose.JweContentEncryption){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.jose/DecryptedJwe.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.jose/DecryptedJwe.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.jose/DecryptedJwe.toString|toString(){}[0]
+}
+
+final class id.walt.crypto2.jose/InvalidJwsSignatureException : kotlin/IllegalArgumentException { // id.walt.crypto2.jose/InvalidJwsSignatureException|null[0]
+    constructor <init>() // id.walt.crypto2.jose/InvalidJwsSignatureException.<init>|<init>(){}[0]
+}
+
+final class id.walt.crypto2.jose/JwkMetadata { // id.walt.crypto2.jose/JwkMetadata|null[0]
+    constructor <init>(kotlin/String? = ..., id.walt.crypto2.jose/JwkUse? = ..., kotlin.collections/Set<id.walt.crypto2.jose/JwkOperation>? = ..., kotlin/String? = ...) // id.walt.crypto2.jose/JwkMetadata.<init>|<init>(kotlin.String?;id.walt.crypto2.jose.JwkUse?;kotlin.collections.Set<id.walt.crypto2.jose.JwkOperation>?;kotlin.String?){}[0]
+
+    final val algorithm // id.walt.crypto2.jose/JwkMetadata.algorithm|{}algorithm[0]
+        final fun <get-algorithm>(): kotlin/String? // id.walt.crypto2.jose/JwkMetadata.algorithm.<get-algorithm>|<get-algorithm>(){}[0]
+    final val keyId // id.walt.crypto2.jose/JwkMetadata.keyId|{}keyId[0]
+        final fun <get-keyId>(): kotlin/String? // id.walt.crypto2.jose/JwkMetadata.keyId.<get-keyId>|<get-keyId>(){}[0]
+    final val operations // id.walt.crypto2.jose/JwkMetadata.operations|{}operations[0]
+        final fun <get-operations>(): kotlin.collections/Set<id.walt.crypto2.jose/JwkOperation>? // id.walt.crypto2.jose/JwkMetadata.operations.<get-operations>|<get-operations>(){}[0]
+    final val use // id.walt.crypto2.jose/JwkMetadata.use|{}use[0]
+        final fun <get-use>(): id.walt.crypto2.jose/JwkUse? // id.walt.crypto2.jose/JwkMetadata.use.<get-use>|<get-use>(){}[0]
+
+    final fun component1(): kotlin/String? // id.walt.crypto2.jose/JwkMetadata.component1|component1(){}[0]
+    final fun component2(): id.walt.crypto2.jose/JwkUse? // id.walt.crypto2.jose/JwkMetadata.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/Set<id.walt.crypto2.jose/JwkOperation>? // id.walt.crypto2.jose/JwkMetadata.component3|component3(){}[0]
+    final fun component4(): kotlin/String? // id.walt.crypto2.jose/JwkMetadata.component4|component4(){}[0]
+    final fun copy(kotlin/String? = ..., id.walt.crypto2.jose/JwkUse? = ..., kotlin.collections/Set<id.walt.crypto2.jose/JwkOperation>? = ..., kotlin/String? = ...): id.walt.crypto2.jose/JwkMetadata // id.walt.crypto2.jose/JwkMetadata.copy|copy(kotlin.String?;id.walt.crypto2.jose.JwkUse?;kotlin.collections.Set<id.walt.crypto2.jose.JwkOperation>?;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.jose/JwkMetadata.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.jose/JwkMetadata.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.jose/JwkMetadata.toString|toString(){}[0]
+}
+
+final class id.walt.crypto2.jose/UnverifiedJws { // id.walt.crypto2.jose/UnverifiedJws|null[0]
+    constructor <init>(kotlinx.serialization.json/JsonObject, kotlin/ByteArray, id.walt.crypto2.jose/JwsAlgorithm) // id.walt.crypto2.jose/UnverifiedJws.<init>|<init>(kotlinx.serialization.json.JsonObject;kotlin.ByteArray;id.walt.crypto2.jose.JwsAlgorithm){}[0]
+
+    final val algorithm // id.walt.crypto2.jose/UnverifiedJws.algorithm|{}algorithm[0]
+        final fun <get-algorithm>(): id.walt.crypto2.jose/JwsAlgorithm // id.walt.crypto2.jose/UnverifiedJws.algorithm.<get-algorithm>|<get-algorithm>(){}[0]
+    final val payload // id.walt.crypto2.jose/UnverifiedJws.payload|{}payload[0]
+        final fun <get-payload>(): kotlin/ByteArray // id.walt.crypto2.jose/UnverifiedJws.payload.<get-payload>|<get-payload>(){}[0]
+    final val protectedHeader // id.walt.crypto2.jose/UnverifiedJws.protectedHeader|{}protectedHeader[0]
+        final fun <get-protectedHeader>(): kotlinx.serialization.json/JsonObject // id.walt.crypto2.jose/UnverifiedJws.protectedHeader.<get-protectedHeader>|<get-protectedHeader>(){}[0]
+
+    final fun component1(): kotlinx.serialization.json/JsonObject // id.walt.crypto2.jose/UnverifiedJws.component1|component1(){}[0]
+    final fun component2(): kotlin/ByteArray // id.walt.crypto2.jose/UnverifiedJws.component2|component2(){}[0]
+    final fun component3(): id.walt.crypto2.jose/JwsAlgorithm // id.walt.crypto2.jose/UnverifiedJws.component3|component3(){}[0]
+    final fun copy(kotlinx.serialization.json/JsonObject = ..., kotlin/ByteArray = ..., id.walt.crypto2.jose/JwsAlgorithm = ...): id.walt.crypto2.jose/UnverifiedJws // id.walt.crypto2.jose/UnverifiedJws.copy|copy(kotlinx.serialization.json.JsonObject;kotlin.ByteArray;id.walt.crypto2.jose.JwsAlgorithm){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.jose/UnverifiedJws.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.jose/UnverifiedJws.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.jose/UnverifiedJws.toString|toString(){}[0]
+}
+
+final class id.walt.crypto2.jose/VerifiedJws { // id.walt.crypto2.jose/VerifiedJws|null[0]
+    constructor <init>(kotlinx.serialization.json/JsonObject, kotlin/ByteArray, id.walt.crypto2.jose/JwsAlgorithm) // id.walt.crypto2.jose/VerifiedJws.<init>|<init>(kotlinx.serialization.json.JsonObject;kotlin.ByteArray;id.walt.crypto2.jose.JwsAlgorithm){}[0]
+
+    final val algorithm // id.walt.crypto2.jose/VerifiedJws.algorithm|{}algorithm[0]
+        final fun <get-algorithm>(): id.walt.crypto2.jose/JwsAlgorithm // id.walt.crypto2.jose/VerifiedJws.algorithm.<get-algorithm>|<get-algorithm>(){}[0]
+    final val payload // id.walt.crypto2.jose/VerifiedJws.payload|{}payload[0]
+        final fun <get-payload>(): kotlin/ByteArray // id.walt.crypto2.jose/VerifiedJws.payload.<get-payload>|<get-payload>(){}[0]
+    final val protectedHeader // id.walt.crypto2.jose/VerifiedJws.protectedHeader|{}protectedHeader[0]
+        final fun <get-protectedHeader>(): kotlinx.serialization.json/JsonObject // id.walt.crypto2.jose/VerifiedJws.protectedHeader.<get-protectedHeader>|<get-protectedHeader>(){}[0]
+
+    final fun component1(): kotlinx.serialization.json/JsonObject // id.walt.crypto2.jose/VerifiedJws.component1|component1(){}[0]
+    final fun component2(): kotlin/ByteArray // id.walt.crypto2.jose/VerifiedJws.component2|component2(){}[0]
+    final fun component3(): id.walt.crypto2.jose/JwsAlgorithm // id.walt.crypto2.jose/VerifiedJws.component3|component3(){}[0]
+    final fun copy(kotlinx.serialization.json/JsonObject = ..., kotlin/ByteArray = ..., id.walt.crypto2.jose/JwsAlgorithm = ...): id.walt.crypto2.jose/VerifiedJws // id.walt.crypto2.jose/VerifiedJws.copy|copy(kotlinx.serialization.json.JsonObject;kotlin.ByteArray;id.walt.crypto2.jose.JwsAlgorithm){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.jose/VerifiedJws.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.jose/VerifiedJws.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.jose/VerifiedJws.toString|toString(){}[0]
+}
+
+final object id.walt.crypto2.jose/CompactJwe { // id.walt.crypto2.jose/CompactJwe|null[0]
+    final suspend fun decrypt(kotlin/String, id.walt.crypto2.keys/Key, kotlin.collections/Set<id.walt.crypto2.jose/JweContentEncryption>, dev.whyoleg.cryptography/CryptographyProvider = ...): id.walt.crypto2.jose/DecryptedJwe // id.walt.crypto2.jose/CompactJwe.decrypt|decrypt(kotlin.String;id.walt.crypto2.keys.Key;kotlin.collections.Set<id.walt.crypto2.jose.JweContentEncryption>;dev.whyoleg.cryptography.CryptographyProvider){}[0]
+    final suspend fun encrypt(kotlin/ByteArray, id.walt.crypto2.keys/EncodedKey.Jwk, id.walt.crypto2.jose/JweContentEncryption, kotlinx.serialization.json/JsonObject = ..., kotlin/ByteArray = ..., kotlin/ByteArray = ..., dev.whyoleg.cryptography/CryptographyProvider = ...): kotlin/String // id.walt.crypto2.jose/CompactJwe.encrypt|encrypt(kotlin.ByteArray;id.walt.crypto2.keys.EncodedKey.Jwk;id.walt.crypto2.jose.JweContentEncryption;kotlinx.serialization.json.JsonObject;kotlin.ByteArray;kotlin.ByteArray;dev.whyoleg.cryptography.CryptographyProvider){}[0]
+}
+
+final object id.walt.crypto2.jose/CompactJws { // id.walt.crypto2.jose/CompactJws|null[0]
+    final fun decodeUnverified(kotlin/String): id.walt.crypto2.jose/UnverifiedJws // id.walt.crypto2.jose/CompactJws.decodeUnverified|decodeUnverified(kotlin.String){}[0]
+    final suspend fun sign(kotlin/ByteArray, id.walt.crypto2.keys/Key, id.walt.crypto2.jose/JwsAlgorithm, kotlinx.serialization.json/JsonObject = ...): kotlin/String // id.walt.crypto2.jose/CompactJws.sign|sign(kotlin.ByteArray;id.walt.crypto2.keys.Key;id.walt.crypto2.jose.JwsAlgorithm;kotlinx.serialization.json.JsonObject){}[0]
+    final suspend fun verify(kotlin/String, id.walt.crypto2.keys/Key, id.walt.crypto2.jose/JwsAlgorithm): id.walt.crypto2.jose/VerifiedJws // id.walt.crypto2.jose/CompactJws.verify|verify(kotlin.String;id.walt.crypto2.keys.Key;id.walt.crypto2.jose.JwsAlgorithm){}[0]
+    final suspend fun verify(kotlin/String, id.walt.crypto2.keys/Key, kotlin.collections/Set<id.walt.crypto2.jose/JwsAlgorithm>): id.walt.crypto2.jose/VerifiedJws // id.walt.crypto2.jose/CompactJws.verify|verify(kotlin.String;id.walt.crypto2.keys.Key;kotlin.collections.Set<id.walt.crypto2.jose.JwsAlgorithm>){}[0]
+}
+
+final object id.walt.crypto2.jose/Jwk { // id.walt.crypto2.jose/Jwk|null[0]
+    final fun containsPrivateMaterial(kotlinx.serialization.json/JsonObject): kotlin/Boolean // id.walt.crypto2.jose/Jwk.containsPrivateMaterial|containsPrivateMaterial(kotlinx.serialization.json.JsonObject){}[0]
+    final fun metadata(id.walt.crypto2.keys/EncodedKey.Jwk): id.walt.crypto2.jose/JwkMetadata // id.walt.crypto2.jose/Jwk.metadata|metadata(id.walt.crypto2.keys.EncodedKey.Jwk){}[0]
+    final fun parse(id.walt.crypto2.keys/EncodedKey.Jwk): kotlinx.serialization.json/JsonObject // id.walt.crypto2.jose/Jwk.parse|parse(id.walt.crypto2.keys.EncodedKey.Jwk){}[0]
+    final fun parse(kotlin/ByteArray): kotlinx.serialization.json/JsonObject // id.walt.crypto2.jose/Jwk.parse|parse(kotlin.ByteArray){}[0]
+    final fun withMetadata(id.walt.crypto2.keys/EncodedKey.Jwk, id.walt.crypto2.jose/JwkMetadata): id.walt.crypto2.keys/EncodedKey.Jwk // id.walt.crypto2.jose/Jwk.withMetadata|withMetadata(id.walt.crypto2.keys.EncodedKey.Jwk;id.walt.crypto2.jose.JwkMetadata){}[0]
+    final suspend fun sha256Thumbprint(id.walt.crypto2.keys/EncodedKey.Jwk, dev.whyoleg.cryptography/CryptographyProvider = ...): kotlin/String // id.walt.crypto2.jose/Jwk.sha256Thumbprint|sha256Thumbprint(id.walt.crypto2.keys.EncodedKey.Jwk;dev.whyoleg.cryptography.CryptographyProvider){}[0]
+}
+
+final fun (id.walt.crypto2.keys/Key).id.walt.crypto2.jose/preferredJwsAlgorithm(): id.walt.crypto2.jose/JwsAlgorithm // id.walt.crypto2.jose/preferredJwsAlgorithm|preferredJwsAlgorithm@id.walt.crypto2.keys.Key(){}[0]
+final fun (id.walt.crypto2.keys/Key).id.walt.crypto2.jose/selectJwsAlgorithm(kotlin.collections/Set<kotlin/String>?): id.walt.crypto2.jose/JwsAlgorithm // id.walt.crypto2.jose/selectJwsAlgorithm|selectJwsAlgorithm@id.walt.crypto2.keys.Key(kotlin.collections.Set<kotlin.String>?){}[0]
+final fun (id.walt.crypto2.keys/KeySpec).id.walt.crypto2.jose/defaultJwsAlgorithm(): id.walt.crypto2.jose/JwsAlgorithm // id.walt.crypto2.jose/defaultJwsAlgorithm|defaultJwsAlgorithm@id.walt.crypto2.keys.KeySpec(){}[0]
+final fun (id.walt.crypto2.keys/KeySpec).id.walt.crypto2.jose/supportsJwsAlgorithm(id.walt.crypto2.jose/JwsAlgorithm): kotlin/Boolean // id.walt.crypto2.jose/supportsJwsAlgorithm|supportsJwsAlgorithm@id.walt.crypto2.keys.KeySpec(id.walt.crypto2.jose.JwsAlgorithm){}[0]
+final fun (id.walt.crypto2.keys/StoredKey).id.walt.crypto2.jose/preferredJwsAlgorithm(): id.walt.crypto2.jose/JwsAlgorithm // id.walt.crypto2.jose/preferredJwsAlgorithm|preferredJwsAlgorithm@id.walt.crypto2.keys.StoredKey(){}[0]

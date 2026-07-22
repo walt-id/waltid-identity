@@ -1,6 +1,9 @@
 package id.walt.w3c.vc.vcs
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDMap
@@ -55,6 +58,7 @@ data class W3CVC(
         }
     }
 
+    @Deprecated("Use the crypto2 overload accepting a Key and JwsAlgorithm")
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -71,46 +75,46 @@ data class W3CVC(
         additionalJwtOptions: Map<String, JsonElement> = emptyMap()
     ): String {
         val kid = issuerKid ?: issuerKey.getKeyId()
-        val wrapInVc = !isV2()
-        val payload = JwsSignatureScheme().toPayload(
-            data = this.toJsonObject(),
-            jwtOptions = mapOf(
-                JwsOption.ISSUER to JsonPrimitive(issuerId),
-                JwsOption.SUBJECT to JsonPrimitive(subjectDid),
-                *(additionalJwtOptions.entries.map { it.toPair() }.toTypedArray())
-            ),
-            wrapInVc = wrapInVc
-        )
-
-        val sdPayload = SDPayload.createSDPayload(
-            payload,
-            if (wrapInVc) {
-                SDMapBuilder(disclosureMap.decoyMode).addField(
-                    JwsOption.VC,
-                    sd = false,
-                    children = disclosureMap
-                ).build()
-            } else {
-                disclosureMap
-            }
-        )
-        val signable = Json.encodeToString(sdPayload.undisclosedPayload).encodeToByteArray()
-
-        // Per vc-jose-cose §securing-vcs-with-sd-jwt, the typ header for W3C VCDM secured
-        // with SD-JWT should be "vc+sd-jwt" regardless of VCDM version.
-        val typHeader = "vc+sd-jwt"
+        val input = sdJwtSigningInput(issuerId, subjectDid, disclosureMap, additionalJwtOptions)
         val signed = issuerKey.signJws(
-            signable, mapOf(
+            input.signable, mapOf(
                 JwsHeader.KEY_ID to kid.toJsonElement(),
-                "typ" to typHeader.toJsonElement()
+                "typ" to input.typ.toJsonElement()
             ).plus(additionalJwtHeaders)
         )
         return SDJwt.createFromSignedJwt(
             signedJwt = signed,
-            sdPayload = sdPayload
+            sdPayload = input.payload
         ).toString().plus("~")
     }
 
+    @JsExport.Ignore
+    suspend fun signSdJwt(
+        issuerKey: Crypto2Key,
+        algorithm: JwsAlgorithm,
+        issuerId: String,
+        issuerKid: String? = null,
+        subjectDid: String,
+        disclosureMap: SDMap,
+        additionalJwtHeaders: Map<String, JsonElement> = emptyMap(),
+        additionalJwtOptions: Map<String, JsonElement> = emptyMap(),
+    ): String {
+        val input = sdJwtSigningInput(issuerId, subjectDid, disclosureMap, additionalJwtOptions)
+        val signed = CompactJws.sign(
+            payload = input.signable,
+            key = issuerKey,
+            algorithm = algorithm,
+            protectedHeader = JsonObject(
+                mapOf(
+                    JwsHeader.KEY_ID to JsonPrimitive(issuerKid ?: issuerKey.id.value),
+                    "typ" to JsonPrimitive(input.typ),
+                ) + additionalJwtHeaders
+            ),
+        )
+        return SDJwt.createFromSignedJwt(signed, input.payload).toString().plus("~")
+    }
+
+    @Deprecated("Use the crypto2 overload accepting a Key and JwsAlgorithm")
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -142,6 +146,75 @@ data class W3CVC(
                 *(additionalJwtOptions.entries.map { it.toPair() }.toTypedArray())
             ),
             wrapInVc = !isV2()
+        )
+    }
+
+    private fun sdJwtSigningInput(
+        issuerId: String,
+        subjectDid: String,
+        disclosureMap: SDMap,
+        additionalJwtOptions: Map<String, JsonElement>,
+    ): SdJwtSigningInput {
+        val wrapInVc = !isV2()
+        val payload = JwsSignatureScheme().toPayload(
+            data = toJsonObject(),
+            jwtOptions = mapOf(
+                JwsOption.ISSUER to JsonPrimitive(issuerId),
+                JwsOption.SUBJECT to JsonPrimitive(subjectDid),
+                *(additionalJwtOptions.entries.map { it.toPair() }.toTypedArray()),
+            ),
+            wrapInVc = wrapInVc,
+        )
+        val sdPayload = SDPayload.createSDPayload(
+            payload,
+            if (wrapInVc) {
+                SDMapBuilder(disclosureMap.decoyMode).addField(
+                    JwsOption.VC,
+                    sd = false,
+                    children = disclosureMap,
+                ).build()
+            } else disclosureMap,
+        )
+        // Per vc-jose-cose, W3C VCDM secured with SD-JWT uses vc+sd-jwt for both data model versions.
+        return SdJwtSigningInput(
+            payload = sdPayload,
+            signable = Json.encodeToString(sdPayload.undisclosedPayload).encodeToByteArray(),
+            typ = "vc+sd-jwt",
+        )
+    }
+
+    private data class SdJwtSigningInput(
+        val payload: SDPayload,
+        val signable: ByteArray,
+        val typ: String,
+    )
+
+    @JsExport.Ignore
+    suspend fun signJws(
+        issuerKey: Crypto2Key,
+        algorithm: JwsAlgorithm,
+        issuerId: String?,
+        issuerKid: String? = null,
+        subjectDid: String,
+        additionalJwtHeader: Map<String, JsonElement> = emptyMap(),
+        additionalJwtOptions: Map<String, JsonElement> = emptyMap(),
+    ): String {
+        val kid = issuerKid ?: issuerKey.id.value
+        val typHeader = if (isV2()) "vc+jwt" else "JWT"
+        return JwsSignatureScheme().sign(
+            data = toJsonObject(),
+            key = issuerKey,
+            algorithm = algorithm,
+            jwtHeaders = mapOf(
+                JwsHeader.KEY_ID to JsonPrimitive(kid),
+                "typ" to JsonPrimitive(typHeader),
+            ) + additionalJwtHeader,
+            jwtOptions = mapOf(
+                JwsOption.ISSUER to JsonPrimitive(issuerId),
+                JwsOption.SUBJECT to JsonPrimitive(subjectDid),
+                *(additionalJwtOptions.entries.map { it.toPair() }.toTypedArray()),
+            ),
+            wrapInVc = !isV2(),
         )
     }
 

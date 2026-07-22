@@ -5,6 +5,9 @@ import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.persistence.PersistenceConfiguration
 import id.walt.commons.persistence.PersistenceNode
+import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPARRepository
@@ -23,6 +26,7 @@ import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
@@ -56,8 +60,8 @@ class ConfiguredRedisRepositoryTest {
         val rotatedRefreshToken = testRefreshToken("$suffix-rotated")
 
         try {
-            sessionRepository.save(session)
-            assertEquals(session, sessionRepository.get(session.sessionId))
+            val savedSession = sessionRepository.save(session)
+            assertEquals(savedSession, sessionRepository.get(session.sessionId))
 
             authorizationCodeRepository.save(authorizationCode)
             assertEquals(authorizationCode, authorizationCodeRepository.consume(authorizationCode.code))
@@ -113,14 +117,12 @@ class ConfiguredRedisRepositoryTest {
         FeatureManager.enabledFeatures.add(CommonsFeatureCatalog.persistenceFeature.name)
     }
 
-    private fun testSession(suffix: String) = IssuanceSession(
+    private suspend fun testSession(suffix: String) = IssuanceSession(
         sessionId = "redis-session-$suffix",
         profileId = "profile-id",
         authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
         credentialConfigurationId = "identity_credential",
-        issuerKey = buildJsonObject {
-            put("type", "jwk")
-        },
+        issuerKey = KeySerialization.serializeKeyToJson(JWKKey.generate(KeyType.secp256r1)).jsonObject,
         credentialData = buildJsonObject {
             put("given_name", "Jane")
             put("family_name", "Doe")

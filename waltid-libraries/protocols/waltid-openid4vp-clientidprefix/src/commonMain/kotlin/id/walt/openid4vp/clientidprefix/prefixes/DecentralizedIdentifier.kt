@@ -1,11 +1,16 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.openid4vp.clientidprefix.prefixes
 
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.did.dids.DidService
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
 import kotlinx.serialization.Serializable
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
@@ -30,26 +35,30 @@ data class DecentralizedIdentifier(val did: String, override val rawValue: Strin
         val jws = context.requestObjectJws
             ?: return ClientValidationResult.Failure(ClientIdError.MissingRequestObject)
 
-        return runCatching {
-            val kid = jws.decodeJws().header["kid"]?.jsonPrimitive?.content
+        return try {
+            val decoded = CompactJws.decodeUnverified(jws)
+            val kid = decoded.protectedHeader["kid"]?.jsonPrimitive?.content
                 ?: throw IllegalStateException("Missing 'kid' header in JWS for key selection.")
 
-            // 1. Resolve all keys from the DID document.
-            val keys = DidService.resolveToKeys(clientId.did).getOrThrow()
-
-            // 2. Find the specific key used for signing.
-            val verificationKey = keys.find { it.getKeyId() == kid }
-                ?: throw IllegalArgumentException("Key ID '$kid' from JWS not found in DID document.")
-
-            // 3. Verify the JWS signature with that key.
-            verificationKey.verifyJws(jws).getOrThrow()
+            if (decoded.algorithm == JwsAlgorithm.ES256K) {
+                val verificationKey = DidService.resolveToKeys(clientId.did).getOrThrow()
+                    .find { it.getKeyId() == kid }
+                    ?: throw IllegalArgumentException("Key ID '$kid' from JWS not found in DID document.")
+                verificationKey.verifyJws(jws).getOrThrow()
+            } else {
+                val verificationKey = DidService.resolveToCrypto2Keys(clientId.did).getOrThrow()
+                    .find { it.id.value == kid }
+                    ?: throw IllegalArgumentException("Key ID '$kid' from JWS not found in DID document.")
+                ClientIdCrypto2.verify(jws, verificationKey)
+            }
 
             val metadataJson = context.clientMetadata
                 ?: throw IllegalStateException("client_metadata parameter is required.")
-            metadataJson
-        }.fold(
-            onSuccess = { ClientValidationResult.Success(it) },
-            onFailure = { ClientValidationResult.Failure(ClientIdError.DidResolutionFailed(it.message!!)) }
-        )
+            ClientValidationResult.Success(metadataJson)
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (cause: Exception) {
+            ClientValidationResult.Failure(ClientIdError.DidResolutionFailed(cause.message ?: "DID verification failed"))
+        }
     }
 }

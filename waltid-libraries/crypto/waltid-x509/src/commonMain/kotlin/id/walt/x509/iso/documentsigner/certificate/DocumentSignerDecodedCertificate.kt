@@ -1,6 +1,7 @@
 package id.walt.x509.iso.documentsigner.certificate
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.EncodedKey
 import id.walt.x509.*
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
@@ -29,11 +30,15 @@ data class DocumentSignerDecodedCertificate internal constructor(
     val akiHex: String,
     val skiHex: String,
     val basicConstraints: X509BasicConstraints,
+    @Deprecated("Use crypto2PublicKey.", ReplaceWith("crypto2PublicKey"))
     val publicKey: Key,
     val criticalExtensionOIDs: Set<X509V3ExtensionOID>,
     val nonCriticalExtensionOIDs: Set<X509V3ExtensionOID>,
     private val certificate: X509CertificateHandle,
 ) {
+
+    val crypto2PublicKey: EncodedKey.Jwk
+        get() = certificate.getCertificateDer().crypto2PublicJwk()
 
     /**
      * Convert the decoded certificate into the specification's profile data shape.

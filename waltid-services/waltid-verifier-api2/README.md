@@ -154,6 +154,8 @@ Accept: text/event-stream
 
 ## Configuration
 
+`requestSigningStoredKey` optionally carries an encoded crypto2 `StoredKey` and takes precedence over the legacy `key` in `verifier-service.conf`. When both are configured, startup validates that they represent the same signing and verification key. Without the StoredKey, a legacy JWK is migrated only in memory; the source file is not rewritten. Malformed or mismatched StoredKey values fail startup without legacy fallback.
+
 See `config/` for service, web, and feature toggles. SSE and webhook delivery can be wired via `waltid-ktor-notifications`.
 
 ## Related projects

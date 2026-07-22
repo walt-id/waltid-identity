@@ -54,14 +54,16 @@ object Verifier2Service {
         block: Verification2Session.() -> Unit
     ) -> Unit = { session, event, block ->
         log.trace { "Updating session due to '$event': ${session.id}" }
+        val notificationConfig = session.notifications
         val newSession = session.apply {
             block.invoke(this)
         }
         sessions[newSession.id] = newSession
 
-        Verifier2SessionUpdate(session.id, event, session)
+        val publicSession = session.publicView()
+        Verifier2SessionUpdate(publicSession.id, event, publicSession)
             .toKtorSessionUpdate()
-            .notifySessionUpdate(session.id, session.notifications)
+            .notifySessionUpdate(publicSession.id, notificationConfig)
     }
 
     /**
@@ -99,7 +101,7 @@ object Verifier2Service {
                         val verifierSession =
                             sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
                                 ?: throw IllegalArgumentException("Unknown session id")
-                        call.respond(verifierSession)
+                        call.respond(verifierSession.publicView())
                     }
 
                     route({
@@ -157,7 +159,9 @@ object Verifier2Service {
 
                     call.respondRequestUriPost(
                         verificationSession = verificationSession,
-                        updateSessionCallback = updateSessionCallback
+                        updateSessionCallback = updateSessionCallback,
+                        resolveSigningKey = OSSVerifier2Manager::resolveRequestSigningKey,
+                        resolveCrypto2SigningKey = OSSVerifier2Manager::resolveCrypto2RequestSigningKey,
                     )
                 }
 

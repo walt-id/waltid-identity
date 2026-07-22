@@ -3,9 +3,15 @@ package id.walt.wallet2
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.persistence.ExposedCredentialStore
+import id.walt.wallet2.persistence.ExposedDidStore
+import id.walt.wallet2.persistence.ExposedKeyStore
+import id.walt.wallet2.persistence.ExposedStoreRegistry
+import id.walt.wallet2.persistence.ExposedWalletStore
 import id.walt.wallet2.server.StoreFactory
 import id.walt.wallet2.server.WalletResolver
 import id.walt.wallet2.server.handlers.Wallet2RouteHandler.registerWallet2Routes
@@ -14,6 +20,7 @@ import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
+import id.walt.x509.CertificateDer
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.GenericHttpWalletAttestationProvider
 import io.ktor.http.*
@@ -21,11 +28,13 @@ import io.ktor.server.auth.*
 import io.ktor.server.routing.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.asFlow
+import org.jetbrains.exposed.v1.jdbc.Database
 
 /**
  * OSS [WalletResolver] and route registration.
  *
- * Uses [InMemoryWalletStore] and in-memory store factories by default.
+ * Uses [InMemoryWalletStore] by default. Persistent startup calls
+ * [configurePersistence] so wallet descriptors and all named stores use one database.
  *
  * When the `wallet2-persistence` feature is enabled, [main] swaps in:
  * - [walletStore] = [id.walt.wallet2.persistence.ExposedWalletStore]
@@ -39,7 +48,14 @@ import kotlinx.coroutines.flow.asFlow
  */
 object OSSWallet2Service {
 
+    /**
+     * Pluggable wallet lifecycle store.
+     *
+     * Persistent implementations should be installed through [configurePersistence]
+     * so descriptors and named stores use the same backend.
+     */
     var walletStore: WalletStore = InMemoryWalletStore()
+    private var persistentStoreRegistry: ExposedStoreRegistry? = null
 
     // Store factories - swapped at startup when persistence is enabled.
     // The route handler uses these (via the resolver) to create new stores for auto-created
@@ -73,39 +89,65 @@ object OSSWallet2Service {
         override val didStoreFactory: StoreFactory<WalletDidStore>
             get() = OSSWallet2Service.didStoreFactory
 
-        // Named store resolution via computeIfAbsent: if the store is not yet cached,
-        // create it using the factory (which may be Exposed-backed for persistence).
-        // This handles wallets created in previous process runs whose store IDs exist in
-        // the DB but are not yet in the in-process cache.
-        override suspend fun resolveKeyStore(storeId: String): WalletKeyStore =
-            namedKeyStores.computeIfAbsent(storeId) { keyStoreFactory(storeId) }
-
+        override suspend fun resolveKeyStore(storeId: String): WalletKeyStore? {
+            val registry = persistentStoreRegistry
+            return if (registry != null) registry.resolveKeyStore(storeId)
+            else namedKeyStores.computeIfAbsent(storeId) { keyStoreFactory(storeId) }
+        }
         override suspend fun storeKeyStore(storeId: String, store: WalletKeyStore) {
-            namedKeyStores[storeId] = store
+            if (persistentStoreRegistry != null) {
+                require(store is ExposedKeyStore && store.storeId == storeId) {
+                    "Persistent key stores must be created through createKeyStore"
+                }
+            } else namedKeyStores[storeId] = store
         }
+        override suspend fun createKeyStore(storeId: String): WalletKeyStore =
+            persistentStoreRegistry?.createKeyStore(storeId)
+                ?: keyStoreFactory(storeId).also { namedKeyStores[storeId] = it }
+        override fun listKeyStoreIds() =
+            persistentStoreRegistry?.listKeyStoreIds() ?: namedKeyStores.keys.asFlow()
 
-        override fun listKeyStoreIds() = namedKeyStores.keys.toList().asFlow()
-
-        override suspend fun resolveCredentialStore(storeId: String): WalletCredentialStore =
-            namedCredentialStores.computeIfAbsent(storeId) { credentialStoreFactory(storeId) }
-
+        override suspend fun resolveCredentialStore(storeId: String): WalletCredentialStore? {
+            val registry = persistentStoreRegistry
+            return if (registry != null) registry.resolveCredentialStore(storeId)
+            else namedCredentialStores.computeIfAbsent(storeId) { credentialStoreFactory(storeId) }
+        }
         override suspend fun storeCredentialStore(storeId: String, store: WalletCredentialStore) {
-            namedCredentialStores[storeId] = store
+            if (persistentStoreRegistry != null) {
+                require(store is ExposedCredentialStore && store.storeId == storeId) {
+                    "Persistent credential stores must be created through createCredentialStore"
+                }
+            } else namedCredentialStores[storeId] = store
         }
+        override suspend fun createCredentialStore(storeId: String): WalletCredentialStore =
+            persistentStoreRegistry?.createCredentialStore(storeId)
+                ?: credentialStoreFactory(storeId).also { namedCredentialStores[storeId] = it }
+        override fun listCredentialStoreIds() =
+            persistentStoreRegistry?.listCredentialStoreIds() ?: namedCredentialStores.keys.asFlow()
 
-        override fun listCredentialStoreIds() = namedCredentialStores.keys.toList().asFlow()
-
-        override suspend fun resolveDidStore(storeId: String): WalletDidStore =
-            namedDidStores.computeIfAbsent(storeId) { didStoreFactory(storeId) }
-
+        override suspend fun resolveDidStore(storeId: String): WalletDidStore? {
+            val registry = persistentStoreRegistry
+            return if (registry != null) registry.resolveDidStore(storeId)
+            else namedDidStores.computeIfAbsent(storeId) { didStoreFactory(storeId) }
+        }
         override suspend fun storeDidStore(storeId: String, store: WalletDidStore) {
-            namedDidStores[storeId] = store
+            if (persistentStoreRegistry != null) {
+                require(store is ExposedDidStore && store.storeId == storeId) {
+                    "Persistent DID stores must be created through createDidStore"
+                }
+            } else namedDidStores[storeId] = store
         }
-
-        override fun listDidStoreIds() = namedDidStores.keys.toList().asFlow()
+        override suspend fun createDidStore(storeId: String): WalletDidStore =
+            persistentStoreRegistry?.createDidStore(storeId)
+                ?: didStoreFactory(storeId).also { namedDidStores[storeId] = it }
+        override fun listDidStoreIds() =
+            persistentStoreRegistry?.listDidStoreIds() ?: namedDidStores.keys.asFlow()
 
         override suspend fun resolveStoreId(store: Any): String? =
-            namedKeyStores.entries.firstOrNull { it.value === store }?.key
+            (store as? ExposedKeyStore)?.storeId
+                ?: (store as? ExposedCredentialStore)?.storeId
+                ?: (store as? ExposedDidStore)?.storeId
+                ?: namedKeyStores.entries.firstOrNull { it.value === store }?.key
                 ?: namedCredentialStores.entries.firstOrNull { it.value === store }?.key
                 ?: namedDidStores.entries.firstOrNull { it.value === store }?.key
 
@@ -119,8 +161,31 @@ object OSSWallet2Service {
             walletStore.getWalletIdsForAccount(accountId)
     }
 
+    fun configurePersistence(db: Database) {
+        walletStore = ExposedWalletStore(db)
+        persistentStoreRegistry = ExposedStoreRegistry(db)
+        keyStoreFactory = { id -> ExposedKeyStore(id, db) }
+        credentialStoreFactory = { id -> ExposedCredentialStore(id, db) }
+        didStoreFactory = { id -> ExposedDidStore(id, db) }
+        namedKeyStores.clear()
+        namedCredentialStores.clear()
+        namedDidStores.clear()
+    }
+
+    fun configureInMemory(store: WalletStore = InMemoryWalletStore()) {
+        walletStore = store
+        persistentStoreRegistry = null
+        keyStoreFactory = { InMemoryKeyStore() }
+        credentialStoreFactory = { InMemoryCredentialStore() }
+        didStoreFactory = { InMemoryDidStore() }
+        namedKeyStores.clear()
+        namedCredentialStores.clear()
+        namedDidStores.clear()
+    }
+
     fun Route.registerRoutes() {
         val attestationAssembler = createAttestationAssembler()
+        val clientIdTrustConfiguration = configuredClientIdTrustConfiguration()
         val authEnabled = runCatching {
             FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)
         }.getOrElse { false }
@@ -133,6 +198,7 @@ object OSSWallet2Service {
                     resolver = resolver,
                     getAccountId = getAccountId,
                     attestationAssembler = attestationAssembler,
+                    clientIdTrustConfiguration = clientIdTrustConfiguration,
                 )
             }
         } else {
@@ -140,9 +206,19 @@ object OSSWallet2Service {
                 resolver = resolver,
                 getAccountId = null,
                 attestationAssembler = attestationAssembler,
+                clientIdTrustConfiguration = clientIdTrustConfiguration,
             )
         }
     }
+
+    private fun ClientIdTrustConfig.toDomain() = ClientIdTrustConfiguration(
+        x509TrustAnchors = x509TrustAnchors.map(CertificateDer::fromPEMEncodedString),
+        trustedVerifierAttestationIssuers = trustedVerifierAttestationIssuers,
+        preRegisteredClients = preRegisteredClients,
+    )
+
+    internal fun configuredClientIdTrustConfiguration(): ClientIdTrustConfiguration =
+        ConfigManager.getConfig<OSSWallet2ServiceConfig>().clientIdTrust.toDomain()
 
     private fun createAttestationAssembler(): ClientAttestationAssembler? {
         val config = ConfigManager.getConfig<OSSWallet2ServiceConfig>().attestationConfig ?: return null

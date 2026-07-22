@@ -1,10 +1,15 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.openid4vp.clientidprefix.prefix
 
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.openid4vp.clientidprefix.*
 import id.walt.openid4vp.clientidprefix.prefixes.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -89,14 +94,17 @@ class PrefixTests {
     @Test
     fun `did should succeed with valid signature from a resolved key`() = runTest {
         DidService.minimalInit()
-
-        // Setup realistic DID
-        val signedJws =
-            "eyJraWQiOiJQQnYzVHh2NnRhWE5zMTBZNUcyOW1kUmFiMzBMVWljN21ubFNSOUxqaVVNIiwiYWxnIjoiRVMyNTYifQ.eyJyZXNwb25zZV90eXBlIjoidnBfdG9rZW4iLCJub25jZSI6Inh5eiJ9.MLhDuXg5uOvgWkRJoTwnWZY7Ump9-TeGLyMWDlxGNCOVBgS6mPyKKd2H8jrcDGvW3BASKo4jJi4MhHgrvCcUsA"
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val did = DidService.registerByKey("key", key).did
+        val kid = DidService.resolveAuthenticationMethodId(did, key.getKeyId())
+        val signedJws = key.signJws(
+            """{"response_type":"vp_token","nonce":"xyz"}""".encodeToByteArray(),
+            mapOf("kid" to JsonPrimitive(kid)),
+        )
 
         // Create context and authenticate
         val context = RequestContext(
-            clientId = "decentralized_identifier:did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2Iiwia2lkIjoiUEJ2M1R4djZ0YVhOczEwWTVHMjltZFJhYjMwTFVpYzdtbmxTUjlMamlVTSIsIngiOiJXeGREdFJJVHYxdW9LU2V5bTg3d3FyTnRtV2ZuNEptVkhsdHNCMEctUFRzIiwieSI6IjBPUmZjNGwyYV9wSWJtUXlTTU13eDF2cVNoRW9lVmpnQnpsUWRJQW5IbkkifQ",
+            clientId = "decentralized_identifier:$did",
             clientMetadataString = validMetadataJson,
             requestObjectJws = signedJws
         )
@@ -131,7 +139,7 @@ class PrefixTests {
     }
 
     @Test
-    fun `pre_registered should succeed if provider finds metadata`() = runTest {
+    fun `pre_registered metadata alone does not authenticate a request`() = runTest {
         val context = RequestContext("my-registered-app")
         val clientId = ClientIdPrefixParser.parse(context.clientId).getOrThrow()
 
@@ -142,7 +150,15 @@ class PrefixTests {
 
         val result = authenticator.authenticate(clientId, context, metadataProvider)
 
-        assertIs<ClientValidationResult.Success>(result)
+        val failure = assertIs<ClientValidationResult.Failure>(result)
+        assertEquals(ClientIdError.MissingRequestObject, failure.error)
+
+        val compatibilityResult = assertIs<PreRegistered>(clientId)
+            .authenticatePreRegistered(assertIs<PreRegistered>(clientId), metadataProvider)
+        assertEquals(
+            ClientIdError.MissingRequestObject,
+            assertIs<ClientValidationResult.Failure>(compatibilityResult).error,
+        )
     }
 
     @Test

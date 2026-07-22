@@ -1,10 +1,14 @@
+@file:Suppress("DEPRECATION")
+
 package id.walt.openid4vci.clientauth.attestation.verifier
 
-import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 @Serializable
 data class ClientAttestationVerifierConfig(
@@ -44,12 +48,18 @@ sealed class ClientAttestationVerificationMethod {
 
 suspend fun ClientAttestationVerifierConfig.toClientAttestationConfig(
     keyReferenceResolver: ClientAttestationKeyReferenceResolver? = null,
+    crypto2KeyReferenceResolver: Crypto2ClientAttestationKeyReferenceResolver? = null,
 ): ClientAttestationConfig =
     when (val source = verificationMethod) {
         is ClientAttestationVerificationMethod.StaticJwk -> {
-            val trustedKey = JWKKey.importJWK(source.jwk.toString()).getOrThrow()
+            val trustedKey = requireNotNull(
+                Crypto2JwtKeyResolver(allowInlineJwk = true).resolveFromJwt(
+                    jwtHeader = buildJsonObject { put("jwk", source.jwk) },
+                    jwtPayload = JsonObject(emptyMap()),
+                )?.key
+            ) { "static-jwk client attestation verification key is invalid" }
             ClientAttestationConfig(
-                attestationVerifier = KeyBasedClientAttestationVerifier { _, _ -> listOf(trustedKey) },
+                attestationVerifier = Crypto2KeyBasedClientAttestationVerifier { _, _ -> listOf(trustedKey) },
             )
         }
 
@@ -59,13 +69,20 @@ suspend fun ClientAttestationVerifierConfig.toClientAttestationConfig(
             )
 
         is ClientAttestationVerificationMethod.KeyReference -> {
-            val resolver = requireNotNull(keyReferenceResolver) {
-                "key-reference client attestation verification requires a key reference resolver"
-            }
             ClientAttestationConfig(
-                attestationVerifier = KeyBasedClientAttestationVerifier { header, payload ->
-                    resolver.resolveTrustedAttesterKeys(source.reference, header, payload)
-                },
+                attestationVerifier = ReferencedClientAttestationVerifier(
+                    reference = source.reference,
+                    crypto2Resolver = crypto2KeyReferenceResolver,
+                    legacyResolver = keyReferenceResolver,
+                ),
             )
         }
     }
+
+@Deprecated("Retained for binary compatibility", level = DeprecationLevel.HIDDEN)
+suspend fun ClientAttestationVerifierConfig.toClientAttestationConfig(
+    keyReferenceResolver: ClientAttestationKeyReferenceResolver? = null,
+): ClientAttestationConfig = toClientAttestationConfig(
+    keyReferenceResolver = keyReferenceResolver,
+    crypto2KeyReferenceResolver = null,
+)

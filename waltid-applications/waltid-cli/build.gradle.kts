@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.gradle.jvm.application.tasks.CreateStartScripts
 
 plugins {
     id("waltid.multiplatform.library.jvm")
@@ -23,12 +24,15 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            api(project(":waltid-libraries:crypto:waltid-crypto"))
+            api(project(":waltid-libraries:crypto:waltid-crypto2"))
+            api(project(":waltid-libraries:crypto:waltid-jose"))
             api(project(":waltid-libraries:waltid-did"))
+            api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
             api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
-            api(project(":waltid-libraries:credentials:waltid-verification-policies"))
-            api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
-            api(project(":waltid-libraries:protocols:waltid-openid4vc"))
+            api(project(":waltid-libraries:credentials:waltid-verification-policies2"))
+            api(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
+            api(project(":waltid-libraries:credentials:waltid-dcql"))
+            implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
 
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.datetime)
@@ -53,10 +57,7 @@ kotlin {
             // Logging
             implementation(identityLibs.slf4j.simple)
 
-            // JOSE
-            implementation(identityLibs.nimbus.jose.jwt)
-
-            // BouncyCastle for PEM import
+            // Bouncy Castle provides strict DER inspection and JVM secp256k1.
             implementation(identityLibs.bouncycastle.pkix)
         }
         jvmTest.dependencies {
@@ -95,4 +96,26 @@ kotlin {
         }
 
     }
+}
+
+tasks.withType<CreateStartScripts>().configureEach {
+    doLast {
+        windowsScript.writeText(
+            """@echo off
+setlocal
+set "APP_HOME=%~dp0.."
+if defined JAVA_HOME (
+  set "JAVA_EXE=%JAVA_HOME%\bin\java.exe"
+) else (
+  set "JAVA_EXE=java.exe"
+)
+"%JAVA_EXE%" %JAVA_OPTS% %WALTID_OPTS% -classpath "%APP_HOME%\lib\*" id.walt.cli.MainKt %*
+exit /b %ERRORLEVEL%
+"""
+        )
+    }
+}
+
+tasks.named("jvmTest") {
+    dependsOn("installJvmDist")
 }

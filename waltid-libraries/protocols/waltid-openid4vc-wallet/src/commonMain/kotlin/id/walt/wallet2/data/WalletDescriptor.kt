@@ -1,5 +1,6 @@
 package id.walt.wallet2.data
 
+import id.walt.crypto2.keys.StoredKey
 import kotlinx.serialization.Serializable
 
 /**
@@ -44,4 +45,7 @@ data class WalletDescriptor(
      * instead of the first DID in the store. Null means "use first DID".
      */
     val defaultDidId: String? = null,
+
+    /** Native crypto2 sidecar for [serializedStaticKey]. */
+    val crypto2StaticKey: StoredKey? = null,
 )

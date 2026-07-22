@@ -46,6 +46,8 @@ kotlin {
         commonMain.dependencies {
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
             api(project(":waltid-libraries:crypto:waltid-crypto"))
+            api(project(":waltid-libraries:crypto:waltid-crypto2"))
+            api(project(":waltid-libraries:crypto:waltid-crypto2-signum"))
             api(project(":waltid-libraries:waltid-did"))
             implementation(identityLibs.sqldelight.runtime)
             implementation(identityLibs.sqldelight.coroutines)
@@ -62,6 +64,11 @@ kotlin {
             androidMain.dependencies {
                 implementation(identityLibs.sqldelight.android.driver)
                 implementation(identityLibs.sqlcipher.android)
+            }
+            named("androidHostTest") {
+                dependencies {
+                    implementation(identityLibs.sqldelight.sqlite.driver)
+                }
             }
         }
         if (enableIosBuild) {

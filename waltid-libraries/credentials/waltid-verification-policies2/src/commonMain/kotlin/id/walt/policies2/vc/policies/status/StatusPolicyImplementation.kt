@@ -16,6 +16,8 @@ import id.walt.policies2.vc.policies.status.reader.IETFJwtStatusValueReader
 import id.walt.policies2.vc.policies.status.reader.W3CStatusValueReader
 import id.walt.policies2.vc.policies.status.reader.format.CwtFormatMatcher
 import id.walt.policies2.vc.policies.status.reader.format.JwtFormatMatcher
+import id.walt.policies2.vc.policies.status.signature.StatusListSignatureVerifier
+import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizer
 import id.walt.policies2.vc.policies.status.validator.IETFStatusValidator
 import id.walt.policies2.vc.policies.status.validator.W3CStatusValidator
 import io.ktor.client.*
@@ -66,6 +68,7 @@ object StatusPolicyImplementation {
     private val ietfCwtStatusReader = IETFCwtStatusValueReader(cwtFormatMatcher, cwtParser)
 
     private val bitValueReaderFactory = BitValueReaderFactory()
+    private val statusListSignatureVerifier = StatusListSignatureVerifier()
 
     private val base64UrlHandler = Base64UrlHandler()
 
@@ -73,7 +76,11 @@ object StatusPolicyImplementation {
         W3cStatusListExpansionAlgorithmFactory(base64UrlHandler)
 
     private val w3cStatusValidator = W3CStatusValidator(
-        credentialFetcher, w3cStatusReader, bitValueReaderFactory, statusListExpansionAlgorithmFactory
+        credentialFetcher,
+        w3cStatusReader,
+        bitValueReaderFactory,
+        statusListExpansionAlgorithmFactory,
+        statusListSignatureVerifier,
     )
 
     private val tokenStatusListExpansionAlgorithm =
@@ -85,20 +92,29 @@ object StatusPolicyImplementation {
         expansionAlgorithm = tokenStatusListExpansionAlgorithm,
         ietfJwtStatusReader,
         ietfCwtStatusReader,
+        signatureVerifier = statusListSignatureVerifier,
     )
 
     suspend fun verifyWithAttributes(
         data: DigitalCredential,
-        attributes: StatusPolicyArgument
+        attributes: StatusPolicyArgument,
+        signerAuthorizer: StatusListSignerAuthorizer? = null,
     ): Result<JsonElement> =
-        getStatusEntryElementExtractor(attributes).extract(data)?.let { processStatusEntry(it, attributes) }
+        getStatusEntryElementExtractor(attributes).extract(data)?.let {
+            processStatusEntry(it, attributes, data, signerAuthorizer)
+        }
             ?: Result.success(JsonObject(mapOf("policy_available" to JsonPrimitive(false))))
 
-    private suspend fun processStatusEntry(data: JsonElement, args: StatusPolicyArgument) =
+    private suspend fun processStatusEntry(
+        data: JsonElement,
+        args: StatusPolicyArgument,
+        credential: DigitalCredential,
+        signerAuthorizer: StatusListSignerAuthorizer?,
+    ) =
         when (args) {
-            is IETFStatusPolicyAttribute -> processIETF(data, args)
-            is W3CStatusPolicyAttribute -> processW3C(data, args)
-            is W3CStatusPolicyListArguments -> processListW3C(data, args)
+            is IETFStatusPolicyAttribute -> processIETF(data, args, credential, signerAuthorizer)
+            is W3CStatusPolicyAttribute -> processW3C(data, args, credential, signerAuthorizer)
+            is W3CStatusPolicyListArguments -> processListW3C(data, args, credential, signerAuthorizer)
         }.fold(onSuccess = {
             Result.success(JsonObject(emptyMap()))
         }, onFailure = {
@@ -107,15 +123,19 @@ object StatusPolicyImplementation {
 
     private suspend fun processW3C(
         data: JsonElement,
-        attribute: W3CStatusPolicyAttribute
+        attribute: W3CStatusPolicyAttribute,
+        credential: DigitalCredential,
+        signerAuthorizer: StatusListSignerAuthorizer?,
     ): Result<Unit> = runCatching {
         val statusEntry = w3cEntryContentParser.parse(data)
-        w3cStatusValidator.validate(statusEntry, attribute).getOrThrow()
+        w3cStatusValidator.validate(statusEntry, attribute, credential, signerAuthorizer).getOrThrow()
     }
 
     private suspend fun processListW3C(
         data: JsonElement,
-        attribute: W3CStatusPolicyListArguments
+        attribute: W3CStatusPolicyListArguments,
+        credential: DigitalCredential,
+        signerAuthorizer: StatusListSignerAuthorizer?,
     ): Result<Unit> =
         runCatching {
             val statusEntries = w3cListEntryContentParser.parse(data)
@@ -125,7 +145,7 @@ object StatusPolicyImplementation {
             val sortedEntries = statusEntries.sortedBy { it.purpose }
             val sortedAttributes = attribute.list.sortedBy { it.purpose }
             val validationResults: List<Result<Unit>> = sortedEntries.zip(sortedAttributes) { entry, attr ->
-                w3cStatusValidator.validate(entry, attr)
+                w3cStatusValidator.validate(entry, attr, credential, signerAuthorizer)
             }
             require(validationResults.isNotEmpty()) { emptyResultMessage(attribute) }
             require(validationResults.none { it.isFailure }) { failResultMessage(validationResults) }
@@ -146,10 +166,12 @@ object StatusPolicyImplementation {
 
     private suspend fun processIETF(
         data: JsonElement,
-        attribute: IETFStatusPolicyAttribute
+        attribute: IETFStatusPolicyAttribute,
+        credential: DigitalCredential,
+        signerAuthorizer: StatusListSignerAuthorizer?,
     ): Result<Unit> = runCatching {
         val statusEntry = ietfEntryContentParser.parse(data)
-        ietfStatusValidator.validate(statusEntry, attribute).getOrThrow()
+        ietfStatusValidator.validate(statusEntry, attribute, credential, signerAuthorizer).getOrThrow()
     }
 
     private fun getStatusEntryElementExtractor(args: StatusPolicyArgument) = when (args) {

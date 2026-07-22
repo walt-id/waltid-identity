@@ -4,6 +4,9 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
+import java.io.ByteArrayInputStream
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -61,5 +64,37 @@ class CertificateSigningRequestTest {
         assertTrue(bundle.certificateDer.toPEMEncodedString().contains("BEGIN CERTIFICATE"))
         assertEquals("Example CA", bundle.decodedCertificate.subjectName.commonName)
         assertTrue(bundle.decodedCertificate.isCertificateAuthority)
+    }
+
+    @Test
+    fun buildAndVerifyRsaCertificatesAndCsrs() = runTest {
+        val rsaTypes = mapOf(
+            KeyType.RSA to "1.2.840.113549.1.1.11",
+            KeyType.RSA3072 to "1.2.840.113549.1.1.12",
+            KeyType.RSA4096 to "1.2.840.113549.1.1.13",
+        )
+
+        rsaTypes.forEach { (keyType, expectedSignatureOid) ->
+            val key = JWKKey.generate(keyType)
+            val subjectName = X509DistinguishedName(commonName = "$keyType Test")
+            val certificate = GenericX509CertificateBuilder().build(
+                profileData = GenericX509CertificateProfileData(subjectName = subjectName),
+                subjectPublicKey = key.getPublicKey(),
+                signingKey = key,
+            )
+            val parsedCertificate = CertificateFactory.getInstance("X.509")
+                .generateCertificate(ByteArrayInputStream(certificate.certificateDer.bytes.toByteArray())) as X509Certificate
+            parsedCertificate.verify(parsedCertificate.publicKey)
+            assertEquals(expectedSignatureOid, parsedCertificate.sigAlgOID)
+
+            val csr = CertificateSigningRequestBuilder().build(
+                profileData = CertificateSigningRequestProfileData(subjectName = subjectName),
+                signingKey = key,
+            )
+            assertEquals(
+                subjectName.commonName,
+                parseCertificateSigningRequest(csr.csrDer).subjectName.commonName,
+            )
+        }
     }
 }

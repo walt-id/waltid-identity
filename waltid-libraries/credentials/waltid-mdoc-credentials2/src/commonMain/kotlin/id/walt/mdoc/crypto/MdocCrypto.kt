@@ -6,9 +6,21 @@ import id.walt.cose.CoseKey
 import id.walt.cose.CoseMac0
 import id.walt.cose.CoseSign1
 import id.walt.cose.toCoseVerifier
+import id.walt.cose.toEncodedJwk
+import id.walt.cose.verifyDetached
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto2.algorithms.KeyAgreementAlgorithm
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.mdoc.encoding.MdocCbor
 import id.walt.mdoc.encoding.startsWith
 import id.walt.mdoc.objects.SessionTranscript
@@ -28,6 +40,7 @@ import org.kotlincrypto.macs.hmac.sha2.HmacSHA256
 object MdocCrypto {
 
     private val log = KotlinLogging.logger { }
+    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
 
     val mdocDigests = listOf(
         "SHA-256",
@@ -55,6 +68,7 @@ object MdocCrypto {
      * @param sDevicePublicKey The public key from the MSO to verify the signature.
      * @return True if the signature is valid, false otherwise.
      */
+    @Deprecated("Use the crypto2 Key overload with an explicit algorithm allowlist")
     suspend fun verifyDeviceSignature(
         payloadToVerify: ByteArray,
         deviceSignature: CoseSign1,
@@ -71,7 +85,33 @@ object MdocCrypto {
         )
     }
 
+    suspend fun verifyDeviceSignature(
+        payloadToVerify: ByteArray,
+        deviceSignature: CoseSign1,
+        devicePublicKey: Crypto2Key,
+        allowedAlgorithms: Set<Int>,
+    ): Boolean = deviceSignature.verifyDetached(
+        key = devicePublicKey,
+        detachedPayload = payloadToVerify,
+        allowedAlgorithms = allowedAlgorithms,
+    )
+
+    suspend fun Crypto2Key.getSharedSecret(other: EncodedKey): ByteArray {
+        val algorithm = when (spec) {
+            is KeySpec.Ec -> KeyAgreementAlgorithm.Ecdh
+            is KeySpec.Montgomery -> KeyAgreementAlgorithm.Xdh
+            else -> throw IllegalArgumentException("Key specification does not support key agreement: $spec")
+        }
+        val agreement = capabilities.keyAgreement
+            ?: throw IllegalArgumentException("Key does not permit key agreement")
+        require(capabilities.supportsKeyAgreementAlgorithm(algorithm)) {
+            "Key does not support key-agreement algorithm: $algorithm"
+        }
+        return agreement.generateSharedSecret(other, algorithm).toByteArray()
+    }
+
     // stub as waltid-crypto does not yet do ECDH
+    @Deprecated("Use the crypto2 Key.getSharedSecret overload")
     fun Key.getSharedSecret(other: Key): ByteArray {
         TODO("")
         /*
@@ -111,6 +151,7 @@ object MdocCrypto {
      * @param sDevicePublicKey The public key of the device from the MSO.
      * @return True if the MAC is valid, false otherwise.
      */
+    @Deprecated("Use the crypto2 Key overload")
     suspend fun verifyDeviceMac(
         deviceAuthBytes: ByteArray,
         deviceMac: CoseMac0,
@@ -132,6 +173,33 @@ object MdocCrypto {
 
         return computedTag.contentEquals(deviceMac.tag)
     }
+
+    suspend fun verifyDeviceMac(
+        deviceAuthBytes: ByteArray,
+        deviceMac: CoseMac0,
+        sessionTranscript: ByteArray,
+        eReaderPrivateKey: Crypto2Key,
+        devicePublicKey: EncodedKey,
+    ): Boolean {
+        val sharedSecret = eReaderPrivateKey.getSharedSecret(devicePublicKey)
+        val salt = SHA256().digest(sessionTranscript)
+        val eMacKey = performHkdf(sharedSecret, salt, "EMacKey".encodeToByteArray(), 32)
+        return HmacSHA256(eMacKey).doFinal(deviceAuthBytes).contentEquals(deviceMac.tag)
+    }
+
+    suspend fun verifyDeviceMac(
+        deviceAuthBytes: ByteArray,
+        deviceMac: CoseMac0,
+        sessionTranscript: ByteArray,
+        eReaderPrivateKey: Crypto2Key,
+        devicePublicKey: CoseKey,
+    ): Boolean = verifyDeviceMac(
+        deviceAuthBytes,
+        deviceMac,
+        sessionTranscript,
+        eReaderPrivateKey,
+        devicePublicKey.toEncodedJwk(),
+    )
 
     // --- Helper Functions ---
 
@@ -183,6 +251,33 @@ object MdocCrypto {
         }
         return JWKKey.importJWK(jwkJson).getOrThrow()
     }
+
+    suspend fun coseKeyToCrypto2Key(coseKey: CoseKey): Crypto2Key = restoreCoseVerificationKey(coseKey)
+
+    suspend fun coseKeyToCrypto2Key(coseKey: CoseKey, expectedAlgorithm: Int): Crypto2Key {
+        require(coseKey.alg == null || coseKey.alg == expectedAlgorithm) {
+            "Device COSE_Key algorithm ${coseKey.alg} is incompatible with device signature algorithm $expectedAlgorithm"
+        }
+        return restoreCoseVerificationKey(coseKey)
+    }
+
+    private suspend fun restoreCoseVerificationKey(coseKey: CoseKey): Crypto2Key {
+        coseKey.key_ops?.let { operations ->
+            require(operations.isNotEmpty() && COSE_KEY_OPERATION_VERIFY in operations) {
+                "Device COSE_Key does not permit signature verification"
+            }
+        }
+        val publicJwk = coseKey.toEncodedJwk()
+        require(!publicJwk.privateMaterial) { "Device authentication verification key must be public" }
+        return crypto2Runtime.restore(
+            publicJwk.toStoredSoftwareKey(
+                KeyId(Jwk.sha256Thumbprint(publicJwk)),
+                setOf(KeyUsage.VERIFY),
+            )
+        )
+    }
+
+    private const val COSE_KEY_OPERATION_VERIFY = 2
 
     internal fun decodeCoseKey(cborBytes: ByteArray): CoseKey {
         // The EReaderKeyBytes is tagged with #6.24

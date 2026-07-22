@@ -1,6 +1,10 @@
 package id.walt.openid4vci.tokens.jwt.refresh
 
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.Key
+import id.walt.openid4vci.tokens.jwt.Crypto2JwtSigningKey
+import id.walt.openid4vci.tokens.jwt.Crypto2JwtSigningKeyResolver
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import id.walt.openid4vci.tokens.jwt.JwtSigningKeyResolver
 import id.walt.openid4vci.tokens.jwt.JwtTokenSigner
@@ -15,10 +19,21 @@ class JwtRefreshTokenIssuer internal constructor(
     private val signer: JwtTokenSigner,
 ) : RefreshTokenIssuer {
 
+    @Deprecated("Use the Crypto2Key constructor or crypto2 resolver factory")
     constructor(
         signingKeyResolver: JwtSigningKeyResolver,
     ) : this(
         signer = JwtTokenSigner(signingKeyResolver),
+    )
+
+    constructor(
+        signingKey: Key,
+        algorithm: JwsAlgorithm,
+        keyId: String = signingKey.id.value,
+    ) : this(
+        signer = JwtTokenSigner(Crypto2JwtSigningKeyResolver {
+            Crypto2JwtSigningKey(signingKey, algorithm, keyId)
+        }),
     )
 
     override suspend fun issue(request: RefreshTokenGenerationRequest): String {
@@ -49,7 +64,10 @@ class JwtRefreshTokenIssuer internal constructor(
     private fun generateTokenId(): String =
         CryptoRand.nextBytes(ByteArray(TOKEN_ID_BYTES)).encodeToBase64Url()
 
-    private companion object {
-        const val TOKEN_ID_BYTES = 32
+    companion object {
+        private const val TOKEN_ID_BYTES = 32
+
+        fun crypto2(resolver: Crypto2JwtSigningKeyResolver): JwtRefreshTokenIssuer =
+            JwtRefreshTokenIssuer(JwtTokenSigner(resolver))
     }
 }

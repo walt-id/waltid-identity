@@ -7,6 +7,12 @@ import id.walt.dcql.DcqlCredential
 import id.walt.dcql.models.TrustedAuthoritiesQuery
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJwe
+import id.walt.crypto2.jose.JweContentEncryption
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.iso18013.annexc.AnnexCResponseVerifier
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
@@ -35,12 +41,16 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.coroutines.CancellationException
+import kotlin.io.encoding.Base64
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 object Verifier2VPDirectPostHandler {
 
     private val log = KotlinLogging.logger {}
+    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
 
     /**
      * Optional callback for `trusted_authorities` verification per OID4VP §6.1.1.
@@ -54,12 +64,14 @@ object Verifier2VPDirectPostHandler {
         responseMode: OpenID4VPResponseMode?,
         responseData: DirectPostResponse,
         session: Verification2Session,
-        ephemeralDecryptionKey: DirectSerializedKey?
+        ephemeralDecryptionKey: DirectSerializedKey?,
+        crypto2EphemeralDecryptionKey: String? = session.crypto2EphemeralDecryptionKey,
     ): Pair<String, String?> = when (responseData) {
         is ErrorResponseDirectPost -> error("Wallet error responses must be handled before parsing vp_token data")
 
         is DcApiJsonDirectPostResponse -> {
-            if (session.setup is DcApiAnnexCFlowSetup) {
+            val setup = session.setup
+            if (setup is DcApiAnnexCFlowSetup) {
                 // Annex C handling
 
                 log.debug { "ANNEX C HANDLING: $responseData" }
@@ -67,30 +79,30 @@ object Verifier2VPDirectPostHandler {
                 val encryptionInfoB64 = session.data?.jsonObject["data"]?.jsonObject["encryptionInfo"]?.jsonPrimitive?.content
                     ?: throw IllegalArgumentException("Missing encryption info data")
 
-                val hpkeInfo = AnnexCTranscriptBuilder.computeHpkeInfo(encryptionInfoB64, session.setup.origin)
+                val hpkeInfo = AnnexCTranscriptBuilder.computeHpkeInfo(encryptionInfoB64, setup.origin)
                 val transcriptHashHex = hpkeInfo.sha256().toHexString()
                 log.debug { "Transcript hash: $transcriptHashHex" }
 
-                val plaintext = AnnexCResponseVerifier.decryptToDeviceResponse(
-                    encryptedResponseB64 = (responseData.jsonBody["response"]
-                        ?: responseData.jsonBody["data"]?.jsonObject["response"])?.jsonPrimitive?.content ?: throw IllegalArgumentException(
-                        "Missing 'response' attribute in Annex C JSON response from wallet"
-                    ),
+                val encryptedResponseB64 = (responseData.jsonBody["response"]
+                    ?: responseData.jsonBody["data"]?.jsonObject?.get("response"))?.jsonPrimitive?.content
+                    ?: throw IllegalArgumentException("Missing 'response' attribute in Annex C JSON response from wallet")
+                val plaintext = decryptAnnexCResponse(
+                    encryptedResponseB64 = encryptedResponseB64,
                     encryptionInfoB64 = encryptionInfoB64,
-                    origin = session.setup.origin,
-                    recipientPrivateKey = ephemeralDecryptionKey?.key as? JWKKey
-                        ?: error("Missing ephemeral decryption key for Annex C")
+                    origin = setup.origin,
+                    legacyKey = ephemeralDecryptionKey,
+                    crypto2StoredKey = crypto2EphemeralDecryptionKey,
                 )
 
                 val deviceResponse = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(plaintext)
+                require(deviceResponse.version == "1.0") { "Unsupported DeviceResponse version: ${deviceResponse.version}" }
+                require(deviceResponse.status == 0u) { "DeviceResponse reported failure status: ${deviceResponse.status}" }
                 requireNotNull(deviceResponse.documents) { "Missing 'documents' in DeviceResponse!" }
 
                 val virtualVpToken = deviceResponse.documents!!
                     .groupBy { it.docType }
                     .mapValues { (_, docs) -> docs.map { doc -> coseCompliantCbor.encodeToHexString(doc) } }
 
-                //require("1.0" == deviceResponse.version)
-                //require(0u == deviceResponse.status)
                 //println("Device response: $deviceResponse")
 
 
@@ -122,7 +134,8 @@ object Verifier2VPDirectPostHandler {
                         responseMode = responseMode,
                         responseData = EncryptedResponseStringDirectPostResponse(response),
                         session = session,
-                        ephemeralDecryptionKey = ephemeralDecryptionKey
+                        ephemeralDecryptionKey = ephemeralDecryptionKey,
+                        crypto2EphemeralDecryptionKey = crypto2EphemeralDecryptionKey,
                     )
                     vpToken to state
                 } else {
@@ -139,9 +152,11 @@ object Verifier2VPDirectPostHandler {
             }
 
             log.trace { "Decrypting encrypted token..." }
-            requireNotNull(ephemeralDecryptionKey) { "Missing decryption key for encrypted response flow" }
-            val decryptedPayloadString = (ephemeralDecryptionKey.key as JWKKey).decryptJwe(responseData.responseParameter)
-                .decodeToString()
+            val decryptedPayloadString = decryptDirectPostJwe(
+                responseData.responseParameter,
+                ephemeralDecryptionKey,
+                crypto2EphemeralDecryptionKey,
+            ).decodeToString()
             val jsonPayload = Json.parseToJsonElement(decryptedPayloadString).jsonObject
             val vpToken = jsonPayload["vp_token"].toString() // Extract the inner vp_token object
             val state = jsonPayload["state"]?.jsonPrimitive?.content
@@ -158,6 +173,32 @@ object Verifier2VPDirectPostHandler {
         }
     }
 
+    internal suspend fun decryptAnnexCResponse(
+        encryptedResponseB64: String,
+        encryptionInfoB64: String,
+        origin: String,
+        legacyKey: DirectSerializedKey?,
+        crypto2StoredKey: String?,
+    ): ByteArray {
+        val crypto2Key = crypto2StoredKey?.let { crypto2Runtime.restore(StoredKeyCodec.decodeFromString(it)) }
+        return if (crypto2Key != null) {
+            AnnexCResponseVerifier.decryptToDeviceResponse(
+                encryptedResponseB64 = encryptedResponseB64,
+                encryptionInfoB64 = encryptionInfoB64,
+                origin = origin,
+                recipientPrivateKey = crypto2Key,
+            )
+        } else {
+            AnnexCResponseVerifier.decryptToDeviceResponse(
+                encryptedResponseB64 = encryptedResponseB64,
+                encryptionInfoB64 = encryptionInfoB64,
+                origin = origin,
+                recipientPrivateKey = legacyKey?.key as? JWKKey
+                    ?: error("Missing ephemeral decryption key for Annex C"),
+            )
+        }
+    }
+
     /**
      * Extracts the `id_token` from a [DirectPostResponse] for `vp_token id_token` flows.
      * Returns null if no `id_token` is present (e.g., plain `vp_token` flow).
@@ -165,17 +206,24 @@ object Verifier2VPDirectPostHandler {
     suspend fun extractIdToken(
         responseData: DirectPostResponse,
         session: Verification2Session,
-        ephemeralDecryptionKey: DirectSerializedKey?
+        ephemeralDecryptionKey: DirectSerializedKey?,
+        crypto2EphemeralDecryptionKey: String? = session.crypto2EphemeralDecryptionKey,
     ): String? = when (responseData) {
         is CleartextDirectPostResponse -> responseData.idToken
         is EncryptedResponseStringDirectPostResponse -> {
             // id_token may also appear in the encrypted JWE payload
-            runCatching {
-                requireNotNull(ephemeralDecryptionKey)
-                val decryptedPayloadString = (ephemeralDecryptionKey.key as JWKKey)
-                    .decryptJwe(responseData.responseParameter).decodeToString()
+            try {
+                val decryptedPayloadString = decryptDirectPostJwe(
+                    responseData.responseParameter,
+                    ephemeralDecryptionKey,
+                    crypto2EphemeralDecryptionKey,
+                ).decodeToString()
                 Json.parseToJsonElement(decryptedPayloadString).jsonObject["id_token"]?.jsonPrimitive?.content
-            }.getOrNull()
+            } catch (cause: CancellationException) {
+                throw cause
+            } catch (_: Throwable) {
+                null
+            }
         }
         else -> null
     }
@@ -241,6 +289,8 @@ object Verifier2VPDirectPostHandler {
         failSessionCallback: suspend (session: Verification2Session, event: SessionEvent, updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit) -> Unit,
         policyContext: PolicyExecutionContext = PolicyExecutionContext.Empty,
         beforeRespond: suspend (rejected: Boolean) -> Unit = {},
+        ephemeralDecryptionKey: DirectSerializedKey? = verificationSession?.ephemeralDecryptionKey,
+        crypto2EphemeralDecryptionKey: String? = verificationSession?.crypto2EphemeralDecryptionKey,
     ) {
         val call = this
 
@@ -260,7 +310,9 @@ object Verifier2VPDirectPostHandler {
                 responseData = call.parseHttpRequestToDirectPostResponse(),
                 updateSessionCallback = updateSessionCallback,
                 failSessionCallback = failSessionCallback,
-                policyContext = policyContext
+                policyContext = policyContext,
+                ephemeralDecryptionKey = ephemeralDecryptionKey,
+                crypto2EphemeralDecryptionKey = crypto2EphemeralDecryptionKey,
             )
 
             beforeRespond(false)
@@ -327,6 +379,9 @@ object Verifier2VPDirectPostHandler {
         updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
         failSessionCallback: suspend (session: Verification2Session, event: SessionEvent, updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit) -> Unit,
         policyContext: PolicyExecutionContext = PolicyExecutionContext.Empty,
+        ephemeralDecryptionKey: DirectSerializedKey? = verificationSession.ephemeralDecryptionKey,
+        crypto2EphemeralDecryptionKey: String? = verificationSession.crypto2EphemeralDecryptionKey,
+        verificationTime: Instant = Clock.System.now(),
     ): Map<String, String> {
         suspend fun Verification2Session.updateSession(event: SessionEvent, block: Verification2Session.() -> Unit) =
             updateSessionCallback.invoke(this, event, block)
@@ -348,7 +403,8 @@ object Verifier2VPDirectPostHandler {
             responseMode = responseMode,
             responseData = responseData,
             session = session,
-            ephemeralDecryptionKey = session.ephemeralDecryptionKey
+            ephemeralDecryptionKey = ephemeralDecryptionKey,
+            crypto2EphemeralDecryptionKey = crypto2EphemeralDecryptionKey,
         )
 
         if (receivedState != session.authorizationRequest.state) {
@@ -358,13 +414,34 @@ object Verifier2VPDirectPostHandler {
         // For vp_token id_token (SIOPv2 combined flow): validate the Self-Issued ID Token.
         // Per SIOPv2 §7 and OID4VP §"Combining this specification with SIOPv2".
         if (session.authorizationRequest.responseType == id.walt.verifier.openid.models.openid.OpenID4VPResponseType.VP_TOKEN_ID_TOKEN) {
-            val idToken = extractIdToken(responseData, session, session.ephemeralDecryptionKey)
-                ?: throw PresentationRejectionException("id_token is required for response_type=vp_token id_token but was absent")
-            SelfIssuedIdTokenValidator.validate(
-                idToken = idToken,
-                expectedNonce = session.authorizationRequest.nonce!!,
-                expectedAudience = session.authorizationRequest.clientId!!,
+            val idToken = extractIdToken(
+                responseData,
+                session,
+                ephemeralDecryptionKey,
+                crypto2EphemeralDecryptionKey,
             )
+                ?: throw PresentationRejectionException("id_token is required for response_type=vp_token id_token but was absent")
+            try {
+                val allowedAlgorithms = session.authorizationRequest.clientMetadata
+                    ?.idTokenSignedResponseAlg
+                    ?.let(JwsAlgorithm::parse)
+                    ?: JwsAlgorithm.RS256
+                SelfIssuedIdTokenValidator.validate(
+                    idToken = idToken,
+                    expectedNonce = session.authorizationRequest.nonce!!,
+                    expectedAudience = session.authorizationRequest.clientId!!,
+                    allowedAlgorithms = setOf(allowedAlgorithms),
+                )
+            } catch (cause: CancellationException) {
+                throw cause
+            } catch (cause: Throwable) {
+                val reason = "Self-Issued ID Token validation failed: ${cause.message}"
+                session.updateSession(SessionEvent.presentation_validation_available) {
+                    failure = SessionFailure.PresentationValidation(reason, emptyMap())
+                }
+                session.failSession(SessionEvent.presentation_validation_failed)
+                throw PresentationRejectionException(reason, cause)
+            }
             log.debug { "Self-Issued ID Token validated successfully for session ${session.id}" }
         }
 
@@ -390,6 +467,7 @@ object Verifier2VPDirectPostHandler {
             updateSessionCallback,
             failSessionCallback,
             policyContext,
+            verificationTime,
             trustedAuthoritiesChecker
         )
 
@@ -421,6 +499,43 @@ object Verifier2VPDirectPostHandler {
                 "message" to "Presentation received and is being processed."
             )
         }
+    }
+
+    internal suspend fun decryptDirectPostJwe(
+        compactJwe: String,
+        legacyKey: DirectSerializedKey?,
+        crypto2StoredKey: String?,
+    ): ByteArray {
+        val crypto2Key = crypto2StoredKey?.let { crypto2Runtime.restore(StoredKeyCodec.decodeFromString(it)) }
+        val expectedKeyId = crypto2Key?.id?.value
+            ?: (legacyKey?.key as? JWKKey)?.getKeyId()
+            ?: error("Missing decryption key for encrypted response flow")
+        validateJweProtectedHeader(compactJwe, expectedKeyId)
+        return if (crypto2Key != null) {
+            CompactJwe.decrypt(
+                compactJwe = compactJwe,
+                recipientKey = crypto2Key,
+                allowedContentEncryptions = setOf(JweContentEncryption.A128GCM, JweContentEncryption.A256GCM),
+            ).plaintext
+        } else {
+            (legacyKey!!.key as JWKKey).decryptJwe(compactJwe)
+        }
+    }
+
+    private fun validateJweProtectedHeader(compactJwe: String, expectedKeyId: String) {
+        val encodedHeader = compactJwe.substringBefore('.', missingDelimiterValue = "")
+        require(encodedHeader.isNotEmpty()) { "JWE protected header cannot be empty" }
+        val header = Json.parseToJsonElement(
+            Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
+                .decode(encodedHeader)
+                .decodeToString(),
+        ).jsonObject
+        require(header["alg"]?.jsonPrimitive?.content == "ECDH-ES") { "Unsupported JWE key-management algorithm" }
+        require(JweContentEncryption.parse(requireNotNull(header["enc"]?.jsonPrimitive?.content)) in setOf(
+            JweContentEncryption.A128GCM,
+            JweContentEncryption.A256GCM,
+        )) { "JWE content-encryption algorithm is not allowed" }
+        require(header["kid"]?.jsonPrimitive?.content == expectedKeyId) { "JWE kid does not match response decryption key" }
     }
 
     /**

@@ -1,6 +1,9 @@
 package id.walt.crypto.keys
 
 import kotlinx.serialization.Serializable
+import org.kotlincrypto.hash.sha2.SHA256
+import org.kotlincrypto.hash.sha2.SHA384
+import org.kotlincrypto.hash.sha2.SHA512
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
@@ -80,6 +83,21 @@ enum class KeyCategory {
     ECC,
     EdDSA
 }
+
+fun KeyType.digestForSignature(data: ByteArray): ByteArray = when (this) {
+    KeyType.secp256k1, KeyType.secp256r1, KeyType.RSA -> SHA256().digest(data)
+    KeyType.secp384r1, KeyType.RSA3072 -> SHA384().digest(data)
+    KeyType.secp521r1, KeyType.RSA4096 -> SHA512().digest(data)
+    KeyType.Ed25519 -> throw IllegalArgumentException("Ed25519 signs messages without an external digest")
+}
+
+val KeyType.signatureDigestName: String
+    get() = when (this) {
+        KeyType.secp256k1, KeyType.secp256r1, KeyType.RSA -> "SHA-256"
+        KeyType.secp384r1, KeyType.RSA3072 -> "SHA-384"
+        KeyType.secp521r1, KeyType.RSA4096 -> "SHA-512"
+        KeyType.Ed25519 -> throw IllegalArgumentException("Ed25519 signs messages without an external digest")
+    }
 
 /*
  * RS256, RS384, RS512 (RSASSA-PKCS1-v1_5 using SHA-256/384/512)

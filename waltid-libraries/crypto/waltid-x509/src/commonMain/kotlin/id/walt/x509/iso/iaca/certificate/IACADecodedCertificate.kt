@@ -1,6 +1,7 @@
 package id.walt.x509.iso.iaca.certificate
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.EncodedKey
 import id.walt.x509.*
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.blockingBridge
@@ -21,6 +22,7 @@ data class IACADecodedCertificate internal constructor(
     val principalName: IACAPrincipalName,
     val validityPeriod: X509ValidityPeriod,
     val issuerAlternativeName: IssuerAlternativeName,
+    @Deprecated("Use crypto2PublicKey.", ReplaceWith("crypto2PublicKey"))
     val publicKey: Key,
     val serialNumber: ByteString,
     val basicConstraints: X509BasicConstraints,
@@ -31,6 +33,9 @@ data class IACADecodedCertificate internal constructor(
     val crlDistributionPointUri: String? = null,
     private val certificate: X509CertificateHandle,
 ) {
+
+    val crypto2PublicKey: EncodedKey.Jwk
+        get() = certificate.getCertificateDer().crypto2PublicJwk()
 
     /**
      * Convert the decoded certificate into the specification's profile data shape.

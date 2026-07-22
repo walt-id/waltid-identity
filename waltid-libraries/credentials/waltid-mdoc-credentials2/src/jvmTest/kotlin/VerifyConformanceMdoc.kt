@@ -1,11 +1,17 @@
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.mdoc.crypto.MdocCrypto
-import id.walt.mdoc.crypto.MdocCryptoHelper
+import id.walt.mdoc.encoding.ByteStringWrapper
+import id.walt.mdoc.objects.document.DeviceAuth
+import id.walt.mdoc.objects.document.IssuerSigned
+import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.parser.MdocParser
 import id.walt.mdoc.verification.MdocVerificationContext
 import id.walt.mdoc.verification.MdocVerifier
+import id.walt.mdoc.verification.verifyDeviceAuthentication
+import id.walt.mdoc.verification.verifyIssuerSignedItemDigests
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class VerifyConformanceMdoc {
@@ -26,37 +32,61 @@ class VerifyConformanceMdoc {
         println("==== VERIFICATION: Mdoc Device Signature ====")
         val document = MdocParser.parseToDocument(vpTokenMdocBase64)
         val mso = document.issuerSigned.decodeMobileSecurityObject()
-        val sessionTranscript = MdocCryptoHelper.reconstructOid4vpSessionTranscript(verificationContext)
+        val sessionTranscript = MdocVerifier.buildSessionTranscriptForContext(verificationContext)
 
-        println("--- Verifying device authentication ---")
+        val verification = verifyDeviceAuthentication(document, mso, sessionTranscript)
+        assertTrue(verification.deviceAuthenticationBytes.isNotEmpty())
 
-        val deviceSigned = document.deviceSigned ?: throw IllegalArgumentException("DeviceSigned structure is missing.")
-        println("Device signed: $deviceSigned")
+        assertFailsWith<IllegalArgumentException> {
+            verifyDeviceAuthentication(document, mso, sessionTranscript, allowedAlgorithms = emptySet())
+        }
 
-
-        val devicePublicKey = JWKKey.importJWK(mso.deviceKeyInfo.deviceKey.toJWK().toString()).getOrThrow()
-        println("Device public key: $devicePublicKey")
-
-        val deviceAuth = deviceSigned.deviceAuth
-        println("Device auth (of device signed): $deviceAuth")
-
-        val deviceAuthBytes = MdocCryptoHelper.buildDeviceAuthenticationBytes(
-            sessionTranscript,
-            document.docType,
-            deviceSigned.namespaces
+        val deviceSigned = requireNotNull(document.deviceSigned)
+        val signature = requireNotNull(deviceSigned.deviceAuth.deviceSignature)
+        val tamperedSignature = signature.copy(
+            signature = signature.signature.copyOf().also { it[0] = (it[0].toInt() xor 1).toByte() }
         )
-        println("Device auth bytes (hex): ${deviceAuthBytes.toHexString()}")
-
-        println("Device auth contains device signature: ${deviceAuth.deviceSignature}")
-
-        val verifyResult = MdocCrypto.verifyDeviceSignature(
-            payloadToVerify = deviceAuthBytes,
-            deviceSignature = deviceAuth.deviceSignature!!,
-            sDevicePublicKey = devicePublicKey
+        val tamperedDocument = document.copy(
+            deviceSigned = deviceSigned.copy(deviceAuth = DeviceAuth(deviceSignature = tamperedSignature))
         )
-        println("Key (from MSO): $verifyResult")
+        assertFailsWith<IllegalArgumentException> {
+            verifyDeviceAuthentication(tamperedDocument, mso, sessionTranscript)
+        }
+    }
 
-        require(verifyResult) { "Failed verifying device signature" }
+    @Test
+    fun verifyIssuerSignedDigestsUseOriginalBytesAndRejectTampering() {
+        val document = MdocParser.parseToDocument(vpTokenMdocBase64)
+        val mso = document.issuerSigned.decodeMobileSecurityObject()
+        val verifications = verifyIssuerSignedItemDigests(document, mso)
+        val namespaces = requireNotNull(document.issuerSigned.namespaces)
+        val (namespace, issuerSignedList) = namespaces.entries.first()
+        val original = issuerSignedList.entries.first()
+        val verified = verifications.first { it.namespace == namespace && it.item.digestId == original.value.digestId }
+
+        assertContentEquals(original.serialized, verified.serialized)
+        assertTrue(verified.calculatedDigest.contentEquals(verified.expectedDigest))
+
+        val tamperedBytes = original.serialized.copyOf().also {
+            it[it.lastIndex] = (it.last().toInt() xor 1).toByte()
+        }
+        val tamperedList = IssuerSignedList(
+            listOf(ByteStringWrapper(original.value, tamperedBytes)) + issuerSignedList.entries.drop(1)
+        )
+        val tamperedDocument = document.copy(
+            issuerSigned = IssuerSigned.fromIssuerSignedLists(
+                namespaces = namespaces + (namespace to tamperedList),
+                issuerAuth = document.issuerSigned.issuerAuth,
+            )
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            verifyIssuerSignedItemDigests(tamperedDocument, mso)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            verifyIssuerSignedItemDigests(document, mso.copy(digestAlgorithm = "SHA-1"))
+        }
+        assertFalse(tamperedBytes.contentEquals(original.serialized))
     }
 
     @Test

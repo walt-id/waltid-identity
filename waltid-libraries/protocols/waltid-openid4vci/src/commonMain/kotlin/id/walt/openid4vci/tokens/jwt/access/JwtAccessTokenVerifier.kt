@@ -1,9 +1,13 @@
 package id.walt.openid4vci.tokens.jwt.access
 
-import id.walt.openid4vci.tokens.access.AccessTokenVerifier
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.Key
+import id.walt.openid4vci.tokens.jwt.Crypto2JwtVerificationKey
+import id.walt.openid4vci.tokens.jwt.Crypto2JwtVerificationKeyResolver
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import id.walt.openid4vci.tokens.jwt.JwtTokenVerifier
 import id.walt.openid4vci.tokens.jwt.JwtVerificationKeyResolver
+import id.walt.openid4vci.tokens.access.AccessTokenVerifier
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -15,10 +19,18 @@ import kotlin.time.Clock
 /**
  * JWT access-token verifier. Validates signature and optional standard claims.
  */
-class JwtAccessTokenVerifier(
-    resolver: JwtVerificationKeyResolver,
+class JwtAccessTokenVerifier private constructor(
+    private val verifier: JwtTokenVerifier,
 ) : AccessTokenVerifier {
-    private val verifier = JwtTokenVerifier(resolver)
+
+    @Deprecated("Use the Crypto2Key constructor or crypto2 resolver factory")
+    constructor(resolver: JwtVerificationKeyResolver) : this(JwtTokenVerifier(resolver))
+
+    constructor(verificationKey: Key, allowedAlgorithms: Set<JwsAlgorithm>) : this(
+        JwtTokenVerifier(Crypto2JwtVerificationKeyResolver {
+            Crypto2JwtVerificationKey(verificationKey, allowedAlgorithms)
+        })
+    )
 
     override suspend fun verify(
         token: String,
@@ -60,5 +72,10 @@ class JwtAccessTokenVerifier(
             is JsonPrimitive -> setOf(element.content)
             else -> emptySet()
         }
+    }
+
+    companion object {
+        fun crypto2(resolver: Crypto2JwtVerificationKeyResolver): JwtAccessTokenVerifier =
+            JwtAccessTokenVerifier(JwtTokenVerifier(resolver))
     }
 }

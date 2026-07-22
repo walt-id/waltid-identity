@@ -2,6 +2,7 @@ package id.walt.credentials.formats
 
 import id.walt.credentials.signatures.CredentialSignature
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.Key as Crypto2Key
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -10,7 +11,7 @@ import kotlinx.serialization.json.JsonObject
  * Representation of a Digital Credential
  */
 @Serializable
-sealed class DigitalCredential {
+sealed class DigitalCredential : Crypto2DigitalCredential {
     abstract val format: String
 
     abstract val credentialData: JsonObject
@@ -24,6 +25,7 @@ sealed class DigitalCredential {
     /**
      * Get public key from signer (issuer) for signed credentials
      */
+    @Deprecated("Use getSignerCrypto2Key()")
     abstract suspend fun getSignerKey(): Key?
 
     /**
@@ -33,9 +35,12 @@ sealed class DigitalCredential {
      */
     open suspend fun getHolderKey(): Key? = null
 
+    abstract override suspend fun getHolderCrypto2Key(): Crypto2Key?
+
     // TODO: Signer key should globally move into signature, as such "open" key word to be removed in the future
     //open suspend fun getSignerKey(): Key? = signature?.signerKey
 
+    @Deprecated("Use verifyCrypto2(publicKey, allowedAlgorithms)")
     abstract suspend fun verify(publicKey: Key): Result<JsonElement>
 
     //fun sign()

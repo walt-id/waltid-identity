@@ -15,6 +15,7 @@ abstract class JavaDidResolver : DidResolver {
         runCatching { javaResolve() }
 
     abstract fun javaResolveToKey(): Key
+    @Deprecated("Use Crypto2DidKeyResolver or Crypto2DidService for key resolution")
     override suspend fun resolveToKey(did: String) = runCatching {
         javaResolveToKey()
     }

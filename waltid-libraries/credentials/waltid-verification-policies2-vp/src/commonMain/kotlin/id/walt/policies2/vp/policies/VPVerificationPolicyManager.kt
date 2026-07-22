@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package id.walt.policies2.vp.policies
 
 object VPVerificationPolicyManager {
@@ -10,7 +12,6 @@ object VPVerificationPolicyManager {
         KbJwtIatCheckSdJwtVPPolicy(),
         ExpCheckSdJwtVPPolicy(),
         NbfCheckSdJwtVPPolicy(),
-        TransactionDataHashesVPPolicy(),
         TransactionDataHashCheckSdJwtVPPolicy(),
     )
     val defaultDcSdJwtPolicies = simpleDcSdJwtPolicies.toList()
@@ -47,7 +48,8 @@ object VPVerificationPolicyManager {
     val simpleVerificationPolicies: Map<String, VPPolicy2> = listOf(
         *simpleDcSdJwtPolicies,
         *simpleJwtVcJsonPolicies,
-        *simpleMsoMdocPolicies
+        *simpleMsoMdocPolicies,
+        TransactionDataHashesVPPolicy(),
     ).associateBy { it.id }
 
     fun getSimpleVerificationPolicyByName(id: String): VPPolicy2 =
@@ -56,5 +58,17 @@ object VPVerificationPolicyManager {
 
     fun isSimplePolicy(id: String): Boolean =
         simpleVerificationPolicies.containsKey(id)
+
+    fun shouldSerializeAsSimple(policy: VPPolicy2): Boolean = when (policy) {
+        is SignatureJwtVcJsonVPPolicy -> policy.hasDefaultAlgorithmConfiguration
+        is KbJwtSignatureSdJwtVPPolicy -> policy.hasDefaultAlgorithmConfiguration
+        is KbJwtIatCheckSdJwtVPPolicy -> policy.maxAgeMinutes == 5L
+        is ExpCheckSdJwtVPPolicy -> policy.clockSkewSeconds == 2L
+        is NbfCheckSdJwtVPPolicy -> policy.clockSkewSeconds == 2L
+        is ExpCheckJwtVcJsonVPPolicy -> policy.clockSkewSeconds == 2L
+        is NbfCheckJwtVcJsonVPPolicy -> policy.clockSkewSeconds == 2L
+        is MsoVerificationMdocVpPolicy -> !policy.strictEtsiPrecision
+        else -> isSimplePolicy(policy.id)
+    }
 
 }

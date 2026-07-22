@@ -10,7 +10,7 @@ class VPCmd : CliktCommand(
     name = "vp"
 ) {
 
-    override fun help(context: Context) = "Create and apply a wide range of verification policies on W3C Verifiable Presentations (VPs)."
+    override fun help(context: Context) = "Create and verify Final OpenID4VP jwt_vc_json presentations selected by DCQL."
     override val printHelpOnEmptyArgs = true
 
     init {

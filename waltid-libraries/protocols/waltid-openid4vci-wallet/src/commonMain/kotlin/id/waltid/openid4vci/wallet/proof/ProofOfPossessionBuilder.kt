@@ -1,6 +1,8 @@
 package id.waltid.openid4vci.wallet.proof
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.openid4vci.prooftypes.Proofs
 
 /**
@@ -17,6 +19,7 @@ interface ProofOfPossessionBuilder {
      * @param nonce The c_nonce from the issuer
      * @return Proofs object containing the proof
      */
+    @Deprecated("Use Crypto2ProofOfPossessionBuilder.buildProof")
     suspend fun buildProof(
         key: Key,
         audience: String,
@@ -27,6 +30,15 @@ interface ProofOfPossessionBuilder {
      * Gets the proof type identifier
      */
     val proofType: String
+}
+
+interface Crypto2ProofOfPossessionBuilder {
+    suspend fun buildProof(
+        key: Crypto2Key,
+        algorithm: JwsAlgorithm,
+        audience: String,
+        nonce: String,
+    ): Proofs
 }
 
 /**

@@ -10,6 +10,8 @@ internal fun validateCertificateChainWithExplicitTrust(
     trustAnchors: List<CertificateDer>?,
     enableTrustedChainRoot: Boolean,
     now: Instant = Clock.System.now(),
+    additionalProcessedCriticalExtensionOids: Set<String> = emptySet(),
+    requiredExtendedKeyUsageOid: String? = null,
 ) {
     val parsedLeaf = parseCertificate(leaf, "leaf certificate")
     val parsedChain = chain.mapIndexed { index, certificate ->
@@ -44,6 +46,10 @@ internal fun validateCertificateChainWithExplicitTrust(
         anchors = anchors,
         visited = setOf(parsedLeaf.der),
         now = now,
+        caCertificatesBelow = 0,
+        processedCriticalExtensionOids = processedCriticalExtensionOids + additionalProcessedCriticalExtensionOids,
+        issuerProcessedCriticalExtensionOids = processedCriticalExtensionOids,
+        requiredExtendedKeyUsageOid = requiredExtendedKeyUsageOid,
     )
 
     if (path == null) {
@@ -74,6 +80,10 @@ private fun buildValidatedPath(
     anchors: List<ParsedCertificate>,
     visited: Set<CertificateDer>,
     now: Instant,
+    caCertificatesBelow: Int,
+    processedCriticalExtensionOids: Set<String>,
+    issuerProcessedCriticalExtensionOids: Set<String>,
+    requiredExtendedKeyUsageOid: String?,
 ): List<ParsedCertificate>? {
     try {
         current.certificate.checkValidityAt(now)
@@ -82,6 +92,9 @@ private fun buildValidatedPath(
             "Certificate path invalid: certificate is not valid at $now: ${cause.message}",
             cause,
         )
+    }
+    if (current.certificate.criticalExtensionOids.any { it !in processedCriticalExtensionOids }) {
+        throw X509ValidationException("Certificate path invalid: certificate has an unsupported critical extension.")
     }
 
     if (anchors.any { it.der == current.der }) {
@@ -94,6 +107,14 @@ private fun buildValidatedPath(
 
     for (issuer in issuers) {
         if (!current.hasKeyIdentifierMatch(issuer)) continue
+        val issuerCaCertificatesBelow = caCertificatesBelow + if (current.certificate.isCertificateAuthority) 1 else 0
+        if (
+            !issuer.certificate.canIssueCertificates(
+                issuerCaCertificatesBelow,
+                issuerProcessedCriticalExtensionOids,
+                requiredExtendedKeyUsageOid,
+            )
+        ) continue
 
         val verified = runCatching { current.certificate.verifySignedBy(issuer.certificate) }
             .isSuccess
@@ -105,6 +126,10 @@ private fun buildValidatedPath(
             anchors = anchors,
             visited = visited + issuer.der,
             now = now,
+            caCertificatesBelow = issuerCaCertificatesBelow,
+            processedCriticalExtensionOids = issuerProcessedCriticalExtensionOids,
+            issuerProcessedCriticalExtensionOids = issuerProcessedCriticalExtensionOids,
+            requiredExtendedKeyUsageOid = requiredExtendedKeyUsageOid,
         )
         if (path != null) {
             return listOf(current) + path
@@ -113,6 +138,45 @@ private fun buildValidatedPath(
 
     return null
 }
+
+private fun PlatformX509Certificate.canIssueCertificates(
+    caCertificatesBelow: Int,
+    processedCriticalExtensionOids: Set<String>,
+    requiredExtendedKeyUsageOid: String?,
+): Boolean =
+    isCertificateAuthority &&
+        canSignCertificates &&
+        basicConstraintsCritical &&
+        keyUsageCritical &&
+        criticalExtensionOids.all { it in processedCriticalExtensionOids } &&
+        (requiredExtendedKeyUsageOid == null || extendedKeyUsageOids?.contains(requiredExtendedKeyUsageOid) != false) &&
+        (pathLengthConstraint?.let { caCertificatesBelow <= it } ?: true)
+
+fun validateClientAuthenticationCertificateChain(
+    leaf: CertificateDer,
+    chain: List<CertificateDer>,
+    trustAnchors: List<CertificateDer>,
+) {
+    validatePlatformClientAuthenticationCertificateChain(leaf, chain, trustAnchors)
+    validateCertificateChainWithExplicitTrust(
+        leaf = leaf,
+        chain = chain,
+        trustAnchors = trustAnchors,
+        enableTrustedChainRoot = false,
+        additionalProcessedCriticalExtensionOids = setOf(EXTENDED_KEY_USAGE_OID),
+        requiredExtendedKeyUsageOid = CLIENT_AUTH_EXTENDED_KEY_USAGE_OID,
+    )
+    leaf.validateClientAuthenticationCertificateUsage()
+}
+
+private const val EXTENDED_KEY_USAGE_OID = "2.5.29.37"
+private const val CLIENT_AUTH_EXTENDED_KEY_USAGE_OID = "1.3.6.1.5.5.7.3.2"
+
+internal expect fun validatePlatformClientAuthenticationCertificateChain(
+    leaf: CertificateDer,
+    chain: List<CertificateDer>,
+    trustAnchors: List<CertificateDer>,
+)
 
 private fun ParsedCertificate.hasKeyIdentifierMatch(
     issuer: ParsedCertificate,

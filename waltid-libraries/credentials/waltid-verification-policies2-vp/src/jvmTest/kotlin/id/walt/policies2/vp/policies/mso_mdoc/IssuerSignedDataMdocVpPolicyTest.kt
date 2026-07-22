@@ -13,6 +13,7 @@ import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.mso.DeviceKeyInfo
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.objects.mso.ValidityInfo
+import id.walt.mdoc.verification.MdocVerifier
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -61,11 +62,44 @@ class IssuerSignedDataMdocVpPolicyTest {
         val result = policy.runPolicy(document, mso, dummyVerificationContext())
 
         assertTrue(result.success)
+        MdocVerifier.verifyIssuerSignedDataIntegrity(document, mso)
         val matchingDigest = result.results["matching_digest"]?.jsonObject
         assertNotNull(matchingDigest)
         val ids = matchingDigest[namespace]?.jsonArray
         assertNotNull(ids)
         assertTrue(JsonPrimitive(elementId) in ids)
+    }
+
+    @Test
+    fun shouldFailWhenMsoContainsDuplicateDigestIds() = runTest {
+        val namespace = "eu.europa.ec.eudi.pid.1"
+        val item = IssuerSignedItem(
+            digestId = 1u,
+            random = ByteArray(16) { 1 },
+            elementIdentifier = "given_name",
+            elementValue = CborString("Inga"),
+        )
+        val digest = ValueDigest.fromIssuerSignedItem(item, namespace, "SHA-256")
+        val mso = dummyMsoWithDigests(
+            docType = namespace,
+            digestAlgorithm = "SHA-256",
+            digests = mapOf(namespace to listOf(digest, digest)),
+        )
+        val document = Document(
+            docType = namespace,
+            issuerSigned = IssuerSigned.fromIssuerSignedItems(
+                namespacedItems = mapOf(namespace to listOf(item)),
+                issuerAuth = dummyIssuerAuth(),
+            ),
+            deviceSigned = null,
+        )
+
+        val result = IssuerSignedDataMdocVpPolicy().runPolicy(document, mso, dummyVerificationContext())
+
+        assertFalse(result.success)
+        assertFailsWith<IllegalArgumentException> {
+            MdocVerifier.verifyIssuerSignedDataIntegrity(document, mso)
+        }
     }
 
     @Test

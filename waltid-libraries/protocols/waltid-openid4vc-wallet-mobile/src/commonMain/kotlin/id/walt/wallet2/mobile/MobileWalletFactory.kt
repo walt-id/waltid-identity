@@ -1,7 +1,13 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.wallet2.mobile
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.signum.SignumKeyPolicy
+import id.walt.did.dids.Crypto2DidService
 import app.cash.sqldelight.db.SqlDriver
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
@@ -14,6 +20,9 @@ import id.walt.wallet2.persistence.stores.PlatformKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlin.uuid.Uuid
 
 /**
  * Configuration for creating a [MobileWallet].
@@ -116,6 +125,17 @@ public data class MobileWalletKeys(
 )
 
 /**
+ * Crypto2 customization for the default mobile key and DID bootstrap path.
+ *
+ * @property didService Crypto2 DID service used for did:key and did:jwk registration.
+ * @property keyPolicy Optional platform Signum policy for generated managed keys.
+ */
+public class MobileWalletCrypto2Config(
+    public val didService: Crypto2DidService = Crypto2DidService,
+    public val keyPolicy: SignumKeyPolicy? = null,
+)
+
+/**
  * Platform factory that wires [MobileWallet] to Android or iOS storage and key infrastructure.
  */
 public expect class MobileWalletFactory {
@@ -125,10 +145,33 @@ public expect class MobileWalletFactory {
      * @param config Wallet configuration. Defaults use the stable `default` wallet identifier and P-256 key material.
      */
     public suspend fun create(config: MobileWalletConfig = MobileWalletConfig()): MobileWallet
+
+    /**
+     * Creates a mobile wallet with explicit verifier client-ID trust configuration.
+     */
+    public suspend fun create(
+        config: MobileWalletConfig,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+    ): MobileWallet
+
+    /** Creates a mobile wallet with explicit crypto2 bootstrap customization. */
+    public suspend fun create(
+        config: MobileWalletConfig,
+        crypto2Config: MobileWalletCrypto2Config,
+    ): MobileWallet
+
+    /** Creates a mobile wallet with explicit trust and crypto2 bootstrap customization. */
+    public suspend fun create(
+        config: MobileWalletConfig,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        crypto2Config: MobileWalletCrypto2Config,
+    ): MobileWallet
 }
 
 internal suspend fun createEncryptedSqlDelightMobileWallet(
     config: MobileWalletConfig,
+    clientIdTrustConfiguration: ClientIdTrustConfiguration,
+    crypto2Config: MobileWalletCrypto2Config?,
     managedDatabaseKeyProvider: DatabaseEncryptionKeyProvider,
     platformKeyProvider: PlatformKeyProvider,
     openEncryptedDriver: (
@@ -154,6 +197,8 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
 
     return createSqlDelightMobileWallet(
         config = config,
+        clientIdTrustConfiguration = clientIdTrustConfiguration,
+        crypto2Config = crypto2Config,
         db = db,
         keyProvider = platformKeyProvider,
         deleteLocalPersistence = {
@@ -164,18 +209,41 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
     )
 }
 
-private fun createSqlDelightMobileWallet(
+internal fun createSqlDelightMobileWallet(
     config: MobileWalletConfig,
+    clientIdTrustConfiguration: ClientIdTrustConfiguration,
+    crypto2Config: MobileWalletCrypto2Config?,
     db: WalletPersistenceDatabase,
     keyProvider: PlatformKeyProvider,
     deleteLocalPersistence: suspend () -> Unit,
 ): MobileWallet {
     val queries = db.walletPersistenceQueries
     val keyOverride = config.persistence.stores.keys
-    val keyStore = keyOverride?.store ?: PlatformKeyStore(keyProvider, queries)
+    require(keyOverride == null || crypto2Config == null) {
+        "MobileWalletKeys legacy override cannot be combined with MobileWalletCrypto2Config"
+    }
+    val platformKeyStore = PlatformKeyStore(keyProvider, queries)
+    val keyStore = keyOverride?.store ?: platformKeyStore
     val credentialStore = config.persistence.stores.credentials ?: SqlDelightCredentialStore(queries)
     val didStore = config.persistence.stores.dids ?: SqlDelightDidStore(queries)
-    val keyGenerator = keyOverride?.generate ?: { keyType: KeyType -> keyProvider.generateKey(keyType) }
+    val keyGenerator = keyOverride?.generate ?: { _: KeyType ->
+        error("Legacy key generation requires an explicit MobileWalletKeys override")
+    }
+    val crypto2Bootstrap = if (keyOverride != null) null else {
+        (crypto2Config ?: MobileWalletCrypto2Config()).let { crypto2 ->
+            MobileWalletCrypto2Bootstrap(
+                generateAndPersistKey = { keyType ->
+                    platformKeyStore.generateCrypto2Key(
+                        id = KeyId("wallet_key_${Uuid.random()}"),
+                        spec = keyType.toCrypto2KeySpec(),
+                        usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                        policy = crypto2.keyPolicy,
+                    )
+                },
+                didService = crypto2.didService,
+            )
+        }
+    }
 
     return MobileWallet(
         walletId = config.walletId,
@@ -183,9 +251,11 @@ private fun createSqlDelightMobileWallet(
         didStore = didStore,
         credentialStore = credentialStore,
         keyGenerator = keyGenerator,
+        crypto2Bootstrap = crypto2Bootstrap,
         defaultKeyType = config.defaultKeyType,
         attestationConfig = config.attestationConfig,
         transactionDataProfiles = config.transactionDataProfiles,
+        clientIdTrustConfiguration = clientIdTrustConfiguration,
         onEvent = config.onEvent,
         deleteLocalPersistence = deleteLocalPersistence,
     )

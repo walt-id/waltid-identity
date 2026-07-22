@@ -1,6 +1,8 @@
 package id.waltid.openid4vci.wallet.attestation
 
+import id.walt.crypto2.jose.Jwk
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.EncodedKey
 import id.waltid.openid4vci.wallet.proof.ProofBuilderUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -44,16 +46,19 @@ class HttpWalletAttestationProvider(
 ) : WalletAttestationProvider {
 
     private val mutex = Mutex()
+    private var cachedKey: AttestationCacheKey? = null
     private var cachedJwt: String? = null
     private var cachedExpiresAt: Long = 0
 
     private val endpoint: String
         get() = "${baseUrl.trimEnd('/')}/v1/${attesterPath.trim()}/client-attester-api/attest"
 
-    override suspend fun getAttestationJwt(instanceKey: Key, clientId: String): String {
+    override suspend fun getAttestationJwt(instancePublicKeyJwk: EncodedKey.Jwk, clientId: String): String {
         mutex.withLock {
+            val instanceKeyJwk = instancePublicKeyJwk.requirePublicJwk()
             val now = ProofBuilderUtils.currentTimestampSeconds()
-            cachedJwt?.let { jwt ->
+            val cacheKey = AttestationCacheKey(clientId, Jwk.sha256Thumbprint(instancePublicKeyJwk))
+            cachedJwt?.takeIf { cachedKey == cacheKey }?.let { jwt ->
                 if (now < cachedExpiresAt - 60) {
                     log.debug { "Using cached attestation JWT (expires in ${cachedExpiresAt - now}s)" }
                     return jwt
@@ -62,7 +67,6 @@ class HttpWalletAttestationProvider(
 
             log.info { "Obtaining wallet attestation from $endpoint" }
 
-            val instanceKeyJwk = Json.parseToJsonElement(instanceKey.getPublicKey().exportJWK()) as JsonObject
             val requestBody = buildJsonObject {
                 put("clientId", clientId)
                 put("instancePublicKeyJwk", instanceKeyJwk)
@@ -84,6 +88,7 @@ class HttpWalletAttestationProvider(
             }
 
             val result = response.body<AttestationObtainResponse>()
+            cachedKey = cacheKey
             cachedJwt = result.clientAttestationJwt
             cachedExpiresAt = result.expiresAt
 
@@ -91,4 +96,13 @@ class HttpWalletAttestationProvider(
             return result.clientAttestationJwt
         }
     }
+
+    @Deprecated("Use the EncodedKey.Jwk overload")
+    override suspend fun getAttestationJwt(instanceKey: Key, clientId: String): String =
+        getAttestationJwt(instanceKey.exportPublicCrypto2Jwk(), clientId)
+
+    private data class AttestationCacheKey(
+        val clientId: String,
+        val publicKeyThumbprint: String,
+    )
 }

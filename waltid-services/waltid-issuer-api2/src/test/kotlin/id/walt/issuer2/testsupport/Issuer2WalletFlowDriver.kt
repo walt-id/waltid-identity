@@ -3,6 +3,7 @@ package id.walt.issuer2.testsupport
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.issuer2.models.CredentialOfferCreateResponse
@@ -50,7 +51,7 @@ class Issuer2WalletFlowDriver(
     ),
     private val attestationAssembler: ClientAttestationAssembler? = null,
 ) {
-    private var walletInstanceKey: Key? = null
+    private var walletInstanceKey: Crypto2Key? = null
 
     suspend fun resolve(createdOffer: CredentialOfferCreateResponse): ResolvedCredentialOffer {
         val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(createdOffer.credentialOffer)
@@ -292,8 +293,8 @@ class Issuer2WalletFlowDriver(
         )
     }
 
-    private suspend fun getWalletInstanceKey(): Key =
-        walletInstanceKey ?: JWKKey.generate(KeyType.secp256r1).also {
+    private suspend fun getWalletInstanceKey(): Crypto2Key =
+        walletInstanceKey ?: generateIssuer2WalletInstanceKey().also {
             walletInstanceKey = it
         }
 

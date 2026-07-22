@@ -13,6 +13,7 @@ import id.walt.dcql.models.meta.NoMeta
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.VerifierInfoItem
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier2.data.Verification2Session.DefinedVerificationPolicies
 import id.walt.verifier2.utils.UrlUtils
 import io.ktor.http.Url
@@ -83,6 +84,31 @@ sealed interface VerificationSessionSetup {
     val core: GeneralFlowConfig
 }
 
+internal fun VerificationSessionSetup.publicView(): VerificationSessionSetup = when (this) {
+    is CrossDeviceFlowSetup -> copy(core = core.publicView())
+    is SameDeviceFlowSetup -> copy(core = core.publicView())
+    is DcApiAnnexDFlowSetup -> copy(core = core.publicView())
+    is DcApiAnnexCFlowSetup -> DcApiAnnexCFlowSetup(
+        coreInput = core.publicView(),
+        requestedElements = requestedElements,
+        origin = origin,
+    )
+}
+
+private fun GeneralFlowConfig.publicView(): GeneralFlowConfig = copy(
+    notifications = notifications?.publicView(),
+    policies = policies.publicView(),
+    key = null,
+)
+
+internal fun KtorSessionNotifications.publicView(): KtorSessionNotifications = copy(
+    webhook = webhook?.copy(
+        basicAuthUser = null,
+        basicAuthPass = null,
+        bearerToken = null,
+    )
+)
+
 /** Flows that use URLs*/
 sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
     val urlConfig: UrlConfig
@@ -90,8 +116,22 @@ sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
 
 @Serializable
 data class OpenId4VPConfig(
-    val transactionData: List<JsonObject>? = null
-)
+    val transactionData: List<JsonObject>? = null,
+    val responseType: OpenID4VPResponseType = OpenID4VPResponseType.VP_TOKEN,
+    val scope: String? = null,
+    @SerialName("id_token_type") val idTokenType: String? = null,
+) {
+    init {
+        if (responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN) {
+            require(scope?.split(' ')?.contains("openid") == true) {
+                "scope must contain openid for response_type=vp_token id_token"
+            }
+            require(idTokenType == "subject_signed") {
+                "id_token_type must be subject_signed for response_type=vp_token id_token"
+            }
+        }
+    }
+}
 
 /** Allow exposing certain OpenID4VP specific options */
 sealed interface OpenID4VP1FlowSetup : VerificationSessionSetup {

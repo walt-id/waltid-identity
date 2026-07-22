@@ -1,19 +1,24 @@
 package id.walt.openid4vci.clientauth.attestation.verifier
 
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
+import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.x509.CertificateDer
 import id.walt.x509.validateCertificateChain
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 class X509ChainClientAttestationVerifier(
     trustedRootCertificatesPem: List<String>,
 ) : ClientAttestationVerifier {
 
     private val trustedRootCertificates = trustedRootCertificatesPem.map { CertificateDer.fromPEMEncodedString(it) }
+    private val keyResolver = Crypto2JwtKeyResolver()
 
     init {
         require(trustedRootCertificatesPem.isNotEmpty()) {
@@ -46,9 +51,18 @@ class X509ChainClientAttestationVerifier(
         if (!chainIsTrusted) {
             return ClientAttestationVerificationResult.Rejected("Client attestation x5c chain is not trusted")
         }
-
-        val leafKey = JWKKey.importFromDerCertificate(leafCertificate.bytes.toByteArray()).getOrNull()
-        if (leafKey?.verifyJws(jwt)?.isSuccess != true) {
+        val leafKey = keyResolver.resolveFromJwt(header, JsonObject(emptyMap()))?.key
+            ?: return ClientAttestationVerificationResult.Rejected("Client attestation certificate key is invalid")
+        val algorithm = runCatching {
+            JwsAlgorithm.parse(requireNotNull(header["alg"]?.jsonPrimitive?.contentOrNull))
+        }.getOrElse {
+            return ClientAttestationVerificationResult.Rejected("Client attestation algorithm is invalid")
+        }
+        try {
+            CompactJws.verify(jwt, leafKey, algorithm)
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: Throwable) {
             return ClientAttestationVerificationResult.Rejected("Client attestation signature is invalid")
         }
 

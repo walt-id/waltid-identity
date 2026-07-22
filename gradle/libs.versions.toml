@@ -2,6 +2,7 @@
 # Build/compilation versions
 kotlin = "2.4.0"
 suspend-transform = "2.4.0-0.14.0"
+jspecify = "1.0.0"
 
 # Used for build-plugins
 java-service = "21"
@@ -213,6 +214,7 @@ smiley-ktor-swaggerui = { module = "io.github.smiley4:ktor-swagger-ui", version.
 smiley-ktor-redoc = { module = "io.github.smiley4:ktor-redoc", version.ref = "smiley-openapi" }
 
 ## Kotlinx
+jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 kotlinx-serialization-cbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref = "kotlinx-serialization-cbor-TEMP" }
@@ -299,6 +301,7 @@ sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sq
 sqldelight-coroutines = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
 sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
 sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
+sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
 sqldelight-gradle-plugin = { module = "app.cash.sqldelight:gradle-plugin", version.ref = "sqldelight" }
 sqlcipher-android = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipher-android" }
 

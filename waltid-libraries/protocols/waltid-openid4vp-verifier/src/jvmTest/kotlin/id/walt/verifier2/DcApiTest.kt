@@ -7,6 +7,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
+import kotlin.time.Instant
 
 class DcApiTest {
 
@@ -78,7 +80,14 @@ class DcApiTest {
             }
           ]
         },
-        "client_metadata": { },
+        "client_metadata": {
+          "vp_formats_supported": {
+            "mso_mdoc": {
+              "issuerauth_alg_values": [ -9 ],
+              "deviceauth_alg_values": [ -9 ]
+            }
+          }
+        },
         "expected_origins": [
           "https://digital-credentials.walt.id"
         ]
@@ -147,8 +156,26 @@ class DcApiTest {
             },
             failSessionCallback = { session, event, _ ->
                 println(">> Called callback for fail session due to $event: $session")
-            }
+            },
+            verificationTime = Instant.parse("2025-11-25T10:07:00Z"),
         )
+    }
+
+    @Test
+    fun `rejects mdoc algorithm outside verifier metadata`() = runTest {
+        val verificationSession = Json.decodeFromString<Verification2Session>(
+            request1.replace("\"issuerauth_alg_values\": [ -9 ]", "\"issuerauth_alg_values\": [ -35 ]")
+        )
+
+        assertFailsWith<Verifier2VPDirectPostHandler.PresentationRejectionException> {
+            Verifier2VPDirectPostHandler.handleDirectPost(
+                verificationSession = verificationSession,
+                responseData = DcApiJsonDirectPostResponse(response1),
+                updateSessionCallback = { _, _, _ -> },
+                failSessionCallback = { _, _, _ -> },
+                verificationTime = Instant.parse("2025-11-25T10:07:00Z"),
+            )
+        }
     }
 
 }

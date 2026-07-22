@@ -1,20 +1,37 @@
 package id.walt.credentials.keyresolver.resolvers
 
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.serialization.BinaryData
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.URLBuilder
 import io.ktor.http.Url
 import io.ktor.http.encodedPath
-import kotlinx.serialization.json.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 object WellKnownKeyResolver : BaseKeyResolver {
     private val log = KotlinLogging.logger { }
 
     private val web = WebDataFetcher(WebDataFetcherId.WELL_KNOWN_KEY_RESOLVER)
 
+    @Deprecated(
+        "Use resolveJwkFromWellKnown for crypto2 key material",
+        ReplaceWith("resolveJwkFromWellKnown(issuerId, header)"),
+    )
     suspend fun resolveKeyFromWellKnown(issuerId: String, header: JsonObject?): JWKKey {
+        val jwk = resolveJwkFromWellKnown(issuerId, header)
+        return JWKKey.importJWK(jwk.data.toByteArray().decodeToString()).getOrThrow()
+    }
+
+    suspend fun resolveJwkFromWellKnown(issuerId: String, header: JsonObject?): EncodedKey.Jwk {
         log.debug { "Resolving issuer key via JWT VC Issuer Metadata for: $issuerId" }
         try {
             // Construct the well-known URL
@@ -43,17 +60,21 @@ object WellKnownKeyResolver : BaseKeyResolver {
 
             // Find the specific key using the 'kid' from the JWS header if present,
             // otherwise fall back to the first key in the JWKS.
+            val keys = jwks["keys"]?.jsonArray
+                ?: throw IllegalArgumentException("JWKS for issuer $issuerId contains no keys.")
             val kid = header?.get("kid")?.jsonPrimitive?.contentOrNull
             val keyJwk = if (kid != null) {
-                jwks["keys"]?.jsonArray?.firstOrNull { it.jsonObject["kid"]?.jsonPrimitive?.contentOrNull == kid }
+                keys.singleOrNull { it.jsonObject["kid"]?.jsonPrimitive?.contentOrNull == kid }
                     ?: throw IllegalArgumentException("Key with kid '$kid' not found in JWKS for issuer $issuerId.")
             } else {
-                log.debug { "No 'kid' in JWS header for $issuerId — using first key from JWKS" }
-                jwks["keys"]?.jsonArray?.firstOrNull()
-                    ?: throw IllegalArgumentException("JWKS for issuer $issuerId contains no keys.")
+                require(keys.size == 1) { "JWT VC issuer metadata with multiple keys must be resolved with kid: $issuerId" }
+                keys.single()
             }
 
-            return JWKKey.importJWK(keyJwk.jsonObject.toString()).getOrThrow()
+            return EncodedKey.Jwk(
+                data = BinaryData(Json.encodeToString(keyJwk.jsonObject).encodeToByteArray()),
+                privateMaterial = false,
+            )
         } catch (e: Exception) {
             log.error(e) { "Failed to retrieve key via JWT VC Issuer Metadata for $issuerId." }
             throw e // Re-throw to indicate failure to the caller

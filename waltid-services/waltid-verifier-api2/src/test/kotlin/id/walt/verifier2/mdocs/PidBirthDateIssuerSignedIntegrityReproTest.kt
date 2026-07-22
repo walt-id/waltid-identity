@@ -2,14 +2,23 @@
 
 package id.walt.verifier2.mdocs
 
+import id.walt.cose.coseCompliantCbor
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.mdoc.objects.digest.ValueDigest
+import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.document.IssuerSigned
+import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.parser.MdocParser
+import id.walt.mdoc.verification.MdocVerifier
 import id.walt.policies2.vp.policies.IssuerSignedDataMdocVpPolicy
 import id.walt.policies2.vp.policies.VerificationSessionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborString
+import kotlinx.serialization.encodeToByteArray
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -17,7 +26,7 @@ class PidBirthDateIssuerSignedIntegrityReproTest {
 
     @OptIn(ExperimentalSerializationApi::class)
     @Test
-    fun issuerSignedIntegrity_requires_pid_birthDate_fullDate_encoding() = kotlinx.coroutines.test.runTest {
+    fun selectiveDisclosurePreservesExternalPidIssuerSignedItemBytes() = kotlinx.coroutines.test.runTest {
         /**
          * This test is a regression guard for a real-world mdoc PID (`eu.europa.ec.eudi.pid.1`) sample
          * that failed issuer-signed digest integrity verification in Verifier2.
@@ -70,10 +79,26 @@ class PidBirthDateIssuerSignedIntegrityReproTest {
         val recomputedDigest = ValueDigest.fromIssuerSignedItemBytes(wrapped.value.digestId, wrapped.serialized, mso.digestAlgorithm).value
         assertTrue(digestFromMso.value.contentEquals(recomputedDigest), "Expected digest match for correctly handled full-date encoding")
 
-        val result = IssuerSignedDataMdocVpPolicy().runPolicy(document, mso, dummyVerificationContext())
+        val selectiveDocument = Document(
+            docType = document.docType,
+            issuerSigned = IssuerSigned.fromIssuerSignedLists(
+                namespaces = mapOf(namespace to IssuerSignedList(listOf(wrapped))),
+                issuerAuth = document.issuerSigned.issuerAuth,
+            ),
+            deviceSigned = document.deviceSigned,
+        )
+        val presentedDocument = MdocParser.parseToDocument(
+            coseCompliantCbor.encodeToByteArray(selectiveDocument).encodeToBase64Url()
+        )
+        val presentedItems = assertNotNull(presentedDocument.issuerSigned.namespaces?.get(namespace)?.entries)
+        assertEquals(1, presentedItems.size)
+        assertContentEquals(wrapped.serialized, presentedItems.single().serialized)
+
+        val result = IssuerSignedDataMdocVpPolicy().runPolicy(presentedDocument, mso, dummyVerificationContext())
 
         assertTrue(result.success)
         assertTrue(result.errors.isEmpty())
+        MdocVerifier.verifyIssuerSignedDataIntegrity(presentedDocument, mso)
     }
 
     private fun loadResource(path: String): String {

@@ -1,8 +1,15 @@
+@file:OptIn(CryptographyProviderApi::class)
+
 package id.walt.cose
 
-import org.kotlincrypto.macs.hmac.sha2.HmacSHA256
-import org.kotlincrypto.macs.hmac.sha2.HmacSHA384
-import org.kotlincrypto.macs.hmac.sha2.HmacSHA512
+import dev.whyoleg.cryptography.CryptographyAlgorithmId
+import dev.whyoleg.cryptography.CryptographyProvider
+import dev.whyoleg.cryptography.CryptographyProviderApi
+import dev.whyoleg.cryptography.algorithms.Digest
+import dev.whyoleg.cryptography.algorithms.HMAC
+import dev.whyoleg.cryptography.algorithms.SHA256
+import dev.whyoleg.cryptography.algorithms.SHA384
+import dev.whyoleg.cryptography.algorithms.SHA512
 
 /** A suspendable interface for a COSE-compatible MAC creator. */
 fun interface CoseMacCreator {
@@ -21,33 +28,39 @@ fun interface CoseMacVerifier {
  */
 data class CoseHmacKey(val keyBytes: ByteArray) {
 
-    fun toCoseMacCreator(algorithm: Int?): CoseMacCreator {
+    fun toCoseMacCreator(
+        algorithm: Int?,
+        provider: CryptographyProvider = CryptographyProvider.Default,
+    ): CoseMacCreator {
         return CoseMacCreator { dataToMac ->
-            when (algorithm) {
-                Cose.Algorithm.HMAC_256_64 -> {
-                    val fullTag = HmacSHA256(keyBytes).doFinal(dataToMac)
-                    fullTag.copyOf(8)
-                }
+            val fullTag = hmacKey(provider, algorithm).signatureGenerator().generateSignature(dataToMac)
+            if (algorithm == Cose.Algorithm.HMAC_256_64) fullTag.copyOf(8) else fullTag
+        }
+    }
 
-                Cose.Algorithm.HMAC_256 -> HmacSHA256(keyBytes).doFinal(dataToMac)
-                Cose.Algorithm.HMAC_384 -> HmacSHA384(keyBytes).doFinal(dataToMac)
-                Cose.Algorithm.HMAC_512 -> HmacSHA512(keyBytes).doFinal(dataToMac)
-                else -> throw IllegalArgumentException("Unsupported or unknown HMAC algorithm: $algorithm")
+    fun toCoseMacVerifier(
+        algorithm: Int?,
+        provider: CryptographyProvider = CryptographyProvider.Default,
+    ): CoseMacVerifier {
+        return CoseMacVerifier { data, tag ->
+            val key = hmacKey(provider, algorithm)
+            if (algorithm == Cose.Algorithm.HMAC_256_64) {
+                val expected = key.signatureGenerator().generateSignature(data).copyOf(8)
+                constantTimeEquals(tag, expected)
+            } else {
+                key.signatureVerifier().tryVerifySignature(data, tag)
             }
         }
     }
 
-    fun toCoseMacVerifier(algorithm: Int?): CoseMacVerifier {
-        return CoseMacVerifier { data, tag ->
-            val expectedTag = when (algorithm) {
-                Cose.Algorithm.HMAC_256_64 -> HmacSHA256(keyBytes).doFinal(data).copyOf(8)
-                Cose.Algorithm.HMAC_256 -> HmacSHA256(keyBytes).doFinal(data)
-                Cose.Algorithm.HMAC_384 -> HmacSHA384(keyBytes).doFinal(data)
-                Cose.Algorithm.HMAC_512 -> HmacSHA512(keyBytes).doFinal(data)
-                else -> throw IllegalArgumentException("Unsupported or unknown HMAC algorithm: $algorithm")
-            }
-            tag.contentEquals(expectedTag)
+    private suspend fun hmacKey(provider: CryptographyProvider, algorithm: Int?): HMAC.Key {
+        val digest: CryptographyAlgorithmId<Digest> = when (algorithm) {
+            Cose.Algorithm.HMAC_256_64, Cose.Algorithm.HMAC_256 -> SHA256
+            Cose.Algorithm.HMAC_384 -> SHA384
+            Cose.Algorithm.HMAC_512 -> SHA512
+            else -> throw IllegalArgumentException("Unsupported or unknown HMAC algorithm: $algorithm")
         }
+        return provider.get(HMAC).keyDecoder(digest).decodeFromByteArray(HMAC.Key.Format.RAW, keyBytes)
     }
 
     override fun equals(other: Any?): Boolean {
@@ -59,4 +72,13 @@ data class CoseHmacKey(val keyBytes: ByteArray) {
     override fun hashCode(): Int {
         return keyBytes.contentHashCode()
     }
+}
+
+private fun constantTimeEquals(first: ByteArray, second: ByteArray): Boolean {
+    if (first.size != second.size) return false
+    var difference = 0
+    for (index in first.indices) {
+        difference = difference or (first[index].toInt() xor second[index].toInt())
+    }
+    return difference == 0
 }

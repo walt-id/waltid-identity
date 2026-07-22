@@ -1,20 +1,17 @@
 package id.walt.crypto.keys
 
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import id.walt.crypto.exceptions.KeyTypeMissingException
+import id.walt.crypto.keys.jwk.JWKKey
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
-// don't
-@OptIn(DelicateCoroutinesApi::class)
 actual fun resolveSerializedKeyBlocking(json: JsonObject): Key {
-    var resolved: Key? = null
-    GlobalScope.launch {
-        resolved = KeyManager.resolveSerializedKey(json)
-    }
-    while (resolved == null) {
-
-    }
-
-    return resolved!!
+    val type = json["type"]?.jsonPrimitive?.content
+        ?: throw KeyTypeMissingException()
+    require(type == "jwk") { "Synchronous JS key deserialization only supports JWK keys" }
+    return Json.decodeFromJsonElement(
+        JWKKey.serializer(),
+        JsonObject(json.filterKeys { it != "type" }),
+    )
 }

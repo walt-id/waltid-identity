@@ -2,6 +2,7 @@ package id.walt.iso18013.annexc
 
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.iso18013.annexc.TestResources.createJwkKeyFromRawHex
+import id.walt.iso18013.annexc.TestResources.migrateToCrypto2
 import id.walt.mdoc.objects.sha256
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
@@ -81,7 +82,7 @@ class AnnexCTestVectorHarnessTest {
             encryptedResponseB64 = v.encryptedResponseB64,
             encryptionInfoB64 = v.encryptionInfoB64,
             origin = v.origin,
-            recipientPrivateKey = createJwkKeyFromRawHex(v.recipientPrivateKeyHex)
+            recipientPrivateKey = migrateToCrypto2(createJwkKeyFromRawHex(v.recipientPrivateKeyHex))
         )
         val hashHex = plaintext.sha256().joinToString("") { "%02x".format(it.toInt() and 0xff) }
         assertEquals(v.expected.deviceResponseCborSha256Hex, hashHex)

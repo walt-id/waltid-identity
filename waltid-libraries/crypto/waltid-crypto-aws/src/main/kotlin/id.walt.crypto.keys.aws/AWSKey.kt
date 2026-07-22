@@ -4,10 +4,9 @@ import aws.sdk.kotlin.services.kms.KmsClient
 import aws.sdk.kotlin.services.kms.model.*
 import id.walt.crypto.exceptions.KeyAlreadyExistsException
 import id.walt.crypto.exceptions.KeyTypeNotSupportedException
-import id.walt.crypto.exceptions.SigningException
+import id.walt.crypto.exceptions.VerificationException
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -20,7 +19,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import org.kotlincrypto.hash.sha2.SHA256
 
 
 @Serializable
@@ -113,10 +111,7 @@ class AWSKey(
     // =========================================================================
 
     override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
-        if (!awsSigningAlgorithm.endsWith("_SHA_256")) {
-            throw SigningException("failed to sign - unsupported hashing algorithm: $awsSigningAlgorithm")
-        }
-        val digestedMessage = sha256(plaintext)
+        val digestedMessage = keyType.digestForSignature(plaintext)
 
         val signRequest = SignRequest {
             this.keyId = id
@@ -154,12 +149,9 @@ class AWSKey(
     }
 
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> {
-        if (!awsSigningAlgorithm.endsWith("_SHA_256")) {
-            throw SigningException("failed to verify - unsupported hashing algorithm: $awsSigningAlgorithm")
-        }
         val messageToVerify =
             detachedPlaintext ?: return Result.failure(IllegalArgumentException("Detached plaintext is required for verification"))
-        val digestedMessage = sha256(messageToVerify)
+        val digestedMessage = keyType.digestForSignature(messageToVerify)
 
         val verifyRequest = VerifyRequest {
             this.keyId = id
@@ -171,7 +163,11 @@ class AWSKey(
 
         return executeWithFailover { kmsClient ->
             val response = kmsClient.verify(verifyRequest)
-            Result.success(response.signatureValid.toString().decodeFromBase64())
+            if (response.signatureValid == true) {
+                Result.success(messageToVerify)
+            } else {
+                Result.failure(VerificationException("Signature is not valid"))
+            }
         }
     }
 
@@ -595,7 +591,5 @@ $encodedPk
             else -> throw KeyTypeNotSupportedException(type)
         }
 
-        // Utility to perform SHA-256 digest on binary data
-        fun sha256(data: ByteArray): ByteArray = SHA256().digest(data)
     }
 }

@@ -1,0 +1,141 @@
+name: Crypto2 platform tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'waltid-libraries/crypto/waltid-crypto2/**'
+      - 'waltid-libraries/crypto/waltid-jose/**'
+      - 'waltid-libraries/crypto/waltid-crypto2-*/**'
+      - '.github/workflows/crypto2-platforms.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'waltid-libraries/crypto/waltid-crypto2/**'
+      - 'waltid-libraries/crypto/waltid-jose/**'
+      - 'waltid-libraries/crypto/waltid-crypto2-*/**'
+      - '.github/workflows/crypto2-platforms.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  linux-jvm-browser:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout all repositories
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
+
+      - name: Configure Gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+
+      - name: Install browser and SoftHSM
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y softhsm2
+
+      - name: Run JVM, browser, Linux, API, and PKCS11 tests
+        run: >-
+          ./gradlew
+          :waltid-libraries:crypto:waltid-crypto2:jvmTest
+          :waltid-libraries:crypto:waltid-crypto2-kms:jvmTest
+          :waltid-libraries:crypto:waltid-crypto2:jsBrowserTest
+          :waltid-libraries:crypto:waltid-crypto2-kms:jsBrowserTest
+          :waltid-libraries:crypto:waltid-crypto2:linuxX64Test
+          :waltid-libraries:crypto:waltid-crypto2-kms:linuxX64Test
+          :waltid-libraries:crypto:waltid-crypto2-pkcs11:test
+          :waltid-libraries:crypto:waltid-crypto2:checkKotlinAbi
+          :waltid-libraries:crypto:waltid-crypto2:checkTypeScriptDefinitions
+
+      - name: Compile non-host crypto2 targets
+        run: >-
+          ./gradlew
+          :waltid-libraries:crypto:waltid-crypto2:compileTestKotlinLinuxArm64
+          :waltid-libraries:crypto:waltid-crypto2:compileTestKotlinMingwX64
+          :waltid-libraries:crypto:waltid-crypto2:compileTestKotlinMacosX64
+          :waltid-libraries:crypto:waltid-crypto2:compileTestKotlinMacosArm64
+
+  android-host:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout all repositories
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
+
+      - name: Configure Gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+
+      - name: Run Android host tests
+        run: >-
+          ./gradlew -PenableAndroidBuild=true
+          :waltid-libraries:crypto:waltid-crypto2:testAndroidHostTest
+          :waltid-libraries:crypto:waltid-crypto2-kms:testAndroidHostTest
+          :waltid-libraries:crypto:waltid-crypto2-signum:testAndroidHostTest
+          :waltid-libraries:crypto:waltid-crypto2:checkKotlinAbi
+
+  windows:
+    runs-on: windows-2025
+    steps:
+      - name: Checkout all repositories
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
+
+      - name: Configure Gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+
+      - name: Run Windows native tests
+        shell: bash
+        run: >-
+          ./gradlew
+          :waltid-libraries:crypto:waltid-crypto2:mingwX64Test
+          :waltid-libraries:crypto:waltid-crypto2-kms:mingwX64Test
+
+  macos-x64:
+    runs-on: macos-15-intel
+    steps:
+      - name: Checkout all repositories
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
+
+      - name: Configure Gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+
+      - name: Run macOS x64 tests
+        run: >-
+          ./gradlew
+          :waltid-libraries:crypto:waltid-crypto2:macosX64Test
+          :waltid-libraries:crypto:waltid-crypto2-kms:macosX64Test
+
+  macos-arm64-ios:
+    runs-on: macos-26
+    steps:
+      - name: Checkout all repositories
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
+
+      - name: Configure Gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+
+      - name: Run macOS and iOS simulator tests
+        run: >-
+          ./gradlew -PenableIosBuild=true
+          :waltid-libraries:crypto:waltid-crypto2:macosArm64Test
+          :waltid-libraries:crypto:waltid-crypto2-kms:macosArm64Test
+          :waltid-libraries:crypto:waltid-crypto2:iosSimulatorArm64Test
+          :waltid-libraries:crypto:waltid-crypto2-kms:iosSimulatorArm64Test
+          :waltid-libraries:crypto:waltid-crypto2-signum:iosSimulatorArm64Test

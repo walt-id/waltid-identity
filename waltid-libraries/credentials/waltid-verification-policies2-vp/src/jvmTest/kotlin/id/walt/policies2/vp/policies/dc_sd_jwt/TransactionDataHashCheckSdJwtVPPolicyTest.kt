@@ -38,6 +38,61 @@ class TransactionDataHashCheckSdJwtVPPolicyTest {
     }
 
     @Test
+    @Suppress("DEPRECATION")
+    fun `legacy policy alias uses per-credential transaction data in multi-query request`() = runTest {
+        val selectedTransactionData = transactionData()
+        val otherTransactionData = transactionData().replace("42.00", "99.00")
+        val presentation = samplePresentation().copy(
+            transactionDataHashes = calculateTransactionDataHashes(listOf(selectedTransactionData)),
+            transactionDataHashesAlg = DEFAULT_HASH_ALGORITHM,
+        )
+        val context = verificationContext(
+            expectedTransactionData = listOf(selectedTransactionData),
+            transactionData = listOf(selectedTransactionData, otherTransactionData),
+        )
+
+        assertTrue(policy.runPolicy(presentation, context).success)
+        assertTrue(TransactionDataHashesVPPolicy().runPolicy(presentation, context).success)
+        assertFalse(VPVerificationPolicyManager.defaultDcSdJwtPolicies.any { it is TransactionDataHashesVPPolicy })
+    }
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun `legacy policy alias accepts legacy whole-request context when filtered context is absent`() = runTest {
+        val transactionData = transactionData()
+        val presentation = samplePresentation().copy(
+            transactionDataHashes = calculateTransactionDataHashes(listOf(transactionData)),
+            transactionDataHashesAlg = DEFAULT_HASH_ALGORITHM,
+        )
+
+        val result = TransactionDataHashesVPPolicy().runPolicy(
+            presentation,
+            verificationContext(expectedTransactionData = null, transactionData = listOf(transactionData)),
+        )
+
+        assertTrue(result.success)
+    }
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun `public runner executes only canonical policy from persisted pre-consolidation list`() = runTest {
+        val transactionData = transactionData()
+        val presentation = samplePresentation().copy(
+            transactionDataHashes = calculateTransactionDataHashes(listOf(transactionData)),
+            transactionDataHashesAlg = DEFAULT_HASH_ALGORITHM,
+        )
+
+        val results = VPPolicyRunner.verifySpecificPresentation(
+            presentation = presentation,
+            policies = listOf(TransactionDataHashesVPPolicy(), TransactionDataHashCheckSdJwtVPPolicy()),
+            verificationContext = verificationContext(expectedTransactionData = listOf(transactionData)),
+        )
+
+        assertTrue("dc+sd-jwt/transaction-data-hash-check" in results)
+        assertFalse(TransactionDataHashesVPPolicy.ID in results)
+    }
+
+    @Test
     fun `fails when presentation hashes do not match requested transaction data`() = runTest {
         val transactionData = transactionData()
         val presentation = samplePresentation().copy(
@@ -178,7 +233,10 @@ class TransactionDataHashCheckSdJwtVPPolicyTest {
         assertFalse(result.success, "empty string must not be treated as omitted")
     }
 
-    private fun verificationContext(expectedTransactionData: List<String>? = null) = VerificationSessionContext(
+    private fun verificationContext(
+        expectedTransactionData: List<String>? = null,
+        transactionData: List<String>? = null,
+    ) = VerificationSessionContext(
         vpToken = "vp_token",
         expectedNonce = "3c04c5fc-9306-40fa-b544-0e00474ace09",
         expectedAudience = "x509_san_dns:test123",
@@ -191,6 +249,7 @@ class TransactionDataHashCheckSdJwtVPPolicyTest {
         jwkThumbprint = null,
         isAnnexC = false,
         customData = null,
+        transactionData = transactionData,
     )
 
     private suspend fun samplePresentation(): DcSdJwtPresentation =

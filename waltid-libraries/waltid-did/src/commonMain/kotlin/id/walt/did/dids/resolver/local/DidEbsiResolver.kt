@@ -62,6 +62,7 @@ class DidEbsiResolver(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Deprecated("Use Crypto2DidKeyResolver or Crypto2DidService for key resolution")
     override suspend fun resolveToKey(did: String): Result<Key> {
         // For backward compatibility, prioritize secp256r1 (P-256) keys
         val didDocumentResult = resolve(did)
@@ -95,6 +96,7 @@ class DidEbsiResolver(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Deprecated("Use Crypto2DidKeyResolver or Crypto2DidService for key resolution")
     override suspend fun resolveToKeys(did: String): Result<Set<Key>> {
         val didDocumentResult = resolve(did)
         if (didDocumentResult.isFailure) return Result.failure(didDocumentResult.exceptionOrNull()!!)

@@ -401,8 +401,11 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
 
                 val resp = presentationResult.getOrThrow()
                 println("Response: $resp")
-                assertTrue("Transmission success is false") { resp.transmissionSuccess == true }
-                assertTrue { resp.verifierResponse!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
+                assertTrue("Pre-final SD-JWT fixture must be rejected") { resp.transmissionSuccess == false }
+                assertTrue {
+                    resp.verifierResponse!!.jsonObject["error_description"]!!.jsonPrimitive.content
+                        .contains("sd_hash-check")
+                }
             }
 
 
@@ -415,16 +418,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
             // Check created session
             test("Check Verification Session after presentation") {
                 assertTrue { info2.attempted }
-                assertTrue { info2.status == Verification2Session.VerificationSessionStatus.SUCCESSFUL }
-
-                assertNotNull(info2.presentedCredentials)
-                assertEquals(info2.presentedCredentials!!.size, 1)
-                assertNotNull(info2.presentedCredentials!!["my_pid"])
-                assertTrue { info2.presentedCredentials!!["my_pid"]!!.size == 1 }
-
-                assertNotNull(info2.policyResults)
-                assertTrue { info2.policyResults!!.overallSuccess }
-                assertTrue { info2.policyResults!!.vcPolicies.size == 1 }
+                assertTrue { info2.status == Verification2Session.VerificationSessionStatus.FAILED }
             }
         }
     }

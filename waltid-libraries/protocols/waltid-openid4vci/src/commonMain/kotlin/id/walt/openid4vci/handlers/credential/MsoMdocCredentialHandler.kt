@@ -15,6 +15,7 @@ import id.walt.sdjwt.SDMap
 import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.coroutines.CancellationException
 import kotlin.time.Instant
 
 
@@ -85,6 +86,8 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
                     credentials = listOf(IssuedCredential(credential = JsonPrimitive(issued))),
                 )
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             CredentialResponseResult.Failure(OAuthError("invalid_request", e.message))
         }

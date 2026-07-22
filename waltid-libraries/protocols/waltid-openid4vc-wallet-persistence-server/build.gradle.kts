@@ -8,6 +8,8 @@ group = "id.walt.protocols"
 dependencies {
     // The base wallet library — store interfaces and data models
     api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
 
     // Exposed — SQL framework (api so Database is visible to consumers)
     api(identityLibs.exposed.core)
@@ -35,6 +37,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation(identityLibs.kotlinx.coroutines.test)
     testImplementation(identityLibs.sqlite.jdbc)
+    testImplementation(project(":waltid-libraries:crypto:waltid-jose"))
 }
 
 mavenPublishing {

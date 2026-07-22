@@ -1,0 +1,170 @@
+public final class id/walt/crypto2/jose/CompactJwe {
+	public static final field INSTANCE Lid/walt/crypto2/jose/CompactJwe;
+	public final fun decrypt (Ljava/lang/String;Lid/walt/crypto2/keys/Key;Ljava/util/Set;Ldev/whyoleg/cryptography/CryptographyProvider;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun decrypt$default (Lid/walt/crypto2/jose/CompactJwe;Ljava/lang/String;Lid/walt/crypto2/keys/Key;Ljava/util/Set;Ldev/whyoleg/cryptography/CryptographyProvider;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun encrypt ([BLid/walt/crypto2/keys/EncodedKey$Jwk;Lid/walt/crypto2/jose/JweContentEncryption;Lkotlinx/serialization/json/JsonObject;[B[BLdev/whyoleg/cryptography/CryptographyProvider;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun encrypt$default (Lid/walt/crypto2/jose/CompactJwe;[BLid/walt/crypto2/keys/EncodedKey$Jwk;Lid/walt/crypto2/jose/JweContentEncryption;Lkotlinx/serialization/json/JsonObject;[B[BLdev/whyoleg/cryptography/CryptographyProvider;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/jose/CompactJws {
+	public static final field INSTANCE Lid/walt/crypto2/jose/CompactJws;
+	public final fun decodeUnverified (Ljava/lang/String;)Lid/walt/crypto2/jose/UnverifiedJws;
+	public final fun sign ([BLid/walt/crypto2/keys/Key;Lid/walt/crypto2/jose/JwsAlgorithm;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun sign$default (Lid/walt/crypto2/jose/CompactJws;[BLid/walt/crypto2/keys/Key;Lid/walt/crypto2/jose/JwsAlgorithm;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun verify (Ljava/lang/String;Lid/walt/crypto2/keys/Key;Lid/walt/crypto2/jose/JwsAlgorithm;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun verify (Ljava/lang/String;Lid/walt/crypto2/keys/Key;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/jose/DecryptedJwe {
+	public fun <init> (Lkotlinx/serialization/json/JsonObject;[BLid/walt/crypto2/jose/JweContentEncryption;)V
+	public final fun component1 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component2 ()[B
+	public final fun component3 ()Lid/walt/crypto2/jose/JweContentEncryption;
+	public final fun copy (Lkotlinx/serialization/json/JsonObject;[BLid/walt/crypto2/jose/JweContentEncryption;)Lid/walt/crypto2/jose/DecryptedJwe;
+	public static synthetic fun copy$default (Lid/walt/crypto2/jose/DecryptedJwe;Lkotlinx/serialization/json/JsonObject;[BLid/walt/crypto2/jose/JweContentEncryption;ILjava/lang/Object;)Lid/walt/crypto2/jose/DecryptedJwe;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContentEncryption ()Lid/walt/crypto2/jose/JweContentEncryption;
+	public final fun getPlaintext ()[B
+	public final fun getProtectedHeader ()Lkotlinx/serialization/json/JsonObject;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/jose/InvalidJwsSignatureException : java/lang/IllegalArgumentException {
+	public fun <init> ()V
+}
+
+public final class id/walt/crypto2/jose/JweContentEncryption : java/lang/Enum {
+	public static final field A128GCM Lid/walt/crypto2/jose/JweContentEncryption;
+	public static final field A256GCM Lid/walt/crypto2/jose/JweContentEncryption;
+	public static final field Companion Lid/walt/crypto2/jose/JweContentEncryption$Companion;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getIdentifier ()Ljava/lang/String;
+	public final fun getKeySizeBytes ()I
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/jose/JweContentEncryption;
+	public static fun values ()[Lid/walt/crypto2/jose/JweContentEncryption;
+}
+
+public final class id/walt/crypto2/jose/JweContentEncryption$Companion {
+	public final fun parse (Ljava/lang/String;)Lid/walt/crypto2/jose/JweContentEncryption;
+}
+
+public final class id/walt/crypto2/jose/Jwk {
+	public static final field INSTANCE Lid/walt/crypto2/jose/Jwk;
+	public final fun containsPrivateMaterial (Lkotlinx/serialization/json/JsonObject;)Z
+	public final fun metadata (Lid/walt/crypto2/keys/EncodedKey$Jwk;)Lid/walt/crypto2/jose/JwkMetadata;
+	public final fun parse (Lid/walt/crypto2/keys/EncodedKey$Jwk;)Lkotlinx/serialization/json/JsonObject;
+	public final fun parse ([B)Lkotlinx/serialization/json/JsonObject;
+	public final fun sha256Thumbprint (Lid/walt/crypto2/keys/EncodedKey$Jwk;Ldev/whyoleg/cryptography/CryptographyProvider;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun sha256Thumbprint$default (Lid/walt/crypto2/jose/Jwk;Lid/walt/crypto2/keys/EncodedKey$Jwk;Ldev/whyoleg/cryptography/CryptographyProvider;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun withMetadata (Lid/walt/crypto2/keys/EncodedKey$Jwk;Lid/walt/crypto2/jose/JwkMetadata;)Lid/walt/crypto2/keys/EncodedKey$Jwk;
+}
+
+public final class id/walt/crypto2/jose/JwkMetadata {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Lid/walt/crypto2/jose/JwkUse;Ljava/util/Set;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Lid/walt/crypto2/jose/JwkUse;Ljava/util/Set;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lid/walt/crypto2/jose/JwkUse;
+	public final fun component3 ()Ljava/util/Set;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Lid/walt/crypto2/jose/JwkUse;Ljava/util/Set;Ljava/lang/String;)Lid/walt/crypto2/jose/JwkMetadata;
+	public static synthetic fun copy$default (Lid/walt/crypto2/jose/JwkMetadata;Ljava/lang/String;Lid/walt/crypto2/jose/JwkUse;Ljava/util/Set;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/crypto2/jose/JwkMetadata;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlgorithm ()Ljava/lang/String;
+	public final fun getKeyId ()Ljava/lang/String;
+	public final fun getOperations ()Ljava/util/Set;
+	public final fun getUse ()Lid/walt/crypto2/jose/JwkUse;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/jose/JwkOperation : java/lang/Enum {
+	public static final field DECRYPT Lid/walt/crypto2/jose/JwkOperation;
+	public static final field DERIVE_BITS Lid/walt/crypto2/jose/JwkOperation;
+	public static final field DERIVE_KEY Lid/walt/crypto2/jose/JwkOperation;
+	public static final field ENCRYPT Lid/walt/crypto2/jose/JwkOperation;
+	public static final field SIGN Lid/walt/crypto2/jose/JwkOperation;
+	public static final field UNWRAP_KEY Lid/walt/crypto2/jose/JwkOperation;
+	public static final field VERIFY Lid/walt/crypto2/jose/JwkOperation;
+	public static final field WRAP_KEY Lid/walt/crypto2/jose/JwkOperation;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/jose/JwkOperation;
+	public static fun values ()[Lid/walt/crypto2/jose/JwkOperation;
+}
+
+public final class id/walt/crypto2/jose/JwkUse : java/lang/Enum {
+	public static final field ENCRYPTION Lid/walt/crypto2/jose/JwkUse;
+	public static final field SIGNATURE Lid/walt/crypto2/jose/JwkUse;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/jose/JwkUse;
+	public static fun values ()[Lid/walt/crypto2/jose/JwkUse;
+}
+
+public final class id/walt/crypto2/jose/JwsAlgorithm : java/lang/Enum {
+	public static final field Companion Lid/walt/crypto2/jose/JwsAlgorithm$Companion;
+	public static final field ED25519 Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final field ED448 Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final field EDDSA Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final field ES256 Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final field ES256K Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final field ES384 Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final field ES512 Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final field PS256 Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final field PS384 Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final field PS512 Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final field RS256 Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final field RS384 Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final field RS512 Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getIdentifier ()Ljava/lang/String;
+	public final fun toSignatureAlgorithm ()Lid/walt/crypto2/algorithms/SignatureAlgorithm;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static fun values ()[Lid/walt/crypto2/jose/JwsAlgorithm;
+}
+
+public final class id/walt/crypto2/jose/JwsAlgorithm$Companion {
+	public final fun getFullySpecified ()Ljava/util/Set;
+	public final fun parse (Ljava/lang/String;)Lid/walt/crypto2/jose/JwsAlgorithm;
+}
+
+public final class id/walt/crypto2/jose/JwsAlgorithmKt {
+	public static final fun defaultJwsAlgorithm (Lid/walt/crypto2/keys/KeySpec;)Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final fun preferredJwsAlgorithm (Lid/walt/crypto2/keys/Key;)Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final fun preferredJwsAlgorithm (Lid/walt/crypto2/keys/StoredKey;)Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final fun selectJwsAlgorithm (Lid/walt/crypto2/keys/Key;Ljava/util/Set;)Lid/walt/crypto2/jose/JwsAlgorithm;
+	public static final fun supportsJwsAlgorithm (Lid/walt/crypto2/keys/KeySpec;Lid/walt/crypto2/jose/JwsAlgorithm;)Z
+}
+
+public final class id/walt/crypto2/jose/UnverifiedJws {
+	public fun <init> (Lkotlinx/serialization/json/JsonObject;[BLid/walt/crypto2/jose/JwsAlgorithm;)V
+	public final fun component1 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component2 ()[B
+	public final fun component3 ()Lid/walt/crypto2/jose/JwsAlgorithm;
+	public final fun copy (Lkotlinx/serialization/json/JsonObject;[BLid/walt/crypto2/jose/JwsAlgorithm;)Lid/walt/crypto2/jose/UnverifiedJws;
+	public static synthetic fun copy$default (Lid/walt/crypto2/jose/UnverifiedJws;Lkotlinx/serialization/json/JsonObject;[BLid/walt/crypto2/jose/JwsAlgorithm;ILjava/lang/Object;)Lid/walt/crypto2/jose/UnverifiedJws;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlgorithm ()Lid/walt/crypto2/jose/JwsAlgorithm;
+	public final fun getPayload ()[B
+	public final fun getProtectedHeader ()Lkotlinx/serialization/json/JsonObject;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/jose/VerifiedJws {
+	public fun <init> (Lkotlinx/serialization/json/JsonObject;[BLid/walt/crypto2/jose/JwsAlgorithm;)V
+	public final fun component1 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component2 ()[B
+	public final fun component3 ()Lid/walt/crypto2/jose/JwsAlgorithm;
+	public final fun copy (Lkotlinx/serialization/json/JsonObject;[BLid/walt/crypto2/jose/JwsAlgorithm;)Lid/walt/crypto2/jose/VerifiedJws;
+	public static synthetic fun copy$default (Lid/walt/crypto2/jose/VerifiedJws;Lkotlinx/serialization/json/JsonObject;[BLid/walt/crypto2/jose/JwsAlgorithm;ILjava/lang/Object;)Lid/walt/crypto2/jose/VerifiedJws;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlgorithm ()Lid/walt/crypto2/jose/JwsAlgorithm;
+	public final fun getPayload ()[B
+	public final fun getProtectedHeader ()Lkotlinx/serialization/json/JsonObject;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+

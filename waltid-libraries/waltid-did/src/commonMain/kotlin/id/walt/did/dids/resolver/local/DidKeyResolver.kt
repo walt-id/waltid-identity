@@ -36,6 +36,7 @@ class DidKeyResolver : LocalResolverMethod("key") {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Deprecated("Use Crypto2DidKeyResolver or Crypto2DidService for key resolution")
     override suspend fun resolveToKey(did: String): Result<Key> = DidUtils.identifierFromDid(did)?.let {
         KeyUtils.fromPublicKeyMultiBase(it)
     } ?: Result.failure(Throwable("Failed to extract identifier from: $did"))

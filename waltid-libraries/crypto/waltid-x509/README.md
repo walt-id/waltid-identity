@@ -34,6 +34,8 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
   - IACA and Document Signer X.509 certificate generation and parsing.
   - Configurable validators with profile-compliant defaults.
 - **CSR Support**: Support for creating and fulfilling Certificate Signing Requests (CSRs) using the PKCS#10 standard.
+- **Crypto2 signing**: Generic, ISO IACA, and Document Signer certificates plus PKCS#10 CSRs use native crypto2 keys through `buildDer`.
+- **Crypto2 parsing**: Parsed certificate and CSR public keys are available as typed `EncodedKey.Jwk` values.
 - **JVM extensions**: helpers for `X500Name`, `KeyUsage`, and `X509Certificate` v3 extension extraction.
 - **Clear exceptions**: failures raise `X509ValidationException` with context.
 

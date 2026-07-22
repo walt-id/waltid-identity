@@ -50,6 +50,9 @@ dependencies {
 
     api(project(":waltid-libraries:protocols:waltid-openid4vci"))
     api(project(":waltid-libraries:crypto:waltid-crypto"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
+    implementation(project(":waltid-libraries:crypto:waltid-jose"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-aws"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-azure"))
     implementation(project(":waltid-libraries:crypto:waltid-x509"))

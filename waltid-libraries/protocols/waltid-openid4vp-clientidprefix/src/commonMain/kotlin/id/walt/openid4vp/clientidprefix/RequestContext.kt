@@ -1,6 +1,9 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.openid4vp.clientidprefix
 
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.x509.CertificateDer
 import kotlinx.serialization.Serializable
 
 /**
@@ -11,16 +14,22 @@ data class RequestContext(
     val clientMetadata: ClientMetadata? = null,
     val requestObjectJws: String? = null, // The full, signed Request Object JWT
     val redirectUri: String? = null,
-    val responseUri: String? = null
+    val responseUri: String? = null,
 ) {
     constructor(
         clientId: String,
         clientMetadataString: String?,
         requestObjectJws: String? = null, // The full, signed Request Object JWT
         redirectUri: String? = null,
-        responseUri: String? = null
+        responseUri: String? = null,
     ) : this(clientId, clientMetadataString?.let { ClientMetadata.fromJson(it).getOrThrow() }, requestObjectJws, redirectUri, responseUri)
 }
+
+data class ClientIdTrustConfiguration(
+    val x509TrustAnchors: List<CertificateDer> = emptyList(),
+    val trustedVerifierAttestationIssuers: Set<String> = emptySet(),
+    val preRegisteredClients: Map<String, ClientMetadata> = emptyMap(),
+)
 
 /**
  * A sealed class representing all possible validation errors for clear, type-safe error handling.
@@ -36,6 +45,11 @@ sealed class ClientIdError(val message: String) {
     object MissingClientMetadata : ClientIdError("client_metadata parameter is required for this prefix but was not provided.")
     object CannotExtractSanDnsNamesFromDer : ClientIdError("Could not extract SAN dNSNames from DER (leaf cert DER of x5c header).")
     object X509HashMismatch : ClientIdError("The client_id hash does not match the hash of the provided certificate.")
+    object MissingX509TrustAnchors : ClientIdError("No X.509 trust anchors are configured.")
+
+    @Serializable
+    data class ResponseUriHostMismatch(val expectedDnsName: String, val actualHost: String) :
+        ClientIdError("The response URI host '$actualHost' is not within '$expectedDnsName'.")
 
     @Serializable
     data class DidResolutionFailed(val reason: String) : ClientIdError("DID resolution failed: $reason")

@@ -27,7 +27,7 @@ The API, functionality, and structure are subject to change without notice. This
 
 ## What This Library Contains
 
-`waltid-crypto2` is a next-generation cryptography library for walt.id, designed to provide modern cryptographic primitives with improved APIs and multiplatform support. Currently, the library focuses on hashing functionality with plans to expand to other cryptographic operations.
+`waltid-crypto2` is the next-generation cryptography foundation for walt.id. It separates key material, signature algorithms, key capabilities, storage, and provider selection instead of treating a JWK or JOSE implementation as the cryptographic abstraction.
 
 ## Main Purpose
 
@@ -35,17 +35,75 @@ This library is being developed to:
 
 - Provide modern, multiplatform cryptographic primitives
 - Offer improved APIs compared to the original `waltid-crypto` library
-- Support both stateless and stateful hashing operations
+- Provide versioned, provider-independent key persistence
+- Support software, device, remote KMS, and HSM providers through small capability interfaces
 - Enable suspend-friendly (coroutine) operations
-- Serve as a foundation for future cryptographic functionality
+- Keep platform cryptography in maintained underlying libraries
 
 ## Current Features
 
-- **Hashing Algorithms**: Support for SHA-256, SHA-384, SHA-512, SHA3-256, SHA3-384, SHA3-512
-- **Stateless Hashing**: One-shot hash computation via `Hash` interface
-- **Stateful Hashing**: Incremental hashing via `Digest` interface
-- **Multiplatform**: JVM support (with plans for additional platforms)
-- **Coroutine Support**: Suspend-friendly async operations
+- **Stored Keys**: Versioned software and managed-key records with JWK, SPKI DER, and PKCS8 DER material
+- **Key Encoding**: Strict `PUBLIC KEY` and `PRIVATE KEY` PEM helpers plus cross-format JWK/DER conversion
+- **Provider Runtime**: Immutable provider selection with strict overrides and explicit fallback
+- **External Providers**: Kotlin SPI plus Java `CompletionStage` and `ServiceLoader` adapters
+- **Software Keys**: ECDSA, Ed25519, RSA PKCS#1, and RSA-PSS through cryptography-kotlin
+- **Encryption**: RSA-OAEP encryption and decryption
+- **Key Agreement**: NIST ECDH and X25519/XDH shared-secret generation
+- **Portable Signatures**: Explicit P1363 or DER ECDSA encoding
+- **Primitives**: Direct access to cryptography-kotlin for hashing, MAC, KDF, and symmetric encryption
+- **Multiplatform**: Common implementation for JVM, JavaScript, Android, iOS, Linux, Windows, and macOS targets
+
+Encoding support is provider and target specific. Private JWK import derives and validates the public component before
+exposing capabilities. Android supports this validation for RSA, but fails closed for EC, Ed25519, and X25519 private
+JWK import because its cryptography backend cannot derive those public keys from private-only material. Public JWK and
+SPKI paths remain available. Android also does not advertise PKCS8 generation, import, or private export.
+
+## secp256k1 target support
+
+secp256k1 is deliberately excluded from `CryptographyCapabilityProfile.Portable`. cryptography-kotlin 0.6.0 uses
+different Optimal backends by target, and their curve support is not uniform:
+
+| Target | Optimal backend | Local secp256k1 support |
+| --- | --- | --- |
+| JVM | JDK | Stock JDK providers reject the curve. Use `BouncyCastleSecp256k1SoftwareKeyProvider`. |
+| Linux and Windows native | OpenSSL 3 | Use `Openssl3Secp256k1SoftwareKeyProvider`. |
+| JavaScript | WebCrypto | Unavailable. WebCrypto supports only the NIST EC curves. |
+| iOS and macOS | Apple Security/CryptoKit | Unavailable. The backend supports only the NIST EC curves. |
+| Android JVM | JDK/platform JCA | Not exposed because platform provider support is not consistent. |
+
+The opt-in providers advertise only secp256k1, SHA-256 ECDSA, and P1363/DER signature encodings. Register one
+explicitly in `CryptoRuntime`; the default software provider remains portable and never advertises ES256K.
+
+## Key persistence
+
+`Key`, `SoftwareKey`, and `ManagedKey` have kotlinx.serialization serializers. They encode the underlying versioned
+`StoredKey` directly, without another envelope:
+
+```kotlin
+val persisted = Json.encodeToString(generatedSoftwareKey)
+val storableKey = Json.decodeFromString<SoftwareKey>(persisted)
+check(storableKey.capabilities.signer == null)
+val restored = runtime.restore(storableKey)
+```
+
+Decoding is synchronous and provider-independent. It returns a non-operational storable handle and never resolves a
+provider or blocks on suspend restoration. Call `CryptoRuntime.restore(storableKey)` with an explicitly configured
+runtime before using cryptographic capabilities. `StoredKeyCodec` remains available when code works directly with
+`StoredKey` records. Managed records contain provider references and public material, not credentials. Serialized
+software keys can contain private material and must be protected at rest.
+
+The `SoftwareKey` and `ManagedKey` restore overloads preserve their static return types. Runtime provider generation,
+restoration, and close are lifecycle-serialized; generation and restoration fail clearly after close, while key sign
+and other operations are not routed through that lifecycle lock. Managed restore also requires the provider to return
+the exact persisted public key and metadata without capabilities beyond the stored usages. Managed public JWKs are
+parsed and rejected if malformed or if they contain private/secret parameters, regardless of metadata flags.
+
+The `waltid-crypto2-examples` `stored-key` command intentionally prints a disposable private `StoredKey` record to
+demonstrate this shape. It emits a warning immediately beforehand and must never be copied as an application logging
+pattern.
+
+Run `./gradlew :waltid-libraries:crypto:waltid-crypto2:benchmarkStoredKeys` to compare record encoding, decoding,
+provider restoration, first-use materialization, and cached signing on the current JVM.
 
 ## Join the community
 
@@ -60,4 +118,3 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
-

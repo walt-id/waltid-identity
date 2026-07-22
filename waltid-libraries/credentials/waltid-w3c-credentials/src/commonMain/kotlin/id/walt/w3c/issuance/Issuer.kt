@@ -1,6 +1,8 @@
 package id.walt.w3c.issuance
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidUtils
 import id.walt.sdjwt.SDMap
@@ -25,6 +27,7 @@ object Issuer {
     /**
      * Manually set data and issue credential
      */
+    @Deprecated("Use the crypto2 overload accepting a Key and JwsAlgorithm")
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -52,6 +55,30 @@ object Issuer {
         )
     }
 
+    @JsExport.Ignore
+    suspend fun W3CVC.baseIssue(
+        key: Crypto2Key,
+        algorithm: JwsAlgorithm,
+        issuerId: String,
+        subject: String,
+        dataOverwrites: Map<String, JsonElement>,
+        dataUpdates: Map<String, Map<String, JsonElement>>,
+        additionalJwtHeaders: Map<String, JsonElement>,
+        additionalJwtOptions: Map<String, JsonElement>,
+    ): String {
+        var updated = overwrite(dataOverwrites)
+        dataUpdates.forEach { (name, values) -> updated = updated.update(name, values) }
+        return updated.signJws(
+            issuerKey = key,
+            algorithm = algorithm,
+            issuerId = issuerId,
+            subjectDid = subject,
+            additionalJwtHeader = additionalJwtHeaders,
+            additionalJwtOptions = additionalJwtOptions,
+        )
+    }
+
+    @Deprecated("Use the crypto2 overload accepting a Key and JwsAlgorithm")
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -89,6 +116,39 @@ object Issuer {
         )
     }
 
+    @JsExport.Ignore
+    suspend fun W3CVC.mergingJwtIssue(
+        issuerKey: Crypto2Key,
+        algorithm: JwsAlgorithm,
+        issuerId: String,
+        subjectDid: String,
+        mappings: JsonObject,
+        additionalJwtHeader: Map<String, JsonElement>,
+        additionalJwtOptions: Map<String, JsonElement>,
+        display: JsonArray = JsonArray(emptyList()),
+        completeJwtWithDefaultCredentialData: Boolean = true,
+        context: Map<String, JsonElement>? = null,
+    ) = mergingToVc(
+        issuerId = issuerId,
+        subjectDid = subjectDid,
+        mappings = mappings,
+        display = display,
+        completeJwtWithDefaultCredentialData = completeJwtWithDefaultCredentialData,
+        context = context,
+    ).run {
+        val issuerDid = issuerId.takeIf(DidUtils::isDidUrl)
+        w3cVc.signJws(
+            issuerKey = issuerKey,
+            algorithm = algorithm,
+            issuerId = issuerId,
+            issuerKid = getKidHeader(issuerKey, issuerDid),
+            subjectDid = subjectDid,
+            additionalJwtHeader = additionalJwtHeader,
+            additionalJwtOptions = additionalJwtOptions.toMutableMap().apply { putAll(jwtOptions) },
+        )
+    }
+
+    @Deprecated("Use the crypto2 overload accepting a Key and JwsAlgorithm")
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -129,6 +189,41 @@ object Issuer {
             additionalJwtOptions = additionalJwtOptions.toMutableMap().apply {
                 putAll(jwtOptions)
             }
+        )
+    }
+
+    @JsExport.Ignore
+    suspend fun W3CVC.mergingSdJwtIssue(
+        issuerKey: Crypto2Key,
+        algorithm: JwsAlgorithm,
+        issuerId: String,
+        subjectDid: String,
+        display: JsonArray = JsonArray(emptyList()),
+        mappings: JsonObject,
+        type: String,
+        additionalJwtHeaders: Map<String, JsonElement>,
+        additionalJwtOptions: Map<String, JsonElement>,
+        completeJwtWithDefaultCredentialData: Boolean = true,
+        disclosureMap: SDMap,
+        context: Map<String, JsonElement>? = null,
+    ) = mergingToVc(
+        issuerId = issuerId,
+        subjectDid = subjectDid,
+        mappings = mappings,
+        display = display,
+        completeJwtWithDefaultCredentialData = completeJwtWithDefaultCredentialData,
+        context = context,
+    ).run {
+        val issuerDid = issuerId.takeIf(DidUtils::isDidUrl)
+        w3cVc.signSdJwt(
+            issuerKey = issuerKey,
+            algorithm = algorithm,
+            issuerId = issuerId,
+            issuerKid = getKidHeader(issuerKey, issuerDid),
+            subjectDid = subjectDid,
+            disclosureMap = disclosureMap,
+            additionalJwtHeaders = additionalJwtHeaders + ("typ" to JsonPrimitive(type)),
+            additionalJwtOptions = additionalJwtOptions + jwtOptions,
         )
     }
 
@@ -215,16 +310,24 @@ object Issuer {
         return IssuanceInformation(vc, jwtRes)
     }
 
+    @Deprecated("Use getKidHeader with a crypto2 Key")
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
     suspend fun getKidHeader(issuerKey: Key, issuerDid: String? = null): String {
-        return if (!issuerDid.isNullOrEmpty()) {
-            if (issuerDid.startsWith("did:key"))
-                issuerDid + "#" + issuerDid.removePrefix("did:key:")
-            else
-                issuerDid + "#" + issuerKey.getKeyId()
-        } else issuerKey.getKeyId()
+        return qualifyDidKeyId(issuerKey.getKeyId(), issuerDid)
+    }
+
+    @JsExport.Ignore
+    fun getKidHeader(issuerKey: Crypto2Key, issuerDid: String? = null): String =
+        qualifyDidKeyId(issuerKey.id.value, issuerDid)
+
+    private fun qualifyDidKeyId(keyId: String, issuerDid: String?): String = when {
+        issuerDid.isNullOrEmpty() -> keyId
+        DidUtils.isDidUrl(keyId) -> keyId
+        keyId.startsWith("#") -> issuerDid + keyId
+        issuerDid.startsWith("did:key:") -> "$issuerDid#${issuerDid.removePrefix("did:key:")}"
+        else -> "$issuerDid#$keyId"
     }
 }

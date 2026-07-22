@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.wallet2.mobile
 
 import id.walt.credentials.CredentialDetectorTypes
@@ -5,6 +7,16 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.openid4vp.clientidprefix.ClientIdError
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -14,6 +26,8 @@ import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import io.ktor.http.URLBuilder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -22,7 +36,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -31,6 +48,7 @@ import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -40,14 +58,55 @@ class MobileWalletTest {
     @Test
     fun mobileWalletConfigUsesStableDefaults() {
         val config = MobileWalletConfig()
+        val (walletId, defaultKeyType, attestationConfig, persistence, onEvent, transactionDataProfiles) = config
 
-        assertEquals("default", config.walletId)
-        assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
-        assertEquals(null, config.attestationConfig)
-        assertEquals(MobileWalletPersistence(), config.persistence)
-        assertEquals(emptyList(), config.transactionDataProfiles)
+        assertEquals("default", walletId)
+        assertEquals(MobileWalletKeyType.secp256r1, defaultKeyType)
+        assertEquals(null, attestationConfig)
+        assertEquals(MobileWalletPersistence(), persistence)
+        assertEquals(emptyList(), transactionDataProfiles)
+        assertSame(config.onEvent, onEvent)
         assertIs<MobileWalletDatabaseKey.Managed>(config.persistence.databaseKey)
         assertEquals(MobileWalletStores(), config.persistence.stores)
+    }
+
+    @Test
+    fun defaultTrustConfigurationRejectsUnknownPreRegisteredVerifier() = runTest {
+        val verifierKey = JWKKey.generate(KeyType.Ed25519)
+        val requestUrl = preRegisteredRequestUrl(verifierKey)
+        val wallet = MobileWallet(
+            walletId = "default-trust-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "unused-key", keyType = "Ed25519")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:unused", document = JsonObject(emptyMap()))),
+            credentialStore = RecordingCredentialStore(),
+            keyGenerator = { error("Trust tests should not generate keys") },
+        )
+
+        val failure = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
+            wallet.previewPresentation(requestUrl)
+        }
+
+        assertEquals(ClientIdError.PreRegisteredClientNotFound("verifier2"), failure.clientIdError)
+    }
+
+    @Test
+    fun explicitTrustConfigurationAcceptsPreRegisteredVerifier() = runTest {
+        val verifierKey = JWKKey.generate(KeyType.Ed25519)
+        val requestUrl = preRegisteredRequestUrl(verifierKey)
+        val wallet = walletWithTrust(
+            ClientIdTrustConfiguration(
+                preRegisteredClients = mapOf(
+                    "verifier2" to ClientMetadata(
+                        jwks = ClientMetadata.Jwks(listOf(verifierKey.getPublicKey().exportJWKObject())),
+                    )
+                ),
+            )
+        )
+
+        val preview = wallet.previewPresentation(requestUrl)
+
+        assertEquals("verifier2", preview.request.clientId)
+        assertTrue(preview.credentialOptions.isEmpty())
     }
 
     @Test
@@ -96,7 +155,10 @@ class MobileWalletTest {
 
     @Test
     fun walletCanUseInjectedStoresAndAtomicKeyConfiguration() = runTest {
-        val keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1"))
+        val keyStore = PreloadedKeyStore(
+            WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1"),
+            JWKKey.generate(KeyType.secp256r1),
+        )
         val didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap())))
         val credentialStore = RecordingCredentialStore()
         val keys = MobileWalletKeys(
@@ -117,6 +179,49 @@ class MobileWalletTest {
         assertEquals("did:key:custom", bootstrap.did)
         assertEquals(1, keyStore.listKeysCalls)
         assertEquals(1, didStore.listDidsCalls)
+    }
+
+    @Test
+    fun persistedCrypto2OnlyKeyIsRestoredWithoutLegacyKeyAfterRestart() = runTest {
+        val crypto2Key = object : Crypto2Key {
+            override val id = KeyId("crypto2-key")
+            override val spec = KeySpec.Ec(EcCurve.P256)
+            override val usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
+        }
+        val keyStore = PreloadedKeyStore(
+            keyInfo = WalletKeyInfo(keyId = crypto2Key.id.value, keyType = "secp256r1"),
+            crypto2Key = crypto2Key,
+            failOnLegacyGet = true,
+        )
+        val wallet = MobileWallet(
+            walletId = "crypto2-wallet",
+            keyStore = keyStore,
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:crypto2", document = JsonObject(emptyMap()))),
+            credentialStore = RecordingCredentialStore(),
+            keyGenerator = { error("Existing wallet should not generate a replacement key") },
+        )
+
+        val bootstrap = wallet.bootstrap()
+
+        assertEquals(crypto2Key.id.value, bootstrap.keyId)
+        assertEquals("did:key:crypto2", bootstrap.did)
+        assertEquals(1, keyStore.getCrypto2KeyCalls)
+    }
+
+    @Test
+    fun persistedDidWithMissingPlatformKeyFailsBootstrap() = runTest {
+        val keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "missing-key", keyType = "secp256r1"))
+        val wallet = MobileWallet(
+            walletId = "missing-key-wallet",
+            keyStore = keyStore,
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:missing", document = JsonObject(emptyMap()))),
+            credentialStore = RecordingCredentialStore(),
+            keyGenerator = { error("Existing wallet should not generate a replacement key") },
+        )
+
+        val failure = assertFailsWith<IllegalArgumentException> { wallet.bootstrap() }
+
+        assertTrue("missing-key" in failure.message.orEmpty())
     }
 
     @Test
@@ -313,6 +418,30 @@ class MobileWalletTest {
         status = MobileWalletEventStatus.progress,
     )
 
+    private fun walletWithTrust(trustConfiguration: ClientIdTrustConfiguration): MobileWallet = MobileWallet(
+        walletId = "trust-test-wallet",
+        keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "unused-key", keyType = "Ed25519")),
+        didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:unused", document = JsonObject(emptyMap()))),
+        credentialStore = RecordingCredentialStore(),
+        keyGenerator = { error("Trust tests should not generate keys") },
+        clientIdTrustConfiguration = trustConfiguration,
+    )
+
+    private suspend fun preRegisteredRequestUrl(verifierKey: Key): String {
+        val requestObject = verifierKey.signJws(
+            buildJsonObject {
+                put("client_id", "verifier2")
+                put("nonce", "nonce-123")
+                put("dcql_query", buildJsonObject { put("credentials", buildJsonArray {}) })
+            }.toString().encodeToByteArray(),
+            mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
+        )
+        return URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier2")
+            parameters.append("request", requestObject)
+        }.buildString()
+    }
+
     private val displayJson = kotlinx.serialization.json.Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -325,18 +454,32 @@ class MobileWalletTest {
         override suspend fun deleteKey(walletId: String, databaseName: String) = Unit
     }
 
-    private class PreloadedKeyStore(private val keyInfo: WalletKeyInfo) : WalletKeyStore {
+    private class PreloadedKeyStore(
+        private val keyInfo: WalletKeyInfo,
+        private val key: Key? = null,
+        private val crypto2Key: Crypto2Key? = null,
+        private val failOnLegacyGet: Boolean = false,
+    ) : WalletKeyStore {
         var listKeysCalls = 0
+        var getCrypto2KeyCalls = 0
         val removedKeyIds = mutableListOf<String>()
 
-        override suspend fun getKey(keyId: String) = null
+        override suspend fun getKey(keyId: String): Key? {
+            check(!failOnLegacyGet) { "Crypto2-only bootstrap must not load a legacy key" }
+            return key.takeIf { keyId == keyInfo.keyId }
+        }
+
+        override suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage>): Crypto2Key? {
+            getCrypto2KeyCalls++
+            return crypto2Key.takeIf { keyId == keyInfo.keyId }
+        }
 
         override suspend fun listKeys(): Flow<WalletKeyInfo> {
             listKeysCalls++
             return listOf(keyInfo).asFlow()
         }
 
-        override suspend fun addKey(key: id.walt.crypto.keys.Key): String =
+        override suspend fun addKey(key: Key): String =
             error("Preloaded test key store should not add keys")
 
         override suspend fun removeKey(keyId: String): Boolean {

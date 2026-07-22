@@ -57,6 +57,9 @@ dependencies {
 
     /* -- Auth (optional feature) -- */
     implementation(project(":waltid-libraries:auth:waltid-ktor-authnz"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
+    implementation(project(":waltid-libraries:crypto:waltid-jose"))
 
     /* -- Tests -- */
     testImplementation(identityLibs.bundles.waltid.ktortesting)

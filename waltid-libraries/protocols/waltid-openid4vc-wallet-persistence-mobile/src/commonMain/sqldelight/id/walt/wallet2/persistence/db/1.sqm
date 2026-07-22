@@ -1,0 +1,1 @@
+ALTER TABLE key_references ADD COLUMN crypto2_stored_key TEXT;

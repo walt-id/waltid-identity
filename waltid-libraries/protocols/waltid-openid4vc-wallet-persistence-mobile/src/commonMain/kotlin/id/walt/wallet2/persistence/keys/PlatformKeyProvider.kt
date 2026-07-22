@@ -53,9 +53,15 @@ public interface PlatformKeyProvider {
     public suspend fun deleteKey(keyId: String, keyType: KeyType): Boolean
 
     /**
+     * Returns whether [key] is actually backed by the platform key store.
+     */
+    public fun isPlatformBacked(key: Key): Boolean = isPlatformBacked(key.keyType)
+
+    /**
      * Returns whether [keyType] is created with platform-backed storage by this provider.
      */
-    public fun isPlatformBacked(keyType: KeyType): Boolean = keyType in supportedPlatformKeyTypes
+    public fun isPlatformBacked(keyType: KeyType): Boolean =
+        isPlatformBackingAvailable && keyType in supportedPlatformKeyTypes
 
     /**
      * Key types that this provider can create with platform-backed storage.

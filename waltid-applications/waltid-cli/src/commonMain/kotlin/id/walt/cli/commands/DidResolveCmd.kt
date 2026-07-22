@@ -8,7 +8,6 @@ import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import id.walt.cli.util.DidUtil
-import id.walt.cli.util.PrettyPrinter
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -38,7 +37,6 @@ class DidResolveCmd : CliktCommand(
         }
     }
 
-    val print: PrettyPrinter = PrettyPrinter(this)
     private val did by option("-d", "-did")
         .help("The DID to be resolved.")
         .required()
@@ -46,11 +44,7 @@ class DidResolveCmd : CliktCommand(
     override fun run() {
         runBlocking {
             val result = DidUtil.resolveDid(did)
-            val jsonObject = Json.decodeFromString<JsonObject>(result.toString())
-            val prettyJsonString = prettyJson.encodeToString(jsonObject)
-
-            print.green("Did resolved: ")
-            print.box(prettyJsonString)
+            echo(prettyJson.encodeToString(JsonObject(result)))
         }
     }
 }

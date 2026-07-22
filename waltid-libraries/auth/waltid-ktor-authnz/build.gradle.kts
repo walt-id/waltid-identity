@@ -30,6 +30,8 @@ dependencies {
 
     // JWT
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
+    implementation(project(":waltid-libraries:crypto:waltid-jose"))
     implementation(project(":waltid-services:waltid-service-commons"))
     implementation(identityLibs.nimbus.jose.jwt)
 

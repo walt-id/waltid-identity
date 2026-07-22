@@ -6,6 +6,8 @@ import dev.mokkery.matcher.any
 import dev.mokkery.mock
 import id.walt.cose.Cose
 import id.walt.cose.CoseKey
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.keys.toPublicJwk
 import id.walt.mdoc.objects.digest.ValueDigest
 import id.walt.mdoc.objects.digest.ValueDigestList
 import id.walt.mdoc.objects.mso.DeviceKeyInfo
@@ -79,7 +81,7 @@ class MdocsCredentialSerializationTest {
 
     @OptIn(ExperimentalEncodingApi::class)
     @Test
-    fun `holder key is read from the mobile security object`() = runTest {
+    fun `crypto2 holder key is read from the mobile security object for verification only`() = runTest {
         val x = "2Z3gxK7IatHaxPWLYkBYn1XS0wKdL7fMQQuF_nGw2Kw"
         val y = "41CM3oYupV2TNid0xDbESe0bzKWVNu0LU8kKQS47jUI"
         every { mockExtractor.invoke(any()) } returns createDummyMso(
@@ -92,10 +94,33 @@ class MdocsCredentialSerializationTest {
         )
         MdocsCredential.msoExtractionTestHook = mockExtractor
 
-        val holderKey = credential.getHolderKey().getPublicKey().exportJWKObject()
+        val holderKey = credential.getHolderCrypto2Key()
+        val holderJwk = Jwk.parse(
+            assertNotNull(holderKey.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(holderKey.spec)
+        )
 
-        assertEquals(x, holderKey["x"]?.jsonPrimitive?.content)
-        assertEquals(y, holderKey["y"]?.jsonPrimitive?.content)
+        assertEquals(x, holderJwk["x"]?.jsonPrimitive?.content)
+        assertEquals(y, holderJwk["y"]?.jsonPrimitive?.content)
+        assertNotNull(holderKey.capabilities.verifier)
+        assertNull(holderKey.capabilities.signer)
+        assertNull(holderKey.capabilities.privateKeyExporter)
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    @Test
+    fun `crypto2 holder key rejects device keys without verify permission`() = runTest {
+        every { mockExtractor.invoke(any()) } returns createDummyMso(
+            CoseKey(
+                kty = Cose.KeyTypes.EC2,
+                crv = Cose.EllipticCurves.P_256,
+                key_ops = listOf(1),
+                x = Base64.UrlSafe.decode("2Z3gxK7IatHaxPWLYkBYn1XS0wKdL7fMQQuF_nGw2Kw="),
+                y = Base64.UrlSafe.decode("41CM3oYupV2TNid0xDbESe0bzKWVNu0LU8kKQS47jUI="),
+            )
+        )
+        MdocsCredential.msoExtractionTestHook = mockExtractor
+
+        assertFailsWith<IllegalArgumentException> { credential.getHolderCrypto2Key() }
     }
 
     private fun createDummyMso(deviceKey: CoseKey = dummyCoseKey): MobileSecurityObject = MobileSecurityObject(

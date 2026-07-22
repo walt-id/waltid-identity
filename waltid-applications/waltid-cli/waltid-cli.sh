@@ -1,16 +1,16 @@
 #!/usr/bin/env sh
 
-# Launcher script which builds the waltid-cli from source **once** and executes the command supplied
-# If changes are made to the source then waltid-cli has to manually be rebuild (e.g. through waltid-cli-development.sh)
+# Launcher script which builds the waltid-cli from source once and executes the supplied command.
+# If sources change, rebuild through waltid-cli-development.sh.
 
-if [ -f 'build/install/waltid-jvm/bin/waltid' ]; then
-  build/install/waltid-jvm/bin/waltid "$@"
-else
-  echo "waltid-cli not yet build."
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PROJECT_DIR="$SCRIPT_DIR/../.."
+LAUNCHER="$SCRIPT_DIR/build/install/waltid-jvm/bin/waltid"
 
+if [ ! -f "$LAUNCHER" ]; then
+  echo "waltid-cli is not built yet."
   echo "Running build..."
-  ../../gradlew installJvmDist
-
-  echo "Trying to run CLI command after build..."
-  build/install/waltid-jvm/bin/waltid "$@"
+  "$PROJECT_DIR/gradlew" -p "$PROJECT_DIR" :waltid-applications:waltid-cli:installJvmDist || exit $?
 fi
+
+exec "$LAUNCHER" "$@"

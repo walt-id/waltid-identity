@@ -2,9 +2,16 @@ package id.walt.ktorauthnz.methods
 
 import id.walt.commons.web.InvalidChallengeException
 import id.walt.commons.web.Web3AuthException
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.EdwardsCurve
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.Web3Identifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
@@ -29,10 +36,16 @@ import kotlin.time.Clock
 object Web3 : AuthenticationMethod("web3") {
     private val log = logger<Web3>()
 
-    private val jwtHandler = JwtTokenHandler().apply {
-        signingKey = runBlocking { JWKKey.generate(KeyType.Ed25519) }
-        verificationKey = signingKey
+    private val nonceKey = runBlocking {
+        CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("web3-nonce"),
+                spec = KeySpec.Edwards(EdwardsCurve.ED25519),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
     }
+    private val jwtHandler = JwtTokenHandler.crypto2(nonceKey, algorithm = JwsAlgorithm.ED25519)
     private const val NONCE_VALIDITY_SECONDS = 300L // 5 minutes
 
 
@@ -45,7 +58,7 @@ object Web3 : AuthenticationMethod("web3") {
             put("exp", JsonPrimitive(Clock.System.now().epochSeconds + NONCE_VALIDITY_SECONDS))
         }.toString().toByteArray()
 
-        return jwtHandler.signingKey.signJws(payload)
+        return CompactJws.sign(payload, nonceKey, JwsAlgorithm.ED25519)
     }
 
     override val supportsRegistration = true

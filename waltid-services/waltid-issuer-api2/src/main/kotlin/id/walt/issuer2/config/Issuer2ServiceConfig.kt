@@ -10,11 +10,30 @@ import kotlinx.coroutines.runBlocking
 
 data class Issuer2ServiceConfig(
     val baseUrl: String,
+    /** Legacy token key retained as the validation sidecar and in-memory migration source. */
     val ciTokenKey: String = runBlocking { KeySerialization.serializeKey(JWKKey.generate(KeyType.secp256r1)) },
     val credentialEncryptionKey: String? = null,
     val enforcePushedAuthorizationRequests: Boolean = false,
     val clientAuthenticationConfig: ClientAuthenticationConfig? = null,
+    /** Preferred encoded crypto2 StoredKey. Invalid or mismatched values fail startup. */
+    val ciTokenStoredKey: String? = null,
 ) : WaltConfig() {
+    /** Preserves the JVM constructor descriptor from before the StoredKey field was added. */
+    constructor(
+        baseUrl: String,
+        ciTokenKey: String,
+        credentialEncryptionKey: String?,
+        enforcePushedAuthorizationRequests: Boolean,
+        clientAuthenticationConfig: ClientAuthenticationConfig?,
+    ) : this(
+        baseUrl,
+        ciTokenKey,
+        credentialEncryptionKey,
+        enforcePushedAuthorizationRequests,
+        clientAuthenticationConfig,
+        null,
+    )
+
     init {
         credentialEncryptionKey?.let(CredentialEncryptionKeyConfig::validate)
     }

@@ -1,72 +1,70 @@
 package id.waltid.openid4vci.wallet.attestation
 
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyMeta
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
-
-private class AssemblerTestP256Key : Key() {
-    override val keyType: KeyType = KeyType.secp256r1
-    override val hasPrivateKey: Boolean = true
-    override suspend fun getKeyId(): String = "mock-kid"
-    override suspend fun getThumbprint(): String = "mock-thumbprint"
-    override suspend fun exportJWK(): String = """{"kty":"EC","crv":"P-256","x":"x","y":"y"}"""
-    override suspend fun exportJWKObject(): JsonObject = JsonObject(emptyMap())
-    override suspend fun getPublicKey(): Key = this
-    override suspend fun getMeta(): KeyMeta = throw NotImplementedError()
-    override suspend fun deleteKey(): Boolean = true
-    override suspend fun exportPEM(): String = ""
-    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): Any = byteArrayOf()
-    override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> = Result.success(byteArrayOf())
-    override suspend fun verifyJws(signedJws: String): Result<JsonElement> = Result.success(JsonObject(emptyMap()))
-    override suspend fun getPublicKeyRepresentation(): ByteArray = byteArrayOf()
-
-    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
-        val headerJson = JsonObject(headers).toString()
-        val headerB64 = headerJson.encodeToByteArray().encodeToBase64Url()
-        val payloadB64 = plaintext.encodeToBase64Url()
-        return "$headerB64.$payloadB64.mock-sig"
-    }
-}
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 
 private class StaticAttestationProvider(private val jwt: String) : WalletAttestationProvider {
-    var callCount = 0
+    var receivedPublicKey: EncodedKey.Jwk? = null
+        private set
+
+    override suspend fun getAttestationJwt(instancePublicKeyJwk: EncodedKey.Jwk, clientId: String): String {
+        receivedPublicKey = instancePublicKeyJwk
+        return jwt
+    }
+
+    @Deprecated("Use the EncodedKey.Jwk overload")
+    override suspend fun getAttestationJwt(instanceKey: Key, clientId: String): String =
+        getAttestationJwt(instanceKey.exportPublicCrypto2Jwk(), clientId)
+}
+
+@Suppress("DEPRECATION")
+private class LegacyStaticAttestationProvider(private val jwt: String) : WalletAttestationProvider {
+    var receivedKey: Key? = null
         private set
 
     override suspend fun getAttestationJwt(instanceKey: Key, clientId: String): String {
-        callCount++
+        receivedKey = instanceKey
         return jwt
     }
 }
 
 class ClientAttestationAssemblerTest {
-
     @Test
-    fun testAttestationHeaders() = runTest {
-        val attestationJwt = "eyJ.attestation.sig"
-        val provider = StaticAttestationProvider(attestationJwt)
-        val assembler = ClientAttestationAssembler(provider)
-        val key = AssemblerTestP256Key()
+    fun providerReceivesPublicKeyUsedByVerifiablePop() = runTest {
+        val key = attestationTestKey("assembler-key")
+        val provider = StaticAttestationProvider("eyJ.attestation.sig")
+        val headers = ClientAttestationAssembler(provider).buildAttestationHeaders(
+            key,
+            "wallet-client",
+            "https://issuer.example.com/token",
+        )
 
-        val headers = assembler.buildAttestationHeaders(key, "wallet-client", "https://issuer.example.com/token")
-
-        assertEquals(attestationJwt, headers.attestationJwt)
-
-        val popParts = headers.popJwt.split(".")
-        assertEquals(3, popParts.size, "PoP should be a valid 3-part JWT")
+        assertEquals("eyJ.attestation.sig", headers.attestationJwt)
+        assertFalse("d" in Jwk.parse(assertNotNull(provider.receivedPublicKey)))
+        CompactJws.verify(headers.popJwt, key, JwsAlgorithm.ES256)
     }
 
     @Test
-    fun testProviderIsCalled() = runTest {
-        val provider = StaticAttestationProvider("attestation.jwt.here")
-        val assembler = ClientAttestationAssembler(provider)
+    fun legacyProviderReceivesOnlyPublicMaterialFromCrypto2Caller() = runTest {
+        val key = attestationTestKey("legacy-provider-key")
+        val provider = LegacyStaticAttestationProvider("eyJ.attestation.sig")
 
-        assembler.buildAttestationHeaders(AssemblerTestP256Key(), "client", "https://token.endpoint")
-        assertEquals(1, provider.callCount)
+        val headers = ClientAttestationAssembler(provider).buildAttestationHeaders(
+            key,
+            "wallet-client",
+            "https://issuer.example.com/token",
+        )
+
+        assertEquals("eyJ.attestation.sig", headers.attestationJwt)
+        assertFalse(requireNotNull(provider.receivedKey).hasPrivateKey)
+        CompactJws.verify(headers.popJwt, key, JwsAlgorithm.ES256)
     }
 }

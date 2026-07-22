@@ -11,14 +11,26 @@ object ClientIdPrefixAuthenticator {
         clientId: ClientId,
         context: RequestContext,
         preRegisteredMetadataProvider: suspend (String) -> String? = { null }
+    ): ClientValidationResult = authenticate(
+        clientId,
+        context,
+        preRegisteredMetadataProvider,
+        ClientIdTrustConfiguration(),
+    )
+
+    suspend fun authenticate(
+        clientId: ClientId,
+        context: RequestContext,
+        preRegisteredMetadataProvider: suspend (String) -> String?,
+        trustConfiguration: ClientIdTrustConfiguration,
     ): ClientValidationResult {
         return when (clientId) {
             is RedirectUri -> clientId.authenticateRedirectUri(context)
-            is X509SanDns -> clientId.authenticateX509SanDns(clientId, context)
-            is X509Hash -> clientId.authenticateX509Hash(clientId, context)
+            is X509SanDns -> clientId.authenticateX509SanDns(clientId, context, trustConfiguration)
+            is X509Hash -> clientId.authenticateX509Hash(clientId, context, trustConfiguration)
             is DecentralizedIdentifier -> clientId.authenticateDecentralizedIdentifier(clientId, context)
-            is VerifierAttestation -> clientId.authenticateVerifierAttestation(clientId, context)
-            is PreRegistered -> clientId.authenticatePreRegistered(clientId, preRegisteredMetadataProvider)
+            is VerifierAttestation -> clientId.authenticateVerifierAttestation(clientId, context, trustConfiguration)
+            is PreRegistered -> clientId.authenticatePreRegistered(clientId, context, preRegisteredMetadataProvider)
 
             // OpenIdFederation requires OpenID Federation trust chain resolution (not yet implemented)
             is OpenIdFederation -> ClientValidationResult.Failure(ClientIdError.FederationError("OpenID Federation trust chain resolution is not yet implemented"))

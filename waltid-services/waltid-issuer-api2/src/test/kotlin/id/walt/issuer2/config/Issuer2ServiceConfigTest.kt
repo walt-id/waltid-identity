@@ -1,9 +1,18 @@
 package id.walt.issuer2.config
 
 import id.walt.commons.config.ConfigManager
+import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.migration.v1.V1KeyMigration
+import id.walt.crypto2.serialization.StoredKeyCodec
+import id.walt.issuer2.application.openid4vci.OpenId4VciModule
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationMethod
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -14,6 +23,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertNotNull
 
 class Issuer2ServiceConfigTest {
 
@@ -55,6 +65,52 @@ class Issuer2ServiceConfigTest {
         )
 
         assertEquals(CREDENTIAL_ENCRYPTION_KEY, config.credentialEncryptionKey)
+    }
+
+    @Test
+    fun `startup loads preferred token StoredKey without rewriting config`() = kotlinx.coroutines.test.runTest {
+        val legacyKey = JWKKey.generate(KeyType.secp256r1)
+        val storedKey = V1KeyMigration().migrate(
+            recordId = KeyId(legacyKey.getKeyId()),
+            serialized = KeySerialization.serializeKeyToJson(legacyKey).jsonObject,
+            usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+        )
+        val content = """
+            baseUrl = "http://localhost:7002"
+            ciTokenKey = ${hoconTripleQuoted(KeySerialization.serializeKey(legacyKey))}
+            ciTokenStoredKey = ${hoconTripleQuoted(StoredKeyCodec.encodeToString(storedKey))}
+        """.trimIndent()
+
+        val config = loadServiceConfig(content)
+        assertNotNull(OpenId4VciModule.resolveCrypto2TokenKey(config))
+        assertEquals(content, Files.readString(tempFiles.last()))
+    }
+
+    @Test
+    fun `startup migrates legacy token JWK only in memory`() = kotlinx.coroutines.test.runTest {
+        val legacyKey = JWKKey.generate(KeyType.secp256r1)
+        val content = """
+            baseUrl = "http://localhost:7002"
+            ciTokenKey = ${hoconTripleQuoted(KeySerialization.serializeKey(legacyKey))}
+        """.trimIndent()
+
+        val config = loadServiceConfig(content)
+        assertNotNull(OpenId4VciModule.resolveCrypto2TokenKey(config))
+        assertNull(config.ciTokenStoredKey)
+        assertEquals(content, Files.readString(tempFiles.last()))
+    }
+
+    @Test
+    fun `legacy positional constructor order remains available`() {
+        val config = Issuer2ServiceConfig(
+            "https://issuer.example",
+            ED25519_KEY,
+            null,
+            false,
+            null,
+        )
+
+        assertNull(config.ciTokenStoredKey)
     }
 
     @Test

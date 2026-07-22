@@ -1,18 +1,21 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.openid4vp.clientidprefix.prefixes
 
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
-import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto2.jose.CompactJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.openid4vp.clientidprefix.RequestContext
 import id.walt.openid4vp.clientidprefix.extractSanDnsNamesFromDer
 import id.walt.x509.CertificateDer
-import id.walt.x509.verifyOrderedCertificateChainSignatures
+import id.walt.x509.validateClientAuthenticationCertificateChain
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.Url
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.JsonArray
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
@@ -32,33 +35,68 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
     }
 
     suspend fun authenticateX509SanDns(clientId: X509SanDns, context: RequestContext): ClientValidationResult {
+        return authenticateX509SanDns(clientId, context, ClientIdTrustConfiguration())
+    }
+
+    suspend fun authenticateX509SanDns(
+        clientId: X509SanDns,
+        context: RequestContext,
+        trustConfiguration: ClientIdTrustConfiguration,
+    ): ClientValidationResult {
         val jws = context.requestObjectJws
             ?: return ClientValidationResult.Failure(ClientIdError.MissingRequestObject)
 
-        val decodedJws = runCatching { jws.decodeJws() }.getOrElse { return ClientValidationResult.Failure(ClientIdError.InvalidJws) }
+        val decodedJws = try {
+            CompactJws.decodeUnverified(jws)
+        } catch (_: Exception) {
+            return ClientValidationResult.Failure(ClientIdError.InvalidJws)
+        }
 
-        val x5cHeader = decodedJws.header["x5c"]?.jsonArray
+        val x5cHeader = decodedJws.protectedHeader["x5c"] as? JsonArray
             ?: return ClientValidationResult.Failure(ClientIdError.MissingX5cHeader)
+        if (trustConfiguration.x509TrustAnchors.isEmpty()) {
+            return ClientValidationResult.Failure(ClientIdError.MissingX509TrustAnchors)
+        }
 
-        val leafCertDer = x5cHeader.firstOrNull()?.jsonPrimitive?.content?.decodeFromBase64()
+        val certificates = try {
+            x5cHeader.map { CertificateDer(it.jsonPrimitive.content.decodeFromBase64()) }
+        } catch (_: Exception) {
+            return ClientValidationResult.Failure(ClientIdError.InvalidJws)
+        }
+        val leafCertificate = certificates.firstOrNull()
             ?: return ClientValidationResult.Failure(ClientIdError.EmptyX5cHeader)
+        val leafCertDer = leafCertificate.bytes.toByteArray()
 
-        // 1. Validate the certificate chain when more than one cert is present.
-        if (x5cHeader.size > 1) {
-            runCatching {
-                verifyOrderedCertificateChainSignatures(
-                    x5cHeader.map { CertificateDer(it.jsonPrimitive.content.decodeFromBase64()) }
-                )
-            }.getOrElse {
-                return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
-            }
+        // 1. Validate the certificate path, trust anchor, validity, constraints, and client-auth usage.
+        try {
+            validateClientAuthenticationCertificateChain(
+                leaf = leafCertificate,
+                chain = certificates.drop(1),
+                trustAnchors = trustConfiguration.x509TrustAnchors,
+            )
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: Exception) {
+            return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
         }
 
         // 2. Verify JWS signature using the leaf certificate's public key.
-        val key = JWKKey.importFromDerCertificate(leafCertDer).getOrThrow()
+        val key = try {
+            ClientIdCrypto2.keyFromCertificate(leafCertDer)
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: Exception) {
+            return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
+        }
         log.trace { "Imported key from leaf cert der for X509SanDns: $key" }
 
-        key.verifyJws(jws).getOrThrow()
+        try {
+            ClientIdCrypto2.verify(jws, key)
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: Exception) {
+            return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
+        }
 
         // 3. Extract SANs using the isolated JCA utility function.
         val sans = extractSanDnsNamesFromDer(leafCertDer).getOrElse {
@@ -74,14 +112,17 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
         // Per OID4VP §x509_san_dns, ecosystems MAY require this match. We log a warning but do not reject.
         val responseUri = context.responseUri ?: context.redirectUri
         if (responseUri != null) {
-            val responseUriHost = runCatching {
+            val responseUriHost = try {
                 Url(responseUri).host
-            }.getOrNull()
-            if (responseUriHost != null && !responseUriHost.endsWith(clientId.dnsName) && responseUriHost != clientId.dnsName) {
-                log.warn {
-                    "x509_san_dns: response_uri host '$responseUriHost' does not match client_id DNS name '${clientId.dnsName}'. " +
-                        "Some ecosystems (e.g. HAIP) require this to match. Consider enabling strict response_uri validation."
-                }
+            } catch (_: Exception) {
+                return ClientValidationResult.Failure(
+                    ClientIdError.ResponseUriHostMismatch(clientId.dnsName, responseUri)
+                )
+            }
+            if (responseUriHost != clientId.dnsName) {
+                return ClientValidationResult.Failure(
+                    ClientIdError.ResponseUriHostMismatch(clientId.dnsName, responseUriHost)
+                )
             }
         }
 

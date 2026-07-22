@@ -6,6 +6,7 @@ import id.walt.x509.X509BasicConstraints
 import id.walt.x509.X509KeyUsage
 import id.walt.x509.X509V3ExtensionOID
 import id.walt.x509.X509ValidityPeriod
+import id.walt.x509.requireHttpUrl
 import id.walt.x509.iso.*
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
@@ -133,9 +134,7 @@ class DocumentSignerValidator(
         }
 
         if (config.crlDistributionPointUri) {
-            require(data.crlDistributionPointUri.isNotBlank()) {
-                "Document signer CRL distribution point uri must not be blank"
-            }
+            requireHttpUrl(data.crlDistributionPointUri, "Document signer CRL distribution point URI")
         }
     }
 

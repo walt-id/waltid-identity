@@ -158,8 +158,11 @@ enabledFeatures = [
 ]
 
 # config/auth.conf
-jwtSecret = "change-this-secret-in-production-min-32-chars"
+signingKey = { type = "jwk", jwk = { kty = "EC", crv = "P-256", x = "...", y = "...", d = "..." } }
+tokenExpiry = "PT24H"
 ```
+
+`signingStoredKey` can additionally contain the encoded crypto2 `StoredKey` sidecar and takes precedence over `signingKey`. Startup validates that both forms represent the same signing and verification key. If it is omitted, the legacy JWK is migrated only in memory and `auth.conf` is not rewritten. Malformed or mismatched StoredKey values fail startup without legacy fallback.
 
 ---
 

@@ -1,6 +1,7 @@
 package id.waltid.openid4vci.wallet.attestation
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.EncodedKey
 import io.ktor.client.HttpClient
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -31,9 +32,9 @@ class GenericHttpWalletAttestationProvider(
         require(attesterUrl.isNotBlank()) { "attesterUrl must not be blank" }
     }
 
-    override suspend fun getAttestationJwt(instanceKey: Key, clientId: String): String {
+    override suspend fun getAttestationJwt(instancePublicKeyJwk: EncodedKey.Jwk, clientId: String): String {
         require(clientId.isNotBlank()) { "clientId must not be blank" }
-        val publicJwk = json.parseToJsonElement(instanceKey.getPublicKey().exportJWK()).jsonObject
+        val publicJwk = instancePublicKeyJwk.requirePublicJwk()
         val requestBody = requestBodyTemplate.render(publicJwk)
 
         val response = httpClient.post(attesterUrl) {
@@ -52,6 +53,10 @@ class GenericHttpWalletAttestationProvider(
             ?.takeIf { it.isNotBlank() }
             ?: error("Wallet attestation response must contain a non-empty '$WALLET_INSTANCE_ATTESTATION_FIELD' field")
     }
+
+    @Deprecated("Use the EncodedKey.Jwk overload")
+    override suspend fun getAttestationJwt(instanceKey: Key, clientId: String): String =
+        getAttestationJwt(instanceKey.exportPublicCrypto2Jwk(), clientId)
 
     private fun JsonElement.render(publicJwk: JsonObject): JsonElement =
         when (this) {

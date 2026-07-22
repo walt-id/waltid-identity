@@ -36,6 +36,7 @@ kotlin {
 
             // Crypto
             api(project(":waltid-libraries:crypto:waltid-crypto"))
+            api(project(":waltid-libraries:crypto:waltid-crypto2"))
 
             // Encodings
             implementation(identityLibs.url.encoder)

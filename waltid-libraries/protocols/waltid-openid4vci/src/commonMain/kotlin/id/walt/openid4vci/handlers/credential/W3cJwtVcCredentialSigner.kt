@@ -3,6 +3,8 @@ package id.walt.openid4vci.handlers.credential
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.requests.credential.CredentialRequest
@@ -28,6 +30,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
 object W3cJwtVcCredentialSigner {
+    @Deprecated("Use the Crypto2Key overload")
     suspend fun generateW3CJwtVC(
         credentialRequest: CredentialRequest,
         credentialData: JsonObject,
@@ -39,6 +42,55 @@ object W3cJwtVcCredentialSigner {
         display: List<CredentialDisplay>? = null,
         credentialStatus: JsonElement? = null,
         w3cVersion: String? = null,
+    ): String = generateW3CJwtVC(
+        credentialRequest = credentialRequest,
+        credentialData = credentialData,
+        issuerSigningKey = IssuerSigningKey.Legacy(issuerKey),
+        issuerId = issuerId,
+        selectiveDisclosure = selectiveDisclosure,
+        dataMapping = dataMapping,
+        x5Chain = x5Chain,
+        display = display,
+        credentialStatus = credentialStatus,
+        w3cVersion = w3cVersion,
+    )
+
+    suspend fun generateW3CJwtVC(
+        credentialRequest: CredentialRequest,
+        credentialData: JsonObject,
+        issuerKey: Crypto2Key,
+        algorithm: JwsAlgorithm,
+        issuerId: String,
+        selectiveDisclosure: SDMap? = null,
+        dataMapping: JsonObject? = null,
+        x5Chain: List<CertificateDer>? = null,
+        display: List<CredentialDisplay>? = null,
+        credentialStatus: JsonElement? = null,
+        w3cVersion: String? = null,
+    ): String = generateW3CJwtVC(
+        credentialRequest = credentialRequest,
+        credentialData = credentialData,
+        issuerSigningKey = IssuerSigningKey.Crypto2(issuerKey, algorithm),
+        issuerId = issuerId,
+        selectiveDisclosure = selectiveDisclosure,
+        dataMapping = dataMapping,
+        x5Chain = x5Chain,
+        display = display,
+        credentialStatus = credentialStatus,
+        w3cVersion = w3cVersion,
+    )
+
+    private suspend fun generateW3CJwtVC(
+        credentialRequest: CredentialRequest,
+        credentialData: JsonObject,
+        issuerSigningKey: IssuerSigningKey,
+        issuerId: String,
+        selectiveDisclosure: SDMap?,
+        dataMapping: JsonObject?,
+        x5Chain: List<CertificateDer>?,
+        display: List<CredentialDisplay>?,
+        credentialStatus: JsonElement?,
+        w3cVersion: String?,
     ): String {
         val proofHeader = credentialRequest.proofs?.jwt?.let { JwtUtils.parseJWTHeader(it.first()) }
             ?: throw IllegalArgumentException("Missing JWT proof in proofs")
@@ -124,35 +176,73 @@ object W3cJwtVcCredentialSigner {
                 }
             }
             when (selectiveDisclosure.isNullOrEmpty()) {
-                true -> w3cVc.mergingJwtIssue(
-                    issuerKey = issuerKey,
-                    issuerId = issuerId,
-                    subjectDid = holderDid ?: "",
-                    mappings = dataMapping ?: JsonObject(emptyMap()),
-                    additionalJwtHeader = additionalJwtHeaders,
-                    display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-                    additionalJwtOptions = emptyMap(),
-                    context = context
-                )
+                true -> when (issuerSigningKey) {
+                    is IssuerSigningKey.Legacy -> w3cVc.mergingJwtIssue(
+                        issuerKey = issuerSigningKey.key,
+                        issuerId = issuerId,
+                        subjectDid = holderDid ?: "",
+                        mappings = dataMapping ?: JsonObject(emptyMap()),
+                        additionalJwtHeader = additionalJwtHeaders,
+                        display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
+                        additionalJwtOptions = emptyMap(),
+                        context = context,
+                    )
 
-                else -> w3cVc.mergingSdJwtIssue(
-                    issuerKey = issuerKey,
-                    issuerId = issuerId,
-                    subjectDid = holderDid ?: "",
-                    mappings = dataMapping ?: JsonObject(emptyMap()),
-                    additionalJwtHeaders = additionalJwtHeaders,
-                    additionalJwtOptions = emptyMap(),
-                    display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-                    disclosureMap = selectiveDisclosure,
-                    context = context,
-                    type = when (builderType) {
+                    is IssuerSigningKey.Crypto2 -> w3cVc.mergingJwtIssue(
+                        issuerKey = issuerSigningKey.key,
+                        algorithm = issuerSigningKey.algorithm,
+                        issuerId = issuerId,
+                        subjectDid = holderDid ?: "",
+                        mappings = dataMapping ?: JsonObject(emptyMap()),
+                        additionalJwtHeader = additionalJwtHeaders,
+                        display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
+                        additionalJwtOptions = emptyMap(),
+                        context = context,
+                    )
+                }
+
+                else -> {
+                    val type = when (builderType) {
                         CredentialBuilderType.W3CV2CredentialBuilder -> SD_JWT_VC_TYPE_HEADER
                         // Including CredentialBuilderType.W3CV11CredentialBuilder
                         else -> "JWT"
                     }
-                )
+                    when (issuerSigningKey) {
+                        is IssuerSigningKey.Legacy -> w3cVc.mergingSdJwtIssue(
+                            issuerKey = issuerSigningKey.key,
+                            issuerId = issuerId,
+                            subjectDid = holderDid ?: "",
+                            mappings = dataMapping ?: JsonObject(emptyMap()),
+                            additionalJwtHeaders = additionalJwtHeaders,
+                            additionalJwtOptions = emptyMap(),
+                            display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
+                            disclosureMap = selectiveDisclosure,
+                            context = context,
+                            type = type,
+                        )
+
+                        is IssuerSigningKey.Crypto2 -> w3cVc.mergingSdJwtIssue(
+                            issuerKey = issuerSigningKey.key,
+                            algorithm = issuerSigningKey.algorithm,
+                            issuerId = issuerId,
+                            subjectDid = holderDid ?: "",
+                            mappings = dataMapping ?: JsonObject(emptyMap()),
+                            additionalJwtHeaders = additionalJwtHeaders,
+                            additionalJwtOptions = emptyMap(),
+                            display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
+                            disclosureMap = selectiveDisclosure,
+                            context = context,
+                            type = type,
+                        )
+                    }
+                }
             }
         }
+    }
+
+    private sealed interface IssuerSigningKey {
+        data class Legacy(val key: Key) : IssuerSigningKey
+        data class Crypto2(val key: Crypto2Key, val algorithm: JwsAlgorithm) : IssuerSigningKey
     }
 
     private const val JWT_HEADER_KID = "kid"

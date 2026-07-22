@@ -1,6 +1,9 @@
 package id.walt.x509
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.Key as Crypto2Key
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
@@ -35,10 +38,14 @@ data class GenericX509DecodedCertificate(
     val extendedKeyUsageOids: Set<String>,
     val subjectAlternativeNames: X509SubjectAlternativeNames? = null,
     val crlDistributionPointUri: String? = null,
+    @Deprecated("Use crypto2PublicKey().", ReplaceWith("crypto2PublicKey()"))
     val publicKey: Key,
-)
+) {
+    suspend fun crypto2PublicKey(): EncodedKey.Jwk = publicKey.toCrypto2PublicJwk()
+}
 
 class GenericX509CertificateBuilder {
+    @Deprecated("Use buildDer with crypto2 keys and an explicit SignatureAlgorithm.")
     suspend fun build(
         profileData: GenericX509CertificateProfileData,
         subjectPublicKey: Key,
@@ -50,25 +57,46 @@ class GenericX509CertificateBuilder {
         require(signingKey.hasPrivateKey) {
             "Certificate signing key must contain a private key."
         }
-        require(profileData.validityPeriod.notAfter > profileData.validityPeriod.notBefore) {
-            "Certificate notAfter must be after notBefore."
-        }
-        profileData.pathLengthConstraint?.let {
-            require(profileData.isCertificateAuthority) {
-                "pathLengthConstraint can only be used for CA certificates."
-            }
-            require(it >= 0) {
-                "pathLengthConstraint must not be negative."
-            }
-        }
+        profileData.validate()
         return platformBuildGenericX509Certificate(
             profileData = profileData,
             subjectPublicKey = subjectPublicKey,
             signingKey = signingKey,
         )
     }
+
+    suspend fun buildDer(
+        profileData: GenericX509CertificateProfileData,
+        subjectPublicKey: Crypto2Key,
+        signingKey: Crypto2Key,
+        signatureAlgorithm: SignatureAlgorithm,
+    ): CertificateDer {
+        profileData.validate()
+        return buildCrypto2GenericX509CertificateDer(
+            profileData = profileData,
+            subjectPublicKey = subjectPublicKey,
+            signingKey = signingKey,
+            signatureAlgorithm = signatureAlgorithm,
+        )
+    }
 }
 
+private fun GenericX509CertificateProfileData.validate() {
+    require(validityPeriod.notAfter > validityPeriod.notBefore) {
+        "Certificate notAfter must be after notBefore."
+    }
+    pathLengthConstraint?.let {
+        require(isCertificateAuthority) {
+            "pathLengthConstraint can only be used for CA certificates."
+        }
+        require(it >= 0) {
+            "pathLengthConstraint must not be negative."
+        }
+    }
+    crlDistributionPointUri?.let { requireHttpUrl(it, "CRL distribution point URI") }
+}
+
+@Deprecated("Use GenericX509CertificateBuilder.buildDer with crypto2 keys and an explicit SignatureAlgorithm.")
 expect suspend fun platformBuildGenericX509Certificate(
     profileData: GenericX509CertificateProfileData,
     subjectPublicKey: Key,

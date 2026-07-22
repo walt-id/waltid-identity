@@ -3,6 +3,18 @@ package id.walt.wallet2.persistence.keys
 import id.walt.crypto.IosKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.ManagedKey
+import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.providers.GenerateManagedKeyRequest
+import id.walt.crypto2.signum.IosSignumKeyBackend
+import id.walt.crypto2.signum.SignumHardwarePolicy
+import id.walt.crypto2.signum.SignumKeyPolicy
+import id.walt.crypto2.signum.SignumKeyOptions
+import id.walt.crypto2.signum.SignumManagedKeyProvider
+import id.walt.crypto2.keys.Key as Crypto2Key
 import kotlin.uuid.Uuid
 
 /**
@@ -12,7 +24,8 @@ import kotlin.uuid.Uuid
  */
 public class IosPlatformKeyProvider(
     private val useSecureElement: Boolean = true,
-) : PlatformKeyProvider {
+) : PlatformKeyProvider, Crypto2PlatformKeyProvider {
+    private val signumProvider = SignumManagedKeyProvider(IosSignumKeyBackend())
 
     /**
      * iOS platform-backed key types supported by this provider.
@@ -35,6 +48,43 @@ public class IosPlatformKeyProvider(
         } else {
             IosKey.Software.create(options)
         }
+    }
+
+    override fun isPlatformBacked(key: Key): Boolean = key is IosKey.Platform
+
+    override suspend fun generateManagedKey(
+        id: KeyId,
+        spec: KeySpec,
+        usages: Set<KeyUsage>,
+        policy: SignumKeyPolicy?,
+    ): ManagedKey = signumProvider.generate(
+        GenerateManagedKeyRequest(
+            id = id,
+            spec = spec,
+            usages = usages,
+            providerOptions = SignumKeyOptions(policy = policy ?: defaultSignumPolicy()).encode(),
+        )
+    )
+
+    override suspend fun migratePlatformKey(
+        id: KeyId,
+        keyType: KeyType,
+        usages: Set<KeyUsage>,
+    ): StoredKey.Managed {
+        return signumProvider.storedKeyForExisting(
+            id = id,
+            spec = keyType.toCrypto2KeySpec(),
+            usages = usages,
+            alias = id.value,
+            policy = defaultSignumPolicy(),
+        )
+    }
+
+    override suspend fun restoreManagedKey(stored: StoredKey.Managed): Crypto2Key =
+        signumProvider.restore(stored)
+
+    override suspend fun deleteManagedKey(stored: StoredKey.Managed) {
+        signumProvider.delete(stored, expectedAlias = stored.id.value)
     }
 
     /**
@@ -72,4 +122,8 @@ public class IosPlatformKeyProvider(
             IosKey.Platform.delete(keyId)
         }
     }.isSuccess
+
+    private fun defaultSignumPolicy(): SignumKeyPolicy = SignumKeyPolicy(
+        hardware = if (useSecureElement) SignumHardwarePolicy.PREFERRED else SignumHardwarePolicy.DISCOURAGED,
+    )
 }

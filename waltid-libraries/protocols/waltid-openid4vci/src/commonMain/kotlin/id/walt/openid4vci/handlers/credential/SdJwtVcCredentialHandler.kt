@@ -3,6 +3,8 @@ package id.walt.openid4vci.handlers.credential
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
+import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialEndpointHandler
+import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.IssuedCredential
@@ -17,16 +19,18 @@ import id.walt.sdjwt.SDMap
 import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.coroutines.CancellationException
 import kotlin.time.Instant
 
 /**
  * SD-JWT VC credential response handler.
  */
-class SdJwtVcCredentialHandler : CredentialEndpointHandler {
+class SdJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpointHandler {
     private companion object {
         val supportedFormats = setOf(CredentialFormat.SD_JWT_VC)
     }
 
+    @Deprecated("Use the Crypto2CredentialSigningKey overload")
     override suspend fun sign(
         request: CredentialRequest,
         configuration: CredentialConfiguration,
@@ -42,6 +46,55 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+    ): CredentialResponseResult = sign(configuration) { vct ->
+        SdJwtVcCredentialSigner.generateSdJwtVC(
+            credentialRequest = request,
+            credentialData = credentialData,
+            issuerId = issuerId,
+            issuerKey = issuerKey,
+            vct = vct,
+            selectiveDisclosure = selectiveDisclosure,
+            dataMapping = dataMapping,
+            x5Chain = x5Chain,
+            display = display,
+            sdJwtTypeHeader = configuration.format.value,
+        )
+    }
+
+    override suspend fun sign(
+        request: CredentialRequest,
+        configuration: CredentialConfiguration,
+        issuerKey: Crypto2CredentialSigningKey,
+        issuerId: String,
+        credentialData: JsonObject,
+        dataMapping: JsonObject?,
+        selectiveDisclosure: SDMap?,
+        x5Chain: List<CertificateDer>?,
+        display: List<CredentialDisplay>?,
+        w3cVersion: String?,
+        mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
+        credentialStatus: Status?,
+        validFrom: Instant?,
+        validUntil: Instant?,
+    ): CredentialResponseResult = sign(configuration) { vct ->
+        SdJwtVcCredentialSigner.generateSdJwtVC(
+            credentialRequest = request,
+            credentialData = credentialData,
+            issuerId = issuerId,
+            issuerKey = issuerKey.key,
+            algorithm = issuerKey.requireJwsAlgorithm(),
+            vct = vct,
+            selectiveDisclosure = selectiveDisclosure,
+            dataMapping = dataMapping,
+            x5Chain = x5Chain,
+            display = display,
+            sdJwtTypeHeader = configuration.format.value,
+        )
+    }
+
+    private suspend fun sign(
+        configuration: CredentialConfiguration,
+        issue: suspend (vct: String) -> String,
     ): CredentialResponseResult {
         return try {
             if (configuration.format !in supportedFormats) {
@@ -58,18 +111,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
                     OAuthError("invalid_request", "Missing vct for SD-JWT VC credential configuration"),
                 )
 
-            val sdJwt = SdJwtVcCredentialSigner.generateSdJwtVC(
-                credentialRequest = request,
-                credentialData = credentialData,
-                issuerId = issuerId,
-                issuerKey = issuerKey,
-                vct = vct,
-                selectiveDisclosure = selectiveDisclosure,
-                dataMapping = dataMapping,
-                x5Chain = x5Chain,
-                display = display,
-                sdJwtTypeHeader = configuration.format.value,
-            )
+            val sdJwt = issue(vct)
 
             CredentialResponseResult.Success(
                 CredentialResponse(
@@ -78,6 +120,8 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
                     ),
                 )
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             CredentialResponseResult.Failure(OAuthError("invalid_request", e.message))
         }

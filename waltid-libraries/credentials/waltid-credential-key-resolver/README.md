@@ -28,11 +28,10 @@ This library provides a unified interface for resolving the public key used to s
 - **X.509 Certificate Chain (x5c)** — Extracts keys from inline `x5c` JWT headers with optional chain validation
 - **HTTPS Well-Known** — Fetches keys from JWT VC Issuer Metadata (`.well-known/jwt-vc-issuer`)
 - **Automatic Method Selection** — Chooses the appropriate resolver based on JWT content
-- **Fallback Support** — Falls back to x5c if DID resolution fails but x5c header is present
 
 ## Resolution Priority
 
-The `JwtKeyResolver` attempts key resolution in the following order:
+The `Crypto2JwtKeyResolver` attempts key resolution in the following order:
 
 1. **DID** — If `iss`/`issuer` is a DID URL, resolve via DID document
 2. **x5c** — If the JWT header contains an `x5c` certificate chain, extract the public key
@@ -57,16 +56,16 @@ dependencies {
 ### Basic Key Resolution
 
 ```kotlin
-import id.walt.credentials.keyresolver.JwtKeyResolver
-import kotlinx.serialization.json.Json
+import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import kotlinx.serialization.json.JsonObject
 
 suspend fun resolveSignerKey(jwtHeader: JsonObject?, jwtPayload: JsonObject) {
-    val key = JwtKeyResolver.resolveFromJwt(jwtHeader, jwtPayload)
+    val resolved = Crypto2JwtKeyResolver().resolveFromJwt(jwtHeader, jwtPayload)
+    val key = resolved?.key
     
     if (key != null) {
-        println("Resolved key: ${key.getKeyId()}")
-        println("Key type: ${key.keyType}")
+        println("Resolved key: ${key.id.value}")
+        println("Key type: ${key.spec}")
     } else {
         println("Could not resolve signer key")
     }
@@ -76,23 +75,23 @@ suspend fun resolveSignerKey(jwtHeader: JsonObject?, jwtPayload: JsonObject) {
 ### Using Individual Resolvers
 
 ```kotlin
-import id.walt.credentials.keyresolver.resolvers.DidKeyResolver
 import id.walt.credentials.keyresolver.resolvers.X5CKeyResolver
 import id.walt.credentials.keyresolver.resolvers.WellKnownKeyResolver
+import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 
 // DID resolution
-val didKey = DidKeyResolver.resolveKeyFromDid(
+val didKey = Crypto2JwtKeyResolver().resolveFromDid(
     did = "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
-    kid = null // optional key ID for multi-key DID documents
+    keyId = null // optional key ID for multi-key DID documents
 )
 
 // x5c certificate chain
-val x5cKey = X5CKeyResolver.resolveKeyFromX5c(x5cJsonArray)
+val x5cJwk = X5CKeyResolver.resolveJwkFromX5c(x5cJsonArray)
 
 // HTTPS well-known metadata
-val wellKnownKey = WellKnownKeyResolver.resolveKeyFromWellKnown(
-    issuerUrl = "https://issuer.example.com",
-    jwtHeader = header
+val wellKnownJwk = WellKnownKeyResolver.resolveJwkFromWellKnown(
+    issuerId = "https://issuer.example.com",
+    header = header
 )
 ```
 
@@ -130,7 +129,7 @@ Fetches issuer metadata from `{issuer}/.well-known/jwt-vc-issuer` and resolves t
 
 ## Related Libraries
 
-- **[waltid-crypto](../../crypto/waltid-crypto)** — Core cryptographic operations
+- **[waltid-crypto2](../../crypto/waltid-crypto2)** - Core cryptographic operations
 - **[waltid-did](../../waltid-did)** — DID resolution and management
 - **[waltid-x509](../../crypto/waltid-x509)** — X.509 certificate handling (JVM)
 - **[waltid-web-data-fetching](../../web/waltid-web-data-fetching)** — HTTP client for metadata fetching

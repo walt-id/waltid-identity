@@ -29,12 +29,14 @@ interface DidResolver {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Deprecated("Use Crypto2DidKeyResolver or Crypto2DidService for key resolution")
     suspend fun resolveToKey(did: String): Result<Key>
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Deprecated("Use Crypto2DidKeyResolver or Crypto2DidService for key resolution")
     suspend fun resolveToKeys(did: String): Result<Set<Key>>
 
 }

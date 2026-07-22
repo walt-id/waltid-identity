@@ -21,6 +21,7 @@ object Wallet2Tables {
     object Wallets : Table("wallet2_wallets") {
         val id = varchar("id", 128)
         val serializedStaticKey = text("static_key").nullable()
+        val crypto2StaticKey = text("crypto2_static_key").nullable()
         val staticDid = varchar("static_did", 1024).nullable()
         val defaultKeyId = varchar("default_key_id", 512).nullable()
         val defaultDidId = varchar("default_did_id", 1024).nullable()
@@ -73,12 +74,14 @@ object Wallet2Tables {
      * [serializedKey]: output of [id.walt.crypto.keys.KeySerialization.serializeKey] —
      * a JSON string of the form `{"type":"jwk","jwk":{...}}` that round-trips via
      * [id.walt.crypto.keys.KeyManager.resolveSerializedKey].
+     * [crypto2StoredKey]: versioned crypto2 descriptor, dual-written during rolling migration.
      */
     object Keys : Table("wallet2_keys") {
         val storeId = reference("store_id", KeyStores.id)
         val keyId = varchar("key_id", 512)
         val keyType = varchar("key_type", 64)
         val serializedKey = text("serialized_key")
+        val crypto2StoredKey = text("crypto2_stored_key").nullable()
         override val primaryKey = PrimaryKey(storeId, keyId)
     }
 

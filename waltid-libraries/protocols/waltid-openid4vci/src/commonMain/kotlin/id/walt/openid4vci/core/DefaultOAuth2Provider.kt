@@ -41,6 +41,8 @@ import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.crypto.keys.Key
+import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialEndpointHandler
+import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.tokens.access.AccessTokenContext
 import id.walt.sdjwt.SDMap
@@ -487,6 +489,7 @@ class DefaultOAuth2Provider(
         return config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())
     }
 
+    @Deprecated("Use the Crypto2CredentialSigningKey overload")
     override suspend fun createCredentialResponse(
         request: CredentialRequest,
         configuration: CredentialConfiguration,
@@ -510,6 +513,55 @@ class DefaultOAuth2Provider(
                     description = "No handler for format ${configuration.format.value}"
                 )
             )
+        return handler.sign(
+            request = request,
+            configuration = configuration,
+            issuerKey = issuerKey,
+            issuerId = issuerId,
+            credentialData = credentialData,
+            dataMapping = dataMapping,
+            selectiveDisclosure = selectiveDisclosure,
+            x5Chain = x5Chain,
+            display = display,
+            w3cVersion = w3cVersion,
+            mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+            credentialStatus = credentialStatus,
+            validFrom = validFrom,
+            validUntil = validUntil,
+        )
+    }
+
+    override suspend fun createCredentialResponse(
+        request: CredentialRequest,
+        configuration: CredentialConfiguration,
+        issuerKey: Crypto2CredentialSigningKey,
+        issuerId: String,
+        credentialData: JsonObject,
+        dataMapping: JsonObject?,
+        selectiveDisclosure: SDMap?,
+        x5Chain: List<CertificateDer>?,
+        display: List<CredentialDisplay>?,
+        w3cVersion: String?,
+        mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
+        credentialStatus: Status?,
+        validFrom: Instant?,
+        validUntil: Instant?,
+    ): CredentialResponseResult {
+        val handler = config.credentialEndpointHandlers.get(configuration.format)
+            ?: return CredentialResponseResult.Failure(
+                OAuthError(
+                    error = "unsupported_credential_configuration",
+                    description = "No handler for format ${configuration.format.value}",
+                )
+            )
+        if (handler !is Crypto2CredentialEndpointHandler) {
+            return CredentialResponseResult.Failure(
+                OAuthError(
+                    error = "unsupported_credential_configuration",
+                    description = "Handler for format ${configuration.format.value} does not support crypto2 signing",
+                )
+            )
+        }
         return handler.sign(
             request = request,
             configuration = configuration,

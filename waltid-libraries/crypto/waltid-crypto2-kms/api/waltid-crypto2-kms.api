@@ -1,0 +1,332 @@
+public final class id/walt/crypto2/kms/CredentialReference {
+	public static final field Companion Lid/walt/crypto2/kms/CredentialReference$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lid/walt/crypto2/kms/CredentialReference;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/kms/CredentialReference$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/kms/CredentialReference$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-MjXOFwM (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-yvPhAjc (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/kms/CredentialReference$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/kms/DigestingKt {
+	public static final fun digest-JdpM_fk ([BLjava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/kms/KmsProviderException : java/lang/Exception {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public abstract interface class id/walt/crypto2/kms/aws/AwsCredentialResolver {
+	public abstract fun resolve-VP_OnCg (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/kms/aws/AwsCredentials {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAccessKeyId ()Ljava/lang/String;
+	public final fun getSecretAccessKey ()Ljava/lang/String;
+	public final fun getSessionToken ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/kms/aws/AwsKmsKeyProvider : id/walt/crypto2/providers/ManagedKeyProvider {
+	public static final field Companion Lid/walt/crypto2/kms/aws/AwsKmsKeyProvider$Companion;
+	public fun <init> (Lio/ktor/client/HttpClient;Lid/walt/crypto2/kms/aws/AwsCredentialResolver;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Lio/ktor/client/HttpClient;Lid/walt/crypto2/kms/aws/AwsCredentialResolver;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun generate (Lid/walt/crypto2/providers/GenerateManagedKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getId-v1VkqW4 ()Ljava/lang/String;
+	public fun restore (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/kms/aws/AwsKmsKeyProvider$Companion {
+	public final fun getID-v1VkqW4 ()Ljava/lang/String;
+	public final fun storedKeyForExisting-JfSZgG0 (Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/kms/aws/AwsKmsOptions;Ljava/lang/String;Lid/walt/crypto2/keys/EncodedKey$SpkiDer;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun storedKeyForExisting-JfSZgG0$default (Lid/walt/crypto2/kms/aws/AwsKmsKeyProvider$Companion;Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/kms/aws/AwsKmsOptions;Ljava/lang/String;Lid/walt/crypto2/keys/EncodedKey$SpkiDer;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/kms/aws/AwsKmsOptions {
+	public static final field Companion Lid/walt/crypto2/kms/aws/AwsKmsOptions$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2-Xow88Fo ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy-P0RD5wE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lid/walt/crypto2/kms/aws/AwsKmsOptions;
+	public static synthetic fun copy-P0RD5wE$default (Lid/walt/crypto2/kms/aws/AwsKmsOptions;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/crypto2/kms/aws/AwsKmsOptions;
+	public final fun encode ()Lid/walt/crypto2/serialization/BinaryData;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCredentialReference-Xow88Fo ()Ljava/lang/String;
+	public final fun getEndpoint ()Ljava/lang/String;
+	public final fun getRegion ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/kms/aws/AwsKmsOptions$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/kms/aws/AwsKmsOptions$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/kms/aws/AwsKmsOptions;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/kms/aws/AwsKmsOptions;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/kms/aws/AwsKmsOptions$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class id/walt/crypto2/kms/azure/AzureAccessTokenProvider {
+	public abstract fun getAccessToken (Lid/walt/crypto2/kms/azure/AzureKeyVaultOptions;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/kms/azure/AzureClientSecretCredential {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getClientSecret ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/kms/azure/AzureClientSecretTokenProvider : id/walt/crypto2/kms/azure/AzureAccessTokenProvider {
+	public fun <init> (Lio/ktor/client/HttpClient;Lid/walt/crypto2/kms/azure/AzureCredentialResolver;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Lio/ktor/client/HttpClient;Lid/walt/crypto2/kms/azure/AzureCredentialResolver;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun getAccessToken (Lid/walt/crypto2/kms/azure/AzureKeyVaultOptions;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class id/walt/crypto2/kms/azure/AzureCredentialResolver {
+	public abstract fun resolve-VP_OnCg (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/kms/azure/AzureKeyVaultKeyProvider : id/walt/crypto2/providers/ManagedKeyProvider {
+	public static final field Companion Lid/walt/crypto2/kms/azure/AzureKeyVaultKeyProvider$Companion;
+	public fun <init> (Lio/ktor/client/HttpClient;Lid/walt/crypto2/kms/azure/AzureAccessTokenProvider;)V
+	public fun <init> (Lio/ktor/client/HttpClient;Lid/walt/crypto2/kms/azure/AzureCredentialResolver;)V
+	public fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun generate (Lid/walt/crypto2/providers/GenerateManagedKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getId-v1VkqW4 ()Ljava/lang/String;
+	public fun restore (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/kms/azure/AzureKeyVaultKeyProvider$Companion {
+	public final fun getID-v1VkqW4 ()Ljava/lang/String;
+	public final fun storedKeyForExisting-FO05kzI (Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/kms/azure/AzureKeyVaultOptions;Ljava/lang/String;Lid/walt/crypto2/keys/EncodedKey$Jwk;Ljava/util/Map;)Lid/walt/crypto2/keys/StoredKey$Managed;
+	public static synthetic fun storedKeyForExisting-FO05kzI$default (Lid/walt/crypto2/kms/azure/AzureKeyVaultKeyProvider$Companion;Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/kms/azure/AzureKeyVaultOptions;Ljava/lang/String;Lid/walt/crypto2/keys/EncodedKey$Jwk;Ljava/util/Map;ILjava/lang/Object;)Lid/walt/crypto2/keys/StoredKey$Managed;
+}
+
+public final class id/walt/crypto2/kms/azure/AzureKeyVaultOptions {
+	public static final field Companion Lid/walt/crypto2/kms/azure/AzureKeyVaultOptions$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3-Xow88Fo ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy-YPvOlSQ (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lid/walt/crypto2/kms/azure/AzureKeyVaultOptions;
+	public static synthetic fun copy-YPvOlSQ$default (Lid/walt/crypto2/kms/azure/AzureKeyVaultOptions;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/crypto2/kms/azure/AzureKeyVaultOptions;
+	public final fun encode ()Lid/walt/crypto2/serialization/BinaryData;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAuthorityUrl ()Ljava/lang/String;
+	public final fun getCredentialReference-Xow88Fo ()Ljava/lang/String;
+	public final fun getKeyName ()Ljava/lang/String;
+	public final fun getKeyVaultUrl ()Ljava/lang/String;
+	public final fun getTenantId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/kms/azure/AzureKeyVaultOptions$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/kms/azure/AzureKeyVaultOptions$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/kms/azure/AzureKeyVaultOptions;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/kms/azure/AzureKeyVaultOptions;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/kms/azure/AzureKeyVaultOptions$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/kms/oci/OciApiKeyCredential {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun getFingerprint ()Ljava/lang/String;
+	public final fun getKeyId ()Ljava/lang/String;
+	public final fun getPrivateKeyPem ()Ljava/lang/String;
+	public final fun getTenancyOcid ()Ljava/lang/String;
+	public final fun getUserOcid ()Ljava/lang/String;
+}
+
+public abstract interface class id/walt/crypto2/kms/oci/OciCredentialResolver {
+	public abstract fun resolve-VP_OnCg (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/kms/oci/OciKmsKeyProvider : id/walt/crypto2/providers/ManagedKeyProvider {
+	public static final field Companion Lid/walt/crypto2/kms/oci/OciKmsKeyProvider$Companion;
+	public fun <init> (Lio/ktor/client/HttpClient;Lid/walt/crypto2/kms/oci/OciCredentialResolver;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Lio/ktor/client/HttpClient;Lid/walt/crypto2/kms/oci/OciCredentialResolver;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun generate (Lid/walt/crypto2/providers/GenerateManagedKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getId-v1VkqW4 ()Ljava/lang/String;
+	public fun restore (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun storedKeyForExisting-FO05kzI (Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/kms/oci/OciKmsOptions;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun storedKeyForExisting-FO05kzI$default (Lid/walt/crypto2/kms/oci/OciKmsKeyProvider;Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/kms/oci/OciKmsOptions;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/kms/oci/OciKmsKeyProvider$Companion {
+	public final fun getID-v1VkqW4 ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/kms/oci/OciKmsOptions {
+	public static final field Companion Lid/walt/crypto2/kms/oci/OciKmsOptions$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lid/walt/crypto2/kms/oci/OciProtectionMode;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lid/walt/crypto2/kms/oci/OciProtectionMode;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4-Xow88Fo ()Ljava/lang/String;
+	public final fun component5 ()Lid/walt/crypto2/kms/oci/OciProtectionMode;
+	public final fun copy-FZuCM6U (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lid/walt/crypto2/kms/oci/OciProtectionMode;)Lid/walt/crypto2/kms/oci/OciKmsOptions;
+	public static synthetic fun copy-FZuCM6U$default (Lid/walt/crypto2/kms/oci/OciKmsOptions;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lid/walt/crypto2/kms/oci/OciProtectionMode;ILjava/lang/Object;)Lid/walt/crypto2/kms/oci/OciKmsOptions;
+	public final fun encode ()Lid/walt/crypto2/serialization/BinaryData;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCompartmentOcid ()Ljava/lang/String;
+	public final fun getCredentialReference-Xow88Fo ()Ljava/lang/String;
+	public final fun getCryptoEndpoint ()Ljava/lang/String;
+	public final fun getManagementEndpoint ()Ljava/lang/String;
+	public final fun getProtectionMode ()Lid/walt/crypto2/kms/oci/OciProtectionMode;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/kms/oci/OciKmsOptions$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/kms/oci/OciKmsOptions$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/kms/oci/OciKmsOptions;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/kms/oci/OciKmsOptions;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/kms/oci/OciKmsOptions$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/kms/oci/OciProtectionMode : java/lang/Enum {
+	public static final field Companion Lid/walt/crypto2/kms/oci/OciProtectionMode$Companion;
+	public static final field HSM Lid/walt/crypto2/kms/oci/OciProtectionMode;
+	public static final field SOFTWARE Lid/walt/crypto2/kms/oci/OciProtectionMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/kms/oci/OciProtectionMode;
+	public static fun values ()[Lid/walt/crypto2/kms/oci/OciProtectionMode;
+}
+
+public final class id/walt/crypto2/kms/oci/OciProtectionMode$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class id/walt/crypto2/kms/vault/VaultCredential {
+}
+
+public final class id/walt/crypto2/kms/vault/VaultCredential$AppRole : id/walt/crypto2/kms/vault/VaultCredential {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getMount ()Ljava/lang/String;
+	public final fun getRoleId ()Ljava/lang/String;
+	public final fun getSecretId ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/kms/vault/VaultCredential$Token : id/walt/crypto2/kms/vault/VaultCredential {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getValue ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/kms/vault/VaultCredential$UserPassword : id/walt/crypto2/kms/vault/VaultCredential {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getMount ()Ljava/lang/String;
+	public final fun getPassword ()Ljava/lang/String;
+	public final fun getUsername ()Ljava/lang/String;
+}
+
+public abstract interface class id/walt/crypto2/kms/vault/VaultCredentialResolver {
+	public abstract fun resolve-VP_OnCg (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/kms/vault/VaultTransitKeyProvider : id/walt/crypto2/providers/ManagedKeyProvider {
+	public static final field Companion Lid/walt/crypto2/kms/vault/VaultTransitKeyProvider$Companion;
+	public fun <init> (Lio/ktor/client/HttpClient;Lid/walt/crypto2/kms/vault/VaultCredentialResolver;)V
+	public fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun generate (Lid/walt/crypto2/providers/GenerateManagedKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getId-v1VkqW4 ()Ljava/lang/String;
+	public fun restore (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/kms/vault/VaultTransitKeyProvider$Companion {
+	public final fun getID-v1VkqW4 ()Ljava/lang/String;
+	public final fun storedKeyForExisting-Hvtcl8A (Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/kms/vault/VaultTransitOptions;Ljava/lang/String;ILid/walt/crypto2/keys/EncodedKey$SpkiDer;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun storedKeyForExisting-Hvtcl8A$default (Lid/walt/crypto2/kms/vault/VaultTransitKeyProvider$Companion;Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/kms/vault/VaultTransitOptions;Ljava/lang/String;ILid/walt/crypto2/keys/EncodedKey$SpkiDer;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/kms/vault/VaultTransitOptions {
+	public static final field Companion Lid/walt/crypto2/kms/vault/VaultTransitOptions$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2-Xow88Fo ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy-bUtkOTs (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lid/walt/crypto2/kms/vault/VaultTransitOptions;
+	public static synthetic fun copy-bUtkOTs$default (Lid/walt/crypto2/kms/vault/VaultTransitOptions;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/crypto2/kms/vault/VaultTransitOptions;
+	public final fun encode ()Lid/walt/crypto2/serialization/BinaryData;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getApiBaseUrl ()Ljava/lang/String;
+	public final fun getCredentialReference-Xow88Fo ()Ljava/lang/String;
+	public final fun getKeyName ()Ljava/lang/String;
+	public final fun getNamespace ()Ljava/lang/String;
+	public final fun getTransitMount ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/kms/vault/VaultTransitOptions$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/kms/vault/VaultTransitOptions$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/kms/vault/VaultTransitOptions;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/kms/vault/VaultTransitOptions;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/kms/vault/VaultTransitOptions$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+

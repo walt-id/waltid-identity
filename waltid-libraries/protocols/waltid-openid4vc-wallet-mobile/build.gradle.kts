@@ -69,6 +69,11 @@ kotlin {
             androidMain.dependencies {
                 implementation(identityLibs.ktor.client.android)
             }
+            named("androidHostTest") {
+                dependencies {
+                    implementation(identityLibs.sqldelight.sqlite.driver)
+                }
+            }
         }
         if (enableIosBuild) {
             iosMain.dependencies {

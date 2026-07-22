@@ -23,6 +23,16 @@ internal actual class PlatformX509Certificate private constructor(
     actual val subjectAlternativeDnsNames: List<String>
         get() = certificate.tbsCertificate.subjectAlternativeNames?.dnsNames.orEmpty()
 
+    private val constraints by lazy { certificate.platformCertificateConstraints() }
+    actual val isCertificateAuthority: Boolean get() = constraints.isCertificateAuthority
+    actual val pathLengthConstraint: Int? get() = constraints.pathLengthConstraint
+    actual val canSignCertificates: Boolean get() = constraints.canSignCertificates
+    actual val canSignData: Boolean get() = constraints.canSignData
+    actual val extendedKeyUsageOids: Set<String>? get() = constraints.extendedKeyUsageOids
+    actual val basicConstraintsCritical: Boolean get() = constraints.basicConstraintsCritical
+    actual val keyUsageCritical: Boolean get() = constraints.keyUsageCritical
+    actual val criticalExtensionOids: Set<String> get() = constraints.criticalExtensionOids
+
     actual fun hasIssuerNameMatching(issuer: PlatformX509Certificate): Boolean =
         certificate.tbsCertificate.issuerName == issuer.certificate.tbsCertificate.subjectName
 
@@ -59,6 +69,12 @@ internal actual class PlatformX509Certificate private constructor(
         }
     }
 }
+
+internal actual fun validatePlatformClientAuthenticationCertificateChain(
+    leaf: CertificateDer,
+    chain: List<CertificateDer>,
+    trustAnchors: List<CertificateDer>,
+) = Unit
 
 private val subjectKeyIdentifierOid = ObjectIdentifier("2.5.29.14")
 private val authorityKeyIdentifierOid = ObjectIdentifier("2.5.29.35")

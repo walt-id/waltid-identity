@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.CborObjectAsArray
 import org.bouncycastle.crypto.hpke.HPKE
+import id.walt.iso18013.annexc.TestResources.migrateToCrypto2
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -97,7 +98,7 @@ class AnnexCHpkeDecryptTest {
             encryptedResponseB64 = encryptedResponseB64,
             encryptionInfoB64 = encryptionInfoB64,
             origin = origin,
-            recipientPrivateKey = recipientKeyPair
+            recipientPrivateKey = migrateToCrypto2(recipientKeyPair)
         )
         assertContentEquals(plaintext, decrypted)
     }
@@ -144,9 +145,8 @@ class AnnexCHpkeDecryptTest {
                 encryptedResponseB64 = encryptedResponseB64,
                 encryptionInfoB64 = encryptionInfoB64,
                 origin = origin,
-                recipientPrivateKey = wrongKeyPair
+                recipientPrivateKey = migrateToCrypto2(wrongKeyPair)
             )
         }
     }
 }
-

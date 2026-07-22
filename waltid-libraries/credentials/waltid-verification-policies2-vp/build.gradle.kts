@@ -35,8 +35,11 @@ kotlin {
             implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
             implementation(project(":waltid-libraries:credentials:waltid-dcql"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
+            implementation(project(":waltid-libraries:credentials:waltid-credential-key-resolver"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+            implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
             implementation(project(":waltid-libraries:crypto:waltid-x509"))
+            implementation(project(":waltid-libraries:crypto:waltid-jose"))
 
             implementation(identityLibs.korlibs.io)
         }

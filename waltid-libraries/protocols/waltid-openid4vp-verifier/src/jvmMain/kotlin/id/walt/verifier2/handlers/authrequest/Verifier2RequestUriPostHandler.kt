@@ -1,6 +1,21 @@
 package id.walt.verifier2.handlers.authrequest
 
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.keys.toPublicJwk
+import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.serialization.BinaryData
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -9,9 +24,12 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
 
 /**
@@ -31,6 +49,18 @@ import kotlin.time.Clock
 object Verifier2RequestUriPostHandler {
 
     private val log = KotlinLogging.logger { }
+    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+
+    suspend fun RoutingCall.respondRequestUriPostCrypto2(
+        verificationSession: Verification2Session,
+        updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
+        resolveCrypto2SigningKey: suspend (Verification2Session) -> Crypto2Key?,
+    ) = respondRequestUriPost(
+        verificationSession = verificationSession,
+        updateSessionCallback = updateSessionCallback,
+        resolveSigningKey = { null },
+        resolveCrypto2SigningKey = resolveCrypto2SigningKey,
+    )
 
     /**
      * Handles a POST to `/{sessionId}/request`.
@@ -44,6 +74,8 @@ object Verifier2RequestUriPostHandler {
     suspend fun RoutingCall.respondRequestUriPost(
         verificationSession: Verification2Session,
         updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
+        resolveSigningKey: suspend (Verification2Session) -> Key? = { it.setup.core.key?.key },
+        resolveCrypto2SigningKey: suspend (Verification2Session) -> Crypto2Key? = { null },
     ) {
         val call = this
 
@@ -69,14 +101,16 @@ object Verifier2RequestUriPostHandler {
         }
 
         // Re-sign the request object including wallet_nonce per OID4VP 1.0 §5.6
-        val coreSetup = verificationSession.setup.core
-
-        val signingKey = coreSetup.key?.key
-            ?: run {
-                log.warn { "No signing key available for re-sign, returning pre-built JWT (no wallet_nonce)" }
-                call.respondText(existingJwt, ContentType.parse("application/oauth-authz-req+jwt"))
-                return
-            }
+        val crypto2SigningKey = resolveCrypto2SigningKey(verificationSession)
+        val signingKey = if (crypto2SigningKey == null) resolveSigningKey(verificationSession) else null
+        require(crypto2SigningKey != null || signingKey != null) {
+            "No signing key available to bind wallet_nonce to the signed request"
+        }
+        if (crypto2SigningKey != null) {
+            verifyExistingRequestObject(existingJwt, crypto2SigningKey)
+        } else {
+            verifyExistingRequestObject(existingJwt, requireNotNull(signingKey))
+        }
 
         // Decode existing JWT to get headers and payload
         val parts = existingJwt.split(".")
@@ -99,19 +133,116 @@ object Verifier2RequestUriPostHandler {
         }
 
         // Re-sign with the same headers (alg, typ, x5c, kid etc.)
-        val freshJwt = signingKey.signJws(
-            plaintext = newPayload.toString().encodeToByteArray(),
-            headers = existingHeaders
-        )
+        val freshJwt = if (crypto2SigningKey != null) {
+            signRequestObject(crypto2SigningKey, newPayload, existingHeaders)
+        } else {
+            signRequestObject(requireNotNull(signingKey), newPayload, existingHeaders)
+        }
 
-        // Store wallet_nonce on session so the wallet-nonce check can be done on future requests if needed
-        if (walletNonce != null) {
-            updateSessionCallback(verificationSession, SessionEvent.authorization_request_requested) {
-                // No-op session update — wallet_nonce is ephemeral per request
-            }
+        updateSessionCallback(verificationSession, SessionEvent.authorization_request_requested) {
+            status = Verification2Session.VerificationSessionStatus.IN_USE
         }
 
         log.trace { "Re-signed request object with wallet_nonce for session ${verificationSession.id}" }
         call.respondText(freshJwt, ContentType.parse("application/oauth-authz-req+jwt"))
     }
+
+    @Deprecated("Use the Crypto2Key overload")
+    internal suspend fun signRequestObject(
+        signingKey: Key,
+        payload: JsonObject,
+        headers: JsonObject,
+    ): String {
+        requireMatchingKeyId(headers, signingKey.getKeyId())
+        val crypto2Key = resolveCrypto2Key(signingKey, setOf(KeyUsage.SIGN))
+        return if (crypto2Key != null) {
+            val algorithm = JwsAlgorithm.parse(
+                requireNotNull(headers["alg"]?.jsonPrimitive?.contentOrNull) {
+                    "Existing signed request JWT is missing alg"
+                }
+            )
+            CompactJws.sign(
+                payload = Json.encodeToString(payload).encodeToByteArray(),
+                key = crypto2Key,
+                algorithm = algorithm,
+                protectedHeader = headers,
+            )
+        } else signingKey.signJws(payload.toString().encodeToByteArray(), headers)
+    }
+
+    @Deprecated("Use the Crypto2Key overload")
+    internal suspend fun verifyExistingRequestObject(jwt: String, signingKey: Key) {
+        val decoded = CompactJws.decodeUnverified(jwt)
+        requireMatchingKeyId(decoded.protectedHeader, signingKey.getKeyId())
+        val algorithm = JwsAlgorithm.parse(
+            requireNotNull(decoded.protectedHeader["alg"]?.jsonPrimitive?.contentOrNull) {
+                "Existing signed request JWT is missing alg"
+            }
+        )
+        val crypto2Key = resolveCrypto2Key(signingKey, setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
+        if (crypto2Key != null) {
+            CompactJws.verify(jwt, crypto2Key, algorithm)
+        } else {
+            signingKey.getPublicKey().verifyJws(jwt).getOrThrow()
+        }
+    }
+
+    internal suspend fun signRequestObject(
+        signingKey: Crypto2Key,
+        payload: JsonObject,
+        headers: JsonObject,
+    ): String {
+        requireMatchingKeyId(headers, signingKey.id.value)
+        val algorithm = JwsAlgorithm.parse(
+            requireNotNull(headers["alg"]?.jsonPrimitive?.contentOrNull) {
+                "Existing signed request JWT is missing alg"
+            }
+        )
+        return CompactJws.sign(
+            payload = Json.encodeToString(payload).encodeToByteArray(),
+            key = signingKey,
+            algorithm = algorithm,
+            protectedHeader = headers,
+        )
+    }
+
+    internal suspend fun verifyExistingRequestObject(jwt: String, signingKey: Crypto2Key) {
+        val decoded = CompactJws.decodeUnverified(jwt)
+        requireMatchingKeyId(decoded.protectedHeader, signingKey.id.value)
+        val algorithm = decoded.algorithm
+        val publicJwk = requireNotNull(signingKey.capabilities.publicKeyExporter) {
+            "Request signing key does not export public material"
+        }.exportPublicKey().toPublicJwk(signingKey.spec)
+        val verificationKey = crypto2Runtime.restore(
+            StoredKey.Software(
+                version = StoredKey.CURRENT_VERSION,
+                id = signingKey.id,
+                spec = signingKey.spec,
+                usages = setOf(KeyUsage.VERIFY),
+                material = publicJwk,
+            )
+        )
+        CompactJws.verify(jwt, verificationKey, algorithm)
+    }
+
+    private fun requireMatchingKeyId(headers: JsonObject, actualKeyId: String) {
+        val protectedKeyId = requireNotNull(headers["kid"]?.jsonPrimitive?.contentOrNull) {
+            "Existing signed request JWT is missing kid"
+        }
+        require(protectedKeyId == actualKeyId || protectedKeyId.endsWith("#$actualKeyId")) {
+            "Resolved signing key does not match the existing signed request kid"
+        }
+    }
+
+    private suspend fun resolveCrypto2Key(signingKey: Key, usages: Set<KeyUsage>) =
+        (signingKey as? JWKKey)
+            ?.takeUnless { it.keyType == KeyType.secp256k1 }
+            ?.let { key ->
+                val jwk = key.exportJWKObject()
+                EncodedKey.Jwk(
+                    BinaryData(Json.encodeToString(jwk).encodeToByteArray()),
+                    privateMaterial = key.hasPrivateKey,
+                ).toStoredSoftwareKey(KeyId(key.getKeyId()), usages)
+            }
+            ?.let { crypto2Runtime.restore(it) }
 }
