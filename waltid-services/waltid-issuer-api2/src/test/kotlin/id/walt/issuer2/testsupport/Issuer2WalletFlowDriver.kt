@@ -6,6 +6,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.issuer2.models.CredentialOfferCreateResponse
+import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
@@ -34,7 +35,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLBuilder
 import io.ktor.http.contentType
-import io.ktor.http.parseQueryString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -117,8 +117,8 @@ class Issuer2WalletFlowDriver(
             issuerState = issuerState,
             requestMode = requestMode,
         )
-        val internalAuthorizationRequest = redirectUri.substringAfter("/external_login/")
-        assertEquals(issuerState, parseQueryString(internalAuthorizationRequest)["issuer_state"])
+        val internalAuthorizationRequest = decodeExternalLoginAuthorizationRequest(redirectUri)
+        assertEquals(issuerState, internalAuthorizationRequest["issuer_state"]?.singleOrNull())
         assertAuthorizationRequestMode(internalAuthorizationRequest, scenario, requestMode)
         return redirectUri
     }
@@ -134,8 +134,8 @@ class Issuer2WalletFlowDriver(
             issuerState = null,
             requestMode = requestMode,
         )
-        val internalAuthorizationRequest = redirectUri.substringAfter("/external_login/")
-        assertEquals(null, parseQueryString(internalAuthorizationRequest)["issuer_state"])
+        val internalAuthorizationRequest = decodeExternalLoginAuthorizationRequest(redirectUri)
+        assertEquals(null, internalAuthorizationRequest["issuer_state"]?.singleOrNull())
         assertAuthorizationRequestMode(internalAuthorizationRequest, scenario, requestMode)
         return redirectUri
     }
@@ -160,8 +160,8 @@ class Issuer2WalletFlowDriver(
             issuerState = issuerState,
             requestMode = requireNotNull(variant.authorizationRequestMode),
         )
-        val internalAuthorizationRequest = redirectUri.substringAfter("/external_login/")
-        assertEquals(issuerState, parseQueryString(internalAuthorizationRequest)["issuer_state"])
+        val internalAuthorizationRequest = decodeExternalLoginAuthorizationRequest(redirectUri)
+        assertEquals(issuerState, internalAuthorizationRequest["issuer_state"]?.singleOrNull())
         assertAuthorizationRequestMode(internalAuthorizationRequest, scenario, variant.authorizationRequestMode)
         return redirectUri
     }
@@ -181,8 +181,8 @@ class Issuer2WalletFlowDriver(
             requestMode = requestMode,
         )
         val redirectUri = sendAuthorizationRequest(authorizationUrl)
-        val internalAuthorizationRequest = redirectUri.substringAfter("/external_login/")
-        assertEquals(null, parseQueryString(internalAuthorizationRequest)["issuer_state"])
+        val internalAuthorizationRequest = decodeExternalLoginAuthorizationRequest(redirectUri)
+        assertEquals(null, internalAuthorizationRequest["issuer_state"]?.singleOrNull())
         assertAuthorizationRequestMode(internalAuthorizationRequest, scenario, requestMode)
         return redirectUri
     }
@@ -327,14 +327,13 @@ class Issuer2WalletFlowDriver(
         }
 
     private fun assertAuthorizationRequestMode(
-        internalAuthorizationRequest: String,
+        parameters: Map<String, List<String>>,
         scenario: Issuer2CredentialScenario,
         requestMode: Issuer2AuthorizationRequestMode,
     ) {
-        val parameters = parseQueryString(internalAuthorizationRequest)
         when (requestMode) {
             Issuer2AuthorizationRequestMode.SCOPE -> {
-                assertEquals(scenario.authorizationScope, parameters["scope"])
+                assertEquals(listOf(scenario.authorizationScope), parameters["scope"])
                 assertEquals(null, parameters["authorization_details"])
             }
 
@@ -344,6 +343,9 @@ class Issuer2WalletFlowDriver(
             }
         }
     }
+
+    private fun decodeExternalLoginAuthorizationRequest(redirectUri: String): Map<String, List<String>> =
+        redirectUri.substringAfter("/external_login/").decodeExternalLoginAuthorizationParameters()
 
     suspend fun buildJwtProofs(
         issuerMetadata: CredentialIssuerMetadata,
