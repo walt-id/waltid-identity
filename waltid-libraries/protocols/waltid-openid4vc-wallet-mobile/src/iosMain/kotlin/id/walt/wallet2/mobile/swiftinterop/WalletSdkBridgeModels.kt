@@ -48,6 +48,7 @@ import kotlin.time.Instant
  * @property requestObjectEnableSystemTrustAnchors Retained for source compatibility. iOS system
  * trust anchors are not supported for Request Object validation and `true` is rejected.
  * @property requestObjectAudience Expected Request Object audience.
+ * @property preferredLocales Ordered BCP 47 locale preferences used to select display metadata.
  * @property transactionDataProfiles Transaction data profiles this wallet accepts.
  */
 public data class WalletBridgeConfiguration(
@@ -59,6 +60,7 @@ public data class WalletBridgeConfiguration(
     public val requestObjectTrustAnchorPemCertificates: List<String> = emptyList(),
     public val requestObjectEnableSystemTrustAnchors: Boolean = false,
     public val requestObjectAudience: String = "https://self-issued.me/v2",
+    public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
 )
 
@@ -66,13 +68,8 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
     require(!requestObjectEnableSystemTrustAnchors) {
         "iOS system trust anchors are not supported for OID4VP Request Object validation"
     }
-    val x509Trust = if (requestObjectTrustAnchorPemCertificates.isNotEmpty() || requestObjectEnableSystemTrustAnchors) {
-        WalletX509TrustConfig(
-            trustAnchorPemCertificates = requestObjectTrustAnchorPemCertificates,
-            enableSystemTrustAnchors = requestObjectEnableSystemTrustAnchors,
-        )
-    } else {
-        null
+    val x509Trust = requestObjectTrustAnchorPemCertificates.takeIf { it.isNotEmpty() }?.let {
+        WalletX509TrustConfig(trustAnchorPemCertificates = it)
     }
     return MobileWalletConfig(
         walletId = walletId,
@@ -81,6 +78,7 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
         persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
         requestObjectX509Trust = x509Trust,
         requestObjectAudience = requestObjectAudience,
+        preferredLocales = preferredLocales,
         transactionDataProfiles = transactionDataProfiles,
     )
 }

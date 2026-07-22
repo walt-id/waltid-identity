@@ -60,11 +60,15 @@ class WalletIssuanceHandlerPreviewTest {
             id = "offer-binding-test",
             staticKey = JWKKey.generate(KeyType.Ed25519),
         )
-        WalletIssuanceHandler.previewOffer(
+        val preview = WalletIssuanceHandler.previewOffer(
             wallet = wallet,
             request = ResolveOfferRequest(offerUrl = Url(OFFER_DEEP_LINK)),
             httpClient = client,
         )
+
+        assertEquals(ISSUER, preview.issuerMetadata.credentialIssuer)
+        assertEquals("pid", preview.offeredCredentials.single().credentialConfigurationId)
+        assertEquals("text", preview.transactionCode?.inputMode)
 
         repeat(2) {
             assertFails {
@@ -120,6 +124,7 @@ class WalletIssuanceHandlerPreviewTest {
             {
               "credential_issuer": "$ISSUER",
               "credential_endpoint": "$ISSUER/credential",
+              "display": [{ "name": "Example Issuer", "locale": "en" }],
               "credential_configurations_supported": {
                 "pid": {
                   "format": "jwt_vc_json",

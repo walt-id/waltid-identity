@@ -30,6 +30,7 @@ import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import id.waltid.openid4vp.wallet.response.ResponseEncryptionHandler
+import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.coroutines.flow.toList
@@ -180,6 +181,8 @@ data class PreviewPresentationRequest(
 sealed interface PreviewPresentationResult {
     data class Ready(
         val authorizationRequest: AuthorizationRequest,
+        /** Response-encryption selection derived from this authenticated request, or `null` for a plain response. */
+        val responseEncryption: ResponseEncryption.Metadata?,
         val credentialOptions: List<PresentationCredentialOption>,
         val credentialRequirements: List<PresentationCredentialRequirement>,
         val transactionData: List<PresentationTransactionDataItem>,
@@ -387,6 +390,7 @@ object WalletPresentationHandler {
                 details = decoded.details,
             )
         }
+        val responseEncryption = ResponseEncryption.resolve(authorizationRequest)?.metadata()
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
         val matched = selectFromStores(wallet, query, useWalletCredentialIds = true)
         val availableCredentialQueryIds = matched.filterValues { it.isNotEmpty() }.keys
@@ -415,6 +419,7 @@ object WalletPresentationHandler {
 
         return PreviewPresentationResult.Ready(
             authorizationRequest = authorizationRequest,
+            responseEncryption = responseEncryption,
             credentialRequirements = query.requiredCredentialRequirements(),
             credentialOptions = matched.flatMap { (queryId, results) ->
                 results.map { result ->

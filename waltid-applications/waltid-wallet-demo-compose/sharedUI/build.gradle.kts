@@ -43,6 +43,7 @@ kotlin {
             implementation(identityLibs.compose.material.icons.core)
             implementation(identityLibs.compose.navigation3.ui)
             implementation(identityLibs.coil.compose)
+            implementation(identityLibs.coil.network.ktor3)
         }
 
         if (enableAndroidBuild || enableIosBuild) {

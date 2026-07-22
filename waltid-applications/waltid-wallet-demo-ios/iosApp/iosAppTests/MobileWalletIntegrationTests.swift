@@ -185,7 +185,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: Self.eudiPidSdJwtCredentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
         let resolution = try await wallet.resolveOffer(offer: offerURL)
-        XCTAssertTrue(resolution.transactionCodeRequired, "EUDI offer should require a transaction code")
+        XCTAssertFalse(resolution.issuer.credentialIssuer.isEmpty)
+        XCTAssertFalse(resolution.offeredCredentials.isEmpty)
+        XCTAssertTrue(resolution.offeredCredentials.allSatisfy {
+            !$0.configurationID.isEmpty && !$0.format.isEmpty
+        })
+        XCTAssertNotNil(resolution.transactionCode, "EUDI offer should require a transaction code")
         let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
 
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
@@ -446,6 +451,9 @@ final class MobileWalletIntegrationTests: XCTestCase {
             preview.credentialOptions.allSatisfy { credentialIDs.contains($0.credentialID) },
             "Preview should only offer credentials received in this test. Received: \(credentialIDs), Preview: \(preview)"
         )
+        guard case .required = preview.request.responseEncryption else {
+            return XCTFail("EUDI verifier should request an encrypted response: \(preview)")
+        }
 
         let result = try await wallet.submitPresentation(
             request: presentationURL,

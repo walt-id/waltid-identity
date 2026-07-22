@@ -11,7 +11,18 @@ final class WalletViewModelPresentationTests: XCTestCase {
         let previewError = PresentationPreviewError(
             request: PresentationRequestInfo(
                 clientID: "https://verifier.example",
-                verifierName: "Example Verifier"
+                verifierMetadata: VerifierMetadata(
+                    display: MetadataDisplay(
+                        name: "Example Verifier",
+                        locale: "en",
+                        logoURI: nil,
+                        logoAltText: nil
+                    ),
+                    clientURI: nil,
+                    policyURI: nil,
+                    termsOfServiceURI: nil
+                ),
+                responseEncryption: .notRequired
             ),
             code: .invalidTransactionData,
             message: "Unsupported transaction data type"

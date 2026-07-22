@@ -40,7 +40,7 @@ internal fun PresentationErrorSection(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
-            VerifierDetailsCard(error.verifier)
+            VerifierReviewSections(error)
             Text(error.message, style = MaterialTheme.typography.bodyMedium)
             Text(
                 "OpenID4VP error: ${error.errorCode}",

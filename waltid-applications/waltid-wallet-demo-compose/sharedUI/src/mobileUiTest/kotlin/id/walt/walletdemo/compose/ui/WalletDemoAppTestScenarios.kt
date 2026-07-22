@@ -8,6 +8,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -29,12 +30,15 @@ import androidx.compose.ui.test.v2.runComposeUiTest
 import id.walt.walletdemo.compose.logic.DemoPinStore
 import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.InMemoryDemoPinStore
-import id.walt.walletdemo.compose.logic.VerifierDetails
 import id.walt.walletdemo.compose.logic.WalletDemoBootstrapResult
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialClaimMetadata
+import id.walt.walletdemo.compose.logic.WalletDemoIssuerMetadata
+import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
+import id.walt.walletdemo.compose.logic.WalletDemoOfferedCredentialMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialOption
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialRequirement
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
@@ -43,6 +47,10 @@ import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelectio
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationError
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreview
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreviewResult
+import id.walt.walletdemo.compose.logic.WalletDemoResponseEncryption
+import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeInputMode
+import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeRequirement
+import id.walt.walletdemo.compose.logic.WalletDemoVerifierMetadata
 import id.walt.walletdemo.compose.logic.WalletOperationState
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.statusText
@@ -98,6 +106,11 @@ class WalletDemoAppTestScenarios {
         onNodeWithContentDescription("Back").assertIsDisplayed()
         onNodeWithText("Credential details").assertIsDisplayed()
         onAllNodesWithText("Example Credential").assertCountEquals(1)
+        onNodeWithTag(WalletUiTestTags.claimGroup("About this credential"))
+            .performScrollTo()
+            .assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.claim("system.format")).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.claimGroup("About this credential")).performClick()
         onNodeWithText("Example Issuer").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.claim("system.format")).performScrollTo().assertIsDisplayed()
         onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
@@ -127,6 +140,9 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.offerInput").performTextInput("openid-credential-offer://example")
         onNodeWithTag("wallet.receiveButton").performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+        onNodeWithText("Example Issuer").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
+        onNodeWithText("vc+sd-jwt").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
 
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
@@ -248,6 +264,71 @@ class WalletDemoAppTestScenarios {
         assertEquals(null, wallet.receivedOfferUrl)
     }
 
+    fun offerClaimsUseSemanticGroupsAndInclusionLabels() = runComposeUiTest {
+        val wallet = FakeDemoWallet(
+            offeredCredential = WalletDemoOfferedCredentialMetadata(
+                configurationId = "org.iso.23220.photoid.1",
+                format = "mso_mdoc",
+                vct = null,
+                doctype = "org.iso.23220.photoid.1",
+                display = WalletDemoMetadataDisplay(
+                    name = "Photo ID",
+                    logoUri = null,
+                    logoAltText = null,
+                ),
+                claims = listOf(
+                    WalletDemoCredentialClaimMetadata(
+                        path = listOf("org.iso.23220.1", "given_name"),
+                        mandatory = true,
+                        displayName = "Given name",
+                    ),
+                    WalletDemoCredentialClaimMetadata(
+                        path = listOf("org.iso.23220.1", "age_over_18"),
+                        mandatory = true,
+                        displayName = null,
+                    ),
+                    WalletDemoCredentialClaimMetadata(
+                        path = listOf("org.iso.23220.1", "age_over_65"),
+                        mandatory = false,
+                        displayName = null,
+                    ),
+                    WalletDemoCredentialClaimMetadata(
+                        path = listOf("org.iso.23220.dtc.1", "dtc_dg1"),
+                        mandatory = null,
+                        displayName = null,
+                    ),
+                    WalletDemoCredentialClaimMetadata(
+                        path = listOf("org.iso.23220.dtc.1", "dtc_sod"),
+                        mandatory = true,
+                        displayName = null,
+                    ),
+                ),
+            )
+        )
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag(WalletUiTestTags.ReceiveTab).performClick()
+        onNodeWithTag(WalletUiTestTags.OfferInput).performTextInput("openid-credential-offer://example")
+        onNodeWithTag(WalletUiTestTags.ReceiveButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+
+        onNodeWithTag(WalletUiTestTags.OfferSupportedClaims).performScrollTo().assertIsDisplayed()
+        onAllNodesWithText("18 or older").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.OfferSupportedClaims).performClick()
+        onNodeWithText("Age attestations").performScrollTo().assertIsDisplayed()
+        onNodeWithText("18 or older").performScrollTo().assertIsDisplayed()
+        onNodeWithText("65 or older").performScrollTo().assertIsDisplayed()
+        onAllNodesWithText("Always included").assertCountEquals(3)
+        onAllNodesWithText("May be included").assertCountEquals(2)
+        onNodeWithText("Travel document data").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Document security object (SOD)").performScrollTo().assertIsDisplayed()
+        onNodeWithText("DG1: Machine-readable zone").performScrollTo().assertIsDisplayed()
+    }
+
     fun receiveAndPresentTabsExposeQrScanActions() = runComposeUiTest {
         val controller = WalletDemoController(
             FakeDemoWallet(credentials = listOf(sampleCredential)),
@@ -290,7 +371,9 @@ class WalletDemoAppTestScenarios {
 
     fun invalidPresentationCanBeDismissedLocallyOrReportedToVerifier() = runComposeUiTest {
         val error = WalletDemoPresentationError(
-            verifier = VerifierDetails(name = "Example Verifier", clientId = "https://verifier.example"),
+            verifierMetadata = samplePresentationPreview.verifierMetadata,
+            clientId = samplePresentationPreview.clientId,
+            responseEncryption = samplePresentationPreview.responseEncryption,
             errorCode = "invalid_transaction_data",
             message = "Unsupported transaction data type",
         )
@@ -354,8 +437,16 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.presentationInput").assertIsDisplayed()
         onNodeWithTag("wallet.presentationInput").assertIsNotEnabled()
         onNodeWithTag("wallet.presentationSubmitButton").performScrollTo().assertIsDisplayed()
-        onNodeWithTag("wallet.presentationVerifier").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationVerifierSection).performScrollTo().assertIsDisplayed()
         onNodeWithText("Example Verifier").performScrollTo().assertIsDisplayed()
+        onNodeWithText("https://verifier.example").performScrollTo().assertIsDisplayed().assertHasClickAction()
+        onNodeWithText("https://verifier.example/privacy").performScrollTo().assertIsDisplayed().assertHasClickAction()
+        onNodeWithText("https://verifier.example/terms").performScrollTo().assertIsDisplayed().assertHasClickAction()
+        onNodeWithTag(WalletUiTestTags.PresentationResponseProtectionSection).performScrollTo().assertIsDisplayed()
+        onNodeWithText("Required").performScrollTo().assertIsDisplayed()
+        onNodeWithText("ECDH-ES").performScrollTo().assertIsDisplayed()
+        onNodeWithText("A256GCM").performScrollTo().assertIsDisplayed()
+        onNodeWithText("thumbprint-1").performScrollTo().assertIsDisplayed()
         assertVerifierTechnicalDetailsCollapsedUntilRequested()
         onNodeWithTag(WalletUiTestTags.credentialCard(samplePresentationCredentialOption.selection.id)).performScrollTo().assertIsDisplayed()
 
@@ -409,6 +500,29 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.PresentationNewButton).assertIsDisplayed()
     }
 
+    fun presentTabShowsUnencryptedResponseState() = runComposeUiTest {
+        val wallet = FakeDemoWallet(
+            credentials = listOf(sampleCredential),
+            presentationPreview = samplePresentationPreview.copy(
+                responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            ),
+        )
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+        onNodeWithTag(WalletUiTestTags.PresentTab).performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationInput).performTextInput("openid4vp://example")
+        onNodeWithTag(WalletUiTestTags.PresentButton).performSemanticsAction(SemanticsActions.OnClick)
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+
+        onNodeWithTag(WalletUiTestTags.PresentationResponseProtectionSection).performScrollTo().assertIsDisplayed()
+        onNodeWithText("Not requested").assertIsDisplayed()
+        onAllNodesWithText("Key management algorithm").assertCountEquals(0)
+        onAllNodesWithText("Verifier key thumbprint").assertCountEquals(0)
+    }
+
     fun presentationDisclosureImagesRenderAsImages() = runComposeUiTest {
         val wallet = FakeDemoWallet(
             credentials = listOf(sampleCredential),
@@ -439,11 +553,11 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath)).assertIsDisplayed()
     }
 
-    fun presentTabShowsReadableVerifierFallbackForDidClientIds() = runComposeUiTest {
+    fun presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails() = runComposeUiTest {
         val wallet = FakeDemoWallet(
             credentials = listOf(sampleCredential),
             presentationPreview = samplePresentationPreview.copy(
-                verifierName = null,
+                verifierMetadata = null,
                 clientId = sampleDidClientId,
             ),
         )
@@ -458,35 +572,10 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.presentButton").performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
-        onNodeWithText("DID verifier").performScrollTo().assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.PresentationVerifierSection).assertCountEquals(0)
         onAllNodesWithText(sampleDidClientId).assertCountEquals(0)
-        onNodeWithTag("wallet.verifierTechnicalDetailsToggle").performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.VerifierTechnicalDetailsToggle).performScrollTo().performClick()
         onNodeWithText(sampleDidClientId).performScrollTo().assertIsDisplayed()
-    }
-
-    fun presentTabShowsReadableVerifierFallbackForX509SanDnsClientIds() = runComposeUiTest {
-        val wallet = FakeDemoWallet(
-            credentials = listOf(sampleCredential),
-            presentationPreview = samplePresentationPreview.copy(
-                verifierName = null,
-                clientId = sampleX509SanDnsClientId,
-            ),
-        )
-        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
-
-        setContent { WalletDemoApp(controller) }
-        unlockWithPin()
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
-
-        onNodeWithTag("wallet.tab.present").performClick()
-        onNodeWithTag("wallet.presentationInput").performTextInput("openid4vp://example")
-        onNodeWithTag("wallet.presentButton").performSemanticsAction(SemanticsActions.OnClick)
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
-
-        onNodeWithText("verifier.example").performScrollTo().assertIsDisplayed()
-        onAllNodesWithText(sampleX509SanDnsClientId).assertCountEquals(0)
-        onNodeWithTag("wallet.verifierTechnicalDetailsToggle").performScrollTo().performClick()
-        onNodeWithText(sampleX509SanDnsClientId).performScrollTo().assertIsDisplayed()
     }
 
     fun presentationDetailsResolveDuplicateCredentialOptionsIndependently() = runComposeUiTest {
@@ -742,7 +831,9 @@ class WalletDemoAppTestScenarios {
         )
         val reviewLandmarkTags = onAllNodes(
             matcher = hasAnyAncestor(hasTestTag("wallet.presentationReview")) and (
-                hasTestTag("wallet.presentationVerifier") or
+                hasTestTag(WalletUiTestTags.PresentationVerifierSection) or
+                    hasTestTag(WalletUiTestTags.PresentationResponseProtectionSection) or
+                    hasTestTag(WalletUiTestTags.PresentationTechnicalDetailsSection) or
                     hasTestTag(expectedCredentialTag) or
                     hasTestTag("wallet.presentationActions")
                 ),
@@ -751,16 +842,25 @@ class WalletDemoAppTestScenarios {
             .fetchSemanticsNodes()
             .mapNotNull { it.config.getOrElseNullable(SemanticsProperties.TestTag) { null } }
 
-        val verifierIndex = reviewLandmarkTags.indexOf("wallet.presentationVerifier")
+        val verifierIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationVerifierSection)
+        val responseProtectionIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationResponseProtectionSection)
+        val technicalDetailsIndex = reviewLandmarkTags.indexOf(WalletUiTestTags.PresentationTechnicalDetailsSection)
         val credentialIndex = reviewLandmarkTags.indexOf(expectedCredentialTag)
         val actionsIndex = reviewLandmarkTags.indexOf("wallet.presentationActions")
 
         assertTrue(verifierIndex >= 0, "Verifier details are missing from presentation review: $reviewLandmarkTags")
+        assertTrue(responseProtectionIndex >= 0, "Response protection is missing from presentation review: $reviewLandmarkTags")
+        assertTrue(technicalDetailsIndex >= 0, "Technical request details are missing from presentation review: $reviewLandmarkTags")
         assertTrue(credentialIndex >= 0, "Shared credential is missing from presentation review: $reviewLandmarkTags")
         assertTrue(actionsIndex >= 0, "Share actions are missing from presentation review: $reviewLandmarkTags")
         assertTrue(
-            verifierIndex < actionsIndex,
-            "Share action should follow verifier details so the verifier is reviewed before consent: $reviewLandmarkTags",
+            verifierIndex < responseProtectionIndex &&
+                responseProtectionIndex < technicalDetailsIndex,
+            "Verifier metadata, response-protection, and technical sections are out of order: $reviewLandmarkTags",
+        )
+        assertTrue(
+            technicalDetailsIndex < credentialIndex,
+            "Credential selection should follow request metadata: $reviewLandmarkTags",
         )
         assertTrue(
             credentialIndex < actionsIndex,
@@ -825,11 +925,26 @@ class WalletDemoAppTestScenarios {
         )
 
         val samplePresentationPreview = WalletDemoPresentationPreview(
-            verifierName = "Example Verifier",
+            verifierMetadata = WalletDemoVerifierMetadata(
+                display = WalletDemoMetadataDisplay(
+                    name = "Example Verifier",
+                    logoUri = null,
+                    logoAltText = null,
+                ),
+                clientUri = "https://verifier.example",
+                policyUri = "https://verifier.example/privacy",
+                termsOfServiceUri = "https://verifier.example/terms",
+            ),
             clientId = "https://verifier.example/client",
             responseUri = "https://verifier.example/response",
             state = "state-123",
             nonce = "nonce-456",
+            responseEncryption = WalletDemoResponseEncryption.Required(
+                keyManagementAlgorithm = "ECDH-ES",
+                contentEncryptionAlgorithm = "A256GCM",
+                verifierKeyId = "verifier-key-1",
+                verifierKeyThumbprint = "thumbprint-1",
+            ),
             credentialOptions = listOf(
                 WalletDemoPresentationCredentialOption(
                     queryId = "pid",
@@ -878,7 +993,6 @@ class WalletDemoAppTestScenarios {
         )
 
         const val sampleDidClientId = "decentralized_identifier:did:jwk:abc"
-        const val sampleX509SanDnsClientId = "x509_san_dns:verifier.example"
         private const val samplePortraitDisclosureValueJson =
             "[-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]"
 
@@ -910,6 +1024,18 @@ private class FakeDemoWallet(
     private val receiveGate: CompletableDeferred<Unit>? = null,
     private val previewGate: CompletableDeferred<Unit>? = null,
     private val transactionCodeRequired: Boolean = false,
+    private val offeredCredential: WalletDemoOfferedCredentialMetadata = WalletDemoOfferedCredentialMetadata(
+        configurationId = "ExampleCredential",
+        format = "vc+sd-jwt",
+        vct = "ExampleCredential",
+        doctype = null,
+        display = WalletDemoMetadataDisplay(
+            name = "Example Credential",
+            logoUri = null,
+            logoAltText = null,
+        ),
+        claims = emptyList(),
+    ),
 ) : DemoWallet {
     var bootstrapCalls = 0
     var receivedOfferUrl: String? = null
@@ -927,9 +1053,22 @@ private class FakeDemoWallet(
 
     override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview =
         WalletDemoOfferPreview(
-            transactionCodeRequired = transactionCodeRequired,
-            credentialIssuer = "Example Issuer",
-            offeredCredentials = listOf("ExampleCredential"),
+            issuer = WalletDemoIssuerMetadata(
+                credentialIssuer = "https://issuer.example",
+                display = WalletDemoMetadataDisplay(
+                    name = "Example Issuer",
+                    logoUri = null,
+                    logoAltText = null,
+                ),
+            ),
+            offeredCredentials = listOf(offeredCredential),
+            transactionCode = transactionCodeRequired.takeIf { it }?.let {
+                WalletDemoTransactionCodeRequirement(
+                    inputMode = WalletDemoTransactionCodeInputMode.Numeric,
+                    length = 6,
+                    description = "Enter the six-digit code",
+                )
+            },
         )
 
     override suspend fun receive(offerUrl: String, txCode: String?): List<String> {
