@@ -8,7 +8,8 @@ import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletOfferResolution
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
-import id.walt.wallet2.mobile.MobileWalletPresentationPreview
+import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
+import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -119,7 +120,7 @@ public class WalletSdkBridge private constructor(
      */
     public suspend fun previewPresentation(
         requestUrl: String,
-    ): WalletBridgeResult<MobileWalletPresentationPreview> =
+    ): WalletBridgeResult<MobileWalletPresentationPreviewResult> =
         walletBridgeCall {
             operations.previewPresentation(requestUrl = requestUrl)
         }
@@ -141,6 +142,20 @@ public class WalletSdkBridge private constructor(
                 selectedDisclosureOptions = selectedDisclosureOptions,
                 did = did,
                 runPolicies = runPolicies,
+            )
+        }
+
+    /** Sends an OpenID4VP error response for a previously previewed request. */
+    public suspend fun rejectPresentation(
+        requestUrl: String,
+        errorCode: MobileWalletPresentationErrorCode? = null,
+        errorDescription: String? = null,
+    ): WalletBridgeResult<MobileWalletPresentationResult> =
+        walletBridgeCall {
+            operations.rejectPresentation(
+                requestUrl = requestUrl,
+                errorCode = errorCode,
+                errorDescription = errorDescription,
             )
         }
 
@@ -181,7 +196,7 @@ internal interface WalletSdkBridgeOperations {
 
     suspend fun previewPresentation(
         requestUrl: String,
-    ): MobileWalletPresentationPreview
+    ): MobileWalletPresentationPreviewResult
 
     suspend fun submitPresentation(
         requestUrl: String,
@@ -191,6 +206,11 @@ internal interface WalletSdkBridgeOperations {
         runPolicies: Boolean?,
     ): MobileWalletPresentationResult
 
+    suspend fun rejectPresentation(
+        requestUrl: String,
+        errorCode: MobileWalletPresentationErrorCode?,
+        errorDescription: String?,
+    ): MobileWalletPresentationResult
 }
 
 internal class MobileWalletSdkBridgeOperations(
@@ -238,7 +258,7 @@ internal class MobileWalletSdkBridgeOperations(
 
     override suspend fun previewPresentation(
         requestUrl: String,
-    ): MobileWalletPresentationPreview =
+    ): MobileWalletPresentationPreviewResult =
         wallet.previewPresentation(requestUrl = requestUrl)
 
     override suspend fun submitPresentation(
@@ -256,4 +276,14 @@ internal class MobileWalletSdkBridgeOperations(
             runPolicies = runPolicies,
         )
 
+    override suspend fun rejectPresentation(
+        requestUrl: String,
+        errorCode: MobileWalletPresentationErrorCode?,
+        errorDescription: String?,
+    ): MobileWalletPresentationResult =
+        wallet.rejectPresentation(
+            requestUrl = requestUrl,
+            errorCode = errorCode,
+            errorDescription = errorDescription,
+        )
 }

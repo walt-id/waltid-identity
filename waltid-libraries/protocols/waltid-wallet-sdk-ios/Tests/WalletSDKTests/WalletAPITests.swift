@@ -303,12 +303,13 @@ final class WalletAPITests: XCTestCase {
 
     func testPresentForwardsRequestAndReturnsPresentationResult() async throws {
         let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
-        let redirect = URL(string: "https://verifier.example/callback")!
+        let redirectURL = URL(string: "https://verifier.example/continue")!
         let bridge = FakeWalletCoreBridge()
-        bridge.presentResult = .init(
-            success: true,
-            redirectTo: redirect,
-            verifierResponseJSON: #"{"status":"ok"}"#
+        bridge.presentResult = .transmitted(
+            .succeeded(
+                verifierResponseJSON: #"{"status":"ok"}"#,
+                redirectURL: redirectURL
+            )
         )
         let wallet = Wallet(bridge: bridge)
 
@@ -318,8 +319,15 @@ final class WalletAPITests: XCTestCase {
             runPolicies: true
         )
 
-        XCTAssertEqual(result.redirectTo, redirect)
-        XCTAssertEqual(result.verifierResponseJSON, #"{"status":"ok"}"#)
+        XCTAssertEqual(
+            result,
+            .transmitted(
+                .succeeded(
+                    verifierResponseJSON: #"{"status":"ok"}"#,
+                    redirectURL: redirectURL
+                )
+            )
+        )
         XCTAssertEqual(bridge.presentCalls.count, 1)
         XCTAssertEqual(bridge.presentCalls.first?.request, request)
         XCTAssertEqual(bridge.presentCalls.first?.did, "did:key:wallet")
@@ -329,35 +337,69 @@ final class WalletAPITests: XCTestCase {
     func testPreviewPresentationForwardsRequestAndReturnsPreview() async throws {
         let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
         let bridge = FakeWalletCoreBridge()
-        bridge.previewResult = .init(
-            request: .init(
-                clientID: "https://verifier.example",
-                verifierName: "Example Verifier",
-                responseURI: nil,
-                state: nil,
-                nonce: "nonce-1"
-            ),
-            credentialOptions: [
-                .init(
-                    queryID: "pid",
-                    credentialID: "credential-1",
-                    multiple: true,
-                    format: "vc+sd-jwt",
-                    issuer: nil,
-                    subject: nil,
-                    label: "PID",
-                    credentialDataJSON: "{}",
-                    disclosures: []
-                )
-            ]
+        bridge.previewResult = .ready(
+            .init(
+                request: .init(
+                    clientID: "https://verifier.example",
+                    verifierName: "Example Verifier",
+                    responseURI: nil,
+                    state: nil,
+                    nonce: "nonce-1"
+                ),
+                credentialOptions: [
+                    .init(
+                        queryID: "pid",
+                        credentialID: "credential-1",
+                        multiple: true,
+                        format: "vc+sd-jwt",
+                        issuer: nil,
+                        subject: nil,
+                        label: "PID",
+                        credentialDataJSON: "{}",
+                        disclosures: []
+                    )
+                ]
+            )
         )
         let wallet = Wallet(bridge: bridge)
 
         let result = try await wallet.previewPresentation(request: request)
 
-        XCTAssertEqual(result.request.clientID, "https://verifier.example")
-        XCTAssertEqual(result.credentialOptions.single?.credentialID, "credential-1")
-        XCTAssertEqual(result.credentialOptions.single?.multiple, true)
+        guard case .ready(let preview) = result else {
+            return XCTFail("Expected a ready preview")
+        }
+        XCTAssertEqual(preview.request.clientID, "https://verifier.example")
+        XCTAssertEqual(preview.credentialOptions.single?.credentialID, "credential-1")
+        XCTAssertEqual(preview.credentialOptions.single?.multiple, true)
+        XCTAssertEqual(bridge.previewCalls, [request])
+    }
+
+    func testPreviewPresentationReturnsTypedProtocolError() async throws {
+        let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
+        let requestInfo = PresentationRequestInfo(
+            clientID: "https://verifier.example",
+            verifierName: "Example Verifier"
+        )
+        let bridge = FakeWalletCoreBridge()
+        bridge.previewResult = .invalid(
+            .init(
+                request: requestInfo,
+                code: .invalidTransactionData,
+                message: "Unsupported transaction_data type"
+            )
+        )
+        let wallet = Wallet(bridge: bridge)
+
+        let result = try await wallet.previewPresentation(request: request)
+
+        XCTAssertEqual(
+            result,
+            .invalid(.init(
+                request: requestInfo,
+                code: .invalidTransactionData,
+                message: "Unsupported transaction_data type"
+            ))
+        )
         XCTAssertEqual(bridge.previewCalls, [request])
     }
 
@@ -380,6 +422,59 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(bridge.submitCalls.first?.selectedDisclosureOptions, [PresentationDisclosureSelection(queryID: "pid", credentialID: "credential-1", path: "$.given_name")])
         XCTAssertEqual(bridge.submitCalls.first?.did, "did:key:wallet")
         XCTAssertEqual(bridge.submitCalls.first?.runPolicies, false)
+    }
+
+    func testPresentationErrorCodesMatchOpenID4VPValues() {
+        XCTAssertEqual(
+            [
+                PresentationErrorCode.accessDenied.errorCode,
+                PresentationErrorCode.invalidRequest.errorCode,
+                PresentationErrorCode.invalidClient.errorCode,
+                PresentationErrorCode.invalidScope.errorCode,
+                PresentationErrorCode.unauthorizedClient.errorCode,
+                PresentationErrorCode.unsupportedResponseType.errorCode,
+                PresentationErrorCode.serverError.errorCode,
+                PresentationErrorCode.temporarilyUnavailable.errorCode,
+                PresentationErrorCode.vpFormatsNotSupported.errorCode,
+                PresentationErrorCode.invalidRequestURIMethod.errorCode,
+                PresentationErrorCode.invalidTransactionData.errorCode,
+                PresentationErrorCode.walletUnavailable.errorCode,
+            ],
+            [
+                "access_denied",
+                "invalid_request",
+                "invalid_client",
+                "invalid_scope",
+                "unauthorized_client",
+                "unsupported_response_type",
+                "server_error",
+                "temporarily_unavailable",
+                "vp_formats_not_supported",
+                "invalid_request_uri_method",
+                "invalid_transaction_data",
+                "wallet_unavailable",
+            ]
+        )
+    }
+
+    func testRejectPresentationForwardsErrorDetailsAndReturnsResult() async throws {
+        let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
+        let bridge = FakeWalletCoreBridge()
+        let responseURL = URL(string: "https://verifier.example/callback?error=access_denied")!
+        bridge.rejectResult = .prepared(.openURL(responseURL))
+        let wallet = Wallet(bridge: bridge)
+
+        let result = try await wallet.rejectPresentation(
+            request: request,
+            error: .accessDenied,
+            errorDescription: "User declined"
+        )
+
+        XCTAssertEqual(bridge.rejectCalls.count, 1)
+        XCTAssertEqual(bridge.rejectCalls.first?.request, request)
+        XCTAssertEqual(bridge.rejectCalls.first?.error, .accessDenied)
+        XCTAssertEqual(bridge.rejectCalls.first?.errorDescription, "User declined")
+        XCTAssertEqual(result, .prepared(.openURL(responseURL)))
     }
 
     func testBridgeErrorsSurfaceAsWalletErrors() async {
@@ -551,6 +646,12 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         let runPolicies: Bool?
     }
 
+    struct RejectCall {
+        let request: URL
+        let error: PresentationErrorCode?
+        let errorDescription: String?
+    }
+
     var events: AsyncStream<WalletEvent>
     var error: WalletError?
     var bootstrapResult = WalletBootstrapResult(keyID: "key", did: "did:key:wallet")
@@ -561,9 +662,12 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     )
     var receiveResult: [String] = []
     var credentialsResult: [Credential] = []
-    var presentResult = PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
-    var previewResult = PresentationPreview(request: .init(clientID: nil), credentialOptions: [])
-    var submitResult = PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
+    var presentResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
+    var previewResult = PresentationPreviewResult.ready(
+        PresentationPreview(request: .init(clientID: nil), credentialOptions: [])
+    )
+    var submitResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
+    var rejectResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
     private(set) var bootstrapCalls: [BootstrapCall] = []
     private(set) var resolvedOffers: [URL] = []
     private(set) var receiveCalls: [ReceiveCall] = []
@@ -572,6 +676,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     private(set) var presentCalls: [PresentCall] = []
     private(set) var previewCalls: [URL] = []
     private(set) var submitCalls: [SubmitCall] = []
+    private(set) var rejectCalls: [RejectCall] = []
 
     init(events: [WalletEvent] = []) {
         self.events = AsyncStream { continuation in
@@ -635,7 +740,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         return presentResult
     }
 
-    func previewPresentation(request: URL) async throws -> PresentationPreview {
+    func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         if let error {
             throw error
         }
@@ -665,5 +770,24 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
             )
         )
         return submitResult
+    }
+
+    func rejectPresentation(
+        request: URL,
+        error: PresentationErrorCode?,
+        errorDescription: String?
+    ) async throws -> PresentationResult {
+        if let failure = self.error {
+            throw failure
+        }
+
+        rejectCalls.append(
+            .init(
+                request: request,
+                error: error,
+                errorDescription: errorDescription
+            )
+        )
+        return rejectResult
     }
 }

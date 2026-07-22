@@ -22,6 +22,7 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
+import kotlin.uuid.Uuid
 
 /**
  * Test helper for the public walt.id issuer2/verifier2 demo stack.
@@ -147,6 +148,14 @@ object DemoTestBackend {
         return createVerifierSession(scenario.verifierCredentialQuery)
     }
 
+    suspend fun createResponseBoundVerifierSession(scenario: CredentialScenario): VerifierSession {
+        return createVerifierSession(
+            credentialQuery = scenario.verifierCredentialQuery,
+            transactionData = emptyList(),
+            bindClientIdToResponseUri = true,
+        )
+    }
+
     suspend fun createVerifierSession(credentialQuery: JsonObject): VerifierSession {
         return createVerifierSession(
             credentialQuery = credentialQuery,
@@ -190,10 +199,17 @@ object DemoTestBackend {
     private suspend fun createVerifierSession(
         credentialQuery: JsonObject,
         transactionData: List<JsonObject>,
+        bindClientIdToResponseUri: Boolean = false,
     ): VerifierSession {
+        val requestedSessionId = Uuid.random().toString().takeIf { bindClientIdToResponseUri }
         val payload = buildJsonObject {
             put("flow_type", "cross_device")
             putJsonObject("core_flow") {
+                requestedSessionId?.let { sessionId ->
+                    val responseUri = "$VERIFIER_BASE_URL/verification-session/$sessionId/response"
+                    put("sessionId", sessionId)
+                    put("clientId", "redirect_uri:$responseUri")
+                }
                 putJsonObject("dcql_query") {
                     putJsonArray("credentials") {
                         add(credentialQuery)
@@ -215,6 +231,9 @@ object DemoTestBackend {
         )
         val sessionId = response["sessionId"]?.jsonPrimitive?.contentOrNull
             ?: error("Missing sessionId in public demo verifier2 response: $response")
+        check(requestedSessionId == null || requestedSessionId == sessionId) {
+            "Public demo verifier2 did not preserve the requested session ID"
+        }
         val authorizationRequestUri = response["bootstrapAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
             ?: response["authorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
             ?: response["fullAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
@@ -273,6 +292,39 @@ object DemoTestBackend {
                     "SUCCESSFUL" -> return
                     "FAILED", "ERROR", "EXPIRED" -> error("public demo verifier2 reported $status for session $sessionId: $body")
                 }
+            }
+
+            delay(2_000.milliseconds)
+        }
+    }
+
+    suspend fun waitForVerifierFailure(
+        sessionId: String,
+        expectedError: String,
+        timeoutMs: Long = 90_000,
+    ): JsonObject {
+        val mark = TimeSource.Monotonic.markNow()
+        while (true) {
+            if (mark.elapsedNow() > timeoutMs.milliseconds) {
+                error("public demo verifier2 did not report $expectedError within ${timeoutMs}ms for session $sessionId")
+            }
+
+            val info = verifierSessionInfo(sessionId)
+            val status = info["status"]?.jsonPrimitive?.contentOrNull
+                ?: info["session"]?.jsonObject?.get("status")?.jsonPrimitive?.contentOrNull
+            when (status?.uppercase()) {
+                "FAILED" -> {
+                    val failure = info["failure"]?.jsonObject
+                        ?: error("public demo verifier2 omitted failure details for session $sessionId: $info")
+                    val actualError = failure["error"]?.jsonPrimitive?.contentOrNull
+                    check(actualError == expectedError) {
+                        "public demo verifier2 reported $actualError instead of $expectedError for session $sessionId: $info"
+                    }
+                    return info
+                }
+
+                "SUCCESSFUL", "ERROR", "EXPIRED" ->
+                    error("public demo verifier2 reported $status instead of $expectedError for session $sessionId: $info")
             }
 
             delay(2_000.milliseconds)
