@@ -99,6 +99,72 @@ class CredentialEndpointEncryptionTest {
     }
 
     @Test
+    fun `encrypted credential request accepts response encryption JWK without kid`() = runBlocking {
+        val issuerKey = JWKKey.generate(KeyType.secp256r1, JwkKeyMeta("issuer-key"))
+        val walletKey = JWKKey.generate(KeyType.secp256r1, JwkKeyMeta("wallet-key"))
+        val provider = buildOAuth2Provider(
+            createTestConfig(
+                credentialRequestDecryptor = JweCredentialRequestDecryptor(issuerKey.exportJWK()),
+            )
+        )
+
+        val credentialRequestJwe = encryptCredentialRequest(
+            payload = buildJsonObject {
+                put("credential_configuration_id", "test-credential")
+                put("credential_response_encryption", responseEncryptionRequest(walletKey, includeKid = false))
+            },
+            issuerKey = issuerKey,
+        )
+
+        val requestResult = provider.createCredentialRequest(
+            encryptedCredentialRequest = credentialRequestJwe,
+            session = DefaultSession(subject = "subject"),
+        )
+
+        assertTrue(requestResult is CredentialRequestResult.Success)
+        assertNull(requestResult.request.credentialResponseEncryption?.jwk?.get("kid"))
+        assertEquals(CredentialEncryptionProfile.ALG_ECDH_ES, requestResult.request.credentialResponseEncryption?.alg)
+    }
+
+    @Test
+    fun `encrypted credential request rejects unsupported response encryption alg`() = runBlocking {
+        val issuerKey = JWKKey.generate(KeyType.secp256r1, JwkKeyMeta("issuer-key"))
+        val walletKey = JWKKey.generate(KeyType.secp256r1, JwkKeyMeta("wallet-key"))
+        val provider = buildOAuth2Provider(
+            createTestConfig(
+                credentialRequestDecryptor = JweCredentialRequestDecryptor(issuerKey.exportJWK()),
+            )
+        )
+
+        val credentialRequestJwe = encryptCredentialRequest(
+            payload = buildJsonObject {
+                put("credential_configuration_id", "test-credential")
+                put(
+                    "credential_response_encryption",
+                    responseEncryptionRequest(
+                        walletKey = walletKey,
+                        includeKid = false,
+                        alg = "UNSUPPORTED_ALG",
+                    ),
+                )
+            },
+            issuerKey = issuerKey,
+        )
+
+        val requestResult = provider.createCredentialRequest(
+            encryptedCredentialRequest = credentialRequestJwe,
+            session = DefaultSession(subject = "subject"),
+        )
+
+        assertTrue(requestResult is CredentialRequestResult.Failure)
+        assertEquals(CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS, requestResult.error.error)
+        assertEquals(
+            "credential_response_encryption.jwk.alg must be ${CredentialEncryptionProfile.ALG_ECDH_ES}",
+            requestResult.error.description,
+        )
+    }
+
+    @Test
     fun `encrypted credential response omits kid when wallet JWK has no kid`() = runBlocking {
         val walletKey = JWKKey.generate(KeyType.secp256r1, JwkKeyMeta("wallet-key"))
         val walletJwkWithoutKid = encryptionPublicJwk(walletKey, includeKid = false)
@@ -180,13 +246,21 @@ class CredentialEndpointEncryptionTest {
         )
     }
 
-    private suspend fun responseEncryptionRequest(walletKey: JWKKey): JsonObject =
+    private suspend fun responseEncryptionRequest(
+        walletKey: JWKKey,
+        includeKid: Boolean = true,
+        alg: String = CredentialEncryptionProfile.ALG_ECDH_ES,
+    ): JsonObject =
         buildJsonObject {
-            put("jwk", encryptionPublicJwk(walletKey))
+            put("jwk", encryptionPublicJwk(walletKey, includeKid = includeKid, alg = alg))
             put("enc", CredentialEncryptionProfile.ENC_A128GCM)
         }
 
-    private suspend fun encryptionPublicJwk(key: Key, includeKid: Boolean = true): JsonObject =
+    private suspend fun encryptionPublicJwk(
+        key: Key,
+        includeKid: Boolean = true,
+        alg: String = CredentialEncryptionProfile.ALG_ECDH_ES,
+    ): JsonObject =
         JsonObject(
             key.getPublicKey().exportJWKObject().toMutableMap().apply {
                 if (includeKid) {
@@ -195,7 +269,7 @@ class CredentialEndpointEncryptionTest {
                     remove("kid")
                 }
                 put("use", JsonPrimitive(CredentialEncryptionProfile.KEY_USE_ENC))
-                put("alg", JsonPrimitive(CredentialEncryptionProfile.ALG_ECDH_ES))
+                put("alg", JsonPrimitive(alg))
             }
         )
 }
