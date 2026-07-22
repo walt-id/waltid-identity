@@ -321,7 +321,6 @@ class WalletViewModel: ObservableObject {
             selectedTab = .present
             presentationRequestUrl = url.absoluteString
             txCode = ""
-            transactionCodeRequired = false
             offerPreview = nil
             lastReceivedCredentialIDs = []
             receiveCompleted = false
@@ -389,9 +388,6 @@ class WalletViewModel: ObservableObject {
                 guard isCurrent(request) else {
                     try? await walletClient.discardIssuancePreview(resolution.previewHandle)
                     return
-                }
-                if let previousPreviewHandle {
-                    try? await walletClient.discardIssuancePreview(previousPreviewHandle)
                 }
                 offerPreview = resolution
                 newPreviewHandle = nil

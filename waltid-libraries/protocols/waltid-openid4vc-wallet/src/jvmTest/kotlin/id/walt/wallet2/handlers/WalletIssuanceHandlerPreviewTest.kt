@@ -64,14 +64,14 @@ class WalletIssuanceHandlerPreviewTest {
         assertFails {
             WalletIssuanceHandler.receiveCredential(
                 wallet,
-                ReceiveCredentialFromPreviewRequest(first.handle),
+                ReceiveCredentialFromPreviewRequest(first.previewHandle),
                 httpClient = client,
             )
         }
         assertFails {
             WalletIssuanceHandler.receiveCredential(
                 wallet,
-                ReceiveCredentialFromPreviewRequest(second.handle),
+                ReceiveCredentialFromPreviewRequest(second.previewHandle),
                 httpClient = client,
             )
         }
@@ -137,7 +137,7 @@ class WalletIssuanceHandlerPreviewTest {
                 WalletIssuanceHandler.receiveCredential(
                     wallet = wallet,
                     request = ReceiveCredentialFromPreviewRequest(
-                        previewHandle = preview.handle,
+                        previewHandle = preview.previewHandle,
                         txCode = "wrong-code",
                     ),
                     httpClient = client,
@@ -191,14 +191,14 @@ class WalletIssuanceHandlerPreviewTest {
 
         WalletIssuanceHandler.receiveCredential(
             wallet,
-            ReceiveCredentialFromPreviewRequest(preview.handle),
+            ReceiveCredentialFromPreviewRequest(preview.previewHandle),
             httpClient = client,
         )
 
         val error = assertFailsWith<PreviewSessionException> {
             WalletIssuanceHandler.receiveCredential(
                 wallet,
-                ReceiveCredentialFromPreviewRequest(preview.handle),
+                ReceiveCredentialFromPreviewRequest(preview.previewHandle),
                 httpClient = client,
             )
         }

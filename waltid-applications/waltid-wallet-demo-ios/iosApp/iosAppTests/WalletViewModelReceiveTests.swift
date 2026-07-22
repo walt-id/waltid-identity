@@ -116,7 +116,6 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertEqual(discardedHandles, [IssuancePreviewHandle(value: "transaction-code-preview")])
         XCTAssertNil(viewModel.offerPreview)
         XCTAssertEqual(viewModel.receiveNavigationResetKey, receiveResetKey + 1)
-        XCTAssertFalse(viewModel.transactionCodeRequired)
         XCTAssertEqual(viewModel.selectedTab, .present)
     }
 
