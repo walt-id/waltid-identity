@@ -127,11 +127,11 @@ private actor TransactionCodeWalletClient: WalletClient {
     }
 
     func present(request: URL, did: String?) async throws -> PresentationResult {
-        PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
+        .transmitted(.succeeded(verifierResponseJSON: "{}"))
     }
 
-    func previewPresentation(request: URL) async throws -> PresentationPreview {
-        PresentationPreview(request: PresentationRequestInfo(clientID: nil), credentialOptions: [])
+    func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
+        .ready(PresentationPreview(request: PresentationRequestInfo(clientID: nil), credentialOptions: []))
     }
 
     func submitPresentation(
@@ -140,7 +140,11 @@ private actor TransactionCodeWalletClient: WalletClient {
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
     ) async throws -> PresentationResult {
-        PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
+        .transmitted(.succeeded(verifierResponseJSON: "{}"))
+    }
+
+    func rejectPresentation(request: URL) async throws -> PresentationResult {
+        .transmitted(.succeeded(verifierResponseJSON: "{}"))
     }
 
     private static let credential = Credential(

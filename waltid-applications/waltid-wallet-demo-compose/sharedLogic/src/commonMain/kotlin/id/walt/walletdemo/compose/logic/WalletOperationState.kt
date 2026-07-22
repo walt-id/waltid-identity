@@ -7,6 +7,7 @@ sealed interface WalletOperationState {
     data object Receiving : WalletOperationState
     data object ResolvingPresentation : WalletOperationState
     data object Presenting : WalletOperationState
+    data object DecliningPresentation : WalletOperationState
 
     data class Succeeded(
         val message: String,

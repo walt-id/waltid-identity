@@ -11,13 +11,20 @@ data class WalletDemoUiState(
     val lastReceivedCredentialIds: List<String> = emptyList(),
     val receiveCompleted: Boolean = false,
     val receiveNavigationResetKey: Int = 0,
-    val presentationPreview: WalletDemoPresentationPreview? = null,
+    val presentationReview: WalletDemoPresentationPreviewResult? = null,
     val selectedPresentationCredentialOptions: Set<WalletDemoPresentationCredentialSelection> = emptySet(),
     val selectedPresentationDisclosureOptions: Set<WalletDemoPresentationDisclosureSelection> = emptySet(),
     val presentationCompleted: Boolean = false,
     val presentationNavigationResetKey: Int = 0,
     val warning: String? = null,
-)
+    val pendingPresentationContinuation: WalletDemoPendingPresentationContinuation? = null,
+) {
+    val presentationPreview: WalletDemoPresentationPreview?
+        get() = (presentationReview as? WalletDemoPresentationPreviewResult.Ready)?.preview
+
+    val presentationError: WalletDemoPresentationError?
+        get() = (presentationReview as? WalletDemoPresentationPreviewResult.Invalid)?.error
+}
 
 fun WalletDemoUiState.receivedCredentials(): List<WalletDemoCredential> {
     val ready = session as? WalletSessionState.Ready ?: return emptyList()

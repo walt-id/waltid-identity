@@ -38,7 +38,7 @@ internal fun PresentationReviewSection(
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
     onCredentialClick: (String) -> Unit,
     onSubmit: () -> Unit,
-    onCancel: () -> Unit,
+    onReject: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -111,7 +111,7 @@ internal fun PresentationReviewSection(
                 enabled = enabled,
                 selectionComplete = selectionComplete,
                 onSubmit = onSubmit,
-                onCancel = onCancel,
+                onReject = onReject,
             )
         }
     }
@@ -189,7 +189,7 @@ private fun ReviewActionsRow(
     enabled: Boolean,
     selectionComplete: Boolean,
     onSubmit: () -> Unit,
-    onCancel: () -> Unit,
+    onReject: () -> Unit,
 ) {
     Row(
         modifier = Modifier.testTag(WalletUiTestTags.PresentationActions),
@@ -203,11 +203,11 @@ private fun ReviewActionsRow(
             Text("Share")
         }
         TextButton(
-            onClick = onCancel,
+            onClick = onReject,
             enabled = enabled,
-            modifier = Modifier.testTag(WalletUiTestTags.PresentationCancelButton),
+            modifier = Modifier.testTag(WalletUiTestTags.PresentationRejectButton),
         ) {
-            Text("Cancel review")
+            Text("Decline")
         }
     }
 }
