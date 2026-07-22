@@ -2,6 +2,8 @@ package id.walt.walletdemo.compose.logic
 
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
+import platform.Foundation.NSLocale
+import platform.Foundation.preferredLanguages
 
 fun createIosDemoWallet(
     config: DemoWalletConfig = DemoWalletConfig(),
@@ -15,6 +17,7 @@ fun createIosDemoWallet(
                     walletId = config.walletId,
                     attestationConfig = config.toWalletAttestationConfig(),
                     transactionDataProfiles = transactionDataProfiles.profiles,
+                    preferredLocales = NSLocale.preferredLanguages.mapNotNull { it as? String },
                 )
             ),
             warning = transactionDataProfiles.warning,

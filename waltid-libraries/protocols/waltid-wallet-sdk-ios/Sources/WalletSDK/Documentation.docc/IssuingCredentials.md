@@ -10,13 +10,18 @@ persist the issued credentials in the wallet.
 
 Pass the offer URL from a QR scan, deep link, universal link, or another app
 handoff into the wallet actor. Resolve it before issuance so the application
-can determine whether it must collect a separately delivered transaction code.
+can show the localized issuer and credential metadata and determine whether it
+must collect a separately delivered transaction code.
 
 ```swift
 let resolution = try await wallet.resolveOffer(offer: credentialOfferURL)
 let transactionCode: String?
-if resolution.transactionCodeRequired {
-    transactionCode = await collectTransactionCode()
+if let requirement = resolution.transactionCode {
+    transactionCode = await collectTransactionCode(
+        inputMode: requirement.inputMode,
+        expectedLength: requirement.length,
+        description: requirement.description
+    )
 } else {
     transactionCode = nil
 }

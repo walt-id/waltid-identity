@@ -42,7 +42,9 @@ class WalletDemoControllerTest {
     @Test
     fun invalidPresentationPreviewCanBeDismissedOrReturnedToVerifier() = runTest {
         val error = WalletDemoPresentationError(
-            verifier = VerifierDetails(name = "Example Verifier", clientId = "https://verifier.example"),
+            verifierMetadata = verifierMetadata("Example Verifier"),
+            clientId = "https://verifier.example",
+            responseEncryption = WalletDemoResponseEncryption.NotRequired,
             errorCode = "invalid_transaction_data",
             message = "Unsupported transaction_data type",
         )
@@ -233,7 +235,7 @@ class WalletDemoControllerTest {
     @Test
     fun receiveRequiresNonBlankTransactionCodeAndIssuesOnce() = runTest {
         val wallet = FakeDemoWallet(
-            offerResolution = WalletDemoOfferPreview(transactionCodeRequired = true, credentialIssuer = "https://issuer.example", offeredCredentials = listOf("ExampleCredential")),
+            offerResolution = offerPreview(transactionCode = textTransactionCode()),
             receivedCredentialIds = listOf("cred-1"),
         )
         val controller = unlockedControllerWith(wallet, this)
@@ -246,7 +248,7 @@ class WalletDemoControllerTest {
 
         assertEquals(offerUrl, wallet.resolvedOfferUrl)
         assertEquals(0, wallet.receiveCalls)
-        assertTrue(controller.state.value.requestDrafts.transactionCodeRequired)
+        assertEquals(textTransactionCode(), controller.state.value.offerPreview?.transactionCode)
         assertFalse(controller.state.value.acceptOfferEnabled)
         assertEquals(WalletOperationState.OfferPreview, controller.state.value.operation)
 
@@ -265,12 +267,12 @@ class WalletDemoControllerTest {
         assertEquals("abc-123", wallet.receivedTxCode)
         assertTrue(controller.state.value.receiveCompleted)
         assertEquals("", controller.state.value.requestDrafts.txCode)
-        assertFalse(controller.state.value.requestDrafts.transactionCodeRequired)
+        assertEquals(null, controller.state.value.offerPreview)
     }
 
     @Test
     fun changingOfferResetsTransactionCodeState() = runTest {
-        val wallet = FakeDemoWallet(offerResolution = WalletDemoOfferPreview(transactionCodeRequired = true, credentialIssuer = "https://issuer.example", offeredCredentials = listOf("ExampleCredential")))
+        val wallet = FakeDemoWallet(offerResolution = offerPreview(transactionCode = textTransactionCode()))
         val controller = unlockedControllerWith(wallet, this)
 
         controller.updateOfferUrl("openid-credential-offer://first")
@@ -281,7 +283,33 @@ class WalletDemoControllerTest {
         controller.updateOfferUrl("openid-credential-offer://second")
 
         assertEquals("", controller.state.value.requestDrafts.txCode)
-        assertFalse(controller.state.value.requestDrafts.transactionCodeRequired)
+        assertEquals(null, controller.state.value.offerPreview)
+    }
+
+    @Test
+    fun numericTransactionCodeIsFilteredCappedAndValidated() = runTest {
+        val requirement = WalletDemoTransactionCodeRequirement(
+            inputMode = WalletDemoTransactionCodeInputMode.Numeric,
+            length = 6,
+            description = null,
+        )
+        val controller = unlockedControllerWith(
+            FakeDemoWallet(offerResolution = offerPreview(transactionCode = requirement)),
+            this,
+        )
+
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.previewOffer()
+        runCurrent()
+        controller.updateTxCode("12a34")
+
+        assertEquals("1234", controller.state.value.requestDrafts.txCode)
+        assertFalse(controller.state.value.acceptOfferEnabled)
+
+        controller.updateTxCode("12a345678")
+
+        assertEquals("123456", controller.state.value.requestDrafts.txCode)
+        assertTrue(controller.state.value.acceptOfferEnabled)
     }
 
     @Test
@@ -312,7 +340,7 @@ class WalletDemoControllerTest {
     fun staleOfferResolutionCannotOverwriteIncomingDeepLink() = runTest {
         val resolutionGate = CompletableDeferred<Unit>()
         val wallet = FakeDemoWallet(
-            offerResolution = WalletDemoOfferPreview(transactionCodeRequired = true, credentialIssuer = "https://issuer.example", offeredCredentials = listOf("ExampleCredential")),
+            offerResolution = offerPreview(transactionCode = textTransactionCode()),
             resolveOfferGate = resolutionGate,
             ignoreResolveCancellation = true,
         )
@@ -328,7 +356,7 @@ class WalletDemoControllerTest {
 
         val state = controller.state.value
         assertEquals(replacementOffer, state.requestDrafts.offerUrl)
-        assertFalse(state.requestDrafts.transactionCodeRequired)
+        assertEquals(null, state.offerPreview)
         assertEquals(WalletOperationState.Idle, state.operation)
         assertEquals(0, wallet.receiveCalls)
     }
@@ -387,7 +415,7 @@ class WalletDemoControllerTest {
     fun lockCancelsIssuanceAndClearsTransactionCode() = runTest {
         val receiveGate = CompletableDeferred<Unit>()
         val wallet = FakeDemoWallet(
-            offerResolution = WalletDemoOfferPreview(transactionCodeRequired = true, credentialIssuer = "https://issuer.example", offeredCredentials = listOf("ExampleCredential")),
+            offerResolution = offerPreview(transactionCode = textTransactionCode()),
             receiveGate = receiveGate,
             ignoreReceiveCancellation = true,
         )
@@ -435,7 +463,8 @@ class WalletDemoControllerTest {
     @Test
     fun presentationPreviewApproveAndRejectUseStepwiseWalletApi() = runTest {
         val preview = WalletDemoPresentationPreview(
-            verifierName = "Example Verifier",
+            responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
             credentialOptions = listOf(
                 WalletDemoPresentationCredentialOption(
@@ -499,7 +528,8 @@ class WalletDemoControllerTest {
     @Test
     fun presentationDisclosureSelectionDefaultsOffAndSubmitsSelectedPaths() = runTest {
         val preview = WalletDemoPresentationPreview(
-            verifierName = "Example Verifier",
+            responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
             credentialOptions = listOf(
                 WalletDemoPresentationCredentialOption(
@@ -592,7 +622,8 @@ class WalletDemoControllerTest {
         )
         val second = first.copy(queryId = "age", label = "PID age")
         val preview = WalletDemoPresentationPreview(
-            verifierName = "Example Verifier",
+            responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
             credentialOptions = listOf(first, second),
             credentialRequirements = listOf(
@@ -645,7 +676,8 @@ class WalletDemoControllerTest {
         )
         val second = first.copy(credentialId = "cred-2", label = "PID two")
         val preview = WalletDemoPresentationPreview(
-            verifierName = "Example Verifier",
+            responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
             credentialOptions = listOf(first, second),
             credentialRequirements = listOf(
@@ -710,7 +742,8 @@ class WalletDemoControllerTest {
             ),
         )
         val preview = WalletDemoPresentationPreview(
-            verifierName = "Example Verifier",
+            responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
             credentialOptions = listOf(first, second),
             credentialRequirements = listOf(
@@ -763,7 +796,8 @@ class WalletDemoControllerTest {
         )
         val photoId = mdl.copy(queryId = "photo-id", credentialId = "cred-2", label = "Photo ID")
         val preview = WalletDemoPresentationPreview(
-            verifierName = "Example Verifier",
+            responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
             credentialOptions = listOf(mdl, photoId),
             credentialRequirements = listOf(
@@ -793,7 +827,8 @@ class WalletDemoControllerTest {
             disclosures = emptyList(),
         )
         val preview = WalletDemoPresentationPreview(
-            verifierName = "Example Verifier",
+            responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
             credentialOptions = listOf(option),
             credentialRequirements = emptyList(),
@@ -838,7 +873,8 @@ class WalletDemoControllerTest {
             disclosures = emptyList(),
         )
         val preview = WalletDemoPresentationPreview(
-            verifierName = "Example Verifier",
+            responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
             credentialOptions = listOf(option),
             credentialRequirements = listOf(
@@ -907,7 +943,8 @@ class WalletDemoControllerTest {
         val wallet = FakeDemoWallet(
             credentials = listOf(sampleCredential),
             presentationPreview = WalletDemoPresentationPreview(
-                verifierName = "Example Verifier",
+                responseEncryption = WalletDemoResponseEncryption.NotRequired,
+                verifierMetadata = verifierMetadata("Example Verifier"),
                 clientId = "https://verifier.example",
                 credentialOptions = listOf(
                     WalletDemoPresentationCredentialOption(
@@ -1062,7 +1099,8 @@ class WalletDemoControllerTest {
     @Test
     fun presentationCompletionCanStartNewFlow() = runTest {
         val preview = WalletDemoPresentationPreview(
-            verifierName = "Example Verifier",
+            responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            verifierMetadata = verifierMetadata("Example Verifier"),
             clientId = "https://verifier.example",
             credentialOptions = listOf(
                 WalletDemoPresentationCredentialOption(
@@ -1239,10 +1277,53 @@ private class RecoverableDemoPinStore : DemoPinStore {
     override suspend fun verifyPin(pin: String): Boolean = true
 }
 
+private fun offerPreview(
+    transactionCode: WalletDemoTransactionCodeRequirement? = null,
+): WalletDemoOfferPreview = WalletDemoOfferPreview(
+    issuer = WalletDemoIssuerMetadata(
+        credentialIssuer = "https://issuer.example",
+        display = WalletDemoMetadataDisplay(
+            name = "Example Issuer",
+            logoUri = null,
+            logoAltText = null,
+        ),
+    ),
+    offeredCredentials = listOf(
+        WalletDemoOfferedCredentialMetadata(
+            configurationId = "ExampleCredential",
+            format = "vc+sd-jwt",
+            vct = "ExampleCredential",
+            doctype = null,
+            display = null,
+            claims = emptyList(),
+        )
+    ),
+    transactionCode = transactionCode,
+)
+
+private fun textTransactionCode(): WalletDemoTransactionCodeRequirement =
+    WalletDemoTransactionCodeRequirement(
+        inputMode = WalletDemoTransactionCodeInputMode.Text,
+        length = null,
+        description = "Enter the code from the issuer",
+    )
+
+private fun verifierMetadata(name: String): WalletDemoVerifierMetadata =
+    WalletDemoVerifierMetadata(
+        display = WalletDemoMetadataDisplay(
+            name = name,
+            logoUri = null,
+            logoAltText = null,
+        ),
+        clientUri = "https://verifier.example",
+        policyUri = null,
+        termsOfServiceUri = null,
+    )
+
 private class FakeDemoWallet(
     var credentials: List<WalletDemoCredential> = emptyList(),
     private val receivedCredentialIds: List<String> = listOf("cred-1"),
-    private val offerResolution: WalletDemoOfferPreview = WalletDemoOfferPreview(transactionCodeRequired = false, credentialIssuer = "https://issuer.example", offeredCredentials = listOf("ExampleCredential")),
+    private val offerResolution: WalletDemoOfferPreview = offerPreview(),
     private val resolveOfferGate: CompletableDeferred<Unit>? = null,
     private val ignoreResolveCancellation: Boolean = false,
     private val resolveOfferError: Throwable? = null,
@@ -1251,7 +1332,8 @@ private class FakeDemoWallet(
     private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult.Success(WalletDisplayText.PresentationSent),
     private val rejectionResult: WalletDemoOperationResult = WalletDemoOperationResult.Success(WalletDisplayText.PresentationDeclined),
     private val presentationPreview: WalletDemoPresentationPreview = WalletDemoPresentationPreview(
-        verifierName = null,
+        responseEncryption = WalletDemoResponseEncryption.NotRequired,
+        verifierMetadata = null,
         clientId = null,
         credentialOptions = emptyList(),
     ),
