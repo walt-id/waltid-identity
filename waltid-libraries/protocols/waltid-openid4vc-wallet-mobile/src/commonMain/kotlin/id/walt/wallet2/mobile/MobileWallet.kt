@@ -66,6 +66,7 @@ public data class MobileWalletBootstrapResult(
  * @property label Optional display label stored with the credential.
  * @property addedAt ISO-8601 timestamp string for when the credential was added, when known.
  * @property credentialDataJson Parsed credential data encoded as JSON for app-side display.
+ * @property metadataJson Optional arbitrary metadata stored alongside the credential as JSON.
  */
 public data class MobileWalletCredential(
     public val id: String,
@@ -75,6 +76,7 @@ public data class MobileWalletCredential(
     public val label: String?,
     public val addedAt: String?,
     public val credentialDataJson: String,
+    public val metadataJson: String? = null,
 )
 
 /**
@@ -292,6 +294,7 @@ public class MobileWallet internal constructor(
                 label = meta.label,
                 addedAt = meta.addedAt?.toString(),
                 credentialDataJson = credential.credential.credentialData.encodeJsonObject(),
+                metadataJson = credential.metadata?.let { Json.encodeToString(JsonObject.serializer(), it) },
             )
         }
 

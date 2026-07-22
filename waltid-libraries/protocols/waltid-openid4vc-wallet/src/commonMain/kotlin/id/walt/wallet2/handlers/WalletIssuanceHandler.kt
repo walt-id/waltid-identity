@@ -131,7 +131,13 @@ data class ReceiveCredentialRequest(
      * This is a manual escape hatch. Prefer passing a ClientAttestationAssembler to the handler so
      * the library can create attestation headers from authorization server metadata and the wallet key.
      */
-    val tokenRequestHeaders: Map<String, String> = emptyMap()
+    val tokenRequestHeaders: Map<String, String> = emptyMap(),
+
+    /**
+     * Optional arbitrary metadata to store alongside the received credential(s).
+     * This metadata is passed through to [StoredCredential.metadata] when credentials are stored.
+     */
+    val metadata: JsonObject? = null,
 ) : CredentialOfferSource {
     init { checkOfferSource() }
 }
@@ -393,6 +399,7 @@ object WalletIssuanceHandler {
         val key = wallet.resolveKey(request.key, request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, no inline key, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
+        val metadata = request.metadata
 
         val clientConfig = ClientConfiguration(
             clientId = request.clientId,
@@ -521,7 +528,11 @@ object WalletIssuanceHandler {
             }
 
             for (issuedCredential in rawCredentials) {
-                val entry = wallet.parseAndStore(issuedCredential, label = offeredCredential.configuration.credentialMetadata?.display?.firstOrNull()?.name)
+                val entry = wallet.parseAndStore(
+                    issuedCredential,
+                    label = offeredCredential.configuration.credentialMetadata?.display?.firstOrNull()?.name,
+                    metadata = metadata,
+                )
                 onEvent(WalletSessionEvent.issuance_credential_stored)
                 send(entry)
             }
@@ -781,23 +792,27 @@ object WalletIssuanceHandler {
     private suspend fun Wallet.parseAndStore(
         issuedCredential: id.walt.openid4vci.responses.credential.IssuedCredential,
         label: String? = null,
+        metadata: JsonObject? = null,
     ): StoredCredential = parseAndStore(
         rawCredential = issuedCredential.credential.let {
             if (it is JsonPrimitive) it.content else it.toString()
         },
         label = label,
+        metadata = metadata,
     )
 
     private suspend fun Wallet.parseAndStore(
         rawCredential: String,
         label: String? = null,
+        metadata: JsonObject? = null,
     ): StoredCredential {
         val (_, parsed) = CredentialParser.detectAndParse(rawCredential)
         return StoredCredential(
             id = Uuid.random().toString(),
             credential = parsed,
             label = label,
-            addedAt = Clock.System.now()
+            addedAt = Clock.System.now(),
+            metadata = metadata,
         ).also { addCredential(it) }
     }
 

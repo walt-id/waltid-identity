@@ -406,7 +406,8 @@ private extension StoredCredential {
             serializedCredential: serializedCredential,
             format: format,
             label: label,
-            addedAt: addedAt.map { ISO8601DateFormatter().string(from: $0) }
+            addedAt: addedAt.map { ISO8601DateFormatter().string(from: $0) },
+            metadataJson: metadataJSON
         )
     }
 }
@@ -418,7 +419,8 @@ private extension WalletBridgeStoredCredential {
             serializedCredential: serializedCredential,
             format: format,
             label: label,
-            addedAt: addedAt.flatMap(parseWalletISO8601Date)
+            addedAt: addedAt.flatMap(parseWalletISO8601Date),
+            metadataJSON: metadataJson
         )
     }
 }

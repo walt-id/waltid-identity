@@ -204,6 +204,9 @@ public struct StoredCredential: Equatable, Identifiable, Sendable {
     /// Date the credential was added to the wallet when available.
     public let addedAt: Date?
 
+    /// Optional arbitrary metadata as a JSON string.
+    public let metadataJSON: String?
+
     /// Creates a credential entry for custom Swift credential stores.
     ///
     /// - Parameters:
@@ -214,18 +217,21 @@ public struct StoredCredential: Equatable, Identifiable, Sendable {
     ///     `jwt_vc_json`.
     ///   - label: User-facing credential label when available.
     ///   - addedAt: Date the credential was added to the wallet when available.
+    ///   - metadataJSON: Optional arbitrary metadata as a JSON string.
     public init(
         id: String,
         serializedCredential: String,
         format: String,
         label: String? = nil,
-        addedAt: Date? = nil
+        addedAt: Date? = nil,
+        metadataJSON: String? = nil
     ) {
         self.id = id
         self.serializedCredential = serializedCredential
         self.format = format
         self.label = label
         self.addedAt = addedAt
+        self.metadataJSON = metadataJSON
     }
 }
 

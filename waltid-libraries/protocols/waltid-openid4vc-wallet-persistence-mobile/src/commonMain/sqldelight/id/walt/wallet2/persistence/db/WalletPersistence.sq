@@ -26,7 +26,8 @@ CREATE TABLE credentials (
     serialized_credential TEXT NOT NULL,
     format TEXT NOT NULL DEFAULT '',
     label TEXT,
-    added_at INTEGER NOT NULL
+    added_at INTEGER NOT NULL,
+    metadata TEXT
 );
 
 selectAllCredentials:
@@ -36,8 +37,8 @@ selectCredentialById:
 SELECT * FROM credentials WHERE id = ?;
 
 insertCredential:
-INSERT OR REPLACE INTO credentials (id, serialized_credential, format, label, added_at)
-VALUES (?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO credentials (id, serialized_credential, format, label, added_at, metadata)
+VALUES (?, ?, ?, ?, ?, ?);
 
 deleteCredentialById:
 DELETE FROM credentials WHERE id = ?;

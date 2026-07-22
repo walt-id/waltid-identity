@@ -4,7 +4,7 @@ import WalletSDK
 enum CredentialDisplayNormalizer {
 
     static func details(for credential: Credential) -> CredentialDetails {
-        details(
+        var result = details(
             id: credential.id,
             title: credential.label ?? credential.format,
             issuer: credential.issuer,
@@ -12,6 +12,16 @@ enum CredentialDisplayNormalizer {
             format: credential.format,
             addedAt: credential.addedAt,
             credentialDataJSON: credential.credentialDataJSON
+        )
+        return CredentialDetails(
+            id: result.id,
+            title: result.title,
+            issuer: result.issuer,
+            subject: result.subject,
+            format: result.format,
+            addedAt: result.addedAt,
+            groups: result.groups,
+            metadataJSON: nil
         )
     }
 

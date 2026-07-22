@@ -9,6 +9,27 @@ struct CredentialDetails: Equatable, Identifiable {
     let format: String
     let addedAt: Date?
     let groups: [ClaimGroup]
+    let metadataJSON: String?
+
+    init(
+        id: String,
+        title: String,
+        issuer: String?,
+        subject: String?,
+        format: String,
+        addedAt: Date?,
+        groups: [ClaimGroup],
+        metadataJSON: String? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.issuer = issuer
+        self.subject = subject
+        self.format = format
+        self.addedAt = addedAt
+        self.groups = groups
+        self.metadataJSON = metadataJSON
+    }
 }
 
 struct ClaimGroup: Equatable, Identifiable {
