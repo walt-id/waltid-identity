@@ -107,6 +107,7 @@ object X509CertificateUtil {
             .map { it.value.trim() } // Clean up trailing line breaks
             .map { certificateServices.certificateParser.parseCertificatePem(it) }
             .toList()
+        certificateServices.certificateChainValidator.trustStore.findCertificateBySubjectDn("First Atmept")
         return validateCertificateChain(certificateServices, certificates, additionalTrust)
     }
 

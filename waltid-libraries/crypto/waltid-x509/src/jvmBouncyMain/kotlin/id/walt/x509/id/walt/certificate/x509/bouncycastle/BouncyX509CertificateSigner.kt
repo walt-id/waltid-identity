@@ -27,6 +27,8 @@ import java.util.*
 
 class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
 
+    override val name: String = "BouncyCastle"
+
     companion object {
         init {
             // Register Bouncy Castle Provider

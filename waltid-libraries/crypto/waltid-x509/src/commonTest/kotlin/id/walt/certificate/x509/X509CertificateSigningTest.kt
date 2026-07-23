@@ -1,11 +1,11 @@
 package id.walt.certificate.x509
 
+import id.walt.certificate.TestKeys
 import id.walt.certificate.x509.SignatureValidationUtil.verifyPemChain
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
 import id.walt.certificate.x509.extension.KeyUsageExtension
 import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
-import id.walt.crypto.keys.KeyType
-import id.walt.x509.createX509TestKey
+import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
@@ -13,7 +13,7 @@ class X509CertificateSigningTest {
 
     @Test
     fun buildGenericSelfSignedCertificate() = runTest {
-        val key = createX509TestKey(KeyType.secp256r1)
+        val key = JWKKey.importPEM(TestKeys.ecP256KeyPem).getOrThrow()
         val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
             subjectDn = "CN=Example CA, C=US"
             issuerDn = "CN=Example CA, C=US"

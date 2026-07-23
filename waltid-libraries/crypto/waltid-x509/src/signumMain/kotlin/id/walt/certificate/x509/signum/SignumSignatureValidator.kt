@@ -7,6 +7,9 @@ import id.walt.crypto.keys.jwk.JWKKey
 import at.asitplus.signum.indispensable.pki.X509Certificate as SignumCertificate
 
 class SignumSignatureValidator : SignatureValidator {
+
+    override val name: String = "Signum"
+
     override suspend fun validateCertificateSignature(
         issuerPublicKey: X509Certificate.SubjectPublicKeyInfo,
         certificate: X509Certificate

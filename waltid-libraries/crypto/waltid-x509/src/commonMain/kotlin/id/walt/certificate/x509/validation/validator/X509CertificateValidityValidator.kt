@@ -27,8 +27,6 @@ class X509CertificateValidityValidator : X509CertificateValidator {
             } else {
                 if ((certificateValidity.notAfter - now) < 30.days) {
                     context.addLogEntry(ValidationResult.Severity.WARNING, "Certificate will expire soon")
-                } else {
-                    context.addLogEntry(ValidationResult.Severity.INFO, "OK")
                 }
             }
         }

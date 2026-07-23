@@ -13,6 +13,9 @@ import java.security.spec.X509EncodedKeySpec
 import java.security.cert.X509Certificate as JvmX509Certificate
 
 class JavaSignatureValidator : SignatureValidator {
+
+    override val name: String = "JavaSecurity"
+
     override suspend fun validateCertificateSignature(
         issuerPublicKey: X509Certificate.SubjectPublicKeyInfo,
         certificate: X509Certificate

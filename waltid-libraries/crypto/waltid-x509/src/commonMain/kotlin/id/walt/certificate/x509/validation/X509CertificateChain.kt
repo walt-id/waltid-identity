@@ -26,9 +26,6 @@ class X509CertificateChain private constructor(private val certChainList: List<C
                 }
                 .associateBy { it.subjectDn }
 
-            val issuerDnToCertMap = subjectToCertMap.values
-                .associateBy { it.issuerDn }
-
             val potentialRoots = subjectToCertMap
                 .values
                 .filter { it.subjectDn == it.issuerDn || !subjectToCertMap.keys.contains(it.issuerDn) }
@@ -37,6 +34,12 @@ class X509CertificateChain private constructor(private val certChainList: List<C
             require(potentialRoots.size == 1) {
                 "Identified multiple roots in the certificate chain: ${potentialRoots.map { it.subjectDn }}"
             }
+
+            val issuerDnToCertMap = subjectToCertMap.values
+                .filter { it.subjectDn != it.issuerDn }
+                .groupingBy { it.issuerDn }
+                .reduce { key, acc, element -> throw IllegalStateException("Duplicate issuer DN: $key") }
+
             val chainList = mutableListOf<CertChainEntry>()
             val rootOfProvidedCertificateList = potentialRoots.first()
             chainList.add(rootOfProvidedCertificateList)

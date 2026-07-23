@@ -4,37 +4,47 @@ import id.walt.certificate.x509.extension.Extension
 import kotlinx.io.bytestring.ByteString
 import kotlin.experimental.and
 import kotlin.random.Random
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 
-/*
-class MockX509Certificate : X509Certificate {
+/**
+ * Used for TrustStore testing
+ * If moved to the test module, compilation fails
+ */
+class MockX509Certificate(private val subjectDn: String) : X509Certificate {
 
-    class MockX509Certificate : X509Certificate.CertificateData {
-        override val version: Int
-            get() = TODO("Not yet implemented")
+    inner class MockX509CertificateData : X509Certificate.CertificateData {
+        override val version = 3
+
         override val serialNumberRaw: ByteString = randomSerialNumber()
 
         override val issuerDn: String
-            get() = TODO("Not yet implemented")
-        override val validity: X509Certificate.Validity
-            get() = TODO("Not yet implemented")
-        override val subjectDn: String = "OU=walt.id"
+            get() = "issuerDN"
+
+        override val validity: X509Certificate.Validity = X509Certificate.Validity(
+            Clock.System.now(),
+            Clock.System.now() + 3600.days
+        )
+
+        override val subjectDn: String = this@MockX509Certificate.subjectDn
+
         override val subjectPublicKeyInfo: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo
             get() = TODO("Not yet implemented")
+
         override val extensions: Map<String, Extension>
-            get() = TODO("Not yet implemented")
+            get() = emptyMap()
     }
 
-
-    override val data: MockX509Certificate = MockX509Certificate()
+    override val data = MockX509CertificateData()
 
     override val signatureAlgorithmOid: String
-        get() = TODO("Not yet implemented")
+        get() = ""
 
     override val signatureValueRaw: ByteString
-        get() = TODO("Not yet implemented")
+        get() = ByteString()
 
     override val encodedDer: ByteString
-        get() = TODO("Not yet implemented")
+        get() = ByteString()
 
     companion object {
         fun randomSerialNumber(): ByteString {
@@ -43,4 +53,4 @@ class MockX509Certificate : X509Certificate {
             return ByteString(byteArray)
         }
     }
-}*/
+}

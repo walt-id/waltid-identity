@@ -15,8 +15,9 @@ class X509CertificateSignatureValidator(
         context: ValidationContext,
         x509Certificate: X509Certificate
     ) {
-
+        val found = context.findCertificateBySubjectDn("C=US,O=Google Trust Services LLC,CN=GTS Root R4")
         val trustedIssuerCertificates = context.findCertificateBySubjectDn(x509Certificate.data.issuerDn)
+        println("found: ${found.size}")
         if (trustedIssuerCertificates.isEmpty()) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
@@ -35,21 +36,31 @@ class X509CertificateSignatureValidator(
     ) {
 
         if (issuerCertificate.data.subjectDn == certificate.data.subjectDn) {
-            context.addLogEntry(
-                ValidationResult.Severity.ERROR,
-                "Serial number of trusted self signed certificate '${issuerCertificate.data.serialNumberHex}' " +
-                        "not equal to serial number '${certificate.data.serialNumberHex}'"
-            )
+            if (issuerCertificate.fingerprintSha256 != certificate.fingerprintSha256) {
+                context.addLogEntry(
+                    ValidationResult.Severity.ERROR,
+                    "Fingerprint of trusted self signed certificate '${issuerCertificate.fingerprintSha256Hex}' " +
+                            "not equal to fingerprint '${certificate.fingerprintSha256Hex}' of certificate to be validated in chain"
+                )
+            }
         } else {
+            val publicKeyAlgorithm = issuerCertificate.data.subjectPublicKeyInfo.algorithmName
+            val signatureAlgorithmName = certificate.signatureAlgorithmName
             if (signatureValidator.validateCertificateSignature(
                     issuerCertificate.data.subjectPublicKeyInfo,
                     certificate
                 )
             ) {
-                context.addLogEntry(ValidationResult.Severity.INFO, "OK")
                 context.addTrustedCertificate(certificate)
+                context.addLogEntry(
+                    ValidationResult.Severity.INFO,
+                    "(${signatureValidator.name}) Certificate Signature valid: ${publicKeyAlgorithm} / ${signatureAlgorithmName}"
+                )
             } else {
-                context.addLogEntry(ValidationResult.Severity.ERROR, "Certificate Signature not valid")
+                context.addLogEntry(
+                    ValidationResult.Severity.ERROR,
+                    "(${signatureValidator.name}) Certificate Signature not valid: ${publicKeyAlgorithm} / ${signatureAlgorithmName}"
+                )
             }
         }
     }

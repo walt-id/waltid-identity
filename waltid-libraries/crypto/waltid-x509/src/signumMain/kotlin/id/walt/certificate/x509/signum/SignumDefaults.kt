@@ -8,7 +8,8 @@ import id.walt.certificate.x509.validation.validator.X509CertificateValidityVali
 
 class SignumDefaults(
     override val serialNumberGenerator: X509CertificateSerialNumberGenerator,
-    signatureValidator: id.walt.certificate.x509.SignatureValidator
+    signatureValidator: SignatureValidator,
+    trustStore: X509CertificateTrustStore = InMemoryTrustStore()
 ) : X509CertificateServices {
     override val certificateParser: X509CertificateParser = SignumCertificateParser()
 
@@ -19,7 +20,10 @@ class SignumDefaults(
     override val certificateSigner: X509CertificateSigner = SignumCertificateSigner()
 
     override val certificateChainValidator: X509CertificateChainValidator = X509CertificateChainValidator(
-        listOf(X509CertificateValidityValidator(), X509CertificateSignatureValidator(signatureValidator)),
-        InMemoryTrustStore()
+        listOf(
+            X509CertificateValidityValidator(),
+            X509CertificateSignatureValidator(signatureValidator)
+        ),
+        trustStore
     )
 }

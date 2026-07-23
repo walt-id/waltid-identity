@@ -1,8 +1,8 @@
 package id.walt.certificate.x509
 
 import id.walt.certificate.TestData
+import id.walt.certificate.TestKeys
 import id.walt.certificate.TestKeys.opensslHexFormat
-import id.walt.certificate.x509.X509CertificateSignatureValidationTest.Companion.trustStore
 import id.walt.certificate.x509.builder.Pkcs10CertificateSigningRequestBuilder
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
@@ -11,11 +11,14 @@ import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companio
 import id.walt.certificate.x509.model.GeneralName
 import id.walt.certificate.x509.signum.SignumDefaults
 import id.walt.certificate.x509.signum.SignumSignatureValidator
+import id.walt.certificate.x509.testdata.TestDataCertificates.gtsRootR4CrtPem
+import id.walt.certificate.x509.testdata.TestDataCertificates.gtsWe2CrtPem
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
+import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.x509.X509TestCertificates
-import id.walt.x509.createX509TestKey
 import id.walt.x509.id.walt.certificate.x509.JavaX509CertificateSerialNumberGenerator
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.bytestring.ByteString
@@ -23,9 +26,29 @@ import kotlinx.io.bytestring.toHexString
 import kotlin.test.*
 
 /**
+ * This test is to debug the Signum implementation.
  * Java is easier to debug
  */
 class SignumImplementationTest {
+
+    @Test
+    fun shouldValidateGoogleCertificateChainWithOneEntry() = runTest {
+        val certificatePem = gtsWe2CrtPem
+        assertNotNull(certificatePem)
+        val result = validatePemCertificateChain(certificatePem)
+        if (!result.valid) {
+            result.log
+                .filter { it.severity == ValidationResult.Severity.ERROR }
+                .forEach { println("${it.validatorId}: ${it.subjectDn} - ${it.message}") }
+        }
+        assertTrue(result.valid)
+        result.log.filter { it.validatorId == X509CertificateSignatureValidator.ID }
+            .also { signatureValidatorLog ->
+                assertEquals(2, signatureValidatorLog.size)
+                assertEquals(ValidationResult.Severity.INFO, signatureValidatorLog[0].severity)
+                assertEquals("C=US,O=Google Trust Services,CN=WE2", signatureValidatorLog[0].subjectDn)
+            }
+    }
 
 
     @Test
@@ -50,8 +73,7 @@ class SignumImplementationTest {
         val validationResult = validateCertificateChain(
             listOf(X509TestCertificates.tamperedLeafCertificate.let {
                 parseCertificateDerEncoded(it)
-            }),
-            trustStore
+            })
         )
         assertFalse(validationResult.valid)
     }
@@ -62,7 +84,7 @@ class SignumImplementationTest {
             listOf(X509TestCertificates.leafCertificate.let {
                 parseCertificateDerEncoded(it)
             }),
-            trustStore
+            InMemoryTrustStore(listOf(X509TestCertificates.issuerCertificate).map { parseCertificateDerEncoded(it) })
         )
         assertTrue(validationResult.valid)
     }
@@ -96,7 +118,7 @@ class SignumImplementationTest {
 
     @Test
     fun shouldSignCsr() = runTest {
-        val key = createX509TestKey(KeyType.secp256r1)
+        val key = JWKKey.importPEM(TestKeys.ecP256KeyPem).getOrThrow()
         val csr = createCsr(key) {
             requestedCertificate.apply {
                 subjectDn = "CN=Example Leaf,O=Example Org,C=US"
@@ -125,7 +147,10 @@ class SignumImplementationTest {
     companion object {
         val defaults = SignumDefaults(
             JavaX509CertificateSerialNumberGenerator(),
-            SignumSignatureValidator()
+            SignumSignatureValidator(),
+            InMemoryTrustStore(
+                listOf(gtsRootR4CrtPem)
+                    .map { X509CertificateUtil.parseCertificatePem(it) })
         )
 
         fun parseCsrPem(pem: String): Pkcs10CertificateSigningRequest =
@@ -154,5 +179,11 @@ class SignumImplementationTest {
             additionalTrust: X509CertificateTrustStore? = null
         ): ValidationResult =
             X509CertificateUtil.validateCertificateChain(defaults, certificateChain, additionalTrust)
+
+        suspend fun validatePemCertificateChain(
+            certificateChainPem: String,
+            additionalTrust: X509CertificateTrustStore? = null
+        ): ValidationResult =
+            X509CertificateUtil.validatePemCertificateChain(defaults, certificateChainPem, additionalTrust)
     }
 }
