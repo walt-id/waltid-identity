@@ -1,6 +1,7 @@
 package id.walt.openid4vci.core
 
 import id.walt.openid4vci.Session
+import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
@@ -25,7 +26,7 @@ import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.crypto.keys.Key
 import id.walt.mdoc.objects.mso.Status
-import id.walt.openid4vci.tokens.access.AccessTokenContext
+import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.sdjwt.SDMap
 import id.walt.x509.CertificateDer
@@ -103,6 +104,7 @@ interface OAuth2Provider {
         parameters: Map<String, List<String>>,
         headers: Map<String, List<String>>,
         session: Session? = null,
+        tokenEndpointUri: String? = null,
     ): AccessTokenRequestResult
 
     suspend fun createAccessTokenResponse(
@@ -120,13 +122,13 @@ interface OAuth2Provider {
     suspend fun createCredentialRequest(
         parameters: Map<String, List<String>>,
         session: Session? = null,
-        accessTokenContext: AccessTokenContext? = null,
+        accessTokenContext: CredentialAccessTokenContext? = null,
     ): CredentialRequestResult
 
     suspend fun createCredentialRequest(
         encryptedCredentialRequest: String,
         session: Session? = null,
-        accessTokenContext: AccessTokenContext? = null,
+        accessTokenContext: CredentialAccessTokenContext? = null,
     ): CredentialRequestResult
 
     suspend fun createCredentialResponse(
@@ -145,6 +147,10 @@ interface OAuth2Provider {
         validFrom: Instant? = null,
         validUntil: Instant? = null,
     ): CredentialResponseResult
+
+    fun writeCredentialError(error: CredentialError): CredentialResponseHttp
+
+    fun writeCredentialError(request: CredentialRequest, error: CredentialError): CredentialResponseHttp
 
     fun writeCredentialError(error: OAuthError): CredentialResponseHttp
 

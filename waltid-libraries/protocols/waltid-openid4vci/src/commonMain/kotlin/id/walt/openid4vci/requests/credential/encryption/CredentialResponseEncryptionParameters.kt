@@ -13,12 +13,17 @@ import kotlinx.serialization.json.jsonPrimitive
 data class CredentialResponseEncryptionParameters(
     val jwk: JsonObject,
     val enc: String,
+    val zip: String? = null,
 ) {
     val alg: String
         get() = jwk["alg"]?.jsonPrimitive?.contentOrNull.orEmpty()
 
     init {
-        requireSupportedEncryptionJwk(jwk, "credential_response_encryption")
+        requireSupportedEncryptionJwk(
+            jwk = jwk,
+            fieldName = "credential_response_encryption",
+            requireKid = false,
+        )
         require(alg == ALG_ECDH_ES) {
             "credential_response_encryption.jwk.alg must be $ALG_ECDH_ES"
         }
@@ -29,14 +34,12 @@ data class CredentialResponseEncryptionParameters(
 
     companion object {
         fun fromJsonObject(value: JsonObject): CredentialResponseEncryptionParameters {
-            require("zip" !in value) {
-                "credential_response_encryption.zip is not supported"
-            }
             val jwk = value["jwk"]?.jsonObject
                 ?: throw IllegalArgumentException("credential_response_encryption.jwk is required")
             val enc = value["enc"]?.jsonPrimitive?.contentOrNull
                 ?: throw IllegalArgumentException("credential_response_encryption.enc is required")
-            return CredentialResponseEncryptionParameters(jwk = jwk, enc = enc)
+            val zip = value["zip"]?.jsonPrimitive?.contentOrNull
+            return CredentialResponseEncryptionParameters(jwk = jwk, enc = enc, zip = zip)
         }
     }
 }

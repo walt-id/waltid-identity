@@ -21,6 +21,7 @@ import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.ktor.http.Url
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -147,12 +148,12 @@ class WalletPresentationHandlerRequirementsTest {
     }
 
     @Test
-    fun submitPresentationRequiresMatchingPreview() = runTest {
-        val error = assertFailsWith<MissingPresentationPreviewException> {
+    fun submitPresentationRequiresKnownPreviewHandle() = runTest {
+        val error = assertFailsWith<PreviewSessionException> {
             WalletPresentationHandler.submitPresentation(
                 wallet = Wallet(id = "wallet-without-preview"),
                 request = SubmitPresentationRequest(
-                    requestUrl = Url("openid4vp://authorize?request_uri=https%3A%2F%2Fverifier.example%2Frequest.jwt"),
+                    previewHandle = PresentationPreviewHandle("unknown-preview"),
                     selectedCredentialOptions = listOf(
                         PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1"),
                     ),
@@ -162,26 +163,51 @@ class WalletPresentationHandlerRequirementsTest {
         }
 
         assertEquals(
-            "Presentation request preview expired or was not found; preview the request again before responding.",
-            error.message,
+            PreviewSessionFailureReason.UNKNOWN,
+            error.reason,
         )
     }
 
     @Test
-    fun rejectPresentationRequiresMatchingPreview() = runTest {
-        val error = assertFailsWith<MissingPresentationPreviewException> {
+    fun rejectPresentationRequiresKnownPreviewHandle() = runTest {
+        val error = assertFailsWith<PreviewSessionException> {
             WalletPresentationHandler.rejectPresentation(
                 wallet = Wallet(id = "wallet-without-rejection-preview"),
                 request = RejectPresentationRequest(
-                    requestUrl = Url("openid4vp://authorize?request_uri=https%3A%2F%2Fverifier.example%2Frequest.jwt"),
+                    previewHandle = PresentationPreviewHandle("unknown-preview"),
                     errorCode = "access_denied",
                 ),
             )
         }
 
         assertEquals(
-            "Presentation request preview expired or was not found; preview the request again before responding.",
-            error.message,
+            PreviewSessionFailureReason.UNKNOWN,
+            error.reason,
+        )
+    }
+
+    @Test
+    fun sameRequestUrlPreviewsRemainBoundToTheirOwnResolvedContent() = runTest {
+        val wallet = Wallet(id = "same-request-url")
+        val requestUrl = Url("openid4vp://authorize?request_uri=https%3A%2F%2Fverifier.example%2Fmutable.jwt")
+        val first = WalletPresentationHandler.rememberPreviewedAuthorizationRequest(
+            wallet = wallet,
+            preview = readyPreview(requestUrl, state = "first"),
+        )
+        val second = WalletPresentationHandler.rememberPreviewedAuthorizationRequest(
+            wallet = wallet,
+            preview = readyPreview(requestUrl, state = "second"),
+        )
+
+        assertEquals(
+            "first",
+            WalletPresentationHandler.consumePreviewedAuthorizationRequest(wallet, first)
+                .resolvedAuthorizationRequest.authorizationRequest.state,
+        )
+        assertEquals(
+            "second",
+            WalletPresentationHandler.consumePreviewedAuthorizationRequest(wallet, second)
+                .resolvedAuthorizationRequest.authorizationRequest.state,
         )
     }
 
@@ -221,7 +247,7 @@ class WalletPresentationHandlerRequirementsTest {
             WalletPresentationHandler.submitPresentation(
                 wallet = wallet,
                 request = SubmitPresentationRequest(
-                    requestUrl = requestUrl,
+                    previewHandle = invalid.handle,
                     selectedCredentialOptions = listOf(
                         PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1"),
                     ),
@@ -232,14 +258,14 @@ class WalletPresentationHandlerRequirementsTest {
         assertFailsWith<IllegalArgumentException> {
             WalletPresentationHandler.rejectPresentation(
                 wallet = wallet,
-                request = RejectPresentationRequest(requestUrl, errorCode = "access_denied"),
+                request = RejectPresentationRequest(invalid.handle, errorCode = "access_denied"),
             )
         }
 
         val rejection = WalletPresentationHandler.rejectPresentation(
             wallet = wallet,
             request = RejectPresentationRequest(
-                requestUrl = requestUrl,
+                previewHandle = invalid.handle,
                 errorDescription = "Sensitive local validation details",
             ),
         )
@@ -284,7 +310,7 @@ class WalletPresentationHandlerRequirementsTest {
 
         val rejection = WalletPresentationHandler.rejectPresentation(
             wallet = wallet,
-            request = RejectPresentationRequest(requestUrl),
+            request = RejectPresentationRequest(invalid.handle),
         )
 
         assertEquals(
@@ -321,7 +347,7 @@ class WalletPresentationHandlerRequirementsTest {
 
         val rejection = WalletPresentationHandler.rejectPresentation(
             wallet = wallet,
-            request = RejectPresentationRequest(requestUrl),
+            request = RejectPresentationRequest(invalid.handle),
         )
 
         assertEquals(
@@ -329,6 +355,157 @@ class WalletPresentationHandlerRequirementsTest {
             rejection.getUrl,
         )
     }
+
+    @Test
+    fun mutableRequestUriContentRemainsBoundToReviewedPreview() = runTest {
+        val wallet = Wallet(
+            id = "mutable-request-uri",
+            credentialStores = listOf(InMemoryCredentialStore()),
+            staticKey = JWKKey.generate(KeyType.Ed25519),
+        )
+        val requestUrl = Url("openid4vp://authorize?request_uri=https%3A%2F%2Fverifier.example%2Fmutable.jwt")
+        var currentState = "reviewed"
+        var resolutionCalls = 0
+
+        val preview = WalletPresentationHandler.previewPresentation(
+            wallet = wallet,
+            request = PreviewPresentationRequest(requestUrl),
+            onEvent = {},
+            transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+            resolveAuthorizationRequest = { resolvedUrl ->
+                assertEquals(requestUrl, resolvedUrl)
+                resolutionCalls += 1
+                resolvedPreviewRequest(currentState)
+            },
+        )
+        currentState = "mutated"
+        val invalidPreview = assertIs<PreviewPresentationResult.Invalid>(preview)
+
+        val result = WalletPresentationHandler.rejectPresentation(
+            wallet,
+            RejectPresentationRequest(invalidPreview.handle),
+        )
+
+        assertEquals("reviewed", invalidPreview.authorizationRequest.state)
+        assertEquals(
+            "https://verifier.example/callback#error=${invalidPreview.error.code.code}&state=reviewed",
+            result.getUrl,
+        )
+        assertEquals(1, resolutionCalls)
+    }
+
+    @Test
+    fun presentationPreviewIsWalletBoundAndDismissalDiscardsIt() = runTest {
+        val wallet = Wallet(id = "presentation-owner")
+        val otherWallet = Wallet(id = "presentation-other")
+        val handle = WalletPresentationHandler.rememberPreviewedAuthorizationRequest(
+            wallet = wallet,
+            preview = readyPreview(Url("openid4vp://authorize"), state = "owned"),
+        )
+
+        val crossWallet = assertFailsWith<PreviewSessionException> {
+            WalletPresentationHandler.discardPreview(otherWallet, handle)
+        }
+        assertEquals(PreviewSessionFailureReason.WRONG_WALLET, crossWallet.reason)
+
+        WalletPresentationHandler.discardPreview(wallet, handle)
+        val discarded = assertFailsWith<PreviewSessionException> {
+            WalletPresentationHandler.consumePreviewedAuthorizationRequest(wallet, handle)
+        }
+        assertEquals(PreviewSessionFailureReason.DISCARDED, discarded.reason)
+    }
+
+    @Test
+    fun rejectConsumesExactlySelectedPresentationPreview() = runTest {
+        val wallet = Wallet(id = "reject-selected-preview")
+        val first = WalletPresentationHandler.rememberPreviewedAuthorizationRequest(
+            wallet = wallet,
+            preview = readyPreview(Url("openid4vp://first"), state = "first"),
+        )
+        val second = WalletPresentationHandler.rememberPreviewedAuthorizationRequest(
+            wallet = wallet,
+            preview = readyPreview(Url("openid4vp://second"), state = "second"),
+        )
+
+        val result = WalletPresentationHandler.rejectPresentation(
+            wallet,
+            RejectPresentationRequest(previewHandle = first),
+        )
+
+        assertEquals("https://verifier.example/callback#error=access_denied&state=first", result.getUrl)
+        val consumed = assertFailsWith<PreviewSessionException> {
+            WalletPresentationHandler.rejectPresentation(
+                wallet,
+                RejectPresentationRequest(previewHandle = first),
+            )
+        }
+        assertEquals(PreviewSessionFailureReason.CONSUMED, consumed.reason)
+        assertEquals(
+            "second",
+            WalletPresentationHandler.consumePreviewedAuthorizationRequest(wallet, second)
+                .resolvedAuthorizationRequest.authorizationRequest.state,
+        )
+    }
+
+    @Test
+    fun submitConsumesPreviewEvenWhenLaterPresentationWorkFails() = runTest {
+        val wallet = Wallet(id = "submit-consumes")
+        val handle = WalletPresentationHandler.rememberPreviewedAuthorizationRequest(
+            wallet = wallet,
+            preview = readyPreview(Url("openid4vp://submit"), state = "submit"),
+        )
+        val request = SubmitPresentationRequest(
+            previewHandle = handle,
+            selectedCredentialOptions = listOf(
+                PresentationCredentialSelection(queryId = "pid", credentialId = "credential"),
+            ),
+        )
+
+        assertFailsWith<IllegalStateException> {
+            WalletPresentationHandler.submitPresentation(
+                wallet,
+                request,
+                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+            )
+        }
+        val consumed = assertFailsWith<PreviewSessionException> {
+            WalletPresentationHandler.submitPresentation(
+                wallet,
+                request,
+                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+            )
+        }
+        assertEquals(PreviewSessionFailureReason.CONSUMED, consumed.reason)
+    }
+
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    private fun resolvedRequest(state: String): ResolvedAuthorizationRequest =
+        ResolvedAuthorizationRequest.Plain(
+            AuthorizationRequest(
+                clientId = "redirect_uri:https://verifier.example/callback",
+                redirectUri = "https://verifier.example/callback",
+                responseMode = OpenID4VPResponseMode.FRAGMENT,
+                state = state,
+            )
+        )
+
+    private fun readyPreview(requestUrl: Url, state: String) =
+        WalletPresentationHandler.PreviewedPresentation.Ready(
+            requestUrl = requestUrl,
+            resolvedAuthorizationRequest = resolvedRequest(state),
+        )
+
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    private fun resolvedPreviewRequest(state: String): ResolvedAuthorizationRequest =
+        ResolvedAuthorizationRequest.Plain(
+            AuthorizationRequest(
+                clientId = "redirect_uri:https://verifier.example/callback",
+                redirectUri = "https://verifier.example/callback",
+                responseMode = OpenID4VPResponseMode.FRAGMENT,
+                state = state,
+                dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery("pid"))),
+            )
+        )
 
     @Test
     fun presentationSelectionAllowsMultipleCredentialsForOneQueryWhenMatched() {

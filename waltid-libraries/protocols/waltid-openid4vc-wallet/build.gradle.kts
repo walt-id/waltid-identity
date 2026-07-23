@@ -62,6 +62,7 @@ kotlin {
             api(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(project(":waltid-libraries:crypto:waltid-x509"))
             api(project(":waltid-libraries:waltid-did"))
+            implementation(identityLibs.whyoleg.cryptography.random)
         }
 
         jvmMain.dependencies {

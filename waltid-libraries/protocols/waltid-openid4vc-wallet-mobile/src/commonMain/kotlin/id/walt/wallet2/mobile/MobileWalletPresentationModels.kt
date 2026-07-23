@@ -3,12 +3,15 @@ package id.walt.wallet2.mobile
 /**
  * Preview of an OpenID4VP presentation request before the wallet submits a VP token.
  *
+ * @property previewHandle Opaque handle required for submit, reject, or local dismissal.
  * @property request Verifier, protocol, and transaction metadata extracted from the request.
  * @property credentialOptions Wallet-local credentials that can satisfy the presentation request.
  * @property credentialRequirements Required DCQL credential query combinations that must be satisfied before submission.
  * @property encryption Authenticated response-encryption requirements for the retained request.
  */
 public data class MobileWalletPresentationPreview(
+    /** Opaque handle binding a later action to this reviewed presentation. */
+    public val previewHandle: MobileWalletPresentationPreviewHandle,
     public val request: MobileWalletPresentationRequestInfo,
     public val credentialOptions: List<MobileWalletPresentationCredentialOption>,
     public val credentialRequirements: List<MobileWalletPresentationCredentialRequirement> = emptyList(),
@@ -54,6 +57,8 @@ public sealed interface MobileWalletPresentationPreviewResult {
 
     /** The request cannot be fulfilled, but the detected protocol error can be returned after user interaction. */
     public data class Invalid(
+        /** Opaque handle required to reject or discard this reviewed request. */
+        public val previewHandle: MobileWalletPresentationPreviewHandle,
         /** Validated response destination and request context to show before returning the error. */
         public val request: MobileWalletPresentationRequestInfo,
         /** Standard OpenID4VP error detected by the wallet. */
@@ -61,6 +66,20 @@ public sealed interface MobileWalletPresentationPreviewResult {
         /** Local diagnostic intended for wallet UI; it is not sent to the verifier automatically. */
         public val message: String,
     ) : MobileWalletPresentationPreviewResult
+}
+
+/**
+ * Opaque presentation preview handle. It is valid only for the wallet that created it.
+ *
+ * @property value Opaque identifier returned by [MobileWallet.previewPresentation].
+ */
+public data class MobileWalletPresentationPreviewHandle(val value: String) {
+    init {
+        require(value.isNotBlank()) { "Presentation preview handle must not be blank" }
+    }
+
+    /** Returns a redacted representation that does not reveal [value]. */
+    public override fun toString(): String = "MobileWalletPresentationPreviewHandle(<redacted>)"
 }
 
 /**

@@ -36,12 +36,11 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+import kotlin.jvm.JvmInline
 
 private val log = KotlinLogging.logger {}
 private const val DEFAULT_CLIENT_ID = "eudiw-abca"
@@ -136,6 +135,35 @@ data class ReceiveCredentialRequest(
     init { checkOfferSource() }
 }
 
+/** Opaque identifier binding an issuance action to one reviewed credential-offer resolution. */
+@Serializable
+@JvmInline
+value class IssuancePreviewHandle(val value: String) {
+    init {
+        require(value.isNotBlank()) { "Issuance preview handle must not be blank" }
+    }
+
+    override fun toString(): String = "IssuancePreviewHandle(<redacted>)"
+}
+
+/**
+ * Input for receiving credentials from a reviewed preview.
+ *
+ * The offer source is intentionally absent: [previewHandle] is the only authority for the exact
+ * offer and metadata resolution the user reviewed.
+ */
+@Serializable
+data class ReceiveCredentialFromPreviewRequest(
+    val previewHandle: IssuancePreviewHandle,
+    val key: DirectSerializedKey? = null,
+    val keyId: String? = null,
+    val did: String? = null,
+    val txCode: String? = null,
+    val clientId: String = DEFAULT_CLIENT_ID,
+    val redirectUri: Url = Url("openid://"),
+    val tokenRequestHeaders: Map<String, String> = emptyMap(),
+)
+
 /** Result of a completed issuance flow. */
 @Serializable
 data class ReceiveCredentialResult(
@@ -172,6 +200,12 @@ data class ResolveOfferResult(
     val tokenEndpoint: Url? = null,
 )
 
+/** A credential-offer preview and the opaque handle required to act on that review. */
+data class IssuancePreview(
+    val handle: IssuancePreviewHandle,
+    val offer: ResolveOfferResult,
+)
+
 /**
  * Typed metadata for an offer retained between review and issuance.
  *
@@ -179,11 +213,13 @@ data class ResolveOfferResult(
  * It exposes the protocol models already resolved for the retained issuance snapshot so mobile
  * consumers can project them into platform-safe API models without parsing raw JSON or refetching.
  *
+ * @property previewHandle Opaque handle required to act on this retained preview.
  * @property issuerMetadata Credential issuer metadata used by the retained issuance snapshot.
  * @property offeredCredentials Offered credential configurations resolved against [issuerMetadata].
  * @property transactionCode Canonical OpenID4VCI transaction-code metadata, when required.
  */
 data class WalletOfferPreviewResult(
+    val previewHandle: IssuancePreviewHandle,
     val issuerMetadata: CredentialIssuerMetadata,
     val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
     val transactionCode: TxCode?,
@@ -198,7 +234,8 @@ data class WalletOfferPreviewResult(
  * @property authorizationServerMetadata Authorization server metadata used for the token request.
  * @property offeredCredentials Offered configurations resolved against [issuerMetadata].
  */
-private class ResolvedIssuanceOffer(
+internal class ResolvedIssuanceOffer(
+    val source: ResolveOfferRequest,
     val summary: ResolveOfferResult,
     val offer: CredentialOffer,
     val issuerMetadata: CredentialIssuerMetadata,
@@ -316,11 +353,8 @@ data class ExchangeCodeRequest(
  * react to each credential as it arrives (useful for streaming UIs).
  */
 object WalletIssuanceHandler {
-
-    private const val MAX_PREVIEWED_OFFERS = 16
     private val lenientJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
-    private val previewedOffers = LinkedHashMap<OfferPreviewCacheKey, ResolvedIssuanceOffer>()
-    private val previewedOffersMutex = Mutex()
+    private val previewedOffers = PreviewSessionStore<ResolvedIssuanceOffer>(sessionName = "Issuance")
 
     /** HTTP redirect status codes that the wallet should follow for credential/nonce endpoints. */
     private val REDIRECT_STATUS_CODES = setOf(301, 302, 303, 307, 308)
@@ -367,16 +401,7 @@ object WalletIssuanceHandler {
         if (did != null) buildJwtProof(key, issuer, nonce, keyId = did)
         else buildJwtProof(key, issuer, nonce, includeJwk = true)
 
-    /**
-     * Full pre-authorized-code issuance flow, emitting each stored credential
-     * as a [Flow] element as soon as it is received and stored.
-     *
-     * When a matching [previewOffer] resolution is retained for [wallet], this flow reuses that
-     * exact offer and metadata. Failed attempts retain the preview for retry; successful completion
-     * removes it. Calls without a retained preview resolve [request] normally.
-     *
-     * [onEvent] is called at each lifecycle step for progress reporting.
-     */
+    /** Immediate, non-previewed pre-authorized-code issuance flow. */
     fun receiveCredentialFlow(
         wallet: Wallet,
         request: ReceiveCredentialRequest,
@@ -389,6 +414,53 @@ object WalletIssuanceHandler {
          * [transactionId] should be stored and passed to [pollDeferredFlow] later.
          */
         onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit = { _, _ -> },
+    ): Flow<StoredCredential> = receiveCredentialFlowInternal(
+        wallet = wallet,
+        request = request,
+        resolvedOffer = null,
+        attestationAssembler = attestationAssembler,
+        onEvent = onEvent,
+        httpClient = httpClient,
+        onDeferredTransactionId = onDeferredTransactionId,
+    )
+
+    /**
+     * Reviewed pre-authorized-code issuance flow.
+     *
+     * Failed attempts retain the selected preview for retry. Successful completion consumes it.
+     */
+    fun receiveCredentialFlow(
+        wallet: Wallet,
+        request: ReceiveCredentialFromPreviewRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        httpClient: HttpClient = defaultHttpClient(),
+        onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit = { _, _ -> },
+    ): Flow<StoredCredential> = channelFlow {
+        previewedOffers.useRetainingOnFailure(
+            walletId = wallet.id,
+            id = request.previewHandle.value,
+        ) { resolvedOffer ->
+            receiveCredentialFlowInternal(
+                wallet = wallet,
+                request = request.toReceiveCredentialRequest(resolvedOffer.source),
+                resolvedOffer = resolvedOffer,
+                attestationAssembler = attestationAssembler,
+                onEvent = onEvent,
+                httpClient = httpClient,
+                onDeferredTransactionId = onDeferredTransactionId,
+            ).collect(::send)
+        }
+    }
+
+    private fun receiveCredentialFlowInternal(
+        wallet: Wallet,
+        request: ReceiveCredentialRequest,
+        resolvedOffer: ResolvedIssuanceOffer?,
+        attestationAssembler: ClientAttestationAssembler?,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
+        httpClient: HttpClient,
+        onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit,
     ): Flow<StoredCredential> = channelFlow {
         val key = wallet.resolveKey(request.key, request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, no inline key, and no keyId was specified")
@@ -401,20 +473,18 @@ object WalletIssuanceHandler {
         val tokenBuilder = TokenRequestBuilder(clientConfig, httpClient)
         val proofBuilder = JwtProofBuilder()
 
-        // 1. Resolve the offer source, or reuse the exact resolution shown during preview.
+        // 1. Resolve the offer source, or use the exact resolution selected by its preview handle.
         log.trace { "Parsing offer string: ${request.getEffectiveOfferString().take(120)}..." }
-        val cacheKey = offerPreviewCacheKey(wallet, request)
-        val previewedOffer = previewedOffersMutex.withLock { previewedOffers[cacheKey] }
-        val resolvedOffer = previewedOffer ?: resolveIssuanceOffer(
+        val effectiveResolvedOffer = resolvedOffer ?: resolveIssuanceOffer(
             request.toResolveOfferRequest(),
             httpClient,
         )
 
         // 2. Reuse issuer metadata and offered configurations from that resolution.
-        val offer = resolvedOffer.offer
-        val issuerMetadata = resolvedOffer.issuerMetadata
-        val offeredCredentials = resolvedOffer.offeredCredentials
-        val asMetadata = resolvedOffer.authorizationServerMetadata
+        val offer = effectiveResolvedOffer.offer
+        val issuerMetadata = effectiveResolvedOffer.issuerMetadata
+        val offeredCredentials = effectiveResolvedOffer.offeredCredentials
+        val asMetadata = effectiveResolvedOffer.authorizationServerMetadata
         log.trace { "Resolved offer: issuer=${offer.credentialIssuer}, configIds=${offer.credentialConfigurationIds}" }
         onEvent(WalletSessionEvent.issuance_offer_resolved)
 
@@ -528,13 +598,6 @@ object WalletIssuanceHandler {
         }
 
         onEvent(WalletSessionEvent.issuance_completed)
-        if (previewedOffer != null) {
-            previewedOffersMutex.withLock {
-                if (previewedOffers[cacheKey] === previewedOffer) {
-                    previewedOffers.remove(cacheKey)
-                }
-            }
-        }
     }
 
     /**
@@ -561,17 +624,37 @@ object WalletIssuanceHandler {
         return ReceiveCredentialResult(credentialIds = ids, deferredTransactionIds = deferredIds)
     }
 
+    /** Receives credentials using exactly the offer resolution selected by [request]. */
+    suspend fun receiveCredential(
+        wallet: Wallet,
+        request: ReceiveCredentialFromPreviewRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        httpClient: HttpClient = defaultHttpClient(),
+    ): ReceiveCredentialResult {
+        val ids = mutableListOf<String>()
+        val deferredIds = mutableMapOf<String, String>()
+        receiveCredentialFlow(
+            wallet = wallet,
+            request = request,
+            attestationAssembler = attestationAssembler,
+            onEvent = onEvent,
+            httpClient = httpClient,
+            onDeferredTransactionId = { configId, txId -> deferredIds[configId] = txId },
+        ).collect { ids += it.id }
+        return ReceiveCredentialResult(credentialIds = ids, deferredTransactionIds = deferredIds)
+    }
+
     /**
      * Resolves an offer for review and retains the complete resolution for [receiveCredential].
      *
-     * The bounded preview cache is scoped by wallet ID and offer source. While retained, a matching
-     * receive reuses the exact parsed offer, issuer metadata, authorization server metadata, and
-     * offered configurations instead of fetching them again.
+     * The returned opaque handle selects this exact parsed offer, issuer metadata, authorization
+     * server metadata, and offered configuration set for a later reviewed receive action.
      *
      * @param wallet Wallet that will receive the reviewed offer.
      * @param request Credential offer URL or inline offer JSON to resolve.
      * @param httpClient HTTP client used for offer and metadata resolution.
-     * @return Review metadata derived from the retained resolution.
+     * @return Review metadata and the opaque handle required to act on it.
      */
     suspend fun previewOffer(
         wallet: Wallet,
@@ -579,17 +662,25 @@ object WalletIssuanceHandler {
         httpClient: HttpClient = defaultHttpClient(),
     ): WalletOfferPreviewResult {
         val resolvedOffer = resolveIssuanceOffer(request, httpClient)
-        previewedOffersMutex.withLock {
-            if (previewedOffers.size >= MAX_PREVIEWED_OFFERS) {
-                previewedOffers.remove(previewedOffers.keys.first())
-            }
-            previewedOffers[offerPreviewCacheKey(wallet, request)] = resolvedOffer
-        }
+        val previewHandle = IssuancePreviewHandle(
+            previewedOffers.create(walletId = wallet.id, value = resolvedOffer)
+        )
         return WalletOfferPreviewResult(
+            previewHandle = previewHandle,
             issuerMetadata = resolvedOffer.issuerMetadata,
             offeredCredentials = resolvedOffer.offeredCredentials,
             transactionCode = resolvedOffer.offer.grants?.preAuthorizedCode?.txCode,
         )
+    }
+
+    /** Explicitly discards a reviewed issuance preview without contacting the issuer. */
+    suspend fun discardPreview(wallet: Wallet, handle: IssuancePreviewHandle) {
+        previewedOffers.discard(walletId = wallet.id, id = handle.value)
+    }
+
+    /** Clears every issuance preview and tombstone owned by [wallet] during wallet deletion. */
+    suspend fun clearPreviews(wallet: Wallet) {
+        previewedOffers.clearWallet(wallet.id)
     }
 
     private suspend fun resolveIssuanceOffer(
@@ -602,6 +693,7 @@ object WalletIssuanceHandler {
         val asMetadata = metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
         val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
         return ResolvedIssuanceOffer(
+            source = request,
             summary = ResolveOfferResult(
                 credentialIssuer = offer.credentialIssuer,
                 credentialConfigurationIds = offer.credentialConfigurationIds,
@@ -620,19 +712,22 @@ object WalletIssuanceHandler {
         )
     }
 
-    private data class OfferPreviewCacheKey(
-        val walletId: String,
-        val offerSource: String,
-    )
-
-    private fun offerPreviewCacheKey(wallet: Wallet, request: ResolveOfferRequest): OfferPreviewCacheKey =
-        OfferPreviewCacheKey(walletId = wallet.id, offerSource = request.getEffectiveOfferString())
-
-    private fun offerPreviewCacheKey(wallet: Wallet, request: ReceiveCredentialRequest): OfferPreviewCacheKey =
-        OfferPreviewCacheKey(walletId = wallet.id, offerSource = request.getEffectiveOfferString())
-
     private fun ReceiveCredentialRequest.toResolveOfferRequest(): ResolveOfferRequest =
         ResolveOfferRequest(offerUrl = offerUrl, offerJson = offerJson)
+
+    private fun ReceiveCredentialFromPreviewRequest.toReceiveCredentialRequest(
+        source: ResolveOfferRequest,
+    ): ReceiveCredentialRequest = ReceiveCredentialRequest(
+        offerUrl = source.offerUrl,
+        offerJson = source.offerJson,
+        key = key,
+        keyId = keyId,
+        did = did,
+        txCode = txCode,
+        clientId = clientId,
+        redirectUri = redirectUri,
+        tokenRequestHeaders = tokenRequestHeaders,
+    )
 
     // ---------------------------------------------------------------------------
     // Isolated step handlers
