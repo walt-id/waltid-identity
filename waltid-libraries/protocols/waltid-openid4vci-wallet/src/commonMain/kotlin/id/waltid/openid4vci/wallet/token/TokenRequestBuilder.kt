@@ -223,6 +223,7 @@ class TokenRequestBuilder(
         }
 
         if (!response.status.isSuccess()) {
+            val errorBody = response.bodyAsText()
             log.error {
                 "Token request failed - Status: ${response.status.value} ${response.status.description}"
             }
