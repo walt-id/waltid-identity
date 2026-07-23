@@ -264,7 +264,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertTrue(preview.credentialOptions.allSatisfy { $0.format == "mso_mdoc" })
 
         let result = try await wallet.submitPresentation(
-            request: presentationURL,
+            previewHandle: preview.previewHandle,
             selectedCredentialOptions: preview.credentialOptions.map(\.selection),
             did: bootstrapResult.did
         )
