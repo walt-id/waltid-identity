@@ -6,10 +6,11 @@ import org.bouncycastle.asn1.ASN1Object
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x509.Extension as BouncyCastleExtension
 
-internal object BouncyExtensionFactory {
+object BouncyExtensionFactory {
 
 
     fun parseExtension(extension: BouncyCastleExtension): Extension = when (extension.extnId.id) {
+        AuthorityKeyIdentifierExtension.OID -> BouncyAuthorityKeyIdentifierExtension(extension)
         BasicConstraintsExtension.OID -> BouncyBasicConstraintsExtension(extension)
         KeyUsageExtension.OID -> BouncyKeyUsageExtension(extension)
         ExtendedKeyUsageExtension.OID -> BouncyExtendedKeyUsageExtension(extension)

@@ -5,7 +5,7 @@ import org.bouncycastle.asn1.*
 import org.bouncycastle.asn1.x509.BasicConstraints
 import org.bouncycastle.asn1.x509.Extension as BouncyCastleExtension
 
-internal class BouncyBasicConstraintsExtension(extension: BouncyCastleExtension) : BouncyExtension(extension),
+class BouncyBasicConstraintsExtension(extension: BouncyCastleExtension) : BouncyExtension(extension),
     BasicConstraintsExtension {
 
     private val constraints = BasicConstraints.getInstance(extension.parsedValue)
@@ -22,11 +22,13 @@ internal class BouncyBasicConstraintsExtension(extension: BouncyCastleExtension)
             } else {
                 ASN1Boolean.FALSE
             }
-            val lengthConstraint = ext.pathLenConstraint?.let { ASN1Integer(it) } ?: DERNull.INSTANCE
-            val sequence = DERSequence(
-                ca,
-                lengthConstraint
-            )
+            val lengthConstraint = ext.pathLenConstraint?.let { ASN1Integer(it) }
+            val sequence = lengthConstraint?.let { lc ->
+                DERSequence(
+                    ca,
+                    lc
+                )
+            } ?: DERSequence(ca)
             return BasicConstraints.getInstance(sequence)
         }
     }

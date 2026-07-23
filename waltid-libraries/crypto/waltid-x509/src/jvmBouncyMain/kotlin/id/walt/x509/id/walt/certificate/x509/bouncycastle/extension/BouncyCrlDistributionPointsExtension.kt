@@ -15,7 +15,7 @@ import org.bouncycastle.asn1.x509.Extension as BouncyCastleExtension
 import org.bouncycastle.asn1.x509.GeneralNames as BouncyCastleGeneralNames
 import org.bouncycastle.asn1.x509.ReasonFlags as BouncyCastleReasonFlags
 
-internal class BouncyCrlDistributionPointsExtension(extension: BouncyCastleExtension) :
+class BouncyCrlDistributionPointsExtension(extension: BouncyCastleExtension) :
     BouncyExtension(extension),
     CrlDistributionPointsExtension {
 

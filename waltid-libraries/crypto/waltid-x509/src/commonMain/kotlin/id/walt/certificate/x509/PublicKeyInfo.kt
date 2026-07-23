@@ -1,6 +1,7 @@
 package id.walt.certificate.x509
 
 import id.walt.certificate.der.ByteArrayUtil
+import id.walt.certificate.der.ByteArrayUtil.byteStringToBase64Pem
 import id.walt.crypto.utils.ShaUtils
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.toHexString
@@ -23,15 +24,23 @@ interface PublicKeyInfo {
     /**
      * Contains content of subjectPublicKey (without ASN.1 tag information and length - only the content of the BIT STRING)
      */
-    val publicKeyRaw: ByteString
-    val publicKeyHex: String
-        get() = publicKeyRaw.toHexString()
-    val publicKeyBase64: String
-        get() = ByteArrayUtil.byteArrayToBase64(publicKeyRaw.toByteArray())
+    val keyValueRaw: ByteString
+    val keyValueHex: String
+        get() = keyValueRaw.toHexString()
+    val keyValueBase64: String
+        get() = ByteArrayUtil.byteArrayToBase64(keyValueRaw.toByteArray())
 
     /**
      * SHA-1 hash of publicKeyRaw (SubjectPublicKeyInfo.subjectPublicKey)
      */
     val keyId: ByteString
-        get() = ByteString(ShaUtils.sha1(publicKeyRaw.toByteArray()))
+        get() = ByteString(ShaUtils.sha1(keyValueRaw.toByteArray()))
+
+    /**
+     * X509 SubjectPublicKeyInfo encoded as DER
+     */
+    val encodedDer: ByteString
+
+    val encodedPem: String
+        get() = byteStringToBase64Pem(encodedDer, "PUBLIC KEY")
 }

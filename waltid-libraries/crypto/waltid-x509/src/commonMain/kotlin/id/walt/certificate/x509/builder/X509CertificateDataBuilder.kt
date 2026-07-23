@@ -20,34 +20,36 @@ open class X509CertificateDataBuilder(
         notBefore = Clock.System.now(),
         notAfter = Clock.System.now() + 30.days,
     ),
-    override var subjectPublicKeyInfo: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo = SelfSignedSubjectPublicKeyInfo()
+    override var subjectPublicKeyInfo: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder()
 ) : X509Certificate.CertificateData, MutableExtensionContainer {
 
     override val extensions: MutableMap<String, Extension> = mutableMapOf()
 
+    fun subjectPublicKeySelfSigned(): Unit {
+        subjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder()
+    }
+
     fun subjectPublicKey(key: Key): Unit {
-        subjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfo(key)
+        subjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder(key)
     }
 
-    class WaltIdKeySubjectPublicKeyInfo(val key: Key) : X509Certificate.SubjectPublicKeyInfo {
+    class WaltIdKeySubjectPublicKeyInfoBuilder private constructor(
+        val selfSigned: Boolean,
+        val key: Key?
+    ) : X509Certificate.SubjectPublicKeyInfo {
+
+        constructor(key: Key) : this(false, key)
+        constructor() : this(true, null)
+
         override val algorithmName: String
             get() = error("needs to be taken from issuer key")
         override val algorithmOid: String
             get() = error("needs to be taken from issuer key")
         override val ellipticCurveOid: String
             get() = error("needs to be taken from issuer key")
-        override val publicKeyRaw: ByteString
+        override val keyValueRaw: ByteString
             get() = error("needs to be taken from issuer key")
-    }
-
-    class SelfSignedSubjectPublicKeyInfo : X509Certificate.SubjectPublicKeyInfo {
-        override val algorithmName: String
-            get() = error("needs to be taken from issuer key")
-        override val algorithmOid: String
-            get() = error("needs to be taken from issuer key")
-        override val ellipticCurveOid: String
-            get() = error("needs to be taken from issuer key")
-        override val publicKeyRaw: ByteString
+        override val encodedDer: ByteString
             get() = error("needs to be taken from issuer key")
     }
 }

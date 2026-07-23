@@ -1,5 +1,18 @@
 package id.walt.certificate.x509.extension
 
+/**
+ * KeyUsage ::= BIT STRING {
+ *            digitalSignature        (0),
+ *            nonRepudiation          (1), -- recent editions of X.509 have
+ *                                 -- renamed this bit to contentCommitment
+ *            keyEncipherment         (2),
+ *            dataEncipherment        (3),
+ *            keyAgreement            (4),
+ *            keyCertSign             (5),
+ *            cRLSign                 (6),
+ *            encipherOnly            (7),
+ *            decipherOnly            (8) }
+ */
 interface KeyUsageExtension : Extension {
 
     val keyPurposeIdList: Set<KeyUsage>

@@ -41,7 +41,7 @@ class Pkcs10CertificateUtilCsrSigningTest {
                 assertNotNull(data.subjectPublicKeyInfo) { pk ->
                     assertEquals("1.2.840.10045.2.1", pk.algorithmOid)
                     assertEquals("id-ecPublicKey", pk.algorithmName)
-                    assertEquals(intermediateIssuerPublicKeyHex, pk.publicKeyHex)
+                    assertEquals(intermediateIssuerPublicKeyHex, pk.keyValueHex)
                 }
                 assertNotNull(data.extensionSan) { san ->
                     assertEquals(2, san.alternativeNames.size)

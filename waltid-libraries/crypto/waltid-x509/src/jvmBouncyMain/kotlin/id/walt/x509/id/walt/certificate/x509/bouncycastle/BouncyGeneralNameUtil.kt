@@ -8,7 +8,7 @@ import org.bouncycastle.asn1.x509.GeneralName as BouncyCastleGeneralName
 import org.bouncycastle.asn1.x509.GeneralNames as BouncyCastleGeneralNames
 
 
-internal object BouncyGeneralNameUtil {
+object BouncyGeneralNameUtil {
 
     fun BouncyCastleGeneralName.toGeneralName(): GeneralName =
         when (tagNo) {

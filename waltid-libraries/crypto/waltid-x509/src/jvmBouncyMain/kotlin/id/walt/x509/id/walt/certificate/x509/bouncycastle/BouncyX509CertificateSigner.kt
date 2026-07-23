@@ -2,13 +2,15 @@ package id.walt.x509.id.walt.certificate.x509.bouncycastle
 
 import id.walt.certificate.x509.BouncyPublicKeyInfoUtil
 import id.walt.certificate.x509.BouncyPublicKeyInfoUtil.bouncyCastleSubjectPublicKeyInfo
+import id.walt.certificate.x509.PublicKeyInfo
+import id.walt.certificate.x509.SignatureValidator
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateSigner
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
+import id.walt.certificate.x509.builder.X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension
 import id.walt.crypto.keys.Key
 import id.walt.x509.id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory
-import kotlinx.coroutines.runBlocking
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier
@@ -23,7 +25,7 @@ import java.security.Security
 import java.util.*
 
 
-internal class BouncyX509CertificateSigner : X509CertificateSigner {
+class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
 
     companion object {
         init {
@@ -32,7 +34,7 @@ internal class BouncyX509CertificateSigner : X509CertificateSigner {
         }
     }
 
-    override fun signCertificate(
+    override suspend fun signCertificate(
         issuerKey: Key,
         builder: X509CertificateDataBuilder
     ): X509Certificate {
@@ -43,18 +45,13 @@ internal class BouncyX509CertificateSigner : X509CertificateSigner {
         val subject = X500Name(builder.subjectDn)
 
         val keyInfo =
-            when (builder.subjectPublicKeyInfo) {
-                is X509CertificateDataBuilder.SelfSignedSubjectPublicKeyInfo ->
-                    runBlocking {
-                        BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(issuerKey)
-                    }
-                is X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfo -> {
-                    runBlocking {
-                        val subjectKey = builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfo
-                        BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(subjectKey.key)
-                    }
+            (builder.subjectPublicKeyInfo as WaltIdKeySubjectPublicKeyInfoBuilder).let { builder ->
+                if (builder.selfSigned) {
+                    BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(issuerKey)
+                } else {
+                    checkNotNull(builder.key) { "Certificate subject public key missing" }
+                    BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(builder.key)
                 }
-                else -> error("unknown subjectPublicKeyInfo '${builder.subjectPublicKeyInfo::class.qualifiedName}'")
             }
         val bouncyBuilder = X509v3CertificateBuilder(
             issuer,
@@ -82,7 +79,7 @@ internal class BouncyX509CertificateSigner : X509CertificateSigner {
         return BouncyX509Certificate(signed)
     }
 
-    override fun validateCertificateSignature(
+    override suspend fun validateCertificateSignature(
         issuerPublicKey: X509Certificate.SubjectPublicKeyInfo,
         certificate: X509Certificate
     ): Boolean {
@@ -98,7 +95,7 @@ internal class BouncyX509CertificateSigner : X509CertificateSigner {
                 ASN1ObjectIdentifier(issuerPublicKey.algorithmOid),
                 issuerPublicKey.ellipticCurveOid?.let { ASN1ObjectIdentifier(it) }
             ),
-            issuerPublicKey.publicKeyRaw.toByteArray())
+            issuerPublicKey.keyValueRaw.toByteArray())
 
         // Build the verifier provider using the issuer's public key
         val verifierProvider: ContentVerifierProvider? = JcaContentVerifierProviderBuilder()
@@ -106,5 +103,12 @@ internal class BouncyX509CertificateSigner : X509CertificateSigner {
             .build(publicKey)
 
         return bouncyCertificate.isSignatureValid(verifierProvider)
+    }
+
+    override suspend fun validateCsrSignature(
+        subjectPublicKey: PublicKeyInfo,
+        certificate: X509Certificate
+    ): Boolean {
+        TODO("Not yet implemented")
     }
 }

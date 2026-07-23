@@ -21,7 +21,7 @@ actual object X509CertificateUtilDefaults : X509CertificateServices {
     actual override val certificateChainValidator = X509CertificateChainValidator(
         listOf(
             X509CertificateValidityValidator(),
-            X509CertificateSignatureValidator(certificateSigner)
+            X509CertificateSignatureValidator(certificateSigner as id.walt.certificate.x509.SignatureValidator)
         ),
         JavaDefaultTrustStore(certificateParser)
     )

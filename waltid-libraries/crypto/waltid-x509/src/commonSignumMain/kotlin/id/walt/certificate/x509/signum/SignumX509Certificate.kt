@@ -3,6 +3,7 @@ package id.walt.certificate.x509.signum
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.extension.Extension
 import id.walt.certificate.x509.signum.dn.toDistinguishedName
+import id.walt.certificate.x509.signum.extension.SignumExtensionFactory
 import kotlinx.io.bytestring.ByteString
 import at.asitplus.signum.indispensable.pki.X509Certificate as SignumCertificate
 
@@ -44,6 +45,9 @@ class SignumX509Certificate(
             )
 
         override val extensions: Map<String, Extension>
-            get() = TODO("Not yet implemented")
+            get() =
+                certificate.tbsCertificate.extensions?.map {
+                    SignumExtensionFactory.parseExtension(it)
+                }?.associateBy { it.oid } ?: emptyMap()
     }
 }

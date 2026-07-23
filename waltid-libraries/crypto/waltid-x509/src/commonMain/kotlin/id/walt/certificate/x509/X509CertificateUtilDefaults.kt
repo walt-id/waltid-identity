@@ -9,6 +9,5 @@ expect object X509CertificateUtilDefaults : X509CertificateServices {
     override val serialNumberGenerator: X509CertificateSerialNumberGenerator
     override val certificateParser: X509CertificateParser
     override val certificateSigner: X509CertificateSigner
-
     override val certificateChainValidator: X509CertificateChainValidator
 }

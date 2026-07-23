@@ -1,12 +1,12 @@
 package id.walt.certificate.x509.validation.validator
 
+import id.walt.certificate.x509.SignatureValidator
 import id.walt.certificate.x509.X509Certificate
-import id.walt.certificate.x509.X509CertificateSigner
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
 
 class X509CertificateSignatureValidator(
-    private val certificateSigner: X509CertificateSigner
+    private val signatureValidator: SignatureValidator
 ) : X509CertificateValidator {
 
     override val id: String = ID
@@ -28,7 +28,7 @@ class X509CertificateSignatureValidator(
         }
     }
 
-    private fun validateCertificate(
+    private suspend fun validateCertificate(
         context: ValidationContext,
         issuerCertificate: X509Certificate,
         certificate: X509Certificate
@@ -41,7 +41,7 @@ class X509CertificateSignatureValidator(
                         "not equal to serial number '${certificate.data.serialNumberHex}'"
             )
         } else {
-            if (certificateSigner.validateCertificateSignature(
+            if (signatureValidator.validateCertificateSignature(
                     issuerCertificate.data.subjectPublicKeyInfo,
                     certificate
                 )

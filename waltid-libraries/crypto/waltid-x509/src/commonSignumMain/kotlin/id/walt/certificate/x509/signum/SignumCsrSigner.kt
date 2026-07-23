@@ -45,7 +45,6 @@ class SignumCsrSigner : Pkcs10CertificateSigningRequestSigner {
         // For EC keys (e.g., P-256), use EC.fromRawBytes. For RSA, use CryptoSignature.RSA.
         val sigAlgorithm = X509SigningAlgorithmInfo.ofKey(holderKey)
         val algorithm = sigAlgorithm.toSignatureAlgorithm()
-
         val signature = SignumSignatureAlgorithmUtil.evaluateSignature(sigAlgorithm, rawSignatureBytes)
 
         // 4. Directly construct the finished PKCS#10 Certificate Request

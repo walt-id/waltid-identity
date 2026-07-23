@@ -22,6 +22,9 @@ interface X509SigningAlgorithmInfo {
 
     companion object {
 
+        const val KEY_ALG_NAME_EC = "id-ecPublicKey"
+        const val KEY_ALG_NAME_RSA = "rsaEncryption"
+
         fun ofKey(key: Key): X509SigningAlgorithmInfo =
             signingAlgorithmInfoMap.get(key.keyType) ?: error("Unknown key type: $key.keyType")
 
@@ -41,7 +44,7 @@ interface X509SigningAlgorithmInfo {
             KeyType.secp256k1 to Info(
                 signingAlgorithmName = "ecdsa-with-SHA256",
                 signingAlgorithmOid = "1.2.840.10045.4.3.2",
-                keyAlgorithmName = "id-ecPublicKey",
+                keyAlgorithmName = KEY_ALG_NAME_EC,
                 keyAlgorithmOid = "1.2.840.10045.2.1",
                 keyEllipticCurveOid = "1.3.132.0.10"
             ),
@@ -49,7 +52,7 @@ interface X509SigningAlgorithmInfo {
             KeyType.secp256r1 to Info(
                 signingAlgorithmName = "ecdsa-with-SHA256",
                 signingAlgorithmOid = "1.2.840.10045.4.3.2",
-                keyAlgorithmName = "id-ecPublicKey",
+                keyAlgorithmName = KEY_ALG_NAME_EC,
                 keyAlgorithmOid = "1.2.840.10045.2.1",
                 keyEllipticCurveOid = "1.2.840.10045.3.1.7"
             ),
@@ -57,7 +60,7 @@ interface X509SigningAlgorithmInfo {
             KeyType.secp384r1 to Info(
                 signingAlgorithmName = "ecdsa-with-SHA384",
                 signingAlgorithmOid = "1.2.840.10045.4.3.3",
-                keyAlgorithmName = "id-ecPublicKey",
+                keyAlgorithmName = KEY_ALG_NAME_EC,
                 keyAlgorithmOid = "1.2.840.10045.2.1",
                 keyEllipticCurveOid = "1.3.132.0.34"
             ),
@@ -65,7 +68,7 @@ interface X509SigningAlgorithmInfo {
             KeyType.secp521r1 to Info(
                 signingAlgorithmName = "ecdsa-with-SHA512",
                 signingAlgorithmOid = "1.2.840.10045.4.3.4",
-                keyAlgorithmName = "id-ecPublicKey",
+                keyAlgorithmName = KEY_ALG_NAME_EC,
                 keyAlgorithmOid = "1.2.840.10045.2.1",
                 keyEllipticCurveOid = "1.3.132.0.35"
             ),
@@ -73,7 +76,7 @@ interface X509SigningAlgorithmInfo {
             KeyType.RSA to Info(
                 signingAlgorithmName = "sha256WithRSAEncryption",
                 signingAlgorithmOid = "1.2.840.113549.1.1.11",
-                keyAlgorithmName = "rsaEncryption",
+                keyAlgorithmName = KEY_ALG_NAME_RSA,
                 keyAlgorithmOid = "1.2.840.113549.1.1.1",
                 keyEllipticCurveOid = null
             ),
@@ -81,14 +84,14 @@ interface X509SigningAlgorithmInfo {
             KeyType.RSA3072 to Info(
                 signingAlgorithmName = "sha384WithRSAEncryption",
                 signingAlgorithmOid = "1.2.840.113549.1.1.12",
-                keyAlgorithmName = "rsaEncryption",
+                keyAlgorithmName = KEY_ALG_NAME_RSA,
                 keyAlgorithmOid = "1.2.840.113549.1.1.1",
                 keyEllipticCurveOid = null
             ),
             KeyType.RSA4096 to Info(
                 signingAlgorithmName = "sha512WithRSAEncryption",
                 signingAlgorithmOid = "1.2.840.113549.1.1.13",
-                keyAlgorithmName = "rsaEncryption",
+                keyAlgorithmName = KEY_ALG_NAME_RSA,
                 keyAlgorithmOid = "1.2.840.113549.1.1.1",
                 keyEllipticCurveOid = null
             )

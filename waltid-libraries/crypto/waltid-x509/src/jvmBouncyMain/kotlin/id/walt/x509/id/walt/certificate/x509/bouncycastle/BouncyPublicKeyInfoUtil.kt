@@ -25,6 +25,7 @@ object BouncyPublicKeyInfoUtil {
                     ASN1ObjectIdentifier.getInstance(p).id
                 },
             ByteString(keyInfo.publicKeyData.bytes),
+            ByteString(keyInfo.encoded)
         )
     }
 
@@ -36,7 +37,7 @@ object BouncyPublicKeyInfoUtil {
     val PublicKeyInfo.bouncyCastleSubjectPublicKeyInfo: SubjectPublicKeyInfo
         get() = SubjectPublicKeyInfo(
             bouncyCastleAlgorithmIdentifier,
-            this.publicKeyRaw.toByteArray()
+            this.keyValueRaw.toByteArray()
         )
 
     private val pemHeaderFooterRegx = Regex("(^-+[A-Z\\s]+-+\\s*$)|\\s+", RegexOption.MULTILINE)

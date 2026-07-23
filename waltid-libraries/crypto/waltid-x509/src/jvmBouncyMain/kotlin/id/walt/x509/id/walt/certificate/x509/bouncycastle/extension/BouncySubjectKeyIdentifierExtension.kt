@@ -9,7 +9,7 @@ import java.security.MessageDigest
 import org.bouncycastle.asn1.x509.Extension as BouncyCastleExtension
 
 
-internal class BouncySubjectKeyIdentifierExtension(extension: BouncyCastleExtension) : BouncyExtension(extension),
+class BouncySubjectKeyIdentifierExtension(extension: BouncyCastleExtension) : BouncyExtension(extension),
     SubjectKeyIdentifierExtension {
 
     override val keyIdentifier: ByteString

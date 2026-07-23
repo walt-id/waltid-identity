@@ -8,7 +8,7 @@ import org.bouncycastle.openssl.PEMParser
 import java.io.StringReader
 
 
-internal class BouncyX509CertificateParser : X509CertificateParser {
+ class BouncyX509CertificateParser : X509CertificateParser {
 
     override fun parseCertificatePem(pem: String): X509Certificate {
         val result = runCatching {

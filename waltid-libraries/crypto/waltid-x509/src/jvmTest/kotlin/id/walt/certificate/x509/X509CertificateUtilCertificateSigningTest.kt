@@ -3,6 +3,7 @@ package id.walt.certificate.x509
 import id.walt.certificate.TestData.caIssuerPrivateKey
 import id.walt.certificate.TestData.intermediateIssuerPrivateKey
 import id.walt.certificate.TestData.intermediateIssuerPublicKeyHex
+import id.walt.certificate.x509.SignatureValidationUtil.verifyPemChain
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
 import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension
 import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension.Companion.extensionExtendedKeyUsage
@@ -14,12 +15,6 @@ import id.walt.certificate.x509.model.GeneralName
 import id.walt.crypto.keys.JvmJWKKeyCreator
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.bytestring.toHexString
-import java.io.ByteArrayInputStream
-import java.security.KeyStore
-import java.security.cert.CertPathValidator
-import java.security.cert.CertificateFactory
-import java.security.cert.PKIXParameters
-import java.security.cert.X509Certificate
 import kotlin.test.*
 
 class X509CertificateUtilCertificateSigningTest {
@@ -113,7 +108,7 @@ class X509CertificateUtilCertificateSigningTest {
         assertNotNull(intermediateCert.data.subjectPublicKeyInfo) { keyInfo ->
             assertEquals("1.2.840.10045.2.1", keyInfo.algorithmOid)
             assertEquals("id-ecPublicKey", keyInfo.algorithmName)
-            assertEquals(intermediateIssuerPublicKeyHex, keyInfo.publicKeyHex)
+            assertEquals(intermediateIssuerPublicKeyHex, keyInfo.keyValueHex)
         }
 
         assertNotNull(intermediateCert.data.extensionSubjectKeyIdentifier) { keyIdentifier ->
@@ -124,39 +119,5 @@ class X509CertificateUtilCertificateSigningTest {
         println(intermediateCert.encodedPem)
 
         verifyPemChain(intermediateCert.encodedPem, caCert.encodedPem)
-    }
-
-
-    fun verifyPemChain(chainPem: String, selfSignedCaPem: String) {
-        val certFactory = CertificateFactory.getInstance("X.509")
-
-        // 1. Parse the entire certificate chain PEM string into a List
-        // generateCertificates parses all headers (---BEGIN CERTIFICATE---) sequentially
-        val chainToVerify = ByteArrayInputStream(chainPem.toByteArray()).use { stream ->
-            certFactory.generateCertificates(stream).map { it as X509Certificate }
-        }
-
-        // 2. Parse the self-signed Root CA PEM string
-        val caCert = ByteArrayInputStream(selfSignedCaPem.toByteArray()).use { stream ->
-            certFactory.generateCertificate(stream) as X509Certificate
-        }
-
-        // 3. Initialize the in-memory KeyStore and inject the Root CA
-        val inMemoryTrustStore = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
-            load(null, null)
-            setCertificateEntry("my-self-signed-ca", caCert)
-        }
-
-        // 4. Generate the CertPath path from the parsed list
-        val certPath = certFactory.generateCertPath(chainToVerify)
-
-        // 5. Configure validation using your in-memory truststore
-        val params = PKIXParameters(inMemoryTrustStore).apply {
-            isRevocationEnabled = false
-        }
-
-        // 6. Execute verification
-        val validator = CertPathValidator.getInstance("PKIX")
-        validator.validate(certPath, params)
     }
 }

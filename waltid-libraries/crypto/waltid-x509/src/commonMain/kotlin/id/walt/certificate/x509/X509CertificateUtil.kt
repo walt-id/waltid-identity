@@ -2,9 +2,9 @@ package id.walt.certificate.x509
 
 import id.walt.certificate.x509.builder.Pkcs10CertificateSigningRequestBuilder
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
-import id.walt.certificate.x509.builder.X509CertificateDataBuilder.SelfSignedSubjectPublicKeyInfo
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.crypto.keys.Key
+import kotlinx.io.bytestring.ByteString
 
 object X509CertificateUtil {
 
@@ -19,6 +19,15 @@ object X509CertificateUtil {
 
     fun parseCertificatePem(certificateServices: X509CertificateServices, pem: String): X509Certificate =
         certificateServices.certificateParser.parseCertificatePem(pem)
+
+    fun parseCertificateDerEncoded(derEncoded: ByteString): X509Certificate =
+        parseCertificateDerEncoded(X509CertificateUtilDefaults, derEncoded)
+
+    fun parseCertificateDerEncoded(
+        certificateServices: X509CertificateServices,
+        derEncoded: ByteString
+    ): X509Certificate =
+        certificateServices.certificateParser.parseCertificateDerEncoded(derEncoded)
 
     suspend fun createCsr(
         holderKey: Key,
@@ -76,29 +85,41 @@ object X509CertificateUtil {
             subjectDn = "OU=issuer, DC=test, O=Walt.id"
         )
         block.invoke(builder)
-        require(builder.subjectPublicKeyInfo !is SelfSignedSubjectPublicKeyInfo) { "Certificate subject public key missing" }
+        requireNotNull((builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder).key)
+        { "Certificate subject public key missing" }
         return certificateServices.certificateSigner.signCertificate(issuerKey, builder)
     }
 
-    suspend fun validatePemCertificateChain(certificateChainPem: String) =
-        validatePemCertificateChain(X509CertificateUtilDefaults, certificateChainPem)
+    suspend fun validatePemCertificateChain(
+        certificateChainPem: String,
+        additionalTrust: X509CertificateTrustStore? = null
+    ) =
+        validatePemCertificateChain(X509CertificateUtilDefaults, certificateChainPem, additionalTrust)
 
     val CERTIFICATE_CHAIN_PEM_REGEX = "-----BEGIN CERTIFICATE-----[\\s\\S]*?-----END CERTIFICATE-----".toRegex()
 
     suspend fun validatePemCertificateChain(
         certificateServices: X509CertificateServices,
-        certificateChainPem: String
+        certificateChainPem: String,
+        additionalTrust: X509CertificateTrustStore? = null
     ): ValidationResult {
         val certificates = CERTIFICATE_CHAIN_PEM_REGEX.findAll(certificateChainPem)
             .map { it.value.trim() } // Clean up trailing line breaks
             .map { certificateServices.certificateParser.parseCertificatePem(it) }
             .toList()
-        return validateCertificateChain(certificateServices, certificates)
+        return validateCertificateChain(certificateServices, certificates, additionalTrust)
     }
 
     suspend fun validateCertificateChain(
-        certificateServices: X509CertificateServices,
-        certificateChain: Collection<X509Certificate>
+        certificateChain: Collection<X509Certificate>,
+        additionalTrust: X509CertificateTrustStore? = null
     ): ValidationResult =
-        certificateServices.certificateChainValidator.validate(certificateChain)
+        validateCertificateChain(X509CertificateUtilDefaults, certificateChain, additionalTrust)
+
+    suspend fun validateCertificateChain(
+        certificateServices: X509CertificateServices,
+        certificateChain: Collection<X509Certificate>,
+        additionalTrust: X509CertificateTrustStore? = null
+    ): ValidationResult =
+        certificateServices.certificateChainValidator.validate(certificateChain, additionalTrust)
 }

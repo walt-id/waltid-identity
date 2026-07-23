@@ -5,7 +5,7 @@ import org.bouncycastle.asn1.ASN1Object
 import org.bouncycastle.asn1.x509.Extension as BouncyCastleExtension
 
 
-internal class BouncySubjectAlternativeNameExtension(extension: BouncyCastleExtension) :
+class BouncySubjectAlternativeNameExtension(extension: BouncyCastleExtension) :
     BouncyAlternativeNameExtension(extension),
     SubjectAlternativeNameExtension {
 

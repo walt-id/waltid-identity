@@ -92,7 +92,7 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
     ) {
         this.subjectDn = issuerDn
         this.issuerDn = issuerDn
-        subjectPublicKeyInfo = X509CertificateDataBuilder.SelfSignedSubjectPublicKeyInfo()
+        subjectPublicKeySelfSigned()
         extensionBasicConstraints {
             critical = true
             cA = true

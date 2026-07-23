@@ -9,7 +9,7 @@ import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.cert.X509CertificateHolder
 import kotlin.time.toKotlinInstant
 
-internal class BouncyX509Certificate(val certificate: X509CertificateHolder) : X509Certificate {
+ class BouncyX509Certificate(val certificate: X509CertificateHolder) : X509Certificate {
 
     override val data: X509Certificate.CertificateData = object : X509Certificate.CertificateData {
 
@@ -27,7 +27,9 @@ internal class BouncyX509Certificate(val certificate: X509CertificateHolder) : X
                     get() = certificate.subjectPublicKeyInfo.algorithm.algorithm.toString()
                 override val ellipticCurveOid: String?
                     get() = (certificate.subjectPublicKeyInfo.algorithm.parameters as? ASN1ObjectIdentifier)?.toString()
-                override val publicKeyRaw: ByteString = ByteString(certificate.subjectPublicKeyInfo.publicKeyData.bytes)
+                override val keyValueRaw: ByteString = ByteString(certificate.subjectPublicKeyInfo.publicKeyData.bytes)
+                override val encodedDer: ByteString
+                    get() = ByteString(certificate.subjectPublicKeyInfo.encoded)
             }
 
         override val issuerDn: String = certificate.issuer.toString()

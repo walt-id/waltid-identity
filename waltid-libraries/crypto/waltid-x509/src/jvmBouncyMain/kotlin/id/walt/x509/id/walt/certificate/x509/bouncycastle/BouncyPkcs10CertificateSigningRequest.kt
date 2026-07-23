@@ -24,7 +24,9 @@ class BouncyPkcs10CertificateSigningRequest(val csr: PKCS10CertificationRequest)
                         get() = csr.subjectPublicKeyInfo.algorithm.algorithm.toString()
                     override val ellipticCurveOid: String?
                         get() = (csr.subjectPublicKeyInfo.algorithm.parameters as? ASN1ObjectIdentifier)?.toString()
-                    override val publicKeyRaw: ByteString = ByteString(csr.subjectPublicKeyInfo.publicKeyData.bytes)
+                    override val keyValueRaw: ByteString = ByteString(csr.subjectPublicKeyInfo.publicKeyData.bytes)
+                    override val encodedDer: ByteString
+                        get() = ByteString(csr.subjectPublicKeyInfo.encoded)
                 }
 
             override val extensions: Map<String, Extension>

@@ -6,6 +6,7 @@ import kotlinx.io.bytestring.ByteString
 data class BouncyPublicKeyInfo(
     override val algorithmOid: String,
     override val ellipticCurveOid: String?,
-    override val publicKeyRaw: ByteString,
+    override val keyValueRaw: ByteString,
+    override val encodedDer: ByteString,
 ) : PublicKeyInfo {
 }

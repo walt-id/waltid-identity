@@ -10,7 +10,7 @@ import org.bouncycastle.asn1.x509.Extension as BouncyCastleExtension
 import org.bouncycastle.asn1.x509.GeneralNames as BouncyCastleGeneralNames
 
 
-internal abstract class BouncyAlternativeNameExtension(extension: BouncyCastleExtension) :
+ abstract class BouncyAlternativeNameExtension(extension: BouncyCastleExtension) :
     BouncyExtension(extension) {
 
     private val internalSubjectAlternativeNames = BouncyCastleGeneralNames.getInstance(extension.parsedValue)

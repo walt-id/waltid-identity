@@ -16,6 +16,6 @@ class SignumCertificateParser : X509CertificateParser {
     }
 
     override fun parseCertificateDerEncoded(derEncoded: ByteString): X509Certificate {
-        TODO("Not yet implemented")
+        return SignumX509Certificate(SignumCertificate.decodeFromDer(derEncoded.toByteArray()))
     }
 }

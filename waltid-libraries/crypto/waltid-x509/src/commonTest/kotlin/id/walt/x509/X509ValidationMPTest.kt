@@ -4,7 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
 class X509ValidationMPTest {
-
+/*
    // @Test
     fun validatesLeafWithProvidedTrustAnchor() {
         validateCertificateChain(
@@ -57,5 +57,5 @@ class X509ValidationMPTest {
                 chain = listOf(X509TestCertificates.leafCertificate),
             )
         }
-    }
+    }*/
 }

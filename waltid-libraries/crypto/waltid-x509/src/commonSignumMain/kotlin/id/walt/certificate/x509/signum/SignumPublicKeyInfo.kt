@@ -5,11 +5,14 @@ import id.walt.certificate.x509.PublicKeyInfo
 import kotlinx.io.bytestring.ByteString
 
 internal class SignumPublicKeyInfo private constructor(
-    override val algorithmOid: String,
-    override val ellipticCurveOid: String?,
-    override val publicKeyRaw: ByteString
+    private val keyInfo: CryptoPublicKey,
 ) : PublicKeyInfo {
 
+    override val algorithmOid: String = keyInfo.oid.toString()
+    override val ellipticCurveOid: String? = (keyInfo as? CryptoPublicKey.EC)?.curve?.oid?.toString()
+    override val keyValueRaw: ByteString = ByteString(keyInfo.iosEncoded)
+    override val encodedDer: ByteString
+        get() = ByteString(keyInfo.encodeToDer())
 
     companion object {
 
@@ -17,9 +20,7 @@ internal class SignumPublicKeyInfo private constructor(
             ofCryptoPublicKey(CryptoPublicKey.decodeFromDer(derEncodedSubjectPublicKeyInfo))
 
         fun ofCryptoPublicKey(publicKeyInfo: CryptoPublicKey): SignumPublicKeyInfo {
-            val algorithmOid = publicKeyInfo.oid
-            val curveOid = (publicKeyInfo as? CryptoPublicKey.EC)?.curve?.oid?.toString()
-            return SignumPublicKeyInfo(algorithmOid.toString(), curveOid, ByteString(publicKeyInfo.iosEncoded))
+            return SignumPublicKeyInfo(publicKeyInfo)
         }
 
     }

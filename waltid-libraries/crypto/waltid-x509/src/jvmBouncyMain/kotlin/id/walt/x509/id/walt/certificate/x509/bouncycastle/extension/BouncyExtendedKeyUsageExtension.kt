@@ -7,7 +7,7 @@ import org.bouncycastle.asn1.x509.ExtendedKeyUsage
 import org.bouncycastle.asn1.x509.KeyPurposeId
 import org.bouncycastle.asn1.x509.Extension as BouncyCastleExtension
 
-internal class BouncyExtendedKeyUsageExtension(extension: BouncyCastleExtension) : BouncyExtension(extension),
+class BouncyExtendedKeyUsageExtension(extension: BouncyCastleExtension) : BouncyExtension(extension),
     ExtendedKeyUsageExtension {
 
     private val keyUsage = ExtendedKeyUsage.getInstance(extension.parsedValue)

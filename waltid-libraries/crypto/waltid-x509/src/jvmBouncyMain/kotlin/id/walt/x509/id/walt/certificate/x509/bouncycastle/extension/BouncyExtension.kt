@@ -4,7 +4,7 @@ import id.walt.certificate.x509.extension.Extension
 
 import org.bouncycastle.asn1.x509.Extension as BouncyCastleExtension
 
-internal abstract class BouncyExtension(
+abstract class BouncyExtension(
     protected val extension: BouncyCastleExtension
 ) : Extension {
     override val oid: String

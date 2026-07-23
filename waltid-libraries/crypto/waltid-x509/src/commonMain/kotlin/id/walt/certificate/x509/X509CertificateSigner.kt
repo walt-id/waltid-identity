@@ -5,13 +5,8 @@ import id.walt.crypto.keys.Key
 
 interface X509CertificateSigner {
 
-    fun signCertificate(
+    suspend fun signCertificate(
         issuerKey: Key,
         builder: X509CertificateDataBuilder
     ): X509Certificate
-
-    fun validateCertificateSignature(
-        issuerPublicKey: X509Certificate.SubjectPublicKeyInfo,
-        certificate: X509Certificate
-    ): Boolean
 }

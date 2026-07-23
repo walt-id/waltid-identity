@@ -9,7 +9,7 @@ import org.bouncycastle.operator.ContentSigner
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 
-internal class BouncyContentSigner(val signingKey: Key) : ContentSigner {
+class BouncyContentSigner(val signingKey: Key) : ContentSigner {
 
     val info = X509SigningAlgorithmInfo.ofKey(signingKey)
     private val buffer: ByteArrayOutputStream = ByteArrayOutputStream()

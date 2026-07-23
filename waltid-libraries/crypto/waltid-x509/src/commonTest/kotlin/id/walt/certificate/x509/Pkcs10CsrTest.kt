@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class CertificateSigningRequestTest {
+class Pkcs10CsrTest {
 
     @Test
     fun buildAndParseGenericCsrRoundTrip() = runTest {
@@ -37,27 +37,5 @@ class CertificateSigningRequestTest {
                 ?.map { it.value })
 
         println(pem)
-    }
-
-    // @Test
-    fun buildGenericSelfSignedCertificate() = runTest {
-        val key = createX509TestKey(KeyType.secp256r1)
-        val bundle = GenericX509CertificateBuilder().build(
-            profileData = GenericX509CertificateProfileData(
-                subjectName = X509DistinguishedName(
-                    commonName = "Example CA",
-                    country = "US",
-                ),
-                isCertificateAuthority = true,
-                keyUsage = setOf(X509KeyUsage.KeyCertSign, X509KeyUsage.CRLSign),
-            ),
-            subjectPublicKey = key.getPublicKey(),
-            signingKey = key,
-        )
-
-        assertTrue(bundle.certificateDer.toPEMEncodedString().contains("BEGIN CERTIFICATE"))
-        assertEquals("Example CA", bundle.decodedCertificate.subjectName.commonName)
-        assertTrue(bundle.decodedCertificate.isCertificateAuthority)
-        assertEquals(setOf(X509KeyUsage.KeyCertSign, X509KeyUsage.CRLSign), bundle.decodedCertificate.keyUsage)
     }
 }
