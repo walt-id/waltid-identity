@@ -51,7 +51,7 @@ jobs:
       XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
@@ -143,7 +143,7 @@ jobs:
 
       - name: Checkout all repos with ref fallback
         if: ${{ inputs.deploy == true }}
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}

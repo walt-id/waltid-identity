@@ -422,8 +422,11 @@ class Wallet2AdditionalUseCasesTest {
                         put("access_token", resp.response.accessToken); put(
                         "token_type",
                         "Bearer"
-                    ); put("c_nonce", "pres-nonce"); put("c_nonce_expires_in", 300)
+                    )
                     })
+                }
+                post("/nonce") {
+                    call.respond(buildJsonObject { put("c_nonce", "pres-nonce") })
                 }
                 post("/credential") {
                     val body = json.parseToJsonElement(call.receiveText()).jsonObject
@@ -755,8 +758,11 @@ class Wallet2AdditionalUseCasesTest {
                         put("access_token", resp.response.accessToken); put(
                         "token_type",
                         "Bearer"
-                    ); put("c_nonce", "auth-nonce"); put("c_nonce_expires_in", 300)
+                    )
                     })
+                }
+                post("/nonce") {
+                    call.respond(buildJsonObject { put("c_nonce", "auth-nonce") })
                 }
                 post("/credential") {
                     val body = json.parseToJsonElement(call.receiveText()).jsonObject

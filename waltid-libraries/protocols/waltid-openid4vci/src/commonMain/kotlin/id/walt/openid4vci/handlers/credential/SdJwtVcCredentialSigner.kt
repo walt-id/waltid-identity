@@ -114,7 +114,8 @@ object SdJwtVcCredentialSigner {
 
 
         val extraClaims = sdJwtCredentialClaims ?: emptyMap()
-        val undisclosedPayload = sdPayload.undisclosedPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
+        val undisclosedPayload =
+            sdPayload.undisclosedPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
 
         val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
 

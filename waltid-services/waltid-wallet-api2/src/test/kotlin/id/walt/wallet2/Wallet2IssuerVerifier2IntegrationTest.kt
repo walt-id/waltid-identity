@@ -381,9 +381,10 @@ class Wallet2IssuerVerifier2IntegrationTest {
                     call.respond(buildJsonObject {
                         put("access_token", tokenResponse.response.accessToken)
                         put("token_type", "Bearer")
-                        put("c_nonce", "test-nonce")
-                        put("c_nonce_expires_in", 300)
                     })
+                }
+                post("/nonce") {
+                    call.respond(buildJsonObject { put("c_nonce", "test-nonce") })
                 }
                 post("/credential") {
                     val rawBody = call.receiveText()
