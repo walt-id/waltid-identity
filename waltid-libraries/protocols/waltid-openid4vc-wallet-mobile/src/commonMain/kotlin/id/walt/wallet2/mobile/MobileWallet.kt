@@ -28,6 +28,11 @@ import id.walt.wallet2.handlers.ReceiveCredentialFromPreviewRequest
 import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
+import id.walt.wallet2.handlers.WalletIssuanceAuthorizationCallback
+import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.handlers.WalletIssuanceSession
+import id.walt.wallet2.handlers.WalletIssuanceSessionRequest
+import id.walt.wallet2.handlers.WalletIssuanceSessionService
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
@@ -197,6 +202,12 @@ public class MobileWallet internal constructor(
         credentialStores = listOf(credentialStore),
     )
 
+    private val issuanceSessions = WalletIssuanceSessionService(
+        wallet = wallet,
+        attestationAssembler = attestationAssembler,
+        onEvent = ::emitSessionEvent,
+    )
+
     /**
      * Initializes the wallet by creating or reusing platform-backed key material and a DID.
      *
@@ -264,6 +275,63 @@ public class MobileWallet internal constructor(
             wallet = wallet,
             request = ResolveOfferRequest(offerUrl = Url(offerUrl.trim())),
         ).toMobileOfferResolution(preferredLocales)
+
+    /**
+     * Resolves an offer and starts a bound OpenID4VCI 1.0 issuance session.
+     *
+     * Authorization-code offers return a typed browser request containing the authorization URL,
+     * callback binding, state, and PKCE data. Pre-authorized offers return the same typed offer
+     * preview without a browser request and are continued with [continuePreAuthorizedIssuance].
+     */
+    public suspend fun startIssuance(
+        request: MobileWalletIssuanceRequest,
+    ): WalletIssuanceSession =
+        issuanceSessions.start(
+            WalletIssuanceSessionRequest(
+                offerUrl = Url(request.offerUrl.trim()),
+                keyId = request.keyId,
+                did = request.did,
+                clientId = request.clientId,
+                redirectUri = Url(request.redirectUri.trim()),
+            )
+        )
+
+    /** Continues a pre-authorized session after review and optional transaction-code collection. */
+    public suspend fun continuePreAuthorizedIssuance(
+        sessionId: String,
+        transactionCode: String? = null,
+    ): WalletIssuanceOutcome =
+        issuanceSessions.continuePreAuthorized(
+            sessionId = sessionId,
+            transactionCode = transactionCode?.ifBlank { null },
+        )
+
+    /**
+     * Validates and consumes a browser callback bound to an authorization-code session.
+     *
+     * The callback target, OAuth state, authorization code, PKCE verifier, issuer metadata, and
+     * selected holder key are all taken from or checked against the authoritative session record.
+     */
+    public suspend fun continueAuthorizationIssuance(
+        sessionId: String,
+        callbackUri: String,
+    ): WalletIssuanceOutcome =
+        issuanceSessions.continueAuthorization(
+            WalletIssuanceAuthorizationCallback(
+                sessionId = sessionId,
+                callbackUri = callbackUri,
+            )
+        )
+
+    /** Cancels an active issuance session and discards its protocol continuation material. */
+    public suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome =
+        issuanceSessions.cancel(sessionId)
+
+    /** Polls a typed deferred credential result returned by a previous issuance continuation. */
+    public suspend fun resumeDeferredIssuance(
+        deferredCredentialId: String,
+    ): WalletIssuanceOutcome =
+        issuanceSessions.resumeDeferred(deferredCredentialId)
 
     /**
      * Receives credentials from an OpenID4VCI credential offer.

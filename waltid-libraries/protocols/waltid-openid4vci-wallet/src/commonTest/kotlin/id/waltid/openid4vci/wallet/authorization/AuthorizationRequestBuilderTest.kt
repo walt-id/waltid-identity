@@ -1,5 +1,6 @@
 package id.waltid.openid4vci.wallet.authorization
 
+import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import io.ktor.http.*
 import kotlinx.serialization.json.Json
@@ -9,6 +10,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertFailsWith
 
 class AuthorizationRequestBuilderTest {
 
@@ -87,6 +89,37 @@ class AuthorizationRequestBuilderTest {
         )
         val pkceData = assertNotNull(pkce)
         assertEquals(pkceData.codeChallenge, params["code_challenge"])
+    }
+
+    @Test
+    fun authorizationDetailsContainEveryOfferedCredentialConfiguration() {
+        val request = builder.buildAuthorizationRequestForCredentialConfigurations(
+            authorizationEndpoint = endpoint,
+            credentialConfigurationIds = listOf("sd-jwt", "mdoc", "jwt-vc"),
+        )
+
+        val details = Json.parseToJsonElement(
+            Url(request.url).parameters["authorization_details"]!!
+        ).jsonArray
+        assertEquals(
+            listOf("sd-jwt", "mdoc", "jwt-vc"),
+            details.map { it.jsonObject["credential_configuration_id"]!!.jsonPrimitive.content },
+        )
+    }
+
+    @Test
+    fun rejectsAuthorizationServerThatOnlySupportsPlainPkce() {
+        val metadata = Json.decodeFromString<AuthorizationServerMetadata>(
+            """{"issuer":"https://auth.example.com","authorization_endpoint":"https://auth.example.com/authorize","token_endpoint":"https://auth.example.com/token","response_types_supported":["code"],"code_challenge_methods_supported":["plain"]}"""
+        )
+
+        assertFailsWith<IllegalStateException> {
+            builder.buildAuthorizationRequest(
+                authorizationEndpoint = endpoint,
+                credentialConfigurationId = "test_config",
+                metadata = metadata,
+            )
+        }
     }
 
     private fun authorizationDetail(params: Parameters) =

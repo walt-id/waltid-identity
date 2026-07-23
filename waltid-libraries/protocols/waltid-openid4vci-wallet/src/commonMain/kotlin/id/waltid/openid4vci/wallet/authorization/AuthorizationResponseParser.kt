@@ -18,7 +18,9 @@ object AuthorizationResponseParser {
     data class AuthorizationResponse(
         val code: String,
         val state: String,
-    )
+    ) {
+        override fun toString(): String = "AuthorizationResponse(code=<redacted>, state=<redacted>)"
+    }
 
     /**
      * Represents an authorization error response
@@ -28,7 +30,11 @@ object AuthorizationResponseParser {
         val errorDescription: String? = null,
         val errorUri: String? = null,
         val state: String? = null,
-    )
+    ) {
+        override fun toString(): String =
+            "AuthorizationError(error=$error, errorDescription=${errorDescription?.let { "<redacted>" }}, " +
+                "errorUri=${errorUri?.let { "<redacted>" }}, state=${state?.let { "<redacted>" }})"
+    }
 
     /**
      * Parses an authorization response from a redirect URI
@@ -42,6 +48,7 @@ object AuthorizationResponseParser {
     fun parseAuthorizationResponse(
         redirectUri: String,
         expectedState: String,
+        expectedRedirectUri: String? = null,
     ): AuthorizationResponse {
         require(redirectUri.isNotBlank()) { "Redirect URI cannot be blank" }
         require(expectedState.isNotBlank()) { "Expected state cannot be blank" }
@@ -49,14 +56,29 @@ object AuthorizationResponseParser {
         val url = try {
             Url(redirectUri)
         } catch (e: Exception) {
-            throw IllegalArgumentException("Invalid redirect URI: $redirectUri", e)
+            throw IllegalArgumentException("Invalid authorization callback URI", e)
         }
 
-        // Authorization responses can be in query parameters or fragment
-        val parameters = if (url.fragment.isNotBlank()) {
-            parseFragmentParameters(url.fragment)
-        } else {
-            url.parameters
+        require(url.fragment.isBlank()) {
+            "Authorization code callbacks must use query parameters"
+        }
+        expectedRedirectUri?.let { expected ->
+            require(matchesRedirectTarget(expected, url)) {
+                "Authorization callback redirect URI does not match the issuance session"
+            }
+        }
+
+        val parameters = url.parameters
+        listOf("code", "state", "error", "error_description", "error_uri").forEach { name ->
+            require(parameters.getAll(name).orEmpty().size <= 1) {
+                "Authorization callback contains duplicate '$name' parameters"
+            }
+        }
+
+        val state = parameters["state"]
+            ?: throw IllegalArgumentException("Authorization response missing 'state' parameter")
+        if (!StateManager.validateState(expectedState, state)) {
+            throw IllegalArgumentException("State validation failed")
         }
 
         // Check for error response first
@@ -68,7 +90,6 @@ object AuthorizationResponseParser {
                 errorUri = parameters["error_uri"],
                 state = parameters["state"]
             )
-            log.error { "Authorization error response: $authError" }
             throw AuthorizationErrorException(authError)
         }
 
@@ -76,36 +97,36 @@ object AuthorizationResponseParser {
         val code = parameters["code"]
             ?: throw IllegalArgumentException("Authorization response missing 'code' parameter")
 
-        val state = parameters["state"]
-            ?: throw IllegalArgumentException("Authorization response missing 'state' parameter")
-
-        // Validate state
-        if (!StateManager.validateState(expectedState, state)) {
-            log.error { "State mismatch: expected=$expectedState, actual=$state" }
-            throw IllegalArgumentException("State validation failed - possible CSRF attack")
-        }
-
         log.debug { "Successfully parsed authorization response" }
         return AuthorizationResponse(code = code, state = state)
     }
 
-    /**
-     * Parses query parameters from a URL fragment
-     */
-    private fun parseFragmentParameters(fragment: String): Parameters {
-        val params = ParametersBuilder()
-        fragment.split("&").forEach { pair ->
-            val parts = pair.split("=", limit = 2)
-            if (parts.size == 2) {
-                params.append(parts[0], parts[1].decodeURLPart())
-            }
+    private fun matchesRedirectTarget(expectedRedirectUri: String, callback: Url): Boolean {
+        val expected = try {
+            Url(expectedRedirectUri)
+        } catch (e: Exception) {
+            throw IllegalArgumentException("Invalid expected redirect URI", e)
         }
-        return params.build()
+        if (expected.fragment.isNotBlank()) return false
+        if (expected.protocol != callback.protocol ||
+            !expected.host.equals(callback.host, ignoreCase = true) ||
+            expected.port != callback.port ||
+            expected.encodedPath != callback.encodedPath
+        ) {
+            return false
+        }
+
+        val responseParameters = setOf("code", "state", "error", "error_description", "error_uri")
+        val callbackBaseNames = callback.parameters.names() - responseParameters
+        if (callbackBaseNames != expected.parameters.names()) return false
+        return callbackBaseNames.all { name ->
+            callback.parameters.getAll(name) == expected.parameters.getAll(name)
+        }
     }
 
     /**
      * Exception thrown when authorization response contains an error
      */
     class AuthorizationErrorException(val authError: AuthorizationError) :
-        Exception("Authorization failed: ${authError.error} - ${authError.errorDescription ?: "No description"}")
+        Exception("Authorization failed: ${authError.error}")
 }
