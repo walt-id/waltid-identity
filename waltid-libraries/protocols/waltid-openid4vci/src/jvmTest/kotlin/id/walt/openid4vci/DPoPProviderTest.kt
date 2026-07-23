@@ -7,7 +7,7 @@ import id.walt.openid4vci.core.TOKEN_TYPE_DPOP
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.dpop.DPoPConstants
 import id.walt.openid4vci.dpop.DefaultDPoPProofVerifier
-import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
@@ -145,7 +145,7 @@ class DPoPProviderTest {
             accessToken = ACCESS_TOKEN,
         )
 
-        val failure = assertIs<CredentialRequestResult.Failure>(
+        val failure = assertIs<CredentialRequestResult.OAuthFailure>(
             provider.createCredentialRequest(
                 parameters = emptyMap(),
                 accessTokenContext = CredentialAccessTokenContext(
@@ -161,7 +161,7 @@ class DPoPProviderTest {
         )
         val response = provider.writeCredentialError(failure.error)
 
-        assertEquals(CredentialErrorCodes.INVALID_TOKEN, failure.error.error)
+        assertEquals(OAuthErrorCodes.INVALID_TOKEN, failure.error.error)
         assertEquals(401, response.status)
         assertTrue(response.headers["WWW-Authenticate"]?.startsWith(TOKEN_TYPE_DPOP) == true)
     }
