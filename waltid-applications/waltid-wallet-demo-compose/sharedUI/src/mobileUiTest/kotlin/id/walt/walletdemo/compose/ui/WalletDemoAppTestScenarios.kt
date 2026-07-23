@@ -132,7 +132,7 @@ class WalletDemoAppTestScenarios {
     }
 
     fun credentialsTabShowsEmptyStateAndUpdatesAfterReceive() = runComposeUiTest {
-        val wallet = FakeDemoWallet(receivedCredentialIds = listOf("cred-1", "cred-2"))
+        val wallet = FakeDemoWallet(receivedCredentialIds = listOf("cred-1"))
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
