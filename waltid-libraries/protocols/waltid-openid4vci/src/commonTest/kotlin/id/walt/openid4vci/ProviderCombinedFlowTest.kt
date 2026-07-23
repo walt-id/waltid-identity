@@ -19,7 +19,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -76,8 +75,6 @@ class ProviderCombinedFlowTest {
                 scopes = setOf("openid"),
                 audience = setOf("aud:issuer"),
                 session = DefaultSession(subject = "pre-subject"),
-                credentialNonce = "nonce-pre",
-                credentialNonceExpiresAt = kotlin.time.Clock.System.now() + 600.seconds,
             ),
         )
         val preCode = issuedCode.code
