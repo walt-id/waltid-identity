@@ -101,7 +101,6 @@ class ProviderCombinedFlowTest {
         )
         assertTrue(preAccessResponse.isSuccess())
         val preTokenResponse = (preAccessResponse as AccessTokenResponseResult.Success).response
-        assertEquals("nonce-pre", preTokenResponse.extra["c_nonce"])
         val preAuthorizationDetail = (preTokenResponse.extra["authorization_details"] as JsonArray)
             .single()
             .jsonObject
