@@ -809,6 +809,200 @@ public struct WalletBootstrapResult: Equatable, Sendable {
     }
 }
 
+/// Input used to start either OpenID4VCI issuance grant.
+public struct IssuanceRequest: Equatable, Sendable, CustomStringConvertible {
+    public let offer: URL
+    public let clientID: String
+    public let redirectURI: URL
+    public let keyID: String?
+    public let did: String?
+
+    public init(
+        offer: URL,
+        clientID: String = "eudiw-abca",
+        redirectURI: URL,
+        keyID: String? = nil,
+        did: String? = nil
+    ) {
+        self.offer = offer
+        self.clientID = clientID
+        self.redirectURI = redirectURI
+        self.keyID = keyID
+        self.did = did
+    }
+
+    public var description: String {
+        "IssuanceRequest(offer: <redacted>, clientID: \(clientID), redirectURI: \(redirectURI), keyID: \(keyID == nil ? "nil" : "<redacted>"), did: \(did == nil ? "nil" : "<redacted>"))"
+    }
+}
+
+public enum IssuanceGrant: Equatable, Sendable {
+    case preAuthorizedCode
+    case authorizationCode
+}
+
+public struct IssuanceTransactionCode: Equatable, Sendable {
+    public let inputMode: String?
+    public let length: Int?
+    public let descriptionText: String?
+
+    public init(inputMode: String?, length: Int?, descriptionText: String?) {
+        self.inputMode = inputMode
+        self.length = length
+        self.descriptionText = descriptionText
+    }
+}
+
+public struct IssuanceIssuerPreview: Equatable, Sendable {
+    public let identifier: String
+    public let name: String?
+    public let locale: String?
+    public let logoURI: URL?
+    public let logoAltText: String?
+
+    public init(identifier: String, name: String?, locale: String?, logoURI: URL?, logoAltText: String?) {
+        self.identifier = identifier
+        self.name = name
+        self.locale = locale
+        self.logoURI = logoURI
+        self.logoAltText = logoAltText
+    }
+}
+
+public struct IssuanceCredentialPreview: Equatable, Sendable {
+    public let configurationID: String
+    public let format: String
+    public let name: String?
+    public let descriptionText: String?
+    public let logoURI: URL?
+
+    public init(configurationID: String, format: String, name: String?, descriptionText: String?, logoURI: URL?) {
+        self.configurationID = configurationID
+        self.format = format
+        self.name = name
+        self.descriptionText = descriptionText
+        self.logoURI = logoURI
+    }
+}
+
+public struct IssuanceOfferPreview: Equatable, Sendable {
+    public let grant: IssuanceGrant
+    public let issuer: IssuanceIssuerPreview
+    public let credentials: [IssuanceCredentialPreview]
+    public let transactionCode: IssuanceTransactionCode?
+
+    public init(
+        grant: IssuanceGrant,
+        issuer: IssuanceIssuerPreview,
+        credentials: [IssuanceCredentialPreview],
+        transactionCode: IssuanceTransactionCode?
+    ) {
+        self.grant = grant
+        self.issuer = issuer
+        self.credentials = credentials
+        self.transactionCode = transactionCode
+    }
+}
+
+/// PKCE continuation material. Its textual representation always redacts the verifier.
+public struct IssuancePKCEState: Equatable, Sendable, CustomStringConvertible {
+    public let codeVerifier: String
+    public let codeChallenge: String
+    public let codeChallengeMethod: String
+
+    public init(codeVerifier: String, codeChallenge: String, codeChallengeMethod: String) {
+        self.codeVerifier = codeVerifier
+        self.codeChallenge = codeChallenge
+        self.codeChallengeMethod = codeChallengeMethod
+    }
+
+    public var description: String {
+        "IssuancePKCEState(codeVerifier: <redacted>, codeChallenge: <redacted>, codeChallengeMethod: \(codeChallengeMethod))"
+    }
+}
+
+/// Browser authorization request and callback binding for an issuance session.
+public struct IssuanceAuthorization: Equatable, Sendable, CustomStringConvertible {
+    public let url: URL
+    public let state: String
+    public let redirectURI: URL
+    public let pkce: IssuancePKCEState
+    public let pushedAuthorizationRequestUsed: Bool
+
+    public init(
+        url: URL,
+        state: String,
+        redirectURI: URL,
+        pkce: IssuancePKCEState,
+        pushedAuthorizationRequestUsed: Bool
+    ) {
+        self.url = url
+        self.state = state
+        self.redirectURI = redirectURI
+        self.pkce = pkce
+        self.pushedAuthorizationRequestUsed = pushedAuthorizationRequestUsed
+    }
+
+    public var description: String {
+        "IssuanceAuthorization(url: <redacted>, state: <redacted>, redirectURI: \(redirectURI), pkce: \(pkce), pushedAuthorizationRequestUsed: \(pushedAuthorizationRequestUsed))"
+    }
+}
+
+public struct IssuanceSession: Equatable, Sendable {
+    public let id: String
+    public let offer: IssuanceOfferPreview
+    public let authorization: IssuanceAuthorization?
+
+    public init(id: String, offer: IssuanceOfferPreview, authorization: IssuanceAuthorization?) {
+        self.id = id
+        self.offer = offer
+        self.authorization = authorization
+    }
+}
+
+public struct DeferredCredential: Equatable, Sendable {
+    public let id: String
+    public let credentialConfigurationID: String
+    public let intervalSeconds: Int64?
+
+    public init(id: String, credentialConfigurationID: String, intervalSeconds: Int64?) {
+        self.id = id
+        self.credentialConfigurationID = credentialConfigurationID
+        self.intervalSeconds = intervalSeconds
+    }
+}
+
+public enum IssuanceErrorCode: Equatable, Sendable {
+    case invalidSession
+    case invalidCallback
+    case invalidInput
+    case authorizationFailed
+    case issuerMetadata
+    case issuerResponse
+    case network
+    case crypto
+    case storage
+    case `protocol`
+}
+
+public struct IssuanceFailure: Equatable, Sendable {
+    public let code: IssuanceErrorCode
+    public let message: String
+
+    public init(code: IssuanceErrorCode, message: String) {
+        self.code = code
+        self.message = message
+    }
+}
+
+/// Immediate, deferred, cancelled, or failed result of one issuance transition.
+public enum IssuanceOutcome: Equatable, Sendable {
+    case stored(sessionID: String, credentialIDs: [String])
+    case deferred(sessionID: String, storedCredentialIDs: [String], credentials: [DeferredCredential])
+    case cancelled(sessionID: String)
+    case failed(sessionID: String, error: IssuanceFailure, storedCredentialIDs: [String])
+}
+
 /// Result of responding to an OpenID4VP presentation request.
 ///
 /// Each case represents the next action required from the host app.

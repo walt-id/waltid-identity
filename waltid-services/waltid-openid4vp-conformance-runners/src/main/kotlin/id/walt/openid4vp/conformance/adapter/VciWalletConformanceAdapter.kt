@@ -135,7 +135,7 @@ class VciWalletConformanceAdapter(
                 config?.get("format")?.jsonPrimitive?.content
             } else null
         } catch (e: Exception) {
-            println("[VCI Adapter] Could not fetch format: ${e.message}")
+            println("[VCI Adapter] Could not fetch credential format (${e::class.simpleName})")
             null
         }
     }
@@ -189,8 +189,7 @@ class VciWalletConformanceAdapter(
             call.respondText(credentialOfferPageHtml(credentialIssuer, credentials, grantType, offerParam), ContentType.Text.Html)
 
         } catch (e: Exception) {
-            println("[VCI Adapter] Error rendering offer page: ${e.message}")
-            e.printStackTrace()
+            println("[VCI Adapter] Error rendering offer page (${e::class.simpleName})")
             call.respondText("Error: ${e.message}", status = HttpStatusCode.InternalServerError)
         }
     }
@@ -248,8 +247,7 @@ class VciWalletConformanceAdapter(
             call.respondText(credentialOfferPageHtml(credentialIssuer, credentials, grantType, offer), ContentType.Text.Html)
 
         } catch (e: Exception) {
-            println("[VCI Adapter] Error rendering offer page: ${e.message}")
-            e.printStackTrace()
+            println("[VCI Adapter] Error rendering offer page (${e::class.simpleName})")
             call.respondText("Error: ${e.message}", status = HttpStatusCode.InternalServerError)
         }
     }
@@ -322,8 +320,7 @@ class VciWalletConformanceAdapter(
             }
 
         } catch (e: Exception) {
-            println("[VCI Adapter] Error starting issuance: ${e.message}")
-            e.printStackTrace()
+            println("[VCI Adapter] Error starting issuance (${e::class.simpleName})")
             call.respondText(
                 issuanceResultHtml(false, "Error: ${e.message}"),
                 ContentType.Text.Html
@@ -378,8 +375,7 @@ class VciWalletConformanceAdapter(
                     pendingOffers[offerId] = offer
                     val offerUrl = "http://127.0.0.1:$adapterPort/offer/$offerId"
                     
-                    println("[VCI Adapter] Stored offer with ID: $offerId")
-                    println("[VCI Adapter] ✨ Open this URL in your browser: $offerUrl")
+                    println("[VCI Adapter] Stored authorization-code offer for browser continuation")
                     
                     call.respond(HttpStatusCode.OK, buildJsonObject {
                         put("status", "ready")
@@ -393,8 +389,7 @@ class VciWalletConformanceAdapter(
             }
 
         } catch (e: Exception) {
-            println("[VCI Adapter] ERROR: ${e.message}")
-            e.printStackTrace()
+            println("[VCI Adapter] Credential-offer handling failed (${e::class.simpleName})")
             call.respond(HttpStatusCode.InternalServerError, "Error: ${e.message}")
         }
     }
@@ -410,7 +405,7 @@ class VciWalletConformanceAdapter(
             val state = call.request.queryParameters["state"]
             val error = call.request.queryParameters["error"]
 
-            println("[VCI Adapter] Auth callback - code: ${code?.take(20)}..., state: $state, error: $error")
+            println("[VCI Adapter] Auth callback received - code: ${code != null}, state: ${state != null}, error: ${error != null}")
 
             if (error != null) {
                 val errorDesc = call.request.queryParameters["error_description"]
@@ -438,7 +433,6 @@ class VciWalletConformanceAdapter(
                 val credResult = fetchCredential(
                     client = client,
                     accessToken = tokenResult.accessToken,
-                    cNonce = tokenResult.cNonce,
                     credentialEndpoint = pendingFlow.credentialEndpoint,
                     credentialConfigurationId = pendingFlow.credentialConfigurationId ?: "org.iso.18013.5.1.mDL",
                     credentialIssuerUrl = pendingFlow.credentialIssuerUrl,
@@ -456,7 +450,7 @@ class VciWalletConformanceAdapter(
             }
 
         } catch (e: Exception) {
-            println("[VCI Adapter] ERROR: ${e.message}")
+            println("[VCI Adapter] Authorization callback handling failed (${e::class.simpleName})")
             call.respond(HttpStatusCode.InternalServerError, "Error: ${e.message}")
         }
     }
@@ -499,7 +493,7 @@ class VciWalletConformanceAdapter(
             }
 
             val body = response.bodyAsText()
-            println("[VCI Adapter] Response: ${response.status} - $body")
+            println("[VCI Adapter] Authorization initialization status: ${response.status}")
 
             if (response.status.isSuccess()) {
                 val result = Json.parseToJsonElement(body).jsonObject
@@ -543,19 +537,16 @@ class VciWalletConformanceAdapter(
             }
 
             val body = response.bodyAsText()
-            println("[VCI Adapter] Token exchange response: $body")
+            println("[VCI Adapter] Token exchange status: ${response.status}")
             if (response.status.isSuccess()) {
                 val result = Json.parseToJsonElement(body).jsonObject
-                println("[VCI Adapter] Parsed token result keys: ${result.keys}")
-                println("[VCI Adapter] cNonce value: ${result["cNonce"]}")
                 TokenResult(
                     success = true,
                     message = "Token obtained",
                     accessToken = result["accessToken"]?.jsonPrimitive?.content,
-                    cNonce = result["cNonce"]?.jsonPrimitive?.content
                 )
             } else {
-                TokenResult(success = false, message = "Status ${response.status}: $body")
+                TokenResult(success = false, message = "Status ${response.status}")
             }
         } catch (e: Exception) {
             TokenResult(success = false, message = "Exception: ${e.message}")
@@ -565,7 +556,6 @@ class VciWalletConformanceAdapter(
     private suspend fun fetchCredential(
         client: HttpClient,
         accessToken: String,
-        cNonce: String?,
         credentialEndpoint: String,
         credentialConfigurationId: String,
         credentialIssuerUrl: String?,
@@ -574,16 +564,13 @@ class VciWalletConformanceAdapter(
         return try {
             val url = "$walletApiUrl/wallet/$walletId/credentials/receive/fetch-credential"
             println("[VCI Adapter] POST $url")
-            println("[VCI Adapter] cNonce: $cNonce, nonceEndpoint: $nonceEndpoint, credentialIssuerUrl: $credentialIssuerUrl")
+            println("[VCI Adapter] Strict nonce endpoint configured: ${nonceEndpoint != null}")
 
-            // Let the wallet API handle nonce fetching and proof signing
-            // It will: 1) fetch from nonceEndpoint if provided, 2) fall back to cNonce, 3) sign proof with wallet's key
+            // Let the wallet API fetch a fresh nonce and sign the proof with the wallet key.
             val requestBody = buildJsonObject {
                 put("credentialEndpoint", credentialEndpoint)
                 put("accessToken", accessToken)
                 put("credentialConfigurationId", credentialConfigurationId)
-                // Pass nonce info for the API to handle
-                cNonce?.let { put("cNonce", it) }
                 nonceEndpoint?.let { put("nonceEndpoint", it) }
                 credentialIssuerUrl?.let { put("credentialIssuerUrl", it) }
             }
@@ -594,12 +581,12 @@ class VciWalletConformanceAdapter(
             }
 
             val body = response.bodyAsText()
-            println("[VCI Adapter] Fetch response: ${response.status} - ${body.take(200)}")
+            println("[VCI Adapter] Fetch response status: ${response.status}")
             
             if (response.status.isSuccess()) {
                 ClaimResult(true, "Credential received")
             } else {
-                ClaimResult(false, "Status ${response.status}: $body")
+                ClaimResult(false, "Status ${response.status}")
             }
         } catch (e: Exception) {
             ClaimResult(false, "Exception: ${e.message}")
@@ -610,7 +597,7 @@ class VciWalletConformanceAdapter(
         return try {
             val url = "$walletApiUrl/wallet/$walletId/credentials/receive/sign-proof"
             println("[VCI Adapter] POST $url")
-            println("[VCI Adapter] Sign proof request - nonce: $nonce, issuerUrl: $issuerUrl")
+            println("[VCI Adapter] Sign proof request prepared")
 
             val requestBody = buildJsonObject {
                 put("issuerUrl", issuerUrl)
@@ -623,20 +610,19 @@ class VciWalletConformanceAdapter(
             }
 
             val body = response.bodyAsText()
-            println("[VCI Adapter] Sign proof response: ${response.status} - $body")
+            println("[VCI Adapter] Sign proof response status: ${response.status}")
             
             if (response.status.isSuccess()) {
                 val result = Json.parseToJsonElement(body).jsonObject
                 val proofJwt = result["proofJwt"]?.jsonPrimitive?.content
-                println("[VCI Adapter] Extracted proofJwt: ${proofJwt?.take(50)}...")
+                println("[VCI Adapter] Sign proof response contained proof: ${proofJwt != null}")
                 proofJwt
             } else {
-                println("[VCI Adapter] Sign proof failed: ${response.status} - $body")
+                println("[VCI Adapter] Sign proof failed: ${response.status}")
                 null
             }
         } catch (e: Exception) {
-            println("[VCI Adapter] Sign proof exception: ${e.message}")
-            e.printStackTrace()
+            println("[VCI Adapter] Sign proof failed (${e::class.simpleName})")
             null
         }
     }
@@ -850,6 +836,5 @@ class VciWalletConformanceAdapter(
         val success: Boolean,
         val message: String,
         val accessToken: String? = null,
-        val cNonce: String? = null
     )
 }

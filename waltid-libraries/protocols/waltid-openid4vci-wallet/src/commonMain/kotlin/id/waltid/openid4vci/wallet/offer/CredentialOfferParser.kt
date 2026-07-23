@@ -31,7 +31,7 @@ object CredentialOfferParser {
         val url = try {
             Url(offerUrl)
         } catch (e: Exception) {
-            throw IllegalArgumentException("Invalid credential offer URL: $offerUrl", e)
+            throw IllegalArgumentException("Invalid credential offer URL", e)
         }
 
         // Validate scheme
@@ -63,7 +63,7 @@ object CredentialOfferParser {
             try {
                 Url(credentialOfferUri)
             } catch (e: Exception) {
-                throw IllegalArgumentException("Invalid credential_offer_uri: $credentialOfferUri", e)
+                throw IllegalArgumentException("Invalid credential_offer_uri", e)
             }
             return CredentialOfferRequest(
                 credentialOffer = null,
