@@ -193,7 +193,7 @@ object OpenId4VciRoutesDocs {
 
     fun nonce(): RouteConfig.() -> Unit = {
         summary = "Nonce endpoint"
-        description = "Return a nonce."
+        description = "Return a signed nonce and its lifetime."
         response {
             HttpStatusCode.OK to {
                 description = "Nonce response"
