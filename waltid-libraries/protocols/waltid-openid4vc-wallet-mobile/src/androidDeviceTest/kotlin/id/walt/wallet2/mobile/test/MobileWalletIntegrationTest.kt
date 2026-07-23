@@ -19,6 +19,7 @@ import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
 import id.walt.wallet2.mobile.MobileWalletPresentationPreview
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
+import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -100,7 +101,10 @@ class MobileWalletIntegrationTest {
 
         val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
         val resolution = client.resolveOffer(offer.offerUrl)
-        assertTrue(resolution.transactionCodeRequired, "EUDI offer should require a transaction code")
+        assertTrue(resolution.issuer.credentialIssuer.isNotBlank(), "Resolved issuer metadata should include its identifier")
+        assertTrue(resolution.offeredCredentials.isNotEmpty(), "Offer should resolve credential metadata")
+        assertTrue(resolution.offeredCredentials.all { it.configurationId.isNotBlank() && it.format.isNotBlank() })
+        assertNotNull(resolution.transactionCode, "EUDI offer should require a transaction code")
         val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
         assertTrue(credentialIds.isNotEmpty(), "Should receive at least one credential")
     }
@@ -194,7 +198,7 @@ class MobileWalletIntegrationTest {
             "Preview should expose readable payment details: ${transactionData.detailsJson}",
         )
         val result = client.submitPresentation(
-            requestUrl = session.authorizationRequestUri,
+            previewHandle = preview.previewHandle,
             selectedCredentialOptions = preview.credentialOptions.map { option -> option.selection },
             did = bootstrapResult.did,
         )
@@ -213,8 +217,11 @@ class MobileWalletIntegrationTest {
         client.bootstrap()
 
         val session = DemoTestBackend.createResponseBoundVerifierSession(scenario)
-        client.previewPresentation(session.authorizationRequestUri)
-        val result = client.rejectPresentation(session.authorizationRequestUri)
+        val previewHandle = when (val preview = client.previewPresentation(session.authorizationRequestUri)) {
+            is MobileWalletPresentationPreviewResult.Ready -> preview.preview.previewHandle
+            is MobileWalletPresentationPreviewResult.Invalid -> preview.previewHandle
+        }
+        val result = client.rejectPresentation(previewHandle)
 
         assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
             result,
@@ -241,7 +248,7 @@ class MobileWalletIntegrationTest {
         assertEquals("redirect_uri:https://verifier.example/callback", preview.request.clientId)
 
         val result = assertIs<MobileWalletPresentationResult.Prepared.OpenUrl>(
-            client.rejectPresentation(requestUrl),
+            client.rejectPresentation(preview.previewHandle),
         )
         assertEquals(
             "https://verifier.example/callback#error=invalid_transaction_data&state=state-123",
@@ -280,7 +287,7 @@ class MobileWalletIntegrationTest {
         )
 
         val defaultOffResult = client.submitPresentation(
-            requestUrl = defaultOffSession.authorizationRequestUri,
+            previewHandle = defaultOffPreview.previewHandle,
             selectedCredentialOptions = listOf(defaultOffOption.selection),
             selectedDisclosureOptions = emptyList(),
             did = bootstrapResult.did,
@@ -317,7 +324,7 @@ class MobileWalletIntegrationTest {
         )
 
         val selectedResult = client.submitPresentation(
-            requestUrl = selectedSession.authorizationRequestUri,
+            previewHandle = selectedPreview.previewHandle,
             selectedCredentialOptions = listOf(selectedOption.selection),
             selectedDisclosureOptions = listOf(
                 MobileWalletPresentationDisclosureSelection(
@@ -453,9 +460,13 @@ class MobileWalletIntegrationTest {
             preview.credentialOptions.all { it.credentialId in credentialIds },
             "Preview should only offer credentials received in this test: received=$credentialIds, preview=$preview",
         )
+        assertTrue(
+            preview.request.responseEncryption is MobileWalletResponseEncryption.Required,
+            "EUDI verifier should request an encrypted response: preview=$preview",
+        )
 
         val result = client.submitPresentation(
-            requestUrl = transaction.authorizationRequestUri,
+            previewHandle = preview.previewHandle,
             selectedCredentialOptions = preview.credentialOptions.map { option ->
                 MobileWalletPresentationCredentialSelection(
                     queryId = option.queryId,
@@ -522,7 +533,7 @@ class MobileWalletIntegrationTest {
         )
 
         val result = client.submitPresentation(
-            requestUrl = session.authorizationRequestUri,
+            previewHandle = preview.previewHandle,
             selectedCredentialOptions = preview.credentialOptions.map { option ->
                 MobileWalletPresentationCredentialSelection(
                     queryId = option.queryId,

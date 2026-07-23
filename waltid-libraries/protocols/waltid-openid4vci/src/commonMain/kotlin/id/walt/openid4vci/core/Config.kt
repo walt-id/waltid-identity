@@ -3,6 +3,7 @@ package id.walt.openid4vci.core
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolver
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
+import id.walt.openid4vci.dpop.DPoPProofVerifier
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.par.PushedAuthorizationEndpointHandlers
@@ -60,6 +61,7 @@ data class OAuth2ProviderConfig(
     val tokenEndpointHandlers: TokenEndpointHandlers,
     val accessTokenIssuer: AccessTokenIssuer,
     val accessTokenVerifier: AccessTokenVerifier? = null,
+    val dpopProofVerifier: DPoPProofVerifier? = null,
     val refreshTokenIssuer: RefreshTokenIssuer,
     val refreshTokenVerifier: RefreshTokenVerifier,
     val refreshTokenRepository: RefreshTokenRepository,

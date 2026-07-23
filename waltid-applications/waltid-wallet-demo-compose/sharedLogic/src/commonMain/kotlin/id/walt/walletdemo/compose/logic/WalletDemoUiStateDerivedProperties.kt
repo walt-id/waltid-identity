@@ -28,10 +28,7 @@ val WalletDemoUiState.offerReviewEnabled: Boolean
     get() = !isBusy && offerPreview != null && !receiveCompleted
 
 val WalletDemoUiState.acceptOfferEnabled: Boolean
-    get() = offerReviewEnabled && requestDrafts.hasValidTxCode
-
-private val WalletRequestDrafts.hasValidTxCode: Boolean
-    get() = !transactionCodeRequired || txCode.isNotBlank()
+    get() = offerReviewEnabled && (offerPreview?.transactionCode?.accepts(requestDrafts.txCode) ?: true)
 
 val WalletDemoUiState.presentationUrlEntryEnabled: Boolean
     get() = !isBusy && presentationReview == null && !presentationCompleted

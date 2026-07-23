@@ -6,13 +6,14 @@ import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 private val log = KotlinLogging.logger {}
+private val tokenResponseJson = Json { ignoreUnknownKeys = true }
 
 /**
  * Builds OAuth 2.0 token requests for OpenID4VCI.
@@ -36,8 +37,6 @@ class TokenRequestBuilder(
         val expires_in: Long? = null,
         val refresh_token: String? = null,
         val scope: String? = null,
-        val c_nonce: String? = null,
-        val c_nonce_expires_in: Long? = null,
         val authorization_details: List<AuthorizationDetail>? = null
     )
 
@@ -49,7 +48,7 @@ class TokenRequestBuilder(
      * @param codeVerifier The PKCE code verifier (if PKCE was used)
      * @param additionalHeaders Extra HTTP headers for token endpoint client authentication
      * @param attestationHeaders Attestation-based client authentication headers
-     * @return TokenResponse containing access token and optional c_nonce
+     * @return TokenResponse containing the OAuth access token response fields
      * @throws Exception if token request fails
      */
     suspend fun exchangeAuthorizationCode(
@@ -92,7 +91,7 @@ class TokenRequestBuilder(
      * @param additionalHeaders Extra HTTP headers for token endpoint client authentication
      * @param attestationHeaders Attestation-based client authentication headers
      * @param anonymous Whether to omit client_id for anonymous pre-authorized code token requests
-     * @return TokenResponse containing access token and optional c_nonce
+     * @return TokenResponse containing the OAuth access token response fields
      * @throws Exception if token request fails
      */
     suspend fun exchangePreAuthorizedCode(
@@ -224,18 +223,17 @@ class TokenRequestBuilder(
         }
 
         if (!response.status.isSuccess()) {
-            val errorBody = response.bodyAsText()
             log.error {
-                "Token request failed - Status: ${response.status.value} ${response.status.description}, " +
-                "Response body: ${errorBody.take(200)}${if (errorBody.length > 200) "..." else ""}"
+                "Token request failed - Status: ${response.status.value} ${response.status.description}"
             }
-            throw Exception("Token request failed. Status: ${response.status}, Body: $errorBody")
+            throw Exception("Token request failed. Status: ${response.status}")
         }
 
         log.trace { "Received successful token response (${response.status.value}), parsing" }
         
+        val responseBody = response.bodyAsText()
         return try {
-            val tokenResponse = response.body<TokenResponse>()
+            val tokenResponse = tokenResponseJson.decodeFromString<TokenResponse>(responseBody)
             log.info {
                 "Successfully obtained access token - " +
                 "Type: ${tokenResponse.token_type}, " +
@@ -244,13 +242,9 @@ class TokenRequestBuilder(
             }
             log.trace { "Token scope: ${tokenResponse.scope ?: "not specified"}" }
             tokenResponse
-        } catch (e: Exception) {
-            val responseBody = response.bodyAsText()
-            log.error(e) {
-                "Failed to parse token response - " +
-                "Body preview: ${responseBody.take(200)}${if (responseBody.length > 200) "..." else ""}"
-            }
-            throw Exception("Failed to parse token response", e)
+        } catch (_: Exception) {
+            log.error { "Failed to parse token response" }
+            throw Exception("Failed to parse token response")
         }
     }
 
