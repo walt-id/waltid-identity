@@ -58,56 +58,6 @@ public actor Wallet {
         )
     }
 
-    /// Resolves a credential offer before issuance.
-    ///
-    /// - Parameter offer: OpenID4VCI credential offer URL received by the app.
-    /// - Returns: The issuer, offered credential identifiers, and transaction-code requirement.
-    /// - Throws: ``WalletError`` when the offer is invalid or issuer communication fails.
-    public func resolveOffer(offer: URL) async throws -> OfferResolution {
-        try await bridge.resolveOffer(offer: offer)
-    }
-
-    /// Receives credentials from an OpenID4VCI credential offer URL.
-    ///
-    /// - Parameters:
-    ///   - offer: OpenID4VCI credential offer URL received by the app.
-    ///   - txCode: Optional transaction code requested by the issuer.
-    ///   - clientID: Client identifier to use for issuer interactions.
-    /// - Returns: Local credential identifiers stored by the wallet.
-    /// - Throws: ``WalletError`` when the offer is invalid, issuer
-    ///   communication fails, issuance fails, or local persistence fails.
-    public func receive(
-        offer: URL,
-        txCode: String? = nil,
-        clientID: String = "wallet-client"
-    ) async throws -> [String] {
-        try await bridge.receive(offer: offer, txCode: txCode, clientID: clientID)
-    }
-
-    /// Receives credentials using exactly one reviewed offer preview.
-    ///
-    /// - Parameters:
-    ///   - previewHandle: Handle returned by ``resolveOffer(offer:)``.
-    ///   - txCode: Optional transaction code requested by the issuer.
-    ///   - clientID: Client identifier to use for issuer interactions.
-    /// - Returns: Local credential identifiers stored by the wallet.
-    /// - Throws: ``WalletError`` when the handle is invalid or issuance fails.
-    public func receive(
-        previewHandle: IssuancePreviewHandle,
-        txCode: String? = nil,
-        clientID: String = "wallet-client"
-    ) async throws -> [String] {
-        try await bridge.receive(previewHandle: previewHandle, txCode: txCode, clientID: clientID)
-    }
-
-    /// Discards a reviewed issuance preview after local dismissal.
-    ///
-    /// - Parameter previewHandle: Handle returned by ``resolveOffer(offer:)``.
-    /// - Throws: ``WalletError`` when the handle cannot be discarded.
-    public func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
-        try await bridge.discardIssuancePreview(previewHandle)
-    }
-
     /// Starts a typed pre-authorized or authorization-code issuance session.
     ///
     /// - Parameter request: Offer, callback, client, and holder-binding configuration.
