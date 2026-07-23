@@ -2,6 +2,7 @@ package id.walt.openid4vci.prooftypes
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -21,6 +22,7 @@ data class Proofs(
     val diVp: List<JsonObject>? = null,
     @SerialName("attestation")
     val attestation: List<String>? = null,
+    @Transient
     val additional: Map<String, JsonElement> = emptyMap(),
 ) {
     companion object {
