@@ -29,6 +29,7 @@ import id.walt.wallet2.handlers.ReceiveCredentialFromPreviewRequest
 import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceAuthorizationCallback
+import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceSession
 import id.walt.wallet2.handlers.WalletIssuanceSessionRequest
@@ -212,7 +213,6 @@ public class MobileWallet internal constructor(
         attestationAssembler = attestationAssembler,
         onEvent = ::emitSessionEvent,
         sessionStore = issuanceSessionStore,
-        httpClient = httpClient,
     )
 
     /**
