@@ -56,11 +56,15 @@ jobs:
     needs: macos-eligibility
     if: ${{ needs.macos-eligibility.outputs.should-run == 'true' }}
     secrets: inherit
+    with:
+      job_name_prefix: ios-tests
   android-device-tests:
     uses: ./.github/workflows/android-device-tests.yml
     needs: android-eligibility
     if: ${{ needs.android-eligibility.outputs.should-run == 'true' }}
     secrets: inherit
+    with:
+      job_name_prefix: android-device-tests
   gradle-build:
     uses: ./.github/workflows/gradle.yml
     secrets: inherit

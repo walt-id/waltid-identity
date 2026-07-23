@@ -3,11 +3,15 @@ name: Android device tests
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      job_name_prefix:
+        description: 'Caller job id, used to build the check job name (empty when run standalone).'
+        type: string
+        required: false
+        default: ''
 
 permissions:
-  contents: read
   checks: write
-  pull-requests: read
 
 jobs:
   android-device-test-phase:
@@ -96,7 +100,7 @@ jobs:
         uses: mikepenz/action-junit-report@v6
         with:
           update_check: true
-          job_name: android-device-tests (${{ matrix.phase }})
+          job_name: ${{ inputs.job_name_prefix != '' && format('{0} / ', inputs.job_name_prefix) || '' }}android-device-tests (${{ matrix.phase }})
           check_name: Android Device Test Report (${{ matrix.phase }})
           report_paths: ${{ steps.android-device-phase.outputs.report_paths }}
           detailed_summary: true

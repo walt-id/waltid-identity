@@ -3,10 +3,17 @@ name: iOS build and test
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      job_name_prefix:
+        description: 'Caller job id, used to build the check job name (empty when run standalone).'
+        type: string
+        required: false
+        default: ''
 
 env:
   XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
   IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=latest
+  JOB_NAME_PREFIX: ${{ inputs.job_name_prefix != '' && format('{0} / ', inputs.job_name_prefix) || '' }}
 
 jobs:
   ios-simulator-tests:
@@ -33,7 +40,7 @@ jobs:
           run-wallet-core-xcframework: 'false'
           run-native-demo-tests: 'false'
           run-compose-demo-tests: 'false'
-          test-report-job-name: ios-simulator-tests
+          test-report-job-name: ${{ env.JOB_NAME_PREFIX }}ios-simulator-tests
           test-report-check-name: iOS Simulator Test Report
           test-result-artifact-name: ios-simulator-test-results
 
@@ -61,7 +68,7 @@ jobs:
           run-wallet-core-xcframework: 'true'
           run-native-demo-tests: 'true'
           run-compose-demo-tests: 'false'
-          test-report-job-name: wallet-core-native-ios-demo-tests
+          test-report-job-name: ${{ env.JOB_NAME_PREFIX }}wallet-core-native-ios-demo-tests
           test-report-check-name: Native iOS Demo Test Report
           test-result-artifact-name: native-ios-demo-test-results
 
@@ -89,7 +96,7 @@ jobs:
           run-wallet-core-xcframework: 'false'
           run-native-demo-tests: 'false'
           run-compose-demo-tests: 'true'
-          test-report-job-name: compose-ios-demo-tests
+          test-report-job-name: ${{ env.JOB_NAME_PREFIX }}compose-ios-demo-tests
           test-report-check-name: Compose iOS Demo Test Report
           test-report-require-tests: 'false'
           test-result-artifact-name: compose-ios-demo-test-results
@@ -166,7 +173,7 @@ jobs:
         uses: mikepenz/action-junit-report@v6
         with:
           update_check: true
-          job_name: enterprise-ios-mobile-tests
+          job_name: ${{ env.JOB_NAME_PREFIX }}enterprise-ios-mobile-tests
           check_name: Enterprise iOS Mobile Test Report
           report_paths: waltid-identity-enterprise/waltid-enterprise-integration-tests/build/ios-test-reports/**/*.xml
           detailed_summary: true
