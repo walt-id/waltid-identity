@@ -75,7 +75,7 @@ netty-4_2 = "4.2.15.Final"
 jackson-core = "2.22.0"
 jackson-core-3 = "3.1.1"
 # web3j brings bcprov-jdk18on; pin to latest to override its 1.80
-bcprov-jdk18on = "1.84"
+bcprov-jdk18on = "1.85"
 oci-sdk = "3.90.0"
 
 # JVM-only: auth (platform-specific, not multiplatform)
