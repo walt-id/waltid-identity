@@ -18,6 +18,7 @@ import id.walt.issuer2.testsupport.createIssuer2ClientAttestationTestMaterial
 import id.walt.issuer2.testsupport.createWalletFlowCredentialOffer
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.issuer2.testsupport.referencedOfferUri
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
@@ -31,6 +32,9 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -170,6 +174,55 @@ class Issuer2PreAuthorizedWalletFlowTest {
             ),
         )
         assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
+    }
+
+    @Test
+    fun credentialEndpointUsesFinalCredentialErrorCodes() = testApplication {
+        val scenario = Issuer2CredentialScenarios.identitySdJwt
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val walletFlow = Issuer2WalletFlowDriver(client)
+
+        suspend fun assertCredentialError(
+            credentialRequest: JsonObject,
+            expectedError: String,
+        ) {
+            val createdOffer = client.createWalletFlowCredentialOffer(
+                scenario = scenario,
+                authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+                txCodeMode = Issuer2TxCodeMode.NONE,
+            )
+            val resolvedOffer = walletFlow.resolve(createdOffer)
+            val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
+
+            val response = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
+                bearerAuth(tokenResponse.access_token)
+                contentType(ContentType.Application.Json)
+                setBody(credentialRequest)
+            }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+            assertEquals(expectedError, response.body<JsonObject>()["error"]?.jsonPrimitive?.content)
+        }
+
+        assertCredentialError(
+            buildJsonObject {
+                put("credential_configuration_id", scenario.credentialConfigurationId)
+            },
+            CredentialErrorCodes.INVALID_PROOF,
+        )
+        assertCredentialError(
+            buildJsonObject {
+                put("credential_configuration_id", "unknown_credential_configuration")
+            },
+            CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
+        )
+        assertCredentialError(
+            buildJsonObject {
+                put("credential_identifier", "unknown_credential_identifier")
+            },
+            CredentialErrorCodes.UNKNOWN_CREDENTIAL_IDENTIFIER,
+        )
     }
 
     @Test

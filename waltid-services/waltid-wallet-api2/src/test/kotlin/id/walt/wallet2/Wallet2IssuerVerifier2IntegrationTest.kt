@@ -391,8 +391,6 @@ class Wallet2IssuerVerifier2IntegrationTest {
                     call.respond(buildJsonObject {
                         put("access_token", tokenResponse.response.accessToken)
                         put("token_type", "Bearer")
-                        put("c_nonce", nonce.nonce)
-                        put("c_nonce_expires_in", nonce.expiresInSeconds)
                     })
                 }
                 post("/credential") {

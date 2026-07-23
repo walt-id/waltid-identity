@@ -6,6 +6,7 @@ sealed interface WalletDemoPresentationPreviewResult {
 }
 
 data class WalletDemoPresentationError(
+    val previewHandle: WalletDemoPresentationPreviewHandle,
     override val verifierMetadata: WalletDemoVerifierMetadata?,
     override val clientId: String?,
     override val responseUri: String? = null,
@@ -28,6 +29,7 @@ interface WalletDemoPresentationRequestInfo {
 }
 
 data class WalletDemoPresentationPreview(
+    val previewHandle: WalletDemoPresentationPreviewHandle,
     override val verifierMetadata: WalletDemoVerifierMetadata?,
     override val clientId: String?,
     override val responseUri: String? = null,
@@ -49,6 +51,8 @@ sealed interface WalletDemoResponseEncryption {
         val verifierKeyThumbprint: String,
     ) : WalletDemoResponseEncryption
 }
+
+data class WalletDemoPresentationPreviewHandle(val value: String)
 
 data class WalletDemoPresentationCredentialRequirement(
     val options: List<List<String>>,

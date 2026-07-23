@@ -4,8 +4,8 @@ import id.walt.cose.CoseCertificate
 import id.walt.crypto.keys.Key
 import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
-import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
@@ -52,8 +52,8 @@ class MdocCredentialHandler : CredentialEndpointHandler {
         return try {
             if (configuration.format != CredentialFormat.MSO_MDOC) {
                 return CredentialResponseResult.Failure(
-                    OAuthError(
-                        CredentialErrorCodes.UNSUPPORTED_CREDENTIAL_CONFIGURATION,
+                    CredentialError(
+                        CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
                         "Unsupported format ${configuration.format.value}"
                     )
                 )
@@ -72,7 +72,7 @@ class MdocCredentialHandler : CredentialEndpointHandler {
                 verifiedProofs = verifiedProofs,
             )
         } catch (e: Exception) {
-            CredentialResponseResult.Failure(OAuthError("invalid_request", e.message))
+            CredentialResponseResult.Failure(e.toCredentialHandlerError())
         }
     }
 

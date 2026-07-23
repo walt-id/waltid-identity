@@ -36,7 +36,7 @@ jobs:
         include: ${{ fromJSON(inputs.images) }}
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
       - name: Configure gradle

@@ -1,6 +1,7 @@
 package id.walt.openid4vci.core
 
 import id.walt.openid4vci.Session
+import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
@@ -148,6 +149,10 @@ interface OAuth2Provider {
         validUntil: Instant? = null,
         proofValidationContext: CredentialProofValidationContext? = null,
     ): CredentialResponseResult
+
+    fun writeCredentialError(error: CredentialError): CredentialResponseHttp
+
+    fun writeCredentialError(request: CredentialRequest, error: CredentialError): CredentialResponseHttp
 
     fun writeCredentialError(error: OAuthError): CredentialResponseHttp
 

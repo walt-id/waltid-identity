@@ -427,13 +427,15 @@ class Wallet2AdditionalUseCasesTest {
                     if (resp !is AccessTokenResponseResult.Success) return@post call.respond(
                         HttpStatusCode.InternalServerError,
                         buildJsonObject { put("error", "server_error") })
-                    val nonce = proofSupport.issueNonce()
                     call.respond(buildJsonObject {
                         put("access_token", resp.response.accessToken); put(
                         "token_type",
                         "Bearer"
-                    ); put("c_nonce", nonce.nonce); put("c_nonce_expires_in", nonce.expiresInSeconds)
+                    )
                     })
+                }
+                post("/nonce") {
+                    call.respond(buildJsonObject { put("c_nonce", "pres-nonce") })
                 }
                 post("/credential") {
                     val body = json.parseToJsonElement(call.receiveText()).jsonObject
@@ -779,7 +781,7 @@ class Wallet2AdditionalUseCasesTest {
                         put("access_token", resp.response.accessToken); put(
                         "token_type",
                         "Bearer"
-                    ); put("c_nonce", nonce.nonce); put("c_nonce_expires_in", nonce.expiresInSeconds)
+                    )
                     })
                 }
                 post("/credential") {
