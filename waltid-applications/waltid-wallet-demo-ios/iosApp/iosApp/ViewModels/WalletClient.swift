@@ -7,6 +7,11 @@ protocol WalletClient {
     func resolveOffer(offer: URL) async throws -> OfferResolution
     func receive(previewHandle: IssuancePreviewHandle, txCode: String?) async throws -> [String]
     func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws
+    func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession
+    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome
+    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome
+    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
+    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome
     func present(request: URL, did: String?) async throws -> PresentationResult
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult
     func submitPresentation(
@@ -46,6 +51,12 @@ final class SDKWalletClient: WalletClient {
     func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
         try await wallet().discardIssuancePreview(previewHandle)
     }
+
+    func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession { try await wallet().startIssuance(request) }
+    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome { try await wallet().continuePreAuthorizedIssuance(sessionID: sessionID, transactionCode: transactionCode) }
+    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome { try await wallet().continueAuthorizationIssuance(sessionID: sessionID, callbackURI: callbackURI) }
+    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome { try await wallet().cancelIssuance(sessionID: sessionID) }
+    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome { try await wallet().resumeDeferredIssuance(deferredCredentialID: deferredCredentialID) }
 
     func present(request: URL, did: String?) async throws -> PresentationResult {
         try await wallet().present(request: request, did: did)
