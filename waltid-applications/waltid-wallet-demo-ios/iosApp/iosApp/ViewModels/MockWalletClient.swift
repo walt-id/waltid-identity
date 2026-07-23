@@ -77,6 +77,32 @@ actor MockWalletClient: WalletClient {
 
     func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {}
 
+    func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
+        try await delayOperation()
+        return IssuanceSession(
+            id: "mock-session",
+            offer: .init(
+                grant: .preAuthorizedCode,
+                issuer: .init(identifier: "https://issuer.example", name: "Example Issuer", locale: nil, logoURI: nil, logoAltText: nil),
+                credentials: [.init(configurationID: "ExampleCredential", format: "dc+sd-jwt", name: "Example", descriptionText: nil, logoURI: nil)],
+                transactionCode: nil
+            ),
+            authorization: nil
+        )
+    }
+
+    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome {
+        try await delayOperation()
+        storedCredentials = [mdocMetadata ? Self.photoIDCredential : Self.sampleCredential]
+        return .stored(sessionID: sessionID, credentialIDs: storedCredentials.map(\.id))
+    }
+
+    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome {
+        try await continuePreAuthorizedIssuance(sessionID: sessionID, transactionCode: nil)
+    }
+
+    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome { .cancelled(sessionID: sessionID) }
+
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
         .failed(
             sessionID: "mock-session",
