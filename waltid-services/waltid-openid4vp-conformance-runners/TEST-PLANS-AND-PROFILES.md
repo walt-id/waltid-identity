@@ -9,7 +9,7 @@ Test plan classes follow this pattern:
 
 Examples:
 - `VciWalletSdJwtDpop` - VCI Wallet with SD-JWT and DPoP
-- `Oid4vciIssuerClientAttestationDpop` - VCI Issuer with Client Attestation and DPoP
+- `Oid4vciIssuerVariantPlan` - VCI Issuer matrix variant
 - `SdJwtVcX509SanDnsRequestUriSignedDirectPost` - VP Verifier for SD-JWT VC with X.509 client ID
 - `VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost` - VP Wallet for SD-JWT VC with X.509 client ID
 
@@ -75,31 +75,24 @@ Examples:
 
 ### 2. OpenID4VCI - Issuer Role
 
-#### Oid4vciIssuerClientAttestationDpop
-**File:** `src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/vci/issuer/Oid4vciIssuerClientAttestationDpop.kt`  
+#### Oid4vciIssuerVariantPlan
+**File:** `src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/vci/issuer/Oid4vciIssuerVariantPlan.kt`
 **Test Class:** `IssuerConformanceTests.kt`
 
 **Configuration:**
 - **Protocol:** OpenID4VCI 1.0
 - **Role:** Issuer (Credential Provider)
-- **Credential Format:** SD-JWT VC (`vc+sd-jwt`)
-- **Authentication:** DPoP + Client Attestation
-- **Flow:** Authorization Code
-- **Key Binding:** openid4vci-proof+jwt
+- **Credential Formats:** SD-JWT VC and mdoc
+- **Grant Types:** Authorization Code and Pre-Authorized Code
+- **Authentication:** Client Attestation, private_key_jwt, and mTLS
+- **Sender Constraints:** DPoP and mTLS
 
-**Test Plan Name:** `oid4vci-1_0-issuer-test-credential-issuance-dpop-client_attestation-sd_jwt_vc-issuer_initiated-simple-immediate-unsigned-authorization_code-by_value-plain`
+**Test Plan Name:** `oid4vci-1_0-issuer-test-plan`
 
-**Status:** ⚠️ **53/55 tests passing**
-
-**Known Issues:**
-1. Missing RFC 9207 `iss` in authorization response
-2. Unexpected HTTP status on credential endpoint
-
-**HAIP Features:**
-- ✅ DPoP support
-- ✅ Client attestation
-- ✅ Authorization code flow
-- ✅ SD-JWT VC issuance
+The runner generates the 288 valid `fapi_profile=vci` combinations described in
+the README. Environment filters select subsets without introducing separate fixed
+plan classes. Issuer-initiated variants receive a fresh issuer2 credential offer
+for each module.
 
 ---
 
@@ -294,11 +287,11 @@ Examples:
 1. **VciWalletSdJwtDpop** - stable SD-JWT VC reference profile
 2. **VciWalletMdocDpop** - stable ISO mdoc reference profile
 3. **VciWalletSdJwtHaip** - HAIP-oriented baseline profile
+4. **Oid4vciIssuerVariantPlan** - generated base VCI issuer matrix
 
 ### ⚠️ Mostly Working (Minor Issues)
-2. **Oid4vciIssuerClientAttestationDpop** - 53/55 tests passing
-3. **MdlX509SanDnsRequestUriSignedDirectPost** - mDL tests passing
-4. **SdJwtVcX509SanDnsRequestUriSignedDirectPost** - needs trust anchor config
+1. **MdlX509SanDnsRequestUriSignedDirectPost** - mDL tests passing
+2. **SdJwtVcX509SanDnsRequestUriSignedDirectPost** - needs trust anchor config
 
 ### 🚫 Framework Ready (Awaiting Implementation)
 5. **VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost** - awaiting WAL-896
@@ -384,7 +377,7 @@ export VERIFIER_NGROK_URL="https://YOUR-NGROK.ngrok-free.app"
 
 ## Files
 
-### Test Plan Classes (7 total)
+### Selected Test Plan Classes
 ```
 src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/
 ├── vci/
@@ -393,7 +386,7 @@ src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/
 │   │   ├── VciWalletMdocDpop.kt                                       ✅
 │   │   └── VciWalletSdJwtHaip.kt                                      ⚠️
 │   └── issuer/
-│       └── Oid4vciIssuerClientAttestationDpop.kt                       ⚠️
+│       └── Oid4vciIssuerVariantPlan.kt                                 ⚠️
 └── vp/
     ├── verifier/
     │   ├── SdJwtVcX509SanDnsRequestUriSignedDirectPost.kt              ⚠️

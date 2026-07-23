@@ -1,0 +1,9 @@
+{
+  "kty": "EC",
+  "crv": "P-256",
+  "kid": "conformance-attester-x509",
+  "x": "uca7_l8rv-ItebmtIsfg2-2p8EchZBk-C-91LMabJws",
+  "y": "hXYFz2urwDJzAJ1pdWLpNrpv9ZEw_54EQsEE-1x_1cg",
+  "alg": "ES256",
+  "use": "sig"
+}

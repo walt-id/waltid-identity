@@ -23,7 +23,7 @@ import kotlin.time.Duration.Companion.seconds
 class ConformanceInterface(
     val conformanceHost: String,
     val conformancePort: Int
-) {
+) : AutoCloseable {
 
     // Use simple HttpClient - relies on javax.net.ssl.trustStore system property
     // set in build.gradle.kts for SSL certificate trust
@@ -78,12 +78,12 @@ class ConformanceInterface(
             contentType(ContentType.Application.Json)
             setBody(testPlanCreationConfiguration)
         }.bodyAsText().also { println(it) }
-        
+
         // Check if response is an error
         if (response.contains("\"error\"")) {
             throw IllegalStateException("Conformance suite error: $response")
         }
-        
+
         return response.fromJson<CreateTestPlanResponse>()
     }
 
@@ -118,6 +118,32 @@ class ConformanceInterface(
     suspend fun getTestRun(testId: String): TestRunResult =
         conformanceHttp.get("/api/runner/$testId").body<TestRunResult>()
 
+    /** Mark a front-channel browser URL as visited, matching the conformance-suite UI behavior. */
+    suspend fun markBrowserUrlVisited(testId: String, url: String) {
+        val response = conformanceHttp.post("/api/runner/browser/$testId/visit") {
+            parameter("url", url)
+        }
+        if (response.status.value !in 200..299) {
+            throw IllegalStateException("Conformance suite returned ${response.status} while marking browser URL as visited")
+        }
+    }
+
+    /** Deliver an issuer-initiated credential offer to the endpoint exposed by the conformance suite. */
+    suspend fun deliverCredentialOffer(
+        credentialOfferEndpoint: String,
+        parameterName: String,
+        parameterValue: String,
+    ) {
+        val url = URLBuilder(credentialOfferEndpoint).apply {
+            parameters.append(parameterName, parameterValue)
+        }.build()
+
+        val response = conformanceHttp.get(url)
+        if (response.status.value !in 200..299) {
+            throw IllegalStateException("Conformance suite returned ${response.status} while delivering credential offer")
+        }
+    }
+
     /** Get [TestRunInfo] for a test referenced by [testId] */
     suspend fun getTestRunInfo(testId: String): TestRunInfo {
         val response = conformanceHttp.get("/api/info/$testId") {
@@ -136,7 +162,7 @@ class ConformanceInterface(
         var counter = 0
         // Give conformance suite time to initialize the test
         delay(2.seconds)
-        
+
         while (true) {
             counter++
 
@@ -163,4 +189,7 @@ class ConformanceInterface(
         }
     }
 
+    override fun close() {
+        conformanceHttp.close()
+    }
 }
