@@ -170,7 +170,7 @@ class MobileWalletIntegrationTest {
         assertTrue(preview.credentialOptions.all { it.format == "mso_mdoc" })
 
         val result = client.submitPresentation(
-            requestUrl = transaction.authorizationRequestUri,
+            previewHandle = preview.previewHandle,
             selectedCredentialOptions = preview.credentialOptions.map { it.selection },
             did = bootstrapResult.did,
         )
