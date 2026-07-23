@@ -4,7 +4,6 @@ import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletCredentialClaimMetadata
 import id.walt.wallet2.mobile.MobileWalletMetadataDisplay
 import id.walt.wallet2.mobile.MobileWalletOfferedCredentialMetadata
-import id.walt.wallet2.mobile.MobileWalletIssuancePreviewHandle
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationPreview
@@ -20,6 +19,7 @@ import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
 import id.walt.wallet2.handlers.WalletIssuanceGrant
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceTransactionCode
+import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.WalletAttestationConfig
 
 internal class MobileDemoWallet(
@@ -47,30 +47,6 @@ internal class MobileDemoWallet(
                 credentialDataJson = credential.credentialDataJson,
             )
         }
-
-    override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview =
-        mobileWallet.resolveOffer(offerUrl).let { resolution ->
-            WalletDemoOfferPreview(
-                previewHandle = WalletDemoIssuancePreviewHandle(resolution.previewHandle.value),
-                issuer = WalletDemoIssuerMetadata(
-                    credentialIssuer = resolution.issuer.credentialIssuer,
-                    display = resolution.issuer.display?.toDemoMetadataDisplay(),
-                ),
-                offeredCredentials = resolution.offeredCredentials.map { it.toDemoMetadata() },
-                transactionCode = resolution.transactionCode?.toDemoRequirement(),
-            )
-        }
-
-    override suspend fun receive(
-        previewHandle: WalletDemoIssuancePreviewHandle,
-        txCode: String?,
-    ): List<String> = mobileWallet.receive(
-        previewHandle = MobileWalletIssuancePreviewHandle(previewHandle.value),
-        txCode = txCode,
-    )
-
-    override suspend fun discardIssuancePreview(previewHandle: WalletDemoIssuancePreviewHandle) =
-        mobileWallet.discardIssuancePreview(MobileWalletIssuancePreviewHandle(previewHandle.value))
 
     override suspend fun startIssuance(
         offerUrl: String,
@@ -229,6 +205,23 @@ private fun MobileWalletPresentationResult.toDemoOperationResult(
         )
 
         is MobileWalletPresentationResult.Transmitted.Failed -> WalletDemoOperationResult.Failure(failureMessage)
+    }
+
+private fun WalletIssuanceOutcome.toDemoOutcome(): WalletDemoIssuanceOutcome =
+    when (this) {
+        is WalletIssuanceOutcome.Stored -> WalletDemoIssuanceOutcome.Stored(credentialIds)
+        is WalletIssuanceOutcome.Deferred -> WalletDemoIssuanceOutcome.Deferred(
+            storedCredentialIds = storedCredentialIds,
+            credentials = credentials.map { credential ->
+                WalletDemoDeferredCredential(
+                    id = credential.id,
+                    credentialConfigurationId = credential.credentialConfigurationId,
+                    intervalSeconds = credential.intervalSeconds,
+                )
+            },
+        )
+        is WalletIssuanceOutcome.Cancelled -> WalletDemoIssuanceOutcome.Cancelled
+        is WalletIssuanceOutcome.Failed -> WalletDemoIssuanceOutcome.Failed(error.message)
     }
 
 internal fun DemoWalletConfig.toWalletAttestationConfig(): WalletAttestationConfig? =
