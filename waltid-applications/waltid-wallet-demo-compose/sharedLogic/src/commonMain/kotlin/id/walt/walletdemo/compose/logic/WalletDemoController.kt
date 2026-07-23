@@ -467,9 +467,10 @@ class WalletDemoController(
         val current = _state.value
         val ready = current.session as? WalletSessionState.Ready ?: return
         val request = ReceiveRequest(current.requestDrafts.offerUrl.trim(), current.receiveNavigationResetKey)
+        if (!_state.compareAndSet(current, current.copy(operation = WalletOperationState.Receiving))) return
         receiveJob = scope.launch(dispatcher) {
             try { completeIssuanceOutcome(ready, request, wallet.continueAuthorizationIssuance(session.id, callbackUri)) }
-            catch (error: Throwable) { updateIfCurrent(request, WalletOperationState.OfferPreview) { it.copy(operation = WalletOperationState.Failed(WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error), WalletDemoTab.Receive)) } }
+            catch (error: Throwable) { updateIfCurrent(request, WalletOperationState.Receiving) { it.copy(operation = WalletOperationState.Failed(WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error), WalletDemoTab.Receive)) } }
         }
     }
 
