@@ -223,11 +223,10 @@ class TokenRequestBuilder(
         }
 
         if (!response.status.isSuccess()) {
-            val errorBody = response.bodyAsText()
             log.error {
                 "Token request failed - Status: ${response.status.value} ${response.status.description}"
             }
-            throw IllegalArgumentException("Token request failed. Status: ${response.status}, Body: $errorBody")
+            throw IllegalArgumentException("Token request failed. Status: ${response.status}")
         }
 
         log.trace { "Received successful token response (${response.status.value}), parsing" }
