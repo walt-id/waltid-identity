@@ -57,41 +57,6 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return .init(keyID: value.keyId, did: value.did)
     }
 
-    func resolveOffer(offer: URL) async throws -> OfferResolution {
-        let result = try await bridge.resolveOffer(offerUrl: offer.absoluteString)
-        let value = try Self.successValue(
-            result,
-            as: MobileWalletOfferResolution.self,
-            operation: "resolve credential offer"
-        )
-        return OfferResolution(
-            issuer: value.issuer.toSwiftIssuerMetadata(),
-            offeredCredentials: swiftArray(
-                value.offeredCredentials,
-                of: MobileWalletOfferedCredentialMetadata.self
-            ).map { $0.toSwiftOfferedCredentialMetadata() },
-            transactionCode: value.transactionCode?.toSwiftTransactionCodeRequirement()
-        )
-    }
-
-    func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String] {
-        let result = try await bridge.receive(
-            offerUrl: offer.absoluteString,
-            txCode: txCode,
-            clientId: clientID
-        )
-        let value = try Self.successAnyValue(result, operation: "receive credentials")
-
-        if let credentialIDs = value as? [String] {
-            return credentialIDs
-        }
-        if let credentialIDs = value as? NSArray {
-            return credentialIDs.compactMap { $0 as? String }
-        }
-
-        throw WalletError.internalFailure("Unexpected receive result type: \(type(of: value))")
-    }
-
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
         let result = try await bridge.startIssuance(
             request: MobileWalletIssuanceRequest(
@@ -188,14 +153,14 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     }
 
     func submitPresentation(
-        request: URL,
+        previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         did: String?,
         runPolicies: Bool?
     ) async throws -> PresentationResult {
         let result = try await bridge.submitPresentation(
-            requestUrl: request.absoluteString,
+            previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value),
             selectedCredentialOptions: selectedCredentialOptions.map {
                 MobileWalletPresentationCredentialSelection(
                     queryId: $0.queryID,
@@ -222,12 +187,12 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     }
 
     func rejectPresentation(
-        request: URL,
+        previewHandle: PresentationPreviewHandle,
         error: PresentationErrorCode?,
         errorDescription: String?
     ) async throws -> PresentationResult {
         let result = try await bridge.rejectPresentation(
-            requestUrl: request.absoluteString,
+            previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value),
             errorCode: error?.toKMPErrorCode(),
             errorDescription: errorDescription
         )
@@ -238,6 +203,13 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
 
         return try value.toSwiftPresentationResult()
+    }
+
+    func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
+        let result = try await bridge.discardPresentationPreview(
+            previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value)
+        )
+        _ = try Self.successAnyValue(result, operation: "discard presentation preview")
     }
 
     private static func successValue<T>(
@@ -799,6 +771,7 @@ private extension MobileWalletPresentationPreviewResult {
         case let result as MobileWalletPresentationPreviewResultInvalid:
             return .invalid(
                 PresentationPreviewError(
+                    previewHandle: PresentationPreviewHandle(value: result.previewHandle.value),
                     request: result.request.toSwiftRequestInfo(),
                     code: result.errorCode.toSwiftErrorCode(),
                     message: result.message
@@ -813,6 +786,7 @@ private extension MobileWalletPresentationPreviewResult {
 private extension MobileWalletPresentationPreview {
     func toSwiftPreview() -> PresentationPreview {
         PresentationPreview(
+            previewHandle: PresentationPreviewHandle(value: previewHandle.value),
             request: request.toSwiftRequestInfo(),
             credentialOptions: swiftArray(credentialOptions, of: MobileWalletPresentationCredentialOption.self)
                 .map { $0.toSwiftCredentialOption() },
@@ -867,50 +841,6 @@ private extension MobileWalletMetadataDisplay {
             backgroundColor: backgroundColor,
             backgroundImageURI: backgroundImageUri,
             textColor: textColor
-        )
-    }
-}
-
-private extension MobileWalletIssuerMetadata {
-    func toSwiftIssuerMetadata() -> IssuerMetadata {
-        IssuerMetadata(
-            credentialIssuer: credentialIssuer,
-            display: display?.toSwiftMetadataDisplay()
-        )
-    }
-}
-
-private extension MobileWalletCredentialClaimMetadata {
-    func toSwiftCredentialClaimMetadata() -> CredentialClaimMetadata {
-        CredentialClaimMetadata(
-            path: swiftArray(path, of: String.self),
-            mandatory: mandatory?.boolValue,
-            displayName: displayName
-        )
-    }
-}
-
-private extension MobileWalletOfferedCredentialMetadata {
-    func toSwiftOfferedCredentialMetadata() -> OfferedCredentialMetadata {
-        OfferedCredentialMetadata(
-            configurationID: configurationId,
-            format: format,
-            scope: scope,
-            vct: vct,
-            doctype: doctype,
-            display: display?.toSwiftMetadataDisplay(),
-            claims: swiftArray(claims, of: MobileWalletCredentialClaimMetadata.self)
-                .map { $0.toSwiftCredentialClaimMetadata() }
-        )
-    }
-}
-
-private extension MobileWalletTransactionCodeRequirement {
-    func toSwiftTransactionCodeRequirement() -> TransactionCodeRequirement {
-        TransactionCodeRequirement(
-            inputMode: inputMode == .numeric ? .numeric : .text,
-            length: length?.intValue,
-            description: descriptionText
         )
     }
 }

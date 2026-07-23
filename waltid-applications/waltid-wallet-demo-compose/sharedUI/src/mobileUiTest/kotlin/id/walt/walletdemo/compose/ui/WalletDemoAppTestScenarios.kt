@@ -38,7 +38,9 @@ import id.walt.walletdemo.compose.logic.WalletDemoCredentialClaimMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoIssuerMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
-import id.walt.walletdemo.compose.logic.WalletDemoIssuancePreviewHandle
+import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
+import id.walt.walletdemo.compose.logic.WalletDemoIssuanceOutcome
+import id.walt.walletdemo.compose.logic.WalletDemoIssuanceSession
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
 import id.walt.walletdemo.compose.logic.WalletDemoOfferedCredentialMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialOption
@@ -1026,7 +1028,7 @@ private class FakeDemoWallet(
     var previewedRequestUrl: String? = null
     var submittedRequestUrl: String? = null
     var rejectedRequestUrl: String? = null
-    private val issuanceSources = mutableMapOf<WalletDemoIssuancePreviewHandle, String>()
+    private val issuanceSources = mutableMapOf<String, String>()
     private val presentationSources = mutableMapOf<WalletDemoPresentationPreviewHandle, String>()
 
     override suspend fun bootstrap(): WalletDemoBootstrapResult {
@@ -1036,11 +1038,17 @@ private class FakeDemoWallet(
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 
-    override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview {
-        val handle = WalletDemoIssuancePreviewHandle("fake-issuance-preview-${issuanceSources.size}")
-        issuanceSources[handle] = offerUrl
-        return WalletDemoOfferPreview(
-            previewHandle = handle,
+    override suspend fun startIssuance(
+        offerUrl: String,
+        redirectUri: String,
+        did: String?,
+    ): WalletDemoIssuanceSession {
+        val sessionId = "fake-issuance-session-${issuanceSources.size}"
+        issuanceSources[sessionId] = offerUrl
+        return WalletDemoIssuanceSession(
+            id = sessionId,
+            grant = WalletDemoIssuanceGrant.PreAuthorizedCode,
+            preview = WalletDemoOfferPreview(
             issuer = WalletDemoIssuerMetadata(
                 credentialIssuer = "https://issuer.example",
                 display = WalletDemoMetadataDisplay(
@@ -1057,19 +1065,32 @@ private class FakeDemoWallet(
                     description = "Enter the six-digit code",
                 )
             },
+            ),
         )
     }
 
-    override suspend fun receive(previewHandle: WalletDemoIssuancePreviewHandle, txCode: String?): List<String> {
-        receivedOfferUrl = issuanceSources[previewHandle]
+    override suspend fun continuePreAuthorizedIssuance(
+        sessionId: String,
+        transactionCode: String?,
+    ): WalletDemoIssuanceOutcome {
+        receivedOfferUrl = issuanceSources[sessionId]
         receiveGate?.await()
         credentialsAfterReceive?.let { credentials = it }
-        return receivedCredentialIds
+        return WalletDemoIssuanceOutcome.Stored(receivedCredentialIds)
     }
 
-    override suspend fun discardIssuancePreview(previewHandle: WalletDemoIssuancePreviewHandle) {
-        issuanceSources.remove(previewHandle)
+    override suspend fun continueAuthorizationIssuance(
+        sessionId: String,
+        callbackUri: String,
+    ): WalletDemoIssuanceOutcome = WalletDemoIssuanceOutcome.Failed("Authorization code is not configured")
+
+    override suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome {
+        issuanceSources.remove(sessionId)
+        return WalletDemoIssuanceOutcome.Cancelled
     }
+
+    override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome =
+        WalletDemoIssuanceOutcome.Failed("Deferred issuance is not configured")
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult {
         presentedRequestUrl = requestUrl
