@@ -2,37 +2,14 @@ name: iOS build and test
 
 on:
   workflow_dispatch:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, labeled, unlabeled]
-  push:
-    branches: [main]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
-permissions:
-  contents: read
-  pull-requests: read
+  workflow_call:
 
 env:
   XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
   IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=latest
 
 jobs:
-  macos-eligibility:
-    uses: ./.github/workflows/macos-eligibility.yml
-    with:
-      event-name: ${{ github.event_name }}
-      ref: ${{ github.ref }}
-      pr-number: ${{ github.event.pull_request.number || '' }}
-      pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
-      pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
-      pr-draft: ${{ github.event.pull_request.draft || false }}
-
   ios-simulator-tests:
-    needs: macos-eligibility
-    if: ${{ needs.macos-eligibility.outputs.should-run == 'true' }}
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
@@ -61,8 +38,6 @@ jobs:
           test-result-artifact-name: ios-simulator-test-results
 
   wallet-core-native-ios-demo-tests:
-    needs: macos-eligibility
-    if: ${{ needs.macos-eligibility.outputs.should-run == 'true' }}
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
@@ -91,8 +66,6 @@ jobs:
           test-result-artifact-name: native-ios-demo-test-results
 
   compose-ios-demo-tests:
-    needs: macos-eligibility
-    if: ${{ needs.macos-eligibility.outputs.should-run == 'true' }}
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
@@ -122,8 +95,6 @@ jobs:
           test-result-artifact-name: compose-ios-demo-test-results
 
   enterprise-ios-mobile-tests:
-    needs: macos-eligibility
-    if: ${{ needs.macos-eligibility.outputs.should-run == 'true' }}
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
@@ -218,43 +189,3 @@ jobs:
         run: |
           echo "::error::Enterprise iOS mobile platform tests failed"
           exit 1
-
-  gradle:
-    runs-on: ubuntu-22.04
-    needs:
-      - macos-eligibility
-      - ios-simulator-tests
-      - wallet-core-native-ios-demo-tests
-      - compose-ios-demo-tests
-      - enterprise-ios-mobile-tests
-    if: always()
-    steps:
-      - name: Verify iOS workflow jobs
-        run: |
-          set -euo pipefail
-          failed=()
-
-          if [[ "${{ needs.macos-eligibility.outputs.should-run }}" != "true" ]]; then
-            echo "macOS eligibility skipped this run: ${{ needs.macos-eligibility.outputs.reason }}"
-            exit 0
-          fi
-
-          if [[ "${{ needs.ios-simulator-tests.result }}" != "success" ]]; then
-            failed+=("ios-simulator-tests=${{ needs.ios-simulator-tests.result }}")
-          fi
-          if [[ "${{ needs.wallet-core-native-ios-demo-tests.result }}" != "success" ]]; then
-            failed+=("wallet-core-native-ios-demo-tests=${{ needs.wallet-core-native-ios-demo-tests.result }}")
-          fi
-          if [[ "${{ needs.compose-ios-demo-tests.result }}" != "success" ]]; then
-            failed+=("compose-ios-demo-tests=${{ needs.compose-ios-demo-tests.result }}")
-          fi
-          if [[ "${{ needs.enterprise-ios-mobile-tests.result }}" != "success" ]]; then
-            failed+=("enterprise-ios-mobile-tests=${{ needs.enterprise-ios-mobile-tests.result }}")
-          fi
-
-          if (( ${#failed[@]} > 0 )); then
-            printf '::error::iOS workflow job(s) failed: %s\n' "${failed[*]}"
-            exit 1
-          fi
-
-          echo "All iOS workflow jobs succeeded."

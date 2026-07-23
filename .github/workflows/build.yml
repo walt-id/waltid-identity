@@ -1,8 +1,8 @@
-name: Build on every push
+name: Build and test
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
     paths-ignore: &docs-and-assets
       - '**/*.md'
       - '**/*.png'
@@ -22,7 +22,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  checks: write
+  pull-requests: read
+
 jobs:
+  version:
+    uses: ./.github/workflows/version.yml
   android-eligibility:
     uses: ./.github/workflows/android-eligibility.yml
     with:
@@ -32,10 +39,32 @@ jobs:
       pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
       pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
       pr-draft: ${{ github.event.pull_request.draft || false }}
-  version:
-    uses: walt-id/waltid-identity/.github/workflows/version.yml@6bb27c98fb66d9525dcc5ed8b0e703ff07a18c4a
+  macos-eligibility:
+    uses: ./.github/workflows/macos-eligibility.yml
+    with:
+      event-name: ${{ github.event_name }}
+      ref: ${{ github.ref }}
+      pr-number: ${{ github.event.pull_request.number || '' }}
+      pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
+      pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
+      pr-draft: ${{ github.event.pull_request.draft || false }}
+  sdk-docs:
+    uses: ./.github/workflows/mobile-sdk-docs.yml
+    needs: macos-eligibility
+    if: ${{ needs.macos-eligibility.outputs.should-run == 'true' }}
+    secrets: inherit
+  ios-tests:
+    uses: ./.github/workflows/gradle-macos.yml
+    needs: macos-eligibility
+    if: ${{ needs.macos-eligibility.outputs.should-run == 'true' }}
+    secrets: inherit
+  android-device-tests:
+    uses: ./.github/workflows/android-device-tests.yml
+    needs: android-eligibility
+    if: ${{ needs.android-eligibility.outputs.should-run == 'true' }}
+    secrets: inherit
   gradle-build:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@0601e9b457f63238dfbc2a9a4fa54b7b1aee0a9d
+    uses: ./.github/workflows/gradle.yml
     secrets: inherit
     needs:
       - android-eligibility
