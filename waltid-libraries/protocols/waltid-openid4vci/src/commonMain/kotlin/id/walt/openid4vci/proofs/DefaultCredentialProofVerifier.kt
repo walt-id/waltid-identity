@@ -284,7 +284,6 @@ class DefaultCredentialProofVerifier(
         if (!jwt.isNullOrEmpty()) add(ProofTypeId.JWT.value)
         if (!diVp.isNullOrEmpty()) add(ProofTypeId.DI_VP.value)
         if (!attestation.isNullOrEmpty()) add(ProofTypeId.ATTESTATION.value)
-        additional.keys.forEach { add(it) }
     }
 
     private fun JsonObject.requiredStringHeader(name: String): String =
