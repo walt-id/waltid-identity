@@ -363,7 +363,7 @@ class TokenRequestBuilderTest {
         }
 
         val builder = TokenRequestBuilder(clientConfig, client)
-        val error = assertFailsWith<IllegalStateException> {
+        val error = assertFailsWith<TokenRequestException> {
             builder.exchangePreAuthorizedCode(
                 tokenEndpoint = tokenEndpoint,
                 preAuthorizedCode = "pre-auth-code",
@@ -371,7 +371,49 @@ class TokenRequestBuilderTest {
             )
         }
 
-        assertContains(error.message.orEmpty(), "Cross-origin redirect")
+        assertEquals("unsafe_redirect", error.oauthError)
         assertEquals(1, callCount)
+    }
+
+    @Test
+    fun testDpopNonceChallengeRegeneratesProof() = runTest {
+        var callCount = 0
+        val proofInputs = mutableListOf<Pair<String, String?>>()
+        val client = createMockClient { request ->
+            callCount += 1
+            assertEquals("proof-$callCount", request.headers["DPoP"])
+            if (callCount == 1) {
+                respond(
+                    content = "{}",
+                    status = HttpStatusCode.Unauthorized,
+                    headers = headersOf(
+                        HttpHeaders.ContentType to listOf("application/json"),
+                        HttpHeaders.WWWAuthenticate to listOf("DPoP error=\"use_dpop_nonce\""),
+                        "DPoP-Nonce" to listOf("server-nonce"),
+                    ),
+                )
+            } else {
+                respond(
+                    content = """{"access_token":"dpop-token","token_type":"DPoP"}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            }
+        }
+
+        val response = TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
+            tokenEndpoint = tokenEndpoint,
+            code = "auth-code",
+            dpopProofFactory = { endpoint, nonce ->
+                proofInputs += endpoint to nonce
+                "proof-${proofInputs.size}"
+            },
+        )
+
+        assertEquals("dpop-token", response.access_token)
+        assertEquals(
+            listOf(tokenEndpoint to null, tokenEndpoint to "server-nonce"),
+            proofInputs,
+        )
     }
 }

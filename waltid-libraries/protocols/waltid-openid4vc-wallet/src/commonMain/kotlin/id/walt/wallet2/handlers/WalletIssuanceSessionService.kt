@@ -1,0 +1,1064 @@
+package id.walt.wallet2.handlers
+
+import id.walt.credentials.CredentialParser
+import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto.keys.Key
+import id.walt.openid4vci.CryptographicBindingMethod
+import id.walt.openid4vci.GrantType
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
+import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
+import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
+import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
+import id.walt.openid4vci.offers.CredentialOffer
+import id.walt.openid4vci.responses.credential.CredentialResponse
+import id.walt.openid4vci.responses.credential.IssuedCredential
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
+import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.LoggingConfiguration
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
+import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
+import id.waltid.openid4vci.wallet.authorization.AuthorizationResponseParser
+import id.waltid.openid4vci.wallet.dpop.DPoPProofBuilder
+import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
+import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
+import id.waltid.openid4vci.wallet.nonce.NonceRequestBuilder
+import id.waltid.openid4vci.wallet.nonce.NonceRequestError
+import id.waltid.openid4vci.wallet.nonce.NonceRequestException
+import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
+import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
+import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
+import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
+import id.waltid.openid4vci.wallet.token.DPoPProofFactory
+import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
+import id.waltid.openid4vci.wallet.token.TokenRequestException
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.Parameters
+import io.ktor.http.URLBuilder
+import io.ktor.http.Url
+import io.ktor.http.formUrlEncode
+import io.ktor.http.isSuccess
+import io.ktor.http.contentType
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
+import kotlin.time.Clock
+import kotlin.uuid.Uuid
+
+/** Grant selected for a resolved issuance session. */
+@Serializable
+enum class WalletIssuanceGrant {
+    PRE_AUTHORIZED_CODE,
+    AUTHORIZATION_CODE,
+}
+
+/** Typed transaction-code requirement from a pre-authorized offer. */
+@Serializable
+data class WalletIssuanceTransactionCode(
+    val inputMode: String?,
+    val length: Int?,
+    val descriptionText: String?,
+)
+
+/** Issuer display information safe for an app review screen. */
+@Serializable
+data class WalletIssuanceIssuerPreview(
+    val identifier: String,
+    val name: String?,
+    val locale: String?,
+    val logoUri: String?,
+    val logoAltText: String?,
+)
+
+/** Offered credential information safe for an app review screen. */
+@Serializable
+data class WalletIssuanceCredentialPreview(
+    val configurationId: String,
+    val format: String,
+    val name: String?,
+    val descriptionText: String?,
+    val logoUri: String?,
+)
+
+/** Typed offer preview retained by the issuance session. */
+@Serializable
+data class WalletIssuanceOfferPreview(
+    val grant: WalletIssuanceGrant,
+    val issuer: WalletIssuanceIssuerPreview,
+    val credentials: List<WalletIssuanceCredentialPreview>,
+    val transactionCode: WalletIssuanceTransactionCode?,
+)
+
+/** PKCE material bound to an authorization-code session. */
+@Serializable
+data class WalletIssuancePkceState(
+    val codeVerifier: String,
+    val codeChallenge: String,
+    val codeChallengeMethod: String,
+) {
+    override fun toString(): String =
+        "WalletIssuancePkceState(codeVerifier=<redacted>, codeChallenge=<redacted>, codeChallengeMethod=$codeChallengeMethod)"
+}
+
+/** Browser request and callback binding for an authorization-code session. */
+@Serializable
+data class WalletIssuanceAuthorization(
+    val url: String,
+    val state: String,
+    val redirectUri: String,
+    val pkce: WalletIssuancePkceState,
+    val pushedAuthorizationRequestUsed: Boolean,
+) {
+    override fun toString(): String =
+        "WalletIssuanceAuthorization(url=<redacted>, state=<redacted>, redirectUri=$redirectUri, " +
+            "pkce=$pkce, pushedAuthorizationRequestUsed=$pushedAuthorizationRequestUsed)"
+}
+
+/** Public handle returned by [WalletIssuanceSessionService.start]. */
+@Serializable
+data class WalletIssuanceSession(
+    val id: String,
+    val offer: WalletIssuanceOfferPreview,
+    val authorization: WalletIssuanceAuthorization?,
+) {
+    override fun toString(): String =
+        "WalletIssuanceSession(id=$id, offer=$offer, authorization=${authorization?.let { "<redacted>" }})"
+}
+
+/** Input used to start either supported grant from one offer. */
+@Serializable
+data class WalletIssuanceSessionRequest(
+    override val offerUrl: Url? = null,
+    override val offerJson: JsonObject? = null,
+    val key: DirectSerializedKey? = null,
+    val keyId: String? = null,
+    val did: String? = null,
+    val clientId: String = "eudiw-abca",
+    val redirectUri: Url = Url("openid://"),
+    val tokenRequestHeaders: Map<String, String> = emptyMap(),
+) : CredentialOfferSource {
+    init {
+        checkOfferSource()
+        require(clientId.isNotBlank()) { "clientId cannot be blank" }
+    }
+
+    override fun toString(): String =
+        "WalletIssuanceSessionRequest(offer=<redacted>, key=<redacted>, keyId=${keyId?.let { "<redacted>" }}, " +
+            "did=${did?.let { "<redacted>" }}, " +
+            "clientId=$clientId, redirectUri=$redirectUri, tokenRequestHeaders=${tokenRequestHeaders.keys})"
+}
+
+/** Callback continuation supplied after the browser returns to the wallet. */
+@Serializable
+data class WalletIssuanceAuthorizationCallback(
+    val sessionId: String,
+    val callbackUri: String,
+) {
+    override fun toString(): String =
+        "WalletIssuanceAuthorizationCallback(sessionId=$sessionId, callbackUri=<redacted>)"
+}
+
+/** Public reference for a credential that must be polled later. */
+@Serializable
+data class WalletDeferredCredential(
+    val id: String,
+    val credentialConfigurationId: String,
+    val intervalSeconds: Long?,
+)
+
+/** Stable failure categories returned without protocol secrets or response bodies. */
+@Serializable
+enum class WalletIssuanceErrorCode {
+    INVALID_SESSION,
+    INVALID_CALLBACK,
+    INVALID_INPUT,
+    AUTHORIZATION_FAILED,
+    ISSUER_METADATA,
+    ISSUER_RESPONSE,
+    NETWORK,
+    CRYPTO,
+    STORAGE,
+    PROTOCOL,
+}
+
+@Serializable
+data class WalletIssuanceError(
+    val code: WalletIssuanceErrorCode,
+    val message: String,
+)
+
+/** Terminal or pending result of an issuance-session transition. */
+sealed interface WalletIssuanceOutcome {
+    val sessionId: String
+
+    data class Stored(
+        override val sessionId: String,
+        val credentialIds: List<String>,
+    ) : WalletIssuanceOutcome
+
+    data class Deferred(
+        override val sessionId: String,
+        val storedCredentialIds: List<String>,
+        val credentials: List<WalletDeferredCredential>,
+    ) : WalletIssuanceOutcome
+
+    data class Cancelled(
+        override val sessionId: String,
+    ) : WalletIssuanceOutcome
+
+    data class Failed(
+        override val sessionId: String,
+        val error: WalletIssuanceError,
+        val storedCredentialIds: List<String> = emptyList(),
+    ) : WalletIssuanceOutcome
+}
+
+/**
+ * Stateful OpenID4VCI 1.0 engine shared by pre-authorized and authorization-code grants.
+ *
+ * Protocol secrets stay in the engine. Public handles contain review data and callback state,
+ * while transitions are validated against the authoritative in-memory record and are single-use.
+ */
+class WalletIssuanceSessionService(
+    private val wallet: Wallet,
+    private val attestationAssembler: ClientAttestationAssembler? = null,
+    private val onEvent: suspend (WalletSessionEvent) -> Unit = {},
+    private val httpClient: HttpClient = WebDataFetcher(
+        WebDataFetcherId.WALLET2_ISSUANCE_HANDLER,
+        WebDataFetchingConfiguration(logging = LoggingConfiguration(enable = false)),
+    ).httpClient,
+) {
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
+    private val mutex = Mutex()
+    private val sessions = LinkedHashMap<String, ActiveSession>()
+    private val deferred = LinkedHashMap<String, DeferredRecord>()
+
+    /** Resolves and binds an offer, returning a browser request only for authorization-code grants. */
+    suspend fun start(request: WalletIssuanceSessionRequest): WalletIssuanceSession {
+        val key = wallet.resolveKey(request.key, request.keyId)
+            ?: error("No holder key is available for credential issuance")
+        val resolved = resolve(request)
+        val grant = resolved.offer.getGrantType()
+            ?: error("Credential offer does not contain a supported grant")
+        val sessionId = Uuid.random().toString()
+        val authorizationState = if (grant is GrantType.AuthorizationCode) {
+            buildAuthorization(resolved, request, key)
+        } else {
+            null
+        }
+        val publicSession = WalletIssuanceSession(
+            id = sessionId,
+            offer = resolved.toPreview(grant),
+            authorization = authorizationState?.public,
+        )
+        val active = ActiveSession(
+            public = publicSession,
+            request = request,
+            resolved = resolved,
+            key = key,
+            did = request.did ?: wallet.defaultDid(),
+            authorization = authorizationState,
+            state = if (grant is GrantType.AuthorizationCode) SessionState.AWAITING_CALLBACK else SessionState.READY,
+        )
+        mutex.withLock {
+            if (sessions.size >= MAX_ACTIVE_SESSIONS) sessions.remove(sessions.keys.first())
+            sessions[sessionId] = active
+        }
+        onEvent(WalletSessionEvent.issuance_offer_resolved)
+        return publicSession
+    }
+
+    /** Continues a pre-authorized session with the separately delivered transaction code. */
+    suspend fun continuePreAuthorized(sessionId: String, transactionCode: String? = null): WalletIssuanceOutcome {
+        val active = beginTransition(sessionId, SessionState.READY) ?: return invalidSession(sessionId)
+        val grant = active.resolved.offer.grants?.preAuthorizedCode
+            ?: return failAndRemove(sessionId, WalletIssuanceErrorCode.INVALID_SESSION)
+        val requirement = grant.txCode
+        if (requirement != null && transactionCode.isNullOrBlank()) {
+            return failAndRemove(sessionId, WalletIssuanceErrorCode.INVALID_INPUT)
+        }
+        return complete(active) {
+            tokenForPreAuthorized(active, grant.preAuthorizedCode, transactionCode)
+        }
+    }
+
+    /** Strictly validates and consumes an authorization callback before exchanging its code. */
+    suspend fun continueAuthorization(callback: WalletIssuanceAuthorizationCallback): WalletIssuanceOutcome {
+        val active = beginTransition(callback.sessionId, SessionState.AWAITING_CALLBACK)
+            ?: return invalidSession(callback.sessionId)
+        val authorization = active.authorization
+            ?: return failAndRemove(callback.sessionId, WalletIssuanceErrorCode.INVALID_SESSION)
+        val parsed = try {
+            AuthorizationResponseParser.parseAuthorizationResponse(
+                redirectUri = callback.callbackUri,
+                expectedState = authorization.public.state,
+                expectedRedirectUri = active.request.redirectUri.toString(),
+            )
+        } catch (error: AuthorizationResponseParser.AuthorizationErrorException) {
+            return if (error.authError.error == "access_denied") {
+                removeSession(callback.sessionId)
+                WalletIssuanceOutcome.Cancelled(callback.sessionId)
+            } else {
+                failAndRemove(callback.sessionId, WalletIssuanceErrorCode.AUTHORIZATION_FAILED)
+            }
+        } catch (_: Exception) {
+            return failAndRemove(callback.sessionId, WalletIssuanceErrorCode.INVALID_CALLBACK)
+        }
+        return complete(active) {
+            tokenForAuthorizationCode(active, parsed.code, authorization.pkce.codeVerifier)
+        }
+    }
+
+    /** Cancels an active session and removes any deferred continuations bound to it. */
+    suspend fun cancel(sessionId: String): WalletIssuanceOutcome {
+        val removed = mutex.withLock {
+            val active = sessions[sessionId]
+            if (active?.state == SessionState.PROCESSING) return@withLock false
+            val activeRemoved = sessions.remove(sessionId) != null
+            val deferredRemoved = deferred.entries.removeAll { it.value.sessionId == sessionId }
+            activeRemoved || deferredRemoved
+        }
+        return if (removed) WalletIssuanceOutcome.Cancelled(sessionId) else invalidSession(sessionId)
+    }
+
+    /** Polls one deferred result while preserving its access material inside the engine. */
+    suspend fun resumeDeferred(deferredCredentialId: String): WalletIssuanceOutcome {
+        val record = mutex.withLock { deferred.remove(deferredCredentialId) }
+            ?: return invalidSession(deferredCredentialId)
+        val response = try {
+            postProtected(
+                endpoint = record.endpoint,
+                accessToken = record.accessToken,
+                tokenType = record.tokenType,
+                dpop = record.dpop,
+                key = record.key,
+                dpopNonce = record.dpopNonce,
+                body = buildJsonObject { put("transaction_id", record.transactionId) }.toString(),
+            )
+        } catch (error: IssuanceStageException) {
+            if (error.code == WalletIssuanceErrorCode.NETWORK) {
+                mutex.withLock { deferred[record.public.id] = record }
+            }
+            return failed(record.sessionId, error.code)
+        } catch (_: Exception) {
+            return failed(record.sessionId, WalletIssuanceErrorCode.PROTOCOL)
+        }
+
+        if (response.response.status == HttpStatusCode.Accepted || response.response.oauthError() == "issuance_pending") {
+            mutex.withLock { deferred[record.public.id] = record.copy(dpopNonce = response.dpopNonce) }
+            return WalletIssuanceOutcome.Deferred(record.sessionId, emptyList(), listOf(record.public))
+        }
+        if (response.response.status != HttpStatusCode.OK) {
+            mutex.withLock { deferred[record.public.id] = record.copy(dpopNonce = response.dpopNonce) }
+            return failed(record.sessionId, WalletIssuanceErrorCode.ISSUER_RESPONSE)
+        }
+
+        return try {
+            val credentials = response.response.body<CredentialResponse>().credentials
+                ?.takeIf { it.isNotEmpty() }
+                ?: return failed(record.sessionId, WalletIssuanceErrorCode.PROTOCOL)
+            val stored = credentials.map { wallet.parseAndStore(it, record.label) }
+            stored.forEach { onEvent(WalletSessionEvent.issuance_credential_stored) }
+            onEvent(WalletSessionEvent.issuance_completed)
+            WalletIssuanceOutcome.Stored(record.sessionId, stored.map { it.id })
+        } catch (_: Exception) {
+            failed(record.sessionId, WalletIssuanceErrorCode.STORAGE)
+        }
+    }
+
+    private suspend fun complete(
+        active: ActiveSession,
+        obtainToken: suspend () -> TokenRequestBuilder.TokenResponse,
+    ): WalletIssuanceOutcome {
+        val storedIds = mutableListOf<String>()
+        return try {
+            val dpop = active.dpopAlgorithms()
+            if (dpop != null && active.key.keyType.jwsAlg !in dpop) {
+                throw IssuanceStageException(WalletIssuanceErrorCode.CRYPTO)
+            }
+            val token = obtainToken()
+            validateTokenType(token.token_type, dpop != null)
+            onEvent(WalletSessionEvent.issuance_token_obtained)
+
+            val deferredResults = issueCredentials(active, token, dpop, storedIds)
+            removeSession(active.public.id)
+            if (deferredResults.isNotEmpty()) {
+                onEvent(WalletSessionEvent.issuance_deferred)
+                WalletIssuanceOutcome.Deferred(active.public.id, storedIds, deferredResults)
+            } else {
+                onEvent(WalletSessionEvent.issuance_completed)
+                WalletIssuanceOutcome.Stored(active.public.id, storedIds)
+            }
+        } catch (error: TokenRequestException) {
+            removeSession(active.public.id)
+            failed(
+                active.public.id,
+                if (error.statusCode == 0) WalletIssuanceErrorCode.NETWORK else WalletIssuanceErrorCode.ISSUER_RESPONSE,
+                storedIds,
+            )
+        } catch (error: IssuanceStageException) {
+            removeSession(active.public.id)
+            failed(active.public.id, error.code, storedIds)
+        } catch (_: IllegalArgumentException) {
+            removeSession(active.public.id)
+            failed(active.public.id, WalletIssuanceErrorCode.PROTOCOL, storedIds)
+        } catch (_: Exception) {
+            removeSession(active.public.id)
+            failed(active.public.id, WalletIssuanceErrorCode.ISSUER_RESPONSE, storedIds)
+        }
+    }
+
+    private suspend fun issueCredentials(
+        active: ActiveSession,
+        token: TokenRequestBuilder.TokenResponse,
+        dpopAlgorithms: Set<String>?,
+        storedIds: MutableList<String>,
+    ): List<WalletDeferredCredential> {
+        val pending = mutableListOf<WalletDeferredCredential>()
+        for (offered in active.resolved.offeredCredentials) {
+            val proof = try {
+                proofForCredential(active, offered.configuration)
+            } catch (error: Exception) {
+                throw IssuanceStageException(WalletIssuanceErrorCode.CRYPTO, error)
+            }
+            val nonceResult = if (proof.required) fetchNonce(active.resolved.issuerMetadata) else null
+            val proofJwt = if (proof.required) {
+                try {
+                    buildCredentialProof(active, offered.configuration, nonceResult!!.cNonce)
+                } catch (error: Exception) {
+                    throw IssuanceStageException(WalletIssuanceErrorCode.CRYPTO, error)
+                }
+            } else {
+                null
+            }
+            if (proofJwt != null) onEvent(WalletSessionEvent.issuance_proof_signed)
+
+            val requestBody = buildJsonObject {
+                put("credential_configuration_id", offered.credentialConfigurationId)
+                proofJwt?.let { jwt ->
+                    putJsonObject("proofs") {
+                        put("jwt", buildJsonArray { add(JsonPrimitive(jwt)) })
+                    }
+                }
+            }.toString()
+            val protected = postProtected(
+                endpoint = active.resolved.issuerMetadata.credentialEndpoint,
+                accessToken = token.access_token,
+                tokenType = token.token_type,
+                dpop = dpopAlgorithms,
+                key = active.key,
+                dpopNonce = nonceResult?.dpopNonce,
+                body = requestBody,
+            )
+
+            when (protected.response.status) {
+                HttpStatusCode.OK -> {
+                    val response = try {
+                        protected.response.body<CredentialResponse>()
+                    } catch (error: Exception) {
+                        throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL, error)
+                    }
+                    if (response.transactionId != null || response.credentials.isNullOrEmpty()) {
+                        throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL)
+                    }
+                    val credentials = response.credentials
+                        ?: throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL)
+                    onEvent(WalletSessionEvent.issuance_credential_received)
+                    val label = offered.configuration.credentialMetadata?.display?.firstOrNull()?.name
+                    credentials.forEach { issued ->
+                        val stored = try {
+                            wallet.parseAndStore(issued, label)
+                        } catch (error: Exception) {
+                            throw IssuanceStageException(WalletIssuanceErrorCode.STORAGE, error)
+                        }
+                        storedIds += stored.id
+                        onEvent(WalletSessionEvent.issuance_credential_stored)
+                    }
+                }
+
+                HttpStatusCode.Accepted -> {
+                    val response = try {
+                        protected.response.body<CredentialResponse>()
+                    } catch (error: Exception) {
+                        throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL, error)
+                    }
+                    if (response.credentials != null || response.transactionId.isNullOrBlank()) {
+                        throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL)
+                    }
+                    val transactionId = response.transactionId
+                        ?: throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL)
+                    val deferredEndpoint = active.resolved.issuerMetadata.deferredCredentialEndpoint
+                        ?: throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL)
+                    val public = WalletDeferredCredential(
+                        id = Uuid.random().toString(),
+                        credentialConfigurationId = offered.credentialConfigurationId,
+                        intervalSeconds = response.interval,
+                    )
+                    val label = offered.configuration.credentialMetadata?.display?.firstOrNull()?.name
+                    mutex.withLock {
+                        deferred[public.id] = DeferredRecord(
+                            public = public,
+                            sessionId = active.public.id,
+                            endpoint = deferredEndpoint,
+                            transactionId = transactionId,
+                            accessToken = token.access_token,
+                            tokenType = token.token_type,
+                            dpop = dpopAlgorithms,
+                            dpopNonce = protected.dpopNonce,
+                            key = active.key,
+                            label = label,
+                        )
+                    }
+                    pending += public
+                }
+
+                else -> throw IssuanceStageException(WalletIssuanceErrorCode.ISSUER_RESPONSE)
+            }
+        }
+        return pending
+    }
+
+    private suspend fun tokenForPreAuthorized(
+        active: ActiveSession,
+        preAuthorizedCode: String,
+        transactionCode: String?,
+    ): TokenRequestBuilder.TokenResponse {
+        val metadata = active.resolved.authorizationServerMetadata
+        val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
+        val attestation = attestationHeaders(metadata, active.request.clientId, active.key)
+        val anonymous = metadata.preAuthorizedGrantAnonymousAccessSupported == true &&
+            active.request.tokenRequestHeaders.isEmpty() && attestation == null
+        return TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangePreAuthorizedCode(
+            tokenEndpoint = tokenEndpoint,
+            preAuthorizedCode = preAuthorizedCode,
+            txCode = transactionCode,
+            additionalHeaders = active.request.tokenRequestHeaders,
+            attestationHeaders = attestation,
+            anonymous = anonymous,
+            dpopProofFactory = active.dpopFactory(),
+        )
+    }
+
+    private suspend fun tokenForAuthorizationCode(
+        active: ActiveSession,
+        code: String,
+        codeVerifier: String,
+    ): TokenRequestBuilder.TokenResponse {
+        val metadata = active.resolved.authorizationServerMetadata
+        val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
+        val attestation = attestationHeaders(metadata, active.request.clientId, active.key)
+        return TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangeAuthorizationCode(
+            tokenEndpoint = tokenEndpoint,
+            code = code,
+            codeVerifier = codeVerifier,
+            additionalHeaders = active.request.tokenRequestHeaders,
+            attestationHeaders = attestation,
+            dpopProofFactory = active.dpopFactory(),
+        )
+    }
+
+    private fun ActiveSession.dpopAlgorithms(): Set<String>? =
+        resolved.authorizationServerMetadata.dpopSigningAlgValuesSupported
+            ?.takeIf { it.isNotEmpty() }
+
+    private fun ActiveSession.dpopFactory(): DPoPProofFactory? =
+        dpopAlgorithms()?.let { algorithms ->
+            { endpoint: String, nonce: String? ->
+                DPoPProofBuilder().buildProof(
+                    key = key,
+                    httpMethod = "POST",
+                    targetUri = endpoint,
+                    nonce = nonce,
+                    supportedAlgorithms = algorithms,
+                )
+            }
+        }
+
+    private suspend fun buildAuthorization(
+        resolved: ResolvedOffer,
+        request: WalletIssuanceSessionRequest,
+        key: Key,
+    ): AuthorizationState {
+        val metadata = resolved.authorizationServerMetadata
+        val endpoint = requireNotNull(metadata.authorizationEndpoint) {
+            "Authorization server has no authorization endpoint"
+        }
+        val builder = AuthorizationRequestBuilder(
+            ClientConfiguration(request.clientId, listOf(request.redirectUri.toString()))
+        )
+        val credentialConfigurationIds = resolved.offeredCredentials.map { it.credentialConfigurationId }
+        val issuerState = resolved.offer.grants?.authorizationCode?.issuerState
+        val parEndpoint = metadata.pushedAuthorizationRequestEndpoint
+        require(metadata.requirePushedAuthorizationRequests != true || parEndpoint != null) {
+            "Authorization server requires PAR but does not advertise an endpoint"
+        }
+
+        if (parEndpoint != null) {
+            val pushed = builder.buildPushedAuthorizationRequestStateForCredentialConfigurations(
+                credentialConfigurationIds = credentialConfigurationIds,
+                issuerState = issuerState,
+                usePKCE = true,
+                metadata = metadata,
+                redirectUri = request.redirectUri.toString(),
+            )
+            val attestation = attestationHeaders(metadata, request.clientId, key)
+            val response = httpClient.post(parEndpoint) {
+                contentType(ContentType.Application.FormUrlEncoded)
+                setBody(Parameters.build {
+                    pushed.parameters.forEach { (name, value) -> append(name, value) }
+                }.formUrlEncode())
+                attestation?.let { headers ->
+                    header(ClientAttestationHeaders.HEADER_ATTESTATION, headers.attestationJwt)
+                    header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, headers.popJwt)
+                }
+            }
+            require(response.status.isSuccess()) { "Pushed authorization request failed" }
+            val par = response.body<PushedAuthorizationResponse>()
+            val browserUrl = URLBuilder(endpoint).apply {
+                parameters.append("client_id", request.clientId)
+                parameters.append("request_uri", par.requestUri)
+            }.buildString()
+            val pkce = requireNotNull(pushed.pkceData)
+            return AuthorizationState(
+                public = WalletIssuanceAuthorization(
+                    url = browserUrl,
+                    state = pushed.state,
+                    redirectUri = request.redirectUri.toString(),
+                    pkce = WalletIssuancePkceState(
+                        codeVerifier = pkce.codeVerifier,
+                        codeChallenge = pkce.codeChallenge,
+                        codeChallengeMethod = pkce.codeChallengeMethod.value,
+                    ),
+                    pushedAuthorizationRequestUsed = true,
+                ),
+                pkce = pkce,
+            )
+        }
+
+        val direct = builder.buildAuthorizationRequestForCredentialConfigurations(
+            authorizationEndpoint = endpoint,
+            credentialConfigurationIds = credentialConfigurationIds,
+            issuerState = issuerState,
+            usePKCE = true,
+            metadata = metadata,
+            redirectUri = request.redirectUri.toString(),
+        )
+        val pkce = requireNotNull(direct.pkceData)
+        return AuthorizationState(
+            public = WalletIssuanceAuthorization(
+                url = direct.url,
+                state = direct.state,
+                redirectUri = request.redirectUri.toString(),
+                pkce = WalletIssuancePkceState(
+                    codeVerifier = pkce.codeVerifier,
+                    codeChallenge = pkce.codeChallenge,
+                    codeChallengeMethod = pkce.codeChallengeMethod.value,
+                ),
+                pushedAuthorizationRequestUsed = false,
+            ),
+            pkce = pkce,
+        )
+    }
+
+    private suspend fun resolve(request: WalletIssuanceSessionRequest): ResolvedOffer {
+        val offer = if (request.offerJson != null) {
+            val inline = json.decodeFromString<CredentialOffer>(request.offerJson.toString())
+            CredentialOfferResolver(httpClient).resolveCredentialOffer(inline, null)
+        } else {
+            val parsed = CredentialOfferParser.parseCredentialOfferUrl(request.getEffectiveOfferString())
+            parsed.credentialOfferUri?.let { requireSecureProtocolUrl(it, "credential_offer_uri") }
+            CredentialOfferResolver(httpClient).resolveCredentialOffer(parsed.credentialOffer, parsed.credentialOfferUri)
+        }
+        requireSecureProtocolUrl(offer.credentialIssuer, "credential_issuer")
+        val resolver = IssuerMetadataResolver(httpClient)
+        val issuerMetadata = resolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
+        require(issuerMetadata.credentialIssuer == offer.credentialIssuer) {
+            "Credential issuer metadata identifier does not match the offer"
+        }
+        requireSecureProtocolUrl(issuerMetadata.credentialEndpoint, "credential_endpoint")
+        issuerMetadata.nonceEndpoint?.let { requireSecureProtocolUrl(it, "nonce_endpoint") }
+        issuerMetadata.deferredCredentialEndpoint?.let {
+            requireSecureProtocolUrl(it, "deferred_credential_endpoint")
+        }
+        val grantAuthorizationServer = when (offer.getGrantType()) {
+            is GrantType.AuthorizationCode -> offer.grants?.authorizationCode?.authorizationServer
+            is GrantType.PreAuthorizedCode -> offer.grants?.preAuthorizedCode?.authorizationServer
+            else -> null
+        }
+        val selectedAuthorizationServer = selectAuthorizationServer(issuerMetadata, grantAuthorizationServer)
+        requireSecureProtocolUrl(selectedAuthorizationServer, "authorization_server")
+        val authorizationServerMetadata = resolver.resolveAuthorizationServerMetadata(selectedAuthorizationServer)
+        require(authorizationServerMetadata.issuer == selectedAuthorizationServer) {
+            "Authorization server metadata issuer does not match the selected server"
+        }
+        authorizationServerMetadata.authorizationEndpoint?.let {
+            requireSecureProtocolUrl(it, "authorization_endpoint")
+        }
+        authorizationServerMetadata.tokenEndpoint?.let { requireSecureProtocolUrl(it, "token_endpoint") }
+        authorizationServerMetadata.pushedAuthorizationRequestEndpoint?.let {
+            requireSecureProtocolUrl(it, "pushed_authorization_request_endpoint")
+        }
+        val offered = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
+        require(offered.isNotEmpty()) { "Credential offer resolved no supported credentials" }
+        if (offered.any { it.configuration.proofTypesSupported != null }) {
+            require(issuerMetadata.nonceEndpoint != null) {
+                "Credential issuer requires key proof but does not advertise nonce_endpoint"
+            }
+        }
+        return ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offered)
+    }
+
+    private fun requireSecureProtocolUrl(value: String, fieldName: String) {
+        val url = Url(value)
+        val loopback = url.host.equals("localhost", ignoreCase = true) ||
+            url.host == "127.0.0.1" || url.host == "::1"
+        require(url.protocol.name.equals("https", ignoreCase = true) || loopback) {
+            "$fieldName must use HTTPS except on a loopback host"
+        }
+    }
+
+    private fun selectAuthorizationServer(
+        issuerMetadata: CredentialIssuerMetadata,
+        grantAuthorizationServer: String?,
+    ): String {
+        val declared = issuerMetadata.authorizationServerIssuers()
+        if (grantAuthorizationServer == null) return declared.first()
+        require(issuerMetadata.authorizationServers?.size?.let { it > 1 } == true) {
+            "Offer authorization_server is only valid when issuer metadata declares multiple servers"
+        }
+        require(grantAuthorizationServer in declared) {
+            "Offer authorization_server is not declared by the credential issuer"
+        }
+        return grantAuthorizationServer
+    }
+
+    private fun ResolvedOffer.toPreview(grant: GrantType): WalletIssuanceOfferPreview {
+        val issuerDisplay = issuerMetadata.display?.firstOrNull()
+        val txCode = offer.grants?.preAuthorizedCode?.txCode
+        return WalletIssuanceOfferPreview(
+            grant = when (grant) {
+                is GrantType.AuthorizationCode -> WalletIssuanceGrant.AUTHORIZATION_CODE
+                is GrantType.PreAuthorizedCode -> WalletIssuanceGrant.PRE_AUTHORIZED_CODE
+                else -> error("Unsupported credential offer grant")
+            },
+            issuer = WalletIssuanceIssuerPreview(
+                identifier = offer.credentialIssuer,
+                name = issuerDisplay?.name,
+                locale = issuerDisplay?.locale,
+                logoUri = issuerDisplay?.logo?.uri,
+                logoAltText = issuerDisplay?.logo?.altText,
+            ),
+            credentials = offeredCredentials.map { offered ->
+                val display = offered.configuration.credentialMetadata?.display?.firstOrNull()
+                WalletIssuanceCredentialPreview(
+                    configurationId = offered.credentialConfigurationId,
+                    format = offered.configuration.format.value,
+                    name = display?.name,
+                    descriptionText = display?.description,
+                    logoUri = display?.logo?.uri,
+                )
+            },
+            transactionCode = txCode?.let {
+                WalletIssuanceTransactionCode(it.inputMode, it.length, it.description)
+            },
+        )
+    }
+
+    private data class CredentialProofRequirement(val required: Boolean)
+
+    private fun proofForCredential(active: ActiveSession, configuration: CredentialConfiguration): CredentialProofRequirement {
+        val proofTypes = configuration.proofTypesSupported ?: return CredentialProofRequirement(false)
+        val jwt = proofTypes["jwt"] ?: error("Issuer requires an unsupported credential proof type")
+        require(active.key.keyType.jwsAlg in jwt.proofSigningAlgValuesSupported) {
+            "Selected holder key algorithm is not supported for credential proof"
+        }
+        return CredentialProofRequirement(true)
+    }
+
+    private suspend fun buildCredentialProof(
+        active: ActiveSession,
+        configuration: CredentialConfiguration,
+        nonce: String,
+    ): String {
+        val methods = requireNotNull(configuration.cryptographicBindingMethodsSupported)
+        val builder = JwtProofBuilder()
+        val proofs = if (methods.any { it is CryptographicBindingMethod.Jwk || it is CryptographicBindingMethod.CoseKey }) {
+            builder.buildJwtProof(
+                key = active.key,
+                audience = active.resolved.offer.credentialIssuer,
+                nonce = nonce,
+                includeJwk = true,
+            )
+        } else {
+            val didUrl = active.did?.takeIf { '#' in it }
+                ?: error("DID-bound credential proof requires a holder DID URL identifying the selected key")
+            val method = didUrl.removePrefix("did:").substringBefore(':')
+            require(methods.any { it is CryptographicBindingMethod.Did && it.method == method }) {
+                "Selected holder DID method is not supported"
+            }
+            builder.buildJwtProof(
+                key = active.key,
+                audience = active.resolved.offer.credentialIssuer,
+                nonce = nonce,
+                keyId = didUrl,
+            )
+        }
+        return proofs.jwt?.singleOrNull() ?: error("Credential proof builder returned no JWT")
+    }
+
+    private suspend fun fetchNonce(metadata: CredentialIssuerMetadata): NonceResult {
+        val endpoint = metadata.nonceEndpoint
+            ?: throw IssuanceStageException(WalletIssuanceErrorCode.ISSUER_METADATA)
+        val nonce = try {
+            NonceRequestBuilder(httpClient).requestNonce(endpoint).cNonce
+        } catch (error: NonceRequestException) {
+            val code = when (error.error) {
+                NonceRequestError.INVALID_ENDPOINT -> WalletIssuanceErrorCode.ISSUER_METADATA
+                NonceRequestError.NETWORK -> WalletIssuanceErrorCode.NETWORK
+                NonceRequestError.ISSUER_RESPONSE -> WalletIssuanceErrorCode.ISSUER_RESPONSE
+                NonceRequestError.INVALID_RESPONSE,
+                NonceRequestError.UNSAFE_REDIRECT -> WalletIssuanceErrorCode.PROTOCOL
+            }
+            throw IssuanceStageException(code, error)
+        }
+        return NonceResult(nonce, dpopNonce = null)
+    }
+
+    private suspend fun postProtected(
+        endpoint: String,
+        accessToken: String,
+        tokenType: String,
+        dpop: Set<String>?,
+        key: Key,
+        dpopNonce: String?,
+        body: String,
+    ): ProtectedResponse {
+        var nonce = dpopNonce
+        repeat(2) { attempt ->
+            val proof = try {
+                dpop?.let { algorithms ->
+                    DPoPProofBuilder().buildProof(
+                        key = key,
+                        httpMethod = "POST",
+                        targetUri = endpoint,
+                        accessToken = accessToken,
+                        nonce = nonce,
+                        supportedAlgorithms = algorithms,
+                    )
+                }
+            } catch (error: Exception) {
+                throw IssuanceStageException(WalletIssuanceErrorCode.CRYPTO, error)
+            }
+            val response = try {
+                httpClient.post(endpoint) {
+                    header(HttpHeaders.Authorization, "${authorizationScheme(tokenType)} $accessToken")
+                    proof?.let { header(DPOP_HEADER, it) }
+                    contentType(ContentType.Application.Json)
+                    setBody(body)
+                }
+            } catch (error: Exception) {
+                throw IssuanceStageException(WalletIssuanceErrorCode.NETWORK, error)
+            }
+            val suppliedNonce = response.headers[DPOP_NONCE_HEADER]
+            if (
+                attempt == 0 &&
+                proof != null &&
+                response.oauthError() == USE_DPOP_NONCE &&
+                !suppliedNonce.isNullOrBlank()
+            ) {
+                nonce = suppliedNonce
+                return@repeat
+            }
+            return ProtectedResponse(response, suppliedNonce ?: nonce)
+        }
+        error("DPoP nonce retry exhausted")
+    }
+
+    private suspend fun HttpResponse.oauthError(): String? {
+        if (status.isSuccess()) return null
+        if (headers[HttpHeaders.WWWAuthenticate]?.contains(USE_DPOP_NONCE, ignoreCase = true) == true) {
+            return USE_DPOP_NONCE
+        }
+        return runCatching {
+            Json.parseToJsonElement(bodyAsText()).jsonObject["error"]?.jsonPrimitive?.contentOrNull
+        }.getOrNull()
+    }
+
+    private suspend fun attestationHeaders(
+        metadata: AuthorizationServerMetadata,
+        clientId: String,
+        key: Key,
+    ): ClientAttestationHeaders? {
+        val assembler = attestationAssembler ?: return null
+        if (metadata.tokenEndpointAuthMethodsSupported
+                ?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) != true
+        ) {
+            return null
+        }
+        return assembler.buildAttestationHeaders(key, clientId, metadata.issuer).also {
+            onEvent(WalletSessionEvent.issuance_attestation_obtained)
+        }
+    }
+
+    private fun validateTokenType(tokenType: String, dpopEnabled: Boolean) {
+        if (dpopEnabled) {
+            require(tokenType.equals("DPoP", ignoreCase = true)) {
+                "Authorization server did not return a DPoP-bound access token"
+            }
+        } else {
+            require(tokenType.equals("Bearer", ignoreCase = true)) {
+                "Authorization server returned an unsupported token type"
+            }
+        }
+    }
+
+    private fun authorizationScheme(tokenType: String): String =
+        if (tokenType.equals("DPoP", ignoreCase = true)) "DPoP" else "Bearer"
+
+    private suspend fun Wallet.parseAndStore(issued: IssuedCredential, label: String?): StoredCredential {
+        val raw = issued.credential.let { value ->
+            if (value is JsonPrimitive) value.content else value.toString()
+        }
+        val (_, parsed) = CredentialParser.detectAndParse(raw)
+        return StoredCredential(
+            id = Uuid.random().toString(),
+            credential = parsed,
+            label = label,
+            addedAt = Clock.System.now(),
+        ).also { addCredential(it) }
+    }
+
+    private fun ActiveSession.clientConfiguration() =
+        ClientConfiguration(request.clientId, listOf(request.redirectUri.toString()))
+
+    private suspend fun beginTransition(sessionId: String, expected: SessionState): ActiveSession? =
+        mutex.withLock {
+            val active = sessions[sessionId] ?: return@withLock null
+            if (active.state != expected) return@withLock null
+            active.state = SessionState.PROCESSING
+            active
+        }
+
+    private suspend fun removeSession(sessionId: String) {
+        mutex.withLock { sessions.remove(sessionId) }
+    }
+
+    private suspend fun failAndRemove(
+        sessionId: String,
+        code: WalletIssuanceErrorCode,
+    ): WalletIssuanceOutcome.Failed {
+        removeSession(sessionId)
+        return failed(sessionId, code)
+    }
+
+    private suspend fun failed(
+        sessionId: String,
+        code: WalletIssuanceErrorCode,
+        storedIds: List<String> = emptyList(),
+    ): WalletIssuanceOutcome.Failed {
+        onEvent(WalletSessionEvent.issuance_failed)
+        return WalletIssuanceOutcome.Failed(
+            sessionId = sessionId,
+            error = WalletIssuanceError(code, code.publicDescription()),
+            storedCredentialIds = storedIds,
+        )
+    }
+
+    private fun invalidSession(sessionId: String): WalletIssuanceOutcome.Failed =
+        WalletIssuanceOutcome.Failed(
+            sessionId = sessionId,
+            error = WalletIssuanceError(
+                WalletIssuanceErrorCode.INVALID_SESSION,
+                WalletIssuanceErrorCode.INVALID_SESSION.publicDescription(),
+            ),
+        )
+
+    private fun WalletIssuanceErrorCode.publicDescription(): String = when (this) {
+        WalletIssuanceErrorCode.INVALID_SESSION -> "The issuance session is unknown, expired, or already consumed."
+        WalletIssuanceErrorCode.INVALID_CALLBACK -> "The authorization callback did not match the issuance session."
+        WalletIssuanceErrorCode.INVALID_INPUT -> "The issuance continuation input is incomplete or invalid."
+        WalletIssuanceErrorCode.AUTHORIZATION_FAILED -> "The authorization server rejected the authorization request."
+        WalletIssuanceErrorCode.ISSUER_METADATA -> "The issuer metadata is incomplete or inconsistent."
+        WalletIssuanceErrorCode.ISSUER_RESPONSE -> "The issuer returned an invalid or unsuccessful response."
+        WalletIssuanceErrorCode.NETWORK -> "The issuer could not be reached."
+        WalletIssuanceErrorCode.CRYPTO -> "The selected holder key could not create the required proof."
+        WalletIssuanceErrorCode.STORAGE -> "The issued credential could not be stored."
+        WalletIssuanceErrorCode.PROTOCOL -> "The issuance response did not satisfy OpenID4VCI 1.0 requirements."
+    }
+
+    private data class ResolvedOffer(
+        val offer: CredentialOffer,
+        val issuerMetadata: CredentialIssuerMetadata,
+        val authorizationServerMetadata: AuthorizationServerMetadata,
+        val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
+    )
+
+    private data class AuthorizationState(
+        val public: WalletIssuanceAuthorization,
+        val pkce: id.waltid.openid4vci.wallet.oauth.PKCEManager.PKCEData,
+    )
+
+    private data class ActiveSession(
+        val public: WalletIssuanceSession,
+        val request: WalletIssuanceSessionRequest,
+        val resolved: ResolvedOffer,
+        val key: Key,
+        val did: String?,
+        val authorization: AuthorizationState?,
+        var state: SessionState,
+    )
+
+    private data class DeferredRecord(
+        val public: WalletDeferredCredential,
+        val sessionId: String,
+        val endpoint: String,
+        val transactionId: String,
+        val accessToken: String,
+        val tokenType: String,
+        val dpop: Set<String>?,
+        val dpopNonce: String?,
+        val key: Key,
+        val label: String?,
+    )
+
+    private data class NonceResult(val cNonce: String, val dpopNonce: String?)
+    private data class ProtectedResponse(val response: HttpResponse, val dpopNonce: String?)
+
+    private class IssuanceStageException(
+        val code: WalletIssuanceErrorCode,
+        cause: Throwable? = null,
+    ) : Exception(code.name, cause)
+
+    private enum class SessionState { READY, AWAITING_CALLBACK, PROCESSING }
+
+    private companion object {
+        const val MAX_ACTIVE_SESSIONS = 32
+        const val DPOP_HEADER = "DPoP"
+        const val DPOP_NONCE_HEADER = "DPoP-Nonce"
+        const val USE_DPOP_NONCE = "use_dpop_nonce"
+    }
+}
