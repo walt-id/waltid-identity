@@ -4,9 +4,11 @@ import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletCredentialClaimMetadata
 import id.walt.wallet2.mobile.MobileWalletMetadataDisplay
 import id.walt.wallet2.mobile.MobileWalletOfferedCredentialMetadata
+import id.walt.wallet2.mobile.MobileWalletIssuancePreviewHandle
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationPreview
+import id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationRequestInfo
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
@@ -47,6 +49,7 @@ internal class MobileDemoWallet(
     override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview =
         mobileWallet.resolveOffer(offerUrl).let { resolution ->
             WalletDemoOfferPreview(
+                previewHandle = WalletDemoIssuancePreviewHandle(resolution.previewHandle.value),
                 issuer = WalletDemoIssuerMetadata(
                     credentialIssuer = resolution.issuer.credentialIssuer,
                     display = resolution.issuer.display?.toDemoMetadataDisplay(),
@@ -56,8 +59,16 @@ internal class MobileDemoWallet(
             )
         }
 
-    override suspend fun receive(offerUrl: String, txCode: String?): List<String> =
-        mobileWallet.receive(offerUrl, txCode = txCode)
+    override suspend fun receive(
+        previewHandle: WalletDemoIssuancePreviewHandle,
+        txCode: String?,
+    ): List<String> = mobileWallet.receive(
+        previewHandle = MobileWalletIssuancePreviewHandle(previewHandle.value),
+        txCode = txCode,
+    )
+
+    override suspend fun discardIssuancePreview(previewHandle: WalletDemoIssuancePreviewHandle) =
+        mobileWallet.discardIssuancePreview(MobileWalletIssuancePreviewHandle(previewHandle.value))
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
         mobileWallet.present(requestUrl = requestUrl, did = did).toDemoOperationResult(
@@ -72,7 +83,8 @@ internal class MobileDemoWallet(
 
             is MobileWalletPresentationPreviewResult.Invalid ->
                 WalletDemoPresentationPreviewResult.Invalid(
-                    WalletDemoPresentationError(
+                WalletDemoPresentationError(
+                        previewHandle = WalletDemoPresentationPreviewHandle(result.previewHandle.value),
                         verifierMetadata = result.request.verifierMetadata?.toDemoMetadata(),
                         clientId = result.request.clientId,
                         responseUri = result.request.responseUri,
@@ -87,13 +99,13 @@ internal class MobileDemoWallet(
         }
 
     override suspend fun submitPresentation(
-        requestUrl: String,
+        previewHandle: WalletDemoPresentationPreviewHandle,
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String?,
     ): WalletDemoOperationResult =
         mobileWallet.submitPresentation(
-            requestUrl = requestUrl,
+            previewHandle = MobileWalletPresentationPreviewHandle(previewHandle.value),
             selectedCredentialOptions = selectedCredentialOptions.map {
                 MobileWalletPresentationCredentialSelection(
                     queryId = it.queryId,
@@ -113,9 +125,16 @@ internal class MobileDemoWallet(
             failureMessage = WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation,
         )
 
-    override suspend fun rejectPresentation(requestUrl: String): WalletDemoOperationResult =
-        mobileWallet.rejectPresentation(requestUrl = requestUrl).toDemoOperationResult(
-            successMessage = WalletDisplayText.PresentationDeclined,
+    override suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle) =
+        mobileWallet.discardPresentationPreview(MobileWalletPresentationPreviewHandle(previewHandle.value))
+
+    override suspend fun rejectPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+    ): WalletDemoOperationResult =
+        mobileWallet.rejectPresentation(
+            previewHandle = MobileWalletPresentationPreviewHandle(previewHandle.value),
+        ).toDemoOperationResult(
+            successMessage = WalletDisplayText.PresentationRejected,
             failureMessage = WalletDisplayText.RejectionFinishedWithoutVerifierConfirmation,
         )
 
@@ -156,6 +175,7 @@ internal fun DemoWalletConfig.toWalletAttestationConfig(): WalletAttestationConf
 
 private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentationPreview =
     WalletDemoPresentationPreview(
+        previewHandle = WalletDemoPresentationPreviewHandle(previewHandle.value),
         verifierMetadata = request.verifierMetadata?.toDemoMetadata(),
         clientId = request.clientId,
         responseUri = request.responseUri,

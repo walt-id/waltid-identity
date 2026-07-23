@@ -67,7 +67,8 @@ struct PresentView: View {
                             onToggleDisclosure: viewModel.togglePresentationDisclosure,
                             onCredentialSelected: { detailsID in selectedDetailsID = detailsID },
                             onSubmit: viewModel.submitPresentation,
-                            onReject: viewModel.rejectPresentation
+                            onReject: viewModel.rejectPresentation,
+                            onCancel: viewModel.cancelPresentationReview
                         )
                     }
 
@@ -76,7 +77,7 @@ struct PresentView: View {
                             error: error,
                             isEnabled: viewModel.presentationReviewEnabled,
                             onNotifyVerifier: viewModel.rejectPresentation,
-                            onDismiss: viewModel.startNewPresentationFlow
+                            onDismiss: viewModel.cancelPresentationReview
                         )
                     }
                 }

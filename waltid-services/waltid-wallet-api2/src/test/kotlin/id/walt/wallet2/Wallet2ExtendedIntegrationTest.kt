@@ -409,9 +409,10 @@ class Wallet2ExtendedIntegrationTest {
                     call.respond(buildJsonObject {
                         put("access_token", tokenResponse.response.accessToken)
                         put("token_type", "Bearer")
-                        put("c_nonce", "isolated-nonce")
-                        put("c_nonce_expires_in", 300)
                     })
+                }
+                post("/nonce") {
+                    call.respond(buildJsonObject { put("c_nonce", "isolated-nonce") })
                 }
                 post("/credential") {
                     val body = json.parseToJsonElement(call.receiveText()).jsonObject
@@ -506,14 +507,23 @@ class Wallet2ExtendedIntegrationTest {
                 }
                 assertNotNull(tokenResult.accessToken)
 
-                // -- Isolated step 3: Sign proof of possession --
+                // -- Isolated step 3: Obtain a fresh proof nonce --
+                val nonceResult = testAndReturn("Isolated: request-nonce") {
+                    http.post("/wallet/$walletId/credentials/receive/request-nonce") {
+                        contentType(ContentType.Application.Json)
+                        setBody(RequestNonceRequest(Url(resolveResult.credentialIssuer)))
+                    }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+                        .body<RequestNonceResult>()
+                }
+
+                // -- Isolated step 4: Sign proof of possession --
                 val signResult = testAndReturn("Isolated: sign-proof") {
                     http.post("/wallet/$walletId/credentials/receive/sign-proof") {
                         contentType(ContentType.Application.Json)
                         setBody(
                             SignProofRequest(
                                 issuerUrl = Url(issuerBase),
-                                nonce = tokenResult.cNonce ?: "isolated-nonce",
+                                nonce = nonceResult.nonce,
                                 keyId = keyInfo.keyId
                             )
                         )
@@ -522,7 +532,7 @@ class Wallet2ExtendedIntegrationTest {
                 }
                 assertNotNull(signResult.proofJwt)
 
-                // -- Isolated step 4: Fetch credential --
+                // -- Isolated step 5: Fetch credential --
                 val fetchResult = testAndReturn("Isolated: fetch-credential") {
                     http.post("/wallet/$walletId/credentials/receive/fetch-credential") {
                         contentType(ContentType.Application.Json)

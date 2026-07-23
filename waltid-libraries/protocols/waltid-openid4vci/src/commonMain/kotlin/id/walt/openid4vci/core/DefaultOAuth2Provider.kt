@@ -12,6 +12,7 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolution
 import id.walt.openid4vci.clientauth.isAnonymousPreAuthorizedCodeTokenRequest
 import id.walt.openid4vci.dpop.DPoPConstants
 import id.walt.openid4vci.dpop.DPoPProofVerificationRequest
+import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
@@ -508,8 +509,8 @@ class DefaultOAuth2Provider(
             is CredentialRequestResult.Success ->
                 if (result.request.credentialResponseEncryption != null) {
                     CredentialRequestResult.Failure(
-                        OAuthError(
-                            "invalid_request",
+                        CredentialError(
+                            CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
                             "credential_response_encryption requires an encrypted Credential Request",
                         )
                     )
@@ -518,6 +519,7 @@ class DefaultOAuth2Provider(
                 }
 
             is CredentialRequestResult.Failure -> result
+            is CredentialRequestResult.OAuthFailure -> result
         }
     }
 
@@ -529,8 +531,8 @@ class DefaultOAuth2Provider(
         verifyCredentialAccessToken(accessTokenContext)?.let { return it }
         val decryptor = config.credentialRequestDecryptor
             ?: return CredentialRequestResult.Failure(
-                OAuthError(
-                    CredentialErrorCodes.ENCRYPTION_NOT_SUPPORTED,
+                CredentialError(
+                    CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
                     "credential request encryption is not supported",
                 )
             )
@@ -538,10 +540,10 @@ class DefaultOAuth2Provider(
             decryptor.decrypt(encryptedCredentialRequest).toParametersMap()
         } catch (e: CredentialRequestEncryptionNotSupported) {
             return CredentialRequestResult.Failure(
-                OAuthError(CredentialErrorCodes.ENCRYPTION_NOT_SUPPORTED, e.message)
+                CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, e.message)
             )
         } catch (e: Exception) {
-            return CredentialRequestResult.Failure(OAuthError("invalid_request", e.message))
+            return CredentialRequestResult.Failure(CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, e.message))
         }
         return config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())
     }
@@ -564,8 +566,8 @@ class DefaultOAuth2Provider(
     ): CredentialResponseResult {
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return CredentialResponseResult.Failure(
-                OAuthError(
-                    error = CredentialErrorCodes.UNSUPPORTED_CREDENTIAL_CONFIGURATION,
+                CredentialError(
+                    error = CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
                     description = "No handler for format ${configuration.format.value}"
                 )
             )
@@ -587,26 +589,23 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override fun writeCredentialError(error: OAuthError): CredentialResponseHttp =
+    override fun writeCredentialError(error: CredentialError): CredentialResponseHttp =
         CredentialResponseHttp(
-            status = when (error.error) {
-                CredentialErrorCodes.INVALID_TOKEN,
-                OAuthErrorCodes.INVALID_DPOP_PROOF -> 401
-
-                else -> 400
-            },
+            status = 400,
             payload = buildMap {
                 put("error", JsonPrimitive(error.error))
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
             },
-            headers = when (error.error) {
-                CredentialErrorCodes.INVALID_TOKEN,
-                OAuthErrorCodes.INVALID_DPOP_PROOF -> mapOf(
-                    WWW_AUTHENTICATE_HEADER to dpopAuthenticationChallenge(error),
-                )
+        )
 
-                else -> emptyMap()
-            },
+    override fun writeCredentialError(request: CredentialRequest, error: CredentialError): CredentialResponseHttp =
+        writeCredentialError(error)
+
+    override fun writeCredentialError(error: OAuthError): CredentialResponseHttp =
+        CredentialResponseHttp(
+            status = credentialOAuthJsonErrorStatus(error),
+            payload = oauthErrorPayload(error),
+            headers = credentialOAuthErrorHeaders(error),
         )
 
     override fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp =
@@ -625,7 +624,10 @@ class DefaultOAuth2Provider(
         } catch (e: Exception) {
             return writeCredentialError(
                 request,
-                OAuthError("invalid_request", e.message ?: "Credential response encryption failed"),
+                CredentialError(
+                    CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS,
+                    e.message ?: "Credential response encryption failed",
+                ),
             )
         }
         return CredentialResponseHttp(
@@ -636,11 +638,11 @@ class DefaultOAuth2Provider(
 
     private suspend fun verifyCredentialAccessToken(
         accessTokenContext: CredentialAccessTokenContext?,
-    ): CredentialRequestResult.Failure? {
+    ): CredentialRequestResult.OAuthFailure? {
         if (accessTokenContext == null) return null
         val verifier = config.accessTokenVerifier
-            ?: return CredentialRequestResult.Failure(
-                OAuthError("invalid_request", "access token verifier not configured")
+            ?: return CredentialRequestResult.OAuthFailure(
+                OAuthError(OAuthErrorCodes.SERVER_ERROR, "access token verifier not configured")
             )
         return try {
             val claims = verifier.verify(
@@ -659,7 +661,7 @@ class DefaultOAuth2Provider(
     private suspend fun verifyCredentialAccessTokenBinding(
         context: CredentialAccessTokenContext,
         claims: JsonObject,
-    ): CredentialRequestResult.Failure? {
+    ): CredentialRequestResult.OAuthFailure? {
         val boundJwkThumbprint = claims.dpopJwkThumbprint()
 
         if (boundJwkThumbprint == null) {
@@ -703,13 +705,13 @@ class DefaultOAuth2Provider(
         }
     }
 
-    private fun invalidCredentialAccessToken(description: String): CredentialRequestResult.Failure =
-        CredentialRequestResult.Failure(
-            OAuthError(CredentialErrorCodes.INVALID_TOKEN, description),
+    private fun invalidCredentialAccessToken(description: String): CredentialRequestResult.OAuthFailure =
+        CredentialRequestResult.OAuthFailure(
+            OAuthError(OAuthErrorCodes.INVALID_TOKEN, description),
         )
 
-    private fun invalidCredentialDPoPProof(description: String): CredentialRequestResult.Failure =
-        CredentialRequestResult.Failure(
+    private fun invalidCredentialDPoPProof(description: String): CredentialRequestResult.OAuthFailure =
+        CredentialRequestResult.OAuthFailure(
             OAuthError(OAuthErrorCodes.INVALID_DPOP_PROOF, description),
         )
 
@@ -840,9 +842,27 @@ class DefaultOAuth2Provider(
             error.description?.let { put("error_description", JsonPrimitive(it)) }
         }
 
+    private fun credentialOAuthJsonErrorStatus(error: OAuthError): Int =
+        when (error.error) {
+            OAuthErrorCodes.INVALID_DPOP_PROOF -> 401
+            else -> oauthJsonErrorStatus(error)
+        }
+
+    private fun credentialOAuthErrorHeaders(error: OAuthError): Map<String, String> =
+        when (error.error) {
+            OAuthErrorCodes.INVALID_TOKEN,
+            OAuthErrorCodes.INVALID_DPOP_PROOF -> mapOf(
+                WWW_AUTHENTICATE_HEADER to dpopAuthenticationChallenge(error),
+            )
+
+            else -> emptyMap()
+        }
+
     private fun oauthJsonErrorStatus(error: OAuthError): Int =
         when (error.error) {
-            OAuthErrorCodes.INVALID_CLIENT -> 401
+            OAuthErrorCodes.INVALID_CLIENT,
+            OAuthErrorCodes.INVALID_TOKEN -> 401
+            OAuthErrorCodes.INSUFFICIENT_SCOPE -> 403
             OAuthErrorCodes.SERVER_ERROR,
             OAuthErrorCodes.TEMPORARILY_UNAVAILABLE -> 500
 

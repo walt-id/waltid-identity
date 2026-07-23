@@ -200,7 +200,10 @@ class Wallet2MoreUseCasesTest {
                     if (tr !is AccessTokenRequestResult.Success) return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error","invalid_grant") })
                     val resp = provider.createAccessTokenResponse(tr.request.withIssuer(issuerBase))
                     if (resp !is AccessTokenResponseResult.Success) return@post call.respond(HttpStatusCode.InternalServerError, buildJsonObject { put("error","server_error") })
-                    call.respond(buildJsonObject { put("access_token", resp.response.accessToken); put("token_type", "Bearer"); put("c_nonce", "nonce-$preAuthCode"); put("c_nonce_expires_in", 300) })
+                    call.respond(buildJsonObject { put("access_token", resp.response.accessToken); put("token_type", "Bearer") })
+                }
+                post("/nonce") {
+                    call.respond(buildJsonObject { put("c_nonce", "nonce-$preAuthCode") })
                 }
                 post("/credential") {
                     val body = json.parseToJsonElement(call.receiveText()).jsonObject

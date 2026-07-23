@@ -1,7 +1,8 @@
 package id.walt.openid4vci.handlers.credential
 
 import id.walt.crypto.keys.Key
-import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.errors.CredentialError
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
@@ -51,7 +52,10 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
         return try {
             val docType = configuration.doctype
                 ?: return CredentialResponseResult.Failure(
-                    OAuthError("invalid_request", "Missing doctype in credential configuration for mso_mdoc")
+                    CredentialError(
+                        CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
+                        "Missing doctype in credential configuration for mso_mdoc",
+                    )
                 )
 
             val namespaceData = credentialData.entries
@@ -62,13 +66,16 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
 
             if (namespaceData.isEmpty()) {
                 return CredentialResponseResult.Failure(
-                    OAuthError("invalid_request", "credentialData must contain at least one namespace for mso_mdoc")
+                    CredentialError(
+                        CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
+                        "credentialData must contain at least one namespace for mso_mdoc",
+                    )
                 )
             }
 
             val holderKey = extractHolderKey(request)
                 ?: return CredentialResponseResult.Failure(
-                    OAuthError("invalid_or_missing_proof", "Could not extract holder key from proof")
+                    CredentialError(CredentialErrorCodes.INVALID_PROOF, "Could not extract holder key from proof")
                 )
 
             val issued = issueMdoc(
@@ -86,7 +93,7 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
                 )
             )
         } catch (e: Exception) {
-            CredentialResponseResult.Failure(OAuthError("invalid_request", e.message))
+            CredentialResponseResult.Failure(e.toCredentialHandlerError())
         }
     }
 
