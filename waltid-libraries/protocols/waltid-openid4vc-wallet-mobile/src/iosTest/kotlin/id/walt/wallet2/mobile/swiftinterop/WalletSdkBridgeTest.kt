@@ -330,6 +330,7 @@ class WalletSdkBridgeTest {
                     hostHeader = "attestation.example",
                 ),
                 requestObjectTrustAnchorPemCertificates = listOf("test-anchor-pem"),
+                requestObjectEnableSystemTrustAnchors = true,
                 requestObjectAudience = "https://wallet.example",
                 preferredLocales = listOf("de-AT", "en"),
                 transactionDataProfiles = listOf(
@@ -358,6 +359,7 @@ class WalletSdkBridgeTest {
             listOf("test-anchor-pem"),
             capturedConfig?.requestObjectX509Trust?.trustAnchorPemCertificates,
         )
+        assertEquals(true, capturedConfig?.requestObjectX509Trust?.enableSystemTrustAnchors)
         assertEquals("https://wallet.example", capturedConfig?.requestObjectAudience)
         assertEquals(
             listOf(

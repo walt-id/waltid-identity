@@ -46,8 +46,8 @@ import kotlin.time.Instant
  * @property attestation Optional client-attestation configuration for issuers that require it.
  * @property requestObjectTrustAnchorPemCertificates Wallet-controlled PEM trust anchors for
  * signed OID4VP Request Objects.
- * @property requestObjectEnableSystemTrustAnchors Retained for source compatibility. iOS system
- * trust anchors are not supported for Request Object validation and `true` is rejected.
+ * @property requestObjectEnableSystemTrustAnchors Whether iOS system trust anchors are accepted
+ * for signed Request Object certificate validation.
  * @property requestObjectAudience Expected Request Object audience.
  * @property preferredLocales Ordered BCP 47 locale preferences used to select display metadata.
  * @property transactionDataProfiles Transaction data profiles this wallet accepts.
@@ -66,11 +66,13 @@ public data class WalletBridgeConfiguration(
 )
 
 internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfig {
-    require(!requestObjectEnableSystemTrustAnchors) {
-        "iOS system trust anchors are not supported for OID4VP Request Object validation"
-    }
-    val x509Trust = requestObjectTrustAnchorPemCertificates.takeIf { it.isNotEmpty() }?.let {
-        WalletX509TrustConfig(trustAnchorPemCertificates = it)
+    val x509Trust = if (requestObjectTrustAnchorPemCertificates.isNotEmpty() || requestObjectEnableSystemTrustAnchors) {
+        WalletX509TrustConfig(
+            trustAnchorPemCertificates = requestObjectTrustAnchorPemCertificates,
+            enableSystemTrustAnchors = requestObjectEnableSystemTrustAnchors,
+        )
+    } else {
+        null
     }
     return MobileWalletConfig(
         walletId = walletId,
