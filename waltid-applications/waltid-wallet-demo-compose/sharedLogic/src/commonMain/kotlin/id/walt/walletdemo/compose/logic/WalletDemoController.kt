@@ -23,6 +23,7 @@ class WalletDemoController(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private var receiveJob: Job? = null
+    private var issuanceSession: WalletDemoIssuanceSession? = null
     private var presentationJob: Job? = null
     private val _state = MutableStateFlow(
         WalletDemoUiState(
@@ -231,6 +232,7 @@ class WalletDemoController(
                 discardIssuancePreview(previous.activeIssuancePreviewHandle())
                 discardPresentationPreview(previous.activePresentationPreviewHandle())
             }
+            WalletDeepLinkScheme.AuthorizationCallback -> continueAuthorization(url)
             null -> Unit
         }
     }
@@ -278,34 +280,23 @@ class WalletDemoController(
         if (!_state.compareAndSet(current, current.copy(operation = WalletOperationState.ResolvingOffer))) return
 
         receiveJob = scope.launch(dispatcher) {
-            var resolution: WalletDemoOfferPreview? = null
             try {
-                val resolvedOffer = wallet.resolveOffer(offerUrl)
-                resolution = resolvedOffer
+                val session = wallet.startIssuance(
+                    offerUrl = offerUrl,
+                    redirectUri = "openid://",
+                    did = (current.session as? WalletSessionState.Ready)?.did,
+                )
                 currentCoroutineContext().ensureActive()
                 val installed = updateIfCurrent(request, WalletOperationState.ResolvingOffer) {
                     it.copy(
-                        offerPreview = resolution,
+                        offerPreview = session.preview,
                         operation = WalletOperationState.OfferPreview,
                     )
                 }
-                if (!installed) {
-                    wallet.discardIssuancePreview(resolvedOffer.previewHandle)
-                }
-                resolution = null
+                if (installed) issuanceSession = session else wallet.cancelIssuance(session.id)
             } catch (cancellation: CancellationException) {
-                resolution?.let { preview ->
-                    withContext(NonCancellable) {
-                        runCatching { wallet.discardIssuancePreview(preview.previewHandle) }
-                    }
-                }
                 throw cancellation
             } catch (error: Throwable) {
-                resolution?.let { preview ->
-                    withContext(NonCancellable) {
-                        runCatching { wallet.discardIssuancePreview(preview.previewHandle) }
-                    }
-                }
                 updateIfCurrent(request, WalletOperationState.ResolvingOffer) {
                     it.copy(
                         operation = WalletOperationState.Failed(
@@ -322,7 +313,7 @@ class WalletDemoController(
         val current = _state.value
         val ready = current.session as? WalletSessionState.Ready ?: return
         if (!current.acceptOfferEnabled) return
-        val preview = current.offerPreview ?: return
+        current.offerPreview ?: return
         val offerUrl = current.requestDrafts.offerUrl.trim()
         val txCode = current.requestDrafts.txCode.trim().ifBlank { null }
         val request = ReceiveRequest(offerUrl, current.receiveNavigationResetKey)
@@ -330,7 +321,15 @@ class WalletDemoController(
 
         receiveJob = scope.launch(dispatcher) {
             try {
-                receiveCredential(ready, request, preview.previewHandle, txCode)
+                val session = issuanceSession ?: error("Issuance session is missing")
+                when (session.grant) {
+                    WalletDemoIssuanceGrant.PreAuthorizedCode -> completeIssuanceOutcome(
+                        ready, request, wallet.continuePreAuthorizedIssuance(session.id, txCode),
+                    )
+                    WalletDemoIssuanceGrant.AuthorizationCode -> updateIfCurrent(request, WalletOperationState.Receiving) {
+                        it.copy(authorizationRequestUrl = session.authorizationUrl, operation = WalletOperationState.OfferPreview)
+                    }
+                }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Throwable) {
@@ -347,10 +346,11 @@ class WalletDemoController(
     }
 
     fun declineOffer() {
-        val previewHandle = _state.value.offerPreview?.previewHandle ?: return
+        val sessionId = issuanceSession?.id ?: return
+        issuanceSession = null
         _state.update {
             it.copy(
-                offerPreview = null,
+                offerPreview = null, authorizationRequestUrl = null,
                 requestDrafts = it.requestDrafts.copy(txCode = ""),
                 operation = WalletOperationState.Succeeded(
                     message = WalletDisplayText.CredentialOfferDeclined,
@@ -360,7 +360,7 @@ class WalletDemoController(
             )
         }
         scope.launch(dispatcher) {
-            runCatching { wallet.discardIssuancePreview(previewHandle) }
+            runCatching { wallet.cancelIssuance(sessionId) }
                 .onFailure { error -> setOperationError(WalletDisplayText.ReceiveFailed, error, WalletDemoTab.Receive) }
         }
     }
@@ -417,6 +417,39 @@ class WalletDemoController(
                 lastReceivedCredentialIds = displayableReceivedCredentialIds,
                 receiveCompleted = true,
             )
+        }
+    }
+
+    private suspend fun completeIssuanceOutcome(
+        ready: WalletSessionState.Ready,
+        request: ReceiveRequest,
+        outcome: WalletDemoIssuanceOutcome,
+    ) {
+        val ids = when (outcome) {
+            is WalletDemoIssuanceOutcome.Stored -> outcome.credentialIds
+            is WalletDemoIssuanceOutcome.Deferred -> emptyList()
+            WalletDemoIssuanceOutcome.Cancelled -> emptyList()
+            is WalletDemoIssuanceOutcome.Failed -> error(outcome.message)
+        }
+        issuanceSession = null
+        val credentials = wallet.listCredentials()
+        updateIfCurrent(request, WalletOperationState.Receiving) {
+            it.copy(session = ready.copy(credentials = credentials), offerPreview = null, authorizationRequestUrl = null,
+                operation = WalletOperationState.Succeeded(WalletDisplayText.receivedCredentials(ids.size), WalletDemoTab.Receive),
+                lastReceivedCredentialIds = ids, receiveCompleted = ids.isNotEmpty())
+        }
+    }
+
+    fun authorizationRequestOpened() { _state.update { it.copy(authorizationRequestUrl = null) } }
+
+    private fun continueAuthorization(callbackUri: String) {
+        val session = issuanceSession ?: return
+        val current = _state.value
+        val ready = current.session as? WalletSessionState.Ready ?: return
+        val request = ReceiveRequest(current.requestDrafts.offerUrl.trim(), current.receiveNavigationResetKey)
+        receiveJob = scope.launch(dispatcher) {
+            try { completeIssuanceOutcome(ready, request, wallet.continueAuthorizationIssuance(session.id, callbackUri)) }
+            catch (error: Throwable) { updateIfCurrent(request, WalletOperationState.OfferPreview) { it.copy(operation = WalletOperationState.Failed(WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error), WalletDemoTab.Receive)) } }
         }
     }
 
