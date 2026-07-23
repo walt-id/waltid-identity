@@ -12,6 +12,7 @@ actor MockWalletClient: WalletClient {
     private let verifierStyle: VerifierStyle
     private let duplicatePresentationOptions: Bool
     private let transactionCodeRequired: Bool
+    private let issuanceGrant: IssuanceGrant
     private let presentationPreviewResultOverride: PresentationPreviewResult?
     private let rejectionResult: PresentationResult
     private let responseEncryptionRequired: Bool
@@ -25,6 +26,7 @@ actor MockWalletClient: WalletClient {
         verifierStyle: VerifierStyle = .named,
         duplicatePresentationOptions: Bool = false,
         transactionCodeRequired: Bool = false,
+        issuanceGrant: IssuanceGrant = .preAuthorizedCode,
         presentationPreviewResult: PresentationPreviewResult? = nil,
         rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}")),
         responseEncryptionRequired: Bool = true,
@@ -35,6 +37,7 @@ actor MockWalletClient: WalletClient {
         self.verifierStyle = verifierStyle
         self.duplicatePresentationOptions = duplicatePresentationOptions
         self.transactionCodeRequired = transactionCodeRequired
+        self.issuanceGrant = issuanceGrant
         self.presentationPreviewResultOverride = presentationPreviewResult
         self.rejectionResult = rejectionResult
         self.responseEncryptionRequired = responseEncryptionRequired
@@ -49,45 +52,27 @@ actor MockWalletClient: WalletClient {
         storedCredentials
     }
 
-    func resolveOffer(offer: URL) async throws -> OfferResolution {
-        try await delayOperation()
-        return OfferResolution(
-            previewHandle: IssuancePreviewHandle(value: "mock-issuance-preview"),
-            issuer: IssuerMetadata(
-                credentialIssuer: "https://issuer.example",
-                display: MetadataDisplay(
-                    name: "Example Issuer",
-                    locale: "en",
-                    logoURI: nil,
-                    logoAltText: nil
-                )
-            ),
-            offeredCredentials: [mdocMetadata ? Self.photoIDMetadata : Self.exampleCredentialMetadata],
-            transactionCode: transactionCodeRequired
-                ? TransactionCodeRequirement(inputMode: .numeric, length: 6, description: "Enter the six-digit code")
-                : nil
-        )
-    }
-
-    func receive(previewHandle: IssuancePreviewHandle, txCode: String?) async throws -> [String] {
-        try await delayOperation()
-        storedCredentials = [mdocMetadata ? Self.photoIDCredential : Self.sampleCredential]
-        return storedCredentials.map(\.id)
-    }
-
-    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {}
-
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
         try await delayOperation()
         return IssuanceSession(
             id: "mock-session",
             offer: .init(
-                grant: .preAuthorizedCode,
+                grant: issuanceGrant,
                 issuer: .init(identifier: "https://issuer.example", name: "Example Issuer", locale: nil, logoURI: nil, logoAltText: nil),
                 credentials: [.init(configurationID: "ExampleCredential", format: "dc+sd-jwt", name: "Example", descriptionText: nil, logoURI: nil)],
-                transactionCode: nil
+                transactionCode: transactionCodeRequired
+                    ? .init(inputMode: "numeric", length: 6, descriptionText: "Enter the six-digit code")
+                    : nil
             ),
-            authorization: nil
+            authorization: issuanceGrant == .authorizationCode
+                ? .init(
+                    url: URL(string: "https://issuer.example/authorize")!,
+                    state: "mock-state",
+                    redirectURI: request.redirectURI,
+                    pkce: .init(codeChallenge: "mock-challenge", codeChallengeMethod: "S256"),
+                    pushedAuthorizationRequestUsed: false
+                )
+                : nil
         )
     }
 
@@ -210,61 +195,6 @@ actor MockWalletClient: WalletClient {
 
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
-    private static let exampleCredentialMetadata = OfferedCredentialMetadata(
-        configurationID: "ExampleCredential",
-        format: "jwt_vc_json",
-        scope: nil,
-        vct: nil,
-        doctype: nil,
-        display: MetadataDisplay(
-            name: "Example credential",
-            locale: "en",
-            logoURI: nil,
-            logoAltText: nil
-        ),
-        claims: []
-    )
-
-    private static let photoIDMetadata = OfferedCredentialMetadata(
-        configurationID: "org.iso.23220.photoid.1",
-        format: "mso_mdoc",
-        scope: nil,
-        vct: nil,
-        doctype: "org.iso.23220.photoid.1",
-        display: MetadataDisplay(
-            name: "Photo ID",
-            locale: "en",
-            logoURI: nil,
-            logoAltText: nil
-        ),
-        claims: [
-            CredentialClaimMetadata(
-                path: ["org.iso.23220.1", "given_name"],
-                mandatory: true,
-                displayName: "Given name"
-            ),
-            CredentialClaimMetadata(
-                path: ["org.iso.23220.1", "age_over_18"],
-                mandatory: true,
-                displayName: nil
-            ),
-            CredentialClaimMetadata(
-                path: ["org.iso.23220.1", "age_over_65"],
-                mandatory: false,
-                displayName: nil
-            ),
-            CredentialClaimMetadata(
-                path: ["org.iso.23220.dtc.1", "dtc_dg1"],
-                mandatory: nil,
-                displayName: nil
-            ),
-            CredentialClaimMetadata(
-                path: ["org.iso.23220.dtc.1", "dtc_sod"],
-                mandatory: true,
-                displayName: nil
-            )
-        ]
-    )
     private static let samplePortraitDisclosureValueJSON = "[-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]"
 
     private static let paymentAuthorizationTransactionData = PresentationTransactionData(

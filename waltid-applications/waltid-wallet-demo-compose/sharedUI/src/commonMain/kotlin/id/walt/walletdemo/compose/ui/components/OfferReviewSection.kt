@@ -72,6 +72,19 @@ internal fun OfferReviewSection(
             }
         }
 
+        if (preview.requiresIssuerAuthentication) {
+            ReviewMetadataSection(
+                title = "Issuer sign-in",
+                modifier = Modifier.testTag(WalletUiTestTags.OfferAuthorizationSection),
+            ) {
+                Text(
+                    text = "Continuing opens your browser to sign in with the issuer before the credential is issued.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+
         preview.transactionCode?.let { requirement ->
             ReviewMetadataSection(
                 title = "Transaction code",
@@ -122,7 +135,7 @@ internal fun OfferReviewSection(
                 enabled = acceptEnabled,
                 modifier = Modifier.testTag(WalletUiTestTags.OfferAcceptButton),
             ) {
-                Text("Accept")
+                Text(if (preview.requiresIssuerAuthentication) "Continue to sign in" else "Accept")
             }
             TextButton(
                 onClick = onDecline,
