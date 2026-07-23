@@ -7,6 +7,7 @@ import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
+import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
@@ -237,9 +238,13 @@ class Issuer2WalletFlowDriver(
         resolvedOffer: ResolvedCredentialOffer,
         accessToken: String,
         credentialConfigurationId: String = resolvedOffer.offer.credentialConfigurationIds.single(),
-        includeDidInProof: Boolean = true,
+        includeDidInProof: Boolean? = null,
     ): JsonObject {
-        val proofs = buildJwtProofs(resolvedOffer.issuerMetadata, includeDidInProof = includeDidInProof)
+        val proofs = buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = credentialConfigurationId,
+            includeDidInProof = includeDidInProof,
+        )
         val response = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(accessToken)
             contentType(ContentType.Application.Json)
@@ -349,11 +354,14 @@ class Issuer2WalletFlowDriver(
 
     suspend fun buildJwtProofs(
         issuerMetadata: CredentialIssuerMetadata,
-        includeDidInProof: Boolean = true,
+        credentialConfigurationId: String,
+        includeDidInProof: Boolean? = null,
     ): Proofs {
         val nonceResponse = client.post(requireNotNull(issuerMetadata.nonceEndpoint)).body<JsonObject>()
         val proofKey = JWKKey.generate(KeyType.secp256r1)
-        val holderDid = if (includeDidInProof) {
+        val useDidInProof = includeDidInProof
+            ?: issuerMetadata.useDidJwkProof(credentialConfigurationId)
+        val holderDid = if (useDidInProof) {
             DidJwkRegistrar()
                 .registerByKey(proofKey, DidJwkCreateOptions(KeyType.secp256r1))
                 .did
@@ -366,8 +374,23 @@ class Issuer2WalletFlowDriver(
             audience = issuerMetadata.credentialIssuer,
             nonce = requireNotNull(nonceResponse["c_nonce"]?.jsonPrimitive?.contentOrNull),
             keyId = holderDid?.let { "$it#0" },
-            includeJwk = !includeDidInProof,
+            includeJwk = !useDidInProof,
         )
+    }
+
+    private fun CredentialIssuerMetadata.useDidJwkProof(credentialConfigurationId: String): Boolean {
+        val configuration = requireNotNull(getCredentialConfiguration(credentialConfigurationId)) {
+            "Credential configuration $credentialConfigurationId is missing from issuer metadata"
+        }
+        val bindingMethods = configuration.cryptographicBindingMethodsSupported
+            ?: return true
+        return when {
+            CryptographicBindingMethod.DidJwk in bindingMethods -> true
+            CryptographicBindingMethod.Jwk in bindingMethods || CryptographicBindingMethod.CoseKey in bindingMethods -> false
+            else -> error(
+                "Credential configuration $credentialConfigurationId does not support did:jwk, jwk, or cose_key holder binding",
+            )
+        }
     }
 }
 
