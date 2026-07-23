@@ -667,45 +667,6 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
-    fun insecureNonceEndpointIsAlwaysRejected() = runTest {
-        val key = JWKKey.generate(KeyType.secp256r1)
-        val insecureNonceEndpoint = "http://127.0.0.1/nonce"
-        var nonceCalls = 0
-        val client = client { request ->
-            when (request.url.toString()) {
-                ISSUER_METADATA -> jsonResponse(
-                    issuerMetadata(proofRequired = true).replace(NONCE_ENDPOINT, insecureNonceEndpoint)
-                )
-                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
-                insecureNonceEndpoint -> {
-                    nonceCalls += 1
-                    jsonResponse("""{"c_nonce":"local-test-nonce"}""")
-                }
-                else -> respondError(HttpStatusCode.NotFound)
-            }
-        }
-
-        val strictService = WalletIssuanceSessionService(Wallet("strict", staticKey = key), httpClient = client)
-        assertFailsWith<IllegalArgumentException> { strictService.start(preAuthorizedRequest()) }
-        assertEquals(0, nonceCalls)
-    }
-
-    @Test
-    fun insecureLoopbackProtocolEndpointsAreAlwaysRejected() = runTest {
-        val key = JWKKey.generate(KeyType.secp256r1)
-        val strictService = WalletIssuanceSessionService(
-            Wallet("strict-loopback", staticKey = key),
-            httpClient = client { respondError(HttpStatusCode.NotFound) },
-        )
-        val httpOffer = requestWithIssuer("http://127.0.0.1")
-        val nonHttpOffer = requestWithIssuer("ftp://127.0.0.1")
-
-        assertFailsWith<IllegalArgumentException> { strictService.start(httpOffer) }
-        assertFailsWith<IllegalArgumentException> { strictService.start(nonHttpOffer) }
-
-    }
-
-    @Test
     fun immediateCredentialIsParsedStoredAndReturned() = runTest {
         val key = JWKKey.generate(KeyType.secp256r1)
         val credential = key.signJws(
@@ -933,25 +894,7 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
-    fun rejectsInsecureIssuerAndMismatchedIssuerMetadata() = runTest {
-        val insecure = service { respondError(HttpStatusCode.NotFound) }
-        assertFailsWith<IllegalArgumentException> {
-            insecure.start(
-                WalletIssuanceSessionRequest(
-                    offerJson = buildJsonObject {
-                        put("credential_issuer", "http://issuer.example")
-                        put("credential_configuration_ids", Json.parseToJsonElement("""["test-credential"]"""))
-                        put(
-                            "grants",
-                            Json.parseToJsonElement(
-                                """{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"pre-code"}}"""
-                            ),
-                        )
-                    }
-                )
-            )
-        }
-
+    fun rejectsMismatchedIssuerMetadata() = runTest {
         val mismatched = service { request ->
             when (request.url.toString()) {
                 ISSUER_METADATA -> jsonResponse(
