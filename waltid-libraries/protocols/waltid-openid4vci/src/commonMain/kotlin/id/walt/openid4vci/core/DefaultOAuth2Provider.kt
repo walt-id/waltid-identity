@@ -745,14 +745,11 @@ class DefaultOAuth2Provider(
         claims: JsonObject,
     ): CredentialRequestResult.OAuthFailure? {
         val boundJwkThumbprint = claims.dpopJwkThumbprint()
-
-        if (boundJwkThumbprint == null) {
-            return if (context.authorization.scheme == AccessTokenAuthorizationScheme.BEARER) {
+            ?: return if (context.authorization.scheme == AccessTokenAuthorizationScheme.BEARER) {
                 null
             } else {
                 invalidCredentialAccessToken("Access token is not DPoP-bound")
             }
-        }
 
         if (context.authorization.scheme != AccessTokenAuthorizationScheme.DPOP) {
             return invalidCredentialAccessToken("DPoP-bound access token must use the DPoP authorization scheme")
