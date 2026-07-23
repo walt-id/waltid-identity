@@ -332,6 +332,7 @@ class WalletDemoControllerTest {
     fun authorizationCodeIssuanceCompletesThroughTheCallbackSession() = runTest {
         val wallet = FakeDemoWallet(
             issuanceGrant = WalletDemoIssuanceGrant.AuthorizationCode,
+            credentials = listOf(sampleCredential.copy(id = "cred-auth")),
             authorizationOutcome = WalletDemoIssuanceOutcome.Stored(listOf("cred-auth")),
         )
         val controller = unlockedControllerWith(wallet, this)
