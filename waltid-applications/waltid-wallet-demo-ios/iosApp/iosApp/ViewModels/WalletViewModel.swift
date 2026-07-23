@@ -10,6 +10,7 @@ enum WalletTab: Hashable {
 private enum WalletDeepLinkScheme: String {
     case credentialOffer = "openid-credential-offer"
     case presentationRequest = "openid4vp"
+    case authorizationCallback = "openid"
 }
 
 private enum WalletStatusText {
@@ -68,9 +69,7 @@ class WalletViewModel: ObservableObject {
         didSet {
             guard offerUrl != oldValue else { return }
             receiveTask?.cancel()
-            if !receiveCompleted, let previewHandle = offerPreview?.previewHandle {
-                Task { try? await walletClient.discardIssuancePreview(previewHandle) }
-            }
+            cancelIssuanceIfPresent()
             txCode = ""
             offerPreview = nil
         }
@@ -81,7 +80,9 @@ class WalletViewModel: ObservableObject {
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
     @Published var selectedPresentationDisclosureOptions: Set<PresentationDisclosureSelection> = []
     @Published var selectedTab: WalletTab = .credentials
-    @Published var offerPreview: OfferResolution?
+    @Published var offerPreview: IssuanceOfferPreview?
+    @Published private(set) var authorizationRequestURL: URL?
+    @Published var deferredCredentials: [DeferredCredential] = []
     @Published var lastReceivedCredentialIDs: [String] = []
     @Published var receiveCompleted = false
     @Published var presentationCompleted = false
@@ -93,6 +94,7 @@ class WalletViewModel: ObservableObject {
     @Published private(set) var pendingPresentationFormPostHTML: String?
     private var statusTab: WalletTab?
     private var receiveTask: Task<Void, Never>?
+    private var issuanceSession: IssuanceSession?
     private var pendingPresentationSuccessMessage: String?
     private var presentationTask: Task<Void, Never>?
 
@@ -125,7 +127,11 @@ class WalletViewModel: ObservableObject {
     }
 
     private var hasValidTransactionCode: Bool {
-        offerPreview?.transactionCode?.accepts(txCode) ?? true
+        guard let requirement = offerPreview?.transactionCode else { return true }
+        let normalizedCode = normalizedTransactionCode(txCode, requirement: requirement)
+        guard !normalizedCode.isEmpty else { return false }
+        guard let length = requirement.length else { return true }
+        return normalizedCode.count == length
     }
 
     var receivedCredentials: [Credential] {
@@ -299,6 +305,7 @@ class WalletViewModel: ObservableObject {
         case .credentialOffer:
             receiveTask?.cancel()
             presentationTask?.cancel()
+            cancelIssuanceIfPresent()
             discardPresentationPreviewIfPresent()
             selectedTab = .receive
             offerUrl = url.absoluteString
@@ -316,7 +323,7 @@ class WalletViewModel: ObservableObject {
         case .presentationRequest:
             receiveTask?.cancel()
             presentationTask?.cancel()
-            discardIssuancePreviewIfPresent()
+            cancelIssuanceIfPresent()
             discardPresentationPreviewIfPresent()
             selectedTab = .present
             presentationRequestUrl = url.absoluteString
@@ -332,6 +339,8 @@ class WalletViewModel: ObservableObject {
             clearPendingPresentationContinuation()
             presentationNavigationResetKey += 1
             resetFlowStatusForIncomingURL()
+        case .authorizationCallback:
+            continueAuthorization(callbackURI: url)
         case nil:
             break
         }
@@ -339,10 +348,12 @@ class WalletViewModel: ObservableObject {
 
     func startNewReceiveFlow() {
         receiveTask?.cancel()
+        cancelIssuanceIfPresent()
         resetInputFocus()
         offerUrl = ""
         txCode = ""
         offerPreview = nil
+        authorizationRequestURL = nil
         lastReceivedCredentialIDs = []
         receiveCompleted = false
         receiveNavigationResetKey += 1
@@ -380,26 +391,33 @@ class WalletViewModel: ObservableObject {
         let request = ReceiveRequest(offerURL: offer.absoluteString, navigationResetKey: receiveNavigationResetKey)
         setLoading(WalletStatusText.resolvingCredentialOffer, tab: .receive)
         receiveTask = Task {
-            var newPreviewHandle: IssuancePreviewHandle?
+            var newSession: IssuanceSession?
             do {
-                let resolution = try await walletClient.resolveOffer(offer: offer)
-                newPreviewHandle = resolution.previewHandle
+                let session = try await walletClient.startIssuance(
+                    IssuanceRequest(
+                        offer: offer,
+                        redirectURI: URL(string: "openid://")!,
+                        did: did.isEmpty ? nil : did
+                    )
+                )
+                newSession = session
                 try Task.checkCancellation()
                 guard isCurrent(request) else {
-                    try? await walletClient.discardIssuancePreview(resolution.previewHandle)
+                    _ = try? await walletClient.cancelIssuance(sessionID: session.id)
                     return
                 }
-                offerPreview = resolution
-                newPreviewHandle = nil
+                issuanceSession = session
+                offerPreview = session.offer
+                newSession = nil
                 setSuccess(WalletStatusText.reviewCredentialOffer, tab: .receive)
             } catch is CancellationError {
-                if let newPreviewHandle {
-                    try? await walletClient.discardIssuancePreview(newPreviewHandle)
+                if let newSession {
+                    _ = try? await walletClient.cancelIssuance(sessionID: newSession.id)
                 }
                 return
             } catch {
-                if let newPreviewHandle {
-                    try? await walletClient.discardIssuancePreview(newPreviewHandle)
+                if let newSession {
+                    _ = try? await walletClient.cancelIssuance(sessionID: newSession.id)
                 }
                 if isCurrent(request) {
                     setError(WalletStatusText.failure(WalletStatusText.receiveFailed, error), tab: .receive)
@@ -416,17 +434,76 @@ class WalletViewModel: ObservableObject {
             setError(WalletStatusText.failure(WalletStatusText.receiveFailed, WalletStatusText.invalidOfferURL), tab: .receive)
             return
         }
-        let trimmedTxCode = txCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let previewHandle = offerPreview?.previewHandle else { return }
+        let trimmedTxCode = offerPreview?.transactionCode.map { normalizedTransactionCode(txCode, requirement: $0) }
+        guard let session = issuanceSession else { return }
         let previousCredentials = credentials
         let request = ReceiveRequest(offerURL: offer.absoluteString, navigationResetKey: receiveNavigationResetKey)
 
         setLoading(WalletStatusText.receivingCredential, tab: .receive)
         receiveTask = Task {
             do {
-                try await completeReceive(
-                    previewHandle: previewHandle,
-                    txCode: offerPreview?.transactionCode == nil ? nil : trimmedTxCode,
+                switch session.offer.grant {
+                case .preAuthorizedCode:
+                    try await completeIssuanceOutcome(
+                        try await walletClient.continuePreAuthorizedIssuance(
+                            sessionID: session.id,
+                            transactionCode: trimmedTxCode
+                        ),
+                        previousCredentials: previousCredentials,
+                        request: request
+                    )
+                case .authorizationCode:
+                    guard let authorizationURL = session.authorization?.url else {
+                        throw WalletError.internalFailure("Issuance session is missing its authorization request")
+                    }
+                    authorizationRequestURL = authorizationURL
+                    setSuccess(WalletStatusText.reviewCredentialOffer, tab: .receive)
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                if isCurrent(request) {
+                    setError(WalletStatusText.failure(WalletStatusText.receiveFailed, error), tab: .receive)
+                }
+            }
+        }
+    }
+
+    func declineOffer() {
+        receiveTask?.cancel()
+        let sessionID = issuanceSession?.id
+        issuanceSession = nil
+        offerPreview = nil
+        authorizationRequestURL = nil
+        txCode = ""
+        receiveNavigationResetKey += 1
+        setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
+        if let sessionID {
+            Task { try? await walletClient.cancelIssuance(sessionID: sessionID) }
+        }
+    }
+
+    func authorizationRequestOpened() {
+        authorizationRequestURL = nil
+    }
+
+    private func continueAuthorization(callbackURI: URL) {
+        guard let session = issuanceSession,
+              let preview = offerPreview,
+              preview.grant == .authorizationCode else { return }
+        let request = ReceiveRequest(
+            offerURL: offerUrl.trimmingCharacters(in: .whitespacesAndNewlines),
+            navigationResetKey: receiveNavigationResetKey
+        )
+        let previousCredentials = credentials
+        setLoading(WalletStatusText.receivingCredential, tab: .receive)
+        receiveTask = Task {
+            do {
+                try await completeIssuanceOutcome(
+                    try await walletClient.continueAuthorizationIssuance(
+                        sessionID: session.id,
+                        callbackURI: callbackURI
+                    ),
                     previousCredentials: previousCredentials,
                     request: request
                 )
@@ -440,28 +517,37 @@ class WalletViewModel: ObservableObject {
         }
     }
 
-    func declineOffer() {
-        receiveTask?.cancel()
-        let previewHandle = offerPreview?.previewHandle
-        offerPreview = nil
-        txCode = ""
-        receiveNavigationResetKey += 1
-        setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
-        if let previewHandle {
-            Task { try? await walletClient.discardIssuancePreview(previewHandle) }
-        }
-    }
-
-    private func completeReceive(
-        previewHandle: IssuancePreviewHandle,
-        txCode: String?,
+    private func completeIssuanceOutcome(
+        _ outcome: IssuanceOutcome,
         previousCredentials: [Credential],
         request: ReceiveRequest
     ) async throws {
         try Task.checkCancellation()
         guard isCurrent(request) else { return }
-        setLoading(WalletStatusText.receivingCredential, tab: .receive)
-        let credentialIDs = try await walletClient.receive(previewHandle: previewHandle, txCode: txCode)
+        let credentialIDs: [String]
+        switch outcome {
+        case let .stored(_, ids):
+            credentialIDs = ids
+        case let .deferred(_, storedIDs, deferred):
+            issuanceSession = nil
+            offerPreview = nil
+            authorizationRequestURL = nil
+            deferredCredentials = (deferredCredentials + deferred).reduce(into: [DeferredCredential]()) { result, credential in
+                if !result.contains(where: { $0.id == credential.id }) { result.append(credential) }
+            }
+            lastReceivedCredentialIDs = storedIDs
+            receiveCompleted = !storedIDs.isEmpty
+            setSuccess("Credential issuance deferred", tab: .receive)
+            return
+        case .cancelled:
+            issuanceSession = nil
+            offerPreview = nil
+            authorizationRequestURL = nil
+            setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
+            return
+        case let .failed(_, error, _):
+            throw WalletError.internalFailure(error.message)
+        }
         try Task.checkCancellation()
         guard isCurrent(request) else { return }
         let refreshedCredentials = try await walletClient.credentials()
@@ -476,7 +562,9 @@ class WalletViewModel: ObservableObject {
         let displayableReceivedCredentialIDs = receivedCredentialIDs.filter { refreshedCredentialIDs.contains($0) }
         guard !displayableReceivedCredentialIDs.isEmpty else {
             credentials = refreshedCredentials
+            issuanceSession = nil
             offerPreview = nil
+            authorizationRequestURL = nil
             lastReceivedCredentialIDs = []
             receiveCompleted = false
             setError(
@@ -490,7 +578,9 @@ class WalletViewModel: ObservableObject {
         }
 
         credentials = refreshedCredentials
+        issuanceSession = nil
         offerPreview = nil
+        authorizationRequestURL = nil
         lastReceivedCredentialIDs = displayableReceivedCredentialIDs
         self.txCode = ""
         receiveCompleted = true
@@ -498,7 +588,50 @@ class WalletViewModel: ObservableObject {
     }
 
     func updateTxCode(_ value: String) {
-        txCode = offerPreview?.transactionCode?.normalizeInput(value) ?? value
+        txCode = offerPreview?.transactionCode.map { normalizedTransactionCode(value, requirement: $0) } ?? value
+    }
+
+    func resumeDeferredCredential(_ credential: DeferredCredential) {
+        guard !isLoading else { return }
+        setLoading(WalletStatusText.receivingCredential, tab: .receive)
+        receiveTask = Task {
+            do {
+                let outcome = try await walletClient.resumeDeferredIssuance(deferredCredentialID: credential.id)
+                switch outcome {
+                case let .stored(_, credentialIDs):
+                    let refreshedCredentials = try await walletClient.credentials()
+                    credentials = refreshedCredentials
+                    deferredCredentials.removeAll { $0.id == credential.id }
+                    lastReceivedCredentialIDs = credentialIDs
+                    receiveCompleted = !credentialIDs.isEmpty
+                    setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: .receive)
+                case let .deferred(_, _, credentials):
+                    deferredCredentials.removeAll { $0.id == credential.id }
+                    deferredCredentials.append(contentsOf: credentials)
+                    setSuccess("Credential issuance still pending", tab: .receive)
+                case .cancelled:
+                    deferredCredentials.removeAll { $0.id == credential.id }
+                    setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
+                case let .failed(_, error, _):
+                    throw WalletError.internalFailure(error.message)
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                setError(WalletStatusText.failure(WalletStatusText.receiveFailed, error), tab: .receive)
+            }
+        }
+    }
+
+    private func normalizedTransactionCode(
+        _ value: String,
+        requirement: IssuanceTransactionCode
+    ) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = requirement.inputMode?.lowercased() == "numeric"
+            ? trimmed.filter { $0.isASCII && $0.isNumber }
+            : trimmed
+        return requirement.length.map { String(normalized.prefix($0)) } ?? normalized
     }
 
     private func isCurrent(_ request: ReceiveRequest) -> Bool {
@@ -789,10 +922,12 @@ class WalletViewModel: ObservableObject {
         pendingPresentationSuccessMessage = nil
     }
 
-    private func discardIssuancePreviewIfPresent() {
+    private func cancelIssuanceIfPresent() {
         guard !receiveCompleted else { return }
-        guard let previewHandle = offerPreview?.previewHandle else { return }
-        Task { try? await walletClient.discardIssuancePreview(previewHandle) }
+        guard let sessionID = issuanceSession?.id else { return }
+        issuanceSession = nil
+        authorizationRequestURL = nil
+        Task { try? await walletClient.cancelIssuance(sessionID: sessionID) }
     }
 
     private func discardPresentationPreviewIfPresent() {
@@ -1000,26 +1135,6 @@ private extension Set where Element == PresentationDisclosureSelection {
                 $0.queryID == disclosure.queryID && $0.credentialID == disclosure.credentialID
             }
         }
-    }
-}
-
-private extension TransactionCodeRequirement {
-    func normalizeInput(_ value: String) -> String {
-        let normalized: String
-        switch inputMode {
-        case .numeric:
-            normalized = value.filter { $0.isASCII && $0.isNumber }
-        case .text:
-            normalized = value
-        }
-        return length.map { String(normalized.prefix($0)) } ?? normalized
-    }
-
-    func accepts(_ value: String) -> Bool {
-        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalized.isEmpty else { return false }
-        if let length, normalized.count != length { return false }
-        return inputMode != .numeric || normalized.allSatisfy { $0.isASCII && $0.isNumber }
     }
 }
 
