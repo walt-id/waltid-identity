@@ -52,18 +52,13 @@ kotlin {
         }
 
 
-        val commonSignumMain by creating {
+        val signumMain by creating {
             dependsOn(commonMain.get())
             dependencies {
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(identityLibs.signum.indispensable)
                 implementation(identityLibs.kotlinx.io.bytestring)
             }
-        }
-
-        val commonSignumTest by creating {
-            dependsOn(commonTest.get())
-            dependsOn(commonSignumMain)
         }
 
         val jvmIosMain by creating {
@@ -77,7 +72,7 @@ kotlin {
 
         jvmMain {
             dependsOn(jvmBouncyMain)
-            dependsOn(commonSignumMain)
+            dependsOn(signumMain)
             dependsOn(jvmIosMain)
             dependencies {
                 implementation(identityLibs.signum.indispensable)
@@ -91,8 +86,8 @@ kotlin {
 
         jvmTest {
             dependsOn(jvmMain.get())
+            dependsOn(signumMain)
             dependsOn(jvmBouncyTest)
-            dependsOn(commonSignumTest)
             dependencies {
                 // Logging
                 implementation(identityLibs.slf4j.simple)
@@ -110,7 +105,7 @@ kotlin {
 
 
         jsMain {
-            dependsOn(commonSignumMain)
+            dependsOn(signumMain)
             dependencies {
                 implementation(identityLibs.signum.indispensable)
             }
