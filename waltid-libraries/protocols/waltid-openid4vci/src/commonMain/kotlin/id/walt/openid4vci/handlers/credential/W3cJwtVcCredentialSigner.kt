@@ -51,7 +51,11 @@ object W3cJwtVcCredentialSigner {
             ?: if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else null
 
         val additionalJwtHeaders = x5Chain?.let {
-            mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert -> JsonPrimitive(cert.bytes.toByteArray().encodeToBase64()) }))
+            mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert ->
+                JsonPrimitive(
+                    cert.bytes.toByteArray().encodeToBase64()
+                )
+            }))
         } ?: mapOf()
 
         val vcPayload = credentialStatus?.let { status ->

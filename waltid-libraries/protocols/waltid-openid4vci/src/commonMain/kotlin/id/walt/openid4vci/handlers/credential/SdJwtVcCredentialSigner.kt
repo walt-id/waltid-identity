@@ -116,7 +116,8 @@ object SdJwtVcCredentialSigner {
 
 
         val extraClaims = sdJwtCredentialClaims ?: emptyMap()
-        val undisclosedPayload = sdPayload.undisclosedPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
+        val undisclosedPayload =
+            sdPayload.undisclosedPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
 
         val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
 
@@ -126,7 +127,9 @@ object SdJwtVcCredentialSigner {
             JWT_HEADER_KID to getKidHeader(issuerKey, issuerDid),
             JWT_HEADER_TYPE to (sdJwtTypeHeader ?: SD_JWT_VC_TYPE_HEADER)
         ).plus(x5Chain?.let {
-            mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert -> cert.bytes.toByteArray().encodeToBase64().toJsonElement() }))
+            mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert ->
+                cert.bytes.toByteArray().encodeToBase64().toJsonElement()
+            }))
         } ?: mapOf())
 
         val finalSdPayload = SDPayload.createSDPayload(

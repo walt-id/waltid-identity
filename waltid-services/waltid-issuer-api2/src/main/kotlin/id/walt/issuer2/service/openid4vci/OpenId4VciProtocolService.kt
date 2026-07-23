@@ -10,13 +10,6 @@ import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.utils.JsonObjectPathMapper
-import id.walt.mdoc.dataelement.DataElement
-import id.walt.mdoc.dataelement.MapElement
-import id.walt.mdoc.dataelement.MapKey
-import id.walt.mdoc.dataelement.NumberElement
-import id.walt.mdoc.dataelement.StringElement
-import id.walt.mdoc.doc.MDoc
-import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.errors.CredentialError
@@ -336,7 +329,10 @@ class OpenId4VciProtocolService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            return oauth2Provider.writeCredentialError(credentialRequest, OAuthError(OAuthErrorCodes.INVALID_TOKEN, e.message))
+            return oauth2Provider.writeCredentialError(
+                credentialRequest,
+                OAuthError(OAuthErrorCodes.INVALID_TOKEN, e.message)
+            )
         }
 
         val sessionId = tokenClaims.stringClaim("sub")
@@ -417,12 +413,14 @@ class OpenId4VciProtocolService(
                         put("credentialStatus", status)
                     })
                 }
+
                 CredentialFormat.SD_JWT_VC -> {
                     // For SD-JWT VC, inject status at root level (as "status" claim)
                     JsonObject(session.credentialData.toMutableMap().apply {
                         put("status", status)
                     })
                 }
+
                 else -> session.credentialData
             }
         } ?: session.credentialData
@@ -746,10 +744,14 @@ class OpenId4VciProtocolService(
             val uri = statusList["uri"]?.jsonPrimitive?.content
                 ?: return null
 
-            MdocStatus(statusList = MdocStatusListInfo(index = idx, uri = id.walt.mdoc.objects.mso.UniformResourceIdentifier(uri)))
+            MdocStatus(
+                statusList = MdocStatusListInfo(
+                    index = idx,
+                    uri = id.walt.mdoc.objects.mso.UniformResourceIdentifier(uri)
+                )
+            )
         } catch (e: Exception) {
             null
         }
     }
-
 }

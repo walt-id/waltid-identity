@@ -198,7 +198,7 @@ object Issuer2RequestExamples {
         authMethod = AuthenticationMethod.AUTHORIZED,
         issuerStateMode = IssuerStateMode.INCLUDE,
         expiresAt = EXAMPLE_EXPIRES_AT,
-        credentialOffer = byValueAuthorizationOfferUrl(issuerState = EXAMPLE_OFFER_ID),
+        credentialOffer = byValueAuthorizationOfferUrl(),
     )
 
     val CREDENTIAL_OFFER_RESPONSE_BY_VALUE_WITH_ISSUER_STATE = CredentialOfferCreateResponse(
@@ -207,7 +207,7 @@ object Issuer2RequestExamples {
         authMethod = AuthenticationMethod.AUTHORIZED,
         issuerStateMode = IssuerStateMode.INCLUDE,
         expiresAt = EXAMPLE_EXPIRES_AT,
-        credentialOffer = byValueAuthorizationOfferUrl(issuerState = EXAMPLE_OFFER_ID),
+        credentialOffer = byValueAuthorizationOfferUrl(),
     )
 
     val PRE_AUTHORIZED_CREDENTIAL_OFFER_RESPONSE_WITH_GENERATED_TX_CODE = CredentialOfferCreateResponse(
@@ -237,7 +237,7 @@ object Issuer2RequestExamples {
             credentialOfferUri = "$EXAMPLE_CREDENTIAL_ISSUER/credential-offer?id=$EXAMPLE_OFFER_ID",
         ).toUrl()
 
-    private fun byValueAuthorizationOfferUrl(issuerState: String? = null): String =
+    private fun byValueAuthorizationOfferUrl(issuerState: String? = EXAMPLE_OFFER_ID): String =
         CredentialOfferRequest(
             credentialOffer = CredentialOffer.withAuthorizationCodeGrant(
                 credentialIssuer = EXAMPLE_CREDENTIAL_ISSUER,
