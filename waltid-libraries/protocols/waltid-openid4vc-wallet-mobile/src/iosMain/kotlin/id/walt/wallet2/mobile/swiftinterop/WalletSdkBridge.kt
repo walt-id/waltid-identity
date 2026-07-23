@@ -6,6 +6,7 @@ import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletIssuancePreviewHandle
+import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.MobileWalletOfferResolution
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
@@ -13,6 +14,8 @@ import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
+import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.handlers.WalletIssuanceSession
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -104,6 +107,38 @@ public class WalletSdkBridge private constructor(
         previewHandle: MobileWalletIssuancePreviewHandle,
     ): WalletBridgeResult<Unit> =
         walletBridgeCall { operations.discardIssuancePreview(previewHandle) }
+
+    /** Resolves an offer and starts its bound OpenID4VCI issuance session. */
+    public suspend fun startIssuance(
+        request: MobileWalletIssuanceRequest,
+    ): WalletBridgeResult<WalletIssuanceSession> =
+        walletBridgeCall { operations.startIssuance(request) }
+
+    /** Continues one reviewed pre-authorized issuance session. */
+    public suspend fun continuePreAuthorizedIssuance(
+        sessionId: String,
+        transactionCode: String? = null,
+    ): WalletBridgeResult<WalletIssuanceOutcome> =
+        walletBridgeCall { operations.continuePreAuthorizedIssuance(sessionId, transactionCode) }
+
+    /** Continues one authorization-code issuance session after its browser callback. */
+    public suspend fun continueAuthorizationIssuance(
+        sessionId: String,
+        callbackUri: String,
+    ): WalletBridgeResult<WalletIssuanceOutcome> =
+        walletBridgeCall { operations.continueAuthorizationIssuance(sessionId, callbackUri) }
+
+    /** Cancels one active issuance session and discards its continuation material. */
+    public suspend fun cancelIssuance(
+        sessionId: String,
+    ): WalletBridgeResult<WalletIssuanceOutcome> =
+        walletBridgeCall { operations.cancelIssuance(sessionId) }
+
+    /** Resumes one deferred credential issuance result. */
+    public suspend fun resumeDeferredIssuance(
+        deferredCredentialId: String,
+    ): WalletBridgeResult<WalletIssuanceOutcome> =
+        walletBridgeCall { operations.resumeDeferredIssuance(deferredCredentialId) }
 
     /**
      * Lists credential summaries stored in the bridged wallet.
@@ -220,6 +255,22 @@ internal interface WalletSdkBridgeOperations {
 
     suspend fun discardIssuancePreview(previewHandle: MobileWalletIssuancePreviewHandle)
 
+    suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceSession
+
+    suspend fun continuePreAuthorizedIssuance(
+        sessionId: String,
+        transactionCode: String?,
+    ): WalletIssuanceOutcome
+
+    suspend fun continueAuthorizationIssuance(
+        sessionId: String,
+        callbackUri: String,
+    ): WalletIssuanceOutcome
+
+    suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome
+
+    suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletIssuanceOutcome
+
     suspend fun credentials(): List<MobileWalletCredential>
 
     suspend fun deleteWallet()
@@ -289,6 +340,27 @@ internal class MobileWalletSdkBridgeOperations(
 
     override suspend fun discardIssuancePreview(previewHandle: MobileWalletIssuancePreviewHandle) =
         wallet.discardIssuancePreview(previewHandle)
+
+    override suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceSession =
+        wallet.startIssuance(request)
+
+    override suspend fun continuePreAuthorizedIssuance(
+        sessionId: String,
+        transactionCode: String?,
+    ): WalletIssuanceOutcome =
+        wallet.continuePreAuthorizedIssuance(sessionId, transactionCode)
+
+    override suspend fun continueAuthorizationIssuance(
+        sessionId: String,
+        callbackUri: String,
+    ): WalletIssuanceOutcome =
+        wallet.continueAuthorizationIssuance(sessionId, callbackUri)
+
+    override suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome =
+        wallet.cancelIssuance(sessionId)
+
+    override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletIssuanceOutcome =
+        wallet.resumeDeferredIssuance(deferredCredentialId)
 
     override suspend fun credentials(): List<MobileWalletCredential> =
         wallet.credentials()
