@@ -6,6 +6,19 @@ interface DemoWallet {
     suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview
     suspend fun receive(previewHandle: WalletDemoIssuancePreviewHandle, txCode: String? = null): List<String>
     suspend fun discardIssuancePreview(previewHandle: WalletDemoIssuancePreviewHandle)
+    suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?): WalletDemoIssuanceSession =
+        error("Issuance sessions are unavailable")
+    suspend fun continuePreAuthorizedIssuance(
+        sessionId: String,
+        transactionCode: String?,
+    ): WalletDemoIssuanceOutcome = WalletDemoIssuanceOutcome.Failed("Issuance sessions are unavailable")
+    suspend fun continueAuthorizationIssuance(
+        sessionId: String,
+        callbackUri: String,
+    ): WalletDemoIssuanceOutcome = WalletDemoIssuanceOutcome.Failed("Issuance sessions are unavailable")
+    suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome = WalletDemoIssuanceOutcome.Cancelled
+    suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome =
+        WalletDemoIssuanceOutcome.Failed("Deferred issuance is unavailable")
     suspend fun present(requestUrl: String, did: String? = null): WalletDemoOperationResult
     suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult
     suspend fun submitPresentation(
