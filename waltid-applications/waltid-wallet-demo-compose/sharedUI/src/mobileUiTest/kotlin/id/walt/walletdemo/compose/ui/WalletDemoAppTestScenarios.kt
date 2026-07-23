@@ -269,6 +269,32 @@ class WalletDemoAppTestScenarios {
         assertEquals(null, wallet.receivedOfferUrl)
     }
 
+    fun authorizationCodeOfferExplainsIssuerSignIn() = runComposeUiTest {
+        val controller = WalletDemoController(
+            FakeDemoWallet(issuanceGrant = WalletDemoIssuanceGrant.AuthorizationCode),
+            InMemoryDemoPinStore(),
+        )
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag(WalletUiTestTags.ReceiveTab).performClick()
+        onNodeWithTag(WalletUiTestTags.OfferInput).performTextInput("openid-credential-offer://authorization-code")
+        onNodeWithTag(WalletUiTestTags.ReceiveButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+
+        onNodeWithTag(WalletUiTestTags.OfferAuthorizationSection).performScrollTo().assertIsDisplayed()
+        onNodeWithText("Issuer sign-in").assertIsDisplayed()
+        onNodeWithText("Continuing opens your browser to sign in with the issuer before the credential is issued.")
+            .assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton)
+            .performScrollTo()
+            .assertIsDisplayed()
+        onNodeWithText("Continue to sign in").assertIsDisplayed()
+        onAllNodesWithText("Accept").assertCountEquals(0)
+    }
+
     fun offerClaimsUseSemanticGroupsAndInclusionLabels() = runComposeUiTest {
         val wallet = FakeDemoWallet(
             offeredCredential = WalletDemoOfferedCredentialMetadata(
@@ -1009,6 +1035,7 @@ private class FakeDemoWallet(
     private val receiveGate: CompletableDeferred<Unit>? = null,
     private val previewGate: CompletableDeferred<Unit>? = null,
     private val transactionCodeRequired: Boolean = false,
+    private val issuanceGrant: WalletDemoIssuanceGrant = WalletDemoIssuanceGrant.PreAuthorizedCode,
     private val offeredCredential: WalletDemoOfferedCredentialMetadata = WalletDemoOfferedCredentialMetadata(
         configurationId = "ExampleCredential",
         format = "vc+sd-jwt",
@@ -1047,7 +1074,7 @@ private class FakeDemoWallet(
         issuanceSources[sessionId] = offerUrl
         return WalletDemoIssuanceSession(
             id = sessionId,
-            grant = WalletDemoIssuanceGrant.PreAuthorizedCode,
+            grant = issuanceGrant,
             preview = WalletDemoOfferPreview(
             issuer = WalletDemoIssuerMetadata(
                 credentialIssuer = "https://issuer.example",
@@ -1065,7 +1092,13 @@ private class FakeDemoWallet(
                     description = "Enter the six-digit code",
                 )
             },
+            requiresIssuerAuthentication = issuanceGrant == WalletDemoIssuanceGrant.AuthorizationCode,
             ),
+            authorizationUrl = if (issuanceGrant == WalletDemoIssuanceGrant.AuthorizationCode) {
+                "https://issuer.example/authorize"
+            } else {
+                null
+            },
         )
     }
 

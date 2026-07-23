@@ -4,9 +4,6 @@ import WalletSDK
 protocol WalletClient {
     func bootstrap() async throws -> WalletBootstrapResult
     func credentials() async throws -> [Credential]
-    func resolveOffer(offer: URL) async throws -> OfferResolution
-    func receive(previewHandle: IssuancePreviewHandle, txCode: String?) async throws -> [String]
-    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome
@@ -38,18 +35,6 @@ final class SDKWalletClient: WalletClient {
 
     func credentials() async throws -> [Credential] {
         try await wallet().credentials()
-    }
-
-    func resolveOffer(offer: URL) async throws -> OfferResolution {
-        try await wallet().resolveOffer(offer: offer)
-    }
-
-    func receive(previewHandle: IssuancePreviewHandle, txCode: String?) async throws -> [String] {
-        try await wallet().receive(previewHandle: previewHandle, txCode: txCode)
-    }
-
-    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
-        try await wallet().discardIssuancePreview(previewHandle)
     }
 
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession { try await wallet().startIssuance(request) }

@@ -18,15 +18,15 @@ final class WalletViewModelReceiveTests: XCTestCase {
         viewModel.previewOffer()
         await Task.yield()
 
-        let receiveCallsBeforeCode = await client.receiveCalls
-        let resolveCalls = await client.resolveCalls
+        let receiveCallsBeforeCode = await client.issuanceContinuationCalls
+        let resolveCalls = await client.issuanceStartCalls
         XCTAssertFalse(viewModel.acceptOfferEnabled)
         XCTAssertEqual(receiveCallsBeforeCode, 0)
         XCTAssertEqual(resolveCalls, 1)
 
         viewModel.acceptOffer()
         await Task.yield()
-        let receiveCallsAfterRejectedAccept = await client.receiveCalls
+        let receiveCallsAfterRejectedAccept = await client.issuanceContinuationCalls
         XCTAssertEqual(receiveCallsAfterRejectedAccept, 0)
 
         viewModel.txCode = " abc-123 "
@@ -34,7 +34,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         viewModel.acceptOffer()
         try await waitUntil { viewModel.receiveCompleted }
 
-        let receiveCalls = await client.receiveCalls
+        let receiveCalls = await client.issuanceContinuationCalls
         let receivedTxCodes = await client.receivedTxCodes
         XCTAssertEqual(receiveCalls, 1)
         XCTAssertEqual(receivedTxCodes, ["abc-123"])
@@ -61,7 +61,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
     func testNumericTransactionCodeIsFilteredCappedAndValidated() async throws {
         let client = TransactionCodeWalletClient(
-            transactionCode: TransactionCodeRequirement(inputMode: .numeric, length: 6, description: nil)
+            transactionCode: IssuanceTransactionCode(inputMode: "numeric", length: 6, descriptionText: nil)
         )
         let viewModel = WalletViewModel(walletClient: client)
         try await waitUntil { viewModel.isReady }
@@ -80,8 +80,25 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertTrue(viewModel.acceptOfferEnabled)
     }
 
-    func testStaleOfferResolutionCannotOverwriteIncomingDeepLink() async throws {
-        let client = TransactionCodeWalletClient(resolveDelayNanoseconds: 100_000_000)
+    func testAuthorizationCodeOfferOpensIssuerSignInContinuation() async throws {
+        let client = TransactionCodeWalletClient(transactionCode: nil, issuanceGrant: .authorizationCode)
+        let viewModel = WalletViewModel(walletClient: client)
+        try await waitUntil { viewModel.isReady }
+
+        viewModel.offerUrl = "openid-credential-offer://issuer.example"
+        viewModel.previewOffer()
+        try await waitUntil { viewModel.offerPreview?.grant == .authorizationCode }
+
+        viewModel.acceptOffer()
+        try await waitUntil { viewModel.authorizationRequestURL != nil }
+
+        XCTAssertEqual(viewModel.authorizationRequestURL, URL(string: "https://issuer.example/authorize"))
+        let issuanceContinuationCalls = await client.issuanceContinuationCalls
+        XCTAssertEqual(issuanceContinuationCalls, 0)
+    }
+
+    func testStaleIssuanceStartCannotOverwriteIncomingDeepLink() async throws {
+        let client = TransactionCodeWalletClient(issuanceStartDelayNanoseconds: 100_000_000)
         let viewModel = WalletViewModel(walletClient: client)
         try await waitUntil { viewModel.isReady }
 
@@ -96,7 +113,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertFalse(viewModel.isError)
     }
 
-    func testPresentationDeepLinkDiscardsActiveIssuancePreview() async throws {
+    func testPresentationDeepLinkCancelsActiveIssuanceSession() async throws {
         let client = TransactionCodeWalletClient(startsWithCredential: true)
         let viewModel = WalletViewModel(walletClient: client)
         try await waitUntil { viewModel.isReady }
@@ -108,12 +125,12 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
         viewModel.handleDeepLink(URL(string: "openid4vp://verifier.example")!)
         try await waitUntilAsync {
-            let handles = await client.discardedIssuancePreviewHandles
-            return !handles.isEmpty
+            let sessionIDs = await client.cancelledIssuanceSessionIDs
+            return !sessionIDs.isEmpty
         }
 
-        let discardedHandles = await client.discardedIssuancePreviewHandles
-        XCTAssertEqual(discardedHandles, [IssuancePreviewHandle(value: "transaction-code-preview")])
+        let cancelledSessionIDs = await client.cancelledIssuanceSessionIDs
+        XCTAssertEqual(cancelledSessionIDs, ["transaction-code-session"])
         XCTAssertNil(viewModel.offerPreview)
         XCTAssertEqual(viewModel.receiveNavigationResetKey, receiveResetKey + 1)
         XCTAssertEqual(viewModel.selectedTab, .present)
@@ -219,34 +236,37 @@ final class WalletViewModelReceiveTests: XCTestCase {
 }
 
 private actor TransactionCodeWalletClient: WalletClient {
-    private(set) var receiveCalls = 0
-    private(set) var resolveCalls = 0
+    private(set) var issuanceContinuationCalls = 0
+    private(set) var issuanceStartCalls = 0
     private(set) var presentationPreviewCalls = 0
     private(set) var presentationSubmitCalls = 0
     private(set) var presentationRejectCalls = 0
     private(set) var receivedTxCodes: [String] = []
-    private(set) var discardedIssuancePreviewHandles: [IssuancePreviewHandle] = []
+    private(set) var cancelledIssuanceSessionIDs: [String] = []
     private(set) var discardedPresentationPreviewHandles: [PresentationPreviewHandle] = []
     private var credentialIssued = false
-    private let resolveDelayNanoseconds: UInt64
-    private let transactionCode: TransactionCodeRequirement
+    private let issuanceStartDelayNanoseconds: UInt64
+    private let transactionCode: IssuanceTransactionCode?
+    private let issuanceGrant: IssuanceGrant
     private let startsWithCredential: Bool
     private let presentationPreviewDelayNanoseconds: UInt64
     private let presentationActionDelayNanoseconds: UInt64
 
     init(
-        resolveDelayNanoseconds: UInt64 = 0,
-        transactionCode: TransactionCodeRequirement = TransactionCodeRequirement(
-            inputMode: .text,
+        issuanceStartDelayNanoseconds: UInt64 = 0,
+        transactionCode: IssuanceTransactionCode? = IssuanceTransactionCode(
+            inputMode: "text",
             length: nil,
-            description: "Enter the code from the issuer"
+            descriptionText: "Enter the code from the issuer"
         ),
+        issuanceGrant: IssuanceGrant = .preAuthorizedCode,
         startsWithCredential: Bool = false,
         presentationPreviewDelayNanoseconds: UInt64 = 0,
         presentationActionDelayNanoseconds: UInt64 = 0
     ) {
-        self.resolveDelayNanoseconds = resolveDelayNanoseconds
+        self.issuanceStartDelayNanoseconds = issuanceStartDelayNanoseconds
         self.transactionCode = transactionCode
+        self.issuanceGrant = issuanceGrant
         self.startsWithCredential = startsWithCredential
         self.presentationPreviewDelayNanoseconds = presentationPreviewDelayNanoseconds
         self.presentationActionDelayNanoseconds = presentationActionDelayNanoseconds
@@ -260,46 +280,53 @@ private actor TransactionCodeWalletClient: WalletClient {
         startsWithCredential || credentialIssued ? [Self.credential] : []
     }
 
-    func resolveOffer(offer: URL) async throws -> OfferResolution {
-        resolveCalls += 1
-        if resolveDelayNanoseconds > 0 {
-            try? await Task.sleep(nanoseconds: resolveDelayNanoseconds)
+    func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
+        issuanceStartCalls += 1
+        if issuanceStartDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: issuanceStartDelayNanoseconds)
         }
-        return OfferResolution(
-            previewHandle: IssuancePreviewHandle(value: "transaction-code-preview"),
-            issuer: IssuerMetadata(
-                credentialIssuer: "https://issuer.example",
-                display: MetadataDisplay(
-                    name: "Example Issuer",
-                    locale: "en",
-                    logoURI: nil,
-                    logoAltText: nil
-                )
+        return IssuanceSession(
+            id: "transaction-code-session",
+            offer: IssuanceOfferPreview(
+                grant: issuanceGrant,
+                issuer: IssuanceIssuerPreview(identifier: "https://issuer.example", name: "Example Issuer", locale: nil, logoURI: nil, logoAltText: nil),
+                credentials: [IssuanceCredentialPreview(configurationID: "ExampleCredential", format: "vc+sd-jwt", name: "Example credential", descriptionText: nil, logoURI: nil)],
+                transactionCode: transactionCode
             ),
-            offeredCredentials: [
-                OfferedCredentialMetadata(
-                    configurationID: "ExampleCredential",
-                    format: "vc+sd-jwt",
-                    scope: nil,
-                    vct: "ExampleCredential",
-                    doctype: nil,
-                    display: nil,
-                    claims: []
+            authorization: issuanceGrant == .authorizationCode
+                ? IssuanceAuthorization(
+                    url: URL(string: "https://issuer.example/authorize")!,
+                    state: "test-state",
+                    redirectURI: request.redirectURI,
+                    pkce: .init(codeChallenge: "test-challenge", codeChallengeMethod: "S256"),
+                    pushedAuthorizationRequestUsed: false
                 )
-            ],
-            transactionCode: transactionCode
+                : nil
         )
     }
 
-    func receive(previewHandle: IssuancePreviewHandle, txCode: String?) async throws -> [String] {
-        receiveCalls += 1
-        receivedTxCodes.append(txCode ?? "")
+    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome {
+        issuanceContinuationCalls += 1
+        receivedTxCodes.append(transactionCode ?? "")
         credentialIssued = true
-        return [Self.credential.id]
+        return .stored(sessionID: sessionID, credentialIDs: [Self.credential.id])
     }
 
-    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
-        discardedIssuancePreviewHandles.append(previewHandle)
+    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome {
+        try await continuePreAuthorizedIssuance(sessionID: sessionID, transactionCode: nil)
+    }
+
+    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
+        cancelledIssuanceSessionIDs.append(sessionID)
+        return .cancelled(sessionID: sessionID)
+    }
+
+    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
+        .failed(
+            sessionID: "transaction-code-session",
+            error: .init(code: .invalidSession, message: "No deferred credential in this test"),
+            storedCredentialIDs: []
+        )
     }
 
     func present(request: URL, did: String?) async throws -> PresentationResult {

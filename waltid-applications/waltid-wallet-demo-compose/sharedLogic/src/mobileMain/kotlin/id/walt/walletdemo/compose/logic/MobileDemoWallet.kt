@@ -91,6 +91,7 @@ internal class MobileDemoWallet(
                     )
                 },
                 transactionCode = session.offer.transactionCode?.toDemoRequirement(),
+                requiresIssuerAuthentication = session.offer.grant == WalletIssuanceGrant.AUTHORIZATION_CODE,
             ),
             authorizationUrl = session.authorization?.url,
         )

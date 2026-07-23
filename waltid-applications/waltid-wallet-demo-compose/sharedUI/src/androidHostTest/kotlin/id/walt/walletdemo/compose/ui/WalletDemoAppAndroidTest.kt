@@ -39,6 +39,10 @@ class WalletDemoAppAndroidTest {
         scenarios.transactionCodeOfferCanBeDeclinedWithoutCode()
 
     @Test
+    fun authorizationCodeOfferExplainsIssuerSignIn() =
+        scenarios.authorizationCodeOfferExplainsIssuerSignIn()
+
+    @Test
     fun offerClaimsUseSemanticGroupsAndInclusionLabels() =
         scenarios.offerClaimsUseSemanticGroupsAndInclusionLabels()
 
