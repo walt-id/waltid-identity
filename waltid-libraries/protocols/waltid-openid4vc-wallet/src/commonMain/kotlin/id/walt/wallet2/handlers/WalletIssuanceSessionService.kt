@@ -827,19 +827,12 @@ class WalletIssuanceSessionService(
             CredentialOfferResolver(httpClient).resolveCredentialOffer(inline, null)
         } else {
             val parsed = CredentialOfferParser.parseCredentialOfferUrl(request.getEffectiveOfferString())
-            parsed.credentialOfferUri?.let { requireSecureProtocolUrl(it, "credential_offer_uri") }
             CredentialOfferResolver(httpClient).resolveCredentialOffer(parsed.credentialOffer, parsed.credentialOfferUri)
         }
-        requireSecureProtocolUrl(offer.credentialIssuer, "credential_issuer")
         val resolver = IssuerMetadataResolver(httpClient)
         val issuerMetadata = resolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
         require(issuerMetadata.credentialIssuer == offer.credentialIssuer) {
             "Credential issuer metadata identifier does not match the offer"
-        }
-        requireSecureProtocolUrl(issuerMetadata.credentialEndpoint, "credential_endpoint")
-        issuerMetadata.nonceEndpoint?.let(::requireNonceEndpointUrl)
-        issuerMetadata.deferredCredentialEndpoint?.let {
-            requireSecureProtocolUrl(it, "deferred_credential_endpoint")
         }
         val grantAuthorizationServer = when (offer.getGrantType()) {
             is GrantType.AuthorizationCode -> offer.grants?.authorizationCode?.authorizationServer
@@ -847,33 +840,13 @@ class WalletIssuanceSessionService(
             else -> null
         }
         val selectedAuthorizationServer = selectAuthorizationServer(issuerMetadata, grantAuthorizationServer)
-        requireSecureProtocolUrl(selectedAuthorizationServer, "authorization_server")
         val authorizationServerMetadata = resolver.resolveAuthorizationServerMetadata(selectedAuthorizationServer)
         require(authorizationServerMetadata.issuer == selectedAuthorizationServer) {
             "Authorization server metadata issuer does not match the selected server"
         }
-        authorizationServerMetadata.authorizationEndpoint?.let {
-            requireSecureProtocolUrl(it, "authorization_endpoint")
-        }
-        authorizationServerMetadata.tokenEndpoint?.let { requireSecureProtocolUrl(it, "token_endpoint") }
-        authorizationServerMetadata.pushedAuthorizationRequestEndpoint?.let {
-            requireSecureProtocolUrl(it, "pushed_authorization_request_endpoint")
-        }
         val offered = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
         require(offered.isNotEmpty()) { "Credential offer resolved no supported credentials" }
         return ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offered)
-    }
-
-    private fun requireNonceEndpointUrl(value: String) {
-        val protocol = Url(value).protocol.name
-        require(protocol.equals("https", ignoreCase = true)) { "nonce_endpoint must use HTTPS" }
-    }
-
-    private fun requireSecureProtocolUrl(value: String, fieldName: String) {
-        val protocol = Url(value).protocol.name
-        require(protocol.equals("https", ignoreCase = true)) {
-            "$fieldName must use HTTPS"
-        }
     }
 
     private fun selectAuthorizationServer(
@@ -1236,21 +1209,6 @@ class WalletIssuanceSessionService(
         }
         require(resolved.authorizationServerMetadata.issuer in resolved.issuerMetadata.authorizationServerIssuers()) {
             "Stored authorization server binding is invalid"
-        }
-        requireSecureProtocolUrl(resolved.offer.credentialIssuer, "credential_issuer")
-        requireSecureProtocolUrl(resolved.issuerMetadata.credentialEndpoint, "credential_endpoint")
-        resolved.issuerMetadata.nonceEndpoint?.let(::requireNonceEndpointUrl)
-        resolved.issuerMetadata.deferredCredentialEndpoint?.let {
-            requireSecureProtocolUrl(it, "deferred_credential_endpoint")
-        }
-        resolved.authorizationServerMetadata.authorizationEndpoint?.let {
-            requireSecureProtocolUrl(it, "authorization_endpoint")
-        }
-        resolved.authorizationServerMetadata.tokenEndpoint?.let {
-            requireSecureProtocolUrl(it, "token_endpoint")
-        }
-        resolved.authorizationServerMetadata.pushedAuthorizationRequestEndpoint?.let {
-            requireSecureProtocolUrl(it, "pushed_authorization_request_endpoint")
         }
         require(
             resolved.offeredCredentials.map { it.credentialConfigurationId } ==
