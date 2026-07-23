@@ -93,7 +93,7 @@ class WalletDemoController(
                 presentationNavigationResetKey = it.presentationNavigationResetKey + 1,
             )
         }
-        discardIssuancePreview(previous.activeIssuancePreviewHandle())
+        cancelIssuance()
         discardPresentationPreview(previous.activePresentationPreviewHandle())
     }
 
@@ -143,7 +143,7 @@ class WalletDemoController(
                 operation = WalletOperationState.Idle,
             )
         }
-        discardIssuancePreview(previous.activeIssuancePreviewHandle())
+        cancelIssuance()
     }
 
     fun updateTxCode(value: String) {
@@ -203,7 +203,7 @@ class WalletDemoController(
                         operation = WalletOperationState.Idle,
                     )
                 }
-                discardIssuancePreview(previous.activeIssuancePreviewHandle())
+                cancelIssuance()
                 discardPresentationPreview(previous.activePresentationPreviewHandle())
             }
             WalletDeepLinkScheme.PresentationRequest -> {
@@ -229,7 +229,7 @@ class WalletDemoController(
                         operation = WalletOperationState.Idle,
                     )
                 }
-                discardIssuancePreview(previous.activeIssuancePreviewHandle())
+                cancelIssuance()
                 discardPresentationPreview(previous.activePresentationPreviewHandle())
             }
             WalletDeepLinkScheme.AuthorizationCallback -> continueAuthorization(url)
@@ -252,7 +252,7 @@ class WalletDemoController(
                 operation = WalletOperationState.Idle,
             )
         }
-        discardIssuancePreview(previous.activeIssuancePreviewHandle())
+        cancelIssuance()
     }
 
     fun startNewPresentationFlow() {
@@ -365,61 +365,6 @@ class WalletDemoController(
         }
     }
 
-    private suspend fun receiveCredential(
-        ready: WalletSessionState.Ready,
-        request: ReceiveRequest,
-        previewHandle: WalletDemoIssuancePreviewHandle,
-        txCode: String?,
-    ) {
-        currentCoroutineContext().ensureActive()
-        if (!isCurrent(request)) return
-        val ids = wallet.receive(previewHandle, txCode)
-        currentCoroutineContext().ensureActive()
-        if (!isCurrent(request)) return
-        val credentials = wallet.listCredentials()
-        currentCoroutineContext().ensureActive()
-        if (!isCurrent(request)) return
-        val receivedCredentialIds = resolvedReceivedCredentialIds(
-            returnedCredentialIds = ids,
-            previousCredentials = ready.credentials,
-            refreshedCredentials = credentials,
-        )
-        val displayableReceivedCredentialIds = receivedCredentialIds
-            .filter { receivedCredentialId -> credentials.any { it.id == receivedCredentialId } }
-        if (displayableReceivedCredentialIds.isEmpty()) {
-            updateIfCurrent(request, WalletOperationState.Receiving) {
-                it.copy(
-                    session = ready.copy(credentials = credentials),
-                    operation = WalletOperationState.Failed(
-                        message = WalletDisplayText.failure(
-                            WalletDisplayText.ReceiveFailed,
-                            WalletDisplayText.ReceivedCredentialsUnavailable,
-                        ),
-                        tab = WalletDemoTab.Receive,
-                    ),
-                    offerPreview = null,
-                    lastReceivedCredentialIds = emptyList(),
-                    receiveCompleted = false,
-                )
-            }
-            return
-        }
-
-        updateIfCurrent(request, WalletOperationState.Receiving) {
-            it.copy(
-                session = ready.copy(credentials = credentials),
-                offerPreview = null,
-                operation = WalletOperationState.Succeeded(
-                    message = WalletDisplayText.receivedCredentials(displayableReceivedCredentialIds.size),
-                    tab = WalletDemoTab.Receive,
-                ),
-                requestDrafts = it.requestDrafts.copy(txCode = ""),
-                lastReceivedCredentialIds = displayableReceivedCredentialIds,
-                receiveCompleted = true,
-            )
-        }
-    }
-
     private suspend fun completeIssuanceOutcome(
         ready: WalletSessionState.Ready,
         request: ReceiveRequest,
@@ -427,7 +372,24 @@ class WalletDemoController(
     ) {
         val ids = when (outcome) {
             is WalletDemoIssuanceOutcome.Stored -> outcome.credentialIds
-            is WalletDemoIssuanceOutcome.Deferred -> emptyList()
+            is WalletDemoIssuanceOutcome.Deferred -> {
+                issuanceSession = null
+                updateIfCurrent(request, WalletOperationState.Receiving) {
+                    it.copy(
+                        offerPreview = null,
+                        authorizationRequestUrl = null,
+                        deferredCredentials = (it.deferredCredentials + outcome.credentials)
+                            .distinctBy(WalletDemoDeferredCredential::id),
+                        lastReceivedCredentialIds = outcome.storedCredentialIds,
+                        receiveCompleted = outcome.storedCredentialIds.isNotEmpty(),
+                        operation = WalletOperationState.Succeeded(
+                            "Credential issuance deferred",
+                            WalletDemoTab.Receive,
+                        ),
+                    )
+                }
+                return
+            }
             WalletDemoIssuanceOutcome.Cancelled -> emptyList()
             is WalletDemoIssuanceOutcome.Failed -> error(outcome.message)
         }
@@ -437,6 +399,64 @@ class WalletDemoController(
             it.copy(session = ready.copy(credentials = credentials), offerPreview = null, authorizationRequestUrl = null,
                 operation = WalletOperationState.Succeeded(WalletDisplayText.receivedCredentials(ids.size), WalletDemoTab.Receive),
                 lastReceivedCredentialIds = ids, receiveCompleted = ids.isNotEmpty())
+        }
+    }
+
+    fun resumeDeferredCredential(deferredCredentialId: String) {
+        val current = _state.value
+        val ready = current.session as? WalletSessionState.Ready ?: return
+        if (current.deferredCredentials.none { it.id == deferredCredentialId }) return
+        if (!_state.compareAndSet(current, current.copy(operation = WalletOperationState.Receiving))) return
+
+        receiveJob = scope.launch(dispatcher) {
+            try {
+                when (val outcome = wallet.resumeDeferredIssuance(deferredCredentialId)) {
+                    is WalletDemoIssuanceOutcome.Stored -> {
+                        val credentials = wallet.listCredentials()
+                        _state.update {
+                            it.copy(
+                                session = ready.copy(credentials = credentials),
+                                deferredCredentials = it.deferredCredentials.filterNot { pending -> pending.id == deferredCredentialId },
+                                lastReceivedCredentialIds = outcome.credentialIds,
+                                receiveCompleted = true,
+                                operation = WalletOperationState.Succeeded(
+                                    WalletDisplayText.receivedCredentials(outcome.credentialIds.size),
+                                    WalletDemoTab.Receive,
+                                ),
+                            )
+                        }
+                    }
+                    is WalletDemoIssuanceOutcome.Deferred -> _state.update {
+                        it.copy(
+                            deferredCredentials = (
+                                it.deferredCredentials.filterNot { pending -> pending.id == deferredCredentialId } + outcome.credentials
+                                ).distinctBy(WalletDemoDeferredCredential::id),
+                            operation = WalletOperationState.Succeeded("Credential issuance still pending", WalletDemoTab.Receive),
+                        )
+                    }
+                    WalletDemoIssuanceOutcome.Cancelled -> _state.update {
+                        it.copy(
+                            deferredCredentials = it.deferredCredentials.filterNot { it.id == deferredCredentialId },
+                            operation = WalletOperationState.Succeeded(
+                                WalletDisplayText.CredentialOfferDeclined,
+                                WalletDemoTab.Receive,
+                            ),
+                        )
+                    }
+                    is WalletDemoIssuanceOutcome.Failed -> _state.update {
+                        it.copy(
+                            operation = WalletOperationState.Failed(
+                                WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, outcome.message),
+                                WalletDemoTab.Receive,
+                            ),
+                        )
+                    }
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                setOperationError(WalletDisplayText.ReceiveFailed, error, WalletDemoTab.Receive)
+            }
         }
     }
 
@@ -812,17 +832,13 @@ class WalletDemoController(
         }
     }
 
-    private fun discardIssuancePreview(previewHandle: WalletDemoIssuancePreviewHandle?) {
-        if (previewHandle == null) return
+    private fun cancelIssuance() {
+        val sessionId = issuanceSession?.id ?: return
+        issuanceSession = null
         scope.launch(dispatcher) {
-            runCatching { wallet.discardIssuancePreview(previewHandle) }
+            runCatching { wallet.cancelIssuance(sessionId) }
         }
     }
-
-    private fun WalletDemoUiState.activeIssuancePreviewHandle(): WalletDemoIssuancePreviewHandle? =
-        offerPreview
-            ?.takeUnless { receiveCompleted }
-            ?.previewHandle
 
     private fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle?) {
         if (previewHandle == null) return
