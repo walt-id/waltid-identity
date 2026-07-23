@@ -560,6 +560,7 @@ class DefaultOAuth2Provider(
             is CredentialRequestResult.Success ->
                 CredentialRequestResult.Success(result.request.withAccessTokenClient(tokenClaims))
             is CredentialRequestResult.Failure -> result
+            is CredentialRequestResult.OAuthFailure -> result
         }
     }
 
@@ -670,7 +671,7 @@ class DefaultOAuth2Provider(
         if (accessTokenContext == null) return CredentialAccessTokenVerification.Success(null)
         val verifier = config.accessTokenVerifier
             ?: return CredentialAccessTokenVerification.Failure(
-                CredentialRequestResult.Failure(
+                CredentialRequestResult.OAuthFailure(
                     OAuthError(OAuthErrorCodes.SERVER_ERROR, "access token verifier not configured")
                 )
             )
@@ -713,11 +714,11 @@ class DefaultOAuth2Provider(
 
         val context = proofValidationContext
             ?: return CredentialProofVerification.Failure(
-                OAuthError(CredentialErrorCodes.INVALID_PROOF, "Credential proof validation context is required"),
+                CredentialError(CredentialErrorCodes.INVALID_PROOF, "Credential proof validation context is required"),
             )
         val verifier = config.credentialProofVerifier
             ?: return CredentialProofVerification.Failure(
-                OAuthError(CredentialErrorCodes.INVALID_PROOF, "Credential proof verification is not configured"),
+                CredentialError(CredentialErrorCodes.INVALID_PROOF, "Credential proof verification is not configured"),
             )
 
         return try {
@@ -731,10 +732,10 @@ class DefaultOAuth2Provider(
         } catch (e: CancellationException) {
             throw e
         } catch (e: CredentialProofValidationException) {
-            CredentialProofVerification.Failure(OAuthError(e.errorCode, e.message))
+            CredentialProofVerification.Failure(CredentialError(e.errorCode, e.message))
         } catch (e: Exception) {
             CredentialProofVerification.Failure(
-                OAuthError(CredentialErrorCodes.INVALID_PROOF, e.message ?: "Invalid credential proof"),
+                CredentialError(CredentialErrorCodes.INVALID_PROOF, e.message ?: "Invalid credential proof"),
             )
         }
     }
@@ -798,14 +799,14 @@ class DefaultOAuth2Provider(
 
     private sealed class CredentialAccessTokenVerification {
         data class Success(val claims: JsonObject?) : CredentialAccessTokenVerification()
-        data class Failure(val result: CredentialRequestResult.Failure) : CredentialAccessTokenVerification()
+        data class Failure(val result: CredentialRequestResult) : CredentialAccessTokenVerification()
     }
 
     private sealed class CredentialProofVerification {
         data class Success(val proofs: List<id.walt.openid4vci.proofs.VerifiedCredentialProof>) :
             CredentialProofVerification()
 
-        data class Failure(val error: OAuthError) : CredentialProofVerification()
+        data class Failure(val error: CredentialError) : CredentialProofVerification()
     }
 
     private fun dpopAuthenticationChallenge(error: OAuthError): String = buildString {
