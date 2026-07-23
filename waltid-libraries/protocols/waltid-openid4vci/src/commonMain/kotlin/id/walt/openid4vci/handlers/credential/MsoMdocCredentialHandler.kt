@@ -3,8 +3,6 @@ package id.walt.openid4vci.handlers.credential
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
-import id.walt.openid4vci.errors.CredentialErrorCodes
-import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay

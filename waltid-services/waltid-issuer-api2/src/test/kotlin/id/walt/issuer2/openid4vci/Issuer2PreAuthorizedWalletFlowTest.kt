@@ -21,7 +21,6 @@ import id.walt.issuer2.testsupport.referencedOfferUri
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.errors.CredentialError
-import id.walt.openid4vci.errors.CredentialErrorCodes
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
