@@ -28,8 +28,6 @@ permissions:
   pull-requests: read
 
 jobs:
-  version:
-    uses: ./.github/workflows/version.yml
   android-eligibility:
     uses: ./.github/workflows/android-eligibility.yml
     with:
@@ -66,10 +64,7 @@ jobs:
   gradle-build:
     uses: ./.github/workflows/gradle.yml
     secrets: inherit
-    needs:
-      - android-eligibility
-      - version
+    needs: android-eligibility
     with:
-      version: ${{ needs.version.outputs.release_version }}
       enable-android-build: ${{ needs.android-eligibility.outputs.should-run == 'true' }}
       report-check-name: 'gradle-build / gradle (ubuntu-22.04)'
