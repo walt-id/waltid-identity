@@ -5,7 +5,6 @@ import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.metadata.issuer.IssuerDisplay
 import id.walt.openid4vci.offers.TxCode
 import id.walt.verifier.openid.models.authorization.ClientMetadata
-import id.walt.wallet2.handlers.WalletIssuanceOfferPreview
 import id.walt.wallet2.handlers.WalletOfferPreviewResult
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -221,53 +220,6 @@ internal fun WalletOfferPreviewResult.toMobileOfferResolution(
     },
     transactionCode = transactionCode?.toMobileRequirement(),
 )
-
-/**
- * Projects the review data retained by a durable issuance session into the legacy mobile offer
- * result without resolving the offer a second time. The session preview deliberately exposes only
- * display-safe fields, so fields not retained by the session remain absent here.
- */
-internal fun WalletIssuanceOfferPreview.toMobileOfferResolution(): MobileWalletOfferResolution =
-    MobileWalletOfferResolution(
-        issuer = MobileWalletIssuerMetadata(
-            credentialIssuer = issuer.identifier,
-            display = MobileWalletMetadataDisplay(
-                name = issuer.name,
-                locale = issuer.locale,
-                logoUri = issuer.logoUri,
-                logoAltText = issuer.logoAltText,
-            ),
-        ),
-        offeredCredentials = credentials.map { credential ->
-            MobileWalletOfferedCredentialMetadata(
-                configurationId = credential.configurationId,
-                format = credential.format,
-                scope = null,
-                vct = null,
-                doctype = null,
-                display = MobileWalletMetadataDisplay(
-                    name = credential.name,
-                    locale = null,
-                    logoUri = credential.logoUri,
-                    logoAltText = null,
-                    description = credential.descriptionText,
-                ),
-                claims = emptyList(),
-            )
-        },
-        transactionCode = transactionCode?.let {
-            val mode = when (it.inputMode ?: "numeric") {
-                "numeric" -> MobileWalletTransactionCodeInputMode.Numeric
-                "text" -> MobileWalletTransactionCodeInputMode.Text
-                else -> throw IllegalArgumentException("Unsupported transaction code input mode: ${it.inputMode}")
-            }
-            MobileWalletTransactionCodeRequirement(
-                inputMode = mode,
-                length = it.length,
-                description = it.descriptionText,
-            )
-        },
-    )
 
 @OptIn(ExperimentalSerializationApi::class)
 internal fun ClientMetadata.toMobileVerifierMetadata(
