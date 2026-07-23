@@ -168,8 +168,6 @@ class Wallet2MoreUseCasesTest {
                 code = preAuthCode, clientId = null, txCode = null, txCodeValue = null,
                 grantedScopes = emptySet(), grantedAudience = emptySet(), session = session,
                 expiresAt = Clock.System.now() + 10.minutes,
-                credentialNonce = "nonce-$preAuthCode",
-                credentialNonceExpiresAt = Clock.System.now() + 10.minutes
             ))
         }
 
@@ -495,8 +493,6 @@ class Wallet2MoreUseCasesTest {
                             grantedScopes = emptySet(), grantedAudience = emptySet(),
                             session = infra.session,
                             expiresAt = kotlin.time.Clock.System.now() + 5.minutes,
-                            credentialNonce = "poll-nonce",
-                            credentialNonceExpiresAt = kotlin.time.Clock.System.now() + 5.minutes
                         )
                     )
                 }

@@ -361,8 +361,6 @@ class Wallet2AdditionalUseCasesTest {
                     code = preAuthCode, clientId = null, txCode = null, txCodeValue = null,
                     grantedScopes = emptySet(), grantedAudience = emptySet(), session = session,
                     expiresAt = Clock.System.now() + 10.minutes,
-                    credentialNonce = "pres-nonce",
-                    credentialNonceExpiresAt = Clock.System.now() + 10.minutes
                 )
             )
         }

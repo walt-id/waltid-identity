@@ -346,8 +346,6 @@ class Wallet2ExtendedIntegrationTest {
                     code = preAuthCode, clientId = null, txCode = null, txCodeValue = null,
                     grantedScopes = emptySet(), grantedAudience = emptySet(), session = session,
                     expiresAt = Clock.System.now() + 10.minutes,
-                    credentialNonce = "isolated-nonce",
-                    credentialNonceExpiresAt = Clock.System.now() + 10.minutes
                 )
             )
         }
@@ -595,8 +593,6 @@ class Wallet2ExtendedIntegrationTest {
                             code = fullFlowCode, clientId = null, txCode = null, txCodeValue = null,
                             grantedScopes = emptySet(), grantedAudience = emptySet(), session = session,
                             expiresAt = Clock.System.now() + 10.minutes,
-                            credentialNonce = "full-nonce",
-                            credentialNonceExpiresAt = Clock.System.now() + 10.minutes
                         )
                     )
                 }

@@ -296,8 +296,6 @@ class Wallet2IssuerVerifier2IntegrationTest {
                     grantedAudience = emptySet(),
                     session = session,
                     expiresAt = Clock.System.now() + 10.minutes,
-                    credentialNonce = "test-nonce",
-                    credentialNonceExpiresAt = Clock.System.now() + 10.minutes
                 )
             )
         }
