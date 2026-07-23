@@ -131,7 +131,7 @@ class WalletDemoController(
 
     fun updateOfferUrl(value: String) {
         receiveJob?.cancel()
-        val previous = getAndUpdateState {
+        getAndUpdateState {
             it.copy(
                 requestDrafts = it.requestDrafts.copy(
                     offerUrl = value,
@@ -239,7 +239,7 @@ class WalletDemoController(
 
     fun startNewReceiveFlow() {
         receiveJob?.cancel()
-        val previous = getAndUpdateState {
+        getAndUpdateState {
             it.copy(
                 requestDrafts = it.requestDrafts.copy(
                     offerUrl = "",

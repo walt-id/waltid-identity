@@ -329,6 +329,65 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun authorizationCodeIssuanceCompletesThroughTheCallbackSession() = runTest {
+        val wallet = FakeDemoWallet(
+            issuanceGrant = WalletDemoIssuanceGrant.AuthorizationCode,
+            authorizationOutcome = WalletDemoIssuanceOutcome.Stored(listOf("cred-auth")),
+        )
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://authorization-code")
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
+        runCurrent()
+
+        assertEquals("openid://authorization", controller.state.value.authorizationRequestUrl)
+        controller.authorizationRequestOpened()
+        controller.handleDeepLink("openid://callback?code=code-1&state=state-1")
+        runCurrent()
+
+        assertEquals(listOf("openid://callback?code=code-1&state=state-1"), wallet.authorizationCallbackUris)
+        assertEquals(listOf("cred-auth"), controller.state.value.lastReceivedCredentialIds)
+        assertTrue(controller.state.value.receiveCompleted)
+        assertEquals(null, controller.state.value.offerPreview)
+    }
+
+    @Test
+    fun deferredIssuanceCanBeResumedFromTheReceiveState() = runTest {
+        val deferredCredential = WalletDemoDeferredCredential(
+            id = "deferred-1",
+            credentialConfigurationId = "ExampleCredential",
+            intervalSeconds = 5,
+        )
+        val wallet = FakeDemoWallet(
+            preAuthorizedOutcome = WalletDemoIssuanceOutcome.Deferred(
+                storedCredentialIds = emptyList(),
+                credentials = listOf(deferredCredential),
+            ),
+            deferredOutcome = WalletDemoIssuanceOutcome.Stored(listOf("cred-deferred")),
+        )
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://deferred")
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
+        runCurrent()
+
+        assertEquals(listOf(deferredCredential), controller.state.value.deferredCredentials)
+        assertFalse(controller.state.value.receiveCompleted)
+
+        controller.resumeDeferredCredential(deferredCredential.id)
+        runCurrent()
+
+        assertEquals(listOf(deferredCredential.id), wallet.resumedDeferredCredentialIds)
+        assertEquals(emptyList(), controller.state.value.deferredCredentials)
+        assertEquals(listOf("cred-deferred"), controller.state.value.lastReceivedCredentialIds)
+        assertTrue(controller.state.value.receiveCompleted)
+    }
+
+    @Test
     fun receiveIsSingleFlight() = runTest {
         val resolutionGate = CompletableDeferred<Unit>()
         val wallet = FakeDemoWallet(startIssuanceGate = resolutionGate)
@@ -1513,6 +1572,12 @@ private class FakeDemoWallet(
     var credentials: List<WalletDemoCredential> = emptyList(),
     private val receivedCredentialIds: List<String> = listOf("cred-1"),
     private val offerResolution: WalletDemoOfferPreview = offerPreview(),
+    private val issuanceGrant: WalletDemoIssuanceGrant = WalletDemoIssuanceGrant.PreAuthorizedCode,
+    private val preAuthorizedOutcome: WalletDemoIssuanceOutcome? = null,
+    private val authorizationOutcome: WalletDemoIssuanceOutcome =
+        WalletDemoIssuanceOutcome.Failed("Authorization code is not configured"),
+    private val deferredOutcome: WalletDemoIssuanceOutcome =
+        WalletDemoIssuanceOutcome.Failed("Deferred issuance is not configured"),
     private val startIssuanceGate: CompletableDeferred<Unit>? = null,
     private val ignoreStartIssuanceCancellation: Boolean = false,
     private val startIssuanceError: Throwable? = null,
@@ -1546,6 +1611,8 @@ private class FakeDemoWallet(
     var submittedCredentialOptions: List<WalletDemoPresentationCredentialSelection>? = null
     var submittedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>? = null
     val cancelledIssuanceSessionIds = mutableListOf<String>()
+    val authorizationCallbackUris = mutableListOf<String>()
+    val resumedDeferredCredentialIds = mutableListOf<String>()
     val discardedPresentationPreviewHandles = mutableListOf<WalletDemoPresentationPreviewHandle>()
     val rejectedPresentationPreviewHandles = mutableListOf<WalletDemoPresentationPreviewHandle>()
 
@@ -1571,8 +1638,13 @@ private class FakeDemoWallet(
         startIssuanceError?.let { throw it }
         return WalletDemoIssuanceSession(
             id = "issuance-session",
-            grant = WalletDemoIssuanceGrant.PreAuthorizedCode,
+            grant = issuanceGrant,
             preview = offerResolution,
+            authorizationUrl = if (issuanceGrant == WalletDemoIssuanceGrant.AuthorizationCode) {
+                "openid://authorization"
+            } else {
+                null
+            },
         )
     }
 
@@ -1587,21 +1659,26 @@ private class FakeDemoWallet(
         } else {
             receiveGate?.await()
         }
-        return WalletDemoIssuanceOutcome.Stored(receivedCredentialIds)
+        return preAuthorizedOutcome ?: WalletDemoIssuanceOutcome.Stored(receivedCredentialIds)
     }
 
     override suspend fun continueAuthorizationIssuance(
         sessionId: String,
         callbackUri: String,
-    ): WalletDemoIssuanceOutcome = WalletDemoIssuanceOutcome.Failed("Authorization code is not configured")
+    ): WalletDemoIssuanceOutcome {
+        authorizationCallbackUris += callbackUri
+        return authorizationOutcome
+    }
 
     override suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome {
         cancelledIssuanceSessionIds += sessionId
         return WalletDemoIssuanceOutcome.Cancelled
     }
 
-    override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome =
-        WalletDemoIssuanceOutcome.Failed("Deferred issuance is not configured")
+    override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome {
+        resumedDeferredCredentialIds += deferredCredentialId
+        return deferredOutcome
+    }
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult {
         presentedRequestUrl = requestUrl
