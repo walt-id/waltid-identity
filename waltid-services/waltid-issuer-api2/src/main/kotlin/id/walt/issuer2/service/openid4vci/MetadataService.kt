@@ -83,6 +83,7 @@ class MetadataService(
             clientAttestationPopSigningAlgValuesSupported =
                 if (supportsClientAttestation) ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS else null,
             preAuthorizedGrantAnonymousAccessSupported = preAuthorizedGrantAnonymousAccessSupported,
+            authorizationResponseIssParameterSupported = true,
         )
 
     fun getJwtVcIssuerMetadata(): JWTVCIssuerMetadata =
