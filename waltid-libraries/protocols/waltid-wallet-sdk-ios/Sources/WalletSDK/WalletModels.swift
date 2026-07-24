@@ -1180,10 +1180,11 @@ public struct PresentationRequestContext: Equatable, Sendable {
     ///
     /// - Parameters:
     ///   - clientID: Validated OpenID4VP client identifier from the request.
-    ///   - verifierName: Human-readable verifier name from client metadata when available.
+    ///   - verifierMetadata: Typed metadata supplied by the verifier when available.
     ///   - responseURI: Response URI to which the wallet would submit the presentation or error, when provided.
     ///   - state: OpenID state value from the request, when provided.
     ///   - nonce: OpenID nonce value from the request, when provided. May be nil if the missing nonce is the validation error.
+    ///   - responseEncryption: Response-encryption state selected for the request.
     public init(
         clientID: String,
         verifierMetadata: VerifierMetadata? = nil,
