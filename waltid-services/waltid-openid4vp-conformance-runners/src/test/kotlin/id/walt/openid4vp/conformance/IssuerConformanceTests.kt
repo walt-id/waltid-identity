@@ -32,6 +32,10 @@ class IssuerConformanceTests {
         private const val sdJwtCredentialConfigurationIdEnv = "OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID"
         private const val mdocCredentialConfigurationIdProperty = "openid4vci.conformance.mdoc-credential-configuration-id"
         private const val mdocCredentialConfigurationIdEnv = "OPENID4VCI_CONFORMANCE_MDOC_CREDENTIAL_CONFIGURATION_ID"
+        private const val haipSdJwtCredentialConfigurationIdProperty = "openid4vci.conformance.haip-sd-jwt-credential-configuration-id"
+        private const val haipSdJwtCredentialConfigurationIdEnv = "OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID"
+        private const val haipMdocCredentialConfigurationIdProperty = "openid4vci.conformance.haip-mdoc-credential-configuration-id"
+        private const val haipMdocCredentialConfigurationIdEnv = "OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID"
         private const val clientAttestationIssuerProperty = "openid4vci.conformance.client-attestation-issuer"
         private const val clientAttestationIssuerEnv = "OPENID4VCI_CONFORMANCE_CLIENT_ATTESTATION_ISSUER"
         private const val clientAttesterJwksFileProperty = "openid4vci.conformance.client-attester-jwks-file"
@@ -113,6 +117,12 @@ class IssuerConformanceTests {
         val mdocCredentialConfigurationId: String? =
             propertyOrEnv(mdocCredentialConfigurationIdProperty, mdocCredentialConfigurationIdEnv)
 
+        val haipSdJwtCredentialConfigurationId: String? =
+            propertyOrEnv(haipSdJwtCredentialConfigurationIdProperty, haipSdJwtCredentialConfigurationIdEnv)
+
+        val haipMdocCredentialConfigurationId: String? =
+            propertyOrEnv(haipMdocCredentialConfigurationIdProperty, haipMdocCredentialConfigurationIdEnv)
+
         val clientAttestationIssuer: String =
             propertyOrEnv(clientAttestationIssuerProperty, clientAttestationIssuerEnv)
                 ?: "https://client-attestation.example.com"
@@ -141,6 +151,8 @@ class IssuerConformanceTests {
                     conformancePort = ConformanceConfig.CONFORMANCE_PORT,
                     sdJwtCredentialConfigurationId = sdJwtCredentialConfigurationId,
                     mdocCredentialConfigurationId = mdocCredentialConfigurationId,
+                    haipSdJwtCredentialConfigurationId = haipSdJwtCredentialConfigurationId,
+                    haipMdocCredentialConfigurationId = haipMdocCredentialConfigurationId,
                     clientAttestationIssuer = clientAttestationIssuer,
                     clientAttesterJwks = clientAttesterJwks,
                     authorizationServer = authorizationServer,

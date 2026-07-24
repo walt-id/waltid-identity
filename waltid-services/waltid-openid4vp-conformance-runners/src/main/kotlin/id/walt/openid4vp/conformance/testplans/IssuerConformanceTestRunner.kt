@@ -37,11 +37,17 @@ class IssuerConformanceTestRunner(
     val conformancePort: Int = 8443,
     private val sdJwtCredentialConfigurationId: String? = null,
     private val mdocCredentialConfigurationId: String? = null,
+    private val haipSdJwtCredentialConfigurationId: String? = null,
+    private val haipMdocCredentialConfigurationId: String? = null,
     private val clientAttestationIssuer: String = "https://client-attestation.example.com",
     private val clientAttesterJwks: JsonObject,
     private val authorizationServer: String? = null,
     private val credentialProofTypeHint: String? = null,
     private val staticTxCode: String? = System.getenv("OPENID4VCI_CONFORMANCE_STATIC_TX_CODE")?.ifBlank { null },
+    private val credentialTrustAnchorPem: String? =
+        System.getenv("OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM")?.ifBlank { null },
+    private val statusListTrustAnchorPem: String? =
+        System.getenv("OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM")?.ifBlank { null },
     private val variantSelection: IssuerVariantSelection = IssuerVariantSelection.fromEnvironment(),
 ) {
     suspend fun run(): List<TestPlanResult> {
@@ -82,6 +88,8 @@ class IssuerConformanceTestRunner(
         println("Resolved issuer credential configuration ids:")
         println("  sd-jwt-vc -> ${resolvedIds.sdJwt ?: "<not found>"}")
         println("  mdoc      -> ${resolvedIds.mdoc ?: "<not found>"}")
+        println("  haip sd-jwt-vc -> ${resolvedIds.haipSdJwt ?: "<not found>"}")
+        println("  haip mdoc      -> ${resolvedIds.haipMdoc ?: "<not found>"}")
         println("Selected OpenID4VCI issuer variants: ${selectedVariants.size}/${allVariants.size}")
 
         if (variantSelection.discoveryOnly) {
@@ -125,6 +133,8 @@ class IssuerConformanceTestRunner(
                         authorizationServer = authorizationServer,
                         credentialProofTypeHint = credentialProofTypeHint,
                         staticTxCode = staticTxCode,
+                        credentialTrustAnchorPem = credentialTrustAnchorPem,
+                        statusListTrustAnchorPem = statusListTrustAnchorPem,
                     )
                     IssuerTestPlanRunner(plan.config, conformance, issuerInterface).attempt(variant)
                 }.getOrElse {
@@ -191,6 +201,8 @@ class IssuerConformanceTestRunner(
     private data class ResolvedCredentialConfigurationIds(
         val sdJwt: String?,
         val mdoc: String?,
+        val haipSdJwt: String?,
+        val haipMdoc: String?,
     )
 
     private fun resolveCredentialConfigurationIds(metadata: JsonObject): ResolvedCredentialConfigurationIds {
@@ -209,6 +221,8 @@ class IssuerConformanceTestRunner(
         return ResolvedCredentialConfigurationIds(
             sdJwt = discoveredSdJwtId,
             mdoc = discoveredMdocId,
+            haipSdJwt = haipSdJwtCredentialConfigurationId ?: discoveredSdJwtId,
+            haipMdoc = haipMdocCredentialConfigurationId ?: discoveredMdocId,
         )
     }
 
@@ -216,8 +230,8 @@ class IssuerConformanceTestRunner(
         variant: IssuerVariant,
         resolvedIds: ResolvedCredentialConfigurationIds,
     ): String? = when (variant.credentialFormat) {
-        "sd_jwt_vc" -> resolvedIds.sdJwt
-        "mdoc" -> resolvedIds.mdoc
+        "sd_jwt_vc" -> if (variant.isHaip) resolvedIds.haipSdJwt else resolvedIds.sdJwt
+        "mdoc" -> if (variant.isHaip) resolvedIds.haipMdoc else resolvedIds.mdoc
         else -> null
     }
 

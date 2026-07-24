@@ -95,7 +95,8 @@ class IssuerTestPlanRunner(
         println("Created test plan: $testPlanId")
         println("The conformance suite will call issuer: ${config.issuerUrl}")
 
-        val selectedModules = moduleSelection.filter(createTestPlanResponse.modules) { it.testModule }
+        val variantModules = createTestPlanResponse.modules.filter { moduleAppliesToVariant(variant, it.variant) }
+        val selectedModules = moduleSelection.filter(variantModules) { it.testModule }
         val excludedModules = selectedModules.mapNotNull { module ->
             knownSuiteBugExclusionReason(variant, module.testModule)?.let { reason ->
                 module.testModule to reason
@@ -195,6 +196,28 @@ class IssuerTestPlanRunner(
         return testModule in config.skippableModules &&
             status == "INTERRUPTED" &&
             result == "SKIPPED"
+    }
+
+    private fun moduleAppliesToVariant(variant: IssuerVariant, moduleVariant: JsonObject): Boolean {
+        if (!variant.isHaip) {
+            return true
+        }
+
+        val expectedValues = mapOf(
+            "fapi_profile" to variant.fapiProfile,
+            "credential_format" to variant.credentialFormat,
+            "vci_grant_type" to variant.grantType,
+            "vci_authorization_code_flow_variant" to variant.authorizationCodeFlowVariant,
+            "client_auth_type" to variant.clientAuthType,
+            "sender_constrain" to variant.senderConstrain,
+            "authorization_request_type" to variant.authorizationRequestType,
+            "fapi_request_method" to variant.requestMethod,
+            "vci_credential_encryption" to variant.credentialEncryption,
+        )
+
+        return expectedValues.all { (name, expectedValue) ->
+            moduleVariant[name]?.jsonPrimitive?.contentOrNull?.let { it == expectedValue } ?: true
+        }
     }
 
     private fun overallStatus(moduleResults: List<IssuerVariantModuleRunResult>): IssuerVariantRunStatus {
@@ -533,11 +556,12 @@ private data class IssuerModuleSelection(
         isEmpty() || moduleName in this
 
     companion object {
-        private val allowedGroups = setOf("metadata", "positive", "negative")
+        private val allowedGroups = setOf("metadata", "positive", "negative", "fapi")
 
         private val metadataModules = setOf(
             "oid4vci-1_0-issuer-metadata-test",
             "oid4vci-1_0-issuer-metadata-test-signed",
+            "fapi2-security-profile-final-discovery-end-point-verification",
         )
 
         private val positiveModules = setOf(
@@ -568,6 +592,7 @@ private data class IssuerModuleSelection(
                 moduleName in metadataModules -> "metadata"
                 moduleName in positiveModules -> "positive"
                 moduleName.startsWith("oid4vci-1_0-issuer-fail-") -> "negative"
+                moduleName.startsWith("fapi2-security-profile-final-") -> "fapi"
                 else -> "other"
             }
 

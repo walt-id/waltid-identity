@@ -22,6 +22,16 @@ data class IssuerVariant(
     val requestMethod: String,
     val credentialEncryption: String,
 ) {
+    val isHaip: Boolean
+        get() = fapiProfile == "vci_haip"
+
+    val conformanceTestPlanName: String
+        get() = if (isHaip) {
+            "oid4vci-1_0-issuer-haip-test-plan"
+        } else {
+            "oid4vci-1_0-issuer-test-plan"
+        }
+
     val id: String
         get() = listOf(
             fapiProfile.toIdPart(),
@@ -76,6 +86,16 @@ data class IssuerVariant(
         put("vci_credential_encryption", credentialEncryption)
     }
 
+    fun testPlanCreationVariant(): JsonObject =
+        if (isHaip) {
+            buildJsonObject {
+                put("vci_authorization_code_flow_variant", authorizationCodeFlowVariant)
+                put("credential_format", credentialFormat)
+            }
+        } else {
+            toJsonObject()
+        }
+
     private fun String.toIdPart(): String = when (this) {
         "vci_haip" -> "vcihaip"
         "sd_jwt_vc" -> "sdjwt"
@@ -93,7 +113,9 @@ data class IssuerVariant(
 }
 
 object IssuerVariantMatrix {
-    fun all(): List<IssuerVariant> = combinations(
+    fun all(): List<IssuerVariant> = base() + haip()
+
+    fun base(): List<IssuerVariant> = combinations(
         fapiProfiles = listOf("vci"),
         credentialFormats = listOf("sd_jwt_vc", "mdoc"),
         grantTypes = listOf("authorization_code", "pre_authorization_code"),
@@ -102,6 +124,18 @@ object IssuerVariantMatrix {
         senderConstrains = listOf("dpop", "mtls"),
         authorizationRequestTypes = listOf("simple", "rar"),
         requestMethods = listOf("unsigned", "signed_non_repudiation"),
+        credentialEncryptions = listOf("plain", "encrypted"),
+    )
+
+    fun haip(): List<IssuerVariant> = combinations(
+        fapiProfiles = listOf("vci_haip"),
+        credentialFormats = listOf("sd_jwt_vc", "mdoc"),
+        grantTypes = listOf("authorization_code"),
+        authorizationCodeFlowVariants = listOf("wallet_initiated", "issuer_initiated"),
+        clientAuthTypes = listOf("client_attestation"),
+        senderConstrains = listOf("dpop"),
+        authorizationRequestTypes = listOf("simple"),
+        requestMethods = listOf("unsigned"),
         credentialEncryptions = listOf("plain", "encrypted"),
     )
 
@@ -327,6 +361,8 @@ object IssuerVariantReportWriter {
 }
 
 internal fun deriveIssuerCredentialProfileId(credentialConfigurationId: String): String = when {
+    credentialConfigurationId.contains("identity_credential_haip") -> "identityCredentialHaipSdJwt"
+    credentialConfigurationId.contains("org.iso.18013.5.1.mDL.haip") -> "isoMdlHaip"
     credentialConfigurationId.contains("photoID_credential") -> "photoIdCredentialSdJwt"
     credentialConfigurationId.contains("org.iso.23220.photoid") -> "isoPhotoId"
     credentialConfigurationId.contains("org.iso.18013.5.1.mDL") -> "isoMdl"

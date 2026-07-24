@@ -7,7 +7,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * Generic OpenID4VCI issuer plan for the base oid4vci-1_0-issuer-test-plan.
+ * Generic OpenID4VCI issuer plan for the base VCI and HAIP issuer test plans.
  *
  * The conformance suite owns which test modules are applicable for a variant. This
  * class only supplies the selected variant and the local issuer/client configuration.
@@ -21,6 +21,8 @@ class Oid4vciIssuerVariantPlan(
     private val authorizationServer: String? = null,
     private val credentialProofTypeHint: String? = null,
     private val staticTxCode: String? = null,
+    private val credentialTrustAnchorPem: String? = null,
+    private val statusListTrustAnchorPem: String? = null,
 ) {
 
     // Client keys for DPoP and private_key_jwt tests.
@@ -61,11 +63,11 @@ class Oid4vciIssuerVariantPlan(
         }
     """.trimIndent()
     private val client2JwksJson = Json.decodeFromString<JsonObject>(client2Jwks)
-    private val moduleVariant = variant.toJsonObject().toString()
+    private val moduleVariant = variant.testPlanCreationVariant().toString()
 
     val config = IssuerTestPlanConfiguration(
         testPlanCreationUrl = {
-            append("planName", "oid4vci-1_0-issuer-test-plan")
+            append("planName", variant.conformanceTestPlanName)
             append("variant", moduleVariant)
         },
         testPlanCreationConfiguration = kotlinx.serialization.json.buildJsonObject {
@@ -89,12 +91,18 @@ class Oid4vciIssuerVariantPlan(
                 put("client_id", "conformance-test-client-2")
                 put("jwks", client2JwksJson)
             }
+            if (credentialTrustAnchorPem != null || statusListTrustAnchorPem != null) {
+                putJsonObject("credential") {
+                    credentialTrustAnchorPem?.let { put("trust_anchor_pem", it) }
+                    statusListTrustAnchorPem?.let { put("status_list_trust_anchor_pem", it) }
+                }
+            }
             put("description", variant.description)
         },
         issuerUrl = issuerUrl,
         skippableModules = setOf("oid4vci-1_0-issuer-metadata-test-signed"),
         credentialOfferAuthMethod = variant.credentialOfferAuthMethod,
         credentialProfileId = deriveIssuerCredentialProfileId(credentialConfigurationId),
-        staticTxCode = staticTxCode,
+        staticTxCode = staticTxCode.takeIf { variant.grantType == "pre_authorization_code" },
     )
 }
