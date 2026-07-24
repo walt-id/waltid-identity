@@ -15,6 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
 class TokenRequestBuilderTest {
@@ -40,7 +41,7 @@ class TokenRequestBuilderTest {
         (body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
 
     @Test
-    fun testExchangeAuthorizationCodeSuccess() = runTest {
+    fun testExchangeAuthorizationCodeIgnoresTokenResponseNonceExtension() = runTest {
         val mockResponse = """
             {
                 "access_token": "test-access-token",
@@ -65,7 +66,6 @@ class TokenRequestBuilderTest {
         val response = builder.exchangeAuthorizationCode(tokenEndpoint, "test-code", "test-verifier")
 
         assertEquals("test-access-token", response.access_token)
-        assertEquals("test-nonce", response.c_nonce)
     }
 
     @Test
@@ -123,15 +123,36 @@ class TokenRequestBuilderTest {
     fun testTokenRequestFailure() = runTest {
         val client = createMockClient { _ ->
             respond(
-                content = "Invalid code",
+                content = "private-error-detail",
                 status = HttpStatusCode.BadRequest
             )
         }
 
         val builder = TokenRequestBuilder(clientConfig, client)
-        assertFailsWith<Exception> {
+        val error = assertFailsWith<Exception> {
             builder.exchangeAuthorizationCode(tokenEndpoint, "invalid-code")
         }
+        assertFalse(error.message.orEmpty().contains("private-error-detail"))
+        assertNull(error.cause)
+    }
+
+    @Test
+    fun testMalformedSuccessResponseDoesNotEscapeTokenMaterial() = runTest {
+        val client = createMockClient {
+            respond(
+                content = """{"access_token":"private-token"}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+
+        val error = assertFailsWith<Exception> {
+            TokenRequestBuilder(clientConfig, client)
+                .exchangeAuthorizationCode(tokenEndpoint, "test-code")
+        }
+
+        assertFalse(error.message.orEmpty().contains("private-token"))
+        assertNull(error.cause)
     }
 
     @Test

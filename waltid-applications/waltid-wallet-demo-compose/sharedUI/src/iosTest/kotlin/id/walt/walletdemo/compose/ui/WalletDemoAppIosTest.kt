@@ -34,6 +34,10 @@ class WalletDemoAppIosTest {
         scenarios.transactionCodeOfferCanBeDeclinedWithoutCode()
 
     @Test
+    fun offerClaimsUseSemanticGroupsAndInclusionLabels() =
+        scenarios.offerClaimsUseSemanticGroupsAndInclusionLabels()
+
+    @Test
     fun receiveAndPresentTabsExposeQrScanActions() =
         scenarios.receiveAndPresentTabsExposeQrScanActions()
 
@@ -54,16 +58,16 @@ class WalletDemoAppIosTest {
         scenarios.presentTabDeclineSendsProtocolRejection()
 
     @Test
+    fun presentTabShowsUnencryptedResponseState() =
+        scenarios.presentTabShowsUnencryptedResponseState()
+
+    @Test
     fun presentationDisclosureImagesRenderAsImages() =
         scenarios.presentationDisclosureImagesRenderAsImages()
 
     @Test
-    fun presentTabShowsReadableVerifierFallbackForDidClientIds() =
-        scenarios.presentTabShowsReadableVerifierFallbackForDidClientIds()
-
-    @Test
-    fun presentTabShowsReadableVerifierFallbackForX509SanDnsClientIds() =
-        scenarios.presentTabShowsReadableVerifierFallbackForX509SanDnsClientIds()
+    fun presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails() =
+        scenarios.presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails()
 
     @Test
     fun presentationDetailsResolveDuplicateCredentialOptionsIndependently() =

@@ -8,6 +8,7 @@ import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.OAuth2ProviderConfig
 import id.walt.openid4vci.core.PushedAuthorizationConfig
 import id.walt.openid4vci.core.buildOAuth2Provider
+import id.walt.openid4vci.dpop.DefaultDPoPProofVerifier
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
@@ -80,6 +81,7 @@ data class OpenId4VciModule(
 
                     accessTokenIssuer = JwtAccessTokenIssuer(signingKeyResolver),
                     accessTokenVerifier = accessTokenVerifier,
+                    dpopProofVerifier = DefaultDPoPProofVerifier(),
 
                     refreshTokenIssuer = JwtRefreshTokenIssuer(signingKeyResolver),
                     refreshTokenVerifier = JwtRefreshTokenVerifier(verificationKeyResolver),

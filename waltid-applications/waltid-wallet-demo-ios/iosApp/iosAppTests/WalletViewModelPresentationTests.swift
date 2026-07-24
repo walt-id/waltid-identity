@@ -8,10 +8,23 @@ final class WalletViewModelPresentationTests: XCTestCase {
     @MainActor
     func testInvalidRequestCanBeDismissedLocallyOrReportedToVerifier() async throws {
         let request = try XCTUnwrap(URL(string: "openid4vp://invalid-request"))
+        let previewHandle = PresentationPreviewHandle(value: "invalid-presentation-preview")
         let previewError = PresentationPreviewError(
+            previewHandle: previewHandle,
             request: PresentationRequestInfo(
                 clientID: "https://verifier.example",
-                verifierName: "Example Verifier"
+                verifierMetadata: VerifierMetadata(
+                    display: MetadataDisplay(
+                        name: "Example Verifier",
+                        locale: "en",
+                        logoURI: nil,
+                        logoAltText: nil
+                    ),
+                    clientURI: nil,
+                    policyURI: nil,
+                    termsOfServiceURI: nil
+                ),
+                responseEncryption: .notRequired
             ),
             code: .invalidTransactionData,
             message: "Unsupported transaction data type"
@@ -35,10 +48,13 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertEqual(viewModel.statusMessage(for: .present), "Review presentation error")
 
         viewModel.startNewPresentationFlow()
+        try await waitUntilAsync {
+            await walletClient.discardedPresentationPreviewHandles == [previewHandle]
+        }
 
         XCTAssertNil(viewModel.presentationError)
         XCTAssertTrue(viewModel.presentationUrlEntryEnabled)
-        let rejectedAfterDismiss = await walletClient.rejectedRequestURLs
+        let rejectedAfterDismiss = await walletClient.rejectedPresentationPreviewHandles
         XCTAssertEqual(rejectedAfterDismiss, [])
 
         viewModel.presentationRequestUrl = request.absoluteString
@@ -48,8 +64,8 @@ final class WalletViewModelPresentationTests: XCTestCase {
         try await waitUntil { viewModel.presentationCompleted }
 
         XCTAssertNil(viewModel.presentationError)
-        let rejectedAfterNotify = await walletClient.rejectedRequestURLs
-        XCTAssertEqual(rejectedAfterNotify, [request])
+        let rejectedAfterNotify = await walletClient.rejectedPresentationPreviewHandles
+        XCTAssertEqual(rejectedAfterNotify, [previewHandle])
         XCTAssertEqual(viewModel.statusMessage(for: .present), "Verifier notified")
     }
 
@@ -85,7 +101,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
 
         XCTAssertNil(viewModel.pendingPresentationContinuationURL)
         XCTAssertTrue(viewModel.presentationCompleted)
-        XCTAssertEqual(viewModel.statusMessage(for: .present), "Presentation declined")
+        XCTAssertEqual(viewModel.statusMessage(for: .present), "Presentation rejected")
     }
 
     @MainActor
@@ -129,5 +145,16 @@ final class WalletViewModelPresentationTests: XCTestCase {
             await Task.yield()
         }
         XCTFail("Timed out waiting for wallet state")
+    }
+
+    private func waitUntilAsync(
+        _ predicate: @escaping () async -> Bool,
+        attempts: Int = 1_000
+    ) async throws {
+        for _ in 0..<attempts {
+            if await predicate() { return }
+            await Task.yield()
+        }
+        XCTFail("Timed out waiting for wallet client state")
     }
 }

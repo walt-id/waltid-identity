@@ -66,6 +66,7 @@ class MobileWalletTest {
 
         assertEquals("default", config.walletId)
         assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
+        assertEquals(emptyList(), config.preferredLocales)
         assertEquals(null, config.attestationConfig)
         assertEquals(MobileWalletPersistence(), config.persistence)
         assertEquals(emptyList(), config.transactionDataProfiles)
@@ -315,12 +316,24 @@ class MobileWalletTest {
     @Test
     fun presentationPreviewUsesSwiftFriendlyCredentialAndClaimDtos() {
         val preview = MobileWalletPresentationPreview(
+            previewHandle = MobileWalletPresentationPreviewHandle("preview-1"),
             request = MobileWalletPresentationRequestInfo(
                 clientId = "https://verifier.example",
-                verifierName = "Example Verifier",
+                verifierMetadata = MobileWalletVerifierMetadata(
+                    display = MobileWalletMetadataDisplay(
+                        name = "Example Verifier",
+                        locale = "en",
+                        logoUri = null,
+                        logoAltText = null,
+                    ),
+                    clientUri = "https://verifier.example",
+                    policyUri = null,
+                    termsOfServiceUri = null,
+                ),
                 responseUri = "https://verifier.example/direct-post",
                 state = "state-1",
                 nonce = "nonce-1",
+                responseEncryption = MobileWalletResponseEncryption.NotRequired,
             ),
             credentialOptions = listOf(
                 MobileWalletPresentationCredentialOption(

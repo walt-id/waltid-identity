@@ -1,7 +1,7 @@
 package id.walt.openid4vci.handlers.credential
 
 import id.walt.crypto.keys.Key
-import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.responses.credential.CredentialResponse
@@ -46,8 +46,8 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
         return try {
             if (configuration.format !in supportedFormats) {
                 return CredentialResponseResult.Failure(
-                    OAuthError(
-                        CredentialErrorCodes.UNSUPPORTED_CREDENTIAL_CONFIGURATION,
+                    CredentialError(
+                        CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
                         "Unsupported format ${configuration.format.value}"
                     )
                 )
@@ -55,7 +55,10 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
 
             val vct = configuration.vct
                 ?: return CredentialResponseResult.Failure(
-                    OAuthError("invalid_request", "Missing vct for SD-JWT VC credential configuration"),
+                    CredentialError(
+                        CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
+                        "Missing vct for SD-JWT VC credential configuration",
+                    ),
                 )
 
             val sdJwt = SdJwtVcCredentialSigner.generateSdJwtVC(
@@ -79,7 +82,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
                 )
             )
         } catch (e: Exception) {
-            CredentialResponseResult.Failure(OAuthError("invalid_request", e.message))
+            CredentialResponseResult.Failure(e.toCredentialHandlerError())
         }
     }
 }

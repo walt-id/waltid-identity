@@ -183,7 +183,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: Self.eudiPidSdJwtCredentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
         let resolution = try await wallet.resolveOffer(offer: offerURL)
-        XCTAssertTrue(resolution.transactionCodeRequired, "EUDI offer should require a transaction code")
+        XCTAssertFalse(resolution.issuer.credentialIssuer.isEmpty)
+        XCTAssertFalse(resolution.offeredCredentials.isEmpty)
+        XCTAssertTrue(resolution.offeredCredentials.allSatisfy {
+            !$0.configurationID.isEmpty && !$0.format.isEmpty
+        })
+        XCTAssertNotNil(resolution.transactionCode, "EUDI offer should require a transaction code")
         let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
 
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
@@ -250,8 +255,15 @@ final class MobileWalletIntegrationTests: XCTestCase {
         _ = try await wallet.bootstrap()
         let session = try await DemoBackend.shared.createResponseBoundVerifierSession(scenario: scenario)
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
-        _ = try await wallet.previewPresentation(request: presentationURL)
-        let result = try await wallet.rejectPresentation(request: presentationURL)
+        let previewResult = try await wallet.previewPresentation(request: presentationURL)
+        let previewHandle: PresentationPreviewHandle
+        switch previewResult {
+        case .ready(let preview):
+            previewHandle = preview.previewHandle
+        case .invalid(let error):
+            previewHandle = error.previewHandle
+        }
+        let result = try await wallet.rejectPresentation(previewHandle: previewHandle)
 
         assertTransmittedSuccess(result, "Wallet should deliver access_denied to public demo verifier2: \(result)")
         let info = try await DemoBackend.shared.waitForVerifierFailure(
@@ -278,7 +290,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertEqual(error.code, .invalidTransactionData)
         XCTAssertEqual(error.request.clientID, "redirect_uri:https://verifier.example/callback")
 
-        let result = try await wallet.rejectPresentation(request: presentationURL)
+        let result = try await wallet.rejectPresentation(previewHandle: error.previewHandle)
         XCTAssertEqual(
             result,
             .prepared(.openURL(URL(string: "https://verifier.example/callback#error=invalid_transaction_data&state=state-123")!))
@@ -402,9 +414,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
             preview.credentialOptions.allSatisfy { credentialIDs.contains($0.credentialID) },
             "Preview should only offer credentials received in this test. Received: \(credentialIDs), Preview: \(preview)"
         )
+        guard case .required = preview.request.responseEncryption else {
+            return XCTFail("EUDI verifier should request an encrypted response: \(preview)")
+        }
 
         let result = try await wallet.submitPresentation(
-            request: presentationURL,
+            previewHandle: preview.previewHandle,
             selectedCredentialOptions: preview.credentialOptions.map(\.selection),
             did: bootstrapResult.did
         )
@@ -450,7 +465,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         )
 
         let result = try await wallet.submitPresentation(
-            request: presentationURL,
+            previewHandle: preview.previewHandle,
             selectedCredentialOptions: preview.credentialOptions.map(\.selection),
             did: did
         )
