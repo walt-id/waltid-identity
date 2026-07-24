@@ -15,7 +15,6 @@
 			<string>id.walt.walletdemo</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>openid</string>
 				<string>openid-credential-offer</string>
 				<string>openid4vp</string>
 			</array>

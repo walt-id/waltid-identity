@@ -38,7 +38,6 @@ internal fun ReceiveTab(
     onAcceptOffer: () -> Unit,
     onDeclineOffer: () -> Unit,
     onStartNew: () -> Unit,
-    onResumeDeferred: (String) -> Unit,
     onCredentialClick: (String) -> Unit,
 ) {
     val receivedCredentials = state.receivedCredentials()
@@ -75,18 +74,6 @@ internal fun ReceiveTab(
                 onAccept = onAcceptOffer,
                 onDecline = onDeclineOffer,
             )
-        }
-
-        if (state.deferredCredentials.isNotEmpty()) {
-            Text("Pending credentials", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            state.deferredCredentials.forEach { pending ->
-                OutlinedButton(
-                    onClick = { onResumeDeferred(pending.id) },
-                    enabled = !state.isAuthenticating,
-                ) {
-                    Text("Check ${pending.credentialConfigurationId}")
-                }
-            }
         }
 
         if (state.receiveCompleted) {

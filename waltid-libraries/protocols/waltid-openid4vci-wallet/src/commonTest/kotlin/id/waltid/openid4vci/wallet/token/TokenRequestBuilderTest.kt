@@ -347,130 +347,31 @@ class TokenRequestBuilderTest {
     }
 
     @Test
-    fun testExchangePreAuthorizedCodeRejectsCrossOriginPostPreservingRedirect() = runTest {
+    fun testExchangePreAuthorizedCodeRejectsCrossOriginRedirectWithHeaders() = runTest {
         var callCount = 0
         val client = createMockClient { _ ->
             callCount += 1
             when (callCount) {
                 1 -> respond(
                     content = "",
-                    status = HttpStatusCode.TemporaryRedirect,
+                    status = HttpStatusCode.Found,
                     headers = headersOf(HttpHeaders.Location, "https://other.example.com/token")
                 )
 
-                else -> error("Cross-origin redirect should not be followed")
+                else -> error("Cross-origin redirect should not be followed when request headers are present")
             }
         }
 
         val builder = TokenRequestBuilder(clientConfig, client)
-        val error = assertFailsWith<TokenRequestException> {
+        val error = assertFailsWith<IllegalStateException> {
             builder.exchangePreAuthorizedCode(
                 tokenEndpoint = tokenEndpoint,
                 preAuthorizedCode = "pre-auth-code",
+                additionalHeaders = mapOf(HttpHeaders.Authorization to "Bearer abc"),
             )
         }
 
-        assertEquals("unsafe_redirect", error.oauthError)
+        assertContains(error.message.orEmpty(), "Cross-origin redirect")
         assertEquals(1, callCount)
-    }
-
-    @Test
-    fun testExchangePreAuthorizedCodeDoesNotRepostAfterSeeOther() = runTest {
-        var callCount = 0
-        val client = createMockClient {
-            callCount += 1
-            respond(
-                content = "",
-                status = HttpStatusCode.SeeOther,
-                headers = headersOf(HttpHeaders.Location, "https://auth.example.com/other-token"),
-            )
-        }
-
-        val error = assertFailsWith<TokenRequestException> {
-            TokenRequestBuilder(clientConfig, client).exchangePreAuthorizedCode(
-                tokenEndpoint = tokenEndpoint,
-                preAuthorizedCode = "pre-auth-code",
-            )
-        }
-
-        assertEquals(HttpStatusCode.SeeOther.value, error.statusCode)
-        assertEquals(1, callCount)
-    }
-
-    @Test
-    fun testExchangePreAuthorizedCodeFollowsSameOriginTemporaryRedirect() = runTest {
-        var callCount = 0
-        val client = createMockClient { request ->
-            callCount += 1
-            when (callCount) {
-                1 -> respond(
-                    content = "",
-                    status = HttpStatusCode.TemporaryRedirect,
-                    headers = headersOf(HttpHeaders.Location, "https://auth.example.com/other-token"),
-                )
-
-                2 -> {
-                    assertEquals("https://auth.example.com/other-token", request.url.toString())
-                    assertEquals("pre-auth-code", request.formParameters()["pre-authorized_code"])
-                    respond(
-                        content = """{"access_token":"access","token_type":"Bearer"}""",
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-                    )
-                }
-
-                else -> error("Token redirect should only be followed once")
-            }
-        }
-
-        val response = TokenRequestBuilder(clientConfig, client).exchangePreAuthorizedCode(
-            tokenEndpoint = tokenEndpoint,
-            preAuthorizedCode = "pre-auth-code",
-        )
-
-        assertEquals("access", response.access_token)
-        assertEquals(2, callCount)
-    }
-
-    @Test
-    fun testDpopNonceChallengeRegeneratesProof() = runTest {
-        var callCount = 0
-        val proofInputs = mutableListOf<Pair<String, String?>>()
-        val client = createMockClient { request ->
-            callCount += 1
-            assertEquals("proof-$callCount", request.headers["DPoP"])
-            if (callCount == 1) {
-                respond(
-                    content = "{}",
-                    status = HttpStatusCode.Unauthorized,
-                    headers = headersOf(
-                        HttpHeaders.ContentType to listOf("application/json"),
-                        HttpHeaders.WWWAuthenticate to listOf("DPoP error=\"use_dpop_nonce\""),
-                        "DPoP-Nonce" to listOf("server-nonce"),
-                    ),
-                )
-            } else {
-                respond(
-                    content = """{"access_token":"dpop-token","token_type":"DPoP"}""",
-                    status = HttpStatusCode.OK,
-                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
-                )
-            }
-        }
-
-        val response = TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
-            tokenEndpoint = tokenEndpoint,
-            code = "auth-code",
-            dpopProofFactory = { endpoint, nonce ->
-                proofInputs += endpoint to nonce
-                "proof-${proofInputs.size}"
-            },
-        )
-
-        assertEquals("dpop-token", response.access_token)
-        assertEquals(
-            listOf(tokenEndpoint to null, tokenEndpoint to "server-nonce"),
-            proofInputs,
-        )
     }
 }

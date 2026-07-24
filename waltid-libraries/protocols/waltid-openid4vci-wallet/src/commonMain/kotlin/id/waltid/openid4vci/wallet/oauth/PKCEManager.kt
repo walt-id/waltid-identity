@@ -2,7 +2,7 @@ package id.waltid.openid4vci.wallet.oauth
 
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import org.kotlincrypto.hash.sha2.SHA256
-import kotlin.uuid.Uuid
+import kotlin.random.Random
 
 /**
  * PKCE (Proof Key for Code Exchange) manager for OAuth 2.0 authorization code flow.
@@ -41,11 +41,10 @@ object PKCEManager {
     fun generateCodeVerifier(length: Int = 128): String {
         require(length in 43..128) { "Code verifier length must be between 43 and 128 characters" }
 
-        return buildString {
-            while (this.length < length) {
-                append(Uuid.random().toString().replace("-", ""))
-            }
-        }.take(length)
+        val allowedChars = ('A'..'Z') + ('a'..'z') + ('0'..'9') + listOf('-', '.', '_', '~')
+        return (1..length)
+            .map { allowedChars[Random.nextInt(allowedChars.size)] }
+            .joinToString("")
     }
 
     /**

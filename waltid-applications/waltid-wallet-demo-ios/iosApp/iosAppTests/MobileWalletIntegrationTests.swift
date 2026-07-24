@@ -89,28 +89,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
         )
     }
 
-    private func startIssuance(wallet: Wallet, offerURL: URL) async throws -> IssuanceSession {
-        try await wallet.startIssuance(
-            IssuanceRequest(offer: offerURL, redirectURI: URL(string: "openid://")!)
-        )
-    }
-
-    private func receiveIssuedCredentials(
-        wallet: Wallet,
-        offerURL: URL,
-        transactionCode: String? = nil
-    ) async throws -> [String] {
-        let session = try await startIssuance(wallet: wallet, offerURL: offerURL)
-        let outcome = try await wallet.continuePreAuthorizedIssuance(
-            sessionID: session.id,
-            transactionCode: transactionCode
-        )
-        guard case let .stored(_, credentialIDs) = outcome else {
-            throw MobileWalletIntegrationError.unexpectedIssuanceOutcome
-        }
-        return credentialIDs
-    }
-
     // MARK: - Tests (mirror Android MobileWalletIntegrationTest.kt)
 
     func testBootstrapCreatesKeyAndDid() async throws {
@@ -204,17 +182,14 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: Self.eudiPidSdJwtCredentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let session = try await startIssuance(wallet: wallet, offerURL: offerURL)
-        XCTAssertFalse(session.offer.issuer.identifier.isEmpty)
-        XCTAssertFalse(session.offer.credentials.isEmpty)
-        XCTAssertTrue(session.offer.credentials.allSatisfy {
+        let resolution = try await wallet.resolveOffer(offer: offerURL)
+        XCTAssertFalse(resolution.issuer.credentialIssuer.isEmpty)
+        XCTAssertFalse(resolution.offeredCredentials.isEmpty)
+        XCTAssertTrue(resolution.offeredCredentials.allSatisfy {
             !$0.configurationID.isEmpty && !$0.format.isEmpty
         })
-        XCTAssertNotNil(session.offer.transactionCode, "EUDI offer should require a transaction code")
-        let outcome = try await wallet.continuePreAuthorizedIssuance(sessionID: session.id, transactionCode: offer.txCode)
-        guard case let .stored(_, credentialIDs) = outcome else {
-            throw MobileWalletIntegrationError.unexpectedIssuanceOutcome
-        }
+        XCTAssertNotNil(resolution.transactionCode, "EUDI offer should require a transaction code")
+        let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
 
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
     }
@@ -334,7 +309,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: Self.eudiPidSdJwtCredentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await receiveIssuedCredentials(wallet: wallet1, offerURL: offerURL, transactionCode: offer.txCode)
+        let credentialIDs = try await wallet1.receive(offer: offerURL, txCode: offer.txCode)
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
 
         // Recreate wallet facade (simulates app restart)
@@ -356,7 +331,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await receiveIssuedCredentials(wallet: wallet1, offerURL: offerURL)
+        let credentialIDs = try await wallet1.receive(offer: offerURL)
         XCTAssertFalse(
             credentialIDs.isEmpty,
             "Should receive \(scenario.displayName) from public demo issuer2"
@@ -394,7 +369,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: credentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await receiveIssuedCredentials(wallet: wallet, offerURL: offerURL, transactionCode: offer.txCode)
+        let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive EUDI credential \(credentialID)")
 
         let credentials = try await wallet.credentials()
@@ -423,7 +398,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: credentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await receiveIssuedCredentials(wallet: wallet, offerURL: offerURL, transactionCode: offer.txCode)
+        let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive EUDI credential \(credentialID)")
 
         let offeredCredentialID = await EudiTestBackend.shared.extractCredentialIdFromOfferUrl(offerUrl: offer.offerUrl)
@@ -470,7 +445,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await receiveIssuedCredentials(wallet: wallet, offerURL: offerURL)
+        let credentialIDs = try await wallet.receive(offer: offerURL)
         XCTAssertFalse(
             credentialIDs.isEmpty,
             "Should receive \(scenario.displayName) from public demo issuer2"
@@ -564,7 +539,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await receiveIssuedCredentials(wallet: wallet, offerURL: offerURL)
+        let credentialIDs = try await wallet.receive(offer: offerURL)
 
         XCTAssertFalse(
             credentialIDs.isEmpty,
@@ -586,7 +561,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await receiveIssuedCredentials(wallet: wallet, offerURL: offerURL)
+        let credentialIDs = try await wallet.receive(offer: offerURL)
         XCTAssertFalse(
             credentialIDs.isEmpty,
             "Should receive \(scenario.displayName) from public demo issuer2"
@@ -678,10 +653,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
             "residentstreet",
         ]
     }
-}
-
-private enum MobileWalletIntegrationError: Error {
-    case unexpectedIssuanceOutcome
 }
 
 private actor RecordingWalletCredentialStore: WalletCredentialStore {

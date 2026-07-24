@@ -54,19 +54,6 @@ class AuthorizationRequestBuilder(
     )
 
     /**
-     * Complete state for a Pushed Authorization Request.
-     *
-     * The caller sends [parameters] to the PAR endpoint and retains [state] and
-     * [pkceData] until the authorization callback is validated.
-     */
-    @Serializable
-    data class PushedAuthorizationRequest(
-        val parameters: Map<String, String>,
-        val state: String,
-        val pkceData: PKCEManager.PKCEData?,
-    )
-
-    /**
      * Builds an authorization request URL
      * 
      * @param authorizationEndpoint The authorization endpoint URL from metadata
@@ -85,32 +72,11 @@ class AuthorizationRequestBuilder(
         usePKCE: Boolean = true,
         metadata: AuthorizationServerMetadata? = null,
         redirectUri: String? = null,
-    ): AuthorizationRequest = buildAuthorizationRequestForCredentialConfigurations(
-        authorizationEndpoint = authorizationEndpoint,
-        credentialConfigurationIds = listOf(credentialConfigurationId),
-        issuerState = issuerState,
-        scope = scope,
-        usePKCE = usePKCE,
-        metadata = metadata,
-        redirectUri = redirectUri,
-    )
-
-    /** Builds one authorization request containing all offered credential configurations. */
-    fun buildAuthorizationRequestForCredentialConfigurations(
-        authorizationEndpoint: String,
-        credentialConfigurationIds: List<String>,
-        issuerState: String? = null,
-        scope: String? = null,
-        usePKCE: Boolean = true,
-        metadata: AuthorizationServerMetadata? = null,
-        redirectUri: String? = null,
     ): AuthorizationRequest {
         require(authorizationEndpoint.isNotBlank()) { "Authorization endpoint cannot be blank" }
-        require(credentialConfigurationIds.isNotEmpty() && credentialConfigurationIds.all { it.isNotBlank() }) {
-            "At least one non-blank credential configuration ID is required"
-        }
+        require(credentialConfigurationId.isNotBlank()) { "Credential configuration ID cannot be blank" }
 
-        log.info { "Building authorization request for credential configuration: ${credentialConfigurationIds.first()}" }
+        log.info { "Building authorization request for credential configuration: $credentialConfigurationId" }
         log.trace { "Authorization endpoint: $authorizationEndpoint" }
         log.trace { "Issuer state: ${issuerState ?: "none"}, Scope: $scope" }
 
@@ -130,9 +96,10 @@ class AuthorizationRequestBuilder(
         }
 
         // Build authorization_details
-        val authzDetailsJson = json.encodeToString(
-            credentialConfigurationIds.distinct().map { AuthorizationDetails(credential_configuration_id = it) }
+        val authzDetails = AuthorizationDetails(
+            credential_configuration_id = credentialConfigurationId
         )
+        val authzDetailsJson = json.encodeToString(listOf(authzDetails))
         log.trace { "Authorization details JSON: ${authzDetailsJson.take(100)}${if (authzDetailsJson.length > 100) "..." else ""}" }
 
         // Build URL with query parameters
@@ -188,45 +155,7 @@ class AuthorizationRequestBuilder(
         usePKCE: Boolean = true,
         metadata: AuthorizationServerMetadata? = null,
     ): Pair<Map<String, String>, PKCEManager.PKCEData?> {
-        val request = buildPushedAuthorizationRequestState(
-            credentialConfigurationId = credentialConfigurationId,
-            issuerState = issuerState,
-            scope = scope,
-            usePKCE = usePKCE,
-            metadata = metadata,
-        )
-        return request.parameters to request.pkceData
-    }
-
-    /** Builds the complete PAR request state, including the OAuth state binding. */
-    fun buildPushedAuthorizationRequestState(
-        credentialConfigurationId: String,
-        issuerState: String? = null,
-        scope: String? = null,
-        usePKCE: Boolean = true,
-        metadata: AuthorizationServerMetadata? = null,
-        redirectUri: String? = null,
-    ): PushedAuthorizationRequest = buildPushedAuthorizationRequestStateForCredentialConfigurations(
-        credentialConfigurationIds = listOf(credentialConfigurationId),
-        issuerState = issuerState,
-        scope = scope,
-        usePKCE = usePKCE,
-        metadata = metadata,
-        redirectUri = redirectUri,
-    )
-
-    /** Builds one PAR body containing all offered credential configurations. */
-    fun buildPushedAuthorizationRequestStateForCredentialConfigurations(
-        credentialConfigurationIds: List<String>,
-        issuerState: String? = null,
-        scope: String? = null,
-        usePKCE: Boolean = true,
-        metadata: AuthorizationServerMetadata? = null,
-        redirectUri: String? = null,
-    ): PushedAuthorizationRequest {
-        require(credentialConfigurationIds.isNotEmpty() && credentialConfigurationIds.all { it.isNotBlank() }) {
-            "At least one non-blank credential configuration ID is required"
-        }
+        require(credentialConfigurationId.isNotBlank()) { "Credential configuration ID cannot be blank" }
 
         val state = StateManager.generateState()
 
@@ -236,14 +165,15 @@ class AuthorizationRequestBuilder(
             pkceData = PKCEManager.generatePKCEData(method)
         }
 
-        val authzDetailsJson = json.encodeToString(
-            credentialConfigurationIds.distinct().map { AuthorizationDetails(credential_configuration_id = it) }
+        val authzDetails = AuthorizationDetails(
+            credential_configuration_id = credentialConfigurationId
         )
+        val authzDetailsJson = json.encodeToString(listOf(authzDetails))
 
         val parameters = mutableMapOf<String, String>()
         parameters["response_type"] = ResponseType.CODE.value
         parameters["client_id"] = clientConfig.clientId
-        parameters["redirect_uri"] = redirectUri ?: clientConfig.primaryRedirectUri
+        parameters["redirect_uri"] = clientConfig.primaryRedirectUri
         parameters["state"] = state
         parameters["authorization_details"] = authzDetailsJson
 
@@ -255,12 +185,8 @@ class AuthorizationRequestBuilder(
             parameters["code_challenge_method"] = it.codeChallengeMethod.value
         }
 
-        log.debug { "Built PAR request parameters for credential: ${credentialConfigurationIds.first()}" }
-        return PushedAuthorizationRequest(
-            parameters = parameters,
-            state = state,
-            pkceData = pkceData,
-        )
+        log.debug { "Built PAR request parameters for credential: $credentialConfigurationId" }
+        return Pair(parameters, pkceData)
     }
 
     /**
@@ -280,7 +206,15 @@ class AuthorizationRequestBuilder(
                 PKCEManager.CodeChallengeMethod.S256
             }
 
-            else -> error("Authorization server does not advertise the required S256 PKCE method")
+            "plain" in supportedMethods -> {
+                log.warn { "Only plain PKCE method supported, using plain (not recommended)" }
+                PKCEManager.CodeChallengeMethod.PLAIN
+            }
+
+            else -> {
+                log.warn { "Unknown PKCE methods in metadata: $supportedMethods, defaulting to S256" }
+                PKCEManager.CodeChallengeMethod.S256
+            }
         }
     }
 }

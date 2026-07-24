@@ -78,7 +78,6 @@ kotlin {
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)
             implementation(identityLibs.ktor.client.mock)
-            implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
         }
     }
 }

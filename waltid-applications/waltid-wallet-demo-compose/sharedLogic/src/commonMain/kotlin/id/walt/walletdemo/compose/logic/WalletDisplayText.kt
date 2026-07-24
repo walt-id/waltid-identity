@@ -3,7 +3,6 @@ package id.walt.walletdemo.compose.logic
 internal enum class WalletDeepLinkScheme(val scheme: String) {
     CredentialOffer("openid-credential-offer"),
     PresentationRequest("openid4vp"),
-    AuthorizationCallback("openid"),
     ;
 
     companion object {

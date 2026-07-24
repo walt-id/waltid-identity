@@ -34,10 +34,6 @@ class WalletDemoAppIosTest {
         scenarios.transactionCodeOfferCanBeDeclinedWithoutCode()
 
     @Test
-    fun authorizationCodeOfferExplainsIssuerSignIn() =
-        scenarios.authorizationCodeOfferExplainsIssuerSignIn()
-
-    @Test
     fun offerClaimsUseSemanticGroupsAndInclusionLabels() =
         scenarios.offerClaimsUseSemanticGroupsAndInclusionLabels()
 

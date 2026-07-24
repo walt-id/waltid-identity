@@ -13,7 +13,6 @@ import id.walt.wallet2.persistence.keys.PlatformKeyProvider
 import id.walt.wallet2.persistence.stores.PlatformKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
-import id.walt.wallet2.persistence.stores.SqlDelightIssuanceSessionStore
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 
 /**
@@ -179,7 +178,6 @@ private fun createSqlDelightMobileWallet(
     val keyStore = keyOverride?.store ?: PlatformKeyStore(keyProvider, queries)
     val credentialStore = config.persistence.stores.credentials ?: SqlDelightCredentialStore(queries)
     val didStore = config.persistence.stores.dids ?: SqlDelightDidStore(queries)
-    val issuanceSessionStore = SqlDelightIssuanceSessionStore(queries)
     val keyGenerator = keyOverride?.generate ?: { keyType: KeyType -> keyProvider.generateKey(keyType) }
 
     return MobileWallet(
@@ -187,7 +185,6 @@ private fun createSqlDelightMobileWallet(
         keyStore = keyStore,
         didStore = didStore,
         credentialStore = credentialStore,
-        issuanceSessionStore = issuanceSessionStore,
         keyGenerator = keyGenerator,
         defaultKeyType = config.defaultKeyType,
         attestationConfig = config.attestationConfig,
