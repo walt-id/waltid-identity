@@ -1,6 +1,5 @@
 package id.walt.certificate.x509
 
-import id.walt.certificate.x509.CustomX509CertificateServices.Companion.custom
 import id.walt.certificate.x509.testdata.TestDataCertificates.googleComCrtPem
 import id.walt.certificate.x509.testdata.TestDataCertificates.gtsRootR4CrtPem
 import id.walt.certificate.x509.testdata.TestDataCertificates.gtsWe2CrtPem
@@ -16,7 +15,7 @@ class X509CertificateChainValidationTest {
     fun shouldFindMissingRootCertificateErrorChain() = runTest {
         val certificatePem = googleComCrtPem
         assertNotNull(certificatePem)
-        val result = validatePemCertificateChain(certificatePem)
+        val result = certUtil.validatePemCertificateChain(certificatePem)
         assertFalse(result.valid)
         result.log.filter {
             it.validatorId == X509CertificateSignatureValidator.ID
@@ -34,10 +33,9 @@ class X509CertificateChainValidationTest {
     }
 
 
-    @Ignore //Does not work on JS TODO: fix it
     @Test
     fun shouldValidateGoogleCertificateChainWithOneEntry() = runTest {
-        val result = validatePemCertificateChain(gtsWe2CrtPem)
+        val result = certUtil.validatePemCertificateChain(gtsWe2CrtPem)
         if (!result.valid) {
             result.log
                 .filter { it.severity == ValidationResult.Severity.ERROR }
@@ -52,7 +50,6 @@ class X509CertificateChainValidationTest {
             }
     }
 
-    @Ignore //Does not work on JS TODO: fix it
     @Test
     fun shouldValidateGoogleCertificateChainWithTwoEntries() = runTest {
         val certificatePem = listOf(
@@ -61,7 +58,7 @@ class X509CertificateChainValidationTest {
             googleComCrtPem,
             gtsWe2CrtPem,
         ).joinToString("\n")
-        val result = validatePemCertificateChain(certificatePem)
+        val result = certUtil.validatePemCertificateChain(certificatePem)
         assertTrue(result.valid)
         result.log.filter { it.validatorId == X509CertificateSignatureValidator.ID }
             .also { signatureValidatorLog ->
@@ -75,21 +72,16 @@ class X509CertificateChainValidationTest {
 
     companion object {
 
-        suspend fun validatePemCertificateChain(
-            certificateChainPem: String,
-            additionalTrust: X509CertificateTrustStore? = null
-        ) = X509CertificateUtil.validatePemCertificateChain(services, certificateChainPem, additionalTrust)
-
         val trustStore = InMemoryTrustStore(
             listOf(gtsRootR4CrtPem)
                 .map { X509CertificateUtil.parseCertificatePem(it) })
 
-        /**
-         * Trust store with Google Trust Services root certificate
-         * and without a system trust store to ensure the same behavior in JS and JVM
-         */
-        val services = X509CertificateUtilDefaults.custom(
-            trustStore = trustStore
-        )
+        val certUtil = X509CertificateUtil {
+            /**
+             * Trust store with Google Trust Services root certificate
+             * and without a system trust store to ensure the same behavior in JS and JVM
+             */
+            setTrust(trustStore)
+        }
     }
 }

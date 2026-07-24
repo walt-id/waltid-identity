@@ -10,7 +10,7 @@ class CertificateSerialNumberGeneratorTest {
     @Test
     fun generatesPositiveNonZeroTwentyOctetSerialNumber() {
 
-        val serialNumber = X509CertificateUtilDefaults.serialNumberGenerator.next()
+        val serialNumber = X509CertificateUtil.nextSerialNumber()
         assertEquals(
             expected = ISO_CERT_SERIAL_NUMBER_REQUIRED_LENGTH,
             actual = serialNumber.size,

@@ -3,25 +3,18 @@ package id.walt.certificate.x509
 import id.walt.certificate.TestData
 import id.walt.certificate.TestKeys
 import id.walt.certificate.TestKeys.opensslHexFormat
-import id.walt.certificate.x509.builder.Pkcs10CertificateSigningRequestBuilder
-import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.model.GeneralName
-import id.walt.certificate.x509.signum.SignumDefaults
-import id.walt.certificate.x509.signum.SignumSignatureValidator
 import id.walt.certificate.x509.testdata.TestDataCertificates.gtsRootR4CrtPem
 import id.walt.certificate.x509.testdata.TestDataCertificates.gtsWe2CrtPem
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
-import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.x509.X509TestCertificates
-import id.walt.x509.id.walt.certificate.x509.JavaX509CertificateSerialNumberGenerator
 import kotlinx.coroutines.test.runTest
-import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.toHexString
 import kotlin.test.*
 
@@ -35,7 +28,7 @@ class SignumImplementationTest {
     fun shouldValidateGoogleCertificateChainWithOneEntry() = runTest {
         val certificatePem = gtsWe2CrtPem
         assertNotNull(certificatePem)
-        val result = validatePemCertificateChain(certificatePem)
+        val result = signumCertUtil.validatePemCertificateChain(certificatePem)
         if (!result.valid) {
             result.log
                 .filter { it.severity == ValidationResult.Severity.ERROR }
@@ -53,8 +46,8 @@ class SignumImplementationTest {
 
     @Test
     fun extractsKeyIdentifiersFromCertificateDer() {
-        val issuerCert = parseCertificateDerEncoded(X509TestCertificates.issuerCertificate)
-        val leafCert = parseCertificateDerEncoded(X509TestCertificates.leafCertificate)
+        val issuerCert = signumCertUtil.parseCertificateDerEncoded(X509TestCertificates.issuerCertificate)
+        val leafCert = signumCertUtil.parseCertificateDerEncoded(X509TestCertificates.leafCertificate)
 
         val issuerSubjectKeyId =
             assertNotNull(issuerCert.data.extensionSubjectKeyIdentifier?.keyIdentifier, "issuerSubjectKeyId is null")
@@ -70,9 +63,9 @@ class SignumImplementationTest {
     @Test
     fun rejectsLeafWithTamperedSignature() = runTest {
 
-        val validationResult = validateCertificateChain(
+        val validationResult = signumCertUtil.validateCertificateChain(
             listOf(X509TestCertificates.tamperedLeafCertificate.let {
-                parseCertificateDerEncoded(it)
+                signumCertUtil.parseCertificateDerEncoded(it)
             })
         )
         assertFalse(validationResult.valid)
@@ -80,18 +73,20 @@ class SignumImplementationTest {
 
     @Test
     fun verifiesLeafSignedByIssuer() = runTest {
-        val validationResult = validateCertificateChain(
+        val validationResult = signumCertUtil.validateCertificateChain(
             listOf(X509TestCertificates.leafCertificate.let {
-                parseCertificateDerEncoded(it)
+                signumCertUtil.parseCertificateDerEncoded(it)
             }),
-            InMemoryTrustStore(listOf(X509TestCertificates.issuerCertificate).map { parseCertificateDerEncoded(it) })
+            InMemoryTrustStore(
+                listOf(X509TestCertificates.issuerCertificate)
+                    .map { signumCertUtil.parseCertificateDerEncoded(it) })
         )
         assertTrue(validationResult.valid)
     }
 
     @Test
     fun shouldParseCsr() {
-        assertNotNull(parseCsrPem(TestData.csrPem)) { csr ->
+        assertNotNull(signumCertUtil.parseCsrPem(TestData.csrPem)) { csr ->
             assertEquals("C=AT,ST=Vienna,L=Vienna,O=Walt.id,CN=://walt.id", csr.requestedCertificate.subjectDn)
             assertEquals("1.2.840.10045.2.1", csr.requestedCertificate.subjectPublicKeyInfo.algorithmOid)
             assertEquals("id-ecPublicKey", csr.requestedCertificate.subjectPublicKeyInfo.algorithmName)
@@ -111,7 +106,7 @@ class SignumImplementationTest {
 
     @Test
     fun shouldParseCertificate() {
-        val cert = parseCertificatePem(TestData.GOOGLE_CERTIFICATE_PEM)
+        val cert = signumCertUtil.parseCertificatePem(TestData.GOOGLE_CERTIFICATE_PEM)
         assertNotNull(cert)
         assertEquals("CN=*.google.com", cert.data.subjectDn)
     }
@@ -119,7 +114,7 @@ class SignumImplementationTest {
     @Test
     fun shouldSignCsr() = runTest {
         val key = JWKKey.importPEM(TestKeys.ecP256KeyPem).getOrThrow()
-        val csr = createCsr(key) {
+        val csr = signumCertUtil.createCsr(key) {
             requestedCertificate.apply {
                 subjectDn = "CN=Example Leaf,O=Example Org,C=US"
                 extensionSan {
@@ -131,7 +126,7 @@ class SignumImplementationTest {
         val pem = csr.encodedPem
         assertTrue(pem.contains("BEGIN CERTIFICATE REQUEST"))
 
-        val parsed = parseCsrPem(pem)
+        val parsed = signumCertUtil.parseCsrPem(pem)
 
         assertEquals("CN=Example Leaf,O=Example Org,C=US", parsed.requestedCertificate.subjectDn)
         assertNotNull(parsed.requestedCertificate.extensionSan)
@@ -145,45 +140,13 @@ class SignumImplementationTest {
     }
 
     companion object {
-        val defaults = SignumDefaults(
-            JavaX509CertificateSerialNumberGenerator(),
-            SignumSignatureValidator(),
-            InMemoryTrustStore(
-                listOf(gtsRootR4CrtPem)
-                    .map { X509CertificateUtil.parseCertificatePem(it) })
-        )
+        val trustStore = InMemoryTrustStore(
+            listOf(gtsRootR4CrtPem)
+                .map { X509CertificateUtil.parseCertificatePem(it) })
 
-        fun parseCsrPem(pem: String): Pkcs10CertificateSigningRequest =
-            X509CertificateUtil.parseCsrPem(defaults, pem)
-
-        suspend fun createCsr(
-            holderKey: Key,
-            block: suspend Pkcs10CertificateSigningRequestBuilder.() -> Unit
-        ) =
-            X509CertificateUtil.createCsr(defaults, holderKey, block)
-
-        fun parseCertificatePem(pem: String): X509Certificate =
-            X509CertificateUtil.parseCertificatePem(defaults, pem)
-
-        fun parseCertificateDerEncoded(derEncoded: ByteString): X509Certificate =
-            X509CertificateUtil.parseCertificateDerEncoded(defaults, derEncoded)
-
-        suspend fun createSelfSignedCertificate(
-            issuerKey: Key,
-            block: suspend X509CertificateDataBuilder.() -> Unit
-        ): X509Certificate =
-            X509CertificateUtil.createSelfSignedCertificate(defaults, issuerKey, block)
-
-        suspend fun validateCertificateChain(
-            certificateChain: Collection<X509Certificate>,
-            additionalTrust: X509CertificateTrustStore? = null
-        ): ValidationResult =
-            X509CertificateUtil.validateCertificateChain(defaults, certificateChain, additionalTrust)
-
-        suspend fun validatePemCertificateChain(
-            certificateChainPem: String,
-            additionalTrust: X509CertificateTrustStore? = null
-        ): ValidationResult =
-            X509CertificateUtil.validatePemCertificateChain(defaults, certificateChainPem, additionalTrust)
+        val signumCertUtil = X509CertificateUtil {
+            setTrust(trustStore)
+            signumImplementation()
+        }
     }
 }
