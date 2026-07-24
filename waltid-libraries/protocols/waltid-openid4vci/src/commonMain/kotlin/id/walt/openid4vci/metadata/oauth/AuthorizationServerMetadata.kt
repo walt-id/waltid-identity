@@ -70,6 +70,8 @@ data class AuthorizationServerMetadata(
     val pushedAuthorizationRequestEndpoint: String? = null,
     @SerialName("require_pushed_authorization_requests")
     val requirePushedAuthorizationRequests: Boolean? = null,
+    @SerialName("authorization_response_iss_parameter_supported")
+    val authorizationResponseIssParameterSupported: Boolean? = null,
     @SerialName("service_documentation")
     val serviceDocumentation: String? = null,
     @SerialName("ui_locales_supported")
@@ -229,6 +231,7 @@ data class AuthorizationServerMetadata(
             pushedAuthorizationRequestEndpointPath: String? = "/par",
             statusListAggregationEndpointPath: String? = null,
             preAuthorizedGrantAnonymousAccessSupported: Boolean? = true,
+            authorizationResponseIssParameterSupported: Boolean? = true,
         ): AuthorizationServerMetadata {
             val normalized = baseUrl.trimEnd('/')
             val parEndpoint = pushedAuthorizationRequestEndpointPath?.let { normalized + it }
@@ -250,6 +253,7 @@ data class AuthorizationServerMetadata(
                 pushedAuthorizationRequestEndpoint = parEndpoint,
                 statusListAggregationEndpoint = statusListAggregationEndpointPath?.let { normalized + it },
                 preAuthorizedGrantAnonymousAccessSupported = preAuthorizedGrantAnonymousAccessSupported,
+                authorizationResponseIssParameterSupported = authorizationResponseIssParameterSupported,
             )
         }
 
@@ -328,6 +332,9 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
                     JsonPrimitive(it)
                 )
             }
+            value.authorizationResponseIssParameterSupported?.let {
+                put("authorization_response_iss_parameter_supported", JsonPrimitive(it))
+            }
             value.scopesSupported?.takeIf { it.isNotEmpty() }?.let { put("scopes_supported", it.toJsonArray()) }
             value.serviceDocumentation?.let { put("service_documentation", JsonPrimitive(it)) }
             value.uiLocalesSupported?.takeIf { it.isNotEmpty() }?.let { put("ui_locales_supported", it.toJsonArray()) }
@@ -390,6 +397,8 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
             dpopSigningAlgValuesSupported = element.stringSet("dpop_signing_alg_values_supported"),
             pushedAuthorizationRequestEndpoint = element.string("pushed_authorization_request_endpoint"),
             requirePushedAuthorizationRequests = element.bool("require_pushed_authorization_requests"),
+            authorizationResponseIssParameterSupported =
+                element.bool("authorization_response_iss_parameter_supported"),
             serviceDocumentation = element.string("service_documentation"),
             uiLocalesSupported = element.stringSet("ui_locales_supported"),
             opPolicyUri = element.string("op_policy_uri"),
