@@ -74,6 +74,7 @@ class MetadataService(
     fun getAuthorizationServerMetadata(): AuthorizationServerMetadata =
         AuthorizationServerMetadata.fromBaseUrl(
             baseUrl = baseUrl,
+            codeChallengeMethodsSupported = listOf("S256"),
             pushedAuthorizationRequestEndpointPath = "/par",
             requirePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
             tokenEndpointAuthMethodsSupported =
