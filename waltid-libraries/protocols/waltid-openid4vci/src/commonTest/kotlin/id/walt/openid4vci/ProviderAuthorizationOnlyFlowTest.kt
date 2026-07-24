@@ -10,6 +10,7 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.ClientAuthenticationResult
 import id.walt.openid4vci.core.buildOAuth2Provider
+import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.walt.openid4vci.requests.authorization.OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
@@ -63,7 +64,14 @@ class ProviderAuthorizationOnlyFlowTest {
         assertTrue(authorizeResponse.isSuccess())
         val response = (authorizeResponse as AuthorizationResponseResult.Success).response
         val code = response.code
-        // (Optional) Convert the authorize response into an HTTP response via writeAuthorizeResponse/writeAuthorizeError.
+        val authorizationHttpResponse = provider.writeAuthorizationResponse(authorizeRequest, response)
+        assertEquals(issuerId, authorizationHttpResponse.parameters["iss"])
+
+        val authorizationErrorResponse = provider.writeAuthorizationError(
+            authorizeRequest,
+            OAuthError("access_denied", "Authorization denied"),
+        )
+        assertEquals(issuerId, authorizationErrorResponse.parameters["iss"])
 
         // 3) Parse the token request from the wallet, supplying a fresh session container.
         val accessResult = provider.createAccessTokenRequest(

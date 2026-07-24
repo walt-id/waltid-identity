@@ -134,6 +134,7 @@ class DefaultOAuth2Provider(
                 put("error", error.error)
                 error.description?.let { put("error_description", it) }
                 authorizationRequest.state?.let { put("state", it) }
+                authorizationRequest.issClaim?.let { put("iss", it) }
             }
             val location = appendParams(baseRedirect, parameters)
             val headers = mutableMapOf("Location" to location)
