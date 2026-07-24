@@ -83,13 +83,6 @@ data class PushedAuthorizationConfig(
     val requestUriPrefix: String = PushedAuthorizationResponse.DEFAULT_REQUEST_URI_PREFIX,
     val lifetimeSeconds: Int = 90,
     val enforcePushedAuthorizationRequests: Boolean = false,
-    /**
-     * Require an explicit, single, non-blank `redirect_uri` in every pushed authorization request.
-     *
-     * OAuth 2.0 makes this parameter conditionally optional, while FAPI profiles require it at
-     * the PAR endpoint.
-     */
-    val requireRedirectUri: Boolean = false,
 ) {
     init {
         require(requestUriPrefix.isNotBlank()) { "PAR requestUriPrefix must not be blank" }

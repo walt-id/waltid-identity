@@ -210,18 +210,6 @@ class DefaultOAuth2Provider(
             is ClientIdParameterResolution.Failure -> return AuthorizationRequestResult.Failure(resolution.error)
         }
 
-        if (
-            config.pushedAuthorizationConfig?.requireRedirectUri == true &&
-            effectiveParameters["redirect_uri"]?.singleOrNull()?.isNotBlank() != true
-        ) {
-            return AuthorizationRequestResult.Failure(
-                OAuthError(
-                    error = OAuthErrorCodes.INVALID_REQUEST,
-                    description = "redirect_uri is required",
-                )
-            )
-        }
-
         return when (val result = config.authorizationRequestValidator.validate(effectiveParameters)) {
             is AuthorizationRequestResult.Success ->
                 AuthorizationRequestResult.Success(result.request.withAuthenticatedClient(authenticatedClient))
