@@ -21,8 +21,6 @@ import id.walt.wallet2.handlers.WalletIssuanceHandler.pollDeferredFlow
 import id.walt.wallet2.handlers.WalletIssuanceHandler.receiveCredentialFlow
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
-import id.walt.webdatafetching.WebDataFetchingConfiguration
-import id.walt.webdatafetching.config.LoggingConfiguration
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
@@ -413,10 +411,7 @@ object WalletIssuanceHandler {
      * Enterprise can inject a custom client; they fall back to this shared instance by default.
      */
     private val httpClient: HttpClient by lazy {
-        WebDataFetcher(
-            WebDataFetcherId.WALLET2_ISSUANCE_HANDLER,
-            WebDataFetchingConfiguration(logging = LoggingConfiguration(enable = false)),
-        ).httpClient
+        WebDataFetcher(WebDataFetcherId.WALLET2_ISSUANCE_HANDLER).httpClient
     }
 
     @Deprecated("Use the shared httpClient property", replaceWith = ReplaceWith("httpClient"))
@@ -607,7 +602,7 @@ object WalletIssuanceHandler {
                 // Deferred issuance: the issuer accepted the request but will issue the credential later.
                 // The transactionId can be used to poll the deferred credential endpoint.
                 val transactionId = credentialResponse.transactionId
-                log.info { "Credential issuance was deferred for '${offeredCredential.credentialConfigurationId}'" }
+                log.info { "Deferred issuance: credential for '${offeredCredential.credentialConfigurationId}' will be available later" }
                 if (transactionId != null) {
                     onDeferredTransactionId(offeredCredential.credentialConfigurationId, transactionId)
                 }
@@ -1209,7 +1204,7 @@ object WalletIssuanceHandler {
                 Json.parseToJsonElement(body).jsonObject["error"]?.jsonPrimitive?.content
             }.getOrNull()
             if (errorCode == "issuance_pending") {
-                log.info { "Deferred credential is not yet ready" }
+                log.info { "Deferred credential not yet ready" }
                 return@channelFlow
             }
             error("Deferred credential endpoint returned ${response.status}: $body")

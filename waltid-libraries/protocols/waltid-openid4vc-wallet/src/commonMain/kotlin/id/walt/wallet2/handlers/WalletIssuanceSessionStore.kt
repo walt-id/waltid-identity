@@ -10,7 +10,7 @@ enum class WalletIssuanceSessionRecordKind {
  * Opaque issuance continuation stored outside the protocol engine.
  *
  * [payload] can contain authorization codes, PKCE material, access tokens, and deferred
- * transaction identifiers. Implementations must encrypt it at rest and must never log it.
+ * transaction identifiers. Implementations must encrypt it at rest.
  */
 data class WalletIssuanceSessionRecord(
     val id: String,
@@ -18,11 +18,7 @@ data class WalletIssuanceSessionRecord(
     val kind: WalletIssuanceSessionRecordKind,
     val payload: String,
     val updatedAtEpochMilliseconds: Long,
-) {
-    override fun toString(): String =
-        "WalletIssuanceSessionRecord(id=$id, sessionId=$sessionId, kind=$kind, payload=<redacted>, " +
-            "updatedAtEpochMilliseconds=$updatedAtEpochMilliseconds)"
-}
+)
 
 /**
  * Durable storage boundary for issuance continuations.
