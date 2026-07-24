@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class WalletDemoController(
     private val wallet: DemoWallet,
@@ -21,6 +23,7 @@ class WalletDemoController(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private var receiveJob: Job? = null
+    private var presentationJob: Job? = null
     private val _state = MutableStateFlow(
         WalletDemoUiState(
             auth = readInitialAuthState(),
@@ -73,29 +76,65 @@ class WalletDemoController(
 
     fun lock() {
         receiveJob?.cancel()
-        _state.update {
+        presentationJob?.cancel()
+        val previous = getAndUpdateState {
             it.copy(
                 auth = WalletAuthState.Login(),
                 operation = WalletOperationState.Idle,
                 requestDrafts = it.requestDrafts.copy(txCode = ""),
                 offerPreview = null,
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
+                presentationReview = null,
+                selectedPresentationCredentialOptions = emptySet(),
+                selectedPresentationDisclosureOptions = emptySet(),
+                presentationCompleted = false,
+                pendingPresentationContinuation = null,
+                presentationNavigationResetKey = it.presentationNavigationResetKey + 1,
             )
         }
+        discardIssuancePreview(previous.activeIssuancePreviewHandle())
+        discardPresentationPreview(previous.activePresentationPreviewHandle())
     }
 
     fun selectTab(tab: WalletDemoTab) {
         _state.update { it.copy(selectedTab = tab) }
     }
 
+    fun completePresentationContinuation() {
+        _state.update { state ->
+            val pending = state.pendingPresentationContinuation ?: return@update state
+            state.copy(
+                operation = WalletOperationState.Succeeded(
+                    message = pending.successMessage,
+                    tab = WalletDemoTab.Present,
+                ),
+                presentationCompleted = true,
+                pendingPresentationContinuation = null,
+            )
+        }
+    }
+
+    fun failPresentationContinuation(reason: String) {
+        _state.update { state ->
+            if (state.pendingPresentationContinuation == null) return@update state
+            state.copy(
+                operation = WalletOperationState.Failed(
+                    message = WalletDisplayText.failure(WalletDisplayText.PresentationContinuationFailed, reason),
+                    tab = WalletDemoTab.Present,
+                ),
+                presentationCompleted = false,
+                pendingPresentationContinuation = null,
+            )
+        }
+    }
+
     fun updateOfferUrl(value: String) {
         receiveJob?.cancel()
-        _state.update {
+        val previous = getAndUpdateState {
             it.copy(
                 requestDrafts = it.requestDrafts.copy(
                     offerUrl = value,
                     txCode = "",
-                    transactionCodeRequired = false,
                 ),
                 offerPreview = null,
                 lastReceivedCredentialIds = emptyList(),
@@ -103,64 +142,94 @@ class WalletDemoController(
                 operation = WalletOperationState.Idle,
             )
         }
+        discardIssuancePreview(previous.activeIssuancePreviewHandle())
     }
 
     fun updateTxCode(value: String) {
         _state.update {
-            it.copy(requestDrafts = it.requestDrafts.copy(txCode = value))
+            val normalized = it.offerPreview?.transactionCode?.normalizeInput(value) ?: value
+            it.copy(requestDrafts = it.requestDrafts.copy(txCode = normalized))
         }
     }
 
     fun updatePresentationRequestUrl(value: String) {
-        _state.update {
+        presentationJob?.cancel()
+        val previous = getAndUpdateState {
             it.copy(
                 requestDrafts = it.requestDrafts.copy(presentationRequestUrl = value),
-                presentationPreview = null,
+                presentationReview = null,
                 selectedPresentationCredentialOptions = emptySet(),
                 selectedPresentationDisclosureOptions = emptySet(),
                 presentationCompleted = false,
+                pendingPresentationContinuation = null,
+                presentationNavigationResetKey = it.presentationNavigationResetKey + 1,
+                operation = if (
+                    it.operation == WalletOperationState.ResolvingPresentation ||
+                    it.operation == WalletOperationState.Presenting ||
+                    it.operation == WalletOperationState.DecliningPresentation
+                ) {
+                    WalletOperationState.Idle
+                } else {
+                    it.operation
+                },
             )
         }
+        discardPresentationPreview(previous.activePresentationPreviewHandle())
     }
 
     fun handleDeepLink(url: String) {
         when (WalletDeepLinkScheme.parse(url)) {
             WalletDeepLinkScheme.CredentialOffer -> {
                 receiveJob?.cancel()
-                _state.update {
+                presentationJob?.cancel()
+                val previous = getAndUpdateState {
                     it.copy(
                         selectedTab = WalletDemoTab.Receive,
                         requestDrafts = it.requestDrafts.copy(
                             offerUrl = url,
                             txCode = "",
-                            transactionCodeRequired = false,
                         ),
                         offerPreview = null,
                         lastReceivedCredentialIds = emptyList(),
                         receiveCompleted = false,
                         receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
-                        presentationPreview = null,
+                        presentationReview = null,
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
                         presentationCompleted = false,
-                        operation = WalletOperationState.Idle,
-                    )
-                }
-            }
-            WalletDeepLinkScheme.PresentationRequest -> {
-                receiveJob?.cancel()
-                _state.update {
-                    it.copy(
-                        selectedTab = WalletDemoTab.Present,
-                        requestDrafts = it.requestDrafts.copy(presentationRequestUrl = url),
-                        presentationPreview = null,
-                        selectedPresentationCredentialOptions = emptySet(),
-                        selectedPresentationDisclosureOptions = emptySet(),
-                        presentationCompleted = false,
+                        pendingPresentationContinuation = null,
                         presentationNavigationResetKey = it.presentationNavigationResetKey + 1,
                         operation = WalletOperationState.Idle,
                     )
                 }
+                discardIssuancePreview(previous.activeIssuancePreviewHandle())
+                discardPresentationPreview(previous.activePresentationPreviewHandle())
+            }
+            WalletDeepLinkScheme.PresentationRequest -> {
+                receiveJob?.cancel()
+                presentationJob?.cancel()
+                val previous = getAndUpdateState {
+                    it.copy(
+                        selectedTab = WalletDemoTab.Present,
+                        requestDrafts = it.requestDrafts.copy(
+                            presentationRequestUrl = url,
+                            txCode = "",
+                        ),
+                        offerPreview = null,
+                        lastReceivedCredentialIds = emptyList(),
+                        receiveCompleted = false,
+                        receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
+                        presentationReview = null,
+                        selectedPresentationCredentialOptions = emptySet(),
+                        selectedPresentationDisclosureOptions = emptySet(),
+                        presentationCompleted = false,
+                        pendingPresentationContinuation = null,
+                        presentationNavigationResetKey = it.presentationNavigationResetKey + 1,
+                        operation = WalletOperationState.Idle,
+                    )
+                }
+                discardIssuancePreview(previous.activeIssuancePreviewHandle())
+                discardPresentationPreview(previous.activePresentationPreviewHandle())
             }
             null -> Unit
         }
@@ -168,12 +237,11 @@ class WalletDemoController(
 
     fun startNewReceiveFlow() {
         receiveJob?.cancel()
-        _state.update {
+        val previous = getAndUpdateState {
             it.copy(
                 requestDrafts = it.requestDrafts.copy(
                     offerUrl = "",
                     txCode = "",
-                    transactionCodeRequired = false,
                 ),
                 offerPreview = null,
                 lastReceivedCredentialIds = emptyList(),
@@ -182,21 +250,24 @@ class WalletDemoController(
                 operation = WalletOperationState.Idle,
             )
         }
+        discardIssuancePreview(previous.activeIssuancePreviewHandle())
     }
 
     fun startNewPresentationFlow() {
-        receiveJob?.cancel()
-        _state.update {
+        presentationJob?.cancel()
+        val previous = getAndUpdateState {
             it.copy(
                 requestDrafts = it.requestDrafts.copy(presentationRequestUrl = ""),
-                presentationPreview = null,
+                presentationReview = null,
                 selectedPresentationCredentialOptions = emptySet(),
                 selectedPresentationDisclosureOptions = emptySet(),
                 presentationCompleted = false,
+                pendingPresentationContinuation = null,
                 presentationNavigationResetKey = it.presentationNavigationResetKey + 1,
                 operation = WalletOperationState.Idle,
             )
         }
+        discardPresentationPreview(previous.activePresentationPreviewHandle())
     }
 
     fun previewOffer() {
@@ -207,23 +278,35 @@ class WalletDemoController(
         if (!_state.compareAndSet(current, current.copy(operation = WalletOperationState.ResolvingOffer))) return
 
         receiveJob = scope.launch(dispatcher) {
+            var resolution: WalletDemoOfferPreview? = null
             try {
-                val resolution = wallet.resolveOffer(offerUrl)
+                val resolvedOffer = wallet.resolveOffer(offerUrl)
+                resolution = resolvedOffer
                 currentCoroutineContext().ensureActive()
-                if (!isCurrent(request)) return@launch
-                updateIfCurrent(request) {
+                val installed = updateIfCurrent(request, WalletOperationState.ResolvingOffer) {
                     it.copy(
-                        requestDrafts = it.requestDrafts.copy(
-                            transactionCodeRequired = resolution.transactionCodeRequired,
-                        ),
                         offerPreview = resolution,
                         operation = WalletOperationState.OfferPreview,
                     )
                 }
+                if (!installed) {
+                    wallet.discardIssuancePreview(resolvedOffer.previewHandle)
+                }
+                resolution = null
             } catch (cancellation: CancellationException) {
+                resolution?.let { preview ->
+                    withContext(NonCancellable) {
+                        runCatching { wallet.discardIssuancePreview(preview.previewHandle) }
+                    }
+                }
                 throw cancellation
             } catch (error: Throwable) {
-                updateIfCurrent(request) {
+                resolution?.let { preview ->
+                    withContext(NonCancellable) {
+                        runCatching { wallet.discardIssuancePreview(preview.previewHandle) }
+                    }
+                }
+                updateIfCurrent(request, WalletOperationState.ResolvingOffer) {
                     it.copy(
                         operation = WalletOperationState.Failed(
                             message = WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
@@ -239,6 +322,7 @@ class WalletDemoController(
         val current = _state.value
         val ready = current.session as? WalletSessionState.Ready ?: return
         if (!current.acceptOfferEnabled) return
+        val preview = current.offerPreview ?: return
         val offerUrl = current.requestDrafts.offerUrl.trim()
         val txCode = current.requestDrafts.txCode.trim().ifBlank { null }
         val request = ReceiveRequest(offerUrl, current.receiveNavigationResetKey)
@@ -246,11 +330,11 @@ class WalletDemoController(
 
         receiveJob = scope.launch(dispatcher) {
             try {
-                receiveCredential(ready, request, txCode)
+                receiveCredential(ready, request, preview.previewHandle, txCode)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Throwable) {
-                updateIfCurrent(request) {
+                updateIfCurrent(request, WalletOperationState.Receiving) {
                     it.copy(
                         operation = WalletOperationState.Failed(
                             message = WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
@@ -263,13 +347,11 @@ class WalletDemoController(
     }
 
     fun declineOffer() {
+        val previewHandle = _state.value.offerPreview?.previewHandle ?: return
         _state.update {
             it.copy(
                 offerPreview = null,
-                requestDrafts = it.requestDrafts.copy(
-                    txCode = "",
-                    transactionCodeRequired = false,
-                ),
+                requestDrafts = it.requestDrafts.copy(txCode = ""),
                 operation = WalletOperationState.Succeeded(
                     message = WalletDisplayText.CredentialOfferDeclined,
                     tab = WalletDemoTab.Receive,
@@ -277,16 +359,21 @@ class WalletDemoController(
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
             )
         }
+        scope.launch(dispatcher) {
+            runCatching { wallet.discardIssuancePreview(previewHandle) }
+                .onFailure { error -> setOperationError(WalletDisplayText.ReceiveFailed, error, WalletDemoTab.Receive) }
+        }
     }
 
     private suspend fun receiveCredential(
         ready: WalletSessionState.Ready,
         request: ReceiveRequest,
+        previewHandle: WalletDemoIssuancePreviewHandle,
         txCode: String?,
     ) {
         currentCoroutineContext().ensureActive()
         if (!isCurrent(request)) return
-        val ids = wallet.receive(request.offerUrl, txCode)
+        val ids = wallet.receive(previewHandle, txCode)
         currentCoroutineContext().ensureActive()
         if (!isCurrent(request)) return
         val credentials = wallet.listCredentials()
@@ -300,7 +387,7 @@ class WalletDemoController(
         val displayableReceivedCredentialIds = receivedCredentialIds
             .filter { receivedCredentialId -> credentials.any { it.id == receivedCredentialId } }
         if (displayableReceivedCredentialIds.isEmpty()) {
-            updateIfCurrent(request) {
+            updateIfCurrent(request, WalletOperationState.Receiving) {
                 it.copy(
                     session = ready.copy(credentials = credentials),
                     operation = WalletOperationState.Failed(
@@ -318,7 +405,7 @@ class WalletDemoController(
             return
         }
 
-        updateIfCurrent(request) {
+        updateIfCurrent(request, WalletOperationState.Receiving) {
             it.copy(
                 session = ready.copy(credentials = credentials),
                 offerPreview = null,
@@ -326,10 +413,7 @@ class WalletDemoController(
                     message = WalletDisplayText.receivedCredentials(displayableReceivedCredentialIds.size),
                     tab = WalletDemoTab.Receive,
                 ),
-                requestDrafts = it.requestDrafts.copy(
-                    txCode = "",
-                    transactionCodeRequired = false,
-                ),
+                requestDrafts = it.requestDrafts.copy(txCode = ""),
                 lastReceivedCredentialIds = displayableReceivedCredentialIds,
                 receiveCompleted = true,
             )
@@ -344,17 +428,19 @@ class WalletDemoController(
 
     private inline fun updateIfCurrent(
         request: ReceiveRequest,
+        expectedOperation: WalletOperationState,
         transform: (WalletDemoUiState) -> WalletDemoUiState,
-    ) {
-        _state.update {
+    ): Boolean {
+        while (true) {
+            val current = _state.value
             if (
-                it.receiveNavigationResetKey == request.navigationResetKey &&
-                it.requestDrafts.offerUrl.trim() == request.offerUrl
+                current.receiveNavigationResetKey != request.navigationResetKey ||
+                current.requestDrafts.offerUrl.trim() != request.offerUrl ||
+                current.operation != expectedOperation
             ) {
-                transform(it)
-            } else {
-                it
+                return false
             }
+            if (_state.compareAndSet(current, transform(current))) return true
         }
     }
 
@@ -374,20 +460,7 @@ class WalletDemoController(
             runCatching {
                 wallet.present(requestUrl, ready.did)
             }.onSuccess { result ->
-                _state.update {
-                    it.copy(
-                        operation = when (result) {
-                            is WalletDemoOperationResult.Success -> WalletOperationState.Succeeded(
-                                message = result.message,
-                                tab = WalletDemoTab.Present,
-                            )
-                            is WalletDemoOperationResult.Failure -> WalletOperationState.Failed(
-                                message = result.message,
-                                tab = WalletDemoTab.Present,
-                            )
-                        },
-                    )
-                }
+                _state.update { it.withPresentationResult(result) }
             }.onFailure { error ->
                 setOperationError(WalletDisplayText.PresentFailed, error, WalletDemoTab.Present)
             }
@@ -398,34 +471,91 @@ class WalletDemoController(
         val current = _state.value
         current.session as? WalletSessionState.Ready ?: return
         val requestUrl = current.requestDrafts.presentationRequestUrl.trim()
-        if (requestUrl.isBlank()) return
+        if (
+            requestUrl.isBlank() ||
+            current.presentationReview != null ||
+            current.presentationCompleted ||
+            current.isBusy
+        ) {
+            return
+        }
+        val request = PresentationRequest(requestUrl, current.presentationNavigationResetKey)
+        val resolving = current.copy(
+            operation = WalletOperationState.ResolvingPresentation,
+            selectedPresentationCredentialOptions = emptySet(),
+            selectedPresentationDisclosureOptions = emptySet(),
+        )
+        if (!_state.compareAndSet(current, resolving)) return
 
-        scope.launch(dispatcher) {
-            _state.update {
-                it.copy(
-                    operation = WalletOperationState.ResolvingPresentation,
-                    presentationPreview = null,
-                    selectedPresentationCredentialOptions = emptySet(),
-                    selectedPresentationDisclosureOptions = emptySet(),
-                    presentationCompleted = false,
-                )
-            }
-            runCatching {
-                wallet.previewPresentation(requestUrl)
-            }.onSuccess { preview ->
-                _state.update {
+        presentationJob = scope.launch(dispatcher) {
+            var preview: WalletDemoPresentationPreviewResult? = null
+            try {
+                val resolvedPreview = wallet.previewPresentation(requestUrl)
+                preview = resolvedPreview
+                currentCoroutineContext().ensureActive()
+                val installed = updatePresentationIfCurrent(request, WalletOperationState.ResolvingPresentation) {
                     it.copy(
                         operation = WalletOperationState.Idle,
-                        presentationPreview = preview,
-                        selectedPresentationCredentialOptions = preview.defaultCredentialSelection(),
+                        presentationReview = resolvedPreview,
+                        selectedPresentationCredentialOptions = when (resolvedPreview) {
+                            is WalletDemoPresentationPreviewResult.Ready ->
+                                resolvedPreview.preview.defaultCredentialSelection()
+                            is WalletDemoPresentationPreviewResult.Invalid -> emptySet()
+                        },
                         selectedPresentationDisclosureOptions = emptySet(),
                     )
                 }
-            }.onFailure { error ->
-                setOperationError(WalletDisplayText.PreviewFailed, error, WalletDemoTab.Present)
+                if (!installed) {
+                    wallet.discardPresentationPreview(resolvedPreview.previewHandle())
+                }
+                preview = null
+            } catch (cancellation: CancellationException) {
+                preview?.let { resolvedPreview ->
+                    withContext(NonCancellable) {
+                        runCatching { wallet.discardPresentationPreview(resolvedPreview.previewHandle()) }
+                    }
+                }
+                throw cancellation
+            } catch (error: Throwable) {
+                preview?.let { resolvedPreview ->
+                    withContext(NonCancellable) {
+                        runCatching { wallet.discardPresentationPreview(resolvedPreview.previewHandle()) }
+                    }
+                }
+                updatePresentationIfCurrent(request, WalletOperationState.ResolvingPresentation) {
+                    it.copy(
+                        operation = WalletOperationState.Failed(
+                            message = WalletDisplayText.failure(WalletDisplayText.PreviewFailed, error),
+                            tab = WalletDemoTab.Present,
+                        )
+                    )
+                }
             }
         }
     }
+
+    private inline fun updatePresentationIfCurrent(
+        request: PresentationRequest,
+        expectedOperation: WalletOperationState,
+        transform: (WalletDemoUiState) -> WalletDemoUiState,
+    ): Boolean {
+        while (true) {
+            val current = _state.value
+            if (
+                current.presentationNavigationResetKey != request.navigationResetKey ||
+                current.requestDrafts.presentationRequestUrl.trim() != request.requestUrl ||
+                current.operation != expectedOperation
+            ) {
+                return false
+            }
+            if (_state.compareAndSet(current, transform(current))) return true
+        }
+    }
+
+    private data class PresentationRequest(
+        val requestUrl: String,
+        val navigationResetKey: Int,
+    )
 
     fun togglePresentationCredential(selection: WalletDemoPresentationCredentialSelection) {
         _state.update { state ->
@@ -476,15 +606,18 @@ class WalletDemoController(
     fun submitPresentation() {
         val current = _state.value
         val ready = current.session as? WalletSessionState.Ready ?: return
+        if (!current.presentationReviewEnabled) return
         val requestUrl = current.requestDrafts.presentationRequestUrl.trim()
+        val previewHandle = current.presentationPreview?.previewHandle ?: return
         val selectedCredentialOptions = current.selectedPresentationCredentialOptions.toList()
         val selectedDisclosureOptions = current.selectedPresentationDisclosureOptions
             .forSelectedCredentials(current.selectedPresentationCredentialOptions)
             .toList()
         if (requestUrl.isBlank()) return
         if (!current.presentationCredentialSelectionComplete()) {
-            _state.update {
-                it.copy(
+            _state.compareAndSet(
+                current,
+                current.copy(
                     operation = WalletOperationState.Failed(
                         WalletDisplayText.failure(
                             WalletDisplayText.PresentFailed,
@@ -492,52 +625,194 @@ class WalletDemoController(
                         ),
                         WalletDemoTab.Present,
                     )
-                )
-            }
+                ),
+            )
             return
         }
+        val request = PresentationRequest(requestUrl, current.presentationNavigationResetKey)
+        if (!_state.compareAndSet(current, current.copy(operation = WalletOperationState.Presenting))) return
 
-        scope.launch(dispatcher) {
-            _state.update { it.copy(operation = WalletOperationState.Presenting) }
-            runCatching {
-                wallet.submitPresentation(requestUrl, selectedCredentialOptions, selectedDisclosureOptions, ready.did)
-            }.onSuccess { result ->
-                _state.update {
-                    it.copy(
-                        operation = when (result) {
-                            is WalletDemoOperationResult.Success -> WalletOperationState.Succeeded(
-                                message = result.message,
-                                tab = WalletDemoTab.Present,
-                            )
-                            is WalletDemoOperationResult.Failure -> WalletOperationState.Failed(
-                                message = result.message,
-                                tab = WalletDemoTab.Present,
-                            )
-                        },
-                        selectedPresentationCredentialOptions = emptySet(),
-                        selectedPresentationDisclosureOptions = emptySet(),
-                        presentationCompleted = result is WalletDemoOperationResult.Success,
+        presentationJob = scope.launch(dispatcher) {
+            try {
+                val result = wallet.submitPresentation(
+                    previewHandle,
+                    selectedCredentialOptions,
+                    selectedDisclosureOptions,
+                    ready.did,
+                )
+                currentCoroutineContext().ensureActive()
+                updatePresentationIfCurrent(request, WalletOperationState.Presenting) {
+                    it.withPresentationResult(
+                        result = result,
+                        clearPreview = true,
+                        clearSelections = true,
                     )
                 }
-            }.onFailure { error ->
-                setOperationError(WalletDisplayText.PresentFailed, error, WalletDemoTab.Present)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                updatePresentationIfCurrent(request, WalletOperationState.Presenting) {
+                    it.copy(
+                        operation = WalletOperationState.Failed(
+                            message = WalletDisplayText.failure(WalletDisplayText.PresentFailed, error),
+                            tab = WalletDemoTab.Present,
+                        ),
+                        presentationReview = null,
+                        selectedPresentationCredentialOptions = emptySet(),
+                        selectedPresentationDisclosureOptions = emptySet(),
+                        presentationCompleted = false,
+                    )
+                }
             }
         }
     }
 
-    fun cancelPresentationReview() {
-        _state.update {
-            it.copy(
-                operation = WalletOperationState.Succeeded(
-                    message = WalletDisplayText.PresentationReviewCancelled,
-                    tab = WalletDemoTab.Present,
-                ),
-                presentationPreview = null,
-                selectedPresentationCredentialOptions = emptySet(),
-                selectedPresentationDisclosureOptions = emptySet(),
-                presentationCompleted = false,
-                presentationNavigationResetKey = it.presentationNavigationResetKey + 1,
+    private fun WalletDemoUiState.withPresentationResult(
+        result: WalletDemoOperationResult,
+        clearPreview: Boolean = false,
+        clearSelections: Boolean = false,
+        resetNavigation: Boolean = false,
+    ): WalletDemoUiState {
+        val success = result as? WalletDemoOperationResult.Success
+        val pending = success?.continuation?.let { continuation ->
+            WalletDemoPendingPresentationContinuation(
+                continuation = continuation,
+                successMessage = success.message,
             )
+        }
+
+        return copy(
+            operation = when {
+                result is WalletDemoOperationResult.Failure -> WalletOperationState.Failed(
+                    message = result.message,
+                    tab = WalletDemoTab.Present,
+                )
+                pending != null -> operation
+                else -> WalletOperationState.Succeeded(
+                    message = success!!.message,
+                    tab = WalletDemoTab.Present,
+                )
+            },
+            presentationReview = if (clearPreview) null else presentationReview,
+            selectedPresentationCredentialOptions =
+                if (clearSelections) emptySet() else selectedPresentationCredentialOptions,
+            selectedPresentationDisclosureOptions =
+                if (clearSelections) emptySet() else selectedPresentationDisclosureOptions,
+            presentationCompleted = success != null && pending == null,
+            pendingPresentationContinuation = pending,
+            presentationNavigationResetKey =
+                if (resetNavigation) presentationNavigationResetKey + 1 else presentationNavigationResetKey,
+        )
+    }
+
+    fun cancelPresentationReview() {
+        val current = _state.value
+        if (!current.presentationReviewEnabled) return
+        val previewHandle = current.activePresentationPreviewHandle() ?: return
+        if (!_state.compareAndSet(
+                current,
+                current.copy(
+                    operation = WalletOperationState.Succeeded(
+                        message = WalletDisplayText.PresentationReviewCancelled,
+                        tab = WalletDemoTab.Present,
+                    ),
+                    presentationReview = null,
+                    selectedPresentationCredentialOptions = emptySet(),
+                    selectedPresentationDisclosureOptions = emptySet(),
+                    presentationCompleted = false,
+                    presentationNavigationResetKey = current.presentationNavigationResetKey + 1,
+                ),
+            )
+        ) return
+        presentationJob?.cancel()
+        scope.launch(dispatcher) {
+            runCatching { wallet.discardPresentationPreview(previewHandle) }
+                .onFailure { error -> setOperationError(WalletDisplayText.PresentFailed, error, WalletDemoTab.Present) }
+        }
+    }
+
+    fun rejectPresentation() {
+        val current = _state.value
+        current.session as? WalletSessionState.Ready ?: return
+        if (!current.presentationReviewEnabled) return
+        val previewHandle = current.activePresentationPreviewHandle() ?: return
+        val isReportingError = current.presentationReview is WalletDemoPresentationPreviewResult.Invalid
+        val request = PresentationRequest(
+            current.requestDrafts.presentationRequestUrl.trim(),
+            current.presentationNavigationResetKey,
+        )
+        if (!_state.compareAndSet(current, current.copy(operation = WalletOperationState.DecliningPresentation))) return
+
+        presentationJob = scope.launch(dispatcher) {
+            try {
+                val result = wallet.rejectPresentation(previewHandle)
+                currentCoroutineContext().ensureActive()
+                updatePresentationIfCurrent(request, WalletOperationState.DecliningPresentation) {
+                    it.withPresentationResult(
+                        result = if (isReportingError && result is WalletDemoOperationResult.Success) {
+                            result.copy(message = WalletDisplayText.VerifierNotified)
+                        } else {
+                            result
+                        },
+                        clearPreview = true,
+                        clearSelections = true,
+                        resetNavigation = true,
+                    )
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                updatePresentationIfCurrent(request, WalletOperationState.DecliningPresentation) {
+                    it.copy(
+                        operation = WalletOperationState.Failed(
+                            message = WalletDisplayText.failure(WalletDisplayText.RejectFailed, error),
+                            tab = WalletDemoTab.Present,
+                        ),
+                        presentationReview = null,
+                        selectedPresentationCredentialOptions = emptySet(),
+                        selectedPresentationDisclosureOptions = emptySet(),
+                        presentationCompleted = false,
+                        presentationNavigationResetKey = it.presentationNavigationResetKey + 1,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun discardIssuancePreview(previewHandle: WalletDemoIssuancePreviewHandle?) {
+        if (previewHandle == null) return
+        scope.launch(dispatcher) {
+            runCatching { wallet.discardIssuancePreview(previewHandle) }
+        }
+    }
+
+    private fun WalletDemoUiState.activeIssuancePreviewHandle(): WalletDemoIssuancePreviewHandle? =
+        offerPreview
+            ?.takeUnless { receiveCompleted }
+            ?.previewHandle
+
+    private fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle?) {
+        if (previewHandle == null) return
+        scope.launch(dispatcher) {
+            runCatching { wallet.discardPresentationPreview(previewHandle) }
+        }
+    }
+
+    private fun WalletDemoUiState.activePresentationPreviewHandle(): WalletDemoPresentationPreviewHandle? =
+        takeUnless { presentationCompleted }?.presentationReview?.previewHandle()
+
+    private fun WalletDemoPresentationPreviewResult.previewHandle(): WalletDemoPresentationPreviewHandle =
+        when (this) {
+            is WalletDemoPresentationPreviewResult.Ready -> preview.previewHandle
+            is WalletDemoPresentationPreviewResult.Invalid -> error.previewHandle
+        }
+
+    private inline fun getAndUpdateState(
+        transform: (WalletDemoUiState) -> WalletDemoUiState,
+    ): WalletDemoUiState {
+        while (true) {
+            val previous = _state.value
+            if (_state.compareAndSet(previous, transform(previous))) return previous
         }
     }
 

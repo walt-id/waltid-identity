@@ -84,6 +84,30 @@ public actor Wallet {
         try await bridge.receive(offer: offer, txCode: txCode, clientID: clientID)
     }
 
+    /// Receives credentials using exactly one reviewed offer preview.
+    ///
+    /// - Parameters:
+    ///   - previewHandle: Handle returned by ``resolveOffer(offer:)``.
+    ///   - txCode: Optional transaction code requested by the issuer.
+    ///   - clientID: Client identifier to use for issuer interactions.
+    /// - Returns: Local credential identifiers stored by the wallet.
+    /// - Throws: ``WalletError`` when the handle is invalid or issuance fails.
+    public func receive(
+        previewHandle: IssuancePreviewHandle,
+        txCode: String? = nil,
+        clientID: String = "wallet-client"
+    ) async throws -> [String] {
+        try await bridge.receive(previewHandle: previewHandle, txCode: txCode, clientID: clientID)
+    }
+
+    /// Discards a reviewed issuance preview after local dismissal.
+    ///
+    /// - Parameter previewHandle: Handle returned by ``resolveOffer(offer:)``.
+    /// - Throws: ``WalletError`` when the handle cannot be discarded.
+    public func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
+        try await bridge.discardIssuancePreview(previewHandle)
+    }
+
     /// Lists credentials currently known to the wallet.
     ///
     /// - Returns: Credential metadata currently stored by the wallet.
@@ -104,8 +128,7 @@ public actor Wallet {
     /// This immediate submission API is intended for callers that already handled
     /// request review and user consent. Apps that need to display verifier
     /// details, credential choices, selective disclosures, or transaction data
-    /// should use ``previewPresentation(request:)`` followed by
-    /// ``submitPresentation(request:selectedCredentialOptions:selectedDisclosureOptions:did:runPolicies:)``.
+    /// should use ``previewPresentation(request:)`` followed by an action with its preview handle.
     ///
     /// - Parameters:
     ///   - request: OpenID4VP authorization request URL received by the app.
@@ -127,16 +150,16 @@ public actor Wallet {
     /// Resolves and previews an OpenID4VP presentation request without submitting credentials.
     ///
     /// - Parameter request: OpenID4VP authorization request URL received by the app.
-    /// - Returns: Verifier metadata and matching credential options.
-    /// - Throws: ``WalletError`` when the request cannot be resolved or matched.
-    public func previewPresentation(request: URL) async throws -> PresentationPreview {
+    /// - Returns: A reviewable preview or a protocol error that can be returned after user interaction.
+    /// - Throws: ``WalletError`` when the request cannot be resolved safely or a local wallet operation fails.
+    public func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         try await bridge.previewPresentation(request: request)
     }
 
     /// Submits a presentation with user-selected credential options.
     ///
     /// - Parameters:
-    ///   - request: OpenID4VP authorization request URL received by the app.
+    ///   - previewHandle: Handle returned by ``previewPresentation(request:)``.
     ///   - selectedCredentialOptions: Credential options selected from
     ///     ``previewPresentation(request:)``.
     ///   - selectedDisclosureOptions: Optional selectively disclosable claims
@@ -147,14 +170,14 @@ public actor Wallet {
     /// - Returns: Presentation outcome.
     /// - Throws: ``WalletError`` when selection, signing, or verifier communication fails.
     public func submitPresentation(
-        request: URL,
+        previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection]? = nil,
         did: String? = nil,
         runPolicies: Bool? = nil
     ) async throws -> PresentationResult {
         try await bridge.submitPresentation(
-            request: request,
+            previewHandle: previewHandle,
             selectedCredentialOptions: selectedCredentialOptions,
             selectedDisclosureOptions: selectedDisclosureOptions,
             did: did,
@@ -162,4 +185,32 @@ public actor Wallet {
         )
     }
 
+    /// Rejects a reviewed presentation request and consumes its preview handle.
+    ///
+    /// - Parameters:
+    ///   - previewHandle: Handle returned by ``previewPresentation(request:)``.
+    ///   - error: Optional authorization error code. Omit it to use the error detected during an invalid
+    ///     preview, or `access_denied` for a valid request declined by the user.
+    ///   - errorDescription: Optional verifier-facing error description.
+    /// - Returns: Error-response delivery outcome.
+    /// - Throws: ``WalletError`` when the handle is invalid or the error response cannot be sent.
+    public func rejectPresentation(
+        previewHandle: PresentationPreviewHandle,
+        error: PresentationErrorCode? = nil,
+        errorDescription: String? = nil
+    ) async throws -> PresentationResult {
+        try await bridge.rejectPresentation(
+            previewHandle: previewHandle,
+            error: error,
+            errorDescription: errorDescription
+        )
+    }
+
+    /// Discards a reviewed presentation after local dismissal.
+    ///
+    /// - Parameter previewHandle: Handle returned by ``previewPresentation(request:)``.
+    /// - Throws: ``WalletError`` when the handle cannot be discarded.
+    public func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
+        try await bridge.discardPresentationPreview(previewHandle)
+    }
 }

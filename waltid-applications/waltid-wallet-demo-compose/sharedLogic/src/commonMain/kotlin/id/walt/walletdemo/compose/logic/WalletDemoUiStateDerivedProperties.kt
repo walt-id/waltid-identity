@@ -6,7 +6,8 @@ val WalletDemoUiState.isBusy: Boolean
         operation is WalletOperationState.ResolvingOffer ||
         operation is WalletOperationState.Receiving ||
         operation is WalletOperationState.ResolvingPresentation ||
-        operation is WalletOperationState.Presenting
+        operation is WalletOperationState.Presenting ||
+        operation is WalletOperationState.DecliningPresentation
 
 val WalletDemoUiState.isError: Boolean
     get() = isErrorFor(selectedTab)
@@ -27,21 +28,18 @@ val WalletDemoUiState.offerReviewEnabled: Boolean
     get() = !isBusy && offerPreview != null && !receiveCompleted
 
 val WalletDemoUiState.acceptOfferEnabled: Boolean
-    get() = offerReviewEnabled && requestDrafts.hasValidTxCode
-
-private val WalletRequestDrafts.hasValidTxCode: Boolean
-    get() = !transactionCodeRequired || txCode.isNotBlank()
+    get() = offerReviewEnabled && (offerPreview?.transactionCode?.accepts(requestDrafts.txCode) ?: true)
 
 val WalletDemoUiState.presentationUrlEntryEnabled: Boolean
-    get() = !isBusy && presentationPreview == null && !presentationCompleted
+    get() = !isBusy && presentationReview == null && !presentationCompleted
 
 val WalletDemoUiState.presentationPreviewActionEnabled: Boolean
-    get() = (session as? WalletSessionState.Ready)?.credentials?.isNotEmpty() == true &&
+    get() = session is WalletSessionState.Ready &&
         requestDrafts.presentationRequestUrl.isNotBlank() &&
         presentationUrlEntryEnabled
 
 val WalletDemoUiState.presentationReviewEnabled: Boolean
-    get() = !isBusy && presentationPreview != null && !presentationCompleted
+    get() = !isBusy && presentationReview != null && !presentationCompleted
 
 val WalletDemoUiState.statusText: String
     get() = statusText(selectedTab)
@@ -65,7 +63,8 @@ private fun WalletDemoUiState.tabStatusText(tab: WalletDemoTab): String? =
         }
         WalletDemoTab.Present -> when {
             presentationCompleted -> WalletDisplayText.PresentationSent
-            presentationPreview != null -> WalletDisplayText.ReviewPresentationRequest
+            presentationReview is WalletDemoPresentationPreviewResult.Invalid -> WalletDisplayText.ReviewPresentationError
+            presentationReview is WalletDemoPresentationPreviewResult.Ready -> WalletDisplayText.ReviewPresentationRequest
             else -> null
         }
     }
@@ -94,6 +93,7 @@ private fun WalletOperationState.statusTextFor(tab: WalletDemoTab): String? =
             WalletOperationState.Receiving -> WalletDisplayText.ReceivingCredential
             WalletOperationState.ResolvingPresentation -> WalletDisplayText.ResolvingPresentation
             WalletOperationState.Presenting -> WalletDisplayText.PresentingCredential
+            WalletOperationState.DecliningPresentation -> WalletDisplayText.DecliningPresentation
             is WalletOperationState.Succeeded -> message
             is WalletOperationState.Failed -> message
         }
@@ -107,6 +107,7 @@ private fun WalletOperationState.belongsTo(tab: WalletDemoTab): Boolean =
         WalletOperationState.Receiving -> tab == WalletDemoTab.Receive
         WalletOperationState.ResolvingPresentation,
         WalletOperationState.Presenting,
+        WalletOperationState.DecliningPresentation,
         -> tab == WalletDemoTab.Present
         is WalletOperationState.Succeeded -> this.tab == null || this.tab == tab
         is WalletOperationState.Failed -> this.tab == null || this.tab == tab
@@ -118,6 +119,7 @@ private val WalletOperationState.isBusyOperation: Boolean
         WalletOperationState.Receiving,
         WalletOperationState.ResolvingPresentation,
         WalletOperationState.Presenting,
+        WalletOperationState.DecliningPresentation,
         -> true
         WalletOperationState.Idle,
         WalletOperationState.OfferPreview,

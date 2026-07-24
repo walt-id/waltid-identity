@@ -65,6 +65,9 @@ jobs:
           - k8s: waltid-identity/waltid-applications/waltid-digital-credentials/k8s
             name: digital-credentials
             namespace: ${{ inputs.oss }}
+          - k8s: waltid-identity/waltid-applications/waltid-credentials/k8s
+            name: credentials
+            namespace: ${{ inputs.oss }}
           - k8s: waltid-identity/waltid-services/waltid-verifier-api/k8s/opa
             name: opa
             namespace: ${{ inputs.oss }}
@@ -80,7 +83,7 @@ jobs:
 
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 

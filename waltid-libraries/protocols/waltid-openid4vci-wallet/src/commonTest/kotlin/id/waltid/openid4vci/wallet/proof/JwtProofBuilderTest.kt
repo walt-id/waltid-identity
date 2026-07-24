@@ -4,22 +4,30 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyMeta
 import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 
 class MockKey(
     val kid: String? = null,
     override val keyType: KeyType = KeyType.Ed25519,
 ) : Key() {
+    var signedPayload: JsonObject? = null
+
     override suspend fun getKeyId(): String = kid ?: "mock-kid"
     override suspend fun getThumbprint(): String = "mock-thumbprint"
     override suspend fun exportJWK(): String = """{"kty":"OKP","crv":"Ed25519","x":"..."}"""
     override suspend fun exportJWKObject(): JsonObject = JsonObject(emptyMap())
     override val hasPrivateKey: Boolean = true
-    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String = "mock.jwt.proof"
+    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
+        signedPayload = Json.parseToJsonElement(plaintext.decodeToString()).jsonObject
+        return "mock.jwt.proof"
+    }
     override suspend fun getPublicKey(): Key = this
     override suspend fun getMeta(): KeyMeta = throw NotImplementedError()
     override suspend fun deleteKey(): Boolean = true
@@ -70,5 +78,20 @@ class JwtProofBuilderTest {
 
         assertNotNull(proof.jwt)
         assertEquals("mock.jwt.proof", proof.jwt!!.first())
+    }
+
+    @Test
+    fun proofWithoutNonceOmitsNonceClaim() = runTest {
+        val mockKey = MockKey()
+
+        val proof = builder.buildJwtProof(
+            key = mockKey,
+            audience = audience,
+            nonce = null,
+            includeJwk = true,
+        )
+
+        assertEquals("mock.jwt.proof", proof.jwt!!.first())
+        assertFalse("nonce" in requireNotNull(mockKey.signedPayload))
     }
 }

@@ -6,7 +6,6 @@ import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.TokenType
-import id.walt.openid4vci.core.TOKEN_TYPE_BEARER
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
 import id.walt.openid4vci.preauthorized.hashTxCode
@@ -18,6 +17,8 @@ import id.walt.openid4vci.requests.token.sanitizeForStorage
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
+import id.walt.openid4vci.tokens.access.accessTokenType
+import id.walt.openid4vci.tokens.access.dpopAccessTokenClaims
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import id.walt.openid4vci.tokens.refresh.RefreshTokenGenerationRequest
 import id.walt.openid4vci.tokens.refresh.RefreshTokenIssuer
@@ -142,6 +143,7 @@ class PreAuthorizedCodeTokenEndpoint(
                 clientId.takeIf { it.isNotBlank() }?.let { put("client_id", it) }
                 put("pre_authorized_code", code)
                 consumed.issuanceSessionId?.let { put("issuance_session_id", it) }
+                putAll(clientRequest.dpopAccessTokenClaims())
             },
         )
 
@@ -162,13 +164,6 @@ class PreAuthorizedCodeTokenEndpoint(
         }
 
         val scope = clientRequest.grantedScopes.takeIf { it.isNotEmpty() }?.joinToString(" ")
-        val extra = buildMap<String, Any?> {
-            consumed.credentialNonce?.let { put("c_nonce", it) }
-            consumed.credentialNonceExpiresAt?.let { expiresAt ->
-                put("c_nonce_expires_in", computeRemainingSeconds(expiresAt))
-            }
-        }
-
         // If no explicit session expiry is configured, return the default lifetime exactly.
         // If an explicit expiry exists, return the real remaining lifetime from now.
         val expiresIn = if (sessionExpiresAt == null) {
@@ -181,11 +176,10 @@ class PreAuthorizedCodeTokenEndpoint(
             request = clientRequest,
             AccessTokenResponse(
                 accessToken = accessToken,
-                tokenType = TOKEN_TYPE_BEARER,
+                tokenType = clientRequest.accessTokenType(),
                 expiresIn = expiresIn,
                 refreshToken = refreshToken,
                 scope = scope,
-                extra = extra,
             ),
         )
     }

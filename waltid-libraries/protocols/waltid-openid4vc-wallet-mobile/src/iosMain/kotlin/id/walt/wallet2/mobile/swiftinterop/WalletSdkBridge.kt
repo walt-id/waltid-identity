@@ -5,10 +5,13 @@ import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletKeyType
+import id.walt.wallet2.mobile.MobileWalletIssuancePreviewHandle
 import id.walt.wallet2.mobile.MobileWalletOfferResolution
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
-import id.walt.wallet2.mobile.MobileWalletPresentationPreview
+import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
+import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
+import id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -82,6 +85,26 @@ public class WalletSdkBridge private constructor(
             )
         }
 
+    /** Receives credentials from one reviewed issuance preview. */
+    public suspend fun receivePreviewed(
+        previewHandle: MobileWalletIssuancePreviewHandle,
+        txCode: String? = null,
+        clientId: String = "wallet-client",
+    ): WalletBridgeResult<List<String>> =
+        walletBridgeCall {
+            operations.receivePreviewed(
+                previewHandle = previewHandle,
+                txCode = txCode,
+                clientId = clientId,
+            )
+        }
+
+    /** Discards one reviewed issuance preview locally. */
+    public suspend fun discardIssuancePreview(
+        previewHandle: MobileWalletIssuancePreviewHandle,
+    ): WalletBridgeResult<Unit> =
+        walletBridgeCall { operations.discardIssuancePreview(previewHandle) }
+
     /**
      * Lists credential summaries stored in the bridged wallet.
      */
@@ -119,7 +142,7 @@ public class WalletSdkBridge private constructor(
      */
     public suspend fun previewPresentation(
         requestUrl: String,
-    ): WalletBridgeResult<MobileWalletPresentationPreview> =
+    ): WalletBridgeResult<MobileWalletPresentationPreviewResult> =
         walletBridgeCall {
             operations.previewPresentation(requestUrl = requestUrl)
         }
@@ -128,7 +151,7 @@ public class WalletSdkBridge private constructor(
      * Submits a presentation using user-selected wallet credential options.
      */
     public suspend fun submitPresentation(
-        requestUrl: String,
+        previewHandle: MobileWalletPresentationPreviewHandle,
         selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
         selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
         did: String? = null,
@@ -136,13 +159,33 @@ public class WalletSdkBridge private constructor(
     ): WalletBridgeResult<MobileWalletPresentationResult> =
         walletBridgeCall {
             operations.submitPresentation(
-                requestUrl = requestUrl,
+                previewHandle = previewHandle,
                 selectedCredentialOptions = selectedCredentialOptions,
                 selectedDisclosureOptions = selectedDisclosureOptions,
                 did = did,
                 runPolicies = runPolicies,
             )
         }
+
+    /** Rejects one reviewed presentation and consumes its preview. */
+    public suspend fun rejectPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        errorCode: MobileWalletPresentationErrorCode? = null,
+        errorDescription: String? = null,
+    ): WalletBridgeResult<MobileWalletPresentationResult> =
+        walletBridgeCall {
+            operations.rejectPresentation(
+                previewHandle = previewHandle,
+                errorCode = errorCode,
+                errorDescription = errorDescription,
+            )
+        }
+
+    /** Discards one reviewed presentation locally. */
+    public suspend fun discardPresentationPreview(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+    ): WalletBridgeResult<Unit> =
+        walletBridgeCall { operations.discardPresentationPreview(previewHandle) }
 
     internal companion object {
         internal fun forOperations(
@@ -169,6 +212,14 @@ internal interface WalletSdkBridgeOperations {
         clientId: String,
     ): List<String>
 
+    suspend fun receivePreviewed(
+        previewHandle: MobileWalletIssuancePreviewHandle,
+        txCode: String?,
+        clientId: String,
+    ): List<String>
+
+    suspend fun discardIssuancePreview(previewHandle: MobileWalletIssuancePreviewHandle)
+
     suspend fun credentials(): List<MobileWalletCredential>
 
     suspend fun deleteWallet()
@@ -181,16 +232,23 @@ internal interface WalletSdkBridgeOperations {
 
     suspend fun previewPresentation(
         requestUrl: String,
-    ): MobileWalletPresentationPreview
+    ): MobileWalletPresentationPreviewResult
 
     suspend fun submitPresentation(
-        requestUrl: String,
+        previewHandle: MobileWalletPresentationPreviewHandle,
         selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
         selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
         did: String?,
         runPolicies: Boolean?,
     ): MobileWalletPresentationResult
 
+    suspend fun rejectPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        errorCode: MobileWalletPresentationErrorCode?,
+        errorDescription: String?,
+    ): MobileWalletPresentationResult
+
+    suspend fun discardPresentationPreview(previewHandle: MobileWalletPresentationPreviewHandle)
 }
 
 internal class MobileWalletSdkBridgeOperations(
@@ -219,6 +277,19 @@ internal class MobileWalletSdkBridgeOperations(
             clientId = clientId,
         )
 
+    override suspend fun receivePreviewed(
+        previewHandle: MobileWalletIssuancePreviewHandle,
+        txCode: String?,
+        clientId: String,
+    ): List<String> = wallet.receive(
+        previewHandle = previewHandle,
+        txCode = txCode,
+        clientId = clientId,
+    )
+
+    override suspend fun discardIssuancePreview(previewHandle: MobileWalletIssuancePreviewHandle) =
+        wallet.discardIssuancePreview(previewHandle)
+
     override suspend fun credentials(): List<MobileWalletCredential> =
         wallet.credentials()
 
@@ -238,22 +309,35 @@ internal class MobileWalletSdkBridgeOperations(
 
     override suspend fun previewPresentation(
         requestUrl: String,
-    ): MobileWalletPresentationPreview =
+    ): MobileWalletPresentationPreviewResult =
         wallet.previewPresentation(requestUrl = requestUrl)
 
     override suspend fun submitPresentation(
-        requestUrl: String,
+        previewHandle: MobileWalletPresentationPreviewHandle,
         selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
         selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
         did: String?,
         runPolicies: Boolean?,
     ): MobileWalletPresentationResult =
         wallet.submitPresentation(
-            requestUrl = requestUrl,
+            previewHandle = previewHandle,
             selectedCredentialOptions = selectedCredentialOptions,
             selectedDisclosureOptions = selectedDisclosureOptions,
             did = did,
             runPolicies = runPolicies,
         )
 
+    override suspend fun rejectPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        errorCode: MobileWalletPresentationErrorCode?,
+        errorDescription: String?,
+    ): MobileWalletPresentationResult =
+        wallet.rejectPresentation(
+            previewHandle = previewHandle,
+            errorCode = errorCode,
+            errorDescription = errorDescription,
+        )
+
+    override suspend fun discardPresentationPreview(previewHandle: MobileWalletPresentationPreviewHandle) =
+        wallet.discardPresentationPreview(previewHandle)
 }

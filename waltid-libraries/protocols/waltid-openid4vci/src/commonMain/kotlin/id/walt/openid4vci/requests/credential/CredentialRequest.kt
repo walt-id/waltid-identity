@@ -29,7 +29,13 @@ sealed interface CredentialRequest {
     val requestForm: Map<String, List<String>>
     val session: Session?
     val issClaim: String?
+    val accessTokenClientId: String?
+    val anonymousPreAuthorizedAccess: Boolean
 
     fun withSession(session: Session?): CredentialRequest
     fun withIssuer(issClaim: String?): CredentialRequest
+    fun withAccessTokenClient(
+        clientId: String?,
+        anonymousPreAuthorizedAccess: Boolean,
+    ): CredentialRequest
 }

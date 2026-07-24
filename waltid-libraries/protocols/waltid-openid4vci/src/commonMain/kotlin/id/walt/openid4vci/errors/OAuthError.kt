@@ -1,10 +1,12 @@
 package id.walt.openid4vci.errors
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class OAuthError(
     val error: String,
+    @SerialName("error_description")
     val description: String? = null,
 )
 
@@ -23,4 +25,7 @@ object OAuthErrorCodes {
     const val INVALID_GRANT = "invalid_grant"
     const val UNSUPPORTED_GRANT_TYPE = "unsupported_grant_type"
     const val INVALID_REQUEST_URI = "invalid_request_uri"
+    const val INVALID_TOKEN = "invalid_token"
+    const val INSUFFICIENT_SCOPE = "insufficient_scope"
+    const val INVALID_DPOP_PROOF = "invalid_dpop_proof"
 }

@@ -3,11 +3,14 @@ package id.walt.walletdemo.compose.logic
 internal enum class ClaimGroupKind(
     val title: String,
     val order: Int,
+    val initiallyExpanded: Boolean = true,
 ) {
     Personal(title = "Personal details", order = 0),
-    Address(title = "Address", order = 1),
-    Other(title = "Credential data", order = 2),
-    Technical(title = "Credential metadata", order = 3),
+    AgeAttestations(title = "Age attestations", order = 1, initiallyExpanded = false),
+    Address(title = "Address", order = 2),
+    Other(title = "Credential data", order = 3),
+    TravelDocumentData(title = "Travel document data", order = 4, initiallyExpanded = false),
+    Technical(title = "Credential metadata", order = 5, initiallyExpanded = false),
 }
 
 enum class ClaimRole {
@@ -153,7 +156,13 @@ internal object CredentialDisplayVocabulary {
         "termsOfUse",
     ).map(NormalizedClaimKey::from).toSet()
 
-    fun groupKind(path: ClaimPath): ClaimGroupKind {
+    fun groupKind(path: ClaimPath, format: String? = null): ClaimGroupKind {
+        MdocClaimDisplaySemantics.describe(format = format, path = path.components)?.let { semantics ->
+            return when (semantics.group) {
+                MdocClaimGroup.AgeAttestations -> ClaimGroupKind.AgeAttestations
+                MdocClaimGroup.TravelDocumentData -> ClaimGroupKind.TravelDocumentData
+            }
+        }
         if (path.isW3cMetadataClaimPath()) {
             return ClaimGroupKind.Technical
         }
@@ -197,7 +206,12 @@ internal object CredentialDisplayVocabulary {
         return roles
     }
 
-    fun compareClaimPaths(left: ClaimPath, right: ClaimPath): Int {
+    fun compareClaimPaths(left: ClaimPath, right: ClaimPath, format: String? = null): Int {
+        val semanticOrderComparison = MdocClaimDisplaySemantics
+            .sortOrder(format = format, path = left.components)
+            .compareTo(MdocClaimDisplaySemantics.sortOrder(format = format, path = right.components))
+        if (semanticOrderComparison != 0) return semanticOrderComparison
+
         val orderComparison = left.displayOrderSegments().compareLexicographically(right.displayOrderSegments())
         if (orderComparison != 0) return orderComparison
 
@@ -273,6 +287,117 @@ internal object CredentialDisplayVocabulary {
     }
 
     private const val unknownClaimDisplayOrder = 10_000
+}
+
+internal enum class MdocClaimGroup(val title: String, val order: Int) {
+    AgeAttestations(title = "Age attestations", order = 1),
+    TravelDocumentData(title = "Travel document data", order = 2),
+}
+
+internal enum class MdocClaimValueKind {
+    Boolean,
+    Binary,
+    Other,
+}
+
+internal data class MdocClaimDisplay(
+    val group: MdocClaimGroup,
+    val label: String,
+    val sortOrder: Int,
+    val valueKind: MdocClaimValueKind,
+)
+
+internal object MdocClaimDisplaySemantics {
+    private val ageAttestation = Regex("^age_over_(\\d{2})$")
+    private val dataGroup = Regex("^(?:dtc_)?dg([1-9]|1[0-6])$")
+    private val ageAttestationNamespaces = setOf("org.iso.18013.5.1", "org.iso.23220.1")
+    private const val dataGroupNamespace = "org.iso.23220.dtc.1"
+
+    fun describe(format: String?, path: List<String>): MdocClaimDisplay? {
+        if (format != MdocFormat) return null
+
+        val age = path
+            .takeIf { components -> components.any { it in ageAttestationNamespaces } }
+            ?.asReversed()
+            ?.firstNotNullOfOrNull { component ->
+                ageAttestation.matchEntire(component)?.groupValues?.get(1)?.toIntOrNull()
+            }
+        if (age != null && age in 1..99) {
+            return MdocClaimDisplay(
+                group = MdocClaimGroup.AgeAttestations,
+                label = "$age or older",
+                sortOrder = age,
+                valueKind = MdocClaimValueKind.Boolean,
+            )
+        }
+
+        if (dataGroupNamespace !in path) return null
+        val leaf = path.asReversed().firstOrNull { component ->
+            component == "version" ||
+                    component == "dtc_version" ||
+                    component == "sod" ||
+                    component == "dtc_sod" ||
+                    component == "dg_content_info" ||
+                    dataGroup.matches(component)
+        } ?: return null
+
+        if (leaf == "version" || leaf == "dtc_version") {
+            return MdocClaimDisplay(
+                group = MdocClaimGroup.TravelDocumentData,
+                label = "Specification version",
+                sortOrder = 0,
+                valueKind = MdocClaimValueKind.Other,
+            )
+        }
+        if (leaf == "sod" || leaf == "dtc_sod") {
+            return MdocClaimDisplay(
+                group = MdocClaimGroup.TravelDocumentData,
+                label = "Document security object (SOD)",
+                sortOrder = 1,
+                valueKind = MdocClaimValueKind.Binary,
+            )
+        }
+        if (leaf == "dg_content_info") {
+            return MdocClaimDisplay(
+                group = MdocClaimGroup.TravelDocumentData,
+                label = "Document content information",
+                sortOrder = 18,
+                valueKind = MdocClaimValueKind.Binary,
+            )
+        }
+
+        val number = dataGroup.matchEntire(leaf)?.groupValues?.get(1)?.toIntOrNull() ?: return null
+        return MdocClaimDisplay(
+            group = MdocClaimGroup.TravelDocumentData,
+            label = "DG$number: ${dataGroupNames.getValue(number)}",
+            sortOrder = number + 1,
+            valueKind = MdocClaimValueKind.Binary,
+        )
+    }
+
+    fun sortOrder(format: String?, path: List<String>): Int =
+        describe(format = format, path = path)?.sortOrder ?: Int.MAX_VALUE
+
+    private val dataGroupNames = mapOf(
+        1 to "Machine-readable zone",
+        2 to "Facial image",
+        3 to "Fingerprints",
+        4 to "Iris images",
+        5 to "Displayed portrait",
+        6 to "Reserved",
+        7 to "Signature or usual mark",
+        8 to "Data features",
+        9 to "Structure features",
+        10 to "Substance features",
+        11 to "Additional personal details",
+        12 to "Additional document details",
+        13 to "Optional details",
+        14 to "Security options",
+        15 to "Active authentication public key",
+        16 to "Persons to notify",
+    )
+
+    private const val MdocFormat = "mso_mdoc"
 }
 
 private object ClaimLabelFormatter {

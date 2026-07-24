@@ -14,6 +14,7 @@ import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -30,6 +31,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
@@ -38,11 +40,33 @@ import kotlin.test.assertTrue
 class MobileWalletTest {
 
     @Test
+    fun presentationErrorCodesMatchOAuthAndOpenId4VpValues() {
+        assertEquals(
+            listOf(
+                "access_denied",
+                "invalid_request",
+                "invalid_client",
+                "invalid_scope",
+                "unauthorized_client",
+                "unsupported_response_type",
+                "server_error",
+                "temporarily_unavailable",
+                "vp_formats_not_supported",
+                "invalid_request_uri_method",
+                "invalid_transaction_data",
+                "wallet_unavailable",
+            ),
+            MobileWalletPresentationErrorCode.entries.map { it.errorCode },
+        )
+    }
+
+    @Test
     fun mobileWalletConfigUsesStableDefaults() {
         val config = MobileWalletConfig()
 
         assertEquals("default", config.walletId)
         assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
+        assertEquals(emptyList(), config.preferredLocales)
         assertEquals(null, config.attestationConfig)
         assertEquals(MobileWalletPersistence(), config.persistence)
         assertEquals(emptyList(), config.transactionDataProfiles)
@@ -154,12 +178,17 @@ class MobileWalletTest {
     @Test
     fun walletSessionEventsMapToMobileWalletEventsInCommonCode() {
         val progress = WalletSessionEvent.issuance_offer_resolved.toMobileWalletEvent()
+        val prepared = WalletSessionEvent.presentation_response_prepared.toMobileWalletEvent()
         val completed = WalletSessionEvent.presentation_completed.toMobileWalletEvent()
         val failed = WalletSessionEvent.issuance_failed.toMobileWalletEvent()
 
         assertEquals(MobileWalletEventPhase.issuance, progress.phase)
         assertEquals(MobileWalletEventStatus.progress, progress.status)
         assertEquals("issuance_offer_resolved", progress.name)
+
+        assertEquals(MobileWalletEventPhase.presentation, prepared.phase)
+        assertEquals(MobileWalletEventStatus.progress, prepared.status)
+        assertEquals("presentation_response_prepared", prepared.name)
 
         assertEquals(MobileWalletEventPhase.presentation, completed.phase)
         assertEquals(MobileWalletEventStatus.completed, completed.status)
@@ -172,13 +201,54 @@ class MobileWalletTest {
 
     @Test
     fun presentationResultCarriesVerifierResponseAsJsonString() {
-        val result = MobileWalletPresentationResult(
-            success = true,
-            redirectTo = "wallet://return",
+        val result = MobileWalletPresentationResult.Transmitted.Succeeded(
             verifierResponseJson = """{"accepted":true}""",
+            redirectUrl = "wallet://return",
         )
 
         assertEquals("""{"accepted":true}""", result.verifierResponseJson)
+        assertEquals("wallet://return", result.redirectUrl)
+    }
+
+    @Test
+    fun presentationResultPreservesFrontChannelResponseArtifacts() {
+        val responseUrl = WalletPresentResult(getUrl = "https://verifier.example/callback?error=access_denied")
+            .toMobilePresentationResult()
+        val formPost = WalletPresentResult(formPostHtml = "<form></form>").toMobilePresentationResult()
+
+        assertEquals(
+            MobileWalletPresentationResult.Prepared.OpenUrl(
+                "https://verifier.example/callback?error=access_denied"
+            ),
+            responseUrl,
+        )
+        assertEquals(MobileWalletPresentationResult.Prepared.SubmitForm("<form></form>"), formPost)
+    }
+
+    @Test
+    fun presentationResultHonorsExplicitFailedTransmission() {
+        val result = WalletPresentResult(
+            transmissionSuccess = false,
+            verifierResponse = buildJsonObject { put("error", "server_error") },
+        ).toMobilePresentationResult()
+
+        assertEquals(
+            MobileWalletPresentationResult.Transmitted.Failed("""{"error":"server_error"}"""),
+            result,
+        )
+    }
+
+    @Test
+    fun presentationResultRejectsIncompatibleCoreArtifacts() {
+        assertFailsWith<IllegalArgumentException> {
+            WalletPresentResult(
+                getUrl = "https://verifier.example/callback",
+                formPostHtml = "<form></form>",
+            ).toMobilePresentationResult()
+        }
+        assertFailsWith<IllegalArgumentException> {
+            WalletPresentResult(transmissionSuccess = true).toMobilePresentationResult()
+        }
     }
 
     @Test
@@ -246,12 +316,24 @@ class MobileWalletTest {
     @Test
     fun presentationPreviewUsesSwiftFriendlyCredentialAndClaimDtos() {
         val preview = MobileWalletPresentationPreview(
+            previewHandle = MobileWalletPresentationPreviewHandle("preview-1"),
             request = MobileWalletPresentationRequestInfo(
                 clientId = "https://verifier.example",
-                verifierName = "Example Verifier",
+                verifierMetadata = MobileWalletVerifierMetadata(
+                    display = MobileWalletMetadataDisplay(
+                        name = "Example Verifier",
+                        locale = "en",
+                        logoUri = null,
+                        logoAltText = null,
+                    ),
+                    clientUri = "https://verifier.example",
+                    policyUri = null,
+                    termsOfServiceUri = null,
+                ),
                 responseUri = "https://verifier.example/direct-post",
                 state = "state-1",
                 nonce = "nonce-1",
+                responseEncryption = MobileWalletResponseEncryption.NotRequired,
             ),
             credentialOptions = listOf(
                 MobileWalletPresentationCredentialOption(

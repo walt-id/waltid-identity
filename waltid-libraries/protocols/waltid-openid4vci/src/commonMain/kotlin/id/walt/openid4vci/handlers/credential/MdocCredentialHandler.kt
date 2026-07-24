@@ -4,12 +4,13 @@ import id.walt.cose.CoseCertificate
 import id.walt.crypto.keys.Key
 import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
-import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
+import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
@@ -46,12 +47,13 @@ class MdocCredentialHandler : CredentialEndpointHandler {
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult {
         return try {
             if (configuration.format != CredentialFormat.MSO_MDOC) {
                 return CredentialResponseResult.Failure(
-                    OAuthError(
-                        CredentialErrorCodes.UNSUPPORTED_CREDENTIAL_CONFIGURATION,
+                    CredentialError(
+                        CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
                         "Unsupported format ${configuration.format.value}"
                     )
                 )
@@ -67,9 +69,10 @@ class MdocCredentialHandler : CredentialEndpointHandler {
                 credentialStatus = credentialStatus,
                 validFrom = validFrom,
                 validUntil = validUntil,
+                verifiedProofs = verifiedProofs,
             )
         } catch (e: Exception) {
-            CredentialResponseResult.Failure(OAuthError("invalid_request", e.message))
+            CredentialResponseResult.Failure(e.toCredentialHandlerError())
         }
     }
 
@@ -84,6 +87,7 @@ class MdocCredentialHandler : CredentialEndpointHandler {
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult.Success {
         val docType = configuration.doctype
             ?: throw IllegalArgumentException("Missing doctype for mDoc credential configuration")
@@ -108,23 +112,29 @@ class MdocCredentialHandler : CredentialEndpointHandler {
             "mDoc issuance requests require that the x5Chain parameter contains at least one entry"
         }.map { CoseCertificate(it.bytes.toByteArray()) }
 
-        val issuedCredential = MdocCredentialSigner.generateMdocCredential(
-            credentialRequest = request,
-            credentialData = credentialData,
-            issuerKey = issuerKey,
-            issuerCertificate = issuerCertificateChain,
-            docType = docType,
-            validFrom = validFrom,
-            validUntil = resolveValidUntil(request, validUntil),
-            status = credentialStatus,
-            mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
-        )
+        val proofsToIssue = if (verifiedProofs.isEmpty()) {
+            listOf<VerifiedCredentialProof?>(null)
+        } else {
+            verifiedProofs
+        }
+        val issuedCredentials = proofsToIssue.map { verifiedProof ->
+            MdocCredentialSigner.generateMdocCredential(
+                credentialRequest = request,
+                credentialData = credentialData,
+                issuerKey = issuerKey,
+                issuerCertificate = issuerCertificateChain,
+                docType = docType,
+                validFrom = validFrom,
+                validUntil = resolveValidUntil(request, validUntil),
+                status = credentialStatus,
+                mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+                verifiedProof = verifiedProof,
+            )
+        }
 
         return CredentialResponseResult.Success(
             CredentialResponse(
-                credentials = listOf(
-                    IssuedCredential(credential = JsonPrimitive(issuedCredential)),
-                ),
+                credentials = issuedCredentials.map { IssuedCredential(credential = JsonPrimitive(it)) },
             ),
         )
     }

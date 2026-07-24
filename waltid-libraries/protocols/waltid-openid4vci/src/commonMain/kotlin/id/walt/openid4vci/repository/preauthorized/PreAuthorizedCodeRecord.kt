@@ -17,8 +17,6 @@ interface PreAuthorizedCodeRecord {
     val grantedAudience: Set<String>
     val session: Session
     val expiresAt: Instant
-    val credentialNonce: String?
-    val credentialNonceExpiresAt: Instant?
 
     /** Optional issuance session ID for O(1) lookup on credential endpoint */
     val issuanceSessionId: String?
@@ -35,7 +33,5 @@ data class DefaultPreAuthorizedCodeRecord(
     override val grantedAudience: Set<String>,
     override val session: Session,
     override val expiresAt: Instant,
-    override val credentialNonce: String?,
-    override val credentialNonceExpiresAt: Instant?,
     override val issuanceSessionId: String? = null,
 ) : PreAuthorizedCodeRecord

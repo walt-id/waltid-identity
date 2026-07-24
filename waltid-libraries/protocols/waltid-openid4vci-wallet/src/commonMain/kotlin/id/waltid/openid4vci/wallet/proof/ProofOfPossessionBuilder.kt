@@ -14,13 +14,13 @@ interface ProofOfPossessionBuilder {
      * 
      * @param key The cryptographic key to use for signing
      * @param audience The credential issuer URL (aud claim)
-     * @param nonce The c_nonce from the issuer
+     * @param nonce The optional c_nonce obtained from the issuer's Nonce Endpoint
      * @return Proofs object containing the proof
      */
     suspend fun buildProof(
         key: Key,
         audience: String,
-        nonce: String,
+        nonce: String?,
     ): Proofs
 
     /**
@@ -45,9 +45,9 @@ object ProofBuilderUtils {
      */
     fun validateProofParameters(
         audience: String,
-        nonce: String,
+        nonce: String?,
     ) {
         require(audience.isNotBlank()) { "Audience (issuer URL) cannot be blank" }
-        require(nonce.isNotBlank()) { "Nonce (c_nonce) cannot be blank" }
+        require(nonce == null || nonce.isNotBlank()) { "Nonce (c_nonce) cannot be blank" }
     }
 }

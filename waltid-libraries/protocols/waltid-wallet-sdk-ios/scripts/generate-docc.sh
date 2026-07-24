@@ -36,6 +36,9 @@ ignored_kinds = {
 ignored_titles = {
     "assertIsolated(_:file:line:)",
     "assumeIsolated(_:file:line:)",
+    "hash(into:)",
+    "hashValue",
+    "init(rawValue:)",
     "localizedDescription",
     "preconditionIsolated(_:file:line:)",
     "withSerialExecutor(_:)",
