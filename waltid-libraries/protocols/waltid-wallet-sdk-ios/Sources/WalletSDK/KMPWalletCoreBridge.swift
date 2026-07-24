@@ -629,7 +629,8 @@ private extension MobileWalletCredential {
             subject: subject,
             label: label,
             addedAt: addedAt.flatMap(parseWalletISO8601Date),
-            credentialDataJSON: requiredCredentialDataJSON(credentialDataJson)
+            credentialDataJSON: requiredCredentialDataJSON(credentialDataJson),
+            metadataJSON: metadataJson
         )
     }
 }

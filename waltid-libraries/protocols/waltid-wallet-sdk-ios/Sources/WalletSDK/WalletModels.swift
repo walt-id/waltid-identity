@@ -764,6 +764,9 @@ public struct Credential: Equatable, Identifiable, Sendable {
     /// Parsed credential data encoded as JSON for app-side display.
     public let credentialDataJSON: String
 
+    /// Optional sidecar metadata JSON persisted with the credential (e.g. `issuerDisplay`).
+    public let metadataJSON: String?
+
     /// Creates credential metadata visible to SDK consumers.
     ///
     /// - Parameters:
@@ -777,6 +780,8 @@ public struct Credential: Equatable, Identifiable, Sendable {
     ///     available.
     ///   - credentialDataJSON: Parsed credential data encoded as JSON for
     ///     app-side display.
+    ///   - metadataJSON: Optional sidecar metadata JSON persisted with the
+    ///     credential.
     public init(
         id: String,
         format: String,
@@ -784,7 +789,8 @@ public struct Credential: Equatable, Identifiable, Sendable {
         subject: String?,
         label: String?,
         addedAt: Date?,
-        credentialDataJSON: String
+        credentialDataJSON: String,
+        metadataJSON: String? = nil
     ) {
         self.id = id
         self.format = format
@@ -793,6 +799,7 @@ public struct Credential: Equatable, Identifiable, Sendable {
         self.label = label
         self.addedAt = addedAt
         self.credentialDataJSON = credentialDataJSON
+        self.metadataJSON = metadataJSON
     }
 }
 

@@ -21,7 +21,7 @@ enum CredentialDisplayNormalizer {
             format: result.format,
             addedAt: result.addedAt,
             groups: result.groups,
-            metadataJSON: nil
+            metadataJSON: credential.metadataJSON
         )
     }
 
