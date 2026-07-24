@@ -67,9 +67,9 @@ data class DcqlQuery(
                     format = CredentialFormat.MSO_MDOC,
                     meta = MsoMdocMeta("org.iso.23220.photoid.1"),
                     claims = listOf(
-                        ClaimsQuery(id = "given_name", pathStrings = listOf("org.iso.18013.5.1", "given_name")),
-                        ClaimsQuery(id = "family_name", pathStrings = listOf("org.iso.18013.5.1", "family_name")),
-                        ClaimsQuery(id = "portrait", pathStrings = listOf("org.iso.18013.5.1", "portrait"))
+                        ClaimsQuery(id = "given_name", pathStrings = listOf("org.iso.23220.photoid.1", "given_name")),
+                        ClaimsQuery(id = "family_name", pathStrings = listOf("org.iso.23220.photoid.1", "family_name")),
+                        ClaimsQuery(id = "portrait", pathStrings = listOf("org.iso.23220.photoid.1", "portrait"))
                     )
                 ),
                 CredentialQuery(
@@ -77,8 +77,8 @@ data class DcqlQuery(
                     format = CredentialFormat.MSO_MDOC,
                     meta = MsoMdocMeta("org.iso.23220.photoid.1"),
                     claims = listOf(
-                        ClaimsQuery(id = "resident_address", pathStrings = listOf("org.iso.18013.5.1", "resident_address")),
-                        ClaimsQuery(id = "resident_country", pathStrings = listOf("org.iso.18013.5.1", "resident_country"))
+                        ClaimsQuery(id = "resident_address", pathStrings = listOf("org.iso.23220.photoid.1", "resident_address")),
+                        ClaimsQuery(id = "resident_country", pathStrings = listOf("org.iso.23220.photoid.1", "resident_country"))
                     )
                 )
             ),
