@@ -471,7 +471,7 @@ class Issuer2ProfileEndpointTest {
     }
 
     private fun assertNoUnresolvedString(context: String, value: String) {
-        assertFalse(value.contains("\${"), "Expected $context to have resolved HOCON substitutions, got: $value")
+        assertFalse(value.contains($$"${"), "Expected $context to have resolved HOCON substitutions, got: $value")
     }
 
     private data class SdJwtProfileExpectation(
