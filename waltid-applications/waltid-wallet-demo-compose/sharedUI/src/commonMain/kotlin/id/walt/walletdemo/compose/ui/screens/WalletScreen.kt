@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
@@ -24,14 +23,6 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
     val credentialsBackStack = remember { mutableStateListOf<WalletRoute>(WalletRoute.Root) }
     val receiveBackStack = remember { mutableStateListOf<WalletRoute>(WalletRoute.Root) }
     val presentBackStack = remember { mutableStateListOf<WalletRoute>(WalletRoute.Root) }
-    val uriHandler = LocalUriHandler.current
-
-    LaunchedEffect(state.authorizationRequestUrl) {
-        state.authorizationRequestUrl?.let { authorizationUrl ->
-            uriHandler.openUri(authorizationUrl)
-            controller.authorizationRequestOpened()
-        }
-    }
 
     LaunchedEffect(state.receiveNavigationResetKey) {
         receiveBackStack.resetToRoot()
@@ -89,7 +80,6 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
                             onAcceptOffer = controller::acceptOffer,
                             onDeclineOffer = controller::declineOffer,
                             onStartNew = controller::startNewReceiveFlow,
-                            onResumeDeferred = controller::resumeDeferredCredential,
                             onCredentialClick = { detailsId -> receiveBackStack.pushDetails(detailsId) },
                         )
                     },

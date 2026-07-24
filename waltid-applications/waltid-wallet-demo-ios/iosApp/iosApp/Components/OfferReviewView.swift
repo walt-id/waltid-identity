@@ -2,7 +2,7 @@ import SwiftUI
 import WalletSDK
 
 struct OfferReviewView: View {
-    let preview: IssuanceOfferPreview
+    let preview: OfferResolution
     let isAcceptEnabled: Bool
     let isReviewEnabled: Bool
     let txCode: String
@@ -19,21 +19,21 @@ struct OfferReviewView: View {
                 title: "Issuer",
                 titleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerSection
             ) {
-                Text(preview.issuer.name ?? preview.issuer.identifier)
-                    .font(.body.weight(.semibold))
-                if preview.issuer.name != preview.issuer.identifier {
-                    Text(preview.issuer.identifier)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                MetadataIdentityView(
+                    display: preview.issuer.display,
+                    fallbackName: preview.issuer.credentialIssuer,
+                    supportingText: preview.issuer.display?.name == preview.issuer.credentialIssuer
+                        ? nil
+                        : preview.issuer.credentialIssuer
+                )
             }
 
-            if !preview.credentials.isEmpty {
+            if !preview.offeredCredentials.isEmpty {
                 ReviewMetadataSection(
                     title: "Offered credentials",
                     titleAccessibilityIdentifier: WalletAccessibilityID.offerCredentialsSection
                 ) {
-                    ForEach(Array(preview.credentials.enumerated()), id: \.offset) { index, credential in
+                    ForEach(Array(preview.offeredCredentials.enumerated()), id: \.offset) { index, credential in
                         if index > 0 {
                             Divider()
                         }
@@ -42,23 +42,12 @@ struct OfferReviewView: View {
                 }
             }
 
-            if preview.grant == .authorizationCode {
-                ReviewMetadataSection(
-                    title: "Issuer sign-in",
-                    titleAccessibilityIdentifier: WalletAccessibilityID.offerAuthorizationSection
-                ) {
-                    Text("Continuing opens your browser to sign in with the issuer before the credential is issued.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
             if let requirement = preview.transactionCode {
                 ReviewMetadataSection(
                     title: "Transaction code",
                     titleAccessibilityIdentifier: WalletAccessibilityID.offerTransactionCodeSection
                 ) {
-                    Text(requirement.descriptionText ?? "Enter the transaction code provided by the issuer.")
+                    Text(requirement.description ?? "Enter the transaction code provided by the issuer.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     SecureField(
@@ -66,7 +55,7 @@ struct OfferReviewView: View {
                         text: Binding(get: { txCode }, set: onTxCodeChange)
                     )
                     .textContentType(.oneTimeCode)
-                    .keyboardType(requirement.inputMode?.lowercased() == "numeric" ? .numberPad : .asciiCapable)
+                    .keyboardType(requirement.inputMode == .numeric ? .numberPad : .asciiCapable)
                     .textInputAutocapitalization(.never)
                     .disableAutocorrection(true)
                     .padding(8)
@@ -88,7 +77,7 @@ struct OfferReviewView: View {
             }
 
             HStack(spacing: 8) {
-                Button(preview.grant == .authorizationCode ? "Continue to sign in" : "Accept", action: onAccept)
+                Button("Accept", action: onAccept)
                     .buttonStyle(.borderedProminent)
                     .tint(.waltBlue)
                     .disabled(!isAcceptEnabled)
@@ -104,24 +93,54 @@ struct OfferReviewView: View {
 }
 
 private struct OfferedCredentialView: View {
-    let credential: IssuanceCredentialPreview
+    let credential: OfferedCredentialMetadata
 
     private var title: String {
-        credential.name ?? credential.configurationID
+        credential.display?.name ?? credential.vct ?? credential.doctype ?? credential.configurationID
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.body.weight(.semibold))
-            if let description = credential.descriptionText, !description.isEmpty {
-                Text(description).font(.caption).foregroundStyle(.secondary)
-            }
+            MetadataIdentityView(
+                display: credential.display,
+                fallbackName: title,
+                supportingText: credential.display?.description
+            )
             let details = [
                 MetadataDetailItem(label: "Format", value: credential.format),
+                MetadataDetailItem(label: "Type", value: credential.vct ?? credential.doctype),
             ].filter(\.isVisible)
             if !details.isEmpty {
                 Divider()
                 MetadataDetailList(items: details)
+            }
+            if !credential.claims.isEmpty {
+                Divider()
+                MetadataDisclosure(
+                    title: "Supported claims (\(credential.claims.count))",
+                    initiallyExpanded: false,
+                    accessibilityIdentifier: WalletAccessibilityID.offerSupportedClaims
+                ) {
+                    ForEach(Array(credential.claimDisplayGroups.enumerated()), id: \.offset) { groupIndex, group in
+                        if groupIndex > 0 {
+                            Divider()
+                        }
+                        Text(group.title)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.tint)
+                        ForEach(Array(group.claims.enumerated()), id: \.offset) { index, claim in
+                            if index > 0 {
+                                Divider()
+                            }
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(claim.label).font(.caption)
+                                Text(claim.inclusion)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
             }
         }
     }

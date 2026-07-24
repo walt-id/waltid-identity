@@ -61,26 +61,3 @@ VALUES (?, ?);
 
 deleteDidByDid:
 DELETE FROM dids WHERE did = ?;
-
--- Sensitive OpenID4VCI continuation records. The containing database is SQLCipher-encrypted.
-
-CREATE TABLE issuance_session_records (
-    record_id TEXT NOT NULL PRIMARY KEY,
-    session_id TEXT NOT NULL,
-    kind TEXT NOT NULL,
-    payload TEXT NOT NULL,
-    updated_at INTEGER NOT NULL
-);
-
-selectAllIssuanceSessionRecords:
-SELECT * FROM issuance_session_records;
-
-selectIssuanceSessionRecordById:
-SELECT * FROM issuance_session_records WHERE record_id = ?;
-
-insertIssuanceSessionRecord:
-INSERT OR REPLACE INTO issuance_session_records (record_id, session_id, kind, payload, updated_at)
-VALUES (?, ?, ?, ?, ?);
-
-deleteIssuanceSessionRecordById:
-DELETE FROM issuance_session_records WHERE record_id = ?;

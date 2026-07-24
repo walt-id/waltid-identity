@@ -5,11 +5,10 @@ protocol WalletCoreBridge: Sendable {
     var events: AsyncStream<WalletEvent> { get }
 
     func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult
-    func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession
-    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome
-    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome
-    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
-    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome
+    func resolveOffer(offer: URL) async throws -> OfferResolution
+    func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String]
+    func receive(previewHandle: IssuancePreviewHandle, txCode: String?, clientID: String) async throws -> [String]
+    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws
     func credentials() async throws -> [Credential]
     func deleteLocalData() async throws
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
@@ -52,26 +51,19 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         throw unavailableError()
     }
 
-    func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
+    func resolveOffer(offer: URL) async throws -> OfferResolution {
         throw unavailableError()
     }
 
-    func continuePreAuthorizedIssuance(
-        sessionID: String,
-        transactionCode: String?
-    ) async throws -> IssuanceOutcome {
+    func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String] {
         throw unavailableError()
     }
 
-    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome {
+    func receive(previewHandle: IssuancePreviewHandle, txCode: String?, clientID: String) async throws -> [String] {
         throw unavailableError()
     }
 
-    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
-        throw unavailableError()
-    }
-
-    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
+    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
         throw unavailableError()
     }
 

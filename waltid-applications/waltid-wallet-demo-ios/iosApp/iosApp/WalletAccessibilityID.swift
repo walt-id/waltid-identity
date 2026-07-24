@@ -16,7 +16,6 @@ enum WalletAccessibilityID {
     static let offerIssuerSection = identifier("offerIssuerSection")
     static let offerCredentialsSection = identifier("offerCredentialsSection")
     static let offerSupportedClaims = identifier("offerSupportedClaims")
-    static let offerAuthorizationSection = identifier("offerAuthorizationSection")
     static let offerTransactionCodeSection = identifier("offerTransactionCodeSection")
     static let presentationInput = identifier("presentationInput")
     static let presentationScanButton = identifier("presentationScanButton")

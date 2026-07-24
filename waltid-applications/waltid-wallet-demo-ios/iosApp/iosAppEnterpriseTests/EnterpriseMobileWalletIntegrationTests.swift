@@ -36,7 +36,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         let wallet1 = try await makeWallet(walletId: walletId, attestation: offer.attestation)
         let bootstrapResult = try await wallet1.bootstrap()
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await receiveCredential(wallet: wallet1, offerURL: offerURL, transactionCode: offer.txCode)
+        let credentialIDs = try await wallet1.receive(offer: offerURL, txCode: offer.txCode)
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive \(selectedScenario.displayName)")
 
         let wallet2 = try await makeWallet(walletId: walletId, attestation: offer.attestation)
@@ -56,24 +56,6 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
 
     private func makeFixture() -> EnterpriseMobileFixture {
         EnterpriseMobileFixture(baseURL: fixtureBaseURL)
-    }
-
-    private func receiveCredential(
-        wallet: Wallet,
-        offerURL: URL,
-        transactionCode: String?
-    ) async throws -> [String] {
-        let session = try await wallet.startIssuance(
-            IssuanceRequest(offer: offerURL, redirectURI: URL(string: "openid://")!)
-        )
-        let outcome = try await wallet.continuePreAuthorizedIssuance(
-            sessionID: session.id,
-            transactionCode: transactionCode
-        )
-        guard case let .stored(_, credentialIDs) = outcome else {
-            throw EnterpriseIssuanceError.unexpectedOutcome
-        }
-        return credentialIDs
     }
 
     private func makeWallet(
@@ -126,7 +108,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         _ = try await wallet.bootstrap()
 
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await receiveCredential(wallet: wallet, offerURL: offerURL, transactionCode: offer.txCode)
+        let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
 
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive \(scenario.displayName) from Enterprise issuer2")
     }
@@ -144,7 +126,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         let bootstrapResult = try await wallet.bootstrap()
 
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await receiveCredential(wallet: wallet, offerURL: offerURL, transactionCode: offer.txCode)
+        let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive \(scenario.displayName)")
 
         let credentials = try await wallet.credentials()
@@ -171,10 +153,6 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         let scenarios = try await fixture.scenarios()
         return try XCTUnwrap(scenarios.first { $0.id == scenarioID })
     }
-}
-
-private enum EnterpriseIssuanceError: Error {
-    case unexpectedOutcome
 }
 
 private func assertTransmittedSuccess(

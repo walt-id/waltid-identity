@@ -13,7 +13,6 @@ import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
-import id.walt.wallet2.handlers.WalletIssuanceSessionStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.PresentationCredentialOption
@@ -28,12 +27,7 @@ import id.walt.wallet2.handlers.ReceiveCredentialRequest
 import id.walt.wallet2.handlers.ReceiveCredentialFromPreviewRequest
 import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.SubmitPresentationRequest
-import id.walt.wallet2.handlers.WalletIssuanceAuthorizationCallback
 import id.walt.wallet2.handlers.WalletIssuanceHandler
-import id.walt.wallet2.handlers.WalletIssuanceOutcome
-import id.walt.wallet2.handlers.WalletIssuanceSession
-import id.walt.wallet2.handlers.WalletIssuanceSessionRequest
-import id.walt.wallet2.handlers.WalletIssuanceSessionService
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
@@ -43,8 +37,6 @@ import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -172,7 +164,6 @@ public class MobileWallet internal constructor(
     private val keyStore: WalletKeyStore,
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
-    private val issuanceSessionStore: WalletIssuanceSessionStore? = null,
     private val keyGenerator: suspend (KeyType) -> Key,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     attestationConfig: WalletAttestationConfig? = null,
@@ -182,8 +173,6 @@ public class MobileWallet internal constructor(
     private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {
     private val eventStream = MobileWalletEventStream()
-    private val legacyIssuanceMutex = Mutex()
-    private val legacyIssuanceSessions = mutableMapOf<String, LegacyIssuanceSession>()
 
     /**
      * Buffered stream of recent issuance and presentation events emitted by this wallet.
@@ -206,13 +195,6 @@ public class MobileWallet internal constructor(
         keyStores = listOf(keyStore),
         didStore = didStore,
         credentialStores = listOf(credentialStore),
-    )
-
-    private val issuanceSessions = WalletIssuanceSessionService(
-        wallet = wallet,
-        attestationAssembler = attestationAssembler,
-        onEvent = ::emitSessionEvent,
-        sessionStore = issuanceSessionStore,
     )
 
     /**
@@ -284,62 +266,6 @@ public class MobileWallet internal constructor(
         ).toMobileOfferResolution(preferredLocales)
 
     /**
-     * Resolves an offer and starts a bound OpenID4VCI 1.0 issuance session.
-     *
-     * Authorization-code offers return a typed browser request containing the authorization URL,
-     * callback binding, state, and PKCE data. Pre-authorized offers return the same typed offer
-     * preview without a browser request and are continued with [continuePreAuthorizedIssuance].
-     */
-    public suspend fun startIssuance(
-        request: MobileWalletIssuanceRequest,
-    ): WalletIssuanceSession = issuanceSessions.start(
-        newIssuanceRequest(
-            offerUrl = request.offerUrl.trim(),
-            keyId = request.keyId,
-            did = request.did,
-            clientId = request.clientId,
-            redirectUri = request.redirectUri.trim(),
-        )
-    )
-
-    /** Continues a pre-authorized session after review and optional transaction-code collection. */
-    public suspend fun continuePreAuthorizedIssuance(
-        sessionId: String,
-        transactionCode: String? = null,
-    ): WalletIssuanceOutcome =
-        issuanceSessions.continuePreAuthorized(
-            sessionId = sessionId,
-            transactionCode = transactionCode?.ifBlank { null },
-        )
-
-    /**
-     * Validates and consumes a browser callback bound to an authorization-code session.
-     *
-     * The callback target, OAuth state, authorization code, PKCE verifier, issuer metadata, and
-     * selected holder key are all taken from or checked against the authoritative session record.
-     */
-    public suspend fun continueAuthorizationIssuance(
-        sessionId: String,
-        callbackUri: String,
-    ): WalletIssuanceOutcome =
-        issuanceSessions.continueAuthorization(
-            WalletIssuanceAuthorizationCallback(
-                sessionId = sessionId,
-                callbackUri = callbackUri,
-            )
-        )
-
-    /** Cancels an active issuance session and discards its protocol continuation material. */
-    public suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome =
-        issuanceSessions.cancel(sessionId)
-
-    /** Polls a typed deferred credential result returned by a previous issuance continuation. */
-    public suspend fun resumeDeferredIssuance(
-        deferredCredentialId: String,
-    ): WalletIssuanceOutcome =
-        issuanceSessions.resumeDeferred(deferredCredentialId)
-
-    /**
      * Receives credentials from an OpenID4VCI credential offer.
      *
      * This immediate path resolves the offer as part of the call. Review UIs should use
@@ -354,58 +280,17 @@ public class MobileWallet internal constructor(
         offerUrl: String,
         txCode: String? = null,
         clientId: String = "wallet-client",
-    ): List<String> {
-        val normalizedOffer = offerUrl.trim()
-        var cached = legacyIssuanceMutex.withLock { legacyIssuanceSessions.remove(normalizedOffer) }
-        if (cached != null && cached.clientId != clientId) {
-            issuanceSessions.cancel(cached.session.id)
-            cached = null
-        }
-        val session = cached?.session ?: issuanceSessions.start(
-            newIssuanceRequest(
-                offerUrl = normalizedOffer,
+    ): List<String> =
+        WalletIssuanceHandler.receiveCredential(
+            wallet = wallet,
+            request = ReceiveCredentialRequest(
+                offerUrl = Url(offerUrl.trim()),
+                txCode = txCode?.ifBlank { null },
                 clientId = clientId,
-                redirectUri = LEGACY_ISSUANCE_REDIRECT_URI,
-            )
-        )
-        if (session.authorization != null) {
-            issuanceSessions.cancel(session.id)
-            error("Authorization-code offers require startIssuance and continueAuthorizationIssuance")
-        }
-        return when (
-            val outcome = issuanceSessions.continuePreAuthorized(
-                sessionId = session.id,
-                transactionCode = txCode?.ifBlank { null },
-            )
-        ) {
-            is WalletIssuanceOutcome.Stored -> outcome.credentialIds
-            is WalletIssuanceOutcome.Deferred -> {
-                issuanceSessions.cancel(outcome.sessionId)
-                error("Deferred issuance requires the issuance-session API")
-            }
-            is WalletIssuanceOutcome.Cancelled -> error("Credential issuance was cancelled")
-            is WalletIssuanceOutcome.Failed -> error(outcome.error.message)
-        }
-    }
-
-    private suspend fun newIssuanceRequest(
-        offerUrl: String,
-        clientId: String,
-        redirectUri: String,
-        keyId: String? = null,
-        did: String? = null,
-    ): WalletIssuanceSessionRequest {
-        val selectedKeyId = keyId ?: keyStore.listKeys().toList().firstOrNull()?.keyId
-            ?: error("No holder key is available for credential issuance")
-        val selectedDid = did ?: didStore.listDids().toList().firstOrNull()?.did
-        return WalletIssuanceSessionRequest(
-            offerUrl = Url(offerUrl),
-            keyId = selectedKeyId,
-            did = selectedDid,
-            clientId = clientId,
-            redirectUri = Url(redirectUri),
-        )
-    }
+            ),
+            attestationAssembler = attestationAssembler,
+            onEvent = ::emitSessionEvent,
+        ).credentialIds
 
     /** Receives credentials using exactly one reviewed offer preview. */
     public suspend fun receive(
@@ -502,7 +387,7 @@ public class MobileWallet internal constructor(
             is PreviewPresentationResult.Invalid ->
                 MobileWalletPresentationPreviewResult.Invalid(
                     previewHandle = MobileWalletPresentationPreviewHandle(result.handle.value),
-                    request = result.authorizationRequest.toMobileRequestContext(preferredLocales),
+                    request = result.authorizationRequest.toMobileRequestInfo(preferredLocales),
                     errorCode = result.error.code.toMobileErrorCode(),
                     message = result.error.message,
                 )
@@ -596,15 +481,12 @@ public class MobileWallet internal constructor(
     /**
      * Deletes local wallet material owned by this mobile wallet instance.
      *
-     * Active issuance continuations are invalidated before the key, credential, and DID stores receive
-     * store-level remove calls. The wallet then closes and deletes the encrypted local database and deletes
-     * the configured database key.
+     * The active key, credential, and DID stores receive store-level remove calls. The wallet then closes
+     * and deletes the encrypted local database and deletes the configured database key.
      */
     public suspend fun deleteWallet() {
         WalletIssuanceHandler.clearPreviews(wallet)
         WalletPresentationHandler.clearPreviews(wallet)
-        issuanceSessions.clearSessions()
-        legacyIssuanceMutex.withLock { legacyIssuanceSessions.clear() }
         keyStore.listKeys().toList().forEach { key ->
             keyStore.removeKey(key.keyId)
         }
@@ -657,16 +539,6 @@ public class MobileWallet internal constructor(
             is JsonPrimitive -> contentOrNull
             else -> toString()
         }
-
-    private data class LegacyIssuanceSession(
-        val session: WalletIssuanceSession,
-        val clientId: String,
-    )
-
-    private companion object {
-        const val LEGACY_ISSUANCE_CLIENT_ID = "wallet-client"
-        const val LEGACY_ISSUANCE_REDIRECT_URI = "openid://"
-    }
 }
 
 internal fun WalletPresentResult.toMobilePresentationResult(): MobileWalletPresentationResult =
@@ -716,33 +588,15 @@ private fun AuthorizationRequest.toMobileRequestInfo(
     transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
 ): MobileWalletPresentationRequestInfo {
     return MobileWalletPresentationRequestInfo(
-        clientId = requireNotNull(clientId) {
-            "A validated presentation request must contain client_id."
-        },
-        verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
-        responseUri = responseUri,
-        state = state,
-        nonce = requireNotNull(nonce) {
-            "A validated presentation request must contain nonce."
-        },
-        responseEncryption = responseEncryption.toMobileResponseEncryption(),
-        transactionData = transactionData,
-    )
-}
-
-private fun AuthorizationRequest.toMobileRequestContext(
-    preferredLocales: List<String>,
-): MobileWalletPresentationRequestContext =
-    MobileWalletPresentationRequestContext(
-        clientId = requireNotNull(clientId) {
-            "A reportable invalid presentation request must contain client_id."
-        },
+        clientId = clientId,
         verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
         responseUri = responseUri,
         state = state,
         nonce = nonce,
-        responseEncryption = null.toMobileResponseEncryption(),
+        responseEncryption = responseEncryption.toMobileResponseEncryption(),
+        transactionData = transactionData,
     )
+}
 
 private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {
     WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED -> MobileWalletPresentationErrorCode.accessDenied
