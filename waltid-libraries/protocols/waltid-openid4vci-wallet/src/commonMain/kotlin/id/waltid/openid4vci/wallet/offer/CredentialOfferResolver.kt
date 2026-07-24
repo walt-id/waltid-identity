@@ -38,13 +38,14 @@ class CredentialOfferResolver(
         require(credentialOfferUri.isNotBlank()) { "Credential offer URI cannot be blank" }
 
         log.info { "Resolving credential offer from URI" }
+        log.trace { "Credential offer URI: $credentialOfferUri" }
 
         // Validate URI format
         val url = try {
             Url(credentialOfferUri)
         } catch (e: Exception) {
-            log.error { "Invalid credential offer URI format" }
-            throw IllegalArgumentException("Invalid credential offer URI", e)
+            log.error(e) { "Invalid credential offer URI format: $credentialOfferUri" }
+            throw IllegalArgumentException("Invalid credential offer URI: $credentialOfferUri", e)
         }
 
         log.trace { "Validated URI format, preparing HTTP request" }
@@ -54,14 +55,16 @@ class CredentialOfferResolver(
             log.debug { "Fetching credential offer from: ${url.host}" }
             httpClient.get(url)
         } catch (e: Exception) {
-            log.error { "Network error while fetching credential offer from: ${url.host}" }
-            throw Exception("Failed to fetch credential offer", e)
+            log.error(e) { "Network error while fetching credential offer from: ${url.host}" }
+            throw Exception("Failed to fetch credential offer from URI: $credentialOfferUri", e)
         }
 
         // Check response status
         if (!response.status.isSuccess()) {
+            val errorBody = response.bodyAsText()
             log.error {
-                "Credential offer fetch failed - Status: ${response.status.value} ${response.status.description}"
+                "Credential offer fetch failed - Status: ${response.status.value} ${response.status.description}, " +
+                "Response body: ${errorBody.take(200)}${if (errorBody.length > 200) "..." else ""}"
             }
             throw Exception("Failed to fetch credential offer. Status: ${response.status}")
         }
@@ -72,7 +75,11 @@ class CredentialOfferResolver(
         val credentialOffer = try {
             response.body<CredentialOffer>()
         } catch (e: Exception) {
-            log.error { "Failed to parse credential offer response" }
+            val responseBody = response.bodyAsText()
+            log.error(e) {
+                "Failed to parse credential offer response - " +
+                "Body preview: ${responseBody.take(200)}${if (responseBody.length > 200) "..." else ""}"
+            }
             throw Exception("Failed to parse credential offer response", e)
         }
 
