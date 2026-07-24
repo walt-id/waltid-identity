@@ -96,9 +96,14 @@ object Wallet2OpenApiDocs {
         description = """
             Registers a DID in the wallet's DID store using an existing key.
 
-            Common `method` values: `key` (did:key) and `jwk` (did:jwk). When `keyId` is omitted,
-            the wallet's default key is used — generate one first via
+            Common `method` values: `key` (did:key), `jwk` (did:jwk), `web` (did:web), and `cheqd`.
+            When `keyId` is omitted, the wallet's default key is used — generate one first via
             `POST /wallet/{walletId}/keys/generate` if the wallet has no keys yet.
+
+            Pass method-specific registrar arguments in `options`, for example:
+            - did:web: `domain` (required), `path` (optional)
+            - did:key: `useJwkJcsPub` (optional boolean)
+            - did:cheqd: `network` (`testnet` or `mainnet`)
 
             Wallets without a DID store (inline `staticDid` or `noDidStore`) will not be able to create DIDs.
         """.trimIndent()
@@ -116,6 +121,9 @@ object Wallet2OpenApiDocs {
                 }
                 example("did:jwk bound to a specific key") {
                     value = Wallet2RequestExamples.CREATE_DID_JWK_WITH_KEY_ID
+                }
+                example("did:web with domain and path") {
+                    value = Wallet2RequestExamples.CREATE_DID_WEB_WITH_DOMAIN_AND_PATH
                 }
             }
         }

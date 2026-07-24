@@ -5,6 +5,7 @@ import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.wallet2.server.handlers.CreateDidRequest
 import id.walt.wallet2.server.handlers.CreateWalletRequest
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
@@ -61,5 +62,14 @@ object Wallet2RequestExamples {
     val CREATE_DID_JWK_WITH_KEY_ID = CreateDidRequest(
         method = "jwk",
         keyId = "v_CW0xP256ExampleKeyId",
+    )
+
+    val CREATE_DID_WEB_WITH_DOMAIN_AND_PATH = CreateDidRequest(
+        method = "web",
+        keyId = "v_CW0xEd25519ExampleKeyId",
+        options = mapOf(
+            "domain" to JsonPrimitive("example.com"),
+            "path" to JsonPrimitive("/users/alice"),
+        ),
     )
 }
