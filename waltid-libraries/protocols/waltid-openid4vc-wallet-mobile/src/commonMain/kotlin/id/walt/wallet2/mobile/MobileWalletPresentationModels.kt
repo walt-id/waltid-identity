@@ -62,6 +62,7 @@ public data class MobileWalletPresentationPreviewHandle(val value: String) {
  * @property responseUri Verifier response URI to which the wallet would submit the presentation or error, when provided.
  * @property state OpenID4VP state value supplied by the verifier, when provided.
  * @property nonce OpenID4VP nonce value supplied by the verifier, when provided. May be null if the missing nonce is the validation error.
+ * @property responseEncryption Response-encryption state selected for this request.
  */
 public data class MobileWalletPresentationRequestContext(
     val clientId: String,
