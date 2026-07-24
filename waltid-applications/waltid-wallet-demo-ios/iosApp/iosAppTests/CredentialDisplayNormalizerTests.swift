@@ -919,6 +919,50 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(valuesByLabel["Payee"], "ACME Corp")
     }
 
+    func testParsesStoredIssuerDisplayFromMetadataJSON() {
+        let display = StoredCredentialMetadataParser.issuerDisplay(
+            from: """
+            {
+              "issuerDisplay": [
+                {
+                  "name": "Government Issuer",
+                  "locale": "en-US",
+                  "logo": { "uri": "https://issuer.example/logo.png", "alt_text": "Gov logo" }
+                }
+              ]
+            }
+            """
+        )
+
+        XCTAssertEqual(display?.name, "Government Issuer")
+        XCTAssertEqual(display?.logoURI, "https://issuer.example/logo.png")
+        XCTAssertEqual(display?.logoAltText, "Gov logo")
+    }
+
+    func testCredentialDetailsSurfacesIssuerDisplayFromCredentialMetadata() {
+        let credential = Credential(
+            id: "cred-1",
+            format: "vc+sd-jwt",
+            issuer: "https://issuer.example",
+            subject: "did:key:holder",
+            label: "PID",
+            addedAt: nil,
+            credentialDataJSON: #"{"given_name":"Ada"}"#,
+            metadataJSON: """
+            {
+              "issuerDisplay": [
+                { "name": "Demo Issuer", "logo": { "uri": "https://issuer.example/logo.png" } }
+              ]
+            }
+            """
+        )
+
+        let details = CredentialDisplayNormalizer.details(for: credential)
+        XCTAssertEqual(details.issuerDisplay?.name, "Demo Issuer")
+        XCTAssertEqual(details.issuerDisplay?.logoURI, "https://issuer.example/logo.png")
+        XCTAssertEqual(details.cardSummary.issuer, "Demo Issuer")
+    }
+
     private func onePixelPNGByteArrayJSON() -> String {
         "[" + onePixelPNGData.map { String($0) }.joined(separator: ",") + "]"
     }

@@ -134,6 +134,7 @@ public interface WalletBridgeDatabaseEncryptionKeyProvider {
  * @property format Credential format, for example `vc+sd-jwt` or `jwt_vc_json`.
  * @property label Optional user-facing credential label.
  * @property addedAt Optional ISO-8601 timestamp for when the credential was added.
+ * @property metadataJson Optional arbitrary metadata as a JSON string.
  */
 public data class WalletBridgeStoredCredential(
     public val id: String,
@@ -141,6 +142,7 @@ public data class WalletBridgeStoredCredential(
     public val format: String,
     public val label: String? = null,
     public val addedAt: String? = null,
+    public val metadataJson: String? = null,
 )
 
 /**
@@ -399,6 +401,7 @@ private suspend fun WalletBridgeStoredCredential.toStoredCredential(): StoredCre
         credential = credential,
         label = label,
         addedAt = addedAt?.let(Instant::parse),
+        metadata = metadataJson?.let { Json.decodeFromString(JsonObject.serializer(), it) },
     )
 }
 
@@ -408,6 +411,7 @@ private fun StoredCredential.toBridgeStoredCredential() = WalletBridgeStoredCred
     format = credential.format,
     label = label,
     addedAt = addedAt?.toString(),
+    metadataJson = metadata?.let { Json.encodeToString(JsonObject.serializer(), it) },
 )
 
 private fun DigitalCredential.serializedForBridgeStorage(): String =

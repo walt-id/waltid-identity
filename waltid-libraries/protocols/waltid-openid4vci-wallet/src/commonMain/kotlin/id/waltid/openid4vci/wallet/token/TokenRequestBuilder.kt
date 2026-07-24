@@ -226,7 +226,7 @@ class TokenRequestBuilder(
             log.error {
                 "Token request failed - Status: ${response.status.value} ${response.status.description}"
             }
-            throw Exception("Token request failed. Status: ${response.status}")
+            throw IllegalArgumentException("Token request failed. Status: ${response.status}")
         }
 
         log.trace { "Received successful token response (${response.status.value}), parsing" }

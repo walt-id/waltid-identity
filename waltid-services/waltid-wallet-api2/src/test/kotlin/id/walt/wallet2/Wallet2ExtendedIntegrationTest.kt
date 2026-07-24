@@ -44,6 +44,7 @@ import id.walt.wallet2.handlers.*
 import id.walt.wallet2.server.handlers.CreateWalletRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import id.walt.wallet2.server.handlers.WalletInfoResponse
+import id.walt.wallet2.server.models.ResolveOfferDetailedResponse
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -495,12 +496,14 @@ class Wallet2ExtendedIntegrationTest {
                         contentType(ContentType.Application.Json)
                         setBody(ResolveOfferRequest(offerUrl = Url(offerUri)))
                     }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-                        .body<ResolveOfferResult>()
+                        .body<ResolveOfferDetailedResponse>()
                 }
                 assertEquals(issuerBase, resolveResult.credentialIssuer)
                 assertEquals("$issuerBase/token", resolveResult.tokenEndpoint?.toString())
                 assertEquals(preAuthCode, resolveResult.preAuthorizedCode)
+                assertTrue(resolveResult.credentialConfigurationIds.isNotEmpty())
                 assertTrue(resolveResult.offeredCredentials.isNotEmpty())
+                assertEquals(issuerBase, resolveResult.issuer.credentialIssuer)
 
                 // -- Isolated step 2: Request token --
                 val tokenResult = testAndReturn("Isolated: request-token") {

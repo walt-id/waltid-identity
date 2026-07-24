@@ -9,8 +9,12 @@ import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlin.time.Clock
 import kotlin.time.Instant
+
+private val json = Json { ignoreUnknownKeys = true }
 
 /**
  * SQLDelight-backed implementation of [WalletCredentialStore] for mobile wallets.
@@ -49,6 +53,7 @@ public class SqlDelightCredentialStore(
             format = entry.credential.format,
             label = entry.label,
             added_at = entry.addedAt?.toEpochMilliseconds() ?: Clock.System.now().toEpochMilliseconds(),
+            metadata = entry.metadata?.let { json.encodeToString(JsonObject.serializer(), it) },
         )
     }
 
@@ -68,6 +73,7 @@ public class SqlDelightCredentialStore(
             credential = credential,
             label = label,
             addedAt = Instant.fromEpochMilliseconds(added_at),
+            metadata = metadata?.let { json.decodeFromString(JsonObject.serializer(), it) },
         )
     }
 }

@@ -42,6 +42,7 @@ internal class MobileDemoWallet(
                 label = credential.label ?: credential.format,
                 addedAt = credential.addedAt,
                 credentialDataJson = credential.credentialDataJson,
+                metadataJson = credential.metadataJson,
             )
         }
 

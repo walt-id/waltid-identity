@@ -8,6 +8,10 @@ import id.walt.wallet2.data.*
 import id.walt.wallet2.handlers.*
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.server.WalletResolver
+import id.walt.wallet2.server.models.PresentationPreviewResponse
+import id.walt.wallet2.server.models.ResolveOfferDetailedResponse
+import id.walt.wallet2.server.models.toDetailedResponse
+import id.walt.wallet2.server.models.toPreviewResponse
 import id.walt.wallet2.server.openapi.Wallet2OpenApiDocs
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
@@ -563,11 +567,16 @@ object Wallet2RouteHandler {
 
                     post("/resolve-offer", {
                         summary = "Isolated: resolve a credential offer"
+                        description =
+                            "Resolves the credential offer and returns grant/endpoint summary together with " +
+                                    "issuer display metadata and offered-credential display/claims for a " +
+                                    "consent-first UI. Does not retain a preview handle; complete issuance by " +
+                                    "re-sending the offer to the pre-authorized or authorization-code endpoints."
                         request { pathParameter<String>("walletId"); body<ResolveOfferRequest>() }
-                        response { HttpStatusCode.OK to { body<ResolveOfferResult>() } }
+                        response { HttpStatusCode.OK to { body<ResolveOfferDetailedResponse>() } }
                     }) {
                         val req = call.receive<ResolveOfferRequest>()
-                        call.respond(WalletIssuanceHandler.resolveOffer(req))
+                        call.respond(WalletIssuanceHandler.resolveOfferDetailed(req).toDetailedResponse())
                     }
 
                     post("/request-token", {
@@ -757,10 +766,9 @@ object Wallet2RouteHandler {
                     post("/build-vp-token", {
                         summary = "Build VP token from selected credentials"
                         description =
-                            "Step 3 of the manual presentation flow. " +
-                                    "Takes the resolved authorization request (from /resolve-request) and the " +
-                                    "credential IDs selected by the user (from /match-credentials-from-store), " +
-                                    "then builds and signs the vp_token. " +
+                            "Builds and signs the vp_token from an echoed authorizationRequest and the " +
+                                    "credential options (and optional claim disclosures) selected after /preview, " +
+                                    "or from selectedCredentialIds after /match-credentials-from-store. " +
                                     "Pass the result to /send-response to complete the flow."
                         request { pathParameter<String>("walletId"); body<BuildVpTokenRequest>() }
                         response { HttpStatusCode.OK to { body<BuildVpTokenResult>() } }
@@ -781,6 +789,40 @@ object Wallet2RouteHandler {
                     }) {
                         val req = call.receive<SendAuthorizationResponseRequest>()
                         call.respond(WalletPresentationHandler.sendAuthorizationResponse(req))
+                    }
+
+                    post("/preview", {
+                        summary = "Preview an OpenID4VP request for consent"
+                        description =
+                            "Resolves and validates the VP request and returns the authorization request, " +
+                                    "verifier metadata, transaction data, response-encryption state, and the wallet " +
+                                    "credentials that satisfy each DCQL query with their per-claim selective-disclosure " +
+                                    "options. Stateless: no preview handle is retained. Complete with /build-vp-token " +
+                                    "+ /send-response, or /reject with the original requestUrl. If the request is " +
+                                    "invalid but a response can still be sent, the result has valid=false and an error."
+                        request { pathParameter<String>("walletId"); body<PreviewPresentationRequest>() }
+                        response { HttpStatusCode.OK to { body<PresentationPreviewResponse>() } }
+                    }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
+                        val req = call.receive<PreviewPresentationRequest>()
+                        val result = WalletPresentationHandler.previewPresentationStateless(
+                            wallet = wallet,
+                            request = req,
+                            transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                        )
+                        call.respond(result.toPreviewResponse())
+                    }
+
+                    post("/reject", {
+                        summary = "Reject a presentation request"
+                        description =
+                            "Re-resolves the OpenID4VP request from requestUrl and returns the wallet's error " +
+                                    "response to the verifier when a response channel is available. No preview handle."
+                        request { pathParameter<String>("walletId"); body<RejectPresentationByRequestUrlRequest>() }
+                        response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
+                    }) {
+                        val req = call.receive<RejectPresentationByRequestUrlRequest>()
+                        call.respond(WalletPresentationHandler.rejectPresentationByRequestUrl(req))
                     }
                 }
             }

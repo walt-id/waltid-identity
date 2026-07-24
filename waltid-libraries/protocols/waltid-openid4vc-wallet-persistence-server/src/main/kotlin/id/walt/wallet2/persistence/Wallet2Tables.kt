@@ -96,6 +96,7 @@ object Wallet2Tables {
         val serializedCredential = text("serialized_credential")
         val label = varchar("label", 512).nullable()
         val addedAt = timestamp("added_at")
+        val metadata = text("metadata").nullable()
         override val primaryKey = PrimaryKey(storeId, id)
     }
 

@@ -204,6 +204,9 @@ public struct StoredCredential: Equatable, Identifiable, Sendable {
     /// Date the credential was added to the wallet when available.
     public let addedAt: Date?
 
+    /// Optional arbitrary metadata as a JSON string.
+    public let metadataJSON: String?
+
     /// Creates a credential entry for custom Swift credential stores.
     ///
     /// - Parameters:
@@ -214,18 +217,21 @@ public struct StoredCredential: Equatable, Identifiable, Sendable {
     ///     `jwt_vc_json`.
     ///   - label: User-facing credential label when available.
     ///   - addedAt: Date the credential was added to the wallet when available.
+    ///   - metadataJSON: Optional arbitrary metadata as a JSON string.
     public init(
         id: String,
         serializedCredential: String,
         format: String,
         label: String? = nil,
-        addedAt: Date? = nil
+        addedAt: Date? = nil,
+        metadataJSON: String? = nil
     ) {
         self.id = id
         self.serializedCredential = serializedCredential
         self.format = format
         self.label = label
         self.addedAt = addedAt
+        self.metadataJSON = metadataJSON
     }
 }
 
@@ -758,6 +764,9 @@ public struct Credential: Equatable, Identifiable, Sendable {
     /// Parsed credential data encoded as JSON for app-side display.
     public let credentialDataJSON: String
 
+    /// Optional sidecar metadata JSON persisted with the credential (e.g. `issuerDisplay`).
+    public let metadataJSON: String?
+
     /// Creates credential metadata visible to SDK consumers.
     ///
     /// - Parameters:
@@ -771,6 +780,8 @@ public struct Credential: Equatable, Identifiable, Sendable {
     ///     available.
     ///   - credentialDataJSON: Parsed credential data encoded as JSON for
     ///     app-side display.
+    ///   - metadataJSON: Optional sidecar metadata JSON persisted with the
+    ///     credential.
     public init(
         id: String,
         format: String,
@@ -778,7 +789,8 @@ public struct Credential: Equatable, Identifiable, Sendable {
         subject: String?,
         label: String?,
         addedAt: Date?,
-        credentialDataJSON: String
+        credentialDataJSON: String,
+        metadataJSON: String? = nil
     ) {
         self.id = id
         self.format = format
@@ -787,6 +799,7 @@ public struct Credential: Equatable, Identifiable, Sendable {
         self.label = label
         self.addedAt = addedAt
         self.credentialDataJSON = credentialDataJSON
+        self.metadataJSON = metadataJSON
     }
 }
 

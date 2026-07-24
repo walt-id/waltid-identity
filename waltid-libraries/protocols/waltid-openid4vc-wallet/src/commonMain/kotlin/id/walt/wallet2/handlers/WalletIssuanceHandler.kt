@@ -133,7 +133,13 @@ data class ReceiveCredentialRequest(
      * This is a manual escape hatch. Prefer passing a ClientAttestationAssembler to the handler so
      * the library can create attestation headers from authorization server metadata and the wallet key.
      */
-    val tokenRequestHeaders: Map<String, String> = emptyMap()
+    val tokenRequestHeaders: Map<String, String> = emptyMap(),
+
+    /**
+     * Optional arbitrary metadata to store alongside the received credential(s).
+     * This metadata is passed through to [StoredCredential.metadata] when credentials are stored.
+     */
+    val metadata: JsonObject? = null,
 ) : CredentialOfferSource {
     init { checkOfferSource() }
 }
@@ -224,6 +230,28 @@ data class IssuancePreview(
  */
 data class WalletOfferPreviewResult(
     val previewHandle: IssuancePreviewHandle,
+    val issuerMetadata: CredentialIssuerMetadata,
+    val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
+    val transactionCode: TxCode?,
+)
+
+/**
+ * Stateless, richer variant of [ResolveOfferResult].
+ *
+ * Combines the app-facing [ResolveOfferResult] summary (grant type, endpoints, pre-authorized code,
+ * transaction-code requirement) with the already-resolved protocol metadata so callers can render an
+ * issuer/credential preview without a second resolution and without retaining a preview handle.
+ *
+ * Unlike [WalletOfferPreviewResult] this does not create or store a preview handle, so it is suited to
+ * stateless "resolve for display" endpoints where issuance is completed by re-sending the offer.
+ *
+ * @property summary App-facing offer summary (identical to [resolveOffer]'s result).
+ * @property issuerMetadata Resolved credential issuer metadata.
+ * @property offeredCredentials Offered credential configurations resolved against [issuerMetadata].
+ * @property transactionCode Canonical OpenID4VCI transaction-code metadata, when required.
+ */
+data class WalletOfferResolution(
+    val summary: ResolveOfferResult,
     val issuerMetadata: CredentialIssuerMetadata,
     val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
     val transactionCode: TxCode?,
@@ -503,6 +531,7 @@ object WalletIssuanceHandler {
         val key = wallet.resolveKey(request.key, request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, no inline key, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
+        val requestMetadata = request.metadata
 
         val clientConfig = ClientConfiguration(
             clientId = request.clientId,
@@ -525,6 +554,9 @@ object WalletIssuanceHandler {
         val asMetadata = effectiveResolvedOffer.authorizationServerMetadata
         log.trace { "Resolved offer: issuer=${offer.credentialIssuer}, configIds=${offer.credentialConfigurationIds}" }
         onEvent(WalletSessionEvent.issuance_offer_resolved)
+
+        // Merge issuer display metadata with request metadata
+        val metadata = mergeIssuerDisplayMetadata(issuerMetadata, requestMetadata)
 
         log.debug { "Offer contains ${offeredCredentials.size} credential(s)" }
 
@@ -611,7 +643,11 @@ object WalletIssuanceHandler {
             }
 
             for (issuedCredential in rawCredentials) {
-                val entry = wallet.parseAndStore(issuedCredential, label = offeredCredential.configuration.credentialMetadata?.display?.firstOrNull()?.name)
+                val entry = wallet.parseAndStore(
+                    issuedCredential,
+                    label = offeredCredential.configuration.credentialMetadata?.display?.firstOrNull()?.name,
+                    metadata = metadata,
+                )
                 onEvent(WalletSessionEvent.issuance_credential_stored)
                 send(entry)
             }
@@ -764,6 +800,26 @@ object WalletIssuanceHandler {
      */
     suspend fun resolveOffer(request: ResolveOfferRequest): ResolveOfferResult =
         resolveIssuanceOffer(request).summary
+
+    /**
+     * Resolves an offer and returns the summary together with the resolved issuer and offered-credential
+     * metadata, without retaining a preview handle.
+     *
+     * Use this for stateless "resolve for display" flows that render an issuer/credential preview and then
+     * complete issuance by re-sending the offer (e.g. via the pre-authorized or authorization-code endpoints).
+     */
+    suspend fun resolveOfferDetailed(
+        request: ResolveOfferRequest,
+        httpClient: HttpClient = defaultHttpClient(),
+    ): WalletOfferResolution {
+        val resolved = resolveIssuanceOffer(request, httpClient)
+        return WalletOfferResolution(
+            summary = resolved.summary,
+            issuerMetadata = resolved.issuerMetadata,
+            offeredCredentials = resolved.offeredCredentials,
+            transactionCode = resolved.offer.grants?.preAuthorizedCode?.txCode,
+        )
+    }
 
     suspend fun requestToken(request: RequestTokenRequest): RequestTokenResult =
         requestToken(
@@ -960,24 +1016,57 @@ object WalletIssuanceHandler {
     private suspend fun Wallet.parseAndStore(
         issuedCredential: id.walt.openid4vci.responses.credential.IssuedCredential,
         label: String? = null,
+        metadata: JsonObject? = null,
     ): StoredCredential = parseAndStore(
         rawCredential = issuedCredential.credential.let {
             if (it is JsonPrimitive) it.content else it.toString()
         },
         label = label,
+        metadata = metadata,
     )
 
     private suspend fun Wallet.parseAndStore(
         rawCredential: String,
         label: String? = null,
+        metadata: JsonObject? = null,
     ): StoredCredential {
         val (_, parsed) = CredentialParser.detectAndParse(rawCredential)
         return StoredCredential(
             id = Uuid.random().toString(),
             credential = parsed,
             label = label,
-            addedAt = Clock.System.now()
+            addedAt = Clock.System.now(),
+            metadata = metadata,
         ).also { addCredential(it) }
+    }
+
+    /**
+     * Merges issuer display metadata from the credential issuer metadata into the request metadata.
+     * The issuer display information is stored under the "issuerDisplay" key as a JSON array.
+     */
+    private fun mergeIssuerDisplayMetadata(
+        issuerMetadata: CredentialIssuerMetadata,
+        requestMetadata: JsonObject? = null
+    ): JsonObject? {
+        val issuerDisplayArray = issuerMetadata.display?.takeIf { it.isNotEmpty() }?.let { displays ->
+            JsonArray(displays.map { display ->
+                buildJsonObject {
+                    display.name?.let { put("name", it) }
+                    display.locale?.let { put("locale", it) }
+                    display.logo?.let { logo ->
+                        put("logo", buildJsonObject {
+                            put("uri", logo.uri)
+                            logo.altText?.let { put("alt_text", it) }
+                        })
+                    }
+                }
+            })
+        } ?: return requestMetadata
+
+        val baseMetadata = requestMetadata ?: JsonObject(emptyMap())
+        return JsonObject(baseMetadata.toMutableMap().apply {
+            put("issuerDisplay", issuerDisplayArray)
+        })
     }
 
     private suspend fun buildTokenEndpointAttestationHeaders(
