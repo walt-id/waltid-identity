@@ -16,6 +16,7 @@ import id.walt.openid4vci.repository.par.InMemoryPARRepository
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
@@ -83,6 +84,23 @@ class ProviderPushedAuthorizationFlowTest {
         )
 
         assertEquals(OAuthErrorCodes.INVALID_REQUEST, result.error.error)
+    }
+
+    @Test
+    fun `provider rejects PAR without redirect uri when configured`() = runTest {
+        val provider = buildParProvider(requireRedirectUri = true)
+
+        val result = assertIs<AuthorizationRequestResult.Failure>(
+            provider.createPushedAuthorizationRequest(validPushedParameters() - "redirect_uri")
+        )
+
+        assertEquals(OAuthErrorCodes.INVALID_REQUEST, result.error.error)
+        assertEquals("redirect_uri is required", result.error.description)
+
+        val response = provider.writePushedAuthorizationError(result.error)
+        assertEquals(400, response.status)
+        assertEquals(OAuthErrorCodes.INVALID_REQUEST, response.payload["error"]?.jsonPrimitive?.content)
+        assertEquals("redirect_uri is required", response.payload["error_description"]?.jsonPrimitive?.content)
     }
 
     @Test
@@ -334,6 +352,7 @@ class ProviderPushedAuthorizationFlowTest {
     private fun buildParProvider(
         repository: InMemoryPARRepository = InMemoryPARRepository(),
         enforcePushedAuthorizationRequests: Boolean = false,
+        requireRedirectUri: Boolean = false,
         clientAuthenticationServiceConfig: ClientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(),
     ) =
         buildOAuth2Provider(
@@ -341,6 +360,7 @@ class ProviderPushedAuthorizationFlowTest {
                 pushedAuthorizationConfig = PushedAuthorizationConfig(
                     repository = repository,
                     enforcePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
+                    requireRedirectUri = requireRedirectUri,
                 ),
                 clientAuthenticationServiceConfig = clientAuthenticationServiceConfig,
             )
