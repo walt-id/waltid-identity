@@ -18,9 +18,7 @@ object AuthorizationResponseParser {
     data class AuthorizationResponse(
         val code: String,
         val state: String,
-    ) {
-        override fun toString(): String = "AuthorizationResponse(code=<redacted>, state=<redacted>)"
-    }
+    )
 
     /**
      * Represents an authorization error response
@@ -30,11 +28,7 @@ object AuthorizationResponseParser {
         val errorDescription: String? = null,
         val errorUri: String? = null,
         val state: String? = null,
-    ) {
-        override fun toString(): String =
-            "AuthorizationError(error=$error, errorDescription=${errorDescription?.let { "<redacted>" }}, " +
-                "errorUri=${errorUri?.let { "<redacted>" }}, state=${state?.let { "<redacted>" }})"
-    }
+    )
 
     /**
      * Parses an authorization response from a redirect URI

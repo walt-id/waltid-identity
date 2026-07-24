@@ -646,7 +646,7 @@ public struct WalletBootstrapResult: Equatable, Sendable {
 }
 
 /// Input used to start either OpenID4VCI issuance grant.
-public struct IssuanceRequest: Equatable, Sendable, CustomStringConvertible {
+public struct IssuanceRequest: Equatable, Sendable {
     /// Credential-offer URL to resolve.
     public let offer: URL
 
@@ -684,10 +684,6 @@ public struct IssuanceRequest: Equatable, Sendable, CustomStringConvertible {
         self.did = did
     }
 
-    /// A diagnostic description that redacts the offer and holder identifiers.
-    public var description: String {
-        "IssuanceRequest(offer: <redacted>, clientID: \(clientID), redirectURI: \(redirectURI), keyID: \(keyID == nil ? "nil" : "<redacted>"), did: \(did == nil ? "nil" : "<redacted>"))"
-    }
 }
 
 /// OAuth grant selected by the resolved credential offer.
@@ -826,7 +822,7 @@ public struct IssuanceOfferPreview: Equatable, Sendable {
 }
 
 /// Non-secret PKCE metadata bound to the authorization request.
-public struct IssuancePKCEState: Equatable, Sendable, CustomStringConvertible {
+public struct IssuancePKCEState: Equatable, Sendable {
     /// S256 challenge sent in the authorization request.
     public let codeChallenge: String
 
@@ -843,14 +839,10 @@ public struct IssuancePKCEState: Equatable, Sendable, CustomStringConvertible {
         self.codeChallengeMethod = codeChallengeMethod
     }
 
-    /// A diagnostic description that redacts PKCE secret material.
-    public var description: String {
-        "IssuancePKCEState(codeChallenge: <redacted>, codeChallengeMethod: \(codeChallengeMethod))"
-    }
 }
 
 /// Browser authorization request and callback binding for an issuance session.
-public struct IssuanceAuthorization: Equatable, Sendable, CustomStringConvertible {
+public struct IssuanceAuthorization: Equatable, Sendable {
     /// Authorization URL to open in the system browser.
     public let url: URL
 
@@ -888,14 +880,10 @@ public struct IssuanceAuthorization: Equatable, Sendable, CustomStringConvertibl
         self.pushedAuthorizationRequestUsed = pushedAuthorizationRequestUsed
     }
 
-    /// A diagnostic description that redacts authorization and PKCE values.
-    public var description: String {
-        "IssuanceAuthorization(url: <redacted>, state: <redacted>, redirectURI: \(redirectURI), pkce: \(pkce), pushedAuthorizationRequestUsed: \(pushedAuthorizationRequestUsed))"
-    }
 }
 
 /// Durable issuance session returned after resolving and validating an offer.
-public struct IssuanceSession: Equatable, Sendable, CustomStringConvertible {
+public struct IssuanceSession: Equatable, Sendable {
     /// Opaque identifier used to continue or cancel this session.
     public let id: String
 
@@ -917,11 +905,6 @@ public struct IssuanceSession: Equatable, Sendable, CustomStringConvertible {
         self.authorization = authorization
     }
 
-    /// A diagnostic description that omits authorization continuation data.
-    public var description: String {
-        let authorizationDescription = authorization == nil ? "nil" : "<redacted>"
-        return "IssuanceSession(id: \(id), offer: \(offer), authorization: \(authorizationDescription))"
-    }
 }
 
 /// Credential issuance operation that must be resumed after issuer processing.
