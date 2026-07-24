@@ -162,13 +162,12 @@ class Wallet2MoreUseCasesTest {
             credentialRequestValidator = DefaultCredentialRequestValidator(),
             credentialEndpointHandlers = CredentialEndpointHandlers()
         ))
+        val proofSupport = TestIssuerProofSupport(issuerBase, accessTokenKey)
         runBlocking {
             preAuthRepo.save(DefaultPreAuthorizedCodeRecord(
                 code = preAuthCode, clientId = null, txCode = null, txCodeValue = null,
                 grantedScopes = emptySet(), grantedAudience = emptySet(), session = session,
                 expiresAt = Clock.System.now() + 10.minutes,
-                credentialNonce = "nonce-$preAuthCode",
-                credentialNonceExpiresAt = Clock.System.now() + 10.minutes
             ))
         }
 
@@ -193,6 +192,14 @@ class Wallet2MoreUseCasesTest {
                 get("/.well-known/oauth-authorization-server") { call.respond(AuthorizationServerMetadata(issuer = issuerBase, authorizationEndpoint = "$issuerBase/authorize", tokenEndpoint = "$issuerBase/token", responseTypesSupported = setOf("code"), grantTypesSupported = setOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"))) }
                 get("/.well-known/openid-configuration") { call.respond(AuthorizationServerMetadata(issuer = issuerBase, authorizationEndpoint = "$issuerBase/authorize", tokenEndpoint = "$issuerBase/token", responseTypesSupported = setOf("code"), grantTypesSupported = setOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"))) }
                 get("/credential-offer-json") { call.respond(offer) }
+                post("/nonce") {
+                    val nonce = proofSupport.issueNonce()
+                    call.response.header(HttpHeaders.CacheControl, "no-store")
+                    call.respond(buildJsonObject {
+                        put("c_nonce", nonce.nonce)
+                        put("c_nonce_expires_in", nonce.expiresInSeconds)
+                    })
+                }
                 post("/token") {
                     val params = call.receiveParameters()
                     val code = params["pre-authorized_code"] ?: return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error","invalid_request") })
@@ -200,10 +207,8 @@ class Wallet2MoreUseCasesTest {
                     if (tr !is AccessTokenRequestResult.Success) return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error","invalid_grant") })
                     val resp = provider.createAccessTokenResponse(tr.request.withIssuer(issuerBase))
                     if (resp !is AccessTokenResponseResult.Success) return@post call.respond(HttpStatusCode.InternalServerError, buildJsonObject { put("error","server_error") })
-                    call.respond(buildJsonObject { put("access_token", resp.response.accessToken); put("token_type", "Bearer") })
-                }
-                post("/nonce") {
-                    call.respond(buildJsonObject { put("c_nonce", "nonce-$preAuthCode") })
+                    val nonce = proofSupport.issueNonce()
+                    call.respond(buildJsonObject { put("access_token", resp.response.accessToken); put("token_type", "Bearer"); put("c_nonce", nonce.nonce); put("c_nonce_expires_in", nonce.expiresInSeconds) })
                 }
                 post("/credential") {
                     val body = json.parseToJsonElement(call.receiveText()).jsonObject
@@ -222,14 +227,20 @@ class Wallet2MoreUseCasesTest {
                         return@post
                     }
 
+                    val request = cr.request.withIssuer(issuerBase)
                     val credResp = provider.createCredentialResponse(
-                        request = cr.request.withIssuer(issuerBase),
+                        request = request,
                         configuration = configuration, issuerKey = issuerKey,
                         issuerId = issuerBase, credentialData = credentialData,
-                        selectiveDisclosure = selectiveDisclosure
+                        selectiveDisclosure = selectiveDisclosure,
+                        proofValidationContext = proofSupport.validationContext(request)
                     )
-                    if (credResp !is CredentialResponseResult.Success) return@post call.respond(HttpStatusCode.InternalServerError, buildJsonObject { put("error","server_error") })
-                    val httpResp = provider.writeCredentialResponse(cr.request.withIssuer(issuerBase), credResp.response)
+                    if (credResp !is CredentialResponseResult.Success) {
+                        val failure = credResp as CredentialResponseResult.Failure
+                        val httpResp = provider.writeCredentialError(request, failure.error)
+                        return@post call.respond(HttpStatusCode.fromValue(httpResp.status), httpResp.payload)
+                    }
+                    val httpResp = provider.writeCredentialResponse(request, credResp.response)
                     call.respond(HttpStatusCode.fromValue(httpResp.status), httpResp.payload)
                 }
                 post("/deferred-credential") {
@@ -237,14 +248,20 @@ class Wallet2MoreUseCasesTest {
                     val txId = body["transaction_id"]?.jsonPrimitive?.content ?: return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error","invalid_transaction_id") })
                     val (origRequest, data) = deferredCredentials.remove(txId) ?: return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error","invalid_transaction_id") })
 
+                    val request = origRequest.withIssuer(issuerBase)
                     val credResp = provider.createCredentialResponse(
-                        request = origRequest.withIssuer(issuerBase),
+                        request = request,
                         configuration = configuration, issuerKey = issuerKey,
                         issuerId = issuerBase, credentialData = data,
-                        selectiveDisclosure = null
+                        selectiveDisclosure = null,
+                        proofValidationContext = proofSupport.validationContext(request)
                     )
-                    if (credResp !is CredentialResponseResult.Success) return@post call.respond(HttpStatusCode.InternalServerError, buildJsonObject { put("error","server_error") })
-                    val httpResp = provider.writeCredentialResponse(origRequest.withIssuer(issuerBase), credResp.response)
+                    if (credResp !is CredentialResponseResult.Success) {
+                        val failure = credResp as CredentialResponseResult.Failure
+                        val httpResp = provider.writeCredentialError(request, failure.error)
+                        return@post call.respond(HttpStatusCode.fromValue(httpResp.status), httpResp.payload)
+                    }
+                    val httpResp = provider.writeCredentialResponse(request, credResp.response)
                     call.respond(HttpStatusCode.fromValue(httpResp.status), httpResp.payload)
                 }
             }
@@ -271,7 +288,7 @@ class Wallet2MoreUseCasesTest {
 
         val sdJwtInfra = startIssuer(host, issuerPort1, sdJwtConfig,
             CredentialConfiguration(format = VciCredentialFormat.SD_JWT_VC, vct = pidVct,
-                cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
+                cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk, CryptographicBindingMethod.DidKey),
                 proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
             sdJwtCode,
             buildJsonObject { put("given_name","Alice"); put("family_name","Wallet"); put("issuing_country","AT") },
@@ -309,7 +326,7 @@ class Wallet2MoreUseCasesTest {
                     http.post("/wallet/$walletId/credentials/receive") {
                         contentType(ContentType.Application.Json)
                         setBody(ReceiveCredentialRequest(offerJson = Json.encodeToJsonElement(
-                            CredentialOffer.withPreAuthorizedCodeGrant("http://$host:$issuerPort1", listOf(sdJwtConfig), sdJwtCode)
+                            CredentialOffer.withPreAuthorizedCodeGrant(sdJwtInfra.issuerBase, listOf(sdJwtConfig), sdJwtCode)
                         ).jsonObject))
                     }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
                         .body<ReceiveCredentialResult>()
@@ -319,7 +336,7 @@ class Wallet2MoreUseCasesTest {
                     http.post("/wallet/$walletId/credentials/receive") {
                         contentType(ContentType.Application.Json)
                         setBody(ReceiveCredentialRequest(offerJson = Json.encodeToJsonElement(
-                            CredentialOffer.withPreAuthorizedCodeGrant("http://$host:$issuerPort2", listOf(jwtConfig), jwtCode)
+                            CredentialOffer.withPreAuthorizedCodeGrant(jwtInfra.issuerBase, listOf(jwtConfig), jwtCode)
                         ).jsonObject))
                     }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
                         .body<ReceiveCredentialResult>()
@@ -476,8 +493,6 @@ class Wallet2MoreUseCasesTest {
                             grantedScopes = emptySet(), grantedAudience = emptySet(),
                             session = infra.session,
                             expiresAt = kotlin.time.Clock.System.now() + 5.minutes,
-                            credentialNonce = "poll-nonce",
-                            credentialNonceExpiresAt = kotlin.time.Clock.System.now() + 5.minutes
                         )
                     )
                 }

@@ -38,14 +38,7 @@ class DefaultCredentialRequestValidator : CredentialRequestValidator {
             }
 
             // OpenID4VCI: credential_response_encryption is an optional JSON object.
-            val credentialResponseEncryption =
-                parameters.optionalSingle("credential_response_encryption")?.takeIf { it.isNotBlank() }?.let { value ->
-                    val trimmed = value.trim()
-                    if (!trimmed.startsWith("{")) {
-                        throw IllegalArgumentException("credential_response_encryption must be a JSON object")
-                    }
-                    CredentialResponseEncryptionParameters.fromJsonObject(Json.parseToJsonElement(trimmed).jsonObject)
-                }
+            val credentialResponseEncryption = parseCredentialResponseEncryption(parameters)
 
             // OAuth2: client_id is not required at the credential endpoint (access token authenticates the client).
             val clientId = parameters.optionalSingle("client_id")?.takeIf { it.isNotBlank() } ?: ""
@@ -68,6 +61,10 @@ class DefaultCredentialRequestValidator : CredentialRequestValidator {
             )
 
             CredentialRequestResult.Success(request)
+        } catch (e: InvalidCredentialResponseEncryptionParameters) {
+            CredentialRequestResult.Failure(
+                CredentialError(CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS, e.message)
+            )
         } catch (e: SerializationException) {
             CredentialRequestResult.Failure(CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, e.message))
         } catch (e: IllegalArgumentException) {
@@ -75,3 +72,25 @@ class DefaultCredentialRequestValidator : CredentialRequestValidator {
         }
     }
 }
+
+private fun parseCredentialResponseEncryption(
+    parameters: Map<String, List<String>>,
+): CredentialResponseEncryptionParameters? =
+    try {
+        parameters.optionalSingle("credential_response_encryption")?.takeIf { it.isNotBlank() }?.let { value ->
+            val trimmed = value.trim()
+            if (!trimmed.startsWith("{")) {
+                throw IllegalArgumentException("credential_response_encryption must be a JSON object")
+            }
+            CredentialResponseEncryptionParameters.fromJsonObject(Json.parseToJsonElement(trimmed).jsonObject)
+        }
+    } catch (e: SerializationException) {
+        throw InvalidCredentialResponseEncryptionParameters(e.message, e)
+    } catch (e: IllegalArgumentException) {
+        throw InvalidCredentialResponseEncryptionParameters(e.message, e)
+    }
+
+private class InvalidCredentialResponseEncryptionParameters(
+    message: String?,
+    cause: Throwable,
+) : IllegalArgumentException(message, cause)

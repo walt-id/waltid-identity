@@ -354,14 +354,13 @@ class Wallet2AdditionalUseCasesTest {
                 credentialEndpointHandlers = CredentialEndpointHandlers()
             )
         )
+        val proofSupport = TestIssuerProofSupport(issuerBase, accessTokenKey)
         runBlocking {
             preAuthRepo.save(
                 DefaultPreAuthorizedCodeRecord(
                     code = preAuthCode, clientId = null, txCode = null, txCodeValue = null,
                     grantedScopes = emptySet(), grantedAudience = emptySet(), session = session,
                     expiresAt = Clock.System.now() + 10.minutes,
-                    credentialNonce = "pres-nonce",
-                    credentialNonceExpiresAt = Clock.System.now() + 10.minutes
                 )
             )
         }
@@ -398,6 +397,14 @@ class Wallet2AdditionalUseCasesTest {
                             grantTypesSupported = setOf("urn:ietf:params:oauth:grant-type:pre-authorized_code")
                         )
                     )
+                }
+                post("/nonce") {
+                    val nonce = proofSupport.issueNonce()
+                    call.response.header(HttpHeaders.CacheControl, "no-store")
+                    call.respond(buildJsonObject {
+                        put("c_nonce", nonce.nonce)
+                        put("c_nonce_expires_in", nonce.expiresInSeconds)
+                    })
                 }
                 post("/token") {
                     val params = call.receiveParameters()
@@ -448,8 +455,9 @@ class Wallet2AdditionalUseCasesTest {
                     if (cr !is CredentialRequestResult.Success) return@post call.respond(
                         HttpStatusCode.BadRequest,
                         buildJsonObject { put("error", "invalid_proof") })
+                    val request = cr.request.withIssuer(issuerBase)
                     val credResp = provider.createCredentialResponse(
-                        request = cr.request.withIssuer(issuerBase),
+                        request = request,
                         configuration = configuration,
                         issuerKey = issuerKey,
                         issuerId = issuerBase,
@@ -459,12 +467,15 @@ class Wallet2AdditionalUseCasesTest {
                             true
                         ); put("issuing_country", "AT")
                         },
-                        selectiveDisclosure = null
+                        selectiveDisclosure = null,
+                        proofValidationContext = proofSupport.validationContext(request)
                     )
-                    if (credResp !is CredentialResponseResult.Success) return@post call.respond(
-                        HttpStatusCode.InternalServerError,
-                        buildJsonObject { put("error", "server_error") })
-                    val httpResp = provider.writeCredentialResponse(cr.request.withIssuer(issuerBase), credResp.response)
+                    if (credResp !is CredentialResponseResult.Success) {
+                        val failure = credResp as CredentialResponseResult.Failure
+                        val httpResp = provider.writeCredentialError(request, failure.error)
+                        return@post call.respond(HttpStatusCode.fromValue(httpResp.status), httpResp.payload)
+                    }
+                    val httpResp = provider.writeCredentialResponse(request, credResp.response)
                     call.respond(HttpStatusCode.fromValue(httpResp.status), httpResp.payload)
                 }
             }
@@ -672,6 +683,7 @@ class Wallet2AdditionalUseCasesTest {
                 credentialEndpointHandlers = CredentialEndpointHandlers()
             )
         )
+        val proofSupport = TestIssuerProofSupport(issuerBase, accessTokenKey)
 
         // Seed the auth code directly (simulates the result of a browser authorization)
         runBlocking {
@@ -723,6 +735,14 @@ class Wallet2AdditionalUseCasesTest {
                         )
                     )
                 }
+                post("/nonce") {
+                    val nonce = proofSupport.issueNonce()
+                    call.response.header(HttpHeaders.CacheControl, "no-store")
+                    call.respond(buildJsonObject {
+                        put("c_nonce", nonce.nonce)
+                        put("c_nonce_expires_in", nonce.expiresInSeconds)
+                    })
+                }
                 // Authorization endpoint - in real flows the user is redirected here; we just note it for test
                 get("/authorize") {
                     // Simulate issuer immediately redirecting back with a pre-seeded code
@@ -754,15 +774,13 @@ class Wallet2AdditionalUseCasesTest {
                     if (resp !is AccessTokenResponseResult.Success) return@post call.respond(
                         HttpStatusCode.InternalServerError,
                         buildJsonObject { put("error", "server_error") })
+                    val nonce = proofSupport.issueNonce()
                     call.respond(buildJsonObject {
                         put("access_token", resp.response.accessToken); put(
                         "token_type",
                         "Bearer"
                     )
                     })
-                }
-                post("/nonce") {
-                    call.respond(buildJsonObject { put("c_nonce", "auth-nonce") })
                 }
                 post("/credential") {
                     val body = json.parseToJsonElement(call.receiveText()).jsonObject
@@ -784,8 +802,9 @@ class Wallet2AdditionalUseCasesTest {
                     if (cr !is CredentialRequestResult.Success) return@post call.respond(
                         HttpStatusCode.BadRequest,
                         buildJsonObject { put("error", "invalid_proof") })
+                    val request = cr.request.withIssuer(issuerBase)
                     val credResp = provider.createCredentialResponse(
-                        request = cr.request.withIssuer(issuerBase),
+                        request = request,
                         configuration = configuration,
                         issuerKey = issuerKey,
                         issuerId = issuerBase,
@@ -795,12 +814,15 @@ class Wallet2AdditionalUseCasesTest {
                             "AuthCode"
                         ); put("issuing_country", "AT")
                         },
-                        selectiveDisclosure = null
+                        selectiveDisclosure = null,
+                        proofValidationContext = proofSupport.validationContext(request)
                     )
-                    if (credResp !is CredentialResponseResult.Success) return@post call.respond(
-                        HttpStatusCode.InternalServerError,
-                        buildJsonObject { put("error", "server_error") })
-                    val httpResp = provider.writeCredentialResponse(cr.request.withIssuer(issuerBase), credResp.response)
+                    if (credResp !is CredentialResponseResult.Success) {
+                        val failure = credResp as CredentialResponseResult.Failure
+                        val httpResp = provider.writeCredentialError(request, failure.error)
+                        return@post call.respond(HttpStatusCode.fromValue(httpResp.status), httpResp.payload)
+                    }
+                    val httpResp = provider.writeCredentialResponse(request, credResp.response)
                     call.respond(HttpStatusCode.fromValue(httpResp.status), httpResp.payload)
                 }
             }

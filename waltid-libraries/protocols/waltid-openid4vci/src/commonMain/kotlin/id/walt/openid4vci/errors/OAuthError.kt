@@ -1,10 +1,12 @@
 package id.walt.openid4vci.errors
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class OAuthError(
     val error: String,
+    @SerialName("error_description")
     val description: String? = null,
 )
 

@@ -3,10 +3,6 @@ name: Build and/or push api docker images (reusable workflow)
 on:
   workflow_call:
     inputs:
-      images:
-        description: "The json array specifying image data (built with prepare-docker workflow)"
-        required: true
-        type: string
       version:
         description: "release version"
         required: true
@@ -28,12 +24,18 @@ on:
         default: false
 
 jobs:
+  api-docker-matrix:
+    uses: ./.github/workflows/load-json.yml
+    with:
+      jsonpath: ".github/workflows/data/api-docker-matrix.json"
+
   docker:
     runs-on: ubuntu-latest
+    needs: api-docker-matrix
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.images) }}
+        include: ${{ fromJSON(needs.api-docker-matrix.outputs.json) }}
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2

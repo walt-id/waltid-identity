@@ -32,7 +32,18 @@ data class DefaultCredentialRequest(
     override val session: Session? = null,
     @SerialName("iss_claim")
     override val issClaim: String? = null,
+    @SerialName("access_token_client_id")
+    override val accessTokenClientId: String? = null,
+    @SerialName("anonymous_pre_authorized_access")
+    override val anonymousPreAuthorizedAccess: Boolean = false,
 ) : CredentialRequest {
     override fun withSession(session: Session?): CredentialRequest = copy(session = session)
     override fun withIssuer(issClaim: String?): CredentialRequest = copy(issClaim = issClaim)
+    override fun withAccessTokenClient(
+        clientId: String?,
+        anonymousPreAuthorizedAccess: Boolean,
+    ): CredentialRequest = copy(
+        accessTokenClientId = clientId,
+        anonymousPreAuthorizedAccess = anonymousPreAuthorizedAccess,
+    )
 }

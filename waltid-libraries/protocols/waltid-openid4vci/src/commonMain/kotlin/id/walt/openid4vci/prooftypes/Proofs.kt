@@ -21,16 +21,20 @@ data class Proofs(
     val diVp: List<JsonObject>? = null,
     @SerialName("attestation")
     val attestation: List<String>? = null,
-    val additional: Map<String, JsonElement> = emptyMap(),
 ) {
     companion object {
         fun fromJsonObject(json: JsonObject): Proofs {
+            val unsupportedProofTypes = json.keys - supportedProofTypes
+            require(unsupportedProofTypes.isEmpty()) {
+                "Unsupported credential proof type: ${unsupportedProofTypes.first()}"
+            }
             val jwt = json["jwt"]?.let { parseStringArray("jwt", it) }
             val diVp = json["di_vp"]?.let { parseObjectArray("di_vp", it) }
             val attestation = json["attestation"]?.let { parseStringArray("attestation", it) }
-            val additional = json.filterKeys { it != "jwt" && it != "di_vp" && it != "attestation" }
-            return Proofs(jwt = jwt, diVp = diVp, attestation = attestation, additional = additional)
+            return Proofs(jwt = jwt, diVp = diVp, attestation = attestation)
         }
+
+        private val supportedProofTypes = setOf("jwt", "di_vp", "attestation")
 
         private fun parseStringArray(name: String, element: JsonElement): List<String> {
             val array = element as? JsonArray

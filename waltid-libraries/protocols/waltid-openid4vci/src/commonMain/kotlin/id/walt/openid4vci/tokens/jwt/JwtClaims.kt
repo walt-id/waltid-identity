@@ -57,6 +57,7 @@ object JwtPayloadClaims {
     const val TYPE = "typ"
     const val AUTHORIZED_PARTY = "azp"
     const val SESSION_ID = "sid"
+    const val PRE_AUTHORIZED_CODE = "pre_authorized_code"
 }
 
 /**

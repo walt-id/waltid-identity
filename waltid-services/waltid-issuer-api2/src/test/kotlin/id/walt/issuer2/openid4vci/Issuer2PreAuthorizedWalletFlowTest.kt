@@ -20,6 +20,7 @@ import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.issuer2.testsupport.referencedOfferUri
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.offers.AuthenticationMethod
+import id.walt.openid4vci.errors.CredentialError
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
@@ -77,7 +78,10 @@ class Issuer2PreAuthorizedWalletFlowTest {
         assertRefreshToken(tokenResponse)
         assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
 
-        val proofs = walletFlow.buildJwtProofs(resolvedOffer.issuerMetadata)
+        val proofs = walletFlow.buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+        )
         val credentialResponse = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(tokenResponse.access_token)
             contentType(ContentType.Application.Json)
@@ -92,6 +96,40 @@ class Issuer2PreAuthorizedWalletFlowTest {
         assertEquals(HttpStatusCode.OK, credentialResponse.status, credentialResponse.bodyAsText())
         assertJwtVcJsonCredentialPayload(credentialResponse.body<JsonObject>())
         assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
+    }
+
+    @Test
+    fun credentialEndpointRejectsTamperedProofSignature() = testApplication {
+        val scenario = Issuer2CredentialScenarios.openBadgeCredential
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val walletFlow = Issuer2WalletFlowDriver(client)
+        val createdOffer = client.createWalletFlowCredentialOffer(
+            scenario = scenario,
+            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            txCodeMode = Issuer2TxCodeMode.NONE,
+        )
+        val resolvedOffer = walletFlow.resolve(createdOffer)
+        val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
+        val proofs = walletFlow.buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+        )
+        val tamperedProofs = proofs.copy(jwt = proofs.jwt?.map(::tamperSignature))
+
+        val credentialResponse = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
+            bearerAuth(tokenResponse.access_token)
+            contentType(ContentType.Application.Json)
+            setBody(
+                credentialRequest(
+                    credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+                    proofs = tamperedProofs,
+                )
+            )
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, credentialResponse.status, credentialResponse.bodyAsText())
+        assertEquals(CredentialErrorCodes.INVALID_PROOF, credentialResponse.body<CredentialError>().error)
     }
 
     @Test
@@ -257,5 +295,12 @@ class Issuer2PreAuthorizedWalletFlowTest {
         )
         assertIsoMdlCredentialPayload(credentialPayload)
         assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
+    }
+
+    private fun tamperSignature(jwt: String): String {
+        val parts = jwt.split(".")
+        check(parts.size == 3)
+        val replacement = if (parts[2].first() == 'A') 'B' else 'A'
+        return "${parts[0]}.${parts[1]}.$replacement${parts[2].drop(1)}"
     }
 }
