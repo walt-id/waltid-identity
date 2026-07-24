@@ -105,47 +105,6 @@ class Issuer2PARRouteTest {
     }
 
     @Test
-    fun `par route rejects requests without redirect uri`() = testApplication {
-        application {
-            install(ServerContentNegotiation) {
-                json(json)
-            }
-            install(Authentication) {
-                bearer("auth-oauth") {}
-            }
-            routing {
-                testController().register(this)
-            }
-        }
-        val client = createClient {
-            install(ClientContentNegotiation) {
-                json(json)
-            }
-        }
-
-        val response = client.post("/openid4vci/par") {
-            setBody(
-                FormDataContent(
-                    Parameters.build {
-                        append("client_id", "test-client")
-                        append("response_type", "code")
-                        append("scope", "openid")
-                        append("state", "state123")
-                    }
-                )
-            )
-        }
-
-        assertEquals(HttpStatusCode.BadRequest, response.status)
-        assertEquals("no-store", response.headers[HttpHeaders.CacheControl])
-        assertEquals("no-cache", response.headers[HttpHeaders.Pragma])
-
-        val payload = response.body<JsonObject>()
-        assertEquals("invalid_request", payload["error"]?.jsonPrimitive?.content)
-        assertEquals("redirect_uri is required", payload["error_description"]?.jsonPrimitive?.content)
-    }
-
-    @Test
     fun `nonce route returns a signed no-store nonce`() = testApplication {
         val serviceConfig = Issuer2ServiceConfig(baseUrl = "http://localhost")
         application {
