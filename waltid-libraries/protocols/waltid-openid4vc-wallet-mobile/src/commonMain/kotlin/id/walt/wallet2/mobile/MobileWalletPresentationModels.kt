@@ -50,6 +50,7 @@ public data class MobileWalletPresentationPreviewHandle(val value: String) {
     public override fun toString(): String = "MobileWalletPresentationPreviewHandle(<redacted>)"
 }
 
+/**
  * Partial request context retained when an OpenID4VP request is invalid.
  *
  * A reportable invalid request has a validated, non-blank [clientId]. Its [nonce] remains nullable
@@ -57,7 +58,7 @@ public data class MobileWalletPresentationPreviewHandle(val value: String) {
  * validated, non-null nonce through [MobileWalletPresentationRequestInfo].
  *
  * @property clientId Required OpenID4VP `client_id` value identifying the verifier.
- * @property verifierName Human-readable verifier name derived from request metadata or the client identifier, when available.
+ * @property verifierMetadata Typed verifier metadata supplied by the OpenID4VP client, when available.
  * @property responseUri Verifier response URI to which the wallet would submit the presentation or error, when provided.
  * @property state OpenID4VP state value supplied by the verifier, when provided.
  * @property nonce OpenID4VP nonce value supplied by the verifier, when provided. May be null if the missing nonce is the validation error.
