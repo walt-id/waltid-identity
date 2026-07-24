@@ -3,6 +3,7 @@ import SwiftUI
 struct ReceiveView: View {
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
+    @Environment(\.openURL) private var openURL
 
     private var receivedDetails: [CredentialDetails] {
         viewModel.receivedCredentials.map(CredentialDisplayNormalizer.details(for:))
@@ -54,6 +55,18 @@ struct ReceiveView: View {
                         WarningBannerView(message: warning)
                     }
 
+                    if !viewModel.deferredCredentials.isEmpty {
+                        Text("Pending credentials")
+                            .font(.subheadline.weight(.semibold))
+                        ForEach(viewModel.deferredCredentials, id: \.id) { credential in
+                            Button("Check \(credential.credentialConfigurationID)") {
+                                viewModel.resumeDeferredCredential(credential)
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(viewModel.isLoading)
+                        }
+                    }
+
                     if viewModel.receiveCompleted {
                         Button("New receive", action: viewModel.startNewReceiveFlow)
                             .buttonStyle(.bordered)
@@ -76,6 +89,11 @@ struct ReceiveView: View {
             .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
         }
         .navigationViewStyle(.stack)
+        .onChange(of: viewModel.authorizationRequestURL) { authorizationURL in
+            guard let authorizationURL else { return }
+            openURL(authorizationURL)
+            viewModel.authorizationRequestOpened()
+        }
     }
 
     private var detailsNavigationLink: some View {

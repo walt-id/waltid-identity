@@ -29,5 +29,5 @@ data class ClientConfiguration(
      * Validates if a redirect URI is registered for this client
      */
     fun isValidRedirectUri(uri: String): Boolean =
-        redirectUris.any { it.equals(uri, ignoreCase = true) }
+        redirectUris.any { it == uri }
 }

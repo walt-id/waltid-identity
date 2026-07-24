@@ -13,9 +13,15 @@ private class MockDemoWallet : DemoWallet {
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 
-    override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview =
+    override suspend fun startIssuance(
+        offerUrl: String,
+        redirectUri: String,
+        did: String?,
+    ): WalletDemoIssuanceSession = WalletDemoIssuanceSession(
+        id = "mock-issuance-session",
+        grant = WalletDemoIssuanceGrant.PreAuthorizedCode,
+        preview =
         WalletDemoOfferPreview(
-            previewHandle = WalletDemoIssuancePreviewHandle("mock-issuance-preview"),
             issuer = WalletDemoIssuerMetadata(
                 credentialIssuer = "https://issuer.example",
                 display = WalletDemoMetadataDisplay(
@@ -39,9 +45,13 @@ private class MockDemoWallet : DemoWallet {
                 )
             ),
             transactionCode = null,
-        )
+        ),
+    )
 
-    override suspend fun receive(previewHandle: WalletDemoIssuancePreviewHandle, txCode: String?): List<String> {
+    override suspend fun continuePreAuthorizedIssuance(
+        sessionId: String,
+        transactionCode: String?,
+    ): WalletDemoIssuanceOutcome {
         credentials = listOf(
             WalletDemoCredential(
                 id = "mock-credential",
@@ -53,10 +63,19 @@ private class MockDemoWallet : DemoWallet {
                 credentialDataJson = WalletDemoSampleCredentialData.credentialDataJsonWithPortrait,
             )
         )
-        return credentials.map { it.id }
+        return WalletDemoIssuanceOutcome.Stored(credentials.map { it.id })
     }
 
-    override suspend fun discardIssuancePreview(previewHandle: WalletDemoIssuancePreviewHandle) = Unit
+    override suspend fun continueAuthorizationIssuance(
+        sessionId: String,
+        callbackUri: String,
+    ): WalletDemoIssuanceOutcome = WalletDemoIssuanceOutcome.Failed("Mock issuer does not use authorization code")
+
+    override suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome =
+        WalletDemoIssuanceOutcome.Cancelled
+
+    override suspend fun resumeDeferredIssuance(deferredCredentialId: String) =
+        WalletDemoIssuanceOutcome.Failed("No mock deferred credential")
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
         WalletDemoOperationResult.Success("Mock presentation sent")

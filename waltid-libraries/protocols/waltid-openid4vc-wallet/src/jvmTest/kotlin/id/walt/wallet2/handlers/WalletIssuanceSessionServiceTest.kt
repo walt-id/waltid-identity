@@ -1,0 +1,1084 @@
+package id.walt.wallet2.handlers
+
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.credentials.examples.MdocsExamples
+import id.walt.credentials.examples.SdJwtExamples
+import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.WalletCredentialStore
+import id.walt.wallet2.data.WalletDidEntry
+import id.walt.wallet2.stores.inmemory.InMemoryDidStore
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.MockRequestHandleScope
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.respondError
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.HttpRequestData
+import io.ktor.client.request.HttpResponseData
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
+import io.ktor.http.content.OutgoingContent
+import io.ktor.http.headersOf
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+
+class WalletIssuanceSessionServiceTest {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    @Test
+    fun authorizationCallbackIsBoundToSessionStateAndRedirect() = runTest {
+        var tokenCalls = 0
+        val service = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata())
+                TOKEN_ENDPOINT -> {
+                    tokenCalls += 1
+                    jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                }
+                CREDENTIAL_ENDPOINT -> jsonResponse(
+                    """{"transaction_id":"transaction-1","interval":5}""",
+                    HttpStatusCode.Accepted,
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+
+        val first = service.start(authRequest())
+        val second = service.start(authRequest())
+        val crossBound = service.continueAuthorization(
+            WalletIssuanceAuthorizationCallback(
+                sessionId = second.id,
+                callbackUri = callback(first, code = "cross-bound"),
+            )
+        )
+        assertEquals(WalletIssuanceErrorCode.INVALID_CALLBACK, assertIs<WalletIssuanceOutcome.Failed>(crossBound).error.code)
+        assertEquals(0, tokenCalls)
+
+        val wrongRedirect = service.start(authRequest())
+        val wrongRedirectResult = service.continueAuthorization(
+            WalletIssuanceAuthorizationCallback(
+                sessionId = wrongRedirect.id,
+                callbackUri = "other.wallet:/callback?code=code&state=${wrongRedirect.authorization!!.state}",
+            )
+        )
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_CALLBACK,
+            assertIs<WalletIssuanceOutcome.Failed>(wrongRedirectResult).error.code,
+        )
+        assertEquals(0, tokenCalls)
+
+        val accepted = service.start(authRequest())
+        val result = service.continueAuthorization(
+            WalletIssuanceAuthorizationCallback(accepted.id, callback(accepted, "accepted-code"))
+        )
+        val deferred = assertIs<WalletIssuanceOutcome.Deferred>(result)
+        assertEquals("test-credential", deferred.credentials.single().credentialConfigurationId)
+        assertEquals(1, tokenCalls)
+
+        val replay = service.continueAuthorization(
+            WalletIssuanceAuthorizationCallback(accepted.id, callback(accepted, "replayed-code"))
+        )
+        assertEquals(WalletIssuanceErrorCode.INVALID_SESSION, assertIs<WalletIssuanceOutcome.Failed>(replay).error.code)
+        assertEquals(1, tokenCalls)
+    }
+
+    @Test
+    fun authorizationDenialAndExplicitCancellationReturnTypedCancellation() = runTest {
+        val service = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata())
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+
+        val denied = service.start(authRequest())
+        assertIs<WalletIssuanceOutcome.Cancelled>(
+            service.continueAuthorization(
+                WalletIssuanceAuthorizationCallback(
+                    denied.id,
+                    "wallet.example:/callback?error=access_denied&state=${denied.authorization!!.state}",
+                )
+            )
+        )
+        val cancelled = service.start(authRequest())
+        assertIs<WalletIssuanceOutcome.Cancelled>(service.cancel(cancelled.id))
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_SESSION,
+            assertIs<WalletIssuanceOutcome.Failed>(service.cancel(cancelled.id)).error.code,
+        )
+    }
+
+    @Test
+    fun authorizationCallbackHonorsAuthorizationServerIssuerMetadata() = runTest {
+        val service = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(responseIssuer = true))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                CREDENTIAL_ENDPOINT -> jsonResponse(
+                    """{"transaction_id":"transaction-1"}""",
+                    HttpStatusCode.Accepted,
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+
+        val missing = service.start(authRequest())
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_CALLBACK,
+            assertIs<WalletIssuanceOutcome.Failed>(
+                service.continueAuthorization(
+                    WalletIssuanceAuthorizationCallback(missing.id, callback(missing, "missing-iss"))
+                )
+            ).error.code,
+        )
+
+        val mismatched = service.start(authRequest())
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_CALLBACK,
+            assertIs<WalletIssuanceOutcome.Failed>(
+                service.continueAuthorization(
+                    WalletIssuanceAuthorizationCallback(
+                        mismatched.id,
+                        "${callback(mismatched, "wrong-iss")}&iss=https%3A%2F%2Fother.example",
+                    )
+                )
+            ).error.code,
+        )
+
+        val accepted = service.start(authRequest())
+        assertIs<WalletIssuanceOutcome.Deferred>(
+            service.continueAuthorization(
+                WalletIssuanceAuthorizationCallback(
+                    accepted.id,
+                    "${callback(accepted, "accepted")}&iss=https%3A%2F%2Fissuer.example",
+                )
+            )
+        )
+    }
+
+    @Test
+    fun strictProofPathUsesNonceEndpointSelectedKeyAndDpop() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        var nonceCalls = 0
+        var credentialCalls = 0
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = true))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(dpop = true, authorizationCode = false))
+                TOKEN_ENDPOINT -> {
+                    assertNotNull(request.headers["DPoP"])
+                    jsonResponse(
+                        """{"access_token":"access-token","token_type":"DPoP","c_nonce":"legacy-token-nonce"}"""
+                    )
+                }
+                NONCE_ENDPOINT -> {
+                    nonceCalls += 1
+                    assertEquals(null, request.headers[HttpHeaders.Authorization])
+                    assertEquals(null, request.headers["DPoP"])
+                    jsonResponse("""{"c_nonce":"endpoint-nonce"}""")
+                }
+                CREDENTIAL_ENDPOINT -> {
+                    credentialCalls += 1
+                    val body = Json.parseToJsonElement(request.bodyText()).jsonObject
+                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proofHeader = jwtPart(proof, 0)
+                    val proofPayload = jwtPart(proof, 1)
+                    assertEquals("endpoint-nonce", proofPayload["nonce"]?.jsonPrimitive?.content)
+                    assertEquals(ISSUER, proofPayload["aud"]?.jsonPrimitive?.content)
+                    assertEquals(
+                        Json.parseToJsonElement(key.getPublicKey().exportJWK()).jsonObject,
+                        proofHeader["jwk"],
+                    )
+                    val dpop = assertNotNull(request.headers["DPoP"])
+                    val dpopPayload = jwtPart(dpop, 1)
+                    assertNotNull(dpopPayload["ath"])
+                    if (credentialCalls == 1) {
+                        respond(
+                            content = "{}",
+                            status = HttpStatusCode.Unauthorized,
+                            headers = headersOf(
+                                HttpHeaders.ContentType to listOf("application/json"),
+                                HttpHeaders.WWWAuthenticate to listOf("DPoP error=\"use_dpop_nonce\""),
+                                "DPoP-Nonce" to listOf("resource-nonce"),
+                            ),
+                        )
+                    } else {
+                        assertEquals("resource-nonce", dpopPayload["nonce"]?.jsonPrimitive?.content)
+                        jsonResponse(
+                            """{"transaction_id":"transaction-1","interval":7}""",
+                            HttpStatusCode.Accepted,
+                        )
+                    }
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(Wallet("test", staticKey = key), httpClient = client)
+        val session = service.start(preAuthorizedRequest())
+        val result = service.continuePreAuthorized(session.id)
+
+        val deferred = assertIs<WalletIssuanceOutcome.Deferred>(result)
+        assertEquals(7, deferred.credentials.single().intervalSeconds)
+        assertEquals(1, nonceCalls)
+        assertEquals(2, credentialCalls)
+        assertIs<WalletIssuanceOutcome.Cancelled>(service.cancel(deferred.sessionId))
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_SESSION,
+            assertIs<WalletIssuanceOutcome.Failed>(
+                service.resumeDeferred(deferred.credentials.single().id)
+            ).error.code,
+        )
+    }
+
+    @Test
+    fun proofRequiredWithoutNonceEndpointOmitsNonceAndIgnoresTokenNonce() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        var credentialCalls = 0
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = true, nonceEndpoint = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse(
+                    """{"access_token":"must-not-be-a-proof-nonce","token_type":"Bearer","c_nonce":"legacy-token-nonce"}"""
+                )
+                CREDENTIAL_ENDPOINT -> {
+                    credentialCalls += 1
+                    val body = Json.parseToJsonElement(request.bodyText()).jsonObject
+                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proofPayload = jwtPart(proof, 1)
+                    assertEquals(null, proofPayload["nonce"])
+                    assertEquals(ISSUER, proofPayload["aud"]?.jsonPrimitive?.content)
+                    jsonResponse(
+                        """{"transaction_id":"transaction-1","interval":7}""",
+                        HttpStatusCode.Accepted,
+                    )
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(Wallet("test", staticKey = key), httpClient = client)
+
+        val session = service.start(preAuthorizedRequest())
+        assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
+        assertEquals(1, credentialCalls)
+    }
+
+    @Test
+    fun authorizationSessionSurvivesServiceRecreation() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val records = RecordingSessionStore()
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata())
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                CREDENTIAL_ENDPOINT -> jsonResponse(
+                    """{"transaction_id":"transaction-1","interval":5}""",
+                    HttpStatusCode.Accepted,
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val wallet = Wallet("durable", staticKey = key)
+        val startedBy = WalletIssuanceSessionService(wallet, sessionStore = records, httpClient = client)
+        val session = startedBy.start(authRequest())
+        assertTrue("codeVerifier" !in Json.encodeToString(session))
+
+        val resumedBy = WalletIssuanceSessionService(wallet, sessionStore = records, httpClient = client)
+        val outcome = resumedBy.continueAuthorization(
+            WalletIssuanceAuthorizationCallback(session.id, callback(session, "after-recreation"))
+        )
+
+        assertIs<WalletIssuanceOutcome.Deferred>(outcome)
+        assertTrue(records.records.values.any {
+            it.kind == WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL && it.sessionId == session.id
+        })
+        assertTrue(records.records.values.none {
+            it.kind == WalletIssuanceSessionRecordKind.ACTIVE_SESSION && it.sessionId == session.id
+        })
+    }
+
+    @Test
+    fun cancellationWhilePersistingTransitionInvalidatesSession() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val records = BlockingTransitionSessionStore()
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            wallet = Wallet("transition-cancellation", staticKey = key),
+            sessionStore = records,
+            httpClient = client,
+        )
+        val session = service.start(preAuthorizedRequest())
+
+        val continuation = async { service.continuePreAuthorized(session.id) }
+        records.processingWriteStarted.await()
+        continuation.cancel()
+
+        assertFailsWith<CancellationException> { continuation.await() }
+        assertTrue(records.records.isEmpty())
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_SESSION,
+            assertIs<WalletIssuanceOutcome.Failed>(service.continuePreAuthorized(session.id)).error.code,
+        )
+    }
+
+    @Test
+    fun processingSessionIsDiscardedAfterServiceRecreation() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val records = RecordingSessionStore()
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val wallet = Wallet("interrupted-transition", staticKey = key)
+        val session = WalletIssuanceSessionService(wallet, sessionStore = records, httpClient = client)
+            .start(preAuthorizedRequest())
+        val active = records.records.values.single()
+        val processingPayload = active.payload.replace("\"state\":\"READY\"", "\"state\":\"PROCESSING\"")
+        assertTrue(processingPayload != active.payload)
+        records.records[active.id] = active.copy(payload = processingPayload)
+
+        val restored = WalletIssuanceSessionService(wallet, sessionStore = records, httpClient = client)
+        val outcome = restored.continuePreAuthorized(session.id)
+
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_SESSION,
+            assertIs<WalletIssuanceOutcome.Failed>(outcome).error.code,
+        )
+        assertTrue(records.records.isEmpty())
+    }
+
+    @Test
+    fun clearSessionsRemovesActiveAndDeferredContinuations() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val records = RecordingSessionStore()
+        var authorizationServerMetadataCalls = 0
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(
+                    authorizationServerMetadata(authorizationCode = authorizationServerMetadataCalls++ == 0)
+                )
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                CREDENTIAL_ENDPOINT -> jsonResponse(
+                    """{"transaction_id":"transaction-1","interval":5}""",
+                    HttpStatusCode.Accepted,
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            wallet = Wallet("clear-sessions", staticKey = key),
+            sessionStore = records,
+            httpClient = client,
+        )
+        val authorization = service.start(authRequest())
+        val preAuthorized = service.start(preAuthorizedRequest())
+        val deferred = assertIs<WalletIssuanceOutcome.Deferred>(
+            service.continuePreAuthorized(preAuthorized.id)
+        )
+        assertEquals(
+            setOf(
+                WalletIssuanceSessionRecordKind.ACTIVE_SESSION,
+                WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL,
+            ),
+            records.records.values.map { it.kind }.toSet(),
+        )
+
+        service.clearSessions()
+
+        assertTrue(records.records.isEmpty())
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_SESSION,
+            assertIs<WalletIssuanceOutcome.Failed>(
+                service.continueAuthorization(
+                    WalletIssuanceAuthorizationCallback(
+                        authorization.id,
+                        callback(authorization, "after-clear"),
+                    )
+                )
+            ).error.code,
+        )
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_SESSION,
+            assertIs<WalletIssuanceOutcome.Failed>(
+                service.resumeDeferred(deferred.credentials.single().id)
+            ).error.code,
+        )
+    }
+
+    @Test
+    fun deferredCredentialCanBeResumedAndStored() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val credential = key.signJws(
+            """{"iss":"https://issuer.example","sub":"did:key:holder","vc":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential","TestCredential"],"credentialSubject":{"id":"did:key:holder"}}}"""
+                .encodeToByteArray()
+        )
+        val credentialStore = RecordingCredentialStore()
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                CREDENTIAL_ENDPOINT -> jsonResponse(
+                    """{"transaction_id":"transaction-1","interval":1}""",
+                    HttpStatusCode.Accepted,
+                )
+                DEFERRED_ENDPOINT -> jsonResponse(
+                    """{"credentials":[{"credential":${Json.encodeToString(credential)}}]}"""
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            Wallet("deferred", staticKey = key, credentialStores = listOf(credentialStore)),
+            httpClient = client,
+        )
+
+        val session = service.start(preAuthorizedRequest())
+        val deferred = assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
+        val stored = assertIs<WalletIssuanceOutcome.Stored>(
+            service.resumeDeferred(deferred.credentials.single().id)
+        )
+
+        assertEquals(stored.credentialIds, credentialStore.credentials.map { it.id })
+    }
+
+    @Test
+    fun failedMultiCredentialRequestDoesNotStrandDeferredContinuation() = runTest {
+        val records = RecordingSessionStore()
+        var credentialCalls = 0
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(
+                    issuerMetadata(false, configurationIds = listOf("first", "second"))
+                )
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                CREDENTIAL_ENDPOINT -> {
+                    credentialCalls += 1
+                    if (credentialCalls == 1) {
+                        jsonResponse("""{"transaction_id":"transaction-1"}""", HttpStatusCode.Accepted)
+                    } else {
+                        jsonResponse("""{"error":"invalid_credential_request"}""", HttpStatusCode.BadRequest)
+                    }
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            Wallet("atomic", staticKey = key),
+            sessionStore = records,
+            httpClient = client,
+        )
+        val request = preAuthorizedRequest(configurationIds = listOf("first", "second"))
+
+        assertIs<WalletIssuanceOutcome.Failed>(
+            service.continuePreAuthorized(service.start(request).id)
+        )
+        assertEquals(2, credentialCalls)
+        assertTrue(records.records.values.none { it.kind == WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL })
+    }
+
+    @Test
+    fun cancellationWhilePublishingResolvedEventDoesNotStrandSession() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val records = RecordingSessionStore()
+        val eventStarted = CompletableDeferred<Unit>()
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            wallet = Wallet("event-cancellation", staticKey = key),
+            onEvent = {
+                eventStarted.complete(Unit)
+                kotlinx.coroutines.awaitCancellation()
+            },
+            sessionStore = records,
+            httpClient = client,
+        )
+
+        val start = async { service.start(preAuthorizedRequest()) }
+        eventStarted.await()
+        start.cancel()
+
+        assertFailsWith<CancellationException> { start.await() }
+        assertTrue(records.records.isEmpty())
+    }
+
+    @Test
+    fun coroutineCancellationIsNotConvertedIntoAProtocolFailure() = runTest {
+        val tokenStarted = CompletableDeferred<Unit>()
+        val service = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> {
+                    tokenStarted.complete(Unit)
+                    kotlinx.coroutines.awaitCancellation()
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val session = service.start(preAuthorizedRequest())
+        val continuation = async { service.continuePreAuthorized(session.id) }
+        tokenStarted.await()
+        continuation.cancel()
+
+        assertFailsWith<CancellationException> { continuation.await() }
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_SESSION,
+            assertIs<WalletIssuanceOutcome.Failed>(service.continuePreAuthorized(session.id)).error.code,
+        )
+    }
+
+    @Test
+    fun proofPrefersHolderDidBoundToSelectedKey() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val holderDid = "did:jwk:holder"
+        val holderDidKeyId = "$holderDid#0"
+        val didStore = InMemoryDidStore().also { store ->
+            store.addDid(
+                WalletDidEntry(
+                    did = holderDid,
+                    document = didDocument(holderDid, holderDidKeyId, key),
+                )
+            )
+        }
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(
+                    issuerMetadata(proofRequired = true)
+                        .replace(
+                            "\"cryptographic_binding_methods_supported\":[\"jwk\"]",
+                            "\"cryptographic_binding_methods_supported\":[\"jwk\",\"did:jwk\"]",
+                        )
+                )
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                NONCE_ENDPOINT -> jsonResponse("""{"c_nonce":"endpoint-nonce"}""")
+                CREDENTIAL_ENDPOINT -> {
+                    val body = Json.parseToJsonElement(request.bodyText()).jsonObject
+                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proofHeader = jwtPart(proof, 0)
+                    assertEquals(holderDidKeyId, proofHeader["kid"]?.jsonPrimitive?.content)
+                    assertEquals(null, proofHeader["jwk"])
+                    jsonResponse("""{"transaction_id":"transaction-1"}""", HttpStatusCode.Accepted)
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            wallet = Wallet("test", staticKey = key, didStore = didStore),
+            httpClient = client,
+        )
+
+        val session = service.start(preAuthorizedRequest().copy(did = holderDid))
+        assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
+    }
+
+    @Test
+    fun proofNeverUsesHolderDidBoundToAnotherKey() = runTest {
+        val selectedKey = JWKKey.generate(KeyType.secp256r1)
+        val otherKey = JWKKey.generate(KeyType.secp256r1)
+        val holderDid = "did:jwk:other-holder"
+        val didStore = InMemoryDidStore().also { store ->
+            store.addDid(
+                WalletDidEntry(
+                    did = holderDid,
+                    document = didDocument(holderDid, "$holderDid#0", otherKey),
+                )
+            )
+        }
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(
+                    issuerMetadata(proofRequired = true)
+                        .replace(
+                            "\"cryptographic_binding_methods_supported\":[\"jwk\"]",
+                            "\"cryptographic_binding_methods_supported\":[\"jwk\",\"did:jwk\"]",
+                        )
+                )
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                NONCE_ENDPOINT -> jsonResponse("""{"c_nonce":"endpoint-nonce"}""")
+                CREDENTIAL_ENDPOINT -> {
+                    val body = Json.parseToJsonElement(request.bodyText()).jsonObject
+                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proofHeader = jwtPart(proof, 0)
+                    assertEquals(null, proofHeader["kid"])
+                    assertEquals(
+                        Json.parseToJsonElement(selectedKey.getPublicKey().exportJWK()).jsonObject,
+                        proofHeader["jwk"],
+                    )
+                    jsonResponse("""{"transaction_id":"transaction-1"}""", HttpStatusCode.Accepted)
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            wallet = Wallet("test", staticKey = selectedKey, didStore = didStore),
+            httpClient = client,
+        )
+
+        val session = service.start(preAuthorizedRequest().copy(did = holderDid))
+        assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
+    }
+
+    @Test
+    fun immediateCredentialIsParsedStoredAndReturned() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val credential = key.signJws(
+            """{"iss":"https://issuer.example","sub":"did:key:holder","vc":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential","TestCredential"],"credentialSubject":{"id":"did:key:holder","given_name":"Ada"}}}"""
+                .encodeToByteArray()
+        )
+        val store = RecordingCredentialStore()
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                CREDENTIAL_ENDPOINT -> jsonResponse(
+                    buildJsonObject {
+                        put(
+                            "credentials",
+                            Json.parseToJsonElement("""[{"credential":${Json.encodeToString(credential)}}]"""),
+                        )
+                    }.toString()
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            Wallet("test", staticKey = key, credentialStores = listOf(store)),
+            httpClient = client,
+        )
+
+        val session = service.start(preAuthorizedRequest())
+        val result = assertIs<WalletIssuanceOutcome.Stored>(service.continuePreAuthorized(session.id))
+
+        assertEquals(1, result.credentialIds.size)
+        assertEquals(result.credentialIds, store.credentials.map { it.id })
+    }
+
+    @Test
+    fun immediateResponseStoresW3cJwtSdJwtVcAndMdocWithoutAppParsing() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val w3cJwt = key.signJws(
+            """{"iss":"https://issuer.example","sub":"did:key:holder","vc":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential","TestCredential"],"credentialSubject":{"id":"did:key:holder"}}}"""
+                .encodeToByteArray()
+        )
+        val issuedCredentials = listOf(
+            w3cJwt,
+            SdJwtExamples.sdJwtVcSignedExample2,
+            MdocsExamples.mdocsExampleBase64Url,
+        )
+        val store = RecordingCredentialStore()
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                CREDENTIAL_ENDPOINT -> jsonResponse(
+                    buildJsonObject {
+                        put("credentials", buildJsonArray {
+                            issuedCredentials.forEach { credential ->
+                                add(buildJsonObject { put("credential", credential) })
+                            }
+                        })
+                    }.toString()
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            Wallet("test", staticKey = key, credentialStores = listOf(store)),
+            httpClient = client,
+        )
+
+        val session = service.start(preAuthorizedRequest())
+        val result = assertIs<WalletIssuanceOutcome.Stored>(service.continuePreAuthorized(session.id))
+
+        assertEquals(3, result.credentialIds.size)
+        assertEquals(3, store.credentials.size)
+        assertEquals(setOf("jwt_vc_json", "dc+sd-jwt", "mso_mdoc"), store.credentials.map { it.credential.format }.toSet())
+    }
+
+    @Test
+    fun advertisedDpopUsesTheTokenResponseToSelectResourceProtection() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = true))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(dpop = true, authorizationCode = false))
+                TOKEN_ENDPOINT -> {
+                    assertNotNull(request.headers["DPoP"])
+                    jsonResponse("""{"access_token":"access-token","token_type":"Bearer"}""")
+                }
+                NONCE_ENDPOINT -> jsonResponse("""{"c_nonce":"endpoint-nonce"}""")
+                CREDENTIAL_ENDPOINT -> {
+                    assertEquals("Bearer access-token", request.headers[HttpHeaders.Authorization])
+                    assertEquals(null, request.headers["DPoP"])
+                    assertNotNull(Json.parseToJsonElement(request.bodyText()).jsonObject["proofs"])
+                    jsonResponse(
+                        """{"transaction_id":"transaction-1","interval":7}""",
+                        HttpStatusCode.Accepted,
+                    )
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(Wallet("test", staticKey = key), httpClient = client)
+
+        val session = service.start(preAuthorizedRequest())
+        assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
+    }
+
+    @Test
+    fun dpopIsNotAppliedToAnUnadvertisedGrant() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(
+                    authorizationServerMetadata(
+                        dpop = true,
+                        authorizationCode = false,
+                        advertiseSelectedGrant = false,
+                    )
+                )
+                TOKEN_ENDPOINT -> {
+                    assertEquals(null, request.headers["DPoP"])
+                    jsonResponse("""{"access_token":"access-token","token_type":"Bearer"}""")
+                }
+                CREDENTIAL_ENDPOINT -> {
+                    assertEquals("Bearer access-token", request.headers[HttpHeaders.Authorization])
+                    assertEquals(null, request.headers["DPoP"])
+                    jsonResponse(
+                        """{"transaction_id":"transaction-1","interval":7}""",
+                        HttpStatusCode.Accepted,
+                    )
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(Wallet("test", staticKey = key), httpClient = client)
+
+        val session = service.start(preAuthorizedRequest())
+        assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
+    }
+
+    @Test
+    fun rejectedTransactionCodeDoesNotConsumeTheSession() = runTest {
+        var tokenCalls = 0
+        val service = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> {
+                    tokenCalls += 1
+                    if (request.bodyText().contains("tx_code=wrong")) {
+                        jsonResponse("""{"error":"invalid_grant"}""", HttpStatusCode.BadRequest)
+                    } else {
+                        assertTrue(request.bodyText().contains("tx_code=correct"))
+                        jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                    }
+                }
+                CREDENTIAL_ENDPOINT -> jsonResponse(
+                    """{"transaction_id":"transaction-1","interval":5}""",
+                    HttpStatusCode.Accepted,
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val request = WalletIssuanceSessionRequest(
+            offerJson = buildJsonObject {
+                put("credential_issuer", ISSUER)
+                put("credential_configuration_ids", Json.parseToJsonElement("""["test-credential"]"""))
+                put(
+                    "grants",
+                    Json.parseToJsonElement(
+                        """{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"pre-code","tx_code":{"input_mode":"text","length":7}}}"""
+                    ),
+                )
+            },
+            clientId = "wallet-client",
+            redirectUri = Url(REDIRECT_URI),
+        )
+
+        val session = service.start(request)
+        val rejected = assertIs<WalletIssuanceOutcome.Failed>(
+            service.continuePreAuthorized(session.id, "wrong")
+        )
+        assertEquals(WalletIssuanceErrorCode.ISSUER_RESPONSE, rejected.error.code)
+        assertIs<WalletIssuanceOutcome.Deferred>(
+            service.continuePreAuthorized(session.id, "correct")
+        )
+        assertEquals(2, tokenCalls)
+    }
+
+    @Test
+    fun advertisedParIsUsedForAuthorizationRequest() = runTest {
+        var parCalls = 0
+        val service = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(
+                    """
+                    {
+                      "issuer":"$ISSUER",
+                      "authorization_endpoint":"$AUTHORIZATION_ENDPOINT",
+                      "token_endpoint":"$TOKEN_ENDPOINT",
+                      "pushed_authorization_request_endpoint":"$PAR_ENDPOINT",
+                      "require_pushed_authorization_requests":true,
+                      "response_types_supported":["code"],
+                      "grant_types_supported":["authorization_code"]
+                    }
+                    """.trimIndent()
+                )
+                PAR_ENDPOINT -> {
+                    parCalls += 1
+                    assertTrue(request.bodyText().contains("code_challenge="))
+                    jsonResponse("""{"request_uri":"urn:example:par:1","expires_in":60}""")
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+
+        val session = service.start(authRequest())
+
+        assertEquals(1, parCalls)
+        assertTrue(session.authorization!!.pushedAuthorizationRequestUsed)
+        assertEquals("urn:example:par:1", Url(session.authorization.url).parameters["request_uri"])
+    }
+
+    @Test
+    fun rejectsMismatchedIssuerMetadata() = runTest {
+        val mismatched = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(
+                    issuerMetadata(proofRequired = false).replace(
+                        "\"credential_issuer\":\"$ISSUER\"",
+                        "\"credential_issuer\":\"https://other-issuer.example\"",
+                    )
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        assertFailsWith<IllegalArgumentException> { mismatched.start(preAuthorizedRequest()) }
+    }
+
+    private suspend fun service(
+        handler: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData,
+    ): WalletIssuanceSessionService {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        return WalletIssuanceSessionService(Wallet("test", staticKey = key), httpClient = client(handler))
+    }
+
+    private fun client(
+        handler: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData,
+    ) = HttpClient(MockEngine) {
+        engine { addHandler(handler) }
+        install(ContentNegotiation) { json(json) }
+    }
+
+    private fun MockRequestHandleScope.jsonResponse(
+        content: String,
+        status: HttpStatusCode = HttpStatusCode.OK,
+    ) = respond(
+        content = content,
+        status = status,
+        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+    )
+
+    private fun authRequest() = WalletIssuanceSessionRequest(
+        offerJson = buildJsonObject {
+            put("credential_issuer", ISSUER)
+            put("credential_configuration_ids", Json.parseToJsonElement("""["test-credential"]"""))
+            put("grants", Json.parseToJsonElement("""{"authorization_code":{"issuer_state":"issuer-state"}}"""))
+        },
+        clientId = "wallet-client",
+        redirectUri = Url(REDIRECT_URI),
+    )
+
+    private fun preAuthorizedRequest(
+        configurationIds: List<String> = listOf("test-credential"),
+    ) = WalletIssuanceSessionRequest(
+        offerJson = buildJsonObject {
+            put("credential_issuer", ISSUER)
+            put("credential_configuration_ids", buildJsonArray {
+                configurationIds.forEach { add(Json.parseToJsonElement(Json.encodeToString(it))) }
+            })
+            put(
+                "grants",
+                Json.parseToJsonElement(
+                    """{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"pre-code"}}"""
+                ),
+            )
+        },
+        clientId = "wallet-client",
+        redirectUri = Url(REDIRECT_URI),
+    )
+
+    private fun requestWithIssuer(issuer: String): WalletIssuanceSessionRequest =
+        preAuthorizedRequest().copy(
+            offerJson = Json.parseToJsonElement(
+                preAuthorizedRequest().offerJson.toString().replace(ISSUER, issuer)
+            ).jsonObject,
+        )
+
+    private fun callback(session: WalletIssuanceSession, code: String) =
+        "$REDIRECT_URI?code=$code&state=${session.authorization!!.state}"
+
+    private fun issuerMetadata(
+        proofRequired: Boolean,
+        nonceEndpoint: Boolean = true,
+        configurationIds: List<String> = listOf("test-credential"),
+    ): String {
+        val configurations = configurationIds.joinToString(",") { id ->
+            """
+            "$id":{
+              "format":"jwt_vc_json",
+              "credential_definition":{"type":["VerifiableCredential","TestCredential"]}
+              ${if (proofRequired) ",\"cryptographic_binding_methods_supported\":[\"jwk\"],\"proof_types_supported\":{\"jwt\":{\"proof_signing_alg_values_supported\":[\"ES256\"]}}" else ""}
+            }
+            """.trimIndent()
+        }
+        return """
+        {
+          "credential_issuer":"$ISSUER",
+          "credential_endpoint":"$CREDENTIAL_ENDPOINT",
+          ${if (nonceEndpoint) "\"nonce_endpoint\":\"$NONCE_ENDPOINT\"," else ""}
+          "deferred_credential_endpoint":"$DEFERRED_ENDPOINT",
+          "credential_configurations_supported":{
+            $configurations
+          }
+        }
+        """.trimIndent()
+    }
+
+    private fun authorizationServerMetadata(
+        dpop: Boolean = false,
+        authorizationCode: Boolean = true,
+        responseIssuer: Boolean = false,
+        advertiseSelectedGrant: Boolean = true,
+    ) = """
+        {
+          "issuer":"$ISSUER",
+          ${if (authorizationCode || !advertiseSelectedGrant) "\"authorization_endpoint\":\"$AUTHORIZATION_ENDPOINT\"," else ""}
+          "token_endpoint":"$TOKEN_ENDPOINT",
+          "response_types_supported":["code"],
+          "grant_types_supported":["${if (authorizationCode || !advertiseSelectedGrant) "authorization_code" else "urn:ietf:params:oauth:grant-type:pre-authorized_code"}"]
+          ${if (dpop) ",\"dpop_signing_alg_values_supported\":[\"ES256\"]" else ""}
+          ${if (responseIssuer) ",\"authorization_response_iss_parameter_supported\":true" else ""}
+        }
+    """.trimIndent()
+
+    private fun HttpRequestData.bodyText(): String =
+        (body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
+
+    private suspend fun didDocument(did: String, keyId: String, key: JWKKey) = buildJsonObject {
+        put("id", did)
+        put("verificationMethod", buildJsonArray {
+            add(buildJsonObject {
+                put("id", keyId)
+                put("controller", did)
+                put("type", "JsonWebKey2020")
+                put("publicKeyJwk", Json.parseToJsonElement(key.getPublicKey().exportJWK()))
+            })
+        })
+    }
+
+    private fun jwtPart(jwt: String, index: Int) =
+        Json.parseToJsonElement(jwt.split('.')[index].decodeFromBase64Url().decodeToString()).jsonObject
+
+    private companion object {
+        const val ISSUER = "https://issuer.example"
+        const val ISSUER_METADATA = "$ISSUER/.well-known/openid-credential-issuer"
+        const val AS_METADATA = "$ISSUER/.well-known/oauth-authorization-server"
+        const val AUTHORIZATION_ENDPOINT = "$ISSUER/authorize"
+        const val TOKEN_ENDPOINT = "$ISSUER/token"
+        const val CREDENTIAL_ENDPOINT = "$ISSUER/credential"
+        const val NONCE_ENDPOINT = "$ISSUER/nonce"
+        const val DEFERRED_ENDPOINT = "$ISSUER/deferred"
+        const val PAR_ENDPOINT = "$ISSUER/par"
+        const val REDIRECT_URI = "wallet.example:/callback"
+    }
+
+    private class RecordingCredentialStore : WalletCredentialStore {
+        val credentials = mutableListOf<StoredCredential>()
+
+        override suspend fun getCredential(id: String): StoredCredential? = credentials.find { it.id == id }
+        override suspend fun listCredentials(): Flow<StoredCredential> = flowOf(*credentials.toTypedArray())
+        override suspend fun addCredential(entry: StoredCredential) { credentials += entry }
+        override suspend fun removeCredential(id: String): Boolean = credentials.removeAll { it.id == id }
+    }
+
+    private class RecordingSessionStore : WalletIssuanceSessionStore {
+        val records = linkedMapOf<String, WalletIssuanceSessionRecord>()
+
+        override suspend fun get(id: String): WalletIssuanceSessionRecord? = records[id]
+        override suspend fun list(): List<WalletIssuanceSessionRecord> = records.values.toList()
+        override suspend fun put(record: WalletIssuanceSessionRecord) {
+            records[record.id] = record
+        }
+        override suspend fun remove(id: String): Boolean = records.remove(id) != null
+    }
+
+    private class BlockingTransitionSessionStore : WalletIssuanceSessionStore {
+        val records = linkedMapOf<String, WalletIssuanceSessionRecord>()
+        val processingWriteStarted = CompletableDeferred<Unit>()
+
+        override suspend fun get(id: String): WalletIssuanceSessionRecord? = records[id]
+        override suspend fun list(): List<WalletIssuanceSessionRecord> = records.values.toList()
+        override suspend fun put(record: WalletIssuanceSessionRecord) {
+            if ("\"state\":\"PROCESSING\"" in record.payload) {
+                processingWriteStarted.complete(Unit)
+                kotlinx.coroutines.awaitCancellation()
+            }
+            records[record.id] = record
+        }
+        override suspend fun remove(id: String): Boolean = records.remove(id) != null
+    }
+}
