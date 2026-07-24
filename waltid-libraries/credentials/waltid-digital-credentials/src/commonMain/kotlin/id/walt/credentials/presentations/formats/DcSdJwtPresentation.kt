@@ -219,16 +219,17 @@ data class DcSdJwtPresentation(
         ): Result<Unit> {
             for (claimQuery in claimsQuery) {
                 // Use a helper to resolve the path in the credential's data
-                val resolvedValue = resolveClaimPath(credential.credentialData, claimQuery.path)
+                val pathToResolve = claimQuery.path
+                val resolvedValue = resolveClaimPath(credential.credentialData, pathToResolve)
 
-                presentationRequireNotNull(resolvedValue, DcqlValidationError.MISSING_CLAIM) { "Claim is: ${claimQuery.path}" }
+                presentationRequireNotNull(resolvedValue, DcqlValidationError.MISSING_CLAIM) { "Claim is: ${claimQuery.path.joinToString(".")}" }
 
                 // Optionally, re-check value constraints if they were present in the query
                 if (!claimQuery.values.isNullOrEmpty()) {
                     presentationRequire(
                         !claimQuery.values!!.none { it == resolvedValue },
                         DcqlValidationError.CLAIM_MISMATCH
-                    ) { "Claim is ${claimQuery.path}" }
+                    ) { "Claim is ${claimQuery.path.joinToString(".")}" }
                 }
             }
             return Result.success(Unit)

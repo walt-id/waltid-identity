@@ -1,6 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.plans.vp.verifier
 
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.openid4vp.conformance.testplans.keys.TestKeyMaterial
 import id.walt.openid4vp.conformance.testplans.plans.TestPlan
 import id.walt.openid4vp.conformance.testplans.runner.req.TestPlanConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -17,18 +18,18 @@ import kotlinx.serialization.json.JsonObject
  * HAIP-compliant ISO mDL Verifier Test Plan
  *
  * Tests ISO mDL (mobile Driver License) verification with STRICT HAIP compliance:
- * - Signed authorization requests (JAR) — HAIP §5.1 V-01
- * - Encrypted VP responses (direct_post.jwt) — HAIP §5.1 V-02
- * - **x509_hash client identification** — HAIP §5 P-02 (MANDATORY)
- * - P-256 key curve (COSE -7) — HAIP §7 CF-02
- * - SHA-256 hash algorithm — HAIP §8 CF-03
- * - DeviceAuth validation (MSO + DeviceSignature) — HAIP §5.3.1
- * - Same-device flow — HAIP §5.1 V-03
+ * - Signed authorization requests (JAR) — conformance test V-01
+ * - Encrypted VP responses (direct_post.jwt) — conformance test V-02
+ * - **x509_hash client identification** — conformance requirement P-02
+ * - P-256 key curve (COSE -7) — conformance requirement CF-02
+ * - SHA-256 hash algorithm — conformance requirement CF-03
+ * - DeviceAuth validation (MSO + DeviceSignature)
+ * - Same-device flow — conformance test V-03
  *
  * Conformance test plan: oid4vp-1final-verifier-mdl-haip-test-plan
  *
  * CRITICAL HAIP REQUIREMENTS:
- * - MUST use x509_hash (NOT x509_san_dns) per HAIP §5 requirement P-02
+ * - MUST use x509_hash (NOT x509_san_dns), exercised by conformance requirement P-02
  * - Certificate chain MUST NOT include trust anchor (root CA)
  * - Leaf certificate MUST NOT be self-signed
  * - MUST support ECDH-ES with P-256 for response encryption
@@ -44,15 +45,16 @@ class MdlX509HashRequestUriSignedDirectPostHaip(
     conformanceHost: String = "localhost.emobix.co.uk",
     conformancePort: Int = 8443
 ) : TestPlan {
+    private val x509HashClientId = "x509_hash:L8zOHpvIslIfw3enc7DpZtmZhBUh9OY3DPCdEUz9KPc"
 
-    // Verifier key (P-256 as required by HAIP §7)
+    // Verifier key using the P-256 algorithm profile exercised by the HAIP conformance plan.
     val verifierKey = Json.decodeFromString<DirectSerializedKey>(
         """{"type":"jwk","jwk":{"kty":"EC","crv":"P-256","d":"0piz-la29hD31ITj7uN-U6urITkQR9CKbia4PKOksag","x":"bvayR9-jroMIIAu_i8hTvbZKWLfJlqjs_L04qB29Kq0","y":"D7aI-xpoGqHJLCZshyMBexRB37Aehfb_80ep-REJzJI"}}"""
     )
 
     // Certificate chain: [leaf, intermediate] - HAIP compliant
-    // - Leaf signed by intermediate CA (NOT self-signed) per HAIP §4.1 CF-05
-    // - Trust anchor (root CA) NOT included per HAIP §4.1 CF-04
+    // - Leaf signed by intermediate CA (NOT self-signed), exercised by CF-05
+    // - Trust anchor (root CA) NOT included, exercised by CF-04
     val verifierCertificateChain = listOf(
         // Leaf certificate (CN=verifier.example.com, signed by intermediate CA)
         "MIIB8zCCAZigAwIBAgIUWKvmcrsfgyVa5yKtMJO3rcimTw0wCgYIKoZIzj0EAwIwPTEpMCcGA1UEAwwgd2FsdC5pZCBWZXJpZmllciBJbnRlcm1lZGlhdGUgQ0ExEDAOBgNVBAoMB3dhbHQuaWQwHhcNMjYwNzAxMTAwNTM2WhcNMjcwNzAxMTAwNTM2WjAxMR0wGwYDVQQDDBR2ZXJpZmllci5leGFtcGxlLmNvbTEQMA4GA1UECgwHd2FsdC5pZDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABG72skffo66DCCALv4vIU722Sli3yZao7Py9OKgdvSqtD7aI+xpoGqHJLCZshyMBexRB37Aehfb/80ep+REJzJKjgYEwfzAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIHgDAfBgNVHREEGDAWghR2ZXJpZmllci5leGFtcGxlLmNvbTAdBgNVHQ4EFgQU11ZoOevLE5Sc374ImQT/XSpucXMwHwYDVR0jBBgwFoAUriQP8EdKQj+FXrLUYFHBTuDwWP8wCgYIKoZIzj0EAwIDSQAwRgIhALXrw/oLNimuZlquX89d5unpzmEwFLHmMrWQntk10E++AiEApTAXvA9QSXgKhLvRjpNtXgsyx7nPELgffXV5XBvQQ4w=",
@@ -61,6 +63,7 @@ class MdlX509HashRequestUriSignedDirectPostHaip(
     )
 
     // DCQL Query for ISO mDL (org.iso.18013.5.1.mDL)
+    // Uses path array format per DCQL spec: ["namespace", "claim_name"]
     // language=JSON
     val dcqlQuery = """
         {
@@ -72,10 +75,10 @@ class MdlX509HashRequestUriSignedDirectPostHaip(
                         "doctype_value": "org.iso.18013.5.1.mDL"
                     },
                     "claims": [
-                        {"namespace": "org.iso.18013.5.1", "claim_name": "given_name"},
-                        {"namespace": "org.iso.18013.5.1", "claim_name": "family_name"},
-                        {"namespace": "org.iso.18013.5.1", "claim_name": "birth_date"},
-                        {"namespace": "org.iso.18013.5.1", "claim_name": "age_over_18"}
+                        { "path": ["org.iso.18013.5.1", "given_name"] },
+                        { "path": ["org.iso.18013.5.1", "family_name"] },
+                        { "path": ["org.iso.18013.5.1", "birth_date"] },
+                        { "path": ["org.iso.18013.5.1", "age_over_18"] }
                     ]
                 }
             ]
@@ -85,17 +88,16 @@ class MdlX509HashRequestUriSignedDirectPostHaip(
 
     override val config = TestPlanConfiguration(
         testPlanCreationUrl = {
-            // Use the regular verifier test plan with mdoc credential format
-            // The conformance suite doesn't have a separate mDL HAIP plan
+            // Use the regular verifier test plan with an explicit HAIP variant for mDL.
             append("planName", "oid4vp-1final-verifier-test-plan")
             append(
                 "variant", /* language=json*/
                 """{
                     "credential_format": "iso_mdl",
-                    "client_id_prefix": "x509_san_dns",
+                    "client_id_prefix": "x509_hash",
                     "request_method": "request_uri_signed",
-                    "vp_profile": "plain_vp",
-                    "response_mode": "direct_post"
+                    "vp_profile": "haip",
+                    "response_mode": "direct_post.jwt"
                 }""".trimIndent()
             )
         },
@@ -104,7 +106,9 @@ class MdlX509HashRequestUriSignedDirectPostHaip(
             """
             {
                 "client": {
-                    "x509_certificate_chain": ${Json.encodeToString(verifierCertificateChain)}
+                    "client_id": "$x509HashClientId",
+                    "x509_certificate_chain": ${Json.encodeToString(verifierCertificateChain)},
+                    "request_object_trust_anchor_pem": ${TestKeyMaterial.VERIFIER_ROOT_CA_PEM_JSON}
                 },
                 "description": "HAIP Verifier - mDL + x509_hash + JAR + direct_post.jwt + P-256 + SHA-256",
                 "server": {
@@ -119,15 +123,15 @@ class MdlX509HashRequestUriSignedDirectPostHaip(
                 policies = Verification2Session.DefinedVerificationPolicies(),
 
                 // HAIP mandatory requirements:
-                signedRequest = true,        // JAR - HAIP §5.1 V-01
-                encryptedResponse = true,    // direct_post.jwt - HAIP §5.1 V-02
+                signedRequest = true,        // JAR - conformance test V-01
+                encryptedResponse = true,    // direct_post.jwt - conformance test V-02
 
                 clientMetadata = ClientMetadata(
-                    // HAIP §5.1 V-07: Must support both A128GCM and A256GCM
+                    // Conformance test V-07: support both A128GCM and A256GCM
                     encryptedResponseEncValuesSupported = listOf("A128GCM", "A256GCM")
                 ),
 
-                // HAIP §5 P-02: MUST use x509_hash
+                // Conformance requirement P-02: use x509_hash
                 // For x509_hash, client_id format is: "x509_hash:" + base64url(SHA-256(DER(leaf_cert)))
                 // The conformance suite will validate this matches the certificate in x5c
                 clientId = null, // Let verifier compute x509_hash from x5c
@@ -140,7 +144,7 @@ class MdlX509HashRequestUriSignedDirectPostHaip(
                 //urlHost, // <-- set by TestPlanRunner
             ),
             redirects = VerificationSessionRedirects(
-                // HAIP §5.1 V-05: redirect_uri for same-device flow
+                // Conformance test V-05: redirect_uri for same-device flow
                 successRedirectUri = Url("https://example.org/verification-success")
             )
         )

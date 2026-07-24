@@ -7,6 +7,7 @@ import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDescriptor
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.stores.WalletStore
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
@@ -106,6 +107,8 @@ interface WalletResolver {
             },
             serializedStaticKey = serializedStaticKey,
             staticDid = wallet.staticDid,
+            requestObjectX509Trust = wallet.requestObjectX509TrustPolicy?.let(WalletX509TrustConfig::fromPolicy),
+            requestObjectAudience = wallet.requestObjectAudience,
             defaultKeyId = wallet.defaultKeyId,
             defaultDidId = wallet.defaultDidId,
         )
@@ -165,6 +168,8 @@ interface WalletResolver {
             didStore = didStore,
             staticKey = staticKey,
             staticDid = descriptor.staticDid,
+            requestObjectX509TrustPolicy = descriptor.requestObjectX509Trust?.toTrustPolicy(),
+            requestObjectAudience = descriptor.requestObjectAudience,
             defaultKeyId = descriptor.defaultKeyId,
             defaultDidId = descriptor.defaultDidId,
         )

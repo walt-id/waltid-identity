@@ -6,12 +6,14 @@ import app.cash.sqldelight.db.SqlDriver
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.PlatformKeyProvider
 import id.walt.wallet2.persistence.stores.PlatformKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 
@@ -22,6 +24,11 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
  * @property defaultKeyType Key type used by [MobileWallet.bootstrap] when no key type override is supplied.
  * @property attestationConfig Optional client-attestation configuration for issuer deployments that require it.
  * @property persistence Persistence mode used for wallet-local state.
+ * @property requestObjectX509Trust Wallet-controlled trust anchors for X.509 Request Objects.
+ * @property requestObjectAudience Static Discovery default, or the Wallet issuer for Dynamic Discovery.
+ * @property unsignedRequestObjectPolicy Policy for handling unsigned OID4VP authorization requests.
+ *           Defaults to REQUIRE_SIGNED for production-grade security.
+ *           Use ALLOW_UNSIGNED only for testing or legacy interoperability.
  * @property onEvent Optional callback for observing wallet issuance and presentation session events.
  * @property preferredLocales Ordered BCP 47 locale preferences used for progressive language-tag lookup.
  * When no preference matches, selection falls back to an unlocalized entry and then the first entry.
@@ -32,6 +39,10 @@ public data class MobileWalletConfig(
     public val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     public val attestationConfig: WalletAttestationConfig? = null,
     public val persistence: MobileWalletPersistence = MobileWalletPersistence(),
+    public val requestObjectX509Trust: WalletX509TrustConfig? = null,
+    public val requestObjectAudience: String = "https://self-issued.me/v2",
+    public val unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
@@ -188,6 +199,9 @@ private fun createSqlDelightMobileWallet(
         keyGenerator = keyGenerator,
         defaultKeyType = config.defaultKeyType,
         attestationConfig = config.attestationConfig,
+        requestObjectX509Trust = config.requestObjectX509Trust,
+        requestObjectAudience = config.requestObjectAudience,
+        unsignedRequestObjectPolicy = config.unsignedRequestObjectPolicy,
         preferredLocales = config.preferredLocales,
         transactionDataProfiles = config.transactionDataProfiles,
         onEvent = config.onEvent,

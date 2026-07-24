@@ -3,14 +3,15 @@
 package id.walt.wallet2.handlers
 
 import id.walt.credentials.formats.DigitalCredential
-import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.dcql.DcqlDisclosure
+import id.walt.dcql.DcqlMatchException
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier.openid.transactiondata.decodeList
 import id.walt.wallet2.data.StoredCredential
@@ -28,11 +29,14 @@ import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResul
 import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
+import id.waltid.openid4vp.wallet.response.ResponseEncryptionHandler
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -60,7 +64,7 @@ interface VpRequestSource {
 /**
  * Input for the full presentation flow.
  *
- * The request is resolved and authenticated by the wallet before credentials are selected.
+ * The original URL is required so Request Objects can be fetched and authenticated.
  */
 @Serializable
 data class PresentCredentialRequest(
@@ -116,6 +120,10 @@ data class ResolveVpRequestResult(
     val clientId: String?,
     val responseUri: Url?,
     val hasRequestUri: Boolean,
+    /** Response mode from the authorization request (e.g., direct_post, direct_post.jwt). */
+    val responseMode: String? = null,
+    /** True if the verifier requires encrypted responses (direct_post.jwt or dc_api.jwt). */
+    val requiresEncryptedResponse: Boolean = false,
     /** The DCQL query from the authorization request, ready to pass to match-credentials or present. */
     val dcqlQuery: DcqlQuery?,
 )
@@ -143,6 +151,25 @@ data class MatchCredentialsResult(
     val matchCount: Int,
     /** For each matched query ID, the wallet-assigned IDs of matching credentials. */
     val matchedCredentialIds: Map<String, List<String>>
+)
+
+/**
+ * Result of inspecting encryption requirements for a VP request.
+ *
+ * Per OID4VP 1.0 §8.3, encrypted responses are required when response_mode
+ * is `direct_post.jwt` or `dc_api.jwt`. This result allows mobile UIs to
+ * show encryption status in consent screens before presenting.
+ */
+@Serializable
+data class EncryptionRequirementsResult(
+    /** True if the verifier requires encrypted responses. */
+    val isEncryptionRequired: Boolean,
+    /** Content encryption algorithm that will be used (e.g., "A128GCM"). */
+    val encAlgorithm: String?,
+    /** Key agreement algorithm (always "ECDH-ES" per spec). */
+    val algAlgorithm: String?,
+    /** Thumbprint of verifier's encryption key for display/audit purposes. */
+    val verifierKeyThumbprint: String?
 )
 
 @Serializable
@@ -311,6 +338,8 @@ object WalletPresentationHandler {
             holderPoliciesToRun = null,
             runPolicies = request.runPolicies,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
+            x509TrustPolicy = wallet.requestObjectX509TrustPolicy,
+            expectedRequestObjectAudience = wallet.requestObjectAudience,
         )
 
         return result.emitPresentationOutcome(onEvent)
@@ -346,6 +375,8 @@ object WalletPresentationHandler {
             holderPoliciesToRun = null,
             runPolicies = null,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
+            x509TrustPolicy = wallet.requestObjectX509TrustPolicy,
+            expectedRequestObjectAudience = wallet.requestObjectAudience,
         )
 
         return result.emitPresentationOutcome(onEvent)
@@ -361,7 +392,7 @@ object WalletPresentationHandler {
         request = request,
         onEvent = onEvent,
         transactionDataTypeRegistry = transactionDataTypeRegistry,
-        resolveAuthorizationRequest = ::resolveAuthorizationRequest,
+        resolveAuthorizationRequest = { requestUrl -> resolveAuthorizationRequest(wallet, requestUrl) },
     )
 
     internal suspend fun previewPresentation(
@@ -519,6 +550,8 @@ object WalletPresentationHandler {
             holderPoliciesToRun = null,
             runPolicies = request.runPolicies,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
+            x509TrustPolicy = wallet.requestObjectX509TrustPolicy,
+            expectedRequestObjectAudience = wallet.requestObjectAudience,
         )
 
         return result.emitPresentationOutcome(onEvent)
@@ -554,19 +587,24 @@ object WalletPresentationHandler {
         return result.emitPresentationOutcome(onEvent)
     }
     // ---------------------------------------------------------------------------
-    // Isolated step handlers
+    // Non-transmitting inspection and matching helpers
+    //
+    // Token construction and response delivery must consume the authenticated request retained
+    // by previewPresentation. Do not accept a caller-supplied AuthorizationRequest for those steps.
     // ---------------------------------------------------------------------------
 
     /**
-     * Lightweight resolver for the legacy isolated server endpoint.
+     * Resolves and authenticates the VP authorization request from its original URL.
      *
-     * This returns only request metadata for callers that still drive the older
-     * resolve -> match -> present flow. New presentation flows should use
-     * [previewPresentation], which performs full request-object resolution and
-     * verifier validation through [AuthorizationRequestResolver].
+     * Handles:
+     * - Inline parameters in the URL (openid4vp:// with encoded params)
+     * - request_uri: fetches and authenticates the JWT Request Object
+     *
+     * This mirrors the request resolution logic inside
+     * [WalletPresentFunctionality2.walletPresentHandling].
      */
-    suspend fun resolveRequest(request: ResolveVpRequestRequest): ResolveVpRequestResult {
-        val authRequest = WalletPresentFunctionality2.resolveAuthorizationRequest(request.requestUrl)
+    suspend fun resolveRequest(wallet: Wallet, request: ResolveVpRequestRequest): ResolveVpRequestResult {
+        val authRequest = resolveAuthenticatedAuthorizationRequest(wallet, request)
 
         return ResolveVpRequestResult(
             authorizationRequest = authRequest,
@@ -574,9 +612,24 @@ object WalletPresentationHandler {
             clientId = authRequest.clientId,
             responseUri = authRequest.responseUri?.let { Url(it) },
             hasRequestUri = request.requestUrl.parameters.contains("request_uri"),
+            responseMode = authRequest.responseMode?.let {
+                Json.encodeToString(OpenID4VPResponseMode.serializer(), it).trim('"')
+            },
+            requiresEncryptedResponse = authRequest.responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES,
             dcqlQuery = authRequest.dcqlQuery,
         )
     }
+
+    private suspend fun resolveAuthenticatedAuthorizationRequest(
+        wallet: Wallet,
+        request: ResolveVpRequestRequest,
+    ): AuthorizationRequest =
+        WalletPresentFunctionality2.resolveAuthorizationRequest(
+            presentationRequestUrl = request.requestUrl,
+            unsignedRequestObjectPolicy = wallet.unsignedRequestObjectPolicy,
+            expectedRequestObjectAudience = wallet.requestObjectAudience,
+            x509TrustPolicy = wallet.requestObjectX509TrustPolicy,
+        )
 
     /**
      * Runs DCQL matching against the supplied credentials without presenting.
@@ -589,8 +642,53 @@ object WalletPresentationHandler {
         val rawCredentials = request.credentials.mapIndexed { idx, stored ->
             stored.credential.toRawDcqlCredential(idx.toString())
         }
-        val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrThrow()
+        val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrElse { error ->
+            if (error is DcqlMatchException) return MatchCredentialsResult(emptyList(), 0, emptyMap())
+            throw error
+        }
         return buildMatchResult(matched, idByIndex)
+    }
+
+    /**
+     * Inspects a resolved authorization request to determine encryption requirements.
+     *
+     * Per OID4VP 1.0 §8.3, when response_mode is `direct_post.jwt` or `dc_api.jwt`,
+     * the wallet must encrypt the authorization response. This method extracts
+     * and validates the encryption parameters from the request's client_metadata.
+     *
+     * Use this for consent screens to show users whether their response will be encrypted.
+     *
+     * @param authorizationRequest The resolved authorization request to inspect.
+     * @return Encryption requirements including algorithm details and verifier key info.
+     */
+    suspend fun inspectEncryptionRequirements(
+        authorizationRequest: AuthorizationRequest
+    ): EncryptionRequirementsResult {
+        val responseMode = authorizationRequest.responseMode
+
+        // Check if encryption is required based on response_mode
+        val requiresEncryption = responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES
+
+        if (!requiresEncryption) {
+            return EncryptionRequirementsResult(
+                isEncryptionRequired = false,
+                encAlgorithm = null,
+                algAlgorithm = null,
+                verifierKeyThumbprint = null
+            )
+        }
+
+        // Extract encryption config from client_metadata
+        val encryptionConfig = requireNotNull(
+            ResponseEncryptionHandler.extractEncryptionConfig(authorizationRequest).getOrThrow()
+        ) { "Encrypted response mode requires encryption configuration" }
+
+        return EncryptionRequirementsResult(
+            isEncryptionRequired = true,
+            encAlgorithm = encryptionConfig.encAlgorithm,
+            algAlgorithm = encryptionConfig.algAlgorithm,
+            verifierKeyThumbprint = encryptionConfig.verifierKeyThumbprint
+        )
     }
 
     // ---------------------------------------------------------------------------
@@ -639,76 +737,12 @@ object WalletPresentationHandler {
             idx++
         }
         if (rawCredentials.isEmpty()) return MatchCredentialsResult(emptyList(), 0, emptyMap())
-        val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrThrow()
+        val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrElse { error ->
+            if (error is DcqlMatchException) return MatchCredentialsResult(emptyList(), 0, emptyMap())
+            throw error
+        }
         return buildMatchResult(matched, idByIndex)
     }
-
-    /**
-     * Isolated step 3: build the VP token from the wallet's stored credentials
-     * that were selected in step 2.
-     *
-     * @param wallet The wallet owning the credentials.
-     * @param request Contains the resolved authorization request, selected credential IDs,
-     *   and optional key/DID overrides.
-     */
-    suspend fun buildVpToken(wallet: Wallet, request: BuildVpTokenRequest): BuildVpTokenResult {
-        val key = wallet.resolveKey(request.key, request.keyId)
-            ?: throw IllegalArgumentException("Wallet has no key available for VP token building")
-        val did = request.did ?: wallet.defaultDid()
-
-        val dcqlQuery = request.authorizationRequest.dcqlQuery
-            ?: throw IllegalArgumentException("AuthorizationRequest has no dcql_query")
-
-        val queriesById = dcqlQuery.credentials.associateBy { it.id }
-        val unknownQueryIds = request.selectedCredentialIds.keys - queriesById.keys
-        require(unknownQueryIds.isEmpty()) { "Unknown DCQL query IDs selected: $unknownQueryIds" }
-        require(request.selectedCredentialIds.isNotEmpty()) { "No credentials selected" }
-
-        val matchedCredentials = request.selectedCredentialIds.mapValues { (queryId, credentialIds) ->
-            val query = requireNotNull(queriesById[queryId])
-            require(credentialIds.isNotEmpty()) { "No credentials selected for DCQL query '$queryId'" }
-            require(query.multiple || credentialIds.size == 1) {
-                "DCQL query '$queryId' does not allow multiple credentials"
-            }
-
-            val selectedCredentials = credentialIds.distinct().map { credentialId ->
-                wallet.findCredential(credentialId)
-                    ?: throw IllegalArgumentException("Credential '$credentialId' not found in wallet")
-            }
-            val matches = DcqlMatcher.match(
-                query = DcqlQuery(credentials = listOf(query)),
-                availableCredentials = selectedCredentials.map { stored ->
-                    stored.credential.toRawDcqlCredential(stored.id)
-                },
-            ).getOrThrow()[queryId].orEmpty()
-            require(matches.size == selectedCredentials.size) {
-                "One or more selected credentials do not satisfy DCQL query '$queryId'"
-            }
-            matches
-        }
-
-        val vpToken = WalletPresentFunctionality2.buildVpToken(
-            authorizationRequest = request.authorizationRequest,
-            matchedCredentials = matchedCredentials,
-            holderKey = key,
-            holderDid = did,
-        )
-        val idToken = WalletPresentFunctionality2.buildIdToken(request.authorizationRequest, key, did)
-        return BuildVpTokenResult(vpToken = vpToken, idToken = idToken)
-    }
-
-    /**
-     * Isolated step 4: send the authorization response to the verifier.
-     *
-     * @param request Contains the authorization request, VP token, and optional ID token.
-     * @return The [WalletPresentResult] describing the transmission outcome.
-     */
-    suspend fun sendAuthorizationResponse(request: SendAuthorizationResponseRequest): WalletPresentResult =
-        WalletPresentFunctionality2.sendAuthorizationResponse(
-            authorizationRequest = request.authorizationRequest,
-            vpToken = request.vpToken,
-            idToken = request.idToken,
-        ).getOrThrow()
 
     /**
      * Streams all credentials from all wallet credential stores, converts each
@@ -735,7 +769,9 @@ object WalletPresentationHandler {
         }
 
         log.debug { "DCQL matching against $idx stored credential(s), queries=${query.credentials.map { it.id }}" }
-        val matched = DcqlMatcher.match(query.copy(credentialSets = null), rawCredentials).getOrThrow()
+        val matched = DcqlMatcher.match(query.copy(credentialSets = null), rawCredentials).getOrElse { error ->
+            if (error is DcqlMatchException) emptyMap() else throw error
+        }
         log.trace { "DCQL match result: matchedQueryIds=${matched.keys}, matchCounts=${matched.mapValues { it.value.size }}" }
         return matched
     }
@@ -885,16 +921,20 @@ object WalletPresentationHandler {
             credentialId = credential.id,
         )
 
-    private suspend fun resolveAuthorizationRequest(requestUrl: Url): ResolvedAuthorizationRequest {
+    private suspend fun resolveAuthorizationRequest(wallet: Wallet, requestUrl: Url): ResolvedAuthorizationRequest {
         val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
         return AuthorizationRequestResolver.resolve(
             requestUrl = requestUrl,
-            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            unsignedRequestObjectPolicy = wallet.unsignedRequestObjectPolicy,
+            expectedRequestObjectAudience = wallet.requestObjectAudience,
+            x509TrustPolicy = wallet.requestObjectX509TrustPolicy,
             fetchRequestUri = { requestUri, requestUriMethod ->
                 AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
                     webResolveAuthReq = fetcher,
                     requestUri = requestUri,
                     requestUriMethod = requestUriMethod,
+                    requestUriPostWalletMetadata = AuthorizationRequestResolver
+                        .buildRequestUriPostWalletMetadata(wallet.requestObjectX509TrustPolicy),
                 )
             },
         )
@@ -985,14 +1025,11 @@ object WalletPresentationHandler {
     }
 
     private fun DcqlMatcher.DcqlMatchResult.findMatchingDisclosure(claim: ClaimsQuery): DcqlDisclosure? {
-        val claimName = claim.path
-            .lastOrNull { pathPart -> pathPart is JsonPrimitive && pathPart.isString }
-            ?.jsonPrimitive?.content
-            ?: return null
         val allowedValues = claim.values.orEmpty()
 
         return credential.disclosures?.firstOrNull { disclosure ->
-            disclosure.name == claimName && (allowedValues.isEmpty() || disclosure.value in allowedValues)
+            DcqlMatcher.run { disclosure.matchesPath(claim.path) } &&
+                (allowedValues.isEmpty() || disclosure.value in allowedValues)
         }
     }
 
@@ -1068,59 +1105,7 @@ object WalletPresentationHandler {
             format = format,
             data = credentialData,
             originalCredential = this,
-            disclosures = sdvc?.disclosures?.map { DcqlDisclosure(it.name, it.value) }
+            disclosures = sdvc?.disclosures?.map { DcqlDisclosure(it.name, it.value, it.location) }
         )
     }
 }
-
-// ---------------------------------------------------------------------------
-// Isolated-step request / response types for the manual presentation flow
-// ---------------------------------------------------------------------------
-
-/**
- * Request to build a VP token from already-matched credentials.
- *
- * Used in the manual presentation flow:
- * 1. `POST /present/resolve-request` - resolves the authorization request
- * 2. `POST /present/match-credentials-from-store` - selects matching credentials
- * 3. `POST /present/build-vp-token` - builds the VP token (this request)
- * 4. `POST /present/send-response` - transmits the response to the verifier
- */
-@Serializable
-data class BuildVpTokenRequest(
-    /** The resolved authorization request from step 1. */
-    val authorizationRequest: AuthorizationRequest,
-    /**
-     * Credential IDs (wallet-assigned) to include, grouped by DCQL query ID.
-     * These are the IDs returned by `match-credentials-from-store`.
-     */
-    val selectedCredentialIds: Map<String, List<String>>,
-    /** Key to use for signing. Defaults to the wallet's default key. */
-    val key: DirectSerializedKey? = null,
-    val keyId: String? = null,
-    /** DID to use as holder binding. Defaults to the wallet's default DID. */
-    val did: String? = null,
-)
-
-@Serializable
-data class BuildVpTokenResult(
-    /** The serialized `vp_token` JSON string, ready for [SendAuthorizationResponseRequest]. */
-    val vpToken: String,
-    /** The Self-Issued ID Token for SIOPv2 flows, or null for plain vp_token flows. */
-    val idToken: String? = null,
-)
-
-/**
- * Request to send the authorization response to the verifier.
- *
- * Final step of the manual presentation flow.
- */
-@Serializable
-data class SendAuthorizationResponseRequest(
-    /** The resolved authorization request from step 1. */
-    val authorizationRequest: AuthorizationRequest,
-    /** The VP token from step 3. */
-    val vpToken: String,
-    /** The ID token from step 3, or null. */
-    val idToken: String? = null,
-)

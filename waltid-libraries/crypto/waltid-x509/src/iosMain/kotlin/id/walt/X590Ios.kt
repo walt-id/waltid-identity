@@ -1,5 +1,7 @@
 package id.walt.x509
 
+actual val platformSupportsPkixCertificatePathValidation: Boolean = false
+
 @Throws(X509ValidationException::class)
 actual fun validateCertificateChain(
     leaf: CertificateDer,

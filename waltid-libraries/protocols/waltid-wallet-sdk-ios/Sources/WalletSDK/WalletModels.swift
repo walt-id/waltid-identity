@@ -14,6 +14,15 @@ public struct WalletConfiguration: Sendable {
     /// Wallet-local persistence configuration.
     public var persistence: WalletPersistence
 
+    /// Wallet-controlled PEM trust anchors for signed OID4VP Request Objects.
+    public var requestObjectTrustAnchorPEMCertificates: [String]
+
+    /// Whether platform trust anchors are also accepted for Request Objects.
+    public var requestObjectEnableSystemTrustAnchors: Bool
+
+    /// Expected audience of signed OID4VP Request Objects.
+    public var requestObjectAudience: String
+
     /// Transaction data profiles this wallet accepts in OpenID4VP requests.
     public var transactionDataProfiles: [WalletTransactionDataProfile]
 
@@ -30,6 +39,11 @@ public struct WalletConfiguration: Sendable {
     ///   - attestation: Optional wallet attestation configuration for issuers
     ///     that require client attestation.
     ///   - persistence: Local persistence configuration for wallet-owned state.
+    ///   - requestObjectTrustAnchorPEMCertificates: Wallet-controlled PEM trust
+    ///     anchors used to validate signed OID4VP Request Objects.
+    ///   - requestObjectEnableSystemTrustAnchors: Retained for compatibility. Passing `true`
+    ///     is rejected because iOS Request Object PKIX validation is not yet supported.
+    ///   - requestObjectAudience: Expected audience of signed OID4VP Request Objects.
     ///   - transactionDataProfiles: OpenID4VP transaction data profiles this
     ///     wallet accepts before previewing or submitting a presentation.
     ///   - preferredLocales: Ordered BCP 47 locale preferences used for issuer,
@@ -39,6 +53,9 @@ public struct WalletConfiguration: Sendable {
         defaultKeyType: WalletKeyType = .secp256r1,
         attestation: WalletAttestationConfiguration? = nil,
         persistence: WalletPersistence = WalletPersistence(),
+        requestObjectTrustAnchorPEMCertificates: [String] = [],
+        requestObjectEnableSystemTrustAnchors: Bool = false,
+        requestObjectAudience: String = "https://self-issued.me/v2",
         transactionDataProfiles: [WalletTransactionDataProfile] = [],
         preferredLocales: [String] = Locale.preferredLanguages
     ) {
@@ -46,6 +63,9 @@ public struct WalletConfiguration: Sendable {
         self.defaultKeyType = defaultKeyType
         self.attestation = attestation
         self.persistence = persistence
+        self.requestObjectTrustAnchorPEMCertificates = requestObjectTrustAnchorPEMCertificates
+        self.requestObjectEnableSystemTrustAnchors = requestObjectEnableSystemTrustAnchors
+        self.requestObjectAudience = requestObjectAudience
         self.transactionDataProfiles = transactionDataProfiles
         self.preferredLocales = preferredLocales
     }
@@ -912,6 +932,9 @@ public struct PresentationPreview: Equatable, Sendable {
     /// Required DCQL credential query combinations that must be satisfied before submission.
     public let credentialRequirements: [PresentationCredentialRequirement]
 
+    /// Authenticated response-encryption requirements for the retained request.
+    public let encryption: PresentationEncryptionInfo
+
     /// Creates a presentation preview.
     ///
     /// - Parameters:
@@ -922,17 +945,39 @@ public struct PresentationPreview: Equatable, Sendable {
     ///     requested credential queries.
     ///   - credentialRequirements: Required DCQL credential query combinations
     ///     that must be satisfied before submission.
+    ///   - encryption: Authenticated response-encryption requirements for the
+    ///     retained request.
     public init(
         previewHandle: PresentationPreviewHandle,
         request: PresentationRequestInfo,
         credentialOptions: [PresentationCredentialOption],
-        credentialRequirements: [PresentationCredentialRequirement] = []
+        credentialRequirements: [PresentationCredentialRequirement] = [],
+        encryption: PresentationEncryptionInfo = .notRequired
     ) {
         self.previewHandle = previewHandle
         self.request = request
         self.credentialOptions = credentialOptions
         self.credentialRequirements = credentialRequirements
+        self.encryption = encryption
     }
+}
+
+/// Authenticated encryption requirements for an OpenID4VP response.
+public enum PresentationEncryptionInfo: Equatable, Sendable {
+    /// The authorization response does not require JWE encryption.
+    case notRequired
+
+    /// The authorization response must be encrypted for the verifier.
+    ///
+    /// - Parameters:
+    ///   - contentEncryptionAlgorithm: Negotiated JWE content-encryption algorithm.
+    ///   - keyManagementAlgorithm: Negotiated JWE key-management algorithm.
+    ///   - verifierKeyThumbprint: RFC 7638 thumbprint of the selected verifier key.
+    case required(
+        contentEncryptionAlgorithm: String,
+        keyManagementAlgorithm: String,
+        verifierKeyThumbprint: String
+    )
 }
 
 /// A required presentation credential-query combination.
@@ -1017,6 +1062,9 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     /// Response-encryption state selected for this request.
     public let responseEncryption: PresentationResponseEncryption
 
+    /// Serialized OpenID4VP response mode requested by the verifier.
+    public let responseMode: String?
+
     /// Decoded transaction data attached to the request.
     public let transactionData: [PresentationTransactionData]
 
@@ -1029,6 +1077,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     ///   - state: OpenID state value from the request.
     ///   - nonce: OpenID nonce value from the request.
     ///   - responseEncryption: Response-encryption state selected for the request.
+    ///   - responseMode: Serialized OpenID4VP response mode requested by the verifier.
     ///   - transactionData: Decoded transaction data attached to the request.
     public init(
         clientID: String? = nil,
@@ -1037,6 +1086,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
         state: String? = nil,
         nonce: String? = nil,
         responseEncryption: PresentationResponseEncryption,
+        responseMode: String? = nil,
         transactionData: [PresentationTransactionData] = []
     ) {
         self.clientID = clientID
@@ -1045,6 +1095,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
         self.state = state
         self.nonce = nonce
         self.responseEncryption = responseEncryption
+        self.responseMode = responseMode
         self.transactionData = transactionData
     }
 }

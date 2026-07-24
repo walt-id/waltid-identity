@@ -143,6 +143,7 @@ dependencies {
     testImplementation(identityLibs.junit.jupiter.params)
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation(identityLibs.ktor.client.mock)
     testImplementation(identityLibs.ktor.server.test.host)
     testImplementation("io.mockk:mockk:1.14.9")
     testImplementation(identityLibs.klogging)

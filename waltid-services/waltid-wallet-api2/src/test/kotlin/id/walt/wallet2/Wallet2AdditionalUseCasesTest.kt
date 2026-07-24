@@ -478,7 +478,7 @@ class Wallet2AdditionalUseCasesTest {
                     ConfigManager.preloadConfig(
                         "verifier-service",
                         OSSVerifier2ServiceConfig(
-                            clientId = "test-verifier-pres",
+                            clientId = null,
                             clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Test Verifier"),
                             urlPrefix = "$walletBase/verification-session",
                             urlHost = "openid4vp://authorize"
@@ -573,7 +573,7 @@ class Wallet2AdditionalUseCasesTest {
                     }.also { assertEquals(HttpStatusCode.OK, it.status) }
                         .body<VerificationSessionCreationResponse>()
                 }
-                val bootstrapUrl = verifierSession.bootstrapAuthorizationRequestUrl
+                val bootstrapUrl = verifierSession.fullAuthorizationRequestUrl
                     ?: Url("$walletBase/verification-session/${verifierSession.sessionId}/request")
 
                 val resolveResult = testAndReturn("Isolated: resolve VP request") {

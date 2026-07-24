@@ -23,6 +23,7 @@ import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vc.policies.RegexPolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
@@ -92,12 +93,14 @@ class MsoMdocsVerifier2IntegrationTest {
         )
     )
 
-    private val verificationSessionSetup: VerificationSessionSetup = CrossDeviceFlowSetup(
-        core = GeneralFlowConfig(
-            dcqlQuery = mdocsDcqlQuery,
-            policies = mdocsPolicies
+    private fun verificationSessionSetup(encryptedResponse: Boolean): VerificationSessionSetup =
+        CrossDeviceFlowSetup(
+            core = GeneralFlowConfig(
+                dcqlQuery = mdocsDcqlQuery,
+                policies = mdocsPolicies,
+                encryptedResponse = encryptedResponse,
+            )
         )
-    )
 
     private val walletCredentials = listOf(
         MdocsCredential(
@@ -225,16 +228,26 @@ class MsoMdocsVerifier2IntegrationTest {
     }
 
     @Test
-    fun test() {
+    fun cleartextMdocPresentation() = runMdocPresentationTest(
+        encryptedResponse = false,
+        port = 17011,
+    )
+
+    @Test
+    fun encryptedMdocPresentationRoundTripsThroughVerifier() = runMdocPresentationTest(
+        encryptedResponse = true,
+        port = 17012,
+    )
+
+    private fun runMdocPresentationTest(encryptedResponse: Boolean, port: Int) {
         val host = "127.0.0.1"
-        val port = 17011
 
         E2ETest(host, port, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(
-                        clientId = "verifier2",
+                        clientId = null,
                         clientMetadata = ClientMetadata(
                             clientName = "Verifier2",
                             logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
@@ -257,7 +270,7 @@ class MsoMdocsVerifier2IntegrationTest {
             // Create the verification session
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
-                    setBody(verificationSessionSetup)
+                    setBody(verificationSessionSetup(encryptedResponse))
                 }.body<VerificationSessionCreationResponse>()
             }
             println("Verification Session Response: $verificationSessionResponse")
@@ -282,10 +295,15 @@ class MsoMdocsVerifier2IntegrationTest {
                 assertTrue {
                     info1.creationDate.wasWithinLastSeconds()
                 }
+                if (encryptedResponse) {
+                    assertTrue { info1.authorizationRequest.responseMode == OpenID4VPResponseMode.DIRECT_POST_JWT }
+                    assertNotNull(info1.ephemeralDecryptionKey)
+                    assertNotNull(info1.jwkThumbprint)
+                }
             }
 
             // Present with wallet
-            val bootstrapUrl = verificationSessionResponse.bootstrapAuthorizationRequestUrl
+            val authorizationRequestUrl = requireNotNull(verificationSessionResponse.fullAuthorizationRequestUrl)
 
             val holderKey = holderKeyFun()
 
@@ -299,7 +317,7 @@ class MsoMdocsVerifier2IntegrationTest {
                 WalletPresentFunctionality2.walletPresentHandling(
                     holderKey = holderKey,
                     holderDid = null, // No DID required for mso_mdoc
-                    presentationRequestUrl = bootstrapUrl!!,
+                    presentationRequestUrl = authorizationRequestUrl,
                     selectCredentialsForQuery = selectCallback,
                     holderPoliciesToRun = null,
                     runPolicies = null,
@@ -336,6 +354,14 @@ class MsoMdocsVerifier2IntegrationTest {
                 assertNotNull(info2.policyResults)
                 assertTrue { info2.policyResults!!.overallSuccess }
                 assertTrue { info2.policyResults!!.vcPolicies.size == 2 }
+
+                // In the encrypted flow, successful mdoc verification proves that the verifier
+                // decrypted the direct_post.jwt response and reconstructed Device Authentication
+                // with the thumbprint of the same ephemeral recipient key selected by the wallet.
+                if (encryptedResponse) {
+                    assertNotNull(info2.jwkThumbprint)
+                    assertTrue { info2.authorizationRequest.responseMode == OpenID4VPResponseMode.DIRECT_POST_JWT }
+                }
             }
         }
     }

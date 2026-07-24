@@ -29,7 +29,6 @@ import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
-import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.verifier.openid.transactiondata.DEFAULT_HASH_ALGORITHM
 import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
@@ -48,15 +47,16 @@ object MdocPresenter {
 
     val log = KotlinLogging.logger {}
 
-    suspend fun buildSessionTranscript(
+    fun buildSessionTranscript(
         authorizationRequest: AuthorizationRequest,
-        responseUri: String
+        responseUri: String,
+        encryptionKeyThumbprint: String?,
     ): SessionTranscript {
         requireNotNull(authorizationRequest.clientId) { "Missing client id in authorization request - is this a DC API flow?" }
         val handoverInfo = OpenID4VPHandoverInfo(
             clientId = authorizationRequest.clientId!!,
             nonce = authorizationRequest.nonce!!,
-            jwkThumbprint = ResponseEncryption.resolve(authorizationRequest)?.thumbprintBytes(),
+            jwkThumbprint = encryptionKeyThumbprint?.decodeFromBase64Url(),
             responseUri = responseUri
         )
         log.trace { "Client side session transaction openid4vp handover info: $handoverInfo" }
@@ -105,6 +105,7 @@ object MdocPresenter {
         authorizationRequest: AuthorizationRequest,
         holderKey: Key,
         typeRegistry: TransactionDataTypeRegistry,
+        encryptionKeyThumbprint: String? = null,
     ): JsonPrimitive {
         log.debug { "Handling mso_mdoc credential" }
 
@@ -119,7 +120,11 @@ object MdocPresenter {
         val issuerSigned: IssuerSigned = document.issuerSigned
 
         // Build OpenID4VPHandover (OID4VP Appendix B.2.6.1) without ISO-specific wallet nonce
-        val sessionTranscript = buildSessionTranscript(authorizationRequest, responseUri)
+        val sessionTranscript = buildSessionTranscript(
+            authorizationRequest,
+            responseUri,
+            encryptionKeyThumbprint,
+        )
 
         // Determine which namespaces and elements to disclose based on the DCQL match
         val disclosedDeviceNamespaces = buildTransactionDataNamespaces(
@@ -146,11 +151,14 @@ object MdocPresenter {
 
         //--- SD START
         val selectedIssuerSignedItems = dcqlQueryClaims
-            // Group by the string content of the first path element (Namespace)
             .groupBy {
-                (it.path.firstOrNull()
-                    ?: throw IllegalArgumentException("Empty path in ClaimsQuery")
-                        ).jsonPrimitive.content
+                require(it.path.size == 2) {
+                    "mso_mdoc Claims Query path must contain exactly namespace and data element identifier"
+                }
+                it.path[0].let { segment ->
+                    require(segment is JsonPrimitive && segment.isString) { "mdoc namespace path segment must be a string" }
+                    segment.content
+                }
             }
             .mapValues { (sdNamespace2, claimQueries) ->
                 claimQueries.map { claimsQuery ->

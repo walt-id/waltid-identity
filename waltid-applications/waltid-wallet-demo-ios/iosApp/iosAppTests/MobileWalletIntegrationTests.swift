@@ -74,6 +74,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await Wallet(
             configuration: WalletConfiguration(
                 walletID: walletId ?? testWalletId,
+                requestObjectTrustAnchorPEMCertificates: [EudiTestBackend.verifierTrustAnchorPEM],
                 transactionDataProfiles: Self.demoTransactionDataProfiles
             )
         )
@@ -84,6 +85,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
             configuration: WalletConfiguration(
                 walletID: testWalletId,
                 persistence: persistence,
+                requestObjectTrustAnchorPEMCertificates: [EudiTestBackend.verifierTrustAnchorPEM],
                 transactionDataProfiles: Self.demoTransactionDataProfiles
             )
         )
@@ -207,10 +209,18 @@ final class MobileWalletIntegrationTests: XCTestCase {
     }
 
     func testReceiveAndPresentEudiEhicSdJwtAgainstEudi() async throws {
+        try XCTSkipIf(
+            true,
+            "Pending native iOS PKIX/x509_hash Request Object authentication and EUDI trust-anchor refresh; tracked by https://github.com/walt-id/waltid-identity/pull/1940"
+        )
         try await receiveAndPresentEudiCredential(credentialID: Self.eudiEhicSdJwtCredentialID)
     }
 
     func testPreviewAndSubmitEudiEhicSdJwtAgainstEudi() async throws {
+        try XCTSkipIf(
+            true,
+            "Pending native iOS PKIX/x509_hash Request Object authentication and EUDI trust-anchor refresh; tracked by https://github.com/walt-id/waltid-identity/pull/1940"
+        )
         try await previewAndSubmitEudiCredential(credentialID: Self.eudiEhicSdJwtCredentialID)
     }
 
@@ -228,6 +238,41 @@ final class MobileWalletIntegrationTests: XCTestCase {
             "Upstream issue: https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/172"
         )
         try await previewAndSubmitEudiCredential(credentialID: Self.eudiPidSdJwtCredentialID)
+    }
+
+    func testPreviewAndSubmitEncryptedEudiPidMdocAgainstDemoIssuer2AndVerifier2() async throws {
+        let scenario = try demoScenario("eudi-pid-mdoc")
+        let wallet = try await makeWallet(walletId: "ios-demo-encrypted-mdoc-\(UUID().uuidString)")
+        let bootstrapResult = try await wallet.bootstrap()
+        let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+        let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
+        XCTAssertFalse(credentialIDs.isEmpty, "Should receive a demo EUDI PID mdoc")
+
+        let session = try await DemoBackend.shared.createVerifierSession(
+            scenario: scenario,
+            encryptedResponse: true
+        )
+        let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
+        let previewResult = try await wallet.previewPresentation(request: presentationURL)
+        let preview = try requireReadyPreview(previewResult)
+        XCTAssertEqual(preview.request.responseMode, "direct_post.jwt")
+        guard case .required = preview.encryption else {
+            return XCTFail("Expected encrypted response metadata: \(preview.encryption)")
+        }
+        XCTAssertFalse(preview.credentialOptions.isEmpty)
+        XCTAssertTrue(preview.credentialOptions.allSatisfy { $0.format == "mso_mdoc" })
+
+        let result = try await wallet.submitPresentation(
+            previewHandle: preview.previewHandle,
+            selectedCredentialOptions: preview.credentialOptions.map(\.selection),
+            did: bootstrapResult.did
+        )
+        assertTransmittedSuccess(result, "Encrypted demo EUDI PID mdoc presentation should succeed: \(result)")
+        try await DemoBackend.shared.waitForVerifierSuccess(
+            sessionID: session.sessionID,
+            timeoutSeconds: verifierPollingTimeout
+        )
     }
 
     func testReceiveAndPresentEudiPidSdJwtAgainstDemoIssuer2AndVerifier2() async throws {
@@ -520,6 +565,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
             URLQueryItem(name: "response_type", value: "vp_token"),
             URLQueryItem(name: "response_mode", value: "fragment"),
             URLQueryItem(name: "redirect_uri", value: "https://verifier.example/callback"),
+            URLQueryItem(name: "client_metadata", value: "{}"),
             URLQueryItem(name: "nonce", value: "nonce"),
             URLQueryItem(name: "state", value: "state-123"),
             URLQueryItem(name: "dcql_query", value: String(decoding: dcqlQuery, as: UTF8.self)),

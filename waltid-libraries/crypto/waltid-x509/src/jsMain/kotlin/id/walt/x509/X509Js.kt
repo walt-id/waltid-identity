@@ -1,5 +1,7 @@
 package id.walt.x509
 
+actual val platformSupportsPkixCertificatePathValidation: Boolean = false
+
 actual fun validateCertificateChain(
     leaf: CertificateDer,
     chain: List<CertificateDer>,

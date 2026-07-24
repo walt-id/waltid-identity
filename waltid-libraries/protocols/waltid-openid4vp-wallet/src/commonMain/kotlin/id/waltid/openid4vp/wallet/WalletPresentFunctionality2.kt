@@ -13,6 +13,7 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
 import id.walt.openid4vp.clientidprefix.ClientIdError
+import id.walt.openid4vp.clientidprefix.X509TrustPolicy
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
@@ -28,7 +29,7 @@ import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.walletRejectHandli
 import id.waltid.openid4vp.wallet.presentation.*
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
-import id.waltid.openid4vp.wallet.response.ResponseEncryption
+import id.waltid.openid4vp.wallet.response.ResponseEncryptionHandler
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -60,7 +61,9 @@ object WalletPresentFunctionality2 {
         holderKey: Key,
         holderDid: String?,
         typeRegistry: TransactionDataTypeRegistry,
+        encryptionConfig: ResponseEncryptionHandler.EncryptionConfig?,
     ): String {
+        validateMatchedCredentialSelection(authorizationRequest, matchedData)
         val vpTokenMapContents = mutableMapOf<String, JsonArray>()
 
         for ((queryId, matchedCredsWithClaimsList) in matchedData) {
@@ -94,6 +97,7 @@ object WalletPresentFunctionality2 {
                                 authorizationRequest = authorizationRequest,
                                 holderKey = holderKey,
                                 typeRegistry = typeRegistry,
+                                encryptionKeyThumbprint = encryptionConfig?.verifierKeyThumbprint,
                             )
                         }
 
@@ -115,19 +119,22 @@ object WalletPresentFunctionality2 {
             }
         }
 
-        if (vpTokenMapContents.isEmpty() && authorizationRequest.dcqlQuery?.credentials?.isNotEmpty() == true) {
-            // No credentials matched any part of a non-empty DCQL query.
-            // Depending on policy, this might be an error or an empty vp_token.
-            // OpenID4VP spec implies vp_token is only returned if something matches.
-            // "A VP Token is only returned if the corresponding Authorization Request contained a dcql_query parameter..."
-            // "...There MUST NOT be any entry in the JSON-encoded object for optional Credential Queries when there are no matching Credentials..."
-            // So, if all queries were effectively optional and none matched, an empty vp_token is possible.
-            // If required queries didn't match, DcqlMatcher should have failed earlier.
-            log.warn { "No presentations generated for any query ID. Returning empty vp_token object." }
-        }
-
         log.trace { "Generated VP Token Map Contents: $vpTokenMapContents" }
         return Json.encodeToString(JsonObject(vpTokenMapContents))
+    }
+
+    internal fun validateMatchedCredentialSelection(
+        authorizationRequest: AuthorizationRequest,
+        matchedData: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+    ) {
+        val query = authorizationRequest.dcqlQuery ?: return
+        val matchedIds = matchedData.filterValues { it.isNotEmpty() }.keys
+        val satisfied = query.credentialSets?.all { set ->
+            !set.required || set.options.any { option -> option.all(matchedIds::contains) }
+        } ?: query.credentials.all { matchedIds.contains(it.id) }
+        require(satisfied) {
+            "Matched credentials do not satisfy all required DCQL credential queries"
+        }
     }
 
     @Serializable
@@ -331,20 +338,23 @@ object WalletPresentFunctionality2 {
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
+        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
+        x509TrustPolicy: X509TrustPolicy? = null,
     ): AuthorizationRequest {
         return try {
             AuthorizationRequestResolver.resolve(
                 requestUrl = presentationRequestUrl,
                 unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+                expectedRequestObjectAudience = expectedRequestObjectAudience,
+                x509TrustPolicy = x509TrustPolicy,
                 fetchRequestUri = { requestUri, requestUriMethod ->
                     AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
                         webResolveAuthReq = webResolveAuthReq,
                         requestUri = requestUri,
                         requestUriMethod = requestUriMethod,
-                        // Optional wallet metadata is omitted until the caller explicitly profiles
-                        // its values. Some Final-compliant verifier endpoints reject unsupported
-                        // capability members, while wallet_nonce remains mandatory for this flow.
-                        sendWalletMetadata = false,
+                        requestUriPostWalletMetadata = AuthorizationRequestResolver
+                            .buildRequestUriPostWalletMetadata(x509TrustPolicy),
+                        sendWalletMetadata = true,
                     )
                 },
             ).authorizationRequest.also(::validateAuthorizationRequest)
@@ -411,7 +421,18 @@ object WalletPresentFunctionality2 {
         holderKey: Key,
         holderDid: String?,
         transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
-    ): String = generateVpTokenForRequest(authorizationRequest, matchedCredentials, holderKey, holderDid, transactionDataTypeRegistry)
+        encryptionConfig: ResponseEncryptionHandler.EncryptionConfig? = null,
+    ): String {
+        val selectedEncryptionConfig = encryptionConfig ?: selectEncryptionConfig(authorizationRequest)
+        return generateVpTokenForRequest(
+            authorizationRequest,
+            matchedCredentials,
+            holderKey,
+            holderDid,
+            transactionDataTypeRegistry,
+            selectedEncryptionConfig,
+        )
+    }
 
     /**
      * Build the Self-Issued ID Token for `vp_token id_token` (SIOPv2) response types.
@@ -443,6 +464,7 @@ object WalletPresentFunctionality2 {
         authorizationRequest: AuthorizationRequest,
         vpToken: String,
         idToken: String? = null,
+        encryptionConfig: ResponseEncryptionHandler.EncryptionConfig? = null,
     ): Result<WalletPresentResult> = runCatching {
         // Infer response_mode from response_type if not explicitly set
         if (authorizationRequest.responseMode == null) {
@@ -521,17 +543,14 @@ object WalletPresentFunctionality2 {
                 requireNotNull(responseUri) {
                     "Invalid AuthorizationRequest: 'response_uri' is required for response_mode 'direct_post.jwt'."
                 }
-                val encryption = requireNotNull(ResponseEncryption.resolve(authorizationRequest))
+                val encryption = requireNotNull(encryptionConfig ?: selectEncryptionConfig(authorizationRequest))
                 val vpTokenElement = Json.parseToJsonElement(vpToken)
                 val payloadJson = buildJsonObject {
                     put("vp_token", vpTokenElement)
                     idToken?.let { put("id_token", it) }
                     authorizationRequest.state?.let { put("state", JsonPrimitive(it)) }
                 }
-                val jweString = encryption.key.encryptJwe(
-                    payloadJson.toString().encodeToByteArray(),
-                    encryption.encryptionMethod,
-                )
+                val jweString = ResponseEncryptionHandler.encryptResponse(payloadJson, encryption)
                 val parameters = ParametersBuilder().apply { append("response", jweString) }.build()
                 postFormResponse(responseUri, parameters)
             }
@@ -542,22 +561,31 @@ object WalletPresentFunctionality2 {
         }
     }
 
+    private suspend fun selectEncryptionConfig(
+        authorizationRequest: AuthorizationRequest,
+    ): ResponseEncryptionHandler.EncryptionConfig? =
+        ResponseEncryptionHandler.extractEncryptionConfig(authorizationRequest).getOrThrow()
+
     private suspend fun resolveAuthorizationRequestObject(
         presentationRequestUrl: Url,
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy,
+        expectedRequestObjectAudience: String,
+        x509TrustPolicy: X509TrustPolicy?,
     ): ResolvedAuthorizationRequest =
         AuthorizationRequestResolver.resolve(
             requestUrl = presentationRequestUrl,
             unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+            expectedRequestObjectAudience = expectedRequestObjectAudience,
+            x509TrustPolicy = x509TrustPolicy,
             fetchRequestUri = { requestUri, requestUriMethod ->
                 AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
                     webResolveAuthReq = webResolveAuthReq,
                     requestUri = requestUri,
                     requestUriMethod = requestUriMethod,
-                    // Optional wallet metadata is omitted until the caller explicitly profiles
-                    // its values. Some Final-compliant verifier endpoints reject unsupported
-                    // capability members, while wallet_nonce remains mandatory for this flow.
-                    sendWalletMetadata = false,
+                    requestUriPostWalletMetadata = AuthorizationRequestResolver
+                        .buildRequestUriPostWalletMetadata(x509TrustPolicy),
+                    // Advertise only capabilities this target and trust configuration can process.
+                    sendWalletMetadata = true,
                 )
             },
         )
@@ -607,6 +635,8 @@ object WalletPresentFunctionality2 {
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
 
+        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
+        x509TrustPolicy: X509TrustPolicy? = null,
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
     ): Result<WalletPresentResult> {
         log.trace { "- Start of Wallet Present Handling -" }
@@ -614,7 +644,12 @@ object WalletPresentFunctionality2 {
 
         // Step 1: Resolve AuthorizationRequest.
         val resolvedRequest = resolvedAuthorizationRequest ?: try {
-            resolveAuthorizationRequestObject(presentationRequestUrl, unsignedRequestObjectPolicy)
+            resolveAuthorizationRequestObject(
+                presentationRequestUrl,
+                unsignedRequestObjectPolicy,
+                expectedRequestObjectAudience,
+                x509TrustPolicy,
+            )
         } catch (error: AuthorizationRequestResolver.SignedAuthorizationRequestValidationException) {
             legacyFallbackResult(presentationRequestUrl, legacyFallbackCallback, error)
                 ?.let { return Result.success(it) }
@@ -690,18 +725,28 @@ object WalletPresentFunctionality2 {
             }
         }
 
+        // Select once so mdoc Device Authentication and the final JWE use the exact same key.
+        val encryptionConfig = selectEncryptionConfig(authorizationRequest)
+
         // Step 3: Build VP token (and optional ID token for SIOPv2).
-        val vpToken = buildVpToken(authorizationRequest, credentials, holderKey, holderDid, transactionDataTypeRegistry)
+        val vpToken = buildVpToken(
+            authorizationRequest,
+            credentials,
+            holderKey,
+            holderDid,
+            transactionDataTypeRegistry,
+            encryptionConfig,
+        )
         val idToken = buildIdToken(authorizationRequest, holderKey, holderDid)
 
         // Step 4: Send response.
-        return sendAuthorizationResponse(authorizationRequest, vpToken, idToken)
+        return sendAuthorizationResponse(authorizationRequest, vpToken, idToken, encryptionConfig)
     }
 
     /**
      * Creates a Key Binding JWT for SD-JWT presentations.
      *
-     * Per OID4VP 1.0 §5.5.1, when the authorization request includes `transaction_data`,
+     * Per OID4VP 1.0 §5.1, when the authorization request includes `transaction_data`,
      * the wallet MUST include `transaction_data_hashes` in the KB-JWT. Each entry is the
      * base64url-encoded SHA-256 hash of the corresponding base64url-encoded transaction data
      * item as it appeared in the request. The algorithm is SHA-256 by default.

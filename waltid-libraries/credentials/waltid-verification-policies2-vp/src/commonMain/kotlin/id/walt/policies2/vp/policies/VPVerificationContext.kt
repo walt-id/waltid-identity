@@ -28,7 +28,7 @@ data class VerificationSessionContext(
 
     /**
      * Base64url-encoded transaction data items from the authorization request's `transaction_data`
-     * parameter (OID4VP 1.0 §5.5.1). When non-null, the KB-JWT MUST contain `transaction_data_hashes`
+     * parameter (OID4VP 1.0 §5.1). When non-null, the KB-JWT MUST contain `transaction_data_hashes`
      * and the verifier MUST validate them against these values.
      */
     val transactionData: List<String>? = null,

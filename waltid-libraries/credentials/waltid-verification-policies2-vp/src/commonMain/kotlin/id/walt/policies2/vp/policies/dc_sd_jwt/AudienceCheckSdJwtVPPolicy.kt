@@ -29,6 +29,7 @@ class AudienceCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
 
         addResult("presentation_audience", presentation.audience)
         addResult("expected_audience", verificationContext.expectedAudience)
+
         presentationRequire(
             presentation.audience == verificationContext.expectedAudience,
             DcSdJwtPresentationValidationError.AUDIENCE_MISMATCH

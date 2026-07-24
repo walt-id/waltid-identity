@@ -138,7 +138,10 @@ jobs:
       - name: Execute Enterprise iOS mobile platform tests
         id: enterprise_ios_mobile_tests
         continue-on-error: true
-        timeout-minutes: 50
+        # This step compiles Enterprise JVM fixtures and then performs a cold native
+        # XCFramework/Xcode build, which can legitimately take longer than an hour
+        # when the native cache is cold.
+        timeout-minutes: 90
         run: |
           ./gradlew :waltid-enterprise-integration-tests:enterpriseIosMobileIntegrationTest \
             --no-configuration-cache \

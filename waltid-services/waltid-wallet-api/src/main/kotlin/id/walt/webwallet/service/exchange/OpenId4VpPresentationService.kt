@@ -24,6 +24,7 @@ import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestParameterCodec
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
+import id.waltid.openid4vp.wallet.request.WalletCapabilities
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.URLBuilder
 import io.ktor.http.Url
@@ -38,6 +39,7 @@ class OpenId4VpPresentationService(
     private val credentialService: CredentialsService,
     private val unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
         AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+    private val requestUriDataFetcher: WebDataFetcher = defaultRequestUriDataFetcher,
 ) {
     private val logger = KotlinLogging.logger { }
     private val json = Json {
@@ -58,7 +60,7 @@ class OpenId4VpPresentationService(
             enforceFinalRequestObject = false,
         ) { requestUri, requestUriMethod ->
             AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
-                webResolveAuthReq = webResolveAuthReq,
+                webResolveAuthReq = requestUriDataFetcher,
                 requestUri = requestUri,
                 requestUriMethod = requestUriMethod,
                 requestUriPostWalletMetadata = runtimeRequestUriPostWalletMetadata,
@@ -178,7 +180,7 @@ class OpenId4VpPresentationService(
     private fun DigitalCredential.toDcqlDisclosures(): List<DcqlDisclosure>? =
         (this as? SelectivelyDisclosableVerifiableCredential)
             ?.disclosures
-            ?.map { DcqlDisclosure(it.name, it.value) }
+            ?.map { DcqlDisclosure(it.name, it.value, it.location) }
 
     private suspend fun buildRuntimeRequestUriPostWalletMetadata(walletId: Uuid): String {
         val runtimeKeyTypes = KeysService.list(walletId)
@@ -191,11 +193,14 @@ class OpenId4VpPresentationService(
 
         val runtimeCapabilities = WalletPresentationFormatRegistry.capabilitiesFromKeyTypes(runtimeKeyTypes)
         val runtimeVpFormatsSupported = WalletPresentationFormatRegistry.buildVpFormatsSupported(runtimeCapabilities)
-        return AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(runtimeVpFormatsSupported)
+        return AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+            WalletCapabilities(vpFormatsSupported = runtimeVpFormatsSupported)
+        )
     }
 
     companion object {
-        private val webResolveAuthReq = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
+        private val defaultRequestUriDataFetcher =
+            WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
 
         fun isOpenId4VpRequestCandidate(request: String): Boolean = runCatching {
             val parameters = Url(request).parameters

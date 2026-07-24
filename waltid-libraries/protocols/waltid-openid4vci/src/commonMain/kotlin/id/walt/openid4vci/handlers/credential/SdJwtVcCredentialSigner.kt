@@ -121,14 +121,19 @@ object SdJwtVcCredentialSigner {
 
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
 
-        val headers = mapOf(
-            JWT_HEADER_KID to getKidHeader(issuerKey, issuerDid),
-            JWT_HEADER_TYPE to (sdJwtTypeHeader ?: SD_JWT_VC_TYPE_HEADER)
-        ).plus(x5Chain?.let {
-            mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert ->
-                cert.bytes.toByteArray().encodeToBase64().toJsonElement()
-            }))
-        } ?: mapOf())
+        // When x5Chain is provided, use x5c header instead of kid (HAIP compliance)
+        // The x5c header identifies the signing key via the certificate chain
+        val headers = if (x5Chain != null && x5Chain.isNotEmpty()) {
+            mapOf(
+                JWT_HEADER_TYPE to (sdJwtTypeHeader ?: SD_JWT_VC_TYPE_HEADER),
+                JWT_HEADER_X5C to JsonArray(x5Chain.map { cert -> cert.bytes.toByteArray().encodeToBase64().toJsonElement() })
+            )
+        } else {
+            mapOf(
+                JWT_HEADER_KID to getKidHeader(issuerKey, issuerDid),
+                JWT_HEADER_TYPE to (sdJwtTypeHeader ?: SD_JWT_VC_TYPE_HEADER)
+            )
+        }
 
         val finalSdPayload = SDPayload.createSDPayload(
             fullPayload = fullPayload,

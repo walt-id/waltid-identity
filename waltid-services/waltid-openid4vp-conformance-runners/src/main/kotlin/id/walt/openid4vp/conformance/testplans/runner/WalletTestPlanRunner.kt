@@ -6,8 +6,11 @@ import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletTestPlan
 import io.ktor.client.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.*
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Executes a single wallet conformance test plan
@@ -33,7 +36,11 @@ class WalletTestPlanRunner(
     private val conformance = ConformanceInterface(conformanceHost, conformancePort)
 
     /**
-     * Execute the test plan and return results
+     * Execute the test plan and return results.
+     *
+     * Each module is run in its own test plan with a unique alias to avoid
+     * "alias conflict" errors from the conformance suite when one test starts
+     * before the previous one fully completes.
      */
     suspend fun test(): List<TestPlanResult> {
         println()
@@ -47,23 +54,25 @@ class WalletTestPlanRunner(
         println("  Signed request: ${testPlan.requiresSignedRequest}")
         println()
 
-        // Create test plan (response includes modules)
-        val planResponse = createTestPlan()
-        val testPlanId = planResponse.id
-        println("Test plan created: $testPlanId")
-        println("View plan: https://$conformanceHost:$conformancePort/plan-detail.html?plan=$testPlanId")
-
-        // Get test modules from create response
-        val modules = planResponse.modules
-        println("Test modules: ${modules.size}")
+        // First, create a "discovery" plan to get the list of modules
+        // We'll then create individual plans per module to avoid alias conflicts
+        val discoveryPlanResponse = createTestPlan(moduleIndex = 0)
+        val modules = discoveryPlanResponse.modules
+        println("Discovered ${modules.size} test modules:")
         modules.forEach { println("   - ${it.testModule}") }
         println()
 
-        // Run each module
+        // Run each module in its own test plan with unique alias
         val results = mutableListOf<TestPlanResult>()
         modules.forEachIndexed { index, module ->
             println("[${index + 1}/${modules.size}] Running module: ${module.testModule}")
             
+            // Create a dedicated test plan for this module with unique alias
+            val modulePlanResponse = createTestPlan(moduleIndex = index + 1)
+            val testPlanId = modulePlanResponse.id
+            println("   Plan ID: $testPlanId (unique alias)")
+            println("   View: https://$conformanceHost:$conformancePort/plan-detail.html?plan=$testPlanId")
+
             val result = runModule(testPlanId, module)
             results.add(result)
 
@@ -83,29 +92,43 @@ class WalletTestPlanRunner(
     /**
      * Create test plan on conformance suite.
      * Returns the full response which includes the modules list.
+     *
+     * @param moduleIndex Index to make the alias unique per module (0 for discovery)
      */
-    private suspend fun createTestPlan(): CreateTestPlanResponse {        
+    private suspend fun createTestPlan(moduleIndex: Int): CreateTestPlanResponse {
         val variantJson = Json.encodeToString(testPlan.variant)
-        
-        println("DEBUG: Creating test plan...")
-        println("DEBUG: Plan name: ${testPlan.planName}")
-        println("DEBUG: Variant JSON: $variantJson")
-        println("DEBUG: Configuration: ${testPlan.configuration}")
         
         val createTestPlanUrl = conformance.createTestPlanUrlWithConfig {
             append("planName", testPlan.planName)
             append("variant", variantJson)
         }
         
-        println("DEBUG: URL: $createTestPlanUrl")
+        // Modify configuration to use unique alias per module
+        // This prevents "alias conflict" errors when tests run sequentially
+        val configWithUniqueAlias = makeAliasUnique(testPlan.configuration, moduleIndex)
         
-        val body = buildJsonObject {
-            put("configuration", testPlan.configuration)
-        }
-        val response = conformance.createTestPlan(createTestPlanUrl, body)
+        // Send configuration directly - conformance suite expects client.jwks at root level
+        val response = conformance.createTestPlan(createTestPlanUrl, configWithUniqueAlias)
+        println(response)
 
         println("Created test plan: ${response.id}")
         return response
+    }
+
+    /**
+     * Modify configuration JSON to create a completely unique alias.
+     * Uses a fresh timestamp + random suffix for each test plan to avoid
+     * "another test using the same alias" conflicts on conformance suite.
+     */
+    private fun makeAliasUnique(config: JsonObject, moduleIndex: Int): JsonObject {
+        val mutableMap = config.toMutableMap()
+        // Create completely unique alias: base_timestamp_random_moduleIndex
+        val randomSuffix = (1000..9999).random()
+        val freshTimestamp = System.currentTimeMillis()
+        val uniqueAlias = "waltid_${freshTimestamp}_${randomSuffix}_m${moduleIndex}"
+        mutableMap["alias"] = JsonPrimitive(uniqueAlias)
+        println("   Using unique alias: $uniqueAlias")
+        return JsonObject(mutableMap)
     }
 
     /**
@@ -128,20 +151,60 @@ class WalletTestPlanRunner(
             // Wait for test to be ready (WAITING state)
             conformance.waitForTestStatus(testId, shouldBeWaiting = true)
 
-            // Get the test run result which contains exposed endpoints
+            // Get the test run result which contains the wallet authorization URL
             val testRunResult = conformance.getTestRun(testId)
-            println("   Test exposed endpoints available")
-
-            // For wallet tests, trigger the wallet to process the authorization request
-            // The conformance suite exposes an authorization endpoint
-            val authEndpoint = testRunResult.getExposedAuthorizationEndpoint()
-            println("   Authorization endpoint: $authEndpoint")
             
-            // Trigger wallet via adapter (adapter forwards to wallet API)
-            // Use https for the conformance suite
-            val httpsEndpoint = authEndpoint.replace("http://", "https://")
-            val walletResponse = conformanceHttp.get(httpsEndpoint)
-            println("   Wallet response: ${walletResponse.status}")
+            // For wallet tests, the conformance suite provides a URL in browser.urls
+            // that should be called to trigger the wallet (simulating QR code scan / deep link)
+            val walletAuthUrl = testRunResult.getWalletAuthorizationUrl()
+                ?: throw IllegalStateException("No wallet authorization URL in browser.urls")
+            println("   Wallet authorization URL: $walletAuthUrl")
+
+            // Call the wallet adapter to trigger the authorization flow
+            // The URL from conformance suite points to ngrok/docker URL, but we call localhost directly
+            // IMPORTANT: Only replace the HOST part, not URLs in query parameters (like request_uri)
+            val parsedUrl = java.net.URL(walletAuthUrl)
+            val localWalletUrl = "http://127.0.0.1:7006${parsedUrl.path}${if (parsedUrl.query != null) "?${parsedUrl.query}" else ""}"
+            println("   Calling local adapter: $localWalletUrl")
+            val walletResponse = conformanceHttp.get(localWalletUrl)
+            println("   Wallet adapter response: ${walletResponse.status}")
+
+            // Check if wallet response contains a redirect URL that we need to follow
+            // This is needed for tests like "alternate-happy-flow" that use fragment-based redirects
+            if (walletResponse.status.isSuccess()) {
+                val responseBody = try { walletResponse.bodyAsText() } catch (_: Exception) { "" }
+                println("   Response body preview: ${responseBody.take(200)}")
+                val redirectUrl = try {
+                    val json = Json.parseToJsonElement(responseBody).jsonObject
+                    json["redirect_to"]?.jsonPrimitive?.contentOrNull
+                } catch (e: Exception) {
+                    println("   Warning: Could not parse redirect_to: ${e.message}")
+                    null
+                }
+
+                if (redirectUrl != null && redirectUrl.contains("#")) {
+                    // Fragment-based redirect - browser would navigate here to complete the flow
+                    // We need to POST the fragment data to the callback URL for the test to complete
+                    println("   Following fragment redirect: ${redirectUrl.take(100)}...")
+
+                    // Extract the base URL and fragment
+                    val fragmentIndex = redirectUrl.indexOf('#')
+                    val baseUrl = redirectUrl.substring(0, fragmentIndex)
+                    val fragment = redirectUrl.substring(fragmentIndex + 1)
+
+                    // POST the fragment as 'response' form parameter to complete the callback
+                    // This simulates what the browser's JavaScript would do to deliver the fragment
+                    try {
+                        val callbackResponse = conformanceHttp.post(baseUrl) {
+                            contentType(ContentType.Application.FormUrlEncoded)
+                            setBody("response=$fragment")
+                        }
+                        println("   Callback response: ${callbackResponse.status}")
+                    } catch (e: Exception) {
+                        println("   Warning: Failed to complete redirect callback: ${e.message}")
+                    }
+                }
+            }
 
             // Wait for test to complete (no longer WAITING)
             conformance.waitForTestStatus(testId, shouldBeWaiting = false)
@@ -149,15 +212,20 @@ class WalletTestPlanRunner(
             // Get final result from test info
             val testInfo = conformance.getTestRunInfo(testId)
             val conformanceResult = testInfo.result ?: "UNKNOWN"
+            val testStatus = testInfo.status ?: "UNKNOWN"
             
-            // For wallet tests, wallet status == conformance result
             val walletStatus = when {
-                testPlan.expectRejection && conformanceResult == "PASSED" -> "REJECTED"
                 conformanceResult == "PASSED" -> "PASSED"
                 conformanceResult == "FAILED" -> "FAILED"
-                conformanceResult == "WARNING" -> "PASSED" // Warnings are acceptable
+                testStatus == "INTERRUPTED" -> "INTERRUPTED"
+                conformanceResult == "REVIEW" -> "REVIEW"
+                conformanceResult == "WARNING" -> "WARNING"
                 else -> "UNKNOWN"
             }
+
+            // Wait a bit after each module to let the conformance suite fully release the alias
+            println("   Waiting for conformance suite to release alias...")
+            delay(2.seconds)
 
             return TestPlanResult(
                 conformanceTestId = testId,
@@ -188,12 +256,14 @@ class WalletTestPlanRunner(
         val passed = results.count { it.walletStatus == "PASSED" }
         val failed = results.count { it.walletStatus == "FAILED" }
         val rejected = results.count { it.walletStatus == "REJECTED" }
+        val interrupted = results.count { it.walletStatus == "INTERRUPTED" }
         val errors = results.count { it.walletStatus == "ERROR" }
         val timeouts = results.count { it.walletStatus == "TIMEOUT" }
 
         println("  Passed:  $passed")
         if (failed > 0) println("  Failed:  $failed")
-        if (rejected > 0) println("  Rejected: $rejected")
+        if (rejected > 0) println("  Rejected: $rejected (negative tests - wallet correctly rejected)")
+        if (interrupted > 0) println("  Interrupted: $interrupted")
         if (errors > 0) println("  Errors:  $errors")
         if (timeouts > 0) println("  Timeouts: $timeouts")
         println()
@@ -203,6 +273,7 @@ class WalletTestPlanRunner(
                 "PASSED" -> "[PASS]"
                 "FAILED" -> "[FAIL]"
                 "REJECTED" -> "[RJCT]"
+                "INTERRUPTED" -> "[INTR]"
                 "ERROR" -> "[ERR ]"
                 "TIMEOUT" -> "[TIME]"
                 else -> "[????]"

@@ -6,6 +6,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
+import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.plans.MdlX509SanDnsRequestUriSignedDirectPost
 import id.walt.openid4vp.conformance.testplans.plans.SdJwtVcX509SanDnsRequestUriSignedDirectPostJwt
@@ -19,22 +20,31 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.reflect.jvm.jvmName
 import kotlin.test.assertNotNull
 
+/**
+ * Runner for Verifier2 conformance tests.
+ *
+ * Starts an embedded Verifier2 server and runs test plans against
+ * the OpenID Foundation conformance suite.
+ *
+ * @param verifierUrlPrefix URL prefix where the verifier is accessible from the conformance suite.
+ *                          Must be a publicly accessible URL (e.g., ngrok tunnel).
+ * @param conformanceHost Conformance suite hostname.
+ * @param conformancePort Conformance suite HTTPS port.
+ */
 class ConformanceTestRunner(
-    verifier2UrlPrefix: String = "https://verifier2.localhost/verification-session",
-    val conformanceHost: String = "localhost.emobix.co.uk",
-    val conformancePort: Int = 8443
+    private val verifierUrlPrefix: String = ConformanceConfig.VERIFIER_URL_PREFIX_PLACEHOLDER,
+    private val conformanceHost: String = ConformanceConfig.CONFORMANCE_HOST,
+    private val conformancePort: Int = ConformanceConfig.CONFORMANCE_PORT
 ) {
 
-
     private val testPlans: List<TestPlan> = listOf(
-        MdlX509SanDnsRequestUriSignedDirectPost(verifier2UrlPrefix, conformanceHost, conformancePort),
-        SdJwtVcX509SanDnsRequestUriSignedDirectPostJwt(verifier2UrlPrefix, conformanceHost, conformancePort)
+        MdlX509SanDnsRequestUriSignedDirectPost(verifierUrlPrefix, conformanceHost, conformancePort),
+        SdJwtVcX509SanDnsRequestUriSignedDirectPostJwt(verifierUrlPrefix, conformanceHost, conformancePort)
     )
 
-
     fun run() {
-        val localVerifierHost = "127.0.0.1"
-        val localVerifierPort = 7003
+        val localVerifierHost = ConformanceConfig.VERIFIER_LOCAL_HOST
+        val localVerifierPort = ConformanceConfig.VERIFIER_LOCAL_PORT
 
         E2ETest(localVerifierHost, localVerifierPort, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
@@ -62,7 +72,7 @@ class ConformanceTestRunner(
             test("Check if conformance available") {
                 val conformanceVersion = conformance.getServerVersion()
                 assertNotNull(conformanceVersion)
-                println("✅ Conformance server version $conformanceVersion available!")
+                println("Conformance server version $conformanceVersion available!")
 
                 conformanceVersion
             }
@@ -81,4 +91,17 @@ class ConformanceTestRunner(
     }
 }
 
-fun main() = ConformanceTestRunner().run()
+/**
+ * Main entry point for running conformance tests standalone.
+ */
+fun main() {
+    val ngrokUrl = System.getenv("VERIFIER_NGROK_URL")
+    val verifierUrlPrefix = ngrokUrl?.let { "$it/verification-session" }
+        ?: ConformanceConfig.VERIFIER_URL_PREFIX_PLACEHOLDER
+
+    println("Starting Verifier2 Conformance Tests")
+    println("Verifier URL: $verifierUrlPrefix")
+    println()
+
+    ConformanceTestRunner(verifierUrlPrefix).run()
+}

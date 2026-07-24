@@ -68,10 +68,12 @@ object ConformanceConfig {
     
     /**
      * Wallet adapter authorization endpoint URL.
-     * Uses host.docker.internal so conformance suite in Docker can reach host.
+     * Set WALLET_ADAPTER_URL env var to override (e.g., ngrok URL).
+     * Default uses host.docker.internal so conformance suite in Docker can reach host.
      */
     val WALLET_ADAPTER_URL: String
-        get() = "http://host.docker.internal:$WALLET_ADAPTER_PORT/openid4vp/authorize"
+        get() = System.getenv("WALLET_ADAPTER_URL")
+            ?: "http://host.docker.internal:$WALLET_ADAPTER_PORT/openid4vp/authorize"
     
     // ================================
     // Issuer Settings

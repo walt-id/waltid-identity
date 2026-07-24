@@ -22,6 +22,33 @@ object EudiTestBackend {
     private const val BACKEND_AUTHORIZE = "https://backend.issuer.eudiw.dev/form_authorize_generate"
     private const val VERIFIER_BACKEND = "https://verifier-backend.eudiw.dev"
 
+    /**
+     * Trust anchor used by the EUDI reference verifier for Request Object signing.
+     *
+     * This is pinned test-PKI material from the EUDI reference wallet rather than a certificate
+     * learned from an untrusted Request Object at runtime.
+     */
+    val verifierTrustAnchorPem = """
+        -----BEGIN CERTIFICATE-----
+        MIIC0zCCAnmgAwIBAgIUXRXxkLbUM6+njr/XT0IIw/HA/uowCgYIKoZIzj0EAwMw
+        VzEZMBcGA1UEAwwQUElEIElzc3VlciBDQSAwMjEtMCsGA1UECgwkRVVESSBXYWxs
+        ZXQgUmVmZXJlbmNlIEltcGxlbWVudGF0aW9uMQswCQYDVQQGEwJFVTAeFw0yNTA0
+        MDkwMDAzMzBaFw0zNDA3MDYwMDAzMjlaMFcxGTAXBgNVBAMMEFBJRCBJc3N1ZXIg
+        Q0EgMDIxLTArBgNVBAoMJEVVREkgV2FsbGV0IFJlZmVyZW5jZSBJbXBsZW1lbnRh
+        dGlvbjELMAkGA1UEBhMCRVUwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARkqdLm
+        wIlv+SSWr00tAIrt7EAMztgd3w9qA6qEm16yVfsLcyx2f4oIWuH45wa37J9GoNWp
+        deo27VoSoNMCzxOYo4IBITCCAR0wEgYDVR0TAQH/BAgwBgEB/wIBADAfBgNVHSME
+        GDAWgBRCUFC+ELgQ8J1EXI2/qxAI7ifcSTATBgNVHSUEDDAKBggrgQICAAABBzBD
+        BgNVHR8EPDA6MDigNqA0hjJodHRwczovL3ByZXByb2QucGtpLmV1ZGl3LmRldi9j
+        cmwvcGlkX0NBX0VVXzAyLmNybDAdBgNVHQ4EFgQUQlBQvhC4EPCdRFyNv6sQCO4n
+        3EkwDgYDVR0PAQH/BAQDAgEGMF0GA1UdEgRWMFSGUmh0dHBzOi8vZ2l0aHViLmNv
+        bS9ldS1kaWdpdGFsLWlkZW50aXR5LXdhbGxldC9hcmNoaXRlY3R1cmUtYW5kLXJl
+        ZmVyZW5jZS1mcmFtZXdvcmswCgYIKoZIzj0EAwMDSAAwRQIhAIavYfC5o0VVLKfg
+        TKkzzWgc09hzDMsCl3O2le2sQfG7AiA2soqAN5gtUOLQKWK00DUz22EW79rvaV+V
+        JPvfdQeokA==
+        -----END CERTIFICATE-----
+    """.trimIndent()
+
     private val client by lazy {
         HttpClient {
             expectSuccess = false
@@ -140,12 +167,16 @@ object EudiTestBackend {
         return GeneratedOffer(offerUrl = offerUrl, txCode = txCodeValue)
     }
 
-    suspend fun createVerifierTransaction(credentialId: String = "eu.europa.ec.eudi.pid_vc_sd_jwt"): VerifierTransaction {
+    suspend fun createVerifierTransaction(
+        credentialId: String = "eu.europa.ec.eudi.pid_vc_sd_jwt",
+        encryptedResponse: Boolean = false,
+    ): VerifierTransaction {
         val dcqlQuery = buildDcqlQuery(credentialId)
         val payload = buildJsonObject {
             put("dcql_query", dcqlQuery)
             put("nonce", JsonPrimitive(Uuid.random().toString()))
             put("request_uri_method", JsonPrimitive("post"))
+            if (encryptedResponse) put("encrypted_response", JsonPrimitive(true))
             put("profile", JsonPrimitive("openid4vp"))
             put("authorization_request_uri", JsonPrimitive("openid4vp://"))
         }

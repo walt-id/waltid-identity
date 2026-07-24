@@ -351,17 +351,6 @@ class HolderPolicyEngineTest {
                             {"path": ["family_name"]},
                             {"path": ["address", "street_address"]}
                           ]
-                        },
-                        {
-                          "id": "mdl",
-                          "format": "mso_mdoc",
-                          "meta": {
-                            "doctype_value": "org.iso.7367.1.mVRC"
-                          },
-                          "claims": [
-                            {"path": ["org.iso.7367.1", "vehicle_holder"]},
-                            {"path": ["org.iso.18013.5.1", "first_name"]}
-                          ]
                         }
                     ]
                     }
@@ -389,17 +378,6 @@ class HolderPolicyEngineTest {
                             {"path": ["given_name"]},
                             {"path": ["family_name"]},
                             {"path": ["birthdate"]}
-                          ]
-                        },
-                        {
-                          "id": "mdl",
-                          "format": "mso_mdoc",
-                          "meta": {
-                            "doctype_value": "org.iso.7367.1.mVRC"
-                          },
-                          "claims": [
-                            {"path": ["org.iso.7367.1", "vehicle_holder"]},
-                            {"path": ["org.iso.18013.5.1", "first_name"]}
                           ]
                         }
                     ]

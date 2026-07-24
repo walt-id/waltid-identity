@@ -464,7 +464,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
                     ConfigManager.preloadConfig(
                         "verifier-service",
                         OSSVerifier2ServiceConfig(
-                            clientId = "test-verifier-$tag",
+                            clientId = null,
                             clientMetadata = ClientMetadata(clientName = "Test Verifier"),
                             urlPrefix = "$walletBase/verification-session",
                             urlHost = "openid4vp://authorize"
@@ -540,15 +540,14 @@ class Wallet2IssuerVerifier2IntegrationTest {
                         .body<VerificationSessionCreationResponse>()
                 }
                 val sessionId = verifierSession.sessionId
-                val bootstrapUrl = verifierSession.bootstrapAuthorizationRequestUrl
-                    ?: Url("$walletBase/verification-session/$sessionId/request")
+                val authorizationRequestUrl = requireNotNull(verifierSession.fullAuthorizationRequestUrl) {
+                    "Verifier session did not return a full Authorization Request URL"
+                }
 
-                // 5. Wallet presents to verifier using the bootstrapAuthorizationRequestUrl
-                // (which contains request_uri=... so WalletPresentFunctionality2 fetches the
-                // full AuthorizationRequest including dcql_query from the server)
+                // 5. Wallet presents to the verifier using the returned authorization request URL.
                 testAndReturn("[$tag] Wallet presents credential (OID4VP 1.0)") {
                     http.post("/wallet/$walletId/credentials/present") {
-                        setBody(PresentCredentialRequest(requestUrl = bootstrapUrl, did = holderDid))
+                        setBody(PresentCredentialRequest(requestUrl = authorizationRequestUrl, did = holderDid))
                     }.also {
                         assertEquals(HttpStatusCode.OK, it.status, "Present failed: ${it.body<String>()}")
                     }

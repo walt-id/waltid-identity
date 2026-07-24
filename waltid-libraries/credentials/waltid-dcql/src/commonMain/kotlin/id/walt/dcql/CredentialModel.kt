@@ -21,6 +21,9 @@ data class DcqlDisclosure(
     val name: String?,
     val value: JsonElement,
 
+    /** Full SD-JWT Claim Path locating this disclosure within the credential. */
+    val location: List<JsonElement>? = null,
+
     // A place to pass a reference to the original (using which this class was created)
     //val original: Any? = null // no longer needed?
 )

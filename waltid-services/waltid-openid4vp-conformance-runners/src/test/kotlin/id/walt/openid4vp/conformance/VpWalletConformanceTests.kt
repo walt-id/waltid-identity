@@ -3,8 +3,9 @@ package id.walt.openid4vp.conformance
 import id.walt.openid4vp.conformance.adapter.VpWalletConformanceAdapter
 import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
+import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.VpWalletMdlX509HashRequestUriSignedDirectPostHaip
 import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.VpWalletMdlX509SanDnsRequestUriSignedDirectPost
-import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.VpWalletNegativeTests
+import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip
 import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost
 import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletTestPlan
 import id.walt.openid4vp.conformance.testplans.runner.WalletTestPlanRunner
@@ -17,11 +18,31 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
 /**
  * VP Wallet Conformance Tests
  * 
  * Tests wallet-side OpenID4VP compliance against the OpenID Foundation conformance suite.
+ * All test modules come from OIDF's `oid4vp-1final-wallet-haip-test-plan`.
+ *
+ * ## OIDF Test Modules Included
+ *
+ * The HAIP test plan includes these modules (positive and negative):
+ * - oid4vp-1final-wallet-happy-flow
+ * - oid4vp-1final-wallet-alternate-happy-flow
+ * - oid4vp-1final-wallet-request-uri-method-post
+ * - oid4vp-1final-wallet-fewer-claims-than-available
+ * - oid4vp-1final-wallet-optional-credential-set
+ * - oid4vp-1final-wallet-no-claims-in-dcql-query
+ * - oid4vp-1final-wallet-negative-test-invalid-request-object-signature
+ * - oid4vp-1final-wallet-negative-test-mismatched-client-id
+ * - oid4vp-1final-wallet-negative-test-missing-nonce
+ * - oid4vp-1final-wallet-negative-test-redirect-uri-with-direct-post
+ * - oid4vp-1final-wallet-negative-test-invalid-client-id-prefix
+ * - oid4vp-1final-wallet-negative-test-unknown-transaction-data-type
+ * - oid4vp-1final-wallet-negative-test-response-uri-not-client-id
+ * - oid4vp-1final-wallet-negative-test-wrong-expected-origins
  * 
  * ## Prerequisites
  * 
@@ -37,26 +58,17 @@ import kotlin.test.Test
  * 
  * ## Running Tests
  * 
- * Run the isolated test (currently working):
  * ```bash
  * ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
- *     --tests "IsolatedWalletConformanceTest"
+ *     --tests "VpWalletConformanceTests"
  * ```
- * 
- * ## Known Issues
- * 
- * - Test plan creation works (verified)
- * - `getTestModules()` returns 404 - API path needs fixing
- * - Full test suite in this class has timeout issues (see IsolatedWalletConformanceTest for working pattern)
- * 
- * @see IsolatedWalletConformanceTest for the working isolated test pattern
  */
 class VpWalletConformanceTests {
 
     companion object {
         val walletApiUrl: String = ConformanceConfig.WALLET_API_URL
         val adapterPort: Int = ConformanceConfig.WALLET_ADAPTER_PORT
-        val adapterUrl: String = "http://host.docker.internal:$adapterPort/openid4vp/authorize"
+        val adapterUrl: String = ConformanceConfig.WALLET_ADAPTER_URL
         val conformanceHost: String = ConformanceConfig.CONFORMANCE_HOST
         val conformancePort: Int = ConformanceConfig.CONFORMANCE_PORT
 
@@ -90,13 +102,80 @@ class VpWalletConformanceTests {
             }
             expectSuccess = false
         }
+
+        fun assertConformancePassed(results: List<id.walt.openid4vp.conformance.testplans.plans.TestPlanResult>) {
+            assertTrue(results.isNotEmpty(), "Conformance plan returned no module results")
+            assertTrue(results.all { it.passed },
+                "Conformance failures: " + results.filterNot { it.passed }.joinToString { result ->
+                    "${result.conformanceTestId}=${result.conformanceResult}/${result.walletStatus}: ${result.message}"
+                }
+            )
+        }
     }
+
+    // ========================================================================
+    // HAIP Tests (x509_hash) - Required for HAIP compliance
+    // ========================================================================
+
+    /**
+     * SD-JWT VC + x509_hash + request_uri_signed + direct_post.jwt (HAIP)
+     *
+     * This is the primary HAIP compliance test for SD-JWT VC credentials.
+     * Runs all OIDF modules from oid4vp-1final-wallet-haip-test-plan.
+     */
+    @Test
+    @EnabledIf("isConformanceAvailable")
+    fun `VP Wallet - SD-JWT VC HAIP`() = runBlocking {
+        val httpClient = createHttpClient()
+        val adapter = VpWalletConformanceAdapter(
+            walletApiUrl = walletApiUrl,
+            adapterPort = adapterPort
+        )
+
+        try {
+            adapter.start(httpClient)
+            val plan = VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip(adapterUrl, conformanceHost, conformancePort)
+            assertConformancePassed(WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test())
+        } finally {
+            adapter.stop()
+            httpClient.close()
+        }
+    }
+
+    /**
+     * mDL + x509_hash + request_uri_signed + direct_post.jwt (HAIP)
+     *
+     * This is the primary HAIP compliance test for mDL credentials.
+     * Runs all OIDF modules from oid4vp-1final-wallet-haip-test-plan.
+     */
+    @Test
+    @EnabledIf("isConformanceAvailable")
+    fun `VP Wallet - mDL HAIP`() = runBlocking {
+        val httpClient = createHttpClient()
+        val adapter = VpWalletConformanceAdapter(
+            walletApiUrl = walletApiUrl,
+            adapterPort = adapterPort
+        )
+
+        try {
+            adapter.start(httpClient)
+            val plan = VpWalletMdlX509HashRequestUriSignedDirectPostHaip(adapterUrl, conformanceHost, conformancePort)
+            assertConformancePassed(WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test())
+        } finally {
+            adapter.stop()
+            httpClient.close()
+        }
+    }
+
+    // ========================================================================
+    // Standard Tests (x509_san_dns) - Non-HAIP variants
+    // ========================================================================
 
     /**
      * SD-JWT VC + x509_san_dns + request_uri_signed + direct_post.jwt
      * 
-     * NOTE: This test currently has timeout issues when run from this class.
-     * Use IsolatedWalletConformanceTest.testWalletTestPlanRunner() instead.
+     * Baseline test using x509_san_dns instead of x509_hash.
+     * For official HAIP certification, use the HAIP variant above.
      */
     @Test
     @EnabledIf("isConformanceAvailable")
@@ -110,7 +189,7 @@ class VpWalletConformanceTests {
         try {
             adapter.start(httpClient)
             val plan = VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(adapterUrl, conformanceHost, conformancePort)
-            WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
+            assertConformancePassed(WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test())
         } finally {
             adapter.stop()
             httpClient.close()
@@ -119,6 +198,9 @@ class VpWalletConformanceTests {
 
     /**
      * mDL + x509_san_dns + request_uri_signed + direct_post.jwt
+     *
+     * Baseline test using x509_san_dns instead of x509_hash.
+     * For official HAIP certification, use the HAIP variant above.
      */
     @Test
     @EnabledIf("isConformanceAvailable")
@@ -132,29 +214,48 @@ class VpWalletConformanceTests {
         try {
             adapter.start(httpClient)
             val plan = VpWalletMdlX509SanDnsRequestUriSignedDirectPost(adapterUrl, conformanceHost, conformancePort)
-            WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
+            assertConformancePassed(WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test())
         } finally {
             adapter.stop()
             httpClient.close()
         }
     }
 
+    // ========================================================================
+    // Combined Test Suites
+    // ========================================================================
+
     /**
-     * Negative Tests - Security Validation
+     * Run all HAIP wallet test plans (x509_hash)
+     *
+     * Use this for HAIP compliance validation.
+     * Each plan runs all OIDF modules with different credential formats.
      */
     @Test
     @EnabledIf("isConformanceAvailable")
-    fun `VP Wallet - Negative Tests`() = runBlocking {
+    fun `Run all VP Wallet HAIP conformance tests`() = runBlocking {
         val httpClient = createHttpClient()
         val adapter = VpWalletConformanceAdapter(
             walletApiUrl = walletApiUrl,
             adapterPort = adapterPort
         )
         
+        val testPlans: List<WalletTestPlan> = listOf(
+            VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip(adapterUrl, conformanceHost, conformancePort),
+            VpWalletMdlX509HashRequestUriSignedDirectPostHaip(adapterUrl, conformanceHost, conformancePort)
+        )
+
         try {
             adapter.start(httpClient)
-            val plan = VpWalletNegativeTests(adapterUrl, conformanceHost, conformancePort)
-            WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
+
+            testPlans.forEach { plan ->
+                println()
+                println("=" .repeat(80))
+                println("Running: ${plan.description}")
+                println("=" .repeat(80))
+
+                assertConformancePassed(WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test())
+            }
         } finally {
             adapter.stop()
             httpClient.close()
@@ -162,7 +263,9 @@ class VpWalletConformanceTests {
     }
 
     /**
-     * Run all VP Wallet test plans
+     * Run all VP Wallet test plans (all variants)
+     *
+     * Includes both HAIP (x509_hash) and baseline (x509_san_dns) variants.
      */
     @Test
     @EnabledIf("isConformanceAvailable")
@@ -174,9 +277,12 @@ class VpWalletConformanceTests {
         )
         
         val testPlans: List<WalletTestPlan> = listOf(
+            // HAIP variants (x509_hash)
+            VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip(adapterUrl, conformanceHost, conformancePort),
+            VpWalletMdlX509HashRequestUriSignedDirectPostHaip(adapterUrl, conformanceHost, conformancePort),
+            // Standard variants (x509_san_dns)
             VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(adapterUrl, conformanceHost, conformancePort),
-            VpWalletMdlX509SanDnsRequestUriSignedDirectPost(adapterUrl, conformanceHost, conformancePort),
-            VpWalletNegativeTests(adapterUrl, conformanceHost, conformancePort)
+            VpWalletMdlX509SanDnsRequestUriSignedDirectPost(adapterUrl, conformanceHost, conformancePort)
         )
         
         try {
@@ -188,7 +294,7 @@ class VpWalletConformanceTests {
                 println("Running: ${plan.description}")
                 println("=" .repeat(80))
                 
-                WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
+                assertConformancePassed(WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test())
             }
         } finally {
             adapter.stop()

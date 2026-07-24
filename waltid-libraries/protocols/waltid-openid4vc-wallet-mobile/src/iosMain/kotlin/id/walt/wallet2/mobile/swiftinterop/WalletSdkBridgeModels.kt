@@ -13,6 +13,7 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.handlers.PreviewSessionException
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
@@ -43,6 +44,11 @@ import kotlin.time.Instant
  * @property databaseKeyProvider Swift-owned database key provider used when [persistence] uses
  * [WalletBridgeDatabaseKeyConfiguration.Provided].
  * @property attestation Optional client-attestation configuration for issuers that require it.
+ * @property requestObjectTrustAnchorPemCertificates Wallet-controlled PEM trust anchors for
+ * signed OID4VP Request Objects.
+ * @property requestObjectEnableSystemTrustAnchors Retained for source compatibility. iOS system
+ * trust anchors are not supported for Request Object validation and `true` is rejected.
+ * @property requestObjectAudience Expected Request Object audience.
  * @property preferredLocales Ordered BCP 47 locale preferences used to select display metadata.
  * @property transactionDataProfiles Transaction data profiles this wallet accepts.
  */
@@ -52,18 +58,31 @@ public data class WalletBridgeConfiguration(
     public val persistence: WalletBridgePersistence = WalletBridgePersistence(),
     public val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
     public val attestation: WalletAttestationConfig? = null,
+    public val requestObjectTrustAnchorPemCertificates: List<String> = emptyList(),
+    public val requestObjectEnableSystemTrustAnchors: Boolean = false,
+    public val requestObjectAudience: String = "https://self-issued.me/v2",
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
 )
 
-internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConfig(
-    walletId = walletId,
-    defaultKeyType = defaultKeyType,
-    attestationConfig = attestation,
-    persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
-    preferredLocales = preferredLocales,
-    transactionDataProfiles = transactionDataProfiles,
-)
+internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfig {
+    require(!requestObjectEnableSystemTrustAnchors) {
+        "iOS system trust anchors are not supported for OID4VP Request Object validation"
+    }
+    val x509Trust = requestObjectTrustAnchorPemCertificates.takeIf { it.isNotEmpty() }?.let {
+        WalletX509TrustConfig(trustAnchorPemCertificates = it)
+    }
+    return MobileWalletConfig(
+        walletId = walletId,
+        defaultKeyType = defaultKeyType,
+        attestationConfig = attestation,
+        persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
+        requestObjectX509Trust = x509Trust,
+        requestObjectAudience = requestObjectAudience,
+        preferredLocales = preferredLocales,
+        transactionDataProfiles = transactionDataProfiles,
+    )
+}
 
 /**
  * Persistence configuration exposed to the Swift wallet bridge.

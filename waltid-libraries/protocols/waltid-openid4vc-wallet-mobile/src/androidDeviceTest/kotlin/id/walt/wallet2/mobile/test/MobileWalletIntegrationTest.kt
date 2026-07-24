@@ -9,12 +9,16 @@ import id.walt.dcql.models.meta.NoMeta
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
+import id.walt.wallet2.mobile.MobileWalletEncryptionInfo
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
 import id.walt.wallet2.mobile.MobileWalletPresentationPreview
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
@@ -144,6 +148,37 @@ class MobileWalletIntegrationTest {
     @Test
     fun previewAndSubmitEudiPidSdJwtAgainstEudi() = runBlocking {
         previewAndSubmitEudiCredential(EUDI_PID_SD_JWT_CREDENTIAL_ID)
+    }
+
+    @Test
+    fun previewAndSubmitEncryptedEudiPidMdocAgainstDemoIssuer2AndVerifier2() = runBlocking {
+        val scenario = demoScenario("eudi-pid-mdoc")
+        val client = MobileWalletFactory(context).create(walletConfig("demo-encrypted-mdoc"))
+        val bootstrapResult = client.bootstrap()
+        val offer = DemoTestBackend.createOffer(scenario)
+        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        assertTrue(credentialIds.isNotEmpty(), "Should receive a demo EUDI PID mdoc")
+
+        val transaction = DemoTestBackend.createVerifierSession(
+            scenario = scenario,
+            encryptedResponse = true,
+        )
+        val preview = client.previewPresentation(transaction.authorizationRequestUri).requireReadyPreview()
+        assertEquals("direct_post.jwt", preview.request.responseMode)
+        assertIs<MobileWalletEncryptionInfo.Required>(preview.encryption)
+        assertTrue(preview.credentialOptions.isNotEmpty())
+        assertTrue(preview.credentialOptions.all { it.format == "mso_mdoc" })
+
+        val result = client.submitPresentation(
+            previewHandle = preview.previewHandle,
+            selectedCredentialOptions = preview.credentialOptions.map { it.selection },
+            did = bootstrapResult.did,
+        )
+        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
+            result,
+            "Encrypted demo EUDI PID mdoc presentation should succeed: $result",
+        )
+        DemoTestBackend.waitForVerifierSuccess(transaction.sessionId)
     }
 
     @Test
@@ -358,7 +393,10 @@ class MobileWalletIntegrationTest {
 
     @Test
     fun eudiPidSdJwtPersistsAcrossWalletRecreation() = runBlocking {
-        val walletConfig = walletConfig("eudi-pid-sd-jwt-persistence")
+        val walletConfig = walletConfig(
+            prefix = "eudi-pid-sd-jwt-persistence",
+            requestObjectX509Trust = eudiVerifierTrust,
+        )
 
         val client1 = MobileWalletFactory(context).create(walletConfig)
         client1.bootstrap()
@@ -399,10 +437,20 @@ class MobileWalletIntegrationTest {
     private fun walletConfig(
         prefix: String,
         transactionDataProfiles: List<MobileWalletTransactionDataProfile> = DEMO_TRANSACTION_DATA_PROFILES,
+        requestObjectX509Trust: WalletX509TrustConfig? = null,
+        // Demo sessions use direct redirect_uri-bound requests; keep Request Objects fail-closed.
+        unsignedRequestPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
     ) = MobileWalletConfig(
         walletId = "android-demo-$prefix-${UUID.randomUUID()}",
+        requestObjectX509Trust = requestObjectX509Trust,
+        unsignedRequestObjectPolicy = unsignedRequestPolicy,
         onEvent = { event -> println("WALLET EVENT: $event") },
         transactionDataProfiles = transactionDataProfiles,
+    )
+
+    private val eudiVerifierTrust = WalletX509TrustConfig(
+        trustAnchorPemCertificates = listOf(EudiTestBackend.verifierTrustAnchorPem),
     )
 
     private suspend fun receiveCredentialFromDemoIssuer2(scenarioId: String) {
@@ -420,7 +468,12 @@ class MobileWalletIntegrationTest {
     }
 
     private suspend fun receiveAndPresentEudiCredential(credentialId: String) {
-        val client = MobileWalletFactory(context).create(walletConfig("eudi-present-$credentialId"))
+        val client = MobileWalletFactory(context).create(
+            walletConfig(
+                prefix = "eudi-present-$credentialId",
+                requestObjectX509Trust = eudiVerifierTrust,
+            )
+        )
         val bootstrapResult = client.bootstrap()
 
         val offer = EudiTestBackend.generateOffer(credentialId)
@@ -442,7 +495,12 @@ class MobileWalletIntegrationTest {
     }
 
     private suspend fun previewAndSubmitEudiCredential(credentialId: String) {
-        val client = MobileWalletFactory(context).create(walletConfig("eudi-preview-submit-$credentialId"))
+        val client = MobileWalletFactory(context).create(
+            walletConfig(
+                prefix = "eudi-preview-submit-$credentialId",
+                requestObjectX509Trust = eudiVerifierTrust,
+            )
+        )
         val bootstrapResult = client.bootstrap()
 
         val offer = EudiTestBackend.generateOffer(credentialId)
@@ -567,6 +625,7 @@ class MobileWalletIntegrationTest {
     @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
     private fun invalidTransactionDataRequestUrl(): String = AuthorizationRequest(
         clientId = "redirect_uri:https://verifier.example/callback",
+        clientMetadata = ClientMetadata(),
         redirectUri = "https://verifier.example/callback",
         responseMode = OpenID4VPResponseMode.FRAGMENT,
         nonce = "nonce",

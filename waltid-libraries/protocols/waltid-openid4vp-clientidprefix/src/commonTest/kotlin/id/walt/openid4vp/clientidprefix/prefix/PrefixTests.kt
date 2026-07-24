@@ -125,6 +125,18 @@ class PrefixTests {
     }
 
     @Test
+    fun parseX509SanDnsAcceptsModernAndPunycodeLabels() {
+        assertEquals(
+            "verifier.example.technology",
+            parseClientIdPrefixTest<X509SanDns>("x509_san_dns:verifier.example.technology").dnsName,
+        )
+        assertEquals(
+            "xn--bcher-kva.example",
+            parseClientIdPrefixTest<X509SanDns>("x509_san_dns:xn--bcher-kva.example").dnsName,
+        )
+    }
+
+    @Test
     fun parseX509HashPrefixExample() {
         val parsed = parseClientIdPrefixTest<X509Hash>(x509HashExample)
         assertEquals("Uvo3HtuIxuhC92rShpgqcT3YXwrqRxWEviRiA0OZszk", parsed.hash)

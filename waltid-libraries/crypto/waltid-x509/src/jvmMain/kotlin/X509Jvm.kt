@@ -6,6 +6,8 @@ import java.io.FileInputStream
 import java.security.KeyStore
 import java.security.cert.*
 
+actual val platformSupportsPkixCertificatePathValidation: Boolean = true
+
 fun CertificateDer.toJcaX509Certificate(): X509Certificate =
     X509CertUtils.parse(bytes.toByteArray())
         ?: throw IllegalArgumentException("Failed to parse DER bytes as X.509 certificate")

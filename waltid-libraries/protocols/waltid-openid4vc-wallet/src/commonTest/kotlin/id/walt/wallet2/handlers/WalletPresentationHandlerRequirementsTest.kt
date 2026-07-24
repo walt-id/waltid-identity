@@ -13,6 +13,7 @@ import id.walt.dcql.models.CredentialSetQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.Wallet
@@ -218,6 +219,7 @@ class WalletPresentationHandlerRequirementsTest {
         )
         val requestUrl = AuthorizationRequest(
             clientId = "redirect_uri:https://verifier.example/callback",
+            clientMetadata = ClientMetadata(),
             redirectUri = "https://verifier.example/callback",
             responseMode = OpenID4VPResponseMode.FRAGMENT,
             nonce = "nonce",
@@ -283,6 +285,7 @@ class WalletPresentationHandlerRequirementsTest {
         )
         val requestUrl = AuthorizationRequest(
             clientId = "redirect_uri:https://verifier.example/callback",
+            clientMetadata = ClientMetadata(),
             redirectUri = "https://verifier.example/callback",
             responseMode = OpenID4VPResponseMode.FRAGMENT,
             nonce = "nonce",
@@ -325,6 +328,7 @@ class WalletPresentationHandlerRequirementsTest {
         )
         val requestUrl = AuthorizationRequest(
             clientId = "redirect_uri:https://verifier.example/callback",
+            clientMetadata = ClientMetadata(),
             redirectUri = "https://verifier.example/callback",
             responseMode = OpenID4VPResponseMode.FRAGMENT,
             nonce = "nonce",
@@ -648,8 +652,8 @@ class WalletPresentationHandlerRequirementsTest {
 
     @Test
     fun disclosureSelectionKeepsRequiredClaimsWhenFilteringDisclosures() {
-        val givenName = claimPath("$", "given_name")
-        val ageOver18 = claimPath("$", "age_over_18")
+        val givenName = claimPath("given_name")
+        val ageOver18 = claimPath("age_over_18")
         val matched = matchResult(
             "pid" to "cred-1",
             selectedDisclosures = mapOf(
@@ -660,8 +664,8 @@ class WalletPresentationHandlerRequirementsTest {
                 credentialQuery(
                     queryId,
                     claims = listOf(
-                        ClaimsQuery(id = "given_name", pathStrings = listOf("$", "given_name")),
-                        ClaimsQuery(id = "age_over_18", pathStrings = listOf("$", "age_over_18")),
+                        ClaimsQuery(id = "given_name", pathStrings = listOf("given_name")),
+                        ClaimsQuery(id = "age_over_18", pathStrings = listOf("age_over_18")),
                     ),
                 )
             },
@@ -684,9 +688,9 @@ class WalletPresentationHandlerRequirementsTest {
 
     @Test
     fun disclosureSelectionFiltersOptionalSelectivelyDisclosableClaimsOnly() {
-        val givenName = claimPath("$", "given_name")
-        val ageOver18 = claimPath("$", "age_over_18")
-        val vct = claimPath("$", "vct")
+        val givenName = claimPath("given_name")
+        val ageOver18 = claimPath("age_over_18")
+        val vct = claimPath("vct")
         val matched = matchResult(
             "pid" to "cred-1",
             selectedDisclosures = mapOf(
@@ -698,9 +702,9 @@ class WalletPresentationHandlerRequirementsTest {
                 credentialQuery(
                     queryId,
                     claims = listOf(
-                        ClaimsQuery(id = "given_name", pathStrings = listOf("$", "given_name")),
-                        ClaimsQuery(id = "age_over_18", pathStrings = listOf("$", "age_over_18")),
-                        ClaimsQuery(id = "vct", pathStrings = listOf("$", "vct")),
+                        ClaimsQuery(id = "given_name", pathStrings = listOf("given_name")),
+                        ClaimsQuery(id = "age_over_18", pathStrings = listOf("age_over_18")),
+                        ClaimsQuery(id = "vct", pathStrings = listOf("vct")),
                     ),
                     claimSets = listOf(
                         listOf("given_name", "vct"),
@@ -725,9 +729,9 @@ class WalletPresentationHandlerRequirementsTest {
 
     @Test
     fun presentationPreviewIncludesOptionalClaimSetDisclosuresWhenMatcherSelectedMinimalSet() {
-        val givenName = claimPath("$", "given_name")
-        val familyName = claimPath("$", "family_name")
-        val birthDate = claimPath("$", "birth_date")
+        val givenName = claimPath("given_name")
+        val familyName = claimPath("family_name")
+        val birthDate = claimPath("birth_date")
         val matched = matchResult(
             "pid" to "cred-1",
             selectedDisclosures = mapOf(
@@ -753,9 +757,9 @@ class WalletPresentationHandlerRequirementsTest {
 
     @Test
     fun disclosureSelectionCanIncludeOptionalClaimSetDisclosureWhenMatcherSelectedMinimalSet() {
-        val givenName = claimPath("$", "given_name")
-        val familyName = claimPath("$", "family_name")
-        val birthDate = claimPath("$", "birth_date")
+        val givenName = claimPath("given_name")
+        val familyName = claimPath("family_name")
+        val birthDate = claimPath("birth_date")
         val matched = matchResult(
             "pid" to "cred-1",
             selectedDisclosures = mapOf(
@@ -787,8 +791,8 @@ class WalletPresentationHandlerRequirementsTest {
 
     @Test
     fun disclosureSelectionOmitsSelectivelyDisclosableClaimsWhenNoClaimsAreRequested() {
-        val givenName = claimPath("$", "given_name")
-        val vct = claimPath("$", "vct")
+        val givenName = claimPath("given_name")
+        val vct = claimPath("vct")
         val matched = matchResult(
             "pid" to "cred-1",
             selectedDisclosures = mapOf(
@@ -810,9 +814,9 @@ class WalletPresentationHandlerRequirementsTest {
 
     @Test
     fun disclosureSelectionRejectsOptionalSubsetThatDoesNotSatisfyClaimSets() {
-        val givenName = claimPath("$", "given_name")
-        val ageOver18 = claimPath("$", "age_over_18")
-        val portrait = claimPath("$", "portrait")
+        val givenName = claimPath("given_name")
+        val ageOver18 = claimPath("age_over_18")
+        val portrait = claimPath("portrait")
         val matched = matchResult(
             "pid" to "cred-1",
             selectedDisclosures = mapOf(
@@ -824,9 +828,9 @@ class WalletPresentationHandlerRequirementsTest {
                 credentialQuery(
                     queryId,
                     claims = listOf(
-                        ClaimsQuery(id = "given_name", pathStrings = listOf("$", "given_name")),
-                        ClaimsQuery(id = "age_over_18", pathStrings = listOf("$", "age_over_18")),
-                        ClaimsQuery(id = "portrait", pathStrings = listOf("$", "portrait")),
+                        ClaimsQuery(id = "given_name", pathStrings = listOf("given_name")),
+                        ClaimsQuery(id = "age_over_18", pathStrings = listOf("age_over_18")),
+                        ClaimsQuery(id = "portrait", pathStrings = listOf("portrait")),
                     ),
                     claimSets = listOf(
                         listOf("given_name", "age_over_18"),
@@ -946,9 +950,9 @@ class WalletPresentationHandlerRequirementsTest {
         credentialQuery(
             queryId,
             claims = listOf(
-                ClaimsQuery(id = "given_name", pathStrings = listOf("$", "given_name")),
-                ClaimsQuery(id = "family_name", pathStrings = listOf("$", "family_name")),
-                ClaimsQuery(id = "birth_date", pathStrings = listOf("$", "birth_date")),
+                ClaimsQuery(id = "given_name", pathStrings = listOf("given_name")),
+                ClaimsQuery(id = "family_name", pathStrings = listOf("family_name")),
+                ClaimsQuery(id = "birth_date", pathStrings = listOf("birth_date")),
             ),
             claimSets = listOf(
                 listOf("given_name", "family_name"),

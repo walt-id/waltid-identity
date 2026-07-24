@@ -174,7 +174,7 @@ data class AuthorizationRequest(
             toJSON().addUpdateJsoObject(
                 buildJsonObject {
                     put(JWTClaims.Payload.issuer, clientId)
-                    put(JWTClaims.Payload.audience, "")
+                    put(JWTClaims.Payload.audience, "https://self-issued.me/v2")
                     put(
                         JWTClaims.Payload.expirationTime,
                         (Clock.System.now() + Duration.parse(1.days.toString())).epochSeconds

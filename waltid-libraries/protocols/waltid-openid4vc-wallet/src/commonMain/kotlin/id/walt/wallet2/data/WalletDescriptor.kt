@@ -33,6 +33,12 @@ data class WalletDescriptor(
     /** Static DID fallback when no DID store is configured. */
     val staticDid: String? = null,
 
+    /** Persisted wallet-controlled trust anchors and X.509 policy options. */
+    val requestObjectX509Trust: WalletX509TrustConfig? = null,
+
+    /** Discovery-mode-specific Request Object audience. */
+    val requestObjectAudience: String = "https://self-issued.me/v2",
+
     /**
      * ID of the preferred default key. When set, [Wallet.defaultKey] returns this key
      * instead of the first key in the stores. Null means "use first key".

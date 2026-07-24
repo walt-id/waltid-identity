@@ -2,6 +2,8 @@ package id.walt.wallet2.data
 
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
+import id.walt.openid4vp.clientidprefix.X509TrustPolicy
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.toList
@@ -55,6 +57,20 @@ data class Wallet(
      * Mirrors WalletServiceConfiguration.staticDid in the Enterprise.
      */
     val staticDid: String? = null,
+
+    /** Wallet-controlled trust policy for X.509-authenticated OID4VP Request Objects. */
+    val requestObjectX509TrustPolicy: X509TrustPolicy? = null,
+
+    /**
+     * Policy for handling unsigned OID4VP authorization requests.
+     * Defaults to REQUIRE_SIGNED for production-grade security.
+     * Use ALLOW_UNSIGNED only for testing or legacy interoperability.
+     */
+    val unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+
+    /** Expected Request Object audience for the wallet's configured discovery mode. */
+    val requestObjectAudience: String = "https://self-issued.me/v2",
 
     /**
      * ID of the preferred default key. When non-null, [defaultKey] returns this key

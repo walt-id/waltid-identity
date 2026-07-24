@@ -294,7 +294,7 @@ class Wallet2MoreUseCasesTest {
                 features = listOf(OSSWallet2FeatureCatalog, OSSVerifier2FeatureCatalog),
                 preload = {
                     ConfigManager.preloadConfig("wallet-service", OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$walletPort")))
-                    ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(clientId = "multi-format-verifier", clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Multi-format Test Verifier"), urlPrefix = "http://$host:$walletPort/verification-session", urlHost = "openid4vp://authorize"))
+                    ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(clientId = null, clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Multi-format Test Verifier"), urlPrefix = "http://$host:$walletPort/verification-session", urlHost = "openid4vp://authorize"))
                 },
                 init = { DidService.minimalInit() },
                 module = { multiFormatModule() }
@@ -386,7 +386,7 @@ class Wallet2MoreUseCasesTest {
                     http.post("/wallet/$walletId/credentials/present") {
                         contentType(ContentType.Application.Json)
                         setBody(id.walt.wallet2.handlers.PresentCredentialRequest(
-                            requestUrl = verifierSession.bootstrapAuthorizationRequestUrl ?: Url("http://$host:$walletPort/verification-session/${verifierSession.sessionId}/request"),
+                            requestUrl = verifierSession.fullAuthorizationRequestUrl ?: Url("http://$host:$walletPort/verification-session/${verifierSession.sessionId}/request"),
                             did = holderDid
                         ))
                     }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
@@ -677,7 +677,7 @@ class Wallet2MoreUseCasesTest {
                 features = listOf(OSSWallet2FeatureCatalog, OSSVerifier2FeatureCatalog),
                 preload = {
                     ConfigManager.preloadConfig("wallet-service", OSSWallet2ServiceConfig(publicBaseUrl = Url(walletBase)))
-                    ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(clientId = "isolated-vp-verifier", clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Isolated VP Verifier"), urlPrefix = "$walletBase/verification-session", urlHost = "openid4vp://authorize"))
+                    ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(clientId = null, clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Isolated VP Verifier"), urlPrefix = "$walletBase/verification-session", urlHost = "openid4vp://authorize"))
                 },
                 init = { DidService.minimalInit() },
                 module = { multiFormatModule() }
@@ -709,7 +709,7 @@ class Wallet2MoreUseCasesTest {
                     )) as VerificationSessionSetup)
                 }.body<VerificationSessionCreationResponse>()
 
-                val bootstrapUrl = verifierSession.bootstrapAuthorizationRequestUrl
+                val bootstrapUrl = verifierSession.fullAuthorizationRequestUrl
                     ?: Url("$walletBase/verification-session/${verifierSession.sessionId}/request")
 
                 // ── Isolated VP: caller supplies the credentials explicitly ──

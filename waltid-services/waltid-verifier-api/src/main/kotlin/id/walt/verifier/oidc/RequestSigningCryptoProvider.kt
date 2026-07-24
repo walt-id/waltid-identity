@@ -47,7 +47,8 @@ object RequestSigningCryptoProvider : JWTCryptoProvider {
 
     override fun sign(payload: JsonObject, keyID: String?, typ: String, headers: Map<String, Any>): String {
         return SignedJWT(
-            JWSHeader.Builder(JWSAlgorithm.ES256).keyID(signingKey.keyID).type(JOSEObjectType.JWT).customParams(headers)
+            JWSHeader.Builder(JWSAlgorithm.ES256).keyID(signingKey.keyID)
+                .type(JOSEObjectType("oauth-authz-req+jwt")).customParams(headers)
                 .also {
                     if (certificateChain != null) {
                         it.x509CertChain(

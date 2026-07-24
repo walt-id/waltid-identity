@@ -14,9 +14,11 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.handlers.PresentCredentialRequest
-import id.walt.wallet2.handlers.PresentationCredentialOption
 import id.walt.wallet2.handlers.PresentationCredentialRequirement
+import id.walt.wallet2.handlers.PresentationCredentialOption
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.walt.wallet2.handlers.PresentationCredentialSelection
 import id.walt.wallet2.handlers.PresentationDisclosureSelection
 import id.walt.wallet2.handlers.PresentationPreviewHandle
@@ -29,6 +31,7 @@ import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
@@ -167,6 +170,10 @@ public class MobileWallet internal constructor(
     private val keyGenerator: suspend (KeyType) -> Key,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     attestationConfig: WalletAttestationConfig? = null,
+    requestObjectX509Trust: WalletX509TrustConfig? = null,
+    requestObjectAudience: String = "https://self-issued.me/v2",
+    unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
     private val preferredLocales: List<String> = emptyList(),
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
@@ -195,6 +202,9 @@ public class MobileWallet internal constructor(
         keyStores = listOf(keyStore),
         didStore = didStore,
         credentialStores = listOf(credentialStore),
+        requestObjectX509TrustPolicy = requestObjectX509Trust?.toTrustPolicy(),
+        requestObjectAudience = requestObjectAudience,
+        unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
     )
 
     /**
@@ -405,6 +415,17 @@ public class MobileWallet internal constructor(
                         detailsJson = item.details.encodeJsonObject(),
                     )
                 }
+                val encryptionRequirements = WalletPresentationHandler
+                    .inspectEncryptionRequirements(result.authorizationRequest)
+                val encryption = if (encryptionRequirements.isEncryptionRequired) {
+                    MobileWalletEncryptionInfo.Required(
+                        contentEncryptionAlgorithm = requireNotNull(encryptionRequirements.encAlgorithm),
+                        keyManagementAlgorithm = requireNotNull(encryptionRequirements.algAlgorithm),
+                        verifierKeyThumbprint = requireNotNull(encryptionRequirements.verifierKeyThumbprint),
+                    )
+                } else {
+                    MobileWalletEncryptionInfo.NotRequired
+                }
                 MobileWalletPresentationPreviewResult.Ready(
                     MobileWalletPresentationPreview(
                         previewHandle = MobileWalletPresentationPreviewHandle(result.handle.value),
@@ -415,6 +436,7 @@ public class MobileWallet internal constructor(
                         ),
                         credentialOptions = result.credentialOptions.map { it.toMobileCredentialOption() },
                         credentialRequirements = result.credentialRequirements.map { it.toMobileCredentialRequirement() },
+                        encryption = encryption,
                     )
                 )
             }
@@ -595,6 +617,9 @@ private fun AuthorizationRequest.toMobileRequestInfo(
         nonce = nonce,
         responseEncryption = responseEncryption.toMobileResponseEncryption(),
         transactionData = transactionData,
+        responseMode = responseMode?.let { mode ->
+            Json.encodeToString(OpenID4VPResponseMode.serializer(), mode).trim('"')
+        },
     )
 }
 

@@ -47,18 +47,16 @@ export VERIFIER_NGROK_URL="https://YOUR-NGROK.ngrok-free.app"
 
 📄 **Details:** [docs/VCI-ISSUER.md](docs/VCI-ISSUER.md)
 
-### VP Verifier (2026-07-08)
+### VP Verifier (2026-07-13) ✅ ALL PASSING
 
-| Test | Result | Notes |
-|------|--------|-------|
-| mDL Baseline (`plain_vp`) | ✅ PASSED | x509_san_dns, direct_post |
-| SD-JWT HAIP | ❌ FAILED | Audience mismatch (x509_hash) |
-| mDL HAIP | ❌ FAILED | Audience mismatch (x509_hash) |
-| SD-JWT x509_hash HAIP | ❌ FAILED | Audience mismatch (x509_hash) |
+| Test | Credential | Client ID | Response Mode | Result |
+|------|------------|-----------|---------------|--------|
+| `MdlX509SanDnsRequestUriSignedDirectPost` | mDL (mdoc) | x509_san_dns | direct_post | ✅ PASSED |
+| `SdJwtVcX509SanDnsRequestUriSignedDirectPost` | SD-JWT VC | x509_san_dns | direct_post.jwt | ✅ PASSED |
+| `SdJwtVcX509HashRequestUriSignedDirectPostHaip` | SD-JWT VC | x509_hash | direct_post.jwt | ✅ PASSED |
+| `MdlX509HashRequestUriSignedDirectPostHaip` | mDL (mdoc) | x509_hash | direct_post.jwt | ✅ PASSED |
 
-**Pass rate: 1/4 (25%)**
-
-**Blocking Issue:** HAIP tests fail because the verifier's `AudienceCheckSdJwtVPPolicy` doesn't support `x509_hash:<sha256>` audience format required by HAIP.
+**Pass rate: 4/4 (100%)**
 
 📄 **Details:** [docs/VP-VERIFIER.md](docs/VP-VERIFIER.md)
 

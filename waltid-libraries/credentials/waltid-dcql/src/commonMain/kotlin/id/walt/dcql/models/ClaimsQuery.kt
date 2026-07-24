@@ -14,7 +14,7 @@ data class ClaimsQuery(
     /** Required if claim_sets is present in parent CredentialQuery */
     val id: String? = null,
 
-    /** Path to the claim (format-specific interpretation) */
+    /** Required non-empty path to the claim (format-specific interpretation). */
     val path: List<JsonElement>,
 
     /** Optional specific values to match */
@@ -24,6 +24,10 @@ data class ClaimsQuery(
     @SerialName("intent_to_retain")
     val intentToRetain: Boolean? = null
 ) {
+    init {
+        require(path.isNotEmpty()) { "Claims Query path must not be empty" }
+    }
+
     constructor(
         id: String? = null,
         pathStrings: List<String>,

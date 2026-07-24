@@ -32,7 +32,7 @@ object DcqlMatcher {
      * @param trustedAuthoritiesChecker Optional callback invoked when a credential query has
      *   `trusted_authorities` constraints. Receives the credential and the list of authority
      *   queries; should return `true` if the credential satisfies at least one authority.
-     *   When null (default), trusted_authorities constraints are not enforced.
+     *   When null (default), credentials cannot match a trusted_authorities constraint.
      * @return A Result containing a map where keys are CredentialQuery IDs and
      *         values are lists of matching Credentials, or a failure with an exception.
      */
@@ -103,6 +103,14 @@ object DcqlMatcher {
             val satisfied = checkCredentialSets(sets, finalIndividualMatches.keys)
             if (!satisfied) {
                 val errorMsg = "Required credential set constraints not met."
+                log.warn { errorMsg }
+                return Result.failure(DcqlMatchException(errorMsg))
+            }
+        } ?: run {
+            val missingRequired = query.credentials.map { it.id }
+                .filterNot(finalIndividualMatches::containsKey)
+            if (missingRequired.isNotEmpty()) {
+                val errorMsg = "No matches found for required credential queries: $missingRequired"
                 log.warn { errorMsg }
                 return Result.failure(DcqlMatchException(errorMsg))
             }
@@ -184,10 +192,7 @@ object DcqlMatcher {
         if (query.credentialSets == null && missingRequired.isNotEmpty()) {
             val errorMsg = "No matches found for required credential queries: $missingRequired"
             log.warn { errorMsg }
-            // Decide if this is a failure. Often, returning an empty map or partial map is desired.
-            // Let's return what we found, assuming partial fulfillment might be acceptable.
-            // If strict fulfillment is needed, uncomment the failure below.
-            // return Result.failure(DcqlMatchException(errorMsg))
+            return Result.failure(DcqlMatchException(errorMsg))
         }
 
 
@@ -298,46 +303,60 @@ object DcqlMatcher {
 
         // If the credential has disclosures and is JWT-based (where SD mechanism applies)
         if (isCredentialPotentiallySD && credential.disclosures != null) {
-            // Match on the claim name (path.last()). The disclosure's full Claim Path is available
-            // via it.location (SD-JWT VC §4.6.1) for stricter matching if needed in the future.
-            val targetClaimName = claimQuery.path.lastOrNull {
-                it is JsonPrimitive && it.isString
-            }?.jsonPrimitive?.content
-            val matchingDisclosure =
-                credential.disclosures?.find { it.name == targetClaimName }
+            val matchingDisclosure = credential.disclosures?.find { disclosure ->
+                disclosure.matchesPath(claimQuery.path)
+            }
 
             if (matchingDisclosure != null) {
                 if (!claimQuery.values.isNullOrEmpty()) {
                     val disclosureValueJson = matchingDisclosure.value
                     val matchesValue = claimQuery.values.any { queryValue -> queryValue == disclosureValueJson }
                     if (!matchesValue) {
-                        log.trace { "SD Disclosure '${targetClaimName}' value '${disclosureValueJson}' does not match required values ${claimQuery.values} in ${credential.id}" }
-                        return Result.failure(DcqlMatchException("SD Disclosure value mismatch for $targetClaimName"))
+                        log.trace { "SD Disclosure at '${matchingDisclosure.location}' value '${disclosureValueJson}' does not match required values ${claimQuery.values} in ${credential.id}" }
+                        return Result.failure(DcqlMatchException("SD Disclosure value mismatch for ${claimQuery.path}"))
                     }
                 }
-                log.trace { "SD Disclosure '${targetClaimName}' found and matches criteria in ${credential.id}" }
+                log.trace { "SD Disclosure at '${matchingDisclosure.location}' found and matches criteria in ${credential.id}" }
                 return Result.success(matchingDisclosure) // Return the disclosure object
             } else {
                 // If path not found as a disclosure, it might be an always-visible claim in the SD-JWT core.
                 // Fall through to generic path resolution for such cases.
-                log.trace { "Claim path ${claimQuery.path} not found among SD disclosures for ${credential.id}. Checking core JWT." }
+                log.trace { "Claim path ${claimQuery.path.joinToString(".")} not found among SD disclosures for ${credential.id}. Checking core JWT." }
             }
         }
 
         // Generic path resolution for non-SD claims or core claims of an SD-JWT
-        val claimJsonElement = resolveClaimPath(credential.data, claimQuery.path)
-            ?: return Result.failure(DcqlMatchException("Claim path ${claimQuery.path} not found in ${credential.id}"))
+        val pathToResolve = claimQuery.path
+        val claimJsonElement = resolveClaimPath(credential.data, pathToResolve)
+            ?: return Result.failure(DcqlMatchException("Claim path ${claimQuery.path.joinToString(".")} not found in ${credential.id}"))
 
         if (!claimQuery.values.isNullOrEmpty()) {
             val matchesValue = claimQuery.values.any { queryValue -> queryValue == claimJsonElement }
             if (!matchesValue) {
-                log.trace { "claimExistsAndMatchesValue: Claim path ${claimQuery.path} value '$claimJsonElement' does not match required values ${claimQuery.values} in ${credential.id} " }
-                return Result.failure(DcqlMatchException("Claim value mismatch for ${claimQuery.path}"))
+                log.trace { "claimExistsAndMatchesValue: Claim path ${claimQuery.path.joinToString(".")} value '$claimJsonElement' does not match required values ${claimQuery.values} in ${credential.id} " }
+                return Result.failure(DcqlMatchException("Claim value mismatch for ${claimQuery.path.joinToString(".")}"))
             }
         }
-        log.trace { "Claim path ${claimQuery.path} exists and matches criteria in ${credential.id}" }
+        log.trace { "Claim path ${claimQuery.path.joinToString(".")} exists and matches criteria in ${credential.id}" }
         // If values were specified and matched, or if no values were specified (existence check), return the element.
         return Result.success(claimJsonElement)
+    }
+
+    /** Match a Claims Path Pointer against the disclosure's complete resolved location. */
+    fun DcqlDisclosure.matchesPath(queryPath: List<JsonElement>): Boolean {
+        val disclosurePath = location ?: name
+            ?.takeIf { queryPath.size == 1 }
+            ?.let { listOf(JsonPrimitive(it)) }
+            ?: return false
+        if (queryPath.size != disclosurePath.size) return false
+        return queryPath.zip(disclosurePath).all { (querySegment, actualSegment) ->
+            when (querySegment) {
+                is JsonNull -> actualSegment is JsonPrimitive &&
+                    !actualSegment.isString &&
+                    actualSegment.intOrNull?.let { it >= 0 } == true
+                else -> querySegment == actualSegment
+            }
+        }
     }
 
     private fun matchesMeta(
@@ -444,8 +463,8 @@ object DcqlMatcher {
     ): Boolean {
         if (authoritiesQuery.isNullOrEmpty()) return true
         if (trustedAuthoritiesChecker == null) {
-            log.trace { "trusted_authorities query present for credential ${credential.id} but no checker provided — skipping (not enforced)" }
-            return true
+            log.warn { "trusted_authorities query present for credential ${credential.id} but no checker was provided; failing closed" }
+            return false
         }
         return trustedAuthoritiesChecker(credential, authoritiesQuery)
     }
@@ -491,9 +510,10 @@ object DcqlMatcher {
 
     /** Check if a single claim exists at the path and matches optional values. */
     private fun claimExistsAndMatches(credential: DcqlCredential, claimQuery: ClaimsQuery): Boolean {
-        val claimValue = resolveClaimPath(credential.data, claimQuery.path)
+        val pathToResolve = claimQuery.path
+        val claimValue = resolveClaimPath(credential.data, pathToResolve)
         if (claimValue == null) {
-            log.trace { "Claim path ${claimQuery.path} not found in credential ${credential.id}" }
+            log.trace { "Claim path ${claimQuery.path.joinToString(".")} not found in credential ${credential.id}" }
             return false // Claim must exist at the path
         }
 
@@ -505,11 +525,11 @@ object DcqlMatcher {
                 queryValue == claimValue
             }
             if (!matchesValue) {
-                log.trace { "claimExistsAndMatches: Claim path ${claimQuery.path} value '$claimValue' does not match required values ${claimQuery.values} in credential ${credential.id}" }
+                log.trace { "claimExistsAndMatches: Claim path ${claimQuery.path.joinToString(".")} value '$claimValue' does not match required values ${claimQuery.values} in credential ${credential.id}" }
                 return false
             }
         }
-        log.trace { "Claim path ${claimQuery.path} exists and matches criteria in credential ${credential.id}" }
+        log.trace { "Claim path ${claimQuery.path.joinToString(".")} exists and matches criteria in credential ${credential.id}" }
         return true // Claim exists and matches value constraints (if any)
     }
 
@@ -586,4 +606,3 @@ object DcqlMatcher {
         return true // All required sets were satisfied
     }
 }
-
