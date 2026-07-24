@@ -87,12 +87,21 @@ Examples:
 - **Authentication:** Client Attestation, private_key_jwt, and mTLS
 - **Sender Constraints:** DPoP and mTLS
 
-**Test Plan Name:** `oid4vci-1_0-issuer-test-plan`
+**Test Plan Names:**
+- Base VCI: `oid4vci-1_0-issuer-test-plan`
+- HAIP VCI: `oid4vci-1_0-issuer-haip-test-plan`
 
 The runner generates the 288 valid `fapi_profile=vci` combinations described in
 the README. Environment filters select subsets without introducing separate fixed
 plan classes. Issuer-initiated variants receive a fresh issuer2 credential offer
 for each module.
+
+The runner also generates the 8 `fapi_profile=vci_haip` issuer variants supported
+by the HAIP issuer plan: SD-JWT VC/mdoc, issuer-initiated/wallet-initiated
+authorization code, plain/encrypted credential response, client attestation, DPoP,
+simple authorization request, and unsigned request method. HAIP variants can use
+dedicated credential configuration IDs so issuer2 selects profiles with `x5Chain`
+and emits credential `x5c` material.
 
 ---
 

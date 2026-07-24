@@ -7,6 +7,7 @@ This document covers setup, execution, and status of OpenID4VCI Issuer conforman
 | Profile | Test Plan | Variants |
 |---------|-----------|----------|
 | Base VCI issuer | `oid4vci-1_0-issuer-test-plan` | 288 generated combinations |
+| HAIP VCI issuer | `oid4vci-1_0-issuer-haip-test-plan` | 8 generated combinations |
 
 ---
 
@@ -27,6 +28,17 @@ config includes:
 For issuer-initiated variants, the runner creates a fresh issuer2 credential offer
 for each conformance module and delivers it when the suite exposes its credential
 offer endpoint.
+
+The conformance suite does not tell issuer2 that a credential request belongs to
+HAIP. issuer2 selects HAIP behavior through the credential configuration/profile
+addressed by `vci.credential_configuration_id`. For HAIP variants, the runner can
+use separate credential configuration IDs:
+
+- `OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID`
+- `OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID`
+
+If these variables are unset, HAIP variants fall back to the base SD-JWT VC and
+mdoc credential configuration IDs.
 
 ---
 
@@ -77,7 +89,39 @@ Set the base URL in the issuer2 service configuration used for the conformance r
 baseUrl = "https://localhost.emobix.co.uk:9443"
 ```
 
-### 3. Start Services
+### 3. Configure HAIP Issuer Profiles
+
+HAIP credential checks validate the issued credential, not an extra request flag.
+For SD-JWT VC, the issued JWS must contain an `x5c` certificate chain in the
+header. Configure the issuer2 credential profile used for HAIP with:
+
+- an `issuerKeyId` whose key matches the leaf certificate public key
+- `issuerDid = null` so issuer2 uses the credential issuer URL as the issuer ID
+- `x5Chain` containing the leaf certificate and any intermediate certificates
+
+Use dedicated HAIP credential configuration IDs when the same issuer2 instance
+also needs to run base VCI DID-signed profiles:
+
+```bash
+export OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID="identity_credential_haip"
+export OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID="org.iso.18013.5.1.mDL.haip"
+```
+
+For issuer-initiated HAIP runs with these default IDs, create issuer2 profiles
+with these IDs:
+
+- `identityCredentialHaipSdJwt`
+- `isoMdlHaip`
+
+The HAIP trust anchors supplied to the conformance suite must validate the
+certificate chain that issuer2 puts into the credential:
+
+```bash
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE=/path/to/credential-root-ca.pem
+export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE=/path/to/status-list-root-ca.pem
+```
+
+### 4. Start Services
 
 ```bash
 # Terminal 1: start enterprise issuer2 on host port 7002
@@ -129,6 +173,10 @@ cd waltid-unified-build
 | `OPENID4VCI_CONFORMANCE_MODULE_GROUPS` | Module groups; defaults to metadata and positive modules | `metadata,positive` or `all` |
 | `OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID` | SD-JWT credential config | `identity_credential` |
 | `OPENID4VCI_CONFORMANCE_MDOC_CREDENTIAL_CONFIGURATION_ID` | mDOC credential config | `org.iso.18013.5.1.mDL` |
+| `OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID` | HAIP SD-JWT credential config; defaults to the base SD-JWT ID | `identity_credential_haip` |
+| `OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID` | HAIP mdoc credential config; defaults to the base mdoc ID | `org.iso.18013.5.1.mDL.haip` |
+| `OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE` | Root/intermediate trust anchor PEM for HAIP credential x5c validation | `/path/to/credential-root-ca.pem` |
+| `OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE` | Root/intermediate trust anchor PEM for HAIP status-list validation | `/path/to/status-list-root-ca.pem` |
 | `OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE` | Private client-attester JWK/JWKS used by the conformance suite to sign client attestation JWTs | `src/test/resources/keys/attester-key.json` |
 | `OPENID4VCI_CONFORMANCE_AUTHORIZATION_SERVER` | External auth server | (optional) |
 

@@ -40,6 +40,10 @@ Conformance test runners for OpenID4VCI and OpenID4VP against the [OpenID Founda
    - `identity_credential` for SD-JWT VC
    - `org.iso.18013.5.1.mDL` for mdoc
 
+   HAIP issuer runs can use separate credential configuration IDs. Those profiles must be x509-backed:
+   configure `x5Chain`, use an `issuerKeyId` matching the leaf certificate, and leave `issuerDid` unset
+   so issuer2 signs with the credential issuer URL and emits `x5c` in SD-JWT VC headers.
+
    It must also support DPoP, client attestation, and plain and encrypted credential responses. Confirm the
    two IDs in `credential_configurations_supported` at:
 
@@ -140,9 +144,10 @@ export VERIFIER_NGROK_URL="https://YOUR-NGROK.ngrok-free.app"
 
 ### VCI Issuer
 
-The issuer2 runner targets `oid4vci-1_0-issuer-test-plan` through the generated
-VCI matrix. It supports selecting individual variants or filtering matrix axes,
-and records module results under `build/reports/openid4vci-issuer-matrix`.
+The issuer2 runner targets the base `oid4vci-1_0-issuer-test-plan` and the HAIP
+`oid4vci-1_0-issuer-haip-test-plan` through generated VCI matrices. It supports
+selecting individual variants or filtering matrix axes, and records module
+results under `build/reports/openid4vci-issuer-matrix`.
 
 Details: [docs/VCI-ISSUER.md](docs/VCI-ISSUER.md)
 
@@ -175,7 +180,7 @@ Details: [docs/VCI-ISSUER.md](docs/VCI-ISSUER.md)
 
 | Interface | Baseline | HAIP | Key Difference |
 |-----------|----------|------|----------------|
-| **VCI Issuer** | Base `vci` issuer matrix | Not included | Matrix axes select grant, authentication, and credential format |
+| **VCI Issuer** | Base `vci` issuer matrix | `vci_haip` issuer matrix | HAIP uses auth-code, DPoP, client attestation, and x509-backed credentials |
 | **VP Verifier** | `x509_san_dns` | `x509_hash` | Client ID scheme |
 
 **Baseline:** Automated functional testing
@@ -299,7 +304,7 @@ Do not include local runtime artifacts such as `mongo/` or `build/` in a clean h
 
 ## VCI Issuer Variant Matrix
 
-By default, `IssuerConformanceTests` now targets the base `oid4vci-1_0-issuer-test-plan` and attempts every generated variant that is defined by that plan's selectable VCI issuer axes:
+By default, `IssuerConformanceTests` targets the base `oid4vci-1_0-issuer-test-plan` and attempts every generated variant that is defined by that plan's selectable VCI issuer axes:
 
 | Dimension | Values |
 |-----------|--------|
@@ -319,6 +324,27 @@ The generated matrix is constrained to the combinations accepted by the base iss
 - `openid` and `fapi_response_mode` are not generated as matrix axes because the conformance suite marks them as not applicable for `fapi_profile=vci`
 
 The matrix uses the conformance-suite enum spelling `pre_authorization_code`.
+
+The HAIP issuer matrix targets `oid4vci-1_0-issuer-haip-test-plan` and contains
+8 variants:
+
+- `fapi_profile=vci_haip`
+- `credential_format=sd_jwt_vc,mdoc`
+- `vci_grant_type=authorization_code`
+- `vci_authorization_code_flow_variant=issuer_initiated,wallet_initiated`
+- `client_auth_type=client_attestation`
+- `sender_constrain=dpop`
+- `authorization_request_type=simple`
+- `fapi_request_method=unsigned`
+- `vci_credential_encryption=plain,encrypted`
+
+For HAIP, the runner uses `OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID`
+and `OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID` when set. If
+they are unset, it falls back to the base SD-JWT VC and mdoc configuration IDs.
+Point the HAIP IDs at issuer2 profiles that include `x5Chain`; otherwise the suite
+will fail SD-JWT VC with `Credential MUST contain an x5c in the header`.
+For the default HAIP IDs above, issuer-initiated runs expect issuer2 profile IDs
+`identityCredentialHaipSdJwt` and `isoMdlHaip`.
 
 The runner records unsupported or not-yet-wired combinations instead of hiding them:
 
@@ -344,6 +370,7 @@ Useful controls:
 export OPENID4VCI_CONFORMANCE_PRESET=vci-client-attestation-dpop-simple-unsigned-preauth
 export OPENID4VCI_CONFORMANCE_PRESET=all-basic-plan
 export OPENID4VCI_CONFORMANCE_PRESET=vci-client-attestation-dpop-simple-unsigned
+export OPENID4VCI_CONFORMANCE_PRESET=vci-haip-client-attestation-dpop-simple-unsigned
 export OPENID4VCI_CONFORMANCE_PRESET=custom
 
 # Generate the matrix and write artifacts without running suite modules
@@ -358,6 +385,12 @@ export OPENID4VCI_CONFORMANCE_FILTER_FAPI_PROFILES="vci"
 export OPENID4VCI_CONFORMANCE_FILTER_FORMATS="sd_jwt_vc"
 export OPENID4VCI_CONFORMANCE_FILTER_CLIENT_AUTH_TYPES="client_attestation,private_key_jwt"
 export OPENID4VCI_CONFORMANCE_FILTER_SENDER_CONSTRAINTS="dpop"
+
+# Optional HAIP-specific credential configuration IDs
+export OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID="identity_credential_haip"
+export OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID="org.iso.18013.5.1.mDL.haip"
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE=/path/to/credential-root-ca.pem
+export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE=/path/to/status-list-root-ca.pem
 
 # Filter conformance-suite modules returned by the selected plan
 export OPENID4VCI_CONFORMANCE_MODULE_GROUPS="metadata,positive"
