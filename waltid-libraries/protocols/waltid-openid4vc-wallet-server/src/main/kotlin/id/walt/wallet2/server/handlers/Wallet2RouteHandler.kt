@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlin.uuid.Uuid
 
@@ -86,7 +87,16 @@ data class ImportKeyRequest(
 @Serializable
 data class CreateDidRequest(
     val method: String,
-    val keyId: String? = null
+    val keyId: String? = null,
+    /**
+     * Method-specific registrar arguments forwarded to [DidService.registerDefaultDidMethodByKey].
+     *
+     * Examples:
+     * - did:web — `domain` (required), `path` (optional)
+     * - did:key — `useJwkJcsPub` (optional boolean)
+     * - did:cheqd — `network` (`testnet` or `mainnet`)
+     */
+    val options: Map<String, JsonPrimitive> = emptyMap(),
 )
 
 @Serializable
@@ -382,7 +392,7 @@ object Wallet2RouteHandler {
                         ?: return@post call.respond(HttpStatusCode.BadRequest, "Wallet has no DID store")
                     val key = (req.keyId?.let { wallet.findKey(it) } ?: wallet.defaultKey())
                         ?: return@post call.respond(HttpStatusCode.BadRequest, "No key available for DID creation")
-                    val did = DidService.registerByKey(req.method, key)
+                    val did = DidService.registerDefaultDidMethodByKey(req.method, key, req.options)
                     val entry = WalletDidEntry(
                         did = did.did,
                         document = runCatching {
