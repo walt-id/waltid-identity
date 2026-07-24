@@ -67,9 +67,9 @@ data class DcqlQuery(
                     format = CredentialFormat.MSO_MDOC,
                     meta = MsoMdocMeta("org.iso.23220.photoid.1"),
                     claims = listOf(
-                        ClaimsQuery(id = "given_name", pathStrings = listOf("org.iso.18013.5.1", "given_name")),
-                        ClaimsQuery(id = "family_name", pathStrings = listOf("org.iso.18013.5.1", "family_name")),
-                        ClaimsQuery(id = "portrait", pathStrings = listOf("org.iso.18013.5.1", "portrait"))
+                        ClaimsQuery(id = "given_name", pathStrings = listOf("org.iso.23220.photoid.1", "given_name")),
+                        ClaimsQuery(id = "family_name", pathStrings = listOf("org.iso.23220.photoid.1", "family_name")),
+                        ClaimsQuery(id = "portrait", pathStrings = listOf("org.iso.23220.photoid.1", "portrait"))
                     )
                 ),
                 CredentialQuery(
@@ -77,8 +77,8 @@ data class DcqlQuery(
                     format = CredentialFormat.MSO_MDOC,
                     meta = MsoMdocMeta("org.iso.23220.photoid.1"),
                     claims = listOf(
-                        ClaimsQuery(id = "resident_address", pathStrings = listOf("org.iso.18013.5.1", "resident_address")),
-                        ClaimsQuery(id = "resident_country", pathStrings = listOf("org.iso.18013.5.1", "resident_country"))
+                        ClaimsQuery(id = "resident_address", pathStrings = listOf("org.iso.23220.photoid.1", "resident_address")),
+                        ClaimsQuery(id = "resident_country", pathStrings = listOf("org.iso.23220.photoid.1", "resident_country"))
                     )
                 )
             ),
@@ -137,6 +137,52 @@ data class DcqlQuery(
                         ClaimsQuery(pathStrings = listOf("eu.europa.ec.eudi.pid.1", "expiry_date")),
                         ClaimsQuery(pathStrings = listOf("eu.europa.ec.eudi.pid.1", "issuing_authority")),
                         ClaimsQuery(pathStrings = listOf("eu.europa.ec.eudi.pid.1", "issuing_country")),
+                    )
+                )
+            )
+        )
+
+        /**
+         * Requests the same PID attributes from either an SD-JWT VC PID or an ISO mdoc PID.
+         * The wallet satisfies the credential set with exactly one of the two options.
+         */
+        val EXAMPLE_SDJWT_OR_ISO_PID = DcqlQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "sdjwt_pid",
+                    format = CredentialFormat.DC_SD_JWT,
+                    meta = SdJwtVcMeta(
+                        vctValues = listOf(
+                            "eu.europa.ec.eudi.pid.1",
+                            "urn:eudi:pid:1",
+                        )
+                    ),
+                    claims = listOf(
+                        ClaimsQuery(id = "family_name", pathStrings = listOf("family_name")),
+                        ClaimsQuery(id = "given_name", pathStrings = listOf("given_name")),
+                        ClaimsQuery(id = "birth_date", pathStrings = listOf("birth_date")),
+                        ClaimsQuery(id = "age_over_18", pathStrings = listOf("age_over_18")),
+                        ClaimsQuery(id = "issuing_country", pathStrings = listOf("issuing_country")),
+                    )
+                ),
+                CredentialQuery(
+                    id = "iso_pid",
+                    format = CredentialFormat.MSO_MDOC,
+                    meta = MsoMdocMeta("eu.europa.ec.eudi.pid.1"),
+                    claims = listOf(
+                        ClaimsQuery(id = "family_name", pathStrings = listOf("eu.europa.ec.eudi.pid.1", "family_name")),
+                        ClaimsQuery(id = "given_name", pathStrings = listOf("eu.europa.ec.eudi.pid.1", "given_name")),
+                        ClaimsQuery(id = "birth_date", pathStrings = listOf("eu.europa.ec.eudi.pid.1", "birth_date")),
+                        ClaimsQuery(id = "age_over_18", pathStrings = listOf("eu.europa.ec.eudi.pid.1", "age_over_18")),
+                        ClaimsQuery(id = "issuing_country", pathStrings = listOf("eu.europa.ec.eudi.pid.1", "issuing_country")),
+                    )
+                ),
+            ),
+            credentialSets = listOf(
+                CredentialSetQuery(
+                    options = listOf(
+                        listOf("sdjwt_pid"),
+                        listOf("iso_pid"),
                     )
                 )
             )
