@@ -149,6 +149,12 @@ data class CrossDeviceFlowSetup(
                 dcqlQuery = DcqlQuery.DcqlQueryExamples.EXAMPLE_EUDI_PID
             )
         )
+
+        val EXAMPLE_SDJWT_OR_ISO_PID: VerificationSessionSetup = BASE_EXAMPLE.copy(
+            core = BASE_EXAMPLE.core.copy(
+                dcqlQuery = DcqlQuery.DcqlQueryExamples.EXAMPLE_SDJWT_OR_ISO_PID
+            )
+        )
     }
 }
 
