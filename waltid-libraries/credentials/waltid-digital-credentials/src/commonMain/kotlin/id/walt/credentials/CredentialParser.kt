@@ -151,7 +151,7 @@ object CredentialParser {
     }
 
     suspend fun handleMdocs(credential: String, base64: Boolean = false): Pair<CredentialDetectionResult, MdocsCredential> {
-        log.trace { "Parsing mdoc credential" }
+        log.trace { "Handle mdocs, string: $credential" }
 
         // --- New mdocs handling ---
 
@@ -183,7 +183,7 @@ object CredentialParser {
             log.trace { "Mdoc could not be parsed as document, trying as IssuerSigned (OID4VCI credential response format)" }
             val issuerSigned = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(deviceResponseBytes)
             val docType = issuerSigned.decodeMobileSecurityObject().docType
-            log.trace { "Mdoc parsed from an OpenID4VCI IssuerSigned response" }
+            log.trace { "Mdoc parsed (from IssuerSigned), docType=$docType" }
             Document(docType = docType, issuerSigned = issuerSigned)
         }.getOrThrow()
 
@@ -196,13 +196,13 @@ object CredentialParser {
                 putJsonObject(namespace) {
                     val issuerSignedItems = issuerSignedList.entries.map { it.value }
                     issuerSignedItems.forEach { item: IssuerSignedItem ->
-                        log.trace { "Parsing mdoc namespace element" }
+                        log.trace { "$namespace - ${item.elementIdentifier} -> ${item.elementValue} (${item.elementValue::class.simpleName})" }
 
                         val serialized = runCatching {
                             item.elementValue.toSerializedJsonElement()
                         }.getOrElse {
                             throw IllegalArgumentException(
-                                "Could not serialize mdoc element",
+                                "Could not serialize element ${item.digestId} in $namespace: ${item.elementIdentifier} (value ${item.elementValue}), due to: ${it.message}",
                                 it
                             )
                         }
@@ -215,6 +215,7 @@ object CredentialParser {
                             ?: item.elementValue.toJsonElement()
                         */
 
+                        log.trace { "-> as JsonElement: $serialized" }
                         put(item.elementIdentifier, serialized)
                     }
 
@@ -297,7 +298,7 @@ object CredentialParser {
         // `signature` is the bare JWT signature bytes (no tilde); disclosures must be
         // extracted from `credential` itself per RFC 9901 §4 compact serialisation format.
         val disclosuresPart = credential.substringAfter("~", "")
-        log.trace { "Parsing SD-JWT disclosures" }
+        log.trace { "Parsing disclosures: $disclosuresPart" }
         var availableDisclosures = parseDisclosureString(disclosuresPart)
 
         if (availableDisclosures?.isNotEmpty() == true) {
@@ -365,7 +366,7 @@ object CredentialParser {
             // 2. Process the queue until all nested hashes are resolved
             while (hashesToVerify.isNotEmpty()) {
                 val (basePath, hash) = hashesToVerify.removeFirst()
-                log.trace { "Processing SD-JWT disclosure digest" }
+                log.trace { "Processing hash: $hash at $basePath" }
 
                 val matchingDisclosure = findForHash(hash)
                 if (matchingDisclosure != null) {
@@ -383,17 +384,19 @@ object CredentialParser {
                     // (SD-JWT spec says digest MUST NOT appear more than once, but safety check)
                     // Add the UPDATED disclosure to the set, not the raw one
                     if (mappedDisclosures.add(updatedDisclosure)) {
-                        log.trace { "Matched SD-JWT disclosure digest" }
+                        log.trace { "Found hash for ${updatedDisclosure.name ?: "array_element"}" }
 
                         // 3. Recursive Step: Scan the *value* of the disclosure for new hashes
                         scanForHashes(updatedDisclosure.value, newPath)
                     }
                 } else {
-                    log.trace { "SD-JWT disclosure digest did not match (possibly a decoy)" }
+                    log.trace { "Hash $hash not found in available disclosures (might be a decoy)" }
                 }
             }
 
-            log.trace { "Mapped ${mappedDisclosures.size} SD-JWT disclosure(s)" }
+            log.trace {
+                mappedDisclosures.mapIndexed { idx, it -> "$idx: ${it.name} -> $it" }.joinToString("\n")
+            }
 
             // Per RFC 9901 §7.1 step 5: "If any Disclosure was not referenced by digest value
             // in the Issuer-signed JWT (directly or recursively via other Disclosures), the

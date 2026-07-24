@@ -20,8 +20,4 @@ public data class MobileWalletIssuanceRequest(
     public val keyId: String? = null,
     public val did: String? = null,
 ) {
-    /** Returns a diagnostic description with offer, key, and DID values redacted. */
-    override fun toString(): String =
-        "MobileWalletIssuanceRequest(offerUrl=<redacted>, clientId=$clientId, " +
-            "redirectUri=$redirectUri, keyId=${keyId?.let { "<redacted>" }}, did=${did?.let { "<redacted>" }})"
 }

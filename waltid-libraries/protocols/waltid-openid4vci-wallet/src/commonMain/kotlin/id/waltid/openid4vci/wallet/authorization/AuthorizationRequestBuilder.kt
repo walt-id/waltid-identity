@@ -51,10 +51,7 @@ class AuthorizationRequestBuilder(
         val url: String,
         val state: String,
         val pkceData: PKCEManager.PKCEData?,
-    ) {
-        override fun toString(): String =
-            "AuthorizationRequest(url=<redacted>, state=<redacted>, pkceData=${pkceData?.let { "<redacted>" }})"
-    }
+    )
 
     /**
      * Complete state for a Pushed Authorization Request.
@@ -67,11 +64,7 @@ class AuthorizationRequestBuilder(
         val parameters: Map<String, String>,
         val state: String,
         val pkceData: PKCEManager.PKCEData?,
-    ) {
-        override fun toString(): String =
-            "PushedAuthorizationRequest(parameters=${parameters.keys}, state=<redacted>, " +
-                "pkceData=${pkceData?.let { "<redacted>" }})"
-    }
+    )
 
     /**
      * Builds an authorization request URL
@@ -117,9 +110,9 @@ class AuthorizationRequestBuilder(
             "At least one non-blank credential configuration ID is required"
         }
 
-        log.info { "Building authorization request for ${credentialConfigurationIds.size} credential configuration(s)" }
+        log.info { "Building authorization request for credential configuration: ${credentialConfigurationIds.first()}" }
         log.trace { "Authorization endpoint: $authorizationEndpoint" }
-        log.trace { "Issuer state present: ${issuerState != null}, Scope present: ${scope != null}" }
+        log.trace { "Issuer state: ${issuerState ?: "none"}, Scope: $scope" }
 
         // Generate state for CSRF protection
         val state = StateManager.generateState()
@@ -140,6 +133,7 @@ class AuthorizationRequestBuilder(
         val authzDetailsJson = json.encodeToString(
             credentialConfigurationIds.distinct().map { AuthorizationDetails(credential_configuration_id = it) }
         )
+        log.trace { "Authorization details JSON: ${authzDetailsJson.take(100)}${if (authzDetailsJson.length > 100) "..." else ""}" }
 
         // Build URL with query parameters
         val urlBuilder = URLBuilder(authorizationEndpoint)
@@ -261,7 +255,7 @@ class AuthorizationRequestBuilder(
             parameters["code_challenge_method"] = it.codeChallengeMethod.value
         }
 
-        log.debug { "Built PAR request parameters for ${credentialConfigurationIds.size} credential configuration(s)" }
+        log.debug { "Built PAR request parameters for credential: ${credentialConfigurationIds.first()}" }
         return PushedAuthorizationRequest(
             parameters = parameters,
             state = state,
