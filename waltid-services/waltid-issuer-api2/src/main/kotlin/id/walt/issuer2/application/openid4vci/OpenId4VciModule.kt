@@ -82,6 +82,7 @@ data class OpenId4VciModule(
                     pushedAuthorizationConfig = PushedAuthorizationConfig(
                         repository = parRepository,
                         enforcePushedAuthorizationRequests = config.enforcePushedAuthorizationRequests,
+                        requireRedirectUri = true,
                     ),
                     clientAuthenticationServiceConfig = createClientAuthenticationServiceConfig(config),
                     credentialRequestDecryptor = config.credentialEncryptionKey

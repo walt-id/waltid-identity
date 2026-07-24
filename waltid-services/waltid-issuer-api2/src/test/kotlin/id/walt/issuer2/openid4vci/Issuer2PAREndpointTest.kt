@@ -112,6 +112,17 @@ class Issuer2PAREndpointTest {
     }
 
     @Test
+    fun `issuer module provider rejects PAR without redirect uri`() = runTest {
+        val provider = issuerProvider()
+
+        val result = provider.createPushedAuthorizationRequest(validParameters() - "redirect_uri")
+
+        assertTrue(result is AuthorizationRequestResult.Failure)
+        assertEquals(OAuthErrorCodes.INVALID_REQUEST, (result as AuthorizationRequestResult.Failure).error.error)
+        assertEquals("redirect_uri is required", result.error.description)
+    }
+
+    @Test
     fun `issuer module provider enforces PAR when configured`() = runTest {
         val provider = issuerProvider(enforcePushedAuthorizationRequests = true)
         val parameters = validParameters(clientId = "required-par-client")
