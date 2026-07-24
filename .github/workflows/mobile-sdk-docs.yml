@@ -103,7 +103,7 @@ jobs:
             WalletSDK.doccarchive
 
       - name: Upload Swift WalletSDK DocC archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: walletsdk-doccarchive
           path: waltid-identity/waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc/WalletSDK.doccarchive.tar.gz
@@ -115,14 +115,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout waltid-identity
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.head_ref || github.ref_name }}
           path: waltid-identity
           sparse-checkout: docs/mobile-sdk-api
 
       - name: Download SDK docs HTML artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: sdk-docs-html
           path: waltid-identity/docs/mobile-sdk-api/html
