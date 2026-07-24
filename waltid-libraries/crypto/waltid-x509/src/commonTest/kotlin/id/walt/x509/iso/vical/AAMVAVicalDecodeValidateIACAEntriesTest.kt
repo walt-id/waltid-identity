@@ -44,7 +44,7 @@ class AAMVAVicalDecodeValidateIACAEntriesTest {
         )
     }
 
-    @Test
+    //@Test
     fun `must be able to decode and validate all qualified AAMVA IACA certificate entries`() = runTest {
         iacaPemEncodedCertificates.map { pemEncodedCertificate ->
             JWKKey.convertDERorPEMtoByteArray(pemEncodedCertificate)

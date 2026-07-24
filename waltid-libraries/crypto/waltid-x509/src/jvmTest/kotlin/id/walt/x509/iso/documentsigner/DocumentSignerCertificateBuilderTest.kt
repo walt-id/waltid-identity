@@ -1,5 +1,6 @@
 package id.walt.x509.iso.documentsigner
 
+import id.walt.certificate.x509.CertificateAssertionUtil.assertBuildersSerialNoCompliance
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
 import id.walt.x509.CertificateDer

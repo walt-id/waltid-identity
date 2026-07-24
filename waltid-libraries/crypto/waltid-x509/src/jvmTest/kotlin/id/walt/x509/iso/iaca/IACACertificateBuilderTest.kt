@@ -1,11 +1,11 @@
 package id.walt.x509.iso.iaca
 
+import id.walt.certificate.x509.CertificateAssertionUtil.assertBuildersSerialNoCompliance
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.iso.IsoSharedTestHarnessValidResources
 import id.walt.x509.iso.IssuerAlternativeName
-import id.walt.x509.iso.assertBuildersSerialNoCompliance
 import id.walt.x509.iso.getJcaSigningAlgorithmNameFromKeyType
 import id.walt.x509.iso.iaca.builder.IACACertificateBuilder
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData

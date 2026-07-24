@@ -12,29 +12,17 @@ group = "id.walt.crypto"
 
 kotlin {
 
-    js(IR) {
+    js {
         outputModuleName = "x509"
         nodejs {
             testTask {
                 useMocha()
-                enabled = false
+                enabled = true
             }
         }
     }
 
     sourceSets {
-        val jvmIosMain by creating {
-            dependsOn(commonMain.get())
-            dependencies {
-                implementation(identityLibs.signum.indispensable)
-                implementation(identityLibs.signum.supreme)
-            }
-        }
-        jvmMain.get().dependsOn(jvmIosMain)
-        if (enableIosBuild) {
-            iosMain.get().dependsOn(jvmIosMain)
-        }
-
         commonMain.dependencies {
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(identityLibs.kotlinx.coroutines.core)
@@ -49,45 +37,103 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.test)
             implementation(identityLibs.kotlinx.serialization.json)
         }
-        jvmMain.dependencies {
-            implementation(identityLibs.bouncycastle.prov)
-            implementation(identityLibs.bouncycastle.pkix)
-            implementation(identityLibs.nimbus.jose.jwt)
-            implementation(identityLibs.kotlinx.coroutines.core)
-        }
-        jvmTest.dependencies {
-            // Logging
-            implementation(identityLibs.slf4j.simple)
 
-            // Ktor client
-            implementation(identityLibs.ktor.client.java)
-
-            // Test
-            implementation(kotlin("test"))
-            implementation(identityLibs.junit.jupiter.api)
-            implementation(identityLibs.junit.jupiter.engine)
-
-            implementation(identityLibs.bouncycastle.prov)
-            implementation(identityLibs.nimbus.jose.jwt)
+        val jvmBouncyMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+                implementation(identityLibs.bouncycastle.prov)
+                implementation(identityLibs.bouncycastle.pkix)
+            }
         }
-        jsMain.dependencies {
-            implementation(identityLibs.signum.indispensable)
-        }
-        jsTest.dependencies {
-            implementation(kotlin("test-js"))
 
+        val jvmBouncyTest by creating {
+            dependsOn(commonTest.get())
         }
+
+
+        val signumMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+                implementation(identityLibs.signum.indispensable)
+                implementation(identityLibs.kotlinx.io.bytestring)
+            }
+        }
+
+        val jvmIosMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+                implementation(identityLibs.signum.indispensable)
+                implementation(identityLibs.signum.supreme)
+            }
+        }
+
+        jvmMain {
+            dependsOn(jvmBouncyMain)
+            dependsOn(signumMain)
+            dependsOn(jvmIosMain)
+            dependencies {
+                implementation(identityLibs.signum.indispensable)
+                implementation(identityLibs.signum.supreme)
+                implementation(identityLibs.nimbus.jose.jwt)
+                implementation(identityLibs.kotlinx.coroutines.core)
+                implementation(identityLibs.bouncycastle.prov) //needs to be here to make intellij happy (and not in bouncy source set)
+                implementation(identityLibs.bouncycastle.pkix) //needs to be here to make intellij happy (and not in bouncy source set)
+            }
+        }
+
+        jvmTest {
+            dependsOn(jvmMain.get())
+            dependsOn(signumMain)
+            dependsOn(jvmBouncyTest)
+            dependencies {
+                // Logging
+                implementation(identityLibs.slf4j.simple)
+
+                // Ktor client
+                implementation(identityLibs.ktor.client.java)
+
+                // Test
+                implementation(kotlin("test"))
+                implementation(identityLibs.junit.jupiter.api)
+                implementation(identityLibs.junit.jupiter.engine)
+                implementation(identityLibs.junit.jupiter.params)
+            }
+        }
+
+
+        jsMain {
+            dependsOn(signumMain)
+            dependencies {
+                implementation(identityLibs.signum.indispensable)
+            }
+        }
+
+        /*
+
+
+                jvmMain.get().dependsOn(jvmIosMain)
+                if (enableIosBuild) {
+                    iosMain.get().dependsOn(jvmIosMain)
+                }
+
+
+                jsTest {
+                    dependsOn(commonSignumMain)
+                }*/
     }
 
-    if (enableAndroidBuild) {
-        // Signum's Android artifacts bring jdk18on Bouncy Castle; this project
-        // already uses lts8on via the shared JVM/Android crypto stack.
-        configurations.all {
-            exclude(group = "org.bouncycastle", module = "bcprov-jdk18on")
-            exclude(group = "org.bouncycastle", module = "bcpkix-jdk18on")
-            exclude(group = "org.bouncycastle", module = "bcutil-jdk18on")
-        }
-    }
+//    if (enableAndroidBuild) {
+    // Signum's Android artifacts bring jdk18on Bouncy Castle; this project
+    // already uses lts8on via the shared JVM/Android crypto stack.
+    //      configurations.all {
+    //          exclude(group = "org.bouncycastle", module = "bcprov-jdk18on")
+    //          exclude(group = "org.bouncycastle", module = "bcpkix-jdk18on")
+    //          exclude(group = "org.bouncycastle", module = "bcutil-jdk18on")
+    //     }
+    // }
 }
 
 mavenPublishing {
