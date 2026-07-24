@@ -346,6 +346,129 @@ will fail SD-JWT VC with `Credential MUST contain an x5c in the header`.
 For the default HAIP IDs above, issuer-initiated runs expect issuer2 profile IDs
 `identityCredentialHaipSdJwt` and `isoMdlHaip`.
 
+HAIP requires a credential trust anchor. It must be the root CA that issued the
+leaf certificate placed in the issued credential's `x5c` header. Do not use the
+leaf certificate itself and do not use the client-attestation CA. For the
+default HAIP issuer2 leaf certificate, the required root has subject
+`CN=walt.id HAIP Conformance Root CA`.
+Keep that root out of issuer2's `x5Chain`; `x5Chain` contains the leaf and any
+intermediates only.
+
+Store the HAIP root as `src/test/resources/certs/issuer2-haip-root-ca.pem` and
+verify the chain before running HAIP:
+
+```bash
+openssl verify \
+  -CAfile waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem \
+  waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-leaf.pem
+```
+
+The command must print `issuer2-haip-leaf.pem: OK`.
+
+The runner test resources contain the generated local HAIP root and leaf. The
+root is supplied to the conformance suite; replace the PEM inside issuer2's
+`defaultHaipIssuerX5chain` with the leaf. Do not place the root in issuer2's
+`x5Chain`.
+
+`issuer2-haip-root-ca.pem`:
+
+```pem
+-----BEGIN CERTIFICATE-----
+MIIB+TCCAZ+gAwIBAgIUPP3bTiVIoMWqEYExsKjIfhywdlkwCgYIKoZIzj0EAwIw
+SjELMAkGA1UEBhMCVVQxEDAOBgNVBAoMB3dhbHQuaWQxKTAnBgNVBAMMIHdhbHQu
+aWQgSEFJUCBDb25mb3JtYW5jZSBSb290IENBMB4XDTI2MDcyNDEyMDkxMVoXDTM2
+MDcyMTEyMDkxMVowSjELMAkGA1UEBhMCVVQxEDAOBgNVBAoMB3dhbHQuaWQxKTAn
+BgNVBAMMIHdhbHQuaWQgSEFJUCBDb25mb3JtYW5jZSBSb290IENBMFkwEwYHKoZI
+zj0CAQYIKoZIzj0DAQcDQgAEkgBYLh/iP7MwVAUG8ktgsRrNiEQBeEWJz13az1YZ
+M56YrdM9+CNHH88m3JSG5Rj8PDxawabTYzvQG4xG2G3KWqNjMGEwHQYDVR0OBBYE
+FIee+SutjFf5dBflQUE5CLl6nztbMB8GA1UdIwQYMBaAFIee+SutjFf5dBflQUE5
+CLl6nztbMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMAoGCCqGSM49
+BAMCA0gAMEUCIQCErYUpzrjGkK2kU5RXyHULwOdCCSBZY/57ibiqd9MEngIgLbvF
+IHgFHl0OkJMBoJwk5MiXG4XDbWMiawsEPCz+4R8=
+-----END CERTIFICATE-----
+```
+
+`issuer2-haip-leaf.pem`:
+
+```pem
+-----BEGIN CERTIFICATE-----
+MIICAjCCAamgAwIBAgIUFQHbJ5+yyg0r1YgHoQJbUsLadPMwCgYIKoZIzj0EAwIw
+SjELMAkGA1UEBhMCVVQxEDAOBgNVBAoMB3dhbHQuaWQxKTAnBgNVBAMMIHdhbHQu
+aWQgSEFJUCBDb25mb3JtYW5jZSBSb290IENBMB4XDTI2MDcyNDEyMDkxMVoXDTM2
+MDcyMTEyMDkxMVowQjELMAkGA1UEBhMCVVQxEDAOBgNVBAoMB3dhbHQuaWQxITAf
+BgNVBAMMGGlzc3VlcjItaGFpcC1jb25mb3JtYW5jZTBZMBMGByqGSM49AgEGCCqG
+SM49AwEHA0IABOBm2DPhn6y/LvSeGz1DHdtQolx9rejw1lXHqcYT7aKVa2Z7QWgv
+Lz0nl4KOjstBcowX47VmhUQgaJi/8cMCqaujdTBzMAwGA1UdEwEB/wQCMAAwDgYD
+VR0PAQH/BAQDAgeAMBMGA1UdJQQMMAoGCCsGAQUFBwMCMB0GA1UdDgQWBBRbR1/M
+shX3RRfHC/W1Ob39VuBKczAfBgNVHSMEGDAWgBSHnvkrrYxX+XQX5UFBOQi5ep87
+WzAKBggqhkjOPQQDAgNHADBEAiAjFIeG4s8AAKBhrJUNVyuuKFmkfFy1/RUovRoP
+y5p7RQIgFBJqz39KOWx+Exr8cVsvPpO/gpprj5cqF6bjlZv8WMg=
+-----END CERTIFICATE-----
+```
+
+If the original HAIP root certificate is unavailable in a local test setup,
+create a new test-only root and a leaf certificate for the existing
+`defaultHaipIssuerKey` JWK:
+
+```bash
+CERT_DIR="$PWD/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs" && \
+WORK_DIR="$PWD/build/conformance/issuer2-haip-ca" && \
+mkdir -p "$CERT_DIR" "$WORK_DIR" && \
+node -e 'const { createPublicKey } = require("crypto"); console.log(createPublicKey({ key: { kty: "EC", crv: "P-256", x: "4GbYM-GfrL8u9J4bPUMd21CiXH2t6PDWVcepxhPtopU", y: "a2Z7QWgvLz0nl4KOjstBcowX47VmhUQgaJi_8cMCqas" }, format: "jwk" }).export({ type: "spki", format: "pem" }));' > "$WORK_DIR/issuer2-haip-public-key.pem" && \
+openssl ecparam -name prime256v1 -genkey -noout -out "$WORK_DIR/issuer2-haip-root-ca.key" && \
+openssl req -x509 -new -sha256 -days 3650 \
+  -key "$WORK_DIR/issuer2-haip-root-ca.key" \
+  -out "$CERT_DIR/issuer2-haip-root-ca.pem" \
+  -subj '/C=UT/O=walt.id/CN=walt.id HAIP Conformance Root CA' \
+  -addext 'basicConstraints=critical,CA:true' \
+  -addext 'keyUsage=critical,keyCertSign,cRLSign' && \
+openssl x509 -new -sha256 -days 3650 \
+  -force_pubkey "$WORK_DIR/issuer2-haip-public-key.pem" \
+  -CA "$CERT_DIR/issuer2-haip-root-ca.pem" \
+  -CAkey "$WORK_DIR/issuer2-haip-root-ca.key" \
+  -CAcreateserial \
+  -out "$CERT_DIR/issuer2-haip-leaf.pem" \
+  -subj '/C=UT/O=walt.id/CN=issuer2-haip-conformance' \
+  -extfile <(printf '%s\n' \
+    'basicConstraints=critical,CA:false' \
+    'keyUsage=critical,digitalSignature' \
+    'extendedKeyUsage=clientAuth') && \
+openssl verify -CAfile "$CERT_DIR/issuer2-haip-root-ca.pem" "$CERT_DIR/issuer2-haip-leaf.pem"
+```
+
+This preserves `defaultHaipIssuerKey`: the generated leaf uses its existing
+public key. Replace the PEM in issuer2's `defaultHaipIssuerX5chain` with the
+contents of `issuer2-haip-leaf.pem`. Do not add `issuer2-haip-root-ca.pem` to
+`x5Chain`; pass it only to the conformance runner as a trust anchor. The
+generated root private key stays under `build/conformance` and must not be
+committed.
+
+Run the full HAIP matrix without the dedicated FAPI module group as follows:
+
+```bash
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://localhost.emobix.co.uk:9443/openid4vci" && \
+export OPENID4VCI_CONFORMANCE_PRESET="vci-haip-client-attestation-dpop-simple-unsigned" && \
+export OPENID4VCI_CONFORMANCE_MATRIX="all" && \
+export OPENID4VCI_CONFORMANCE_MODULE_GROUPS="metadata,positive,negative" && \
+export OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID="identity_credential_haip" && \
+export OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID="org.iso.18013.5.1.mDL.haip" && \
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE="$PWD/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem" && \
+export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE="$PWD/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem" && \
+export OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION="true" && \
+export OPENID4VCI_CONFORMANCE_AUTH_USERNAME="jane@walt.id" && \
+export OPENID4VCI_CONFORMANCE_AUTH_PASSWORD="jane" && \
+export OPENID4VCI_CONFORMANCE_AUTH_TIMEOUT_SECONDS="90" && \
+export OPENID4VCI_CONFORMANCE_INSTALL_PLAYWRIGHT="false" && \
+unset OPENID4VCI_CONFORMANCE_VARIANT_ID \
+      OPENID4VCI_CONFORMANCE_VARIANTS \
+      OPENID4VCI_CONFORMANCE_MODULES && \
+./run-issuer-conformance-local.sh
+```
+
+Reuse the same root for `OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE`
+only when issuer2 signs its status-list JWT under that CA; otherwise provide the
+separate status-list root certificate.
+
 The runner records unsupported or not-yet-wired combinations instead of hiding them:
 
 - `generated`: variant was generated but not executed, usually discovery-only mode
@@ -386,11 +509,11 @@ export OPENID4VCI_CONFORMANCE_FILTER_FORMATS="sd_jwt_vc"
 export OPENID4VCI_CONFORMANCE_FILTER_CLIENT_AUTH_TYPES="client_attestation,private_key_jwt"
 export OPENID4VCI_CONFORMANCE_FILTER_SENDER_CONSTRAINTS="dpop"
 
-# Optional HAIP-specific credential configuration IDs
+# HAIP-specific credential configuration IDs and required x5c trust anchors
 export OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID="identity_credential_haip"
 export OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID="org.iso.18013.5.1.mDL.haip"
-export OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE=/path/to/credential-root-ca.pem
-export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE=/path/to/status-list-root-ca.pem
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE="$PWD/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem"
+export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE="$PWD/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem"
 
 # Filter conformance-suite modules returned by the selected plan
 export OPENID4VCI_CONFORMANCE_MODULE_GROUPS="metadata,positive"
