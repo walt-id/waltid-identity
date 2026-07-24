@@ -12,6 +12,9 @@ import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
+import id.walt.wallet2.handlers.WalletIssuanceSessionRecordKind
+import id.walt.wallet2.handlers.WalletIssuanceSessionStore
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
@@ -148,11 +151,28 @@ class MobileWalletTest {
         val keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1"))
         val didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap())))
         val credentialStore = RecordingCredentialStore()
+        val issuanceSessionStore = RecordingIssuanceSessionStore(
+            WalletIssuanceSessionRecord(
+                id = "active:session-1",
+                sessionId = "session-1",
+                kind = WalletIssuanceSessionRecordKind.ACTIVE_SESSION,
+                payload = "<encrypted>",
+                updatedAtEpochMilliseconds = 1L,
+            ),
+            WalletIssuanceSessionRecord(
+                id = "deferred:credential-1",
+                sessionId = "session-1",
+                kind = WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL,
+                payload = "<encrypted>",
+                updatedAtEpochMilliseconds = 2L,
+            ),
+        )
         val wallet = MobileWallet(
             walletId = "custom-wallet",
             keyStore = keyStore,
             didStore = didStore,
             credentialStore = credentialStore,
+            issuanceSessionStore = issuanceSessionStore,
             keyGenerator = { error("deleteWallet should not generate a key") },
         )
 
@@ -161,6 +181,7 @@ class MobileWalletTest {
         assertEquals(listOf("custom-key"), keyStore.removedKeyIds)
         assertEquals(listOf("did:key:custom"), didStore.removedDids)
         assertEquals(emptyList(), credentialStore.removedCredentialIds)
+        assertTrue(issuanceSessionStore.records.isEmpty())
     }
 
     @Test
@@ -176,27 +197,96 @@ class MobileWalletTest {
     }
 
     @Test
-    fun walletSessionEventsMapToMobileWalletEventsInCommonCode() {
-        val progress = WalletSessionEvent.issuance_offer_resolved.toMobileWalletEvent()
-        val prepared = WalletSessionEvent.presentation_response_prepared.toMobileWalletEvent()
-        val completed = WalletSessionEvent.presentation_completed.toMobileWalletEvent()
-        val failed = WalletSessionEvent.issuance_failed.toMobileWalletEvent()
+    fun walletSessionEventsMapExhaustivelyToMobileWalletEvents() {
+        assertEquals(WalletSessionEvent.entries.size, MobileWalletEvent.entries.size)
+        WalletSessionEvent.entries.forEach { event ->
+            assertEquals(event.name, event.toMobileWalletEvent().name)
+        }
 
-        assertEquals(MobileWalletEventPhase.issuance, progress.phase)
-        assertEquals(MobileWalletEventStatus.progress, progress.status)
-        assertEquals("issuance_offer_resolved", progress.name)
+        assertEquals(MobileWalletEventPhase.issuance, MobileWalletEvent.issuance_offer_resolved.phase)
+        assertEquals(MobileWalletEventStatus.progress, MobileWalletEvent.issuance_offer_resolved.status)
+        assertEquals(MobileWalletEventPhase.presentation, MobileWalletEvent.presentation_completed.phase)
+        assertEquals(MobileWalletEventStatus.completed, MobileWalletEvent.presentation_completed.status)
+        assertEquals(MobileWalletEventStatus.failed, MobileWalletEvent.issuance_failed.status)
+    }
 
-        assertEquals(MobileWalletEventPhase.presentation, prepared.phase)
-        assertEquals(MobileWalletEventStatus.progress, prepared.status)
-        assertEquals("presentation_response_prepared", prepared.name)
+    @Test
+    fun presentationCredentialRequirementsRejectEmptyCombinations() {
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationCredentialRequirement(emptyList())
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationCredentialRequirement(listOf(emptyList()))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationCredentialRequirement(listOf(listOf(" ")))
+        }
+    }
 
-        assertEquals(MobileWalletEventPhase.presentation, completed.phase)
-        assertEquals(MobileWalletEventStatus.completed, completed.status)
-        assertEquals("presentation_completed", completed.name)
+    @Test
+    fun presentationOutputModelsRejectMissingCredentialQueryIds() {
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationCredentialOption(
+                queryId = " ",
+                credentialId = "credential-1",
+                format = "vc+sd-jwt",
+                issuer = null,
+                subject = null,
+                label = null,
+                credentialDataJson = "{}",
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            presentationTransactionData(credentialQueryIds = emptyList())
+        }
+        assertFailsWith<IllegalArgumentException> {
+            presentationTransactionData(credentialQueryIds = listOf(" "))
+        }
+    }
 
-        assertEquals(MobileWalletEventPhase.issuance, failed.phase)
-        assertEquals(MobileWalletEventStatus.failed, failed.status)
-        assertEquals("issuance_failed", failed.name)
+    @Test
+    fun presentationRequestInfoRequiresClientIdAndNonce() {
+        assertFailsWith<IllegalArgumentException> {
+            presentationRequestInfo(clientId = " ")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            presentationRequestInfo(nonce = " ")
+        }
+    }
+
+    @Test
+    fun presentationRequestContextRequiresClientIdButAllowsMissingNonce() {
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationRequestContext(
+                clientId = " ",
+                verifierMetadata = null,
+                responseUri = null,
+                state = null,
+                nonce = null,
+                responseEncryption = MobileWalletResponseEncryption.NotRequired,
+            )
+        }
+
+        val context = MobileWalletPresentationRequestContext(
+            clientId = "https://verifier.example",
+            verifierMetadata = null,
+            responseUri = null,
+            state = null,
+            nonce = null,
+            responseEncryption = MobileWalletResponseEncryption.NotRequired,
+        )
+        assertEquals("https://verifier.example", context.clientId)
+        assertEquals(null, context.nonce)
+    }
+
+    @Test
+    fun presentationDisclosuresRejectImpossibleSelectableStates() {
+        assertFailsWith<IllegalArgumentException> {
+            presentationDisclosure(selectivelyDisclosable = false, required = false, selectable = true)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            presentationDisclosure(selectivelyDisclosable = true, required = true, selectable = true)
+        }
     }
 
     @Test
@@ -381,7 +471,7 @@ class MobileWalletTest {
         runCurrent()
 
         repeat(100) { index ->
-            val emitted = stream.tryEmit(progressEvent("issuance_progress_$index"))
+            val emitted = stream.tryEmit(MobileWalletEvent.issuance_offer_resolved)
 
             assertTrue(emitted, "Progress event $index should not suspend or fail when the buffer is full")
         }
@@ -389,10 +479,51 @@ class MobileWalletTest {
         collector.cancel()
     }
 
-    private fun progressEvent(name: String) = MobileWalletEvent(
-        name = name,
-        phase = MobileWalletEventPhase.issuance,
-        status = MobileWalletEventStatus.progress,
+    private fun presentationRequestInfo(
+        clientId: String = "https://verifier.example",
+        nonce: String = "nonce-1",
+    ) = MobileWalletPresentationRequestInfo(
+        clientId = clientId,
+        verifierMetadata = MobileWalletVerifierMetadata(
+            display = MobileWalletMetadataDisplay(
+                name = "Example Verifier",
+                locale = "en",
+                logoUri = null,
+                logoAltText = null,
+            ),
+            clientUri = null,
+            policyUri = null,
+            termsOfServiceUri = null,
+        ),
+        responseUri = "https://verifier.example/direct-post",
+        state = null,
+        nonce = nonce,
+        responseEncryption = MobileWalletResponseEncryption.NotRequired,
+    )
+
+    private fun presentationTransactionData(
+        credentialQueryIds: List<String>,
+    ) = MobileWalletTransactionDataItem(
+        type = "example",
+        displayName = "Example",
+        credentialQueryIds = credentialQueryIds,
+        supportedFields = emptyList(),
+        rawJson = "{}",
+        detailsJson = "{}",
+    )
+
+    private fun presentationDisclosure(
+        selectivelyDisclosable: Boolean,
+        required: Boolean,
+        selectable: Boolean,
+    ) = MobileWalletPresentationDisclosure(
+        path = "$.claim",
+        name = "claim",
+        valueJson = "true",
+        displayValue = "true",
+        selectivelyDisclosable = selectivelyDisclosable,
+        required = required,
+        selectable = selectable,
     )
 
     private val displayJson = kotlinx.serialization.json.Json {
@@ -464,5 +595,18 @@ class MobileWalletTest {
             removedCredentialIds += id
             return true
         }
+    }
+
+    private class RecordingIssuanceSessionStore(
+        vararg records: WalletIssuanceSessionRecord,
+    ) : WalletIssuanceSessionStore {
+        val records = records.associateByTo(linkedMapOf()) { it.id }
+
+        override suspend fun get(id: String): WalletIssuanceSessionRecord? = records[id]
+        override suspend fun list(): List<WalletIssuanceSessionRecord> = records.values.toList()
+        override suspend fun put(record: WalletIssuanceSessionRecord) {
+            records[record.id] = record
+        }
+        override suspend fun remove(id: String): Boolean = records.remove(id) != null
     }
 }

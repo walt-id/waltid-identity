@@ -58,54 +58,62 @@ public actor Wallet {
         )
     }
 
-    /// Resolves a credential offer before issuance.
+    /// Starts a typed pre-authorized or authorization-code issuance session.
     ///
-    /// - Parameter offer: OpenID4VCI credential offer URL received by the app.
-    /// - Returns: The issuer, offered credential identifiers, and transaction-code requirement.
-    /// - Throws: ``WalletError`` when the offer is invalid or issuer communication fails.
-    public func resolveOffer(offer: URL) async throws -> OfferResolution {
-        try await bridge.resolveOffer(offer: offer)
+    /// - Parameter request: Offer, callback, client, and holder-binding configuration.
+    /// - Returns: A validated session with a typed offer preview and optional browser authorization data.
+    /// - Throws: ``WalletError`` when offer resolution, metadata validation, PAR, or key selection fails.
+    public func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
+        try await bridge.startIssuance(request: request)
     }
 
-    /// Receives credentials from an OpenID4VCI credential offer URL.
+    /// Continues a reviewed pre-authorized issuance session.
     ///
     /// - Parameters:
-    ///   - offer: OpenID4VCI credential offer URL received by the app.
-    ///   - txCode: Optional transaction code requested by the issuer.
-    ///   - clientID: Client identifier to use for issuer interactions.
-    /// - Returns: Local credential identifiers stored by the wallet.
-    /// - Throws: ``WalletError`` when the offer is invalid, issuer
-    ///   communication fails, issuance fails, or local persistence fails.
-    public func receive(
-        offer: URL,
-        txCode: String? = nil,
-        clientID: String = "wallet-client"
-    ) async throws -> [String] {
-        try await bridge.receive(offer: offer, txCode: txCode, clientID: clientID)
+    ///   - sessionID: Opaque identifier returned by ``startIssuance(_:)``.
+    ///   - transactionCode: Separately delivered transaction code when required by the offer.
+    /// - Returns: A typed stored, deferred, cancelled, or failed outcome.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
+    public func continuePreAuthorizedIssuance(
+        sessionID: String,
+        transactionCode: String? = nil
+    ) async throws -> IssuanceOutcome {
+        try await bridge.continuePreAuthorizedIssuance(
+            sessionID: sessionID,
+            transactionCode: transactionCode
+        )
     }
 
-    /// Receives credentials using exactly one reviewed offer preview.
+    /// Strictly validates and consumes a browser authorization callback.
     ///
     /// - Parameters:
-    ///   - previewHandle: Handle returned by ``resolveOffer(offer:)``.
-    ///   - txCode: Optional transaction code requested by the issuer.
-    ///   - clientID: Client identifier to use for issuer interactions.
-    /// - Returns: Local credential identifiers stored by the wallet.
-    /// - Throws: ``WalletError`` when the handle is invalid or issuance fails.
-    public func receive(
-        previewHandle: IssuancePreviewHandle,
-        txCode: String? = nil,
-        clientID: String = "wallet-client"
-    ) async throws -> [String] {
-        try await bridge.receive(previewHandle: previewHandle, txCode: txCode, clientID: clientID)
+    ///   - sessionID: Opaque identifier returned by ``startIssuance(_:)``.
+    ///   - callbackURI: Complete callback URI received from the browser session.
+    /// - Returns: A typed stored, deferred, cancelled, or failed outcome.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
+    public func continueAuthorizationIssuance(
+        sessionID: String,
+        callbackURI: URL
+    ) async throws -> IssuanceOutcome {
+        try await bridge.continueAuthorizationIssuance(sessionID: sessionID, callbackURI: callbackURI)
     }
 
-    /// Discards a reviewed issuance preview after local dismissal.
+    /// Cancels an active issuance session and removes its deferred continuations.
     ///
-    /// - Parameter previewHandle: Handle returned by ``resolveOffer(offer:)``.
-    /// - Throws: ``WalletError`` when the handle cannot be discarded.
-    public func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
-        try await bridge.discardIssuancePreview(previewHandle)
+    /// - Parameter sessionID: Opaque identifier of the session to cancel.
+    /// - Returns: A cancelled outcome, or a typed failure for an invalid session.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
+    public func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
+        try await bridge.cancelIssuance(sessionID: sessionID)
+    }
+
+    /// Polls a deferred credential operation without exposing its access material.
+    ///
+    /// - Parameter deferredCredentialID: Opaque identifier returned in a deferred outcome.
+    /// - Returns: A stored, still-deferred, or failed outcome.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
+    public func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
+        try await bridge.resumeDeferredIssuance(deferredCredentialID: deferredCredentialID)
     }
 
     /// Lists credentials currently known to the wallet.

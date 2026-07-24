@@ -9,11 +9,32 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 private val log = KotlinLogging.logger {}
 private val tokenResponseJson = Json { ignoreUnknownKeys = true }
+
+/** Creates a fresh RFC 9449 proof for the target endpoint and optional server nonce. */
+typealias DPoPProofFactory = suspend (targetEndpoint: String, nonce: String?) -> String
+
+/** Sanitized token endpoint failure that never retains the response body. */
+class TokenRequestException(
+    val statusCode: Int,
+    val oauthError: String? = null,
+    cause: Throwable? = null,
+) : Exception(
+    buildString {
+        append("Token request failed with HTTP ")
+        append(statusCode)
+        oauthError?.let { append(" (").append(it).append(')') }
+    },
+    cause,
+)
 
 /**
  * Builds OAuth 2.0 token requests for OpenID4VCI.
@@ -57,6 +78,23 @@ class TokenRequestBuilder(
         codeVerifier: String? = null,
         additionalHeaders: Map<String, String> = emptyMap(),
         attestationHeaders: ClientAttestationHeaders? = null,
+    ): TokenResponse = exchangeAuthorizationCode(
+        tokenEndpoint = tokenEndpoint,
+        code = code,
+        codeVerifier = codeVerifier,
+        additionalHeaders = additionalHeaders,
+        attestationHeaders = attestationHeaders,
+        dpopProofFactory = null,
+    )
+
+    /** Exchanges an authorization code while creating fresh DPoP proofs when requested. */
+    suspend fun exchangeAuthorizationCode(
+        tokenEndpoint: String,
+        code: String,
+        codeVerifier: String? = null,
+        additionalHeaders: Map<String, String> = emptyMap(),
+        attestationHeaders: ClientAttestationHeaders? = null,
+        dpopProofFactory: DPoPProofFactory?,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(code.isNotBlank()) { "Authorization code cannot be blank" }
@@ -78,7 +116,13 @@ class TokenRequestBuilder(
             }
         }
 
-        return executeTokenRequest(tokenEndpoint, parameters, additionalHeaders, attestationHeaders)
+        return executeTokenRequest(
+            tokenEndpoint,
+            parameters,
+            additionalHeaders,
+            attestationHeaders,
+            dpopProofFactory,
+        )
     }
 
     /**
@@ -102,6 +146,27 @@ class TokenRequestBuilder(
         additionalHeaders: Map<String, String> = emptyMap(),
         attestationHeaders: ClientAttestationHeaders? = null,
         anonymous: Boolean = false,
+    ): TokenResponse = exchangePreAuthorizedCode(
+        tokenEndpoint = tokenEndpoint,
+        preAuthorizedCode = preAuthorizedCode,
+        txCode = txCode,
+        additionalParameters = additionalParameters,
+        additionalHeaders = additionalHeaders,
+        attestationHeaders = attestationHeaders,
+        anonymous = anonymous,
+        dpopProofFactory = null,
+    )
+
+    /** Exchanges a pre-authorized code while creating fresh DPoP proofs when requested. */
+    suspend fun exchangePreAuthorizedCode(
+        tokenEndpoint: String,
+        preAuthorizedCode: String,
+        txCode: String? = null,
+        additionalParameters: Map<String, String> = emptyMap(),
+        additionalHeaders: Map<String, String> = emptyMap(),
+        attestationHeaders: ClientAttestationHeaders? = null,
+        anonymous: Boolean = false,
+        dpopProofFactory: DPoPProofFactory?,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(preAuthorizedCode.isNotBlank()) { "Pre-authorized code cannot be blank" }
@@ -130,7 +195,13 @@ class TokenRequestBuilder(
             additionalParameters.forEach { (k, v) -> append(k, v) }
         }
 
-        return executeTokenRequest(tokenEndpoint, parameters, additionalHeaders, attestationHeaders)
+        return executeTokenRequest(
+            tokenEndpoint,
+            parameters,
+            additionalHeaders,
+            attestationHeaders,
+            dpopProofFactory,
+        )
     }
 
     /**
@@ -152,6 +223,25 @@ class TokenRequestBuilder(
         additionalHeaders: Map<String, String> = emptyMap(),
         attestationHeaders: ClientAttestationHeaders? = null,
         anonymous: Boolean = false,
+    ): TokenResponse = refreshAccessToken(
+        tokenEndpoint = tokenEndpoint,
+        refreshToken = refreshToken,
+        additionalParameters = additionalParameters,
+        additionalHeaders = additionalHeaders,
+        attestationHeaders = attestationHeaders,
+        anonymous = anonymous,
+        dpopProofFactory = null,
+    )
+
+    /** Refreshes an access token while creating fresh DPoP proofs when requested. */
+    suspend fun refreshAccessToken(
+        tokenEndpoint: String,
+        refreshToken: String,
+        additionalParameters: Map<String, String> = emptyMap(),
+        additionalHeaders: Map<String, String> = emptyMap(),
+        attestationHeaders: ClientAttestationHeaders? = null,
+        anonymous: Boolean = false,
+        dpopProofFactory: DPoPProofFactory?,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(refreshToken.isNotBlank()) { "Refresh token cannot be blank" }
@@ -175,7 +265,13 @@ class TokenRequestBuilder(
             additionalParameters.forEach { (k, v) -> append(k, v) }
         }
 
-        return executeTokenRequest(tokenEndpoint, parameters, additionalHeaders, attestationHeaders)
+        return executeTokenRequest(
+            tokenEndpoint,
+            parameters,
+            additionalHeaders,
+            attestationHeaders,
+            dpopProofFactory,
+        )
     }
 
     /**
@@ -186,66 +282,98 @@ class TokenRequestBuilder(
         parameters: Parameters,
         additionalHeaders: Map<String, String> = emptyMap(),
         attestationHeaders: ClientAttestationHeaders? = null,
+        dpopProofFactory: DPoPProofFactory? = null,
     ): TokenResponse {
+        require(dpopProofFactory == null || additionalHeaders.keys.none { it.equals(DPOP_HEADER, ignoreCase = true) }) {
+            "DPoP must be configured with either dpopProofFactory or an additional header, not both"
+        }
         log.debug { "Sending token request to authorization server" }
         log.trace { "Request parameters count: ${parameters.names().size}" }
 
-        var response: HttpResponse = try {
-            httpClient.post(tokenEndpoint) {
-                contentType(ContentType.Application.FormUrlEncoded)
-                setBody(parameters.formUrlEncode())
-                appendTokenRequestHeaders(additionalHeaders, attestationHeaders)
-            }
-        } catch (e: Exception) {
-            log.error(e) { "Network error sending token request to: $tokenEndpoint" }
-            throw Exception("Failed to send token request", e)
-        }
+        var dpopNonce: String? = null
+        repeat(2) { attempt ->
+            val response = sendTokenRequestFollowingRedirects(
+                tokenEndpoint = tokenEndpoint,
+                parameters = parameters,
+                additionalHeaders = additionalHeaders,
+                attestationHeaders = attestationHeaders,
+                dpopProofFactory = dpopProofFactory,
+                dpopNonce = dpopNonce,
+            )
 
-        if (response.status.value in listOf(301, 302, 303, 307, 308)) {
-            val location = response.headers[HttpHeaders.Location]
-            if (location != null) {
-                log.debug { "Following redirect to: $location" }
-                val isSameOrigin = isSameOrigin(tokenEndpoint, location)
-                if (!isSameOrigin && (additionalHeaders.isNotEmpty() || attestationHeaders != null)) {
-                    error(
-                        "Cross-origin redirect from $tokenEndpoint to $location is not supported when token request " +
-                            "headers are present"
-                    )
+            if (!response.status.isSuccess()) {
+                val oauthError = response.oauthError()
+                val suppliedNonce = response.headers[DPOP_NONCE_HEADER]
+                if (
+                    attempt == 0 &&
+                    dpopProofFactory != null &&
+                    oauthError == USE_DPOP_NONCE &&
+                    !suppliedNonce.isNullOrBlank()
+                ) {
+                    dpopNonce = suppliedNonce
+                    return@repeat
                 }
-                response = httpClient.post(location) {
-                    contentType(ContentType.Application.FormUrlEncoded)
-                    setBody(parameters.formUrlEncode())
-                    if (isSameOrigin) {
-                        appendTokenRequestHeaders(additionalHeaders, attestationHeaders)
+                throw TokenRequestException(response.status.value, oauthError)
+            }
+
+            val responseBody = response.bodyAsText()
+            return try {
+                tokenResponseJson.decodeFromString<TokenResponse>(responseBody).also { tokenResponse ->
+                    log.info {
+                        "Successfully obtained access token - " +
+                            "Type: ${tokenResponse.token_type}, " +
+                            "Expires in: ${tokenResponse.expires_in ?: "not specified"} seconds, " +
+                            "Refresh token: ${if (tokenResponse.refresh_token != null) "provided" else "none"}"
                     }
                 }
+            } catch (_: Exception) {
+                log.error { "Failed to parse token response" }
+                throw TokenRequestException(response.status.value)
+            }
+        }
+        error("DPoP nonce retry exhausted")
+    }
+
+    private suspend fun sendTokenRequestFollowingRedirects(
+        tokenEndpoint: String,
+        parameters: Parameters,
+        additionalHeaders: Map<String, String>,
+        attestationHeaders: ClientAttestationHeaders?,
+        dpopProofFactory: DPoPProofFactory?,
+        dpopNonce: String?,
+    ): HttpResponse {
+        suspend fun send(endpoint: String): HttpResponse {
+            val dpopProof = dpopProofFactory?.invoke(endpoint, dpopNonce)
+            return httpClient.post(endpoint) {
+                contentType(ContentType.Application.FormUrlEncoded)
+                setBody(parameters.formUrlEncode())
+                appendTokenRequestHeaders(additionalHeaders, attestationHeaders, dpopProof)
             }
         }
 
-        if (!response.status.isSuccess()) {
-            log.error {
-                "Token request failed - Status: ${response.status.value} ${response.status.description}"
-            }
-            throw Exception("Token request failed. Status: ${response.status}")
+        val initialResponse = try {
+            send(tokenEndpoint)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw TokenRequestException(statusCode = 0, cause = e)
         }
+        if (initialResponse.status.value !in REDIRECT_STATUS_CODES) return initialResponse
 
-        log.trace { "Received successful token response (${response.status.value}), parsing" }
-        
-        val responseBody = response.bodyAsText()
-        return try {
-            val tokenResponse = tokenResponseJson.decodeFromString<TokenResponse>(responseBody)
-            log.info {
-                "Successfully obtained access token - " +
-                "Type: ${tokenResponse.token_type}, " +
-                "Expires in: ${tokenResponse.expires_in ?: "not specified"} seconds, " +
-                "Refresh token: ${if (tokenResponse.refresh_token != null) "provided" else "none"}"
-            }
-            log.trace { "Token scope: ${tokenResponse.scope ?: "not specified"}" }
-            tokenResponse
-        } catch (_: Exception) {
-            log.error { "Failed to parse token response" }
-            throw Exception("Failed to parse token response")
+        val location = initialResponse.headers[HttpHeaders.Location] ?: return initialResponse
+        if (!isSameOrigin(tokenEndpoint, location)) {
+            throw TokenRequestException(initialResponse.status.value, oauthError = "unsafe_redirect")
         }
+        return send(location)
+    }
+
+    private suspend fun HttpResponse.oauthError(): String? {
+        if (headers[HttpHeaders.WWWAuthenticate]?.contains(USE_DPOP_NONCE, ignoreCase = true) == true) {
+            return USE_DPOP_NONCE
+        }
+        return runCatching {
+            Json.parseToJsonElement(bodyAsText()).jsonObject["error"]?.jsonPrimitive?.contentOrNull
+        }.getOrNull()
     }
 
     private fun isSameOrigin(source: String, target: String): Boolean {
@@ -259,11 +387,20 @@ class TokenRequestBuilder(
     private fun HttpRequestBuilder.appendTokenRequestHeaders(
         additionalHeaders: Map<String, String>,
         attestationHeaders: ClientAttestationHeaders?,
+        dpopProof: String? = null,
     ) {
         additionalHeaders.forEach { (name, value) -> header(name, value) }
         attestationHeaders?.let {
             header(ClientAttestationHeaders.HEADER_ATTESTATION, it.attestationJwt)
             header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, it.popJwt)
         }
+        dpopProof?.let { header(DPOP_HEADER, it) }
+    }
+
+    private companion object {
+        const val DPOP_HEADER = "DPoP"
+        const val DPOP_NONCE_HEADER = "DPoP-Nonce"
+        const val USE_DPOP_NONCE = "use_dpop_nonce"
+        val REDIRECT_STATUS_CODES = setOf(307, 308)
     }
 }

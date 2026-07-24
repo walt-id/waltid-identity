@@ -174,54 +174,6 @@ enum ClaimGroupKind: CaseIterable {
     }
 }
 
-struct OfferClaimDisplay: Equatable {
-    let label: String
-    let inclusion: String
-}
-
-struct OfferClaimDisplayGroup: Equatable {
-    let title: String
-    let claims: [OfferClaimDisplay]
-}
-
-extension OfferedCredentialMetadata {
-    var claimDisplayGroups: [OfferClaimDisplayGroup] {
-        let entries = claims.enumerated().map { index, claim in
-            let semantics = MdocClaimDisplaySemantics.describe(format: format, path: claim.path)
-            let trimmedName = claim.displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let displayName = trimmedName.flatMap { $0.isEmpty ? nil : $0 }
-            return OfferClaimDisplayEntry(
-                group: semantics?.group,
-                sortOrder: semantics?.sortOrder ?? .max,
-                sourceOrder: index,
-                display: OfferClaimDisplay(
-                    label: displayName
-                        ?? semantics?.label
-                        ?? CredentialDisplayVocabulary.humanizedLabel(claim.path.last ?? ""),
-                    inclusion: claim.mandatory == true ? "Always included" : "May be included"
-                )
-            )
-        }
-        return Dictionary(grouping: entries, by: \.group)
-            .sorted { ($0.key?.order ?? 0) < ($1.key?.order ?? 0) }
-            .map { group, claims in
-                OfferClaimDisplayGroup(
-                    title: group?.rawValue ?? "Credential claims",
-                    claims: claims
-                        .sorted { ($0.sortOrder, $0.sourceOrder) < ($1.sortOrder, $1.sourceOrder) }
-                        .map(\.display)
-                )
-            }
-    }
-}
-
-private struct OfferClaimDisplayEntry {
-    let group: MdocClaimDisplayGroup?
-    let sortOrder: Int
-    let sourceOrder: Int
-    let display: OfferClaimDisplay
-}
-
 enum ClaimRole: Hashable {
     case givenName
     case familyName

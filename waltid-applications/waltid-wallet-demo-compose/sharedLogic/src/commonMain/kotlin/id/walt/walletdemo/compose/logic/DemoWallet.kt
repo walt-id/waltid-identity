@@ -3,9 +3,17 @@ package id.walt.walletdemo.compose.logic
 interface DemoWallet {
     suspend fun bootstrap(): WalletDemoBootstrapResult
     suspend fun listCredentials(): List<WalletDemoCredential>
-    suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview
-    suspend fun receive(previewHandle: WalletDemoIssuancePreviewHandle, txCode: String? = null): List<String>
-    suspend fun discardIssuancePreview(previewHandle: WalletDemoIssuancePreviewHandle)
+    suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?): WalletDemoIssuanceSession
+    suspend fun continuePreAuthorizedIssuance(
+        sessionId: String,
+        transactionCode: String?,
+    ): WalletDemoIssuanceOutcome
+    suspend fun continueAuthorizationIssuance(
+        sessionId: String,
+        callbackUri: String,
+    ): WalletDemoIssuanceOutcome
+    suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome
+    suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome
     suspend fun present(requestUrl: String, did: String? = null): WalletDemoOperationResult
     suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult
     suspend fun submitPresentation(
