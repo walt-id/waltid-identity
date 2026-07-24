@@ -447,6 +447,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
         val redirect = Url(assertNotNull(authorizationResponse.headers[HttpHeaders.Location]))
         assertEquals("invalid_request", redirect.parameters["error"])
         assertEquals("unknown-scope-state", redirect.parameters["state"])
+        assertEquals(ISSUER_BASE_URL, redirect.parameters["iss"])
         assertTrue(
             assertNotNull(redirect.parameters["error_description"]).contains("No credential configuration"),
         )

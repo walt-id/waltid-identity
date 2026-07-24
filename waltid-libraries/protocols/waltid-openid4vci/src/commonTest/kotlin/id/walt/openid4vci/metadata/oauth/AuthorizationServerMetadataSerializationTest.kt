@@ -42,6 +42,7 @@ class AuthorizationServerMetadataSerializationTest {
             responseModesSupported = null,
             scopesSupported = null,
             authorizationDetailsTypesSupported = null,
+            authorizationResponseIssParameterSupported = null,
         )
 
         val encoded = json.encodeToString(metadata)
@@ -49,6 +50,30 @@ class AuthorizationServerMetadataSerializationTest {
         assertFalse(encoded.contains("response_modes_supported"))
         assertFalse(encoded.contains("scopes_supported"))
         assertFalse(encoded.contains("authorization_details_types_supported"))
+        assertFalse(encoded.contains("authorization_response_iss_parameter_supported"))
+    }
+
+    @Test
+    fun `serializes and deserializes authorization response issuer support`() {
+        val metadata = AuthorizationServerMetadata(
+            issuer = "https://issuer.example",
+            authorizationEndpoint = "https://issuer.example/authorize",
+            tokenEndpoint = "https://issuer.example/token",
+            responseTypesSupported = setOf(ResponseType.CODE.value),
+            authorizationResponseIssParameterSupported = true,
+        )
+
+        val encoded = json.encodeToString(metadata)
+        val jsonObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            true,
+            jsonObject["authorization_response_iss_parameter_supported"]?.jsonPrimitive?.booleanOrNull,
+        )
+
+        val decoded = json.decodeFromString<AuthorizationServerMetadata>(encoded)
+        assertEquals(true, decoded.authorizationResponseIssParameterSupported)
+        assertEquals(null, decoded.customParameters)
     }
 
     @Test

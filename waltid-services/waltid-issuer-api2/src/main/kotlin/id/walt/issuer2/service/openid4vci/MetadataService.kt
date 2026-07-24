@@ -74,6 +74,7 @@ class MetadataService(
     fun getAuthorizationServerMetadata(): AuthorizationServerMetadata =
         AuthorizationServerMetadata.fromBaseUrl(
             baseUrl = baseUrl,
+            codeChallengeMethodsSupported = listOf("S256"),
             pushedAuthorizationRequestEndpointPath = "/par",
             requirePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
             tokenEndpointAuthMethodsSupported =
@@ -83,6 +84,7 @@ class MetadataService(
             clientAttestationPopSigningAlgValuesSupported =
                 if (supportsClientAttestation) ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS else null,
             preAuthorizedGrantAnonymousAccessSupported = preAuthorizedGrantAnonymousAccessSupported,
+            authorizationResponseIssParameterSupported = true,
         )
 
     fun getJwtVcIssuerMetadata(): JWTVCIssuerMetadata =
