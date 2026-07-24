@@ -127,7 +127,7 @@ routing {
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/wallet/{walletId}/credentials/receive` | Full pre-authorized code flow |
-| `POST` | `/wallet/{walletId}/credentials/receive/resolve-offer` | Isolated: resolve offer |
+| `POST` | `/wallet/{walletId}/credentials/receive/resolve-offer` | Isolated: resolve offer (enriched with issuer/credential display metadata) |
 | `POST` | `/wallet/{walletId}/credentials/receive/request-token` | Isolated: exchange code for token |
 | `POST` | `/wallet/{walletId}/credentials/receive/sign-proof` | Isolated: sign proof-of-possession |
 | `POST` | `/wallet/{walletId}/credentials/receive/fetch-credential` | Isolated: fetch credential |
@@ -144,6 +144,10 @@ routing {
 | `POST` | `/wallet/{walletId}/credentials/present/resolve-request` | Isolated: resolve VP request |
 | `POST` | `/wallet/{walletId}/credentials/present/match-credentials` | Isolated: DCQL match inline credentials |
 | `POST` | `/wallet/{walletId}/credentials/present/match-credentials-from-store` | DCQL match from wallet stores |
+| `POST` | `/wallet/{walletId}/credentials/present/preview` | Stateless consent preview (returns authorizationRequest) |
+| `POST` | `/wallet/{walletId}/credentials/present/build-vp-token` | Build signed VP from selections |
+| `POST` | `/wallet/{walletId}/credentials/present/send-response` | Send authorization response to verifier |
+| `POST` | `/wallet/{walletId}/credentials/present/reject` | Reject via requestUrl (no preview handle) |
 
 ### Named Store Management
 

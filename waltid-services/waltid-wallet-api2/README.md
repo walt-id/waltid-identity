@@ -268,7 +268,7 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive \
 #### Step-by-step (isolated steps)
 
 ```bash
-# Step 1: Resolve the offer - returns issuer, token endpoint, offered credentials, grant type
+# Step 1: Resolve the offer - returns grant/endpoints plus issuer display and offered-credential metadata
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/resolve-offer \
   -H "Content-Type: application/json" \
   -d "{\"offerUrl\":\"$OFFER_URL\"}"

@@ -236,6 +236,28 @@ data class WalletOfferPreviewResult(
 )
 
 /**
+ * Stateless, richer variant of [ResolveOfferResult].
+ *
+ * Combines the app-facing [ResolveOfferResult] summary (grant type, endpoints, pre-authorized code,
+ * transaction-code requirement) with the already-resolved protocol metadata so callers can render an
+ * issuer/credential preview without a second resolution and without retaining a preview handle.
+ *
+ * Unlike [WalletOfferPreviewResult] this does not create or store a preview handle, so it is suited to
+ * stateless "resolve for display" endpoints where issuance is completed by re-sending the offer.
+ *
+ * @property summary App-facing offer summary (identical to [resolveOffer]'s result).
+ * @property issuerMetadata Resolved credential issuer metadata.
+ * @property offeredCredentials Offered credential configurations resolved against [issuerMetadata].
+ * @property transactionCode Canonical OpenID4VCI transaction-code metadata, when required.
+ */
+data class WalletOfferResolution(
+    val summary: ResolveOfferResult,
+    val issuerMetadata: CredentialIssuerMetadata,
+    val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
+    val transactionCode: TxCode?,
+)
+
+/**
  * Complete credential-offer resolution retained between review and issuance.
  *
  * @property summary App-facing metadata derived from the resolution.
@@ -778,6 +800,26 @@ object WalletIssuanceHandler {
      */
     suspend fun resolveOffer(request: ResolveOfferRequest): ResolveOfferResult =
         resolveIssuanceOffer(request).summary
+
+    /**
+     * Resolves an offer and returns the summary together with the resolved issuer and offered-credential
+     * metadata, without retaining a preview handle.
+     *
+     * Use this for stateless "resolve for display" flows that render an issuer/credential preview and then
+     * complete issuance by re-sending the offer (e.g. via the pre-authorized or authorization-code endpoints).
+     */
+    suspend fun resolveOfferDetailed(
+        request: ResolveOfferRequest,
+        httpClient: HttpClient = defaultHttpClient(),
+    ): WalletOfferResolution {
+        val resolved = resolveIssuanceOffer(request, httpClient)
+        return WalletOfferResolution(
+            summary = resolved.summary,
+            issuerMetadata = resolved.issuerMetadata,
+            offeredCredentials = resolved.offeredCredentials,
+            transactionCode = resolved.offer.grants?.preAuthorizedCode?.txCode,
+        )
+    }
 
     suspend fun requestToken(request: RequestTokenRequest): RequestTokenResult =
         requestToken(

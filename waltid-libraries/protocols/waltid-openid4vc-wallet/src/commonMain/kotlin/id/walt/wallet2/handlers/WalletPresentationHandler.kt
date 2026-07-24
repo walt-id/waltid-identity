@@ -181,6 +181,29 @@ sealed interface PreviewPresentationResult {
     ) : PreviewPresentationResult
 }
 
+/**
+ * Stateless consent-preview result for HTTP APIs that must not retain a server-side preview session.
+ *
+ * Same UI payload as [PreviewPresentationResult], but without a [PresentationPreviewHandle]. Callers
+ * complete the flow with [buildVpToken] + [sendAuthorizationResponse], or [rejectPresentationByRequestUrl].
+ */
+sealed interface StatelessPreviewPresentationResult {
+    val authorizationRequest: AuthorizationRequest
+
+    data class Ready(
+        override val authorizationRequest: AuthorizationRequest,
+        val responseEncryption: ResponseEncryption.Metadata?,
+        val credentialOptions: List<PresentationCredentialOption>,
+        val credentialRequirements: List<PresentationCredentialRequirement>,
+        val transactionData: List<PresentationTransactionDataItem>,
+    ) : StatelessPreviewPresentationResult
+
+    data class Invalid(
+        override val authorizationRequest: AuthorizationRequest,
+        val error: PresentationRequestError,
+    ) : StatelessPreviewPresentationResult
+}
+
 data class PresentationCredentialRequirement(
     val options: List<List<String>>,
 )
@@ -231,6 +254,7 @@ data class SubmitPresentationRequest(
     val previewHandle: PresentationPreviewHandle,
     val selectedCredentialOptions: List<PresentationCredentialSelection>,
     val selectedDisclosureOptions: List<PresentationDisclosureSelection>? = null,
+    val keyId: String? = null,
     val did: String? = null,
     val runPolicies: Boolean? = null,
 )
@@ -238,6 +262,14 @@ data class SubmitPresentationRequest(
 @Serializable
 data class RejectPresentationRequest(
     val previewHandle: PresentationPreviewHandle,
+    val errorCode: String? = null,
+    val errorDescription: String? = null,
+)
+
+/** Reject a presentation by re-resolving the original request URL (no preview handle / session). */
+@Serializable
+data class RejectPresentationByRequestUrlRequest(
+    val requestUrl: Url,
     val errorCode: String? = null,
     val errorDescription: String? = null,
 )
@@ -364,6 +396,38 @@ object WalletPresentationHandler {
         resolveAuthorizationRequest = ::resolveAuthorizationRequest,
     )
 
+    /**
+     * Stateless consent preview for HTTP APIs: same resolution/validation/matching as
+     * [previewPresentation], but does not retain a preview handle or server-side session.
+     */
+    suspend fun previewPresentationStateless(
+        wallet: Wallet,
+        request: PreviewPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+    ): StatelessPreviewPresentationResult {
+        val computed = computePresentationPreview(
+            wallet = wallet,
+            request = request,
+            onEvent = onEvent,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+            resolveAuthorizationRequest = ::resolveAuthorizationRequest,
+        )
+        return when (computed) {
+            is ComputedPresentationPreview.Invalid -> StatelessPreviewPresentationResult.Invalid(
+                authorizationRequest = computed.authorizationRequest,
+                error = computed.error,
+            )
+            is ComputedPresentationPreview.Ready -> StatelessPreviewPresentationResult.Ready(
+                authorizationRequest = computed.authorizationRequest,
+                responseEncryption = computed.responseEncryption,
+                credentialOptions = computed.credentialOptions,
+                credentialRequirements = computed.credentialRequirements,
+                transactionData = computed.transactionData,
+            )
+        }
+    }
+
     internal suspend fun previewPresentation(
         wallet: Wallet,
         request: PreviewPresentationRequest,
@@ -371,6 +435,71 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest,
     ): PreviewPresentationResult {
+        val computed = computePresentationPreview(
+            wallet = wallet,
+            request = request,
+            onEvent = onEvent,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+            resolveAuthorizationRequest = resolveAuthorizationRequest,
+        )
+        return when (computed) {
+            is ComputedPresentationPreview.Invalid -> {
+                val handle = rememberPreviewedAuthorizationRequest(
+                    wallet = wallet,
+                    preview = PreviewedPresentation.Invalid(
+                        requestUrl = request.requestUrl,
+                        resolvedAuthorizationRequest = computed.resolvedAuthorizationRequest,
+                        error = computed.error,
+                    ),
+                )
+                PreviewPresentationResult.Invalid(handle, computed.authorizationRequest, computed.error)
+            }
+            is ComputedPresentationPreview.Ready -> {
+                val handle = rememberPreviewedAuthorizationRequest(
+                    wallet = wallet,
+                    preview = PreviewedPresentation.Ready(
+                        requestUrl = request.requestUrl,
+                        resolvedAuthorizationRequest = computed.resolvedAuthorizationRequest,
+                    ),
+                )
+                PreviewPresentationResult.Ready(
+                    handle = handle,
+                    authorizationRequest = computed.authorizationRequest,
+                    responseEncryption = computed.responseEncryption,
+                    credentialRequirements = computed.credentialRequirements,
+                    credentialOptions = computed.credentialOptions,
+                    transactionData = computed.transactionData,
+                )
+            }
+        }
+    }
+
+    private sealed interface ComputedPresentationPreview {
+        val resolvedAuthorizationRequest: ResolvedAuthorizationRequest
+        val authorizationRequest: AuthorizationRequest
+            get() = resolvedAuthorizationRequest.authorizationRequest
+
+        data class Ready(
+            override val resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
+            val responseEncryption: ResponseEncryption.Metadata?,
+            val credentialOptions: List<PresentationCredentialOption>,
+            val credentialRequirements: List<PresentationCredentialRequirement>,
+            val transactionData: List<PresentationTransactionDataItem>,
+        ) : ComputedPresentationPreview
+
+        data class Invalid(
+            override val resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
+            val error: PresentationRequestError,
+        ) : ComputedPresentationPreview
+    }
+
+    private suspend fun computePresentationPreview(
+        wallet: Wallet,
+        request: PreviewPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest,
+    ): ComputedPresentationPreview {
         onEvent(WalletSessionEvent.presentation_request_parsed)
         val resolvedAuthorizationRequest = resolveAuthorizationRequest(request.requestUrl)
         val authorizationRequest = resolvedAuthorizationRequest.authorizationRequest
@@ -382,15 +511,7 @@ object WalletPresentationHandler {
             formatCapabilities = WalletPresentationFormatRegistry.capabilitiesFromKeyTypes(setOf(key.keyType)),
         )
         if (validation is PresentationRequestValidationResult.Invalid) {
-            val handle = rememberPreviewedAuthorizationRequest(
-                wallet = wallet,
-                preview = PreviewedPresentation.Invalid(
-                    requestUrl = request.requestUrl,
-                    resolvedAuthorizationRequest = resolvedAuthorizationRequest,
-                    error = validation.error,
-                ),
-            )
-            return PreviewPresentationResult.Invalid(handle, authorizationRequest, validation.error)
+            return ComputedPresentationPreview.Invalid(resolvedAuthorizationRequest, validation.error)
         }
 
         val valid = validation as PresentationRequestValidationResult.Valid
@@ -416,15 +537,7 @@ object WalletPresentationHandler {
         )
         if (availabilityError != null) {
             PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedAuthorizationRequest)
-            val handle = rememberPreviewedAuthorizationRequest(
-                wallet = wallet,
-                preview = PreviewedPresentation.Invalid(
-                    requestUrl = request.requestUrl,
-                    resolvedAuthorizationRequest = resolvedAuthorizationRequest,
-                    error = availabilityError,
-                ),
-            )
-            return PreviewPresentationResult.Invalid(handle, authorizationRequest, availabilityError)
+            return ComputedPresentationPreview.Invalid(resolvedAuthorizationRequest, availabilityError)
         }
         onEvent(WalletSessionEvent.presentation_credentials_selected)
         val credentialOptions = matched.flatMap { (queryId, results) ->
@@ -445,16 +558,8 @@ object WalletPresentationHandler {
                 )
             }
         }
-        val handle = rememberPreviewedAuthorizationRequest(
-            wallet = wallet,
-            preview = PreviewedPresentation.Ready(
-                requestUrl = request.requestUrl,
-                resolvedAuthorizationRequest = resolvedAuthorizationRequest,
-            ),
-        )
-        return PreviewPresentationResult.Ready(
-            handle = handle,
-            authorizationRequest = authorizationRequest,
+        return ComputedPresentationPreview.Ready(
+            resolvedAuthorizationRequest = resolvedAuthorizationRequest,
             responseEncryption = responseEncryption,
             credentialRequirements = query.requiredCredentialRequirements(),
             credentialOptions = credentialOptions,
@@ -477,7 +582,7 @@ object WalletPresentationHandler {
         val resolvedAuthorizationRequest = (preview as? PreviewedPresentation.Ready)
             ?.resolvedAuthorizationRequest
             ?: error("Unexpected presentation preview state")
-        val key = wallet.resolveKey(keyId = null)
+        val key = wallet.resolveKey(keyId = request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
         val selectedQueryIds = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.queryId }
@@ -553,6 +658,29 @@ object WalletPresentationHandler {
 
         return result.emitPresentationOutcome(onEvent)
     }
+
+    /**
+     * Rejects a presentation by re-resolving [RejectPresentationByRequestUrlRequest.requestUrl].
+     * No preview handle or server-side session is required.
+     */
+    suspend fun rejectPresentationByRequestUrl(
+        request: RejectPresentationByRequestUrlRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest = ::resolveAuthorizationRequest,
+    ): WalletPresentResult {
+        val resolvedAuthorizationRequest = resolveAuthorizationRequest(request.requestUrl)
+        PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedAuthorizationRequest)
+        onEvent(WalletSessionEvent.presentation_request_parsed)
+        val errorCode = request.errorCode
+            ?: WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED.code
+        val result = WalletPresentFunctionality2.walletRejectHandling(
+            authorizationRequest = resolvedAuthorizationRequest.authorizationRequest,
+            error = errorCode,
+            errorDescription = request.errorDescription,
+        )
+        return result.emitPresentationOutcome(onEvent)
+    }
+
     // ---------------------------------------------------------------------------
     // Isolated step handlers
     // ---------------------------------------------------------------------------
@@ -645,11 +773,12 @@ object WalletPresentationHandler {
 
     /**
      * Isolated step 3: build the VP token from the wallet's stored credentials
-     * that were selected in step 2.
+     * that were selected in step 2 (or from a consent preview).
      *
-     * @param wallet The wallet owning the credentials.
-     * @param request Contains the resolved authorization request, selected credential IDs,
-     *   and optional key/DID overrides.
+     * Prefer [BuildVpTokenRequest.selectedCredentialOptions] (and optional
+     * [BuildVpTokenRequest.selectedDisclosureOptions]) for the consent UI path.
+     * [BuildVpTokenRequest.selectedCredentialIds] remains supported for the legacy
+     * resolve → match → build flow.
      */
     suspend fun buildVpToken(wallet: Wallet, request: BuildVpTokenRequest): BuildVpTokenResult {
         val key = wallet.resolveKey(request.key, request.keyId)
@@ -659,37 +788,30 @@ object WalletPresentationHandler {
         val dcqlQuery = request.authorizationRequest.dcqlQuery
             ?: throw IllegalArgumentException("AuthorizationRequest has no dcql_query")
 
-        val queriesById = dcqlQuery.credentials.associateBy { it.id }
-        val unknownQueryIds = request.selectedCredentialIds.keys - queriesById.keys
-        require(unknownQueryIds.isEmpty()) { "Unknown DCQL query IDs selected: $unknownQueryIds" }
-        require(request.selectedCredentialIds.isNotEmpty()) { "No credentials selected" }
+        val selectedCredentialOptions = request.resolveSelectedCredentialOptions()
+        selectedCredentialOptions.requireValidPresentationCredentialSelection()
+        val selectedQueryIds = selectedCredentialOptions.mapTo(mutableSetOf()) { it.queryId }
+        val requirements = dcqlQuery.requiredCredentialRequirements()
+        require(requirements.satisfiedBy(selectedQueryIds)) {
+            "Selected credential option(s) do not satisfy required presentation credential query constraints"
+        }
+        validateSelectedTransactionDataCredentials(
+            request.authorizationRequest.transactionData.orEmpty(),
+            selectedQueryIds,
+        )
 
-        val matchedCredentials = request.selectedCredentialIds.mapValues { (queryId, credentialIds) ->
-            val query = requireNotNull(queriesById[queryId])
-            require(credentialIds.isNotEmpty()) { "No credentials selected for DCQL query '$queryId'" }
-            require(query.multiple || credentialIds.size == 1) {
-                "DCQL query '$queryId' does not allow multiple credentials"
-            }
-
-            val selectedCredentials = credentialIds.distinct().map { credentialId ->
-                wallet.findCredential(credentialId)
-                    ?: throw IllegalArgumentException("Credential '$credentialId' not found in wallet")
-            }
-            val matches = DcqlMatcher.match(
-                query = DcqlQuery(credentials = listOf(query)),
-                availableCredentials = selectedCredentials.map { stored ->
-                    stored.credential.toRawDcqlCredential(stored.id)
-                },
-            ).getOrThrow()[queryId].orEmpty()
-            require(matches.size == selectedCredentials.size) {
-                "One or more selected credentials do not satisfy DCQL query '$queryId'"
-            }
-            matches
+        val matched = selectFromStores(wallet, dcqlQuery, useWalletCredentialIds = true)
+        val selected = matched.selectCredentialOptions(
+            selectedCredentialOptions = selectedCredentialOptions,
+            selectedDisclosureOptions = request.selectedDisclosureOptions,
+        )
+        require(requirements.satisfiedBy(selected.keys)) {
+            "Selected credential option(s) do not match required presentation credential query constraints"
         }
 
         val vpToken = WalletPresentFunctionality2.buildVpToken(
             authorizationRequest = request.authorizationRequest,
-            matchedCredentials = matchedCredentials,
+            matchedCredentials = selected,
             holderKey = key,
             holderDid = did,
         )
@@ -1078,29 +1200,47 @@ object WalletPresentationHandler {
 // ---------------------------------------------------------------------------
 
 /**
- * Request to build a VP token from already-matched credentials.
+ * Request to build a VP token from already-matched / user-selected credentials.
  *
  * Used in the manual presentation flow:
- * 1. `POST /present/resolve-request` - resolves the authorization request
- * 2. `POST /present/match-credentials-from-store` - selects matching credentials
- * 3. `POST /present/build-vp-token` - builds the VP token (this request)
- * 4. `POST /present/send-response` - transmits the response to the verifier
+ * 1. `POST /present/preview` (or resolve-request + match) - consent / matching
+ * 2. `POST /present/build-vp-token` - builds the VP token (this request)
+ * 3. `POST /present/send-response` - transmits the response to the verifier
+ *
+ * Prefer [selectedCredentialOptions] (+ optional [selectedDisclosureOptions]) for consent UIs.
+ * [selectedCredentialIds] remains for the legacy resolve → match → build path.
  */
 @Serializable
 data class BuildVpTokenRequest(
-    /** The resolved authorization request from step 1. */
+    /** The resolved authorization request from preview / resolve-request. */
     val authorizationRequest: AuthorizationRequest,
     /**
-     * Credential IDs (wallet-assigned) to include, grouped by DCQL query ID.
-     * These are the IDs returned by `match-credentials-from-store`.
+     * User-selected credential options (queryId + credentialId), preferred for consent UIs.
+     * When non-empty, takes precedence over [selectedCredentialIds].
      */
-    val selectedCredentialIds: Map<String, List<String>>,
+    val selectedCredentialOptions: List<PresentationCredentialSelection> = emptyList(),
+    /** Optional selectively disclosable claim paths for the selected credentials. */
+    val selectedDisclosureOptions: List<PresentationDisclosureSelection>? = null,
+    /**
+     * Legacy credential IDs grouped by DCQL query ID (from match-credentials-from-store).
+     * Used when [selectedCredentialOptions] is empty.
+     */
+    val selectedCredentialIds: Map<String, List<String>> = emptyMap(),
     /** Key to use for signing. Defaults to the wallet's default key. */
     val key: DirectSerializedKey? = null,
     val keyId: String? = null,
     /** DID to use as holder binding. Defaults to the wallet's default DID. */
     val did: String? = null,
 )
+
+internal fun BuildVpTokenRequest.resolveSelectedCredentialOptions(): List<PresentationCredentialSelection> {
+    if (selectedCredentialOptions.isNotEmpty()) return selectedCredentialOptions
+    return selectedCredentialIds.flatMap { (queryId, credentialIds) ->
+        credentialIds.map { credentialId ->
+            PresentationCredentialSelection(queryId = queryId, credentialId = credentialId)
+        }
+    }
+}
 
 @Serializable
 data class BuildVpTokenResult(
