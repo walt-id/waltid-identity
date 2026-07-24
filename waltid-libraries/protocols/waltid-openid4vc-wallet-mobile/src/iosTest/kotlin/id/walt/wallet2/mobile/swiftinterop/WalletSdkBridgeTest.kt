@@ -29,6 +29,7 @@ import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
 import id.walt.wallet2.mobile.MobileWalletPresentationPreview
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle
+import id.walt.wallet2.mobile.MobileWalletPresentationRequestContext
 import id.walt.wallet2.mobile.MobileWalletPresentationRequestInfo
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletResponseEncryption
@@ -225,7 +226,7 @@ class WalletSdkBridgeTest {
     fun bridgePresentationPreviewPreservesDetectedProtocolError() = runTest {
         val expected = MobileWalletPresentationPreviewResult.Invalid(
             previewHandle = MobileWalletPresentationPreviewHandle("presentation-preview"),
-            request = MobileWalletPresentationRequestInfo(
+            request = MobileWalletPresentationRequestContext(
                 clientId = "https://verifier.example",
                 verifierMetadata = MobileWalletVerifierMetadata(
                     display = MobileWalletMetadataDisplay(
@@ -240,7 +241,7 @@ class WalletSdkBridgeTest {
                 ),
                 responseUri = "https://verifier.example/direct-post",
                 state = "state-1",
-                nonce = "nonce-1",
+                nonce = null,
                 responseEncryption = MobileWalletResponseEncryption.NotRequired,
             ),
             errorCode = MobileWalletPresentationErrorCode.invalidTransactionData,
@@ -630,11 +631,7 @@ class WalletSdkBridgeTest {
         )
 
         events.emit(
-            MobileWalletEvent(
-                name = "presentation_completed",
-                phase = MobileWalletEventPhase.presentation,
-                status = MobileWalletEventStatus.completed,
-            )
+            MobileWalletEvent.presentation_completed
         )
         val event = bridge.events.first()
 

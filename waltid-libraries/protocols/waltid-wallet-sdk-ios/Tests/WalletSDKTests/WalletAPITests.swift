@@ -419,7 +419,7 @@ final class WalletAPITests: XCTestCase {
 
     func testPreviewPresentationReturnsTypedProtocolError() async throws {
         let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
-        let requestInfo = PresentationRequestInfo(
+        let requestInfo = PresentationRequestContext(
             clientID: "https://verifier.example",
             verifierMetadata: testVerifierMetadata,
             responseEncryption: .notRequired
@@ -554,7 +554,7 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testEventsReturnsBridgeEventStream() async {
-        let event = WalletEvent(name: "receive", phase: .issuance, status: .progress)
+        let event = WalletEvent.issuanceOfferResolved
         let bridge = FakeWalletCoreBridge(events: [event])
         let wallet = Wallet(bridge: bridge)
 
@@ -565,7 +565,61 @@ final class WalletAPITests: XCTestCase {
         let second = await iterator.next()
 
         XCTAssertEqual(first, event)
+        XCTAssertEqual(first?.phase, .issuance)
+        XCTAssertEqual(first?.status, .progress)
         XCTAssertNil(second)
+    }
+
+    func testWalletEventsHaveAClosedNamePhaseAndStatusMapping() {
+        let completed = WalletEvent.issuanceCompleted
+        let failed = WalletEvent.presentationFailed
+
+        XCTAssertEqual(WalletEvent.allCases.count, 16)
+        XCTAssertEqual(completed.name, "issuance_completed")
+        XCTAssertEqual(completed.phase, .issuance)
+        XCTAssertEqual(completed.status, .completed)
+        XCTAssertEqual(failed.name, "presentation_failed")
+        XCTAssertEqual(failed.phase, .presentation)
+        XCTAssertEqual(failed.status, .failed)
+        XCTAssertEqual(WalletEvent.presentationResponsePrepared.name, "presentation_response_prepared")
+        XCTAssertEqual(WalletEvent.presentationResponsePrepared.status, .progress)
+        XCTAssertNil(WalletEvent(name: "presentation_request_resolved"))
+    }
+
+    func testPresentationModelValidationRejectsInvalidStates() {
+        XCTAssertFalse(PresentationRequestContext.hasValidClientID(" "))
+        XCTAssertTrue(PresentationRequestContext.hasValidClientID("https://verifier.example"))
+
+        XCTAssertFalse(PresentationCredentialRequirement.hasValidOptions([]))
+        XCTAssertFalse(PresentationCredentialRequirement.hasValidOptions([[]]))
+        XCTAssertFalse(PresentationCredentialRequirement.hasValidOptions([[" "]]))
+        XCTAssertTrue(PresentationCredentialRequirement.hasValidOptions([["pid 1", "age.credential"]]))
+
+        XCTAssertFalse(PresentationRequestInfo.hasRequiredFields(clientID: "", nonce: "nonce"))
+        XCTAssertFalse(PresentationRequestInfo.hasRequiredFields(clientID: "client", nonce: " "))
+        XCTAssertTrue(PresentationRequestInfo.hasRequiredFields(clientID: "client", nonce: "nonce"))
+
+        XCTAssertFalse(
+            PresentationDisclosure.hasValidSelectionState(
+                selectivelyDisclosable: false,
+                required: false,
+                selectable: true
+            )
+        )
+        XCTAssertFalse(
+            PresentationDisclosure.hasValidSelectionState(
+                selectivelyDisclosable: true,
+                required: true,
+                selectable: true
+            )
+        )
+        XCTAssertTrue(
+            PresentationDisclosure.hasValidSelectionState(
+                selectivelyDisclosable: true,
+                required: false,
+                selectable: true
+            )
+        )
     }
 
     private func acceptsSendable<T: Sendable>(_ value: T) {
@@ -726,8 +780,9 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         PresentationPreview(
             previewHandle: PresentationPreviewHandle(value: "fake-presentation-preview"),
             request: .init(
-                clientID: nil,
-                responseEncryption: .notRequired
+                clientID: "https://verifier.example",
+                nonce: "nonce-1",
+                responseEncryption: .notRequired,
             ),
             credentialOptions: []
         )
