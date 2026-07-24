@@ -17,7 +17,6 @@ import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -47,8 +46,6 @@ class PreAuthorizedCodeGrantHandlerTest {
                 scopes = setOf("openid"),
                 audience = emptySet(),
                 session = credentialSession,
-                credentialNonce = "nonce-123",
-                credentialNonceExpiresAt = kotlin.time.Clock.System.now() + 600.seconds,
             ),
         )
         val code = issued.code
@@ -67,9 +64,7 @@ class PreAuthorizedCodeGrantHandlerTest {
         assertEquals("client-pre", storedRefreshToken.clientId)
         assertEquals(setOf("openid"), storedRefreshToken.grantedScopes)
         assertEquals(setOf(GrantType.PreAuthorizedCode.value), storedRefreshToken.accessTokenRequest.client.grantTypes)
-        val extra = result.response.extra
-        assertNotNull(extra["c_nonce"])
-        assertTrue((extra["c_nonce_expires_in"] as? Long ?: 0) >= 0)
+        assertTrue(result.response.extra.isEmpty())
         assertNull(repository.get(code))
     }
 

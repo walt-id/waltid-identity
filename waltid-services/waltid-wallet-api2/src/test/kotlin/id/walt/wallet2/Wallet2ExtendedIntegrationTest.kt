@@ -338,6 +338,7 @@ class Wallet2ExtendedIntegrationTest {
                 credentialEndpointHandlers = CredentialEndpointHandlers()
             )
         )
+        val proofSupport = TestIssuerProofSupport(issuerBase, accessTokenKey)
         val session = DefaultSession(subject = "holder-isolated")
         runBlocking {
             preAuthRepo.save(
@@ -345,8 +346,6 @@ class Wallet2ExtendedIntegrationTest {
                     code = preAuthCode, clientId = null, txCode = null, txCodeValue = null,
                     grantedScopes = emptySet(), grantedAudience = emptySet(), session = session,
                     expiresAt = Clock.System.now() + 10.minutes,
-                    credentialNonce = "isolated-nonce",
-                    credentialNonceExpiresAt = Clock.System.now() + 10.minutes
                 )
             )
         }
@@ -387,6 +386,14 @@ class Wallet2ExtendedIntegrationTest {
                     )
                 }
                 get("/credential-offer") { call.respond(offer) }
+                post("/nonce") {
+                    val nonce = proofSupport.issueNonce()
+                    call.response.header(HttpHeaders.CacheControl, "no-store")
+                    call.respond(buildJsonObject {
+                        put("c_nonce", nonce.nonce)
+                        put("c_nonce_expires_in", nonce.expiresInSeconds)
+                    })
+                }
                 post("/token") {
                     val params = call.receiveParameters()
                     val code = params["pre-authorized_code"] ?: return@post call.respond(
@@ -406,13 +413,11 @@ class Wallet2ExtendedIntegrationTest {
                     if (tokenResponse !is AccessTokenResponseResult.Success) return@post call.respond(
                         HttpStatusCode.InternalServerError, buildJsonObject { put("error", "server_error") }
                     )
+                    val nonce = proofSupport.issueNonce()
                     call.respond(buildJsonObject {
                         put("access_token", tokenResponse.response.accessToken)
                         put("token_type", "Bearer")
                     })
-                }
-                post("/nonce") {
-                    call.respond(buildJsonObject { put("c_nonce", "isolated-nonce") })
                 }
                 post("/credential") {
                     val body = json.parseToJsonElement(call.receiveText()).jsonObject
@@ -431,8 +436,9 @@ class Wallet2ExtendedIntegrationTest {
                     if (credentialRequest !is CredentialRequestResult.Success) return@post call.respond(
                         HttpStatusCode.BadRequest, buildJsonObject { put("error", "invalid_proof") }
                     )
+                    val request = credentialRequest.request.withIssuer(issuerBase)
                     val credentialResponse = provider.createCredentialResponse(
-                        request = credentialRequest.request.withIssuer(issuerBase),
+                        request = request,
                         configuration = configuration,
                         issuerKey = issuerKey,
                         issuerId = issuerBase,
@@ -440,13 +446,16 @@ class Wallet2ExtendedIntegrationTest {
                             put("given_name", "Alice"); put("family_name", "Wonder")
                             put("issuing_country", "DE")
                         },
-                        selectiveDisclosure = null
+                        selectiveDisclosure = null,
+                        proofValidationContext = proofSupport.validationContext(request)
                     )
-                    if (credentialResponse !is CredentialResponseResult.Success) return@post call.respond(
-                        HttpStatusCode.InternalServerError, buildJsonObject { put("error", "server_error") }
-                    )
+                    if (credentialResponse !is CredentialResponseResult.Success) {
+                        val failure = credentialResponse as CredentialResponseResult.Failure
+                        val httpResp = provider.writeCredentialError(request, failure.error)
+                        return@post call.respond(HttpStatusCode.fromValue(httpResp.status), httpResp.payload)
+                    }
                     val httpResp = provider.writeCredentialResponse(
-                        credentialRequest.request.withIssuer(issuerBase), credentialResponse.response
+                        request, credentialResponse.response
                     )
                     call.respond(HttpStatusCode.fromValue(httpResp.status), httpResp.payload)
                 }
@@ -584,8 +593,6 @@ class Wallet2ExtendedIntegrationTest {
                             code = fullFlowCode, clientId = null, txCode = null, txCodeValue = null,
                             grantedScopes = emptySet(), grantedAudience = emptySet(), session = session,
                             expiresAt = Clock.System.now() + 10.minutes,
-                            credentialNonce = "full-nonce",
-                            credentialNonceExpiresAt = Clock.System.now() + 10.minutes
                         )
                     )
                 }

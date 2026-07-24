@@ -46,8 +46,6 @@ data class PreAuthorizedCodeIssueRequest(
     val scopes: Set<String> = emptySet(),
     val audience: Set<String> = emptySet(),
     val session: Session,
-    val credentialNonce: String? = null,
-    val credentialNonceExpiresAt: Instant? = null,
     /** Optional issuance session ID for O(1) lookup on credential endpoint */
     val issuanceSessionId: String? = null,
 )
@@ -56,8 +54,6 @@ data class PreAuthorizedCodeIssueResult(
     val code: String,
     val expiresAt: Instant,
     val txCodeValue: String? = null,
-    val credentialNonce: String? = null,
-    val credentialNonceExpiresAt: Instant? = null,
 )
 
 class DefaultPreAuthorizedCodeIssuer(
@@ -97,8 +93,6 @@ class DefaultPreAuthorizedCodeIssuer(
                 grantedAudience = request.audience,
                 session = sessionSnapshot,
                 expiresAt = expiresAt,
-                credentialNonce = request.credentialNonce,
-                credentialNonceExpiresAt = request.credentialNonceExpiresAt,
                 issuanceSessionId = request.issuanceSessionId,
             )
         }
@@ -107,8 +101,6 @@ class DefaultPreAuthorizedCodeIssuer(
             code = code,
             expiresAt = expiresAt,
             txCodeValue = resolvedTxCodeValue,
-            credentialNonce = request.credentialNonce,
-            credentialNonceExpiresAt = request.credentialNonceExpiresAt,
         )
     }
 

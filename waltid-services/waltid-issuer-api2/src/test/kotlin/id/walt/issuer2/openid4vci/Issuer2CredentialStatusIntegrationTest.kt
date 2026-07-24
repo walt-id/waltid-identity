@@ -84,7 +84,10 @@ class Issuer2CredentialStatusIntegrationTest {
         val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
         assertBearerAccessToken(tokenResponse)
 
-        val proofs = walletFlow.buildJwtProofs(resolvedOffer.issuerMetadata)
+        val proofs = walletFlow.buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+        )
         val credentialResponse = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(tokenResponse.access_token)
             contentType(ContentType.Application.Json)
@@ -139,7 +142,10 @@ class Issuer2CredentialStatusIntegrationTest {
         val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
         assertBearerAccessToken(tokenResponse)
 
-        val proofs = walletFlow.buildJwtProofs(resolvedOffer.issuerMetadata)
+        val proofs = walletFlow.buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+        )
         val credentialResponse = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(tokenResponse.access_token)
             contentType(ContentType.Application.Json)
@@ -180,7 +186,10 @@ class Issuer2CredentialStatusIntegrationTest {
         val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
         assertBearerAccessToken(tokenResponse)
 
-        val proofs = walletFlow.buildJwtProofs(resolvedOffer.issuerMetadata)
+        val proofs = walletFlow.buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+        )
         val credentialResponse = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(tokenResponse.access_token)
             contentType(ContentType.Application.Json)
@@ -229,7 +238,10 @@ class Issuer2CredentialStatusIntegrationTest {
         val resolvedOffer = walletFlow.resolve(createdOffer)
         val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
 
-        val proofs = walletFlow.buildJwtProofs(resolvedOffer.issuerMetadata)
+        val proofs = walletFlow.buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+        )
         val credentialResponse = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(tokenResponse.access_token)
             contentType(ContentType.Application.Json)
@@ -283,7 +295,10 @@ class Issuer2CredentialStatusIntegrationTest {
         val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
         assertBearerAccessToken(tokenResponse)
 
-        val proofs = walletFlow.buildJwtProofs(resolvedOffer.issuerMetadata)
+        val proofs = walletFlow.buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+        )
         val credentialResponse = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(tokenResponse.access_token)
             contentType(ContentType.Application.Json)
@@ -325,7 +340,10 @@ class Issuer2CredentialStatusIntegrationTest {
         val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
         assertBearerAccessToken(tokenResponse)
 
-        val proofs = walletFlow.buildJwtProofs(resolvedOffer.issuerMetadata)
+        val proofs = walletFlow.buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+        )
         val credentialResponse = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(tokenResponse.access_token)
             contentType(ContentType.Application.Json)
@@ -389,7 +407,10 @@ class Issuer2CredentialStatusIntegrationTest {
         val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
         assertBearerAccessToken(tokenResponse)
 
-        val proofs = walletFlow.buildJwtProofs(resolvedOffer.issuerMetadata)
+        val proofs = walletFlow.buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+        )
         val credentialResponse = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(tokenResponse.access_token)
             contentType(ContentType.Application.Json)
@@ -437,7 +458,10 @@ class Issuer2CredentialStatusIntegrationTest {
         val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
         assertBearerAccessToken(tokenResponse)
 
-        val proofs = walletFlow.buildJwtProofs(resolvedOffer.issuerMetadata)
+        val proofs = walletFlow.buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+        )
         val credentialResponse = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(tokenResponse.access_token)
             contentType(ContentType.Application.Json)

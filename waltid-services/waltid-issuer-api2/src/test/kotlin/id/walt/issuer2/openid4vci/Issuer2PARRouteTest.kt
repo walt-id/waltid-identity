@@ -1,5 +1,6 @@
 package id.walt.issuer2.openid4vci
 
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
@@ -46,6 +47,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class Issuer2PARRouteTest {
 
@@ -100,6 +102,36 @@ class Issuer2PARRouteTest {
         val requestUri = assertNotNull(payload["request_uri"]?.jsonPrimitive?.contentOrNull)
         assertEquals(true, requestUri.startsWith("urn:ietf:params:oauth:request_uri:"))
         assertEquals("90", payload["expires_in"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `nonce route returns a signed no-store nonce`() = testApplication {
+        val serviceConfig = Issuer2ServiceConfig(baseUrl = "http://localhost")
+        application {
+            install(ServerContentNegotiation) {
+                json(json)
+            }
+            install(Authentication) {
+                bearer("auth-oauth") {}
+            }
+            routing {
+                testController(serviceConfig).register(this)
+            }
+        }
+        val client = createClient {
+            install(ClientContentNegotiation) {
+                json(json)
+            }
+        }
+
+        val response = client.post("/openid4vci/nonce")
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals("no-store", response.headers[HttpHeaders.CacheControl])
+        val payload = response.body<JsonObject>()
+        val nonce = assertNotNull(payload["c_nonce"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("300", payload["c_nonce_expires_in"]?.jsonPrimitive?.content)
+        assertTrue(KeyManager.resolveSerializedKey(serviceConfig.ciTokenKey).getPublicKey().verifyJws(nonce).isSuccess)
     }
 
     @Test
@@ -228,6 +260,7 @@ class Issuer2PARRouteTest {
                 profileService = profileService,
                 metadataService = metadataService,
                 notificationService = notificationService,
+                credentialNonceService = openId4VciModule.credentialNonceService,
             ),
             offerService = CredentialOfferService(
                 profileService = profileService,

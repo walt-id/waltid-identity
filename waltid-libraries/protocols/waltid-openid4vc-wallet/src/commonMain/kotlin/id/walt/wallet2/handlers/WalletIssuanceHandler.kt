@@ -1049,7 +1049,9 @@ object WalletIssuanceHandler {
         methods: Set<CryptographicBindingMethod>?
     ): Boolean {
         if (methods.isNullOrEmpty()) return false
-        val supportsJwk = methods.any { it is CryptographicBindingMethod.Jwk }
+        val supportsJwk = methods.any {
+            it is CryptographicBindingMethod.Jwk || it is CryptographicBindingMethod.CoseKey
+        }
         val supportsDid = methods.any { it is CryptographicBindingMethod.Did }
         return supportsJwk && !supportsDid
     }

@@ -71,6 +71,7 @@ class Issuer2Module(
         profileService = credentialProfileService,
         metadataService = metadataService,
         notificationService = notificationService,
+        credentialNonceService = openId4VciModule.credentialNonceService,
     )
 
     val managementController = Issuer2ManagementController(

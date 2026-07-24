@@ -281,6 +281,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
                 credentialEndpointHandlers = CredentialEndpointHandlers()
             )
         )
+        val proofSupport = TestIssuerProofSupport(issuerBase, accessTokenKey)
 
         // Seed the pre-authorized code directly into the repository
         val session = DefaultSession(subject = "holder-${Uuid.random()}")
@@ -295,8 +296,6 @@ class Wallet2IssuerVerifier2IntegrationTest {
                     grantedAudience = emptySet(),
                     session = session,
                     expiresAt = Clock.System.now() + 10.minutes,
-                    credentialNonce = "test-nonce",
-                    credentialNonceExpiresAt = Clock.System.now() + 10.minutes
                 )
             )
         }
@@ -350,6 +349,14 @@ class Wallet2IssuerVerifier2IntegrationTest {
                 get("/credential-offer") {
                     call.respond(offer)
                 }
+                post("/nonce") {
+                    val nonce = proofSupport.issueNonce()
+                    call.response.header(HttpHeaders.CacheControl, "no-store")
+                    call.respond(buildJsonObject {
+                        put("c_nonce", nonce.nonce)
+                        put("c_nonce_expires_in", nonce.expiresInSeconds)
+                    })
+                }
                 post("/token") {
                     val params = call.receiveParameters()
                     val code = params["pre-authorized_code"]
@@ -378,13 +385,11 @@ class Wallet2IssuerVerifier2IntegrationTest {
                             buildJsonObject { put("error", "server_error") }
                         )
                     }
+                    val nonce = proofSupport.issueNonce()
                     call.respond(buildJsonObject {
                         put("access_token", tokenResponse.response.accessToken)
                         put("token_type", "Bearer")
                     })
-                }
-                post("/nonce") {
-                    call.respond(buildJsonObject { put("c_nonce", "test-nonce") })
                 }
                 post("/credential") {
                     val rawBody = call.receiveText()
@@ -426,26 +431,23 @@ class Wallet2IssuerVerifier2IntegrationTest {
                             buildJsonObject { put("error", "invalid_proof") }
                         )
                     }
+                    val request = credentialRequestResult.request.withIssuer(issuerBase)
                     val credentialResponse = provider.createCredentialResponse(
-                        request = credentialRequestResult.request.withIssuer(issuerBase),
+                        request = request,
                         configuration = configuration,
                         issuerKey = issuerKey,
                         issuerId = issuerBase,
                         credentialData = credentialData,
-                        selectiveDisclosure = selectiveDisclosure
+                        selectiveDisclosure = selectiveDisclosure,
+                        proofValidationContext = proofSupport.validationContext(request)
                     )
                     if (credentialResponse !is CredentialResponseResult.Success) {
                         val failure = credentialResponse as CredentialResponseResult.Failure
-                        return@post call.respond(
-                            HttpStatusCode.InternalServerError,
-                            buildJsonObject {
-                                put("error", failure.error.error)
-                                put("error_description", failure.error.description ?: "no description")
-                            }
-                        )
+                        val httpResponse = provider.writeCredentialError(request, failure.error)
+                        return@post call.respond(HttpStatusCode.fromValue(httpResponse.status), httpResponse.payload)
                     }
                     val httpResponse = provider.writeCredentialResponse(
-                        credentialRequestResult.request.withIssuer(issuerBase),
+                        request,
                         credentialResponse.response
                     )
                     call.respond(HttpStatusCode.fromValue(httpResponse.status), httpResponse.payload)
