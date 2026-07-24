@@ -31,10 +31,7 @@ object PKCEManager {
         val codeVerifier: String,
         val codeChallenge: String,
         val codeChallengeMethod: CodeChallengeMethod,
-    ) {
-        override fun toString(): String =
-            "PKCEData(codeVerifier=<redacted>, codeChallenge=<redacted>, codeChallengeMethod=$codeChallengeMethod)"
-    }
+    )
 
     /**
      * Generates a cryptographically random code verifier

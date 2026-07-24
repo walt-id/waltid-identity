@@ -59,12 +59,7 @@ class TokenRequestBuilder(
         val refresh_token: String? = null,
         val scope: String? = null,
         val authorization_details: List<AuthorizationDetail>? = null
-    ) {
-        override fun toString(): String =
-            "TokenResponse(access_token=<redacted>, token_type=$token_type, expires_in=$expires_in, " +
-                "refresh_token=${refresh_token?.let { "<redacted>" }}, scope=$scope, " +
-                "authorization_details=$authorization_details)"
-    }
+    )
 
     /**
      * Exchanges an authorization code for an access token

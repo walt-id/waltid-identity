@@ -18,8 +18,6 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
-import id.walt.webdatafetching.WebDataFetchingConfiguration
-import id.walt.webdatafetching.config.LoggingConfiguration
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
@@ -126,10 +124,7 @@ data class WalletIssuanceOfferPreview(
 data class WalletIssuancePkceState(
     val codeChallenge: String,
     val codeChallengeMethod: String,
-) {
-    override fun toString(): String =
-        "WalletIssuancePkceState(codeChallenge=<redacted>, codeChallengeMethod=$codeChallengeMethod)"
-}
+)
 
 /** Browser request and callback binding for an authorization-code session. */
 @Serializable
@@ -139,11 +134,7 @@ data class WalletIssuanceAuthorization(
     val redirectUri: String,
     val pkce: WalletIssuancePkceState,
     val pushedAuthorizationRequestUsed: Boolean,
-) {
-    override fun toString(): String =
-        "WalletIssuanceAuthorization(url=<redacted>, state=<redacted>, redirectUri=$redirectUri, " +
-            "pkce=$pkce, pushedAuthorizationRequestUsed=$pushedAuthorizationRequestUsed)"
-}
+)
 
 /** Public handle returned by [WalletIssuanceSessionService.start]. */
 @Serializable
@@ -151,10 +142,7 @@ data class WalletIssuanceSession(
     val id: String,
     val offer: WalletIssuanceOfferPreview,
     val authorization: WalletIssuanceAuthorization?,
-) {
-    override fun toString(): String =
-        "WalletIssuanceSession(id=$id, offer=$offer, authorization=${authorization?.let { "<redacted>" }})"
-}
+)
 
 /** Input used to start either supported grant from one offer. */
 @Serializable
@@ -173,10 +161,6 @@ data class WalletIssuanceSessionRequest(
         require(clientId.isNotBlank()) { "clientId cannot be blank" }
     }
 
-    override fun toString(): String =
-        "WalletIssuanceSessionRequest(offer=<redacted>, key=<redacted>, keyId=${keyId?.let { "<redacted>" }}, " +
-            "did=${did?.let { "<redacted>" }}, " +
-            "clientId=$clientId, redirectUri=$redirectUri, tokenRequestHeaders=${tokenRequestHeaders.keys})"
 }
 
 /** Callback continuation supplied after the browser returns to the wallet. */
@@ -184,10 +168,7 @@ data class WalletIssuanceSessionRequest(
 data class WalletIssuanceAuthorizationCallback(
     val sessionId: String,
     val callbackUri: String,
-) {
-    override fun toString(): String =
-        "WalletIssuanceAuthorizationCallback(sessionId=$sessionId, callbackUri=<redacted>)"
-}
+)
 
 /** Public reference for a credential that must be polled later. */
 @Serializable
@@ -258,10 +239,7 @@ class WalletIssuanceSessionService(
     private val sessionStore: WalletIssuanceSessionStore? = null,
     httpClient: HttpClient? = null,
 ) {
-    private val httpClient = httpClient ?: WebDataFetcher(
-        WebDataFetcherId.WALLET2_ISSUANCE_HANDLER,
-        WebDataFetchingConfiguration(logging = LoggingConfiguration(enable = false)),
-    ).httpClient
+    private val httpClient = httpClient ?: WebDataFetcher(WebDataFetcherId.WALLET2_ISSUANCE_HANDLER).httpClient
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
     private val mutex = Mutex()
     private val sessions = LinkedHashMap<String, ActiveSession>()
@@ -1411,7 +1389,7 @@ class WalletIssuanceSessionService(
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {
-            // Observers are isolated from protocol state transitions and receive no sensitive data.
+            // Observers are isolated from protocol state transitions.
         }
     }
 
@@ -1491,9 +1469,7 @@ class WalletIssuanceSessionService(
         val clientId: String,
         val redirectUri: String,
         val tokenRequestHeaders: Map<String, String>,
-    ) {
-        override fun toString(): String = "PersistedRequest(redacted)"
-    }
+    )
 
     @Serializable
     private data class PersistedActiveSession(
@@ -1505,9 +1481,7 @@ class WalletIssuanceSessionService(
         val selectedPublicJwk: String,
         val codeVerifier: String? = null,
         val state: SessionState,
-    ) {
-        override fun toString(): String = "PersistedActiveSession(redacted)"
-    }
+    )
 
     @Serializable
     private data class PersistedDeferredRecord(
@@ -1522,9 +1496,7 @@ class WalletIssuanceSessionService(
         val keyId: String?,
         val selectedPublicJwk: String,
         val label: String?,
-    ) {
-        override fun toString(): String = "PersistedDeferredRecord(redacted)"
-    }
+    )
 
     private class IssuanceStageException(
         val code: WalletIssuanceErrorCode,
