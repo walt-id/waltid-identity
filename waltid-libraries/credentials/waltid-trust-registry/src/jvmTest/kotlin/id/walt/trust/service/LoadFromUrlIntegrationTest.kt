@@ -47,10 +47,10 @@ class LoadFromUrlIntegrationTest {
         assertNotNull(atSource)
         assertEquals("AT", atSource.territory)
         assertEquals(SourceFamily.TSL, atSource.sourceFamily)
-        assertEquals(AuthenticityState.VALIDATED, atSource.authenticityState, "Signature should be validated")
+        assertEquals(AuthenticityState.INTEGRITY_VERIFIED, atSource.assurance.authenticityState, "Signature should be validated")
 
         println("Territory: ${atSource.territory}")
-        println("Authenticity: ${atSource.authenticityState}")
+        println("Authenticity: ${atSource.assurance.authenticityState}")
         println("Freshness: ${atSource.freshnessState}")
 
         // List some entities
@@ -108,7 +108,7 @@ class LoadFromUrlIntegrationTest {
         val sources = service.listSources().toList()
         val euSource = sources.find { it.sourceId == "eu-lotl" }
         assertNotNull(euSource)
-        assertEquals(AuthenticityState.VALIDATED, euSource.authenticityState)
+        assertEquals(AuthenticityState.INTEGRITY_VERIFIED, euSource.assurance.authenticityState)
     }
 
     @Test

@@ -8,7 +8,7 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Thread-safe in-memory implementation of [TrustStore].
- * Suitable for MVP / demo use. Not persistent across restarts.
+ * Suitable for tests and applications that do not require persistence across restarts.
  *
  * Flow-returning methods snapshot the relevant collection under the mutex and
  * emit from the snapshot, so the lock is not held during downstream consumption.
@@ -67,12 +67,10 @@ class InMemoryTrustStore : TrustStore {
 
     override suspend fun updateSourceFreshness(sourceId: String, freshnessState: FreshnessState): Unit = mutex.withLock {
         sources[sourceId]?.let { sources[sourceId] = it.copy(freshnessState = freshnessState) }
-        Unit
     }
 
-    override suspend fun updateSourceAuthenticity(sourceId: String, authenticityState: AuthenticityState): Unit = mutex.withLock {
-        sources[sourceId]?.let { sources[sourceId] = it.copy(authenticityState = authenticityState) }
-        Unit
+    override suspend fun updateSourceAssurance(sourceId: String, assurance: SourceAssurance): Unit = mutex.withLock {
+        sources[sourceId]?.let { sources[sourceId] = it.copy(assurance = assurance) }
     }
 
     // ---------------------------------------------------------------------------
@@ -96,6 +94,9 @@ class InMemoryTrustStore : TrustStore {
                 it.certificateSha256Hex?.equals(sha256Hex, ignoreCase = true) == true
             }
         }
+
+    override suspend fun listCertificateIdentities(): Flow<ServiceIdentity> =
+        snapshotFlow { identities.values.filter { it.certificateDerBase64 != null } }
 
     override suspend fun findIdentitiesBySubjectDn(subjectDn: String): Flow<ServiceIdentity> =
         snapshotFlow {

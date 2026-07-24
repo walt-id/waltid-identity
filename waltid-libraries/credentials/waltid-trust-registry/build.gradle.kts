@@ -13,6 +13,7 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.datetime)
             implementation(identityLibs.kotlinx.coroutines.core)
+            implementation(identityLibs.optimumcode.jsonschemavalidator)
 
             // HTTP fetching (KMP Ktor client core)
             implementation(identityLibs.bundles.waltid.ktor.client)
@@ -42,6 +43,8 @@ kotlin {
 
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)
+            implementation(identityLibs.bouncycastle.prov)
+            implementation(identityLibs.bouncycastle.pkix)
         }
     }
 }

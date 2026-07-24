@@ -4,8 +4,11 @@ import id.walt.trust.fetcher.SourceFetcher
 import id.walt.trust.fetcher.SourceFormat
 import id.walt.trust.model.*
 import id.walt.trust.parser.lote.LoteJsonParser
+import id.walt.trust.parser.lote.LoteXmlParseConfig
 import id.walt.trust.parser.lote.LoteXmlParser
 import id.walt.trust.parser.tsl.TslXmlParser
+import id.walt.trust.signature.CompactJwsValidator
+import id.walt.trust.signature.SignatureValidationConfig
 import id.walt.trust.store.TrustStore
 import id.walt.trust.utils.HashUtils.computeCertificateSha256
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -13,7 +16,20 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
+import java.io.ByteArrayInputStream
+import java.security.cert.CertPathBuilder
+import java.security.cert.CertPathValidator
+import java.security.cert.CertStore
+import java.security.cert.CertificateFactory
+import java.security.cert.CollectionCertStoreParameters
+import java.security.cert.PKIXBuilderParameters
+import java.security.cert.PKIXCertPathBuilderResult
+import java.security.cert.TrustAnchor
+import java.security.cert.X509CertSelector
+import java.security.cert.X509Certificate
+import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -21,7 +37,7 @@ private val log = KotlinLogging.logger {}
 
 /**
  * Default implementation of [TrustRegistryService].
- * Uses in-memory store for MVP; enterprise persistence is added separately.
+ * Storage is supplied by the caller, allowing either in-memory or persistent implementations.
  */
 class DefaultTrustRegistryService(
     private val store: TrustStore
@@ -34,16 +50,116 @@ class DefaultTrustRegistryService(
     data class SourceConfig(
         val sourceId: String,
         val url: String,
-        val sourceFamily: SourceFamily
+        val sourceFamily: SourceFamily,
+        val options: SourceLoadOptions
     )
 
-    fun registerSource(sourceId: String, url: String, sourceFamily: SourceFamily) {
-        configuredSources[sourceId] = SourceConfig(sourceId, url, sourceFamily)
+    fun registerSource(
+        sourceId: String,
+        url: String,
+        sourceFamily: SourceFamily,
+        options: SourceLoadOptions
+    ) {
+        configuredSources[sourceId] = SourceConfig(sourceId, url, sourceFamily, options)
     }
+
+    @Deprecated("Use registerSource with SourceLoadOptions")
+    fun registerSource(
+        sourceId: String,
+        url: String,
+        sourceFamily: SourceFamily,
+        validateSignature: Boolean,
+        trustedSignerCertificates: List<String>
+    ) = registerSource(
+        sourceId,
+        url,
+        sourceFamily,
+        legacyOptions(validateSignature, trustedSignerCertificates)
+    )
 
     // ---------------------------------------------------------------------------
     // Resolve operations
     // ---------------------------------------------------------------------------
+
+    override suspend fun resolveCertificateChain(
+        certificateChainPemOrDer: List<String>,
+        instant: Instant,
+        expectedEntityType: TrustedEntityType?,
+        expectedServiceType: String?
+    ): TrustDecision {
+        if (certificateChainPemOrDer.isEmpty()) {
+            return TrustDecision(
+                decision = TrustDecisionCode.PROCESSING_ERROR,
+                warnings = listOf("Certificate chain is empty")
+            )
+        }
+
+        val presentedCertificates = runCatching {
+            certificateChainPemOrDer.map(::parseCertificate)
+        }.getOrElse { error ->
+            return TrustDecision(
+                decision = TrustDecisionCode.PROCESSING_ERROR,
+                warnings = listOf("Failed to parse certificate chain: ${error.message}")
+            )
+        }
+
+        val identitiesByAnchor = store.listCertificateIdentities().toList().mapNotNull { identity ->
+            val encoded = identity.certificateDerBase64 ?: return@mapNotNull null
+            runCatching { identity to parseCertificate(encoded) }
+                .onFailure { log.warn(it) { "Ignoring invalid stored certificate for identity ${identity.identityId}" } }
+                .getOrNull()
+        }
+
+        val pathMatches = identitiesByAnchor.filter { (_, anchor) ->
+            validateCertificatePath(presentedCertificates, anchor, instant)
+        }.map { it.first }
+
+        if (pathMatches.isNotEmpty()) {
+            val decision = buildDecisionFromIdentities(
+                pathMatches,
+                instant,
+                expectedEntityType,
+                expectedServiceType
+            )
+            if (decision.decision != TrustDecisionCode.NOT_TRUSTED) {
+                return decision.copy(
+                    evidence = decision.evidence + TrustEvidence(
+                        type = "CERTIFICATE_PATH",
+                        value = "Validated presented chain against registry-owned trust anchor"
+                    )
+                )
+            }
+        }
+
+        // Backwards compatibility for fingerprint-only sources and credentials that
+        // still contain their registered root. New sources should retain certificate DER.
+        for (certificate in certificateChainPemOrDer) {
+            val decision = resolveByCertificate(
+                certificate,
+                instant,
+                expectedEntityType,
+                expectedServiceType
+            )
+            if (decision.decision == TrustDecisionCode.TRUSTED ||
+                decision.decision == TrustDecisionCode.STALE_SOURCE
+            ) {
+                return decision.copy(
+                    warnings = decision.warnings +
+                        "Trust was resolved by exact certificate match; no registry-owned path was built"
+                )
+            }
+        }
+
+        return TrustDecision(
+            decision = TrustDecisionCode.NOT_TRUSTED,
+            evidence = listOf(
+                TrustEvidence(
+                    "CERTIFICATE_PATH",
+                    "No valid path from the presented leaf to an eligible registry certificate"
+                )
+            )
+        )
+    }
 
     override suspend fun resolveByCertificate(
         certificatePemOrDer: String,
@@ -88,10 +204,10 @@ class DefaultTrustRegistryService(
         expectedEntityType: TrustedEntityType?,
         expectedServiceType: String?
     ): TrustDecision {
-        // MVP: JWK thumbprint matching not yet implemented
+        // JWK thumbprint matching is not yet implemented.
         return TrustDecision(
             decision = TrustDecisionCode.UNSUPPORTED_SOURCE,
-            warnings = listOf("JWK-based lookup not yet implemented in MVP")
+            warnings = listOf("JWK-based lookup is not yet implemented")
         )
     }
 
@@ -117,6 +233,9 @@ class DefaultTrustRegistryService(
         }
 
         val source = store.getSource(entity.sourceId)
+        if (source?.assurance?.accepted != true) {
+            return sourceNotAcceptedDecision(source, entity)
+        }
         val trustedService = store.listServicesForEntity(entity.entityId).firstOrNull { it.status in TRUSTED_STATUSES }
 
         val freshness = evaluateFreshness(source, instant)
@@ -125,7 +244,7 @@ class DefaultTrustRegistryService(
             TrustDecision(
                 decision = if (freshness == FreshnessState.EXPIRED) TrustDecisionCode.STALE_SOURCE else TrustDecisionCode.TRUSTED,
                 sourceFreshness = freshness,
-                authenticity = source?.authenticityState ?: AuthenticityState.UNKNOWN,
+                sourceAssurance = source.assurance,
                 matchedSource = source,
                 matchedEntity = entity,
                 matchedService = trustedService,
@@ -164,8 +283,9 @@ class DefaultTrustRegistryService(
                 sourceId = source.sourceId,
                 displayName = source.displayName,
                 sourceFamily = source.sourceFamily,
+                format = source.format,
                 freshnessState = evaluateFreshness(source, now()),
-                authenticityState = source.authenticityState,
+                assurance = source.assurance,
                 nextUpdate = source.nextUpdate,
                 entityCount = store.countEntities(source.sourceId),
                 serviceCount = store.countServices(source.sourceId)
@@ -185,43 +305,71 @@ class DefaultTrustRegistryService(
             return RefreshResult(sourceId, success = false, error = fetchResult.error ?: "Fetch failed")
         }
 
-        return loadSourceFromContent(sourceId, fetchResult.content, config.url)
+        return loadSourceFromContent(sourceId, fetchResult.content, config.url, config.options)
     }
 
     override suspend fun loadSourceFromContent(
         sourceId: String,
         content: String,
         sourceUrl: String?,
-        validateSignature: Boolean
-    ): RefreshResult {
-        return loadSourceFromContentInternal(sourceId, content, sourceUrl, validateSignature)
-    }
+        options: SourceLoadOptions
+    ): RefreshResult = loadSourceFromContentInternal(sourceId, content, sourceUrl, options)
 
     override suspend fun loadSourceFromUrl(
         sourceId: String,
         url: String,
-        validateSignature: Boolean
+        options: SourceLoadOptions
     ): RefreshResult {
         log.info { "Loading trust source from URL: $url" }
-
         val fetchResult = SourceFetcher.fetch(url)
         if (!fetchResult.success || fetchResult.content == null) {
             return RefreshResult(
                 sourceId = sourceId,
                 success = false,
-                error = fetchResult.error ?: "Failed to fetch from $url"
+                error = fetchResult.error ?: "Failed to fetch from $url",
+                errorCode = SourceLoadErrorCode.FETCH_FAILED
             )
         }
 
-        // Register this source for future refreshes
-        val sourceFamily = detectSourceFamily(fetchResult.content)
-        registerSource(sourceId, url, sourceFamily)
+        val sourceFamily = runCatching { detectSourceFamily(fetchResult.content) }.getOrElse { error ->
+            return RefreshResult(
+                sourceId = sourceId,
+                success = false,
+                error = error.message ?: "Unknown source format",
+                errorCode = SourceLoadErrorCode.UNKNOWN_FORMAT
+            )
+        }
+        registerSource(sourceId, url, sourceFamily, options)
+        return loadSourceFromContentInternal(sourceId, fetchResult.content, url, options)
+    }
 
+    @Deprecated("Use the SourceLoadOptions overload with an explicit acceptance policy")
+    override suspend fun loadSourceFromContent(
+        sourceId: String,
+        content: String,
+        sourceUrl: String?,
+        validateSignature: Boolean,
+        trustedSignerCertificates: List<String>
+    ): RefreshResult {
         return loadSourceFromContentInternal(
-            sourceId = sourceId,
-            content = fetchResult.content,
-            sourceUrl = url,
-            validateSignature = validateSignature
+            sourceId,
+            content,
+            sourceUrl,
+            legacyOptions(validateSignature, trustedSignerCertificates)
+        )
+    }
+
+    @Deprecated("Use the SourceLoadOptions overload with an explicit acceptance policy")
+    override suspend fun loadSourceFromUrl(
+        sourceId: String,
+        url: String,
+        validateSignature: Boolean,
+        trustedSignerCertificates: List<String>
+    ): RefreshResult {
+        return loadSourceFromUrl(
+            sourceId,
+            url,
+            legacyOptions(validateSignature, trustedSignerCertificates)
         )
     }
 
@@ -229,42 +377,171 @@ class DefaultTrustRegistryService(
         sourceId: String,
         content: String,
         sourceUrl: String?,
-        validateSignature: Boolean
+        options: SourceLoadOptions
     ): RefreshResult {
+        val signedEnvelope = CompactJwsValidator.isCompactJws(content)
+        val verifySignatures = options.acceptancePolicy != SourceAcceptancePolicy.ALLOW_UNVERIFIED
+        val envelope = try {
+            when {
+                !signedEnvelope -> SourceEnvelope(
+                    content,
+                    SourceAssurance(
+                        signatureStatus = SignatureStatus.NOT_PRESENT,
+                        signerTrust = SignerTrust.NOT_APPLICABLE,
+                        authenticityState = AuthenticityState.UNVERIFIED,
+                        details = "Source has no signed envelope"
+                    )
+                )
+                verifySignatures -> {
+                    val requireTrustedSigner =
+                        options.acceptancePolicy == SourceAcceptancePolicy.REQUIRE_AUTHENTICATED
+                    val validation = CompactJwsValidator.validate(
+                        content,
+                        options.trustedSignerCertificates,
+                        requireTrustedSigner = requireTrustedSigner
+                    )
+                    SourceEnvelope(
+                        content = validation.payload,
+                        assurance = SourceAssurance(
+                            signatureStatus = SignatureStatus.VALID,
+                            signerTrust = if (requireTrustedSigner) SignerTrust.TRUSTED else SignerTrust.NOT_EVALUATED,
+                            authenticityState = if (requireTrustedSigner) {
+                                AuthenticityState.AUTHENTICATED
+                            } else {
+                                AuthenticityState.INTEGRITY_VERIFIED
+                            },
+                            details = if (requireTrustedSigner) {
+                                "Compact JWS signature and signer trust validated"
+                            } else {
+                                "Compact JWS signature integrity validated; signer trust was not evaluated"
+                            }
+                        ),
+                        validationMetadata = validation.metadata
+                    )
+                }
+                else -> SourceEnvelope(
+                    content = CompactJwsValidator.decodePayloadWithoutValidation(content),
+                    assurance = SourceAssurance(
+                        signatureStatus = SignatureStatus.NOT_CHECKED,
+                        signerTrust = SignerTrust.NOT_EVALUATED,
+                        authenticityState = AuthenticityState.UNVERIFIED,
+                        details = "Compact JWS verification was explicitly disabled"
+                    ),
+                    validationMetadata = mapOf("signatureFormat" to "JWS_COMPACT_UNVERIFIED")
+                )
+            }
+        } catch (e: Exception) {
+            log.error(e) { "Failed to validate source signature: $sourceId" }
+            return RefreshResult(
+                sourceId = sourceId,
+                success = false,
+                error = e.message ?: "Signature validation failed",
+                errorCode = SourceLoadErrorCode.SIGNATURE_VALIDATION_FAILED,
+                assurance = SourceAssurance(
+                    signatureStatus = SignatureStatus.INVALID,
+                    signerTrust = SignerTrust.UNTRUSTED,
+                    authenticityState = AuthenticityState.FAILED,
+                    acceptancePolicy = options.acceptancePolicy,
+                    accepted = false,
+                    details = e.message
+                )
+            )
+        }
+
         return try {
-            val format = SourceFetcher.detectFormat(null, content)
+            val sourceContent = envelope.content
+            val format = SourceFetcher.detectFormat(null, sourceContent)
 
             val parsed = when {
                 // Detect if it's TSL (TrustServiceStatusList) or LoTE
-                content.contains("TrustServiceStatusList") || content.contains("TrustServiceProviderList") -> {
-                    log.info { "Parsing TSL XML for source: $sourceId (validateSignature=$validateSignature)" }
+                sourceContent.contains("TrustServiceStatusList") || sourceContent.contains("TrustServiceProviderList") -> {
+                    log.info { "Parsing TSL XML for source: $sourceId (policy=${options.acceptancePolicy})" }
+                    val requireTrustedSigner = options.acceptancePolicy == SourceAcceptancePolicy.REQUIRE_AUTHENTICATED
                     val config = id.walt.trust.parser.tsl.TslParseConfig(
-                        validateSignature = validateSignature
+                        validateSignature = verifySignatures,
+                        signatureConfig = SignatureValidationConfig(
+                            requireTrustedCertificate = requireTrustedSigner,
+                            trustedAnchors = options.trustedSignerCertificates.map(::parseCertificate).toSet()
+                        ),
+                        strictSignatureValidation = false,
+                        requireSignature = options.acceptancePolicy in setOf(
+                            SourceAcceptancePolicy.REQUIRE_AUTHENTICATED,
+                            SourceAcceptancePolicy.REQUIRE_VALID_SIGNATURE
+                        )
                     )
-                    val result = TslXmlParser.parse(content, sourceId, sourceUrl, config)
+                    val result = TslXmlParser.parse(sourceContent, sourceId, sourceUrl, config)
                     ParsedContent(result.source, result.entities, result.services, result.identities)
                 }
 
-                (content.contains("ListOfTrustedEntities") || content.contains("TrustedEntity")) && format == SourceFormat.XML -> {
+                (sourceContent.contains("ListOfTrustedEntities") || sourceContent.contains("TrustedEntity")) && format == SourceFormat.XML -> {
                     log.info { "Parsing LoTE XML for source: $sourceId" }
-                    val result = LoteXmlParser.parse(content, sourceId, sourceUrl)
+                    require(LoteXmlParser.isNormative(sourceContent)) {
+                        "Expected the ETSI TS 119 602 Annex A.2.1 XML binding"
+                    }
+                    val requireTrustedSigner = options.acceptancePolicy == SourceAcceptancePolicy.REQUIRE_AUTHENTICATED
+                    val result = LoteXmlParser.parse(
+                        sourceContent, sourceId, sourceUrl,
+                        LoteXmlParseConfig(
+                            validateSignature = verifySignatures,
+                            signatureConfig = SignatureValidationConfig(
+                                requireTrustedCertificate = requireTrustedSigner,
+                                trustedAnchors = options.trustedSignerCertificates.map(::parseCertificate).toSet()
+                            ),
+                            requireSignature = options.acceptancePolicy in setOf(
+                                SourceAcceptancePolicy.REQUIRE_AUTHENTICATED,
+                                SourceAcceptancePolicy.REQUIRE_VALID_SIGNATURE
+                            )
+                        )
+                    )
                     ParsedContent(result.source, result.entities, result.services, result.identities)
                 }
 
                 format == SourceFormat.JSON -> {
                     log.info { "Parsing LoTE JSON for source: $sourceId" }
-                    val result = LoteJsonParser.parse(content, sourceId, sourceUrl)
+                    require(LoteJsonParser.isNormative(sourceContent)) {
+                        "Expected the ETSI TS 119 602 Annex A.1 JSON binding"
+                    }
+                    val result = LoteJsonParser.parse(
+                        sourceContent, sourceId, sourceUrl,
+                        envelope.assurance, envelope.validationMetadata
+                    )
                     ParsedContent(result.source, result.entities, result.services, result.identities)
                 }
 
                 else -> {
-                    return RefreshResult(sourceId, success = false, error = "Unknown source format")
+                    return RefreshResult(
+                        sourceId,
+                        success = false,
+                        error = "Unknown source format",
+                        errorCode = SourceLoadErrorCode.UNKNOWN_FORMAT
+                    )
                 }
             }
 
-            // Update freshness based on nextUpdate
+            val evaluatedAssurance = parsed.source.assurance.copy(
+                acceptancePolicy = options.acceptancePolicy
+            )
+            val accepted = isAccepted(evaluatedAssurance, options.acceptancePolicy)
+            val finalAssurance = evaluatedAssurance.copy(accepted = accepted)
+            if (!accepted) {
+                return RefreshResult(
+                    sourceId = sourceId,
+                    success = false,
+                    error = rejectionReason(finalAssurance),
+                    errorCode = if (finalAssurance.authenticityState == AuthenticityState.FAILED) {
+                        SourceLoadErrorCode.SIGNATURE_VALIDATION_FAILED
+                    } else {
+                        SourceLoadErrorCode.SOURCE_NOT_ACCEPTED
+                    },
+                    assurance = finalAssurance
+                )
+            }
+
             val freshness = evaluateFreshness(parsed.source, now())
-            val sourceWithFreshness = parsed.source.copy(freshnessState = freshness)
+            val sourceWithFreshness = parsed.source.copy(
+                assurance = finalAssurance,
+                freshnessState = freshness
+            )
 
             // Store everything atomically to prevent partial state on failure
             store.replaceSourceData(
@@ -281,11 +558,23 @@ class DefaultTrustRegistryService(
                 success = true,
                 entitiesLoaded = parsed.entities.size,
                 servicesLoaded = parsed.services.size,
-                identitiesLoaded = parsed.identities.size
+                identitiesLoaded = parsed.identities.size,
+                pointersLoaded = parsed.source.metadata["pointerCount"]?.toIntOrNull() ?: 0,
+                assurance = finalAssurance
             )
         } catch (e: Exception) {
             log.error(e) { "Failed to parse source: $sourceId" }
-            RefreshResult(sourceId, success = false, error = e.message ?: "Parse error")
+            RefreshResult(
+                sourceId = sourceId,
+                success = false,
+                error = e.message ?: "Parse error",
+                errorCode = SourceLoadErrorCode.PARSE_FAILED,
+                assurance = envelope.assurance.copy(
+                    acceptancePolicy = options.acceptancePolicy,
+                    accepted = false,
+                    details = e.message
+                )
+            )
         }
     }
 
@@ -298,6 +587,53 @@ class DefaultTrustRegistryService(
         val entities: List<TrustedEntity>,
         val services: List<TrustedService>,
         val identities: List<ServiceIdentity>
+    )
+
+    private data class SourceEnvelope(
+        val content: String,
+        val assurance: SourceAssurance,
+        val validationMetadata: Map<String, String> = emptyMap()
+    )
+
+    private fun isAccepted(assurance: SourceAssurance, policy: SourceAcceptancePolicy): Boolean {
+        if (assurance.authenticityState == AuthenticityState.FAILED ||
+            assurance.signatureStatus in setOf(SignatureStatus.INVALID, SignatureStatus.UNSUPPORTED)
+        ) return false
+
+        return when (policy) {
+            SourceAcceptancePolicy.REQUIRE_AUTHENTICATED ->
+                assurance.authenticityState == AuthenticityState.AUTHENTICATED
+            SourceAcceptancePolicy.REQUIRE_VALID_SIGNATURE ->
+                assurance.authenticityState in setOf(
+                    AuthenticityState.AUTHENTICATED,
+                    AuthenticityState.INTEGRITY_VERIFIED
+                )
+            SourceAcceptancePolicy.ALLOW_UNSIGNED ->
+                assurance.signatureStatus != SignatureStatus.NOT_CHECKED
+            SourceAcceptancePolicy.ALLOW_UNVERIFIED -> true
+        }
+    }
+
+    private fun rejectionReason(assurance: SourceAssurance): String = when {
+        assurance.authenticityState == AuthenticityState.FAILED ->
+            assurance.details ?: "Source signature validation failed"
+        assurance.acceptancePolicy == SourceAcceptancePolicy.REQUIRE_AUTHENTICATED ->
+            "Source is not authenticated by an independently trusted signer"
+        assurance.acceptancePolicy == SourceAcceptancePolicy.REQUIRE_VALID_SIGNATURE ->
+            "Source does not contain a valid signature"
+        else -> "Source does not satisfy ${assurance.acceptancePolicy}"
+    }
+
+    private fun legacyOptions(
+        validateSignature: Boolean,
+        trustedSignerCertificates: List<String>
+    ): SourceLoadOptions = SourceLoadOptions(
+        acceptancePolicy = when {
+            !validateSignature -> SourceAcceptancePolicy.ALLOW_UNVERIFIED
+            trustedSignerCertificates.isNotEmpty() -> SourceAcceptancePolicy.REQUIRE_AUTHENTICATED
+            else -> SourceAcceptancePolicy.ALLOW_UNSIGNED
+        },
+        trustedSignerCertificates = trustedSignerCertificates
     )
 
     private suspend fun buildDecisionFromIdentities(
@@ -364,8 +700,12 @@ class DefaultTrustRegistryService(
         val source = store.getSource(entity.sourceId)
         val service = identity.serviceId?.let { store.getService(it) }
 
+        if (source?.assurance?.accepted != true) {
+            return sourceNotAcceptedDecision(source, entity, service)
+        }
+
         // Type filtering
-        if (expectedEntityType != null && entity != null && entity.entityType != expectedEntityType) {
+        if (expectedEntityType != null && entity.entityType != expectedEntityType) {
             return TrustDecision(
                 decision = TrustDecisionCode.NOT_TRUSTED,
                 matchedEntity = entity,
@@ -398,7 +738,7 @@ class DefaultTrustRegistryService(
                 else -> TrustDecisionCode.TRUSTED
             },
             sourceFreshness = freshness,
-            authenticity = source?.authenticityState ?: AuthenticityState.UNKNOWN,
+            sourceAssurance = source.assurance,
             matchedSource = source,
             matchedEntity = entity,
             matchedService = service,
@@ -409,6 +749,24 @@ class DefaultTrustRegistryService(
             warnings = if (freshness == FreshnessState.STALE) listOf("Source is stale") else emptyList()
         )
     }
+
+    private fun sourceNotAcceptedDecision(
+        source: TrustSource?,
+        entity: TrustedEntity? = null,
+        service: TrustedService? = null
+    ): TrustDecision = TrustDecision(
+        decision = TrustDecisionCode.NOT_TRUSTED,
+        sourceAssurance = source?.assurance ?: SourceAssurance(),
+        matchedSource = source,
+        matchedEntity = entity,
+        matchedService = service,
+        evidence = listOf(
+            TrustEvidence(
+                type = "SOURCE_NOT_ACCEPTED",
+                value = source?.assurance?.details ?: "Trust source was not admitted"
+            )
+        )
+    )
 
     private fun evaluateFreshness(source: TrustSource?, instant: Instant): FreshnessState {
         if (source == null) return FreshnessState.UNKNOWN
@@ -438,7 +796,57 @@ class DefaultTrustRegistryService(
             content.contains("TrustServiceStatusList") || content.contains("TrustServiceProviderList") -> SourceFamily.TSL
             content.contains("ListOfTrustedEntities") || content.contains("TrustedEntity") -> SourceFamily.LOTE
             content.trimStart().startsWith("{") || content.trimStart().startsWith("[") -> SourceFamily.LOTE
-            else -> SourceFamily.PILOT
+            else -> throw IllegalArgumentException(
+                "Unknown trust-list format; expected ETSI TS 119 612 XML or ETSI TS 119 602 JSON/XML"
+            )
         }
+    }
+
+    private fun parseCertificate(pemOrDer: String): X509Certificate {
+        val encoded = if (pemOrDer.contains("BEGIN CERTIFICATE")) {
+            pemOrDer
+                .replace("-----BEGIN CERTIFICATE-----", "")
+                .replace("-----END CERTIFICATE-----", "")
+                .replace("\\s".toRegex(), "")
+        } else {
+            pemOrDer.replace("\\s".toRegex(), "")
+        }
+        val der = Base64.decode(encoded)
+        return CertificateFactory.getInstance("X.509")
+            .generateCertificate(ByteArrayInputStream(der)) as X509Certificate
+    }
+
+    private fun validateCertificatePath(
+        presentedCertificates: List<X509Certificate>,
+        anchor: X509Certificate,
+        instant: Instant
+    ): Boolean = runCatching {
+        val leaf = presentedCertificates.first()
+
+        // An exact certificate pin is a valid terminal trust decision. Check its
+        // validity explicitly because an empty PKIX path does not always do so.
+        if (leaf.encoded.contentEquals(anchor.encoded)) {
+            leaf.checkValidity(Date(instant.toEpochMilliseconds()))
+            return@runCatching true
+        }
+
+        val intermediates = presentedCertificates.drop(1)
+            .filterNot { it.encoded.contentEquals(anchor.encoded) }
+        val selector = X509CertSelector().apply { certificate = leaf }
+        val certStore = CertStore.getInstance(
+            "Collection",
+            CollectionCertStoreParameters(intermediates)
+        )
+        val parameters = PKIXBuilderParameters(setOf(TrustAnchor(anchor, null)), selector).apply {
+            addCertStore(certStore)
+            date = Date(instant.toEpochMilliseconds())
+            isRevocationEnabled = false
+        }
+        val result = CertPathBuilder.getInstance("PKIX").build(parameters) as PKIXCertPathBuilderResult
+        CertPathValidator.getInstance("PKIX").validate(result.certPath, parameters)
+        true
+    }.getOrElse { error ->
+        log.debug { "Certificate path did not validate against candidate anchor: ${error.message}" }
+        false
     }
 }
