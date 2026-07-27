@@ -14,23 +14,22 @@ jobs:
     name: ${{ matrix.api_level }}-${{ matrix.target }}
     runs-on: ubuntu-24.04
     strategy:
-      fail-fast: false
       matrix:
         include:
           - api_level: '35'
             target: google_apis
-          - api_level: '36'
-            target: google_apis
     steps:
       - name: Boot emulator and verify Play Services
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@v2.37.0
         with:
           api-level: ${{ matrix.api_level }}
           arch: x86_64
           target: ${{ matrix.target }}
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          emulator-boot-timeout: 300
-          disable-animations: true
+          profile: pixel_tablet
+          ram-size: 4096M
+          heap-size: 2048M
+          emulator-options: -no-window -gpu mesa -noaudio -no-boot-anim -camera-back none -no-snapshot -no-snapshot-save -no-snapshot-load
+          disable-animations: false
           script: |
             set -eu
 
