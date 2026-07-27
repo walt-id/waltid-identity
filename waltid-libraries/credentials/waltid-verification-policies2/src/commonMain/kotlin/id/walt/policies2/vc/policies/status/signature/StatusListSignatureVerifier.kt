@@ -107,8 +107,14 @@ class StatusListSignatureVerifier(
         
         val resolved = resolveKeyFromCoseHeaders(coseSign1)
         logger.debug { "Resolved crypto2 key for CWT verification: ${resolved.key.spec}" }
-        val isValid = coseSign1.verify(resolved.key, allowedCoseAlgorithms)
-        
+        val isValid = try {
+            coseSign1.verify(resolved.key, allowedCoseAlgorithms)
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (cause: Throwable) {
+            throw SignatureInvalidException("CWT signature verification failed: ${cause.message}")
+        }
+
         if (!isValid) {
             throw SignatureInvalidException("CWT signature verification failed")
         }

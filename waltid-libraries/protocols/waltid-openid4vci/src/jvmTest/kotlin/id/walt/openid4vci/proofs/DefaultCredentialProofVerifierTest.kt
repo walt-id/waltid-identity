@@ -2,6 +2,8 @@ package id.walt.openid4vci.proofs
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultClient
@@ -35,7 +37,10 @@ class DefaultCredentialProofVerifierTest {
         )
 
         assertEquals(1, verified.size)
-        assertEquals(holderKey.getPublicKey().getThumbprint(), verified.single().holderKey.getThumbprint())
+        assertEquals(
+            holderKey.getPublicKey().getThumbprint(),
+            Jwk.sha256Thumbprint(verified.single().holderKey.exportPublicJwk()),
+        )
     }
 
     @Test

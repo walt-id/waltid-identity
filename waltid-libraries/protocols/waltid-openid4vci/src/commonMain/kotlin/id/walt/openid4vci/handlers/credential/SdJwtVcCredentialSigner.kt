@@ -1,13 +1,14 @@
 package id.walt.openid4vci.handlers.credential
 
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.exportPublicJwkObject
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.Key as Crypto2Key
-import id.walt.credentials.keyresolver.resolvers.DidKeyResolver
+import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.proofs.VerifiedCredentialProof
@@ -202,21 +203,27 @@ object SdJwtVcCredentialSigner {
         return sdJwtVC.toString().plus(SEPARATOR_STR)
     }
 
-    private suspend fun resolveHolderJwk(proofHeader: JsonObject, verifiedHolderKey: Key?): JsonObject {
+    private suspend fun resolveHolderJwk(proofHeader: JsonObject, verifiedHolderKey: Crypto2Key?): JsonObject {
         val holderKey = verifiedHolderKey ?: when {
-            JWT_HEADER_JWK in proofHeader ->
-                JWKKey.importJWK(requireNotNull(proofHeader[JWT_HEADER_JWK]).toString()).getOrThrow().getPublicKey()
+            // An inline proof JWK is already the holder's public JWK.
+            JWT_HEADER_JWK in proofHeader -> {
+                val jwk = requireNotNull(proofHeader[JWT_HEADER_JWK] as? JsonObject) {
+                    "Proof JWT jwk header must be a JSON object"
+                }
+                require(!Jwk.containsPrivateMaterial(jwk)) { "Proof JWT jwk header must be public only" }
+                return jwk
+            }
 
             JWT_HEADER_KID in proofHeader -> {
                 val holderKid = requireNotNull(proofHeader[JWT_HEADER_KID]?.jsonPrimitive).content
                 require(DidUtils.isDidUrl(holderKid))
-                DidKeyResolver.resolveKeyFromDid(holderKid.substringBefore("#"), holderKid)
+                Crypto2JwtKeyResolver().resolveFromDid(holderKid.substringBefore("#"), holderKid)
             }
 
             else -> throw IllegalArgumentException("Proof JWT header must contain kid or jwk claim")
         }
-        return holderKey.exportJWKObject().plus(
-            JWT_HEADER_KID to holderKey.getKeyId().toJsonElement(),
+        return holderKey.exportPublicJwkObject().plus(
+            JWT_HEADER_KID to holderKey.id.value.toJsonElement(),
         ).toJsonObject()
     }
 

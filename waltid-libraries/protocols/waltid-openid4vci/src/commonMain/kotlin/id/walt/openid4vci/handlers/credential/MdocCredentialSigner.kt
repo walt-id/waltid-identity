@@ -3,11 +3,11 @@ package id.walt.openid4vci.handlers.credential
 import id.walt.cose.CoseCertificate
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
-import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
+import id.walt.cose.toCoseKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.Key as Crypto2Key
@@ -173,7 +173,7 @@ object MdocCredentialSigner {
     }
 
     private suspend fun VerifiedCredentialProof.toCosePublicKey(): CoseKey =
-        JWKKey.importJWK(holderKey.exportJWK()).getOrThrow().getCosePublicKey()
+        holderKey.exportPublicJwk().toCoseKey()
 
     private fun validateIssuerKey(issuerKey: IssuerSigningKey) {
         when (issuerKey) {

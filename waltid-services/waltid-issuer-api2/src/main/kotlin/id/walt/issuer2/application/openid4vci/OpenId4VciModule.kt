@@ -55,6 +55,8 @@ data class OpenId4VciModule(
     val oauth2Provider: OAuth2Provider,
     val preAuthorizedCodeIssuer: PreAuthorizedCodeIssuer,
     val credentialNonceService: CredentialNonceService,
+    /** Crypto2 token signing key, or `null` when the configured token key is not crypto2-capable. */
+    val crypto2TokenSigningKey: Crypto2JwtSigningKey?,
 ) {
 
     companion object {
@@ -142,6 +144,7 @@ data class OpenId4VciModule(
                 oauth2Provider = provider,
                 preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,
                 credentialNonceService = credentialNonceService,
+                crypto2TokenSigningKey = crypto2TokenKey,
             )
         }
 

@@ -14,6 +14,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.IssuerDisplay
 import id.walt.openid4vci.metadata.issuer.toSignedJwt
+import id.walt.openid4vci.tokens.jwt.Crypto2JwtSigningKey
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.sdjwt.metadata.issuer.JWTVCIssuerMetadata
@@ -32,6 +33,8 @@ class MetadataService(
     private val profileService: CredentialProfileService,
     private val sessionService: IssuanceSessionService,
     private val preAuthorizedGrantAnonymousAccessSupported: Boolean = false,
+    /** Crypto2 token signing key used for signed issuer metadata. */
+    private val crypto2TokenSigningKey: Crypto2JwtSigningKey? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -66,10 +69,15 @@ class MetadataService(
             )
         }
 
-    suspend fun getSignedCredentialIssuerMetadata(): String =
-        getCredentialIssuerMetadata().toSignedJwt(
-            signingKey = KeyManager.resolveSerializedKey(tokenSigningKeyConfig),
+    suspend fun getSignedCredentialIssuerMetadata(): String {
+        val signingKey = requireNotNull(crypto2TokenSigningKey) {
+            "Signed Credential Issuer Metadata requires a crypto2-capable token signing key"
+        }
+        return getCredentialIssuerMetadata().toSignedJwt(
+            signingKey = signingKey.key,
+            algorithm = signingKey.algorithm,
         )
+    }
 
     fun getAuthorizationServerMetadata(): AuthorizationServerMetadata =
         AuthorizationServerMetadata.fromBaseUrl(

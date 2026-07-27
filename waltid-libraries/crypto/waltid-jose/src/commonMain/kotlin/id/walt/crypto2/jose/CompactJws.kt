@@ -3,6 +3,7 @@ package id.walt.crypto2.jose
 import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.JWK_ALGORITHM_METADATA_KEY
 import id.walt.crypto2.keys.StorableKey
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -67,7 +68,16 @@ object CompactJws {
         require(algorithm in allowedAlgorithms) { "JWS algorithm is not allowed" }
         validateKeySpec(key, algorithm)
         val verifier = requireNotNull(key.capabilities.verifier) { "Key does not support verification" }
-        if (!verifier.verify(parsed.signingInput, parsed.signature, algorithm.toSignatureAlgorithm())) {
+        // Signature bytes are untrusted input, so a malformed signature (wrong length, ECDSA s outside
+        // the group order, ...) must surface as an invalid signature rather than a provider error.
+        val verified = try {
+            verifier.verify(parsed.signingInput, parsed.signature, algorithm.toSignatureAlgorithm())
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: Throwable) {
+            false
+        }
+        if (!verified) {
             throw InvalidJwsSignatureException()
         }
         return VerifiedJws(

@@ -1,10 +1,19 @@
 package id.walt.openid4vci.proofs
 
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.did.dids.DidService
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.jose.supportsJwsAlgorithm
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
@@ -15,6 +24,7 @@ import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -30,6 +40,9 @@ class DefaultCredentialProofVerifier(
     private val clockSkewSeconds: Long = DEFAULT_CLOCK_SKEW_SECONDS,
     private val now: () -> Instant = { Clock.System.now() },
 ) : CredentialProofVerifier {
+
+    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val didKeyResolver = Crypto2JwtKeyResolver()
 
     init {
         require(proofMaxAgeSeconds > 0) { "Credential proof maximum age must be positive" }
@@ -95,9 +108,14 @@ class DefaultCredentialProofVerifier(
         rejectUnsupportedTrustHeaders(decoded.header)
 
         val resolvedHolderKey = resolveHolderKey(decoded.header, credentialConfiguration)
-        val verifiedPayload = resolvedHolderKey.key.verifyJws(proofJwt).getOrElse {
+        val verifiedPayload = runCatching {
+            CompactJws.verify(proofJwt, resolvedHolderKey.key, setOf(JwsAlgorithm.parse(algorithm)))
+        }.getOrElse {
             throw invalidCredentialProof("Invalid credential proof signature", it)
-        } as? JsonObject ?: throw invalidCredentialProof("Credential proof payload must be a JSON object")
+        }.payload.decodeToString().let { payload ->
+            runCatching { Json.parseToJsonElement(payload) }.getOrNull() as? JsonObject
+                ?: throw invalidCredentialProof("Credential proof payload must be a JSON object")
+        }
 
         validateAudience(verifiedPayload, context.credentialIssuer)
         validateIssuedAt(verifiedPayload)
@@ -144,13 +162,10 @@ class DefaultCredentialProofVerifier(
                     }
                 }
                 validateJwkUse(jwk)
-                val key = JWKKey.importJWK(jwk.toString()).getOrElse {
-                    throw invalidCredentialProof("Credential proof contains an invalid JWK", it)
-                }
-                requireCredentialProof(!key.hasPrivateKey) {
+                requireCredentialProof(!Jwk.containsPrivateMaterial(jwk)) {
                     "Credential proof JWK must not contain private key material"
                 }
-                val publicKey = key.getPublicKey()
+                val publicKey = restoreHolderJwk(jwk)
                 validateKeyAlgorithm(publicKey, header.requiredStringHeader(JwtHeaderParams.ALGORITHM))
                 ResolvedHolderKey(key = publicKey, kid = null, did = null)
             }
@@ -162,9 +177,7 @@ class DefaultCredentialProofVerifier(
                 }
                 validateDidBindingMethod(credentialConfiguration, holderKid)
                 val did = holderKid.substringBefore("#")
-                val key = DidService.resolveToKey(did).getOrElse {
-                    throw invalidCredentialProof("Could not resolve credential proof DID key", it)
-                }.getPublicKey()
+                val key = resolveHolderDidKey(did, holderKid)
                 validateKeyAlgorithm(key, header.requiredStringHeader(JwtHeaderParams.ALGORITHM))
                 ResolvedHolderKey(key = key, kid = holderKid, did = did)
             }
@@ -182,8 +195,35 @@ class DefaultCredentialProofVerifier(
         }
     }
 
+    /**
+     * Resolves the holder key referenced by a proof `kid`.
+     *
+     * Wallets do not always use the DID verification method ID as `kid` (a JWK thumbprint fragment is
+     * common), so a DID exposing exactly one verification method is accepted without fragment matching.
+     */
+    private suspend fun resolveHolderDidKey(did: String, holderKid: String): Key =
+        runCatching { didKeyResolver.resolveFromDid(did, holderKid) }
+            .recoverCatching { didKeyResolver.resolveFromDid(did) }
+            .getOrElse { throw invalidCredentialProof("Could not resolve credential proof DID key", it) }
+
+    /** Restores an inline holder JWK as a verification-only crypto2 key. */
+    private suspend fun restoreHolderJwk(jwk: JsonObject): Key {
+        val encoded = EncodedKey.Jwk(
+            data = BinaryData(Json.encodeToString(JsonObject.serializer(), jwk).encodeToByteArray()),
+            privateMaterial = false,
+        )
+        return runCatching {
+            crypto2Runtime.restore(
+                encoded.toStoredSoftwareKey(KeyId(Jwk.sha256Thumbprint(encoded)), setOf(KeyUsage.VERIFY)),
+            )
+        }.getOrElse { throw invalidCredentialProof("Credential proof contains an invalid JWK", it) }
+    }
+
     private fun validateKeyAlgorithm(key: Key, algorithm: String) {
-        requireCredentialProof(key.keyType.jwsAlg == algorithm) {
+        val jwsAlgorithm = runCatching { JwsAlgorithm.parse(algorithm) }.getOrElse {
+            throw invalidCredentialProof("Unsupported credential proof signing algorithm: $algorithm")
+        }
+        requireCredentialProof(key.spec.supportsJwsAlgorithm(jwsAlgorithm)) {
             "Credential proof holder key type does not match algorithm $algorithm"
         }
     }
@@ -357,6 +397,6 @@ class DefaultCredentialProofVerifier(
         const val JWK_SIGNATURE_USE = "sig"
         const val JWK_KEY_OPERATIONS = "key_ops"
         const val JWK_VERIFY_OPERATION = "verify"
-        val supportedAsymmetricAlgorithms = KeyType.entries.map { it.jwsAlg }.toSet()
+        val supportedAsymmetricAlgorithms = JwsAlgorithm.entries.map { it.identifier }.toSet()
     }
 }

@@ -9,6 +9,7 @@ import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeySpec
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.ExperimentalSerializationApi
 
@@ -88,8 +89,17 @@ fun Key.toCoseVerifier(algorithm: Int): CoseVerifier {
     }
     val verifier = requireNotNull(capabilities.verifier) { "Key does not permit verification" }
     return CoseVerifier { data, signature ->
-        validateCoseSignatureLength(this, algorithm, signature)
-        verifier.verify(data, signature, signatureAlgorithm)
+        // Signature bytes are untrusted input: a malformed or out-of-range signature (wrong length,
+        // ECDSA s outside the group order, ...) is an invalid signature, not a configuration error.
+        // Key and algorithm support are already validated above, so failures here cannot be misuse.
+        try {
+            validateCoseSignatureLength(this, algorithm, signature)
+            verifier.verify(data, signature, signatureAlgorithm)
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: Throwable) {
+            false
+        }
     }
 }
 

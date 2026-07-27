@@ -146,7 +146,8 @@ class CoseCrypto2Test {
             key = key,
         )
         assertFails { valid.verify(key, Cose.Algorithm.ES384) }
-        assertFails { valid.copy(signature = byteArrayOf(1)).verify(key, Cose.Algorithm.ES256) }
+        // A malformed signature is an invalid signature, not a caller error.
+        assertFalse(valid.copy(signature = byteArrayOf(1)).verify(key, Cose.Algorithm.ES256))
         assertFails {
             CoseSign1.createAndSign(
                 protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES384),
