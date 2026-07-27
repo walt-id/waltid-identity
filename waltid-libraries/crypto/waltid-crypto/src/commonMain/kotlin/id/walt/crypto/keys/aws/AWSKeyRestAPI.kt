@@ -4,6 +4,7 @@ import id.walt.crypto.exceptions.*
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
+import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -11,7 +12,6 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.util.*
 import io.ktor.utils.io.charsets.*
 import io.ktor.utils.io.core.*
 import kotlinx.datetime.TimeZone
@@ -126,7 +126,7 @@ class AWSKeyRestAPI(
         val body = """
 {
 "KeyId":"$id",
-"Message":"${digestedMessage.encodeBase64()}",
+"Message":"${digestedMessage.encodeToBase64()}",
 "MessageType":"DIGEST",
 "SigningAlgorithm":"$awsSigningAlgorithm"
 }
@@ -196,9 +196,9 @@ class AWSKeyRestAPI(
         val body = """
 {
 "KeyId":"$id",
-"Message":"${digestedMessage.encodeBase64()}",
+"Message":"${digestedMessage.encodeToBase64()}",
 "MessageType":"DIGEST",
-"Signature":"${signed.encodeBase64()}",
+"Signature":"${signed.encodeToBase64()}",
 "SigningAlgorithm":"$awsSigningAlgorithm"
 }
 """.trimIndent().trimMargin()

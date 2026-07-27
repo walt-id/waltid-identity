@@ -6,24 +6,17 @@ import id.walt.cose.CoseSign1
 import id.walt.cose.createAndSign
 import id.walt.cose.verify
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.algorithms.AsymmetricEncryptionAlgorithm
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
-import id.walt.crypto2.keys.AsymmetricCiphertext
 import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.EncodedKeyMaterial
 import id.walt.crypto2.keys.KeyDeletionResult
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.SymmetricKeyType
-import id.walt.crypto2.keys.WrappedKey
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.providers.GenerateManagedKeyRequest
-import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -31,13 +24,10 @@ import org.junit.jupiter.api.BeforeAll
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
-import kotlin.io.encoding.Base64
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFalse
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -79,21 +69,14 @@ class Pkcs11KeyProviderTest {
     }
 
     @Test
-    fun `RSA key signs encrypts wraps and rejects wrong PIN`() = runTest {
+    fun `RSA key signs verifies and rejects wrong PIN`() = runTest {
         assumeTrue(library != null, "SoftHSM is not installed")
         val generated = runtime().generateManagedKey(
             Pkcs11KeyProvider.ID,
             GenerateManagedKeyRequest(
                 id = KeyId("rsa-key"),
                 spec = KeySpec.Rsa(2048),
-                usages = setOf(
-                    KeyUsage.SIGN,
-                    KeyUsage.VERIFY,
-                    KeyUsage.ENCRYPT,
-                    KeyUsage.DECRYPT,
-                    KeyUsage.WRAP,
-                    KeyUsage.UNWRAP,
-                ),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
                 providerOptions = options("rsa-${UUID.randomUUID()}").encode(),
             ),
         )
@@ -109,35 +92,31 @@ class Pkcs11KeyProviderTest {
         )
         assertTrue(cose.verify(generated, Cose.Algorithm.PS256))
 
-        val plaintext = "pkcs11 plaintext".encodeToByteArray()
-        val encryption = AsymmetricEncryptionAlgorithm.RsaPkcs1
-        val ciphertext = assertIs<AsymmetricCiphertext.Raw>(
-            assertNotNull(generated.capabilities.encryptor).encrypt(plaintext, encryption, null)
-        )
-        assertContentEquals(plaintext, assertNotNull(generated.capabilities.decryptor).decrypt(ciphertext, null))
-
-        val secret = ByteArray(16) { it.toByte() }
-        val jwk = EncodedKey.Jwk(
-            BinaryData(
-                """{"kty":"oct","k":"${Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(secret)}"}"""
-                    .encodeToByteArray()
-            ),
-            privateMaterial = true,
-        )
-        val wrapped = assertIs<WrappedKey.Opaque>(
-            assertNotNull(generated.capabilities.keyWrapper).wrapKey(
-                EncodedKeyMaterial(KeySpec.Symmetric(SymmetricKeyType.AES, 128), jwk),
-                Pkcs11WrappingAlgorithms.RSA_PKCS1,
-            )
-        )
-        val unwrapped = assertNotNull(generated.capabilities.keyUnwrapper).unwrapKey(wrapped)
-        assertEquals(jwk, unwrapped.key)
-
         val stored = generated.storedKey
         assertFails {
             runtime(pin = "wrong-pin").restore(stored)
         }
         assertEquals(KeyDeletionResult.Deleted, assertNotNull(generated.capabilities.deleter).delete())
+    }
+
+    @Test
+    fun `RSA key rejects encryption and wrapping usages`() = runTest {
+        assumeTrue(library != null, "SoftHSM is not installed")
+        // JCA exposes no RSA-OAEP for PKCS#11 tokens and RSAES-PKCS1-v1_5 decryption is a Bleichenbacher oracle,
+        // so encryption and key wrapping must not be offered at all
+        setOf(KeyUsage.ENCRYPT, KeyUsage.DECRYPT, KeyUsage.WRAP, KeyUsage.UNWRAP).forEach { usage ->
+            assertFails {
+                runtime().generateManagedKey(
+                    Pkcs11KeyProvider.ID,
+                    GenerateManagedKeyRequest(
+                        id = KeyId("rsa-encrypt-key"),
+                        spec = KeySpec.Rsa(2048),
+                        usages = setOf(KeyUsage.SIGN, usage),
+                        providerOptions = options("rsa-reject-${UUID.randomUUID()}").encode(),
+                    ),
+                )
+            }
+        }
     }
 
     private fun options(alias: String) = Pkcs11Options(

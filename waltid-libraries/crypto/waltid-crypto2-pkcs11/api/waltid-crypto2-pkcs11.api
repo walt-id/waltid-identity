@@ -55,8 +55,3 @@ public abstract interface class id/walt/crypto2/pkcs11/Pkcs11PinResolver {
 	public abstract fun resolve (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
-public final class id/walt/crypto2/pkcs11/Pkcs11WrappingAlgorithms {
-	public static final field INSTANCE Lid/walt/crypto2/pkcs11/Pkcs11WrappingAlgorithms;
-	public final fun getRSA_PKCS1 ()Lid/walt/crypto2/algorithms/KeyWrappingAlgorithm$BuiltIn;
-}
-

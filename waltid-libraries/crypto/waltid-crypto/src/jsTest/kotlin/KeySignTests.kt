@@ -1,5 +1,5 @@
 import id.walt.crypto.keys.jwk.JWKKey
-import io.ktor.util.*
+import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -27,7 +27,7 @@ class KeySignTests {
 
         val plaintext = "Hello world!".toByteArray()
         val res = privateKey.signRaw(plaintext)
-        println((res.encodeBase64()))
+        println((res.encodeToBase64()))
 
         val res2 = privateKey.verifyRaw(res, plaintext)
         val res2Result = res2.getOrThrow()
