@@ -174,7 +174,6 @@ services:
     depends_on:
       - issuer-api2
       - verifier-api2
-      - waltid-demo-wallet
       - caddy
     environment:
       NUXT_PUBLIC_ISSUER_BASE: "http://$PUBLIC_SERVICE_HOST:$ISSUER_API2_PORT"
