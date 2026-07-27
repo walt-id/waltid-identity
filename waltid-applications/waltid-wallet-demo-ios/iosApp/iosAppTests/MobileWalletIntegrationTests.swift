@@ -105,9 +105,13 @@ final class MobileWalletIntegrationTests: XCTestCase {
             request: X509RequestObjectFixture.authorizationRequestURL
         )
 
-        XCTAssertEqual(preview.request.clientID, X509RequestObjectFixture.clientID)
-        XCTAssertEqual(preview.request.nonce, "app-hosted-x509-test")
-        XCTAssertEqual(preview.credentialOptions, [])
+        guard case let .ready(readyPreview) = preview else {
+            return XCTFail("Expected a ready preview for the trusted signed Request Object")
+        }
+
+        XCTAssertEqual(readyPreview.request.clientID, X509RequestObjectFixture.clientID)
+        XCTAssertEqual(readyPreview.request.nonce, "app-hosted-x509-test")
+        XCTAssertEqual(readyPreview.credentialOptions, [])
     }
 
     func testAppHostedWalletRejectsUntrustedSignedRequestObjectCertificateChain() async throws {
