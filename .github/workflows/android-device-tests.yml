@@ -78,9 +78,9 @@ jobs:
           }
 
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-          retry_sdkmanager_install 'build-tools;37.0.0' platform-tools 'platforms;android-34'
+          retry_sdkmanager_install 'build-tools;37.0.0' platform-tools 'platforms;android-34' "platforms;android-${{ steps.android-device-phase.outputs.emulator_api_level }}"
           retry_sdkmanager_install emulator
-          retry_sdkmanager_install "system-images;android-34;${{ steps.android-device-phase.outputs.emulator_target }};x86_64"
+          retry_sdkmanager_install "system-images;android-${{ steps.android-device-phase.outputs.emulator_api_level }};${{ steps.android-device-phase.outputs.emulator_target }};x86_64"
 
       - name: Build Enterprise Android mobile test artifacts
         if: matrix.phase == 'enterprise-mobile'
@@ -89,7 +89,7 @@ jobs:
       - name: Run Android device tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: ${{ steps.android-device-phase.outputs.emulator_api_level }}
           arch: x86_64
           target: ${{ steps.android-device-phase.outputs.emulator_target }}
           disk-size: 4G
