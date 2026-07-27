@@ -533,6 +533,8 @@ final class WalletAPITests: XCTestCase {
 
         XCTAssertEqual(bridge.rejectCalls.first?.previewHandle, handle)
         XCTAssertEqual(String(describing: handle), "PresentationPreviewHandle(<redacted>)")
+    }
+
     func testDigitalCredentialCapabilitiesReflectBridgeRuntimeSupport() async {
         let bridge = FakeWalletCoreBridge()
         bridge.digitalCredentialCapabilitiesResult = .init(
@@ -998,6 +1000,42 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
         if let error { throw error }
     }
+
+    func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
+        digitalCredentialCapabilitiesResult
+    }
+
+    func previewAnnexCPresentation(
+        parsedRequest: AnnexCParsedRequest,
+        verifiedOrigin: String,
+        selectedRegistryEntryIDs: [String]
+    ) async throws -> AnnexCPresentationPreview {
+        if let error { throw error }
+        annexCPreviewCalls.append(.init(
+            parsedRequest: parsedRequest,
+            verifiedOrigin: verifiedOrigin,
+            selectedRegistryEntryIDs: selectedRegistryEntryIDs
+        ))
+        return annexCPreviewResult
+    }
+
+    func submitAnnexCPresentation(
+        requestID: String,
+        verifiedOrigin: String,
+        deviceRequestBase64URL: String,
+        encryptionInfoBase64URL: String,
+        selectedCredentialOptions: [PresentationCredentialSelection]
+    ) async throws -> DigitalCredentialResponse {
+        if let error { throw error }
+        annexCSubmitCalls.append(.init(
+            requestID: requestID,
+            verifiedOrigin: verifiedOrigin,
+            deviceRequestBase64URL: deviceRequestBase64URL,
+            encryptionInfoBase64URL: encryptionInfoBase64URL,
+            selectedCredentialOptions: selectedCredentialOptions
+        ))
+        return digitalCredentialResponseResult
+    }
 }
 
 private let testVerifierMetadata = VerifierMetadata(
@@ -1043,39 +1081,4 @@ private func testOfferResolution(transactionCodeRequired: Bool) -> OfferResoluti
             )
             : nil
     )
-    func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
-        digitalCredentialCapabilitiesResult
-    }
-
-    func previewAnnexCPresentation(
-        parsedRequest: AnnexCParsedRequest,
-        verifiedOrigin: String,
-        selectedRegistryEntryIDs: [String]
-    ) async throws -> AnnexCPresentationPreview {
-        if let error { throw error }
-        annexCPreviewCalls.append(.init(
-            parsedRequest: parsedRequest,
-            verifiedOrigin: verifiedOrigin,
-            selectedRegistryEntryIDs: selectedRegistryEntryIDs
-        ))
-        return annexCPreviewResult
-    }
-
-    func submitAnnexCPresentation(
-        requestID: String,
-        verifiedOrigin: String,
-        deviceRequestBase64URL: String,
-        encryptionInfoBase64URL: String,
-        selectedCredentialOptions: [PresentationCredentialSelection]
-    ) async throws -> DigitalCredentialResponse {
-        if let error { throw error }
-        annexCSubmitCalls.append(.init(
-            requestID: requestID,
-            verifiedOrigin: verifiedOrigin,
-            deviceRequestBase64URL: deviceRequestBase64URL,
-            encryptionInfoBase64URL: encryptionInfoBase64URL,
-            selectedCredentialOptions: selectedCredentialOptions
-        ))
-        return digitalCredentialResponseResult
-    }
 }

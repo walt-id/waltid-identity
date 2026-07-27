@@ -59,7 +59,7 @@ public struct WalletConfiguration: Sendable {
         requestObjectEnableSystemTrustAnchors: Bool = false,
         requestObjectAudience: String = "https://self-issued.me/v2",
         transactionDataProfiles: [WalletTransactionDataProfile] = [],
-        preferredLocales: [String] = Locale.preferredLanguages
+        preferredLocales: [String] = Locale.preferredLanguages,
         crossProcessAccess: WalletCrossProcessAccess? = nil
     ) {
         self.walletID = walletID

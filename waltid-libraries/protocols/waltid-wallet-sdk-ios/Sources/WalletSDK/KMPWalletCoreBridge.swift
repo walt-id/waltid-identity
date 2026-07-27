@@ -219,6 +219,8 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value)
         )
         _ = try Self.successAnyValue(result, operation: "discard presentation preview")
+    }
+
     func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
         bridge.digitalCredentialCapabilities().toSwiftCapabilities()
     }
@@ -318,7 +320,6 @@ private extension WalletConfiguration {
             requestObjectEnableSystemTrustAnchors: requestObjectEnableSystemTrustAnchors,
             requestObjectAudience: requestObjectAudience,
             preferredLocales: preferredLocales,
-            transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() }
             transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
             appGroupIdentifier: crossProcessAccess?.appGroupIdentifier,
             keychainAccessGroup: crossProcessAccess?.keychainAccessGroup
