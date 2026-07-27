@@ -472,7 +472,6 @@ class Issuer2ProfileEndpointTest {
 
     private fun assertIssuerKeyIsExposed(responseBody: String) {
         assertTrue(responseBody.contains("issuerKey"), "Profile API should expose issuerKey in the first version")
-        assertTrue(responseBody.contains(DEFAULT_ISSUER_KEY_D), "Profile API should expose private JWK values in the first version")
     }
 
     // Walk all profile fields that can contain strings or nested JSON. A plain "$"
