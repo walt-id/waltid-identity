@@ -39,5 +39,5 @@ COPY --chown=app:app --from=build /home/gradle/src/waltid-services/waltid-issuer
 COPY --chown=app:app --from=build /home/gradle/src/waltid-services/waltid-issuer-api2/config /waltid-issuer-api2/config
 
 USER app
-EXPOSE 7002
+EXPOSE 7005
 ENTRYPOINT ["java","-jar","/waltid-issuer-api2/issuer-api2.jar"]
