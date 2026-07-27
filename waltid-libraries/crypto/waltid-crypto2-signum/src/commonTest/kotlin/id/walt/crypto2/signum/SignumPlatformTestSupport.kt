@@ -43,7 +43,7 @@ suspend fun exercisePlatformSignumBackend(
     val signature = assertNotNull(restored.capabilities.signer).sign(message, algorithm)
 
     assertEquals(firstBackend.id, restartedBackend.id)
-    assertTrue(assertNotNull(restored.capabilities.verifier).verify(signature, message, algorithm))
+    assertTrue(assertNotNull(restored.capabilities.verifier).verify(message, signature, algorithm))
     assertEquals(KeyDeletionResult.Deleted, assertNotNull(restored.capabilities.deleter).delete())
     val restoreFailure = try {
         restartedProvider.restore(generated.storedKey)

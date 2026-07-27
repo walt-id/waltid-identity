@@ -7,6 +7,7 @@ import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ProviderId
+import kotlin.coroutines.cancellation.CancellationException
 
 class IosSignumKeyBackend : SignumPlatformBackend {
     override val id = ProviderId("ios-keychain-signum")
@@ -25,11 +26,31 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         policy: SignumKeyPolicy,
     ): SignumPlatformKey {
         require(supports(spec, usages, policy)) { "iOS Signum backend does not support the requested key and policy" }
-        val signer = IosKeychainProvider.createSigningKey(alias) {
-            configureSignumKey(spec, usages, policy)
-        }.getOrThrow()
+        val signer = try {
+            createSigner(alias, spec, usages, policy)
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (cause: Throwable) {
+            // Signum turns SignumHardwarePolicy.PREFERRED into kSecAttrTokenIDSecureEnclave with no fallback of its
+            // own, so SecKeyGeneratePair fails outright wherever no Secure Enclave exists - every iOS simulator
+            // above all. PREFERRED has to mean preferred, so fall back to the software keychain. REQUIRED and
+            // attested keys keep failing loudly, and the reported protection level stays UNKNOWN either way
+            // because without an attestation the backing cannot be proven (see effectiveProtection).
+            if (policy.hardware != SignumHardwarePolicy.PREFERRED || policy.attestationChallenge != null) throw cause
+            delete(alias)
+            createSigner(alias, spec, usages, policy.copy(hardware = SignumHardwarePolicy.DISCOURAGED))
+        }
         return handle(alias, spec, usages, policy, signer)
     }
+
+    private suspend fun createSigner(
+        alias: String,
+        spec: KeySpec,
+        usages: Set<KeyUsage>,
+        policy: SignumKeyPolicy,
+    ): PlatformSigningProviderSigner<*, *> = IosKeychainProvider.createSigningKey(alias) {
+        configureSignumKey(spec, usages, policy)
+    }.getOrThrow()
 
     override suspend fun load(
         alias: String,
