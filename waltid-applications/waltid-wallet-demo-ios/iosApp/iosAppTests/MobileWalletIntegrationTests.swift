@@ -111,7 +111,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         }
 
         XCTAssertEqual(readyPreview.request.clientID, X509RequestObjectFixture.clientID)
-        XCTAssertEqual(readyPreview.request.nonce, "app-hosted-x509-test")
+        XCTAssertEqual(readyPreview.request.nonce, "app-hosted-x509-hash-test")
         XCTAssertEqual(readyPreview.credentialOptions, [])
     }
 
