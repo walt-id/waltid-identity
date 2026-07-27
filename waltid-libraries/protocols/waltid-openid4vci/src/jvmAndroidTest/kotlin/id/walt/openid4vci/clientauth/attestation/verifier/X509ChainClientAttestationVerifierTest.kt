@@ -16,6 +16,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.time.Clock
 
+/** Exercises explicit-chain client attestation on JVM and Android host. */
 class X509ChainClientAttestationVerifierTest {
 
     @Test

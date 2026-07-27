@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
-
 plugins {
     id("waltid.full.library")
     id("waltid.publish.maven")
@@ -63,6 +61,10 @@ kotlin {
         }
         jsTest.dependencies {
         }
+
+        if (enableAndroidBuild) {
+            androidHostTest.get().dependsOn(jvmAndroidTest.get())
+        }
     }
 }
 
@@ -70,18 +72,5 @@ mavenPublishing {
     pom {
         name.set("walt.id OpenID4VCI library")
         description.set("walt.id Kotlin/Java OpenID4VCI library")
-    }
-}
-
-if (enableIosBuild) {
-    tasks.withType<KotlinNativeTest>().configureEach {
-        if (name.startsWith("ios")) {
-            // This common test reaches SecTrust through client-attestation validation, which
-            // returns OSStatus -26276 from the standalone Kotlin/Native executable.
-            // App-hosted positive and negative PKIX coverage lives in MobileWalletIntegrationTests.
-            filter.excludeTestsMatching(
-                "id.walt.openid4vci.clientauth.attestation.verifier.X509ChainClientAttestationVerifierTest.*"
-            )
-        }
     }
 }

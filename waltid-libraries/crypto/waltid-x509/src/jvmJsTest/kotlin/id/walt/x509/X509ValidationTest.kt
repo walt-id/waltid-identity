@@ -3,7 +3,8 @@ package id.walt.x509
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
-class X509ValidationMPTest {
+/** Exercises explicit certificate-path validation on JVM and JS. */
+class X509ValidationTest {
 
     @Test
     fun validatesLeafWithProvidedTrustAnchor() {
