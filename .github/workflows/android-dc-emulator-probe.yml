@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   probe:
-    name: api-37-google-apis-playstore-ps16k
+    name: api-36-system-image-37-google-apis-playstore-ps16k
     runs-on: ubuntu-24.04
     steps:
       - name: Enable KVM
@@ -23,7 +23,7 @@ jobs:
       - name: Boot emulator and verify Play Services
         uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
-          api-level: 37
+          api-level: 36
           system-image-api-level: 37.0
           arch: x86_64
           profile: pixel_7
