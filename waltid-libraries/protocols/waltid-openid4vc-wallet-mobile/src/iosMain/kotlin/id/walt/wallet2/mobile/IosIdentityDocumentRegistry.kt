@@ -8,6 +8,8 @@ import platform.Foundation.NSUserDefaults
 /**
  * App-to-extension metadata bridge for Apple's native IdentityDocumentServices registration owner.
  * The Swift app reads the shared document-type list and updates MobileDocumentRegistration objects.
+ *
+ * @property capabilities Current iOS platform and registration availability.
  */
 @OptIn(ExperimentalForeignApi::class)
 public class IosIdentityDocumentRegistry(
@@ -120,8 +122,11 @@ public class IosIdentityDocumentRegistry(
         }
     }
 
+    /** Shared-defaults keys consumed by the iOS app and provider extension. */
     public companion object {
+        /** Shared-defaults key containing the currently registered mdoc document types. */
         public const val DOCUMENT_TYPES_KEY: String = "id.walt.wallet.identity-document-types"
+        /** Shared-defaults key containing the current logical registry identifier. */
         public const val REGISTRY_ID_KEY: String = "id.walt.wallet.identity-document-registry-id"
         internal const val REGISTRATION_STATUS_KEY: String = "id.walt.wallet.identity-document-registration-status"
     }

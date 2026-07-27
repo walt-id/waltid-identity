@@ -28,7 +28,11 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 
-/** Android Credential Manager metadata registry adapter. */
+/**
+ * Android Credential Manager metadata registry adapter.
+ *
+ * @property capabilities Current Android platform and registry availability.
+ */
 public class AndroidDigitalCredentialRegistry(
     context: Context,
 ) : MobileWalletCredentialRegistry {

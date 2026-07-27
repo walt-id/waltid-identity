@@ -19,7 +19,12 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.security.MessageDigest
 import java.net.URI
 
-/** Verified Android Credential Manager input after caller and selected-entry extraction. */
+/**
+ * Verified Android Credential Manager input after caller and selected-entry extraction.
+ *
+ * @property request Platform-neutral request derived from Credential Manager data.
+ * @property providerRequest Original Credential Manager request needed to complete the response.
+ */
 public data class AndroidDigitalCredentialProviderInput(
     public val request: MobileWalletDigitalCredentialRequest,
     public val providerRequest: ProviderGetCredentialRequest,
