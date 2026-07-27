@@ -43,11 +43,14 @@ import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
+import id.walt.openid4vci.proofs.CredentialProofValidationContext
+import id.walt.openid4vci.proofs.CredentialProofValidationException
 import id.walt.crypto.keys.Key
 import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
 import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.tokens.access.dpopJwkThumbprint
+import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import id.walt.sdjwt.SDMap
 import id.walt.x509.CertificateDer
 import kotlinx.coroutines.CancellationException
@@ -56,6 +59,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -504,7 +509,10 @@ class DefaultOAuth2Provider(
         session: Session?,
         accessTokenContext: CredentialAccessTokenContext?
     ): CredentialRequestResult {
-        verifyCredentialAccessToken(accessTokenContext)?.let { return it }
+        val tokenClaims = when (val tokenResult = verifyCredentialAccessToken(accessTokenContext)) {
+            is CredentialAccessTokenVerification.Success -> tokenResult.claims
+            is CredentialAccessTokenVerification.Failure -> return tokenResult.result
+        }
         return when (val result = config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())) {
             is CredentialRequestResult.Success ->
                 if (result.request.credentialResponseEncryption != null) {
@@ -515,7 +523,7 @@ class DefaultOAuth2Provider(
                         )
                     )
                 } else {
-                    result
+                    CredentialRequestResult.Success(result.request.withAccessTokenClient(tokenClaims))
                 }
 
             is CredentialRequestResult.Failure -> result
@@ -528,7 +536,10 @@ class DefaultOAuth2Provider(
         session: Session?,
         accessTokenContext: CredentialAccessTokenContext?
     ): CredentialRequestResult {
-        verifyCredentialAccessToken(accessTokenContext)?.let { return it }
+        val tokenClaims = when (val tokenResult = verifyCredentialAccessToken(accessTokenContext)) {
+            is CredentialAccessTokenVerification.Success -> tokenResult.claims
+            is CredentialAccessTokenVerification.Failure -> return tokenResult.result
+        }
         val decryptor = config.credentialRequestDecryptor
             ?: return CredentialRequestResult.Failure(
                 CredentialError(
@@ -545,7 +556,12 @@ class DefaultOAuth2Provider(
         } catch (e: Exception) {
             return CredentialRequestResult.Failure(CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, e.message))
         }
-        return config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())
+        return when (val result = config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())) {
+            is CredentialRequestResult.Success ->
+                CredentialRequestResult.Success(result.request.withAccessTokenClient(tokenClaims))
+            is CredentialRequestResult.Failure -> result
+            is CredentialRequestResult.OAuthFailure -> result
+        }
     }
 
     override suspend fun createCredentialResponse(
@@ -563,7 +579,19 @@ class DefaultOAuth2Provider(
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        proofValidationContext: CredentialProofValidationContext?,
     ): CredentialResponseResult {
+        val verifiedProofs = when (
+            val proofResult = verifyCredentialProofs(
+                request = request,
+                configuration = configuration,
+                proofValidationContext = proofValidationContext,
+            )
+        ) {
+            is CredentialProofVerification.Success -> proofResult.proofs
+            is CredentialProofVerification.Failure -> return CredentialResponseResult.Failure(proofResult.error)
+        }
+
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return CredentialResponseResult.Failure(
                 CredentialError(
@@ -586,6 +614,7 @@ class DefaultOAuth2Provider(
             credentialStatus = credentialStatus,
             validFrom = validFrom,
             validUntil = validUntil,
+            verifiedProofs = verifiedProofs,
         )
     }
 
@@ -638,11 +667,13 @@ class DefaultOAuth2Provider(
 
     private suspend fun verifyCredentialAccessToken(
         accessTokenContext: CredentialAccessTokenContext?,
-    ): CredentialRequestResult.OAuthFailure? {
-        if (accessTokenContext == null) return null
+    ): CredentialAccessTokenVerification {
+        if (accessTokenContext == null) return CredentialAccessTokenVerification.Success(null)
         val verifier = config.accessTokenVerifier
-            ?: return CredentialRequestResult.OAuthFailure(
-                OAuthError(OAuthErrorCodes.SERVER_ERROR, "access token verifier not configured")
+            ?: return CredentialAccessTokenVerification.Failure(
+                CredentialRequestResult.OAuthFailure(
+                    OAuthError(OAuthErrorCodes.SERVER_ERROR, "access token verifier not configured")
+                )
             )
         return try {
             val claims = verifier.verify(
@@ -651,10 +682,61 @@ class DefaultOAuth2Provider(
                 expectedAudience = accessTokenContext.expectedAudience,
             )
             verifyCredentialAccessTokenBinding(accessTokenContext, claims)
+                ?.let { CredentialAccessTokenVerification.Failure(it) }
+                ?: CredentialAccessTokenVerification.Success(claims)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            invalidCredentialAccessToken(e.message ?: "Access token is invalid")
+            CredentialAccessTokenVerification.Failure(
+                invalidCredentialAccessToken(e.message ?: "Access token is invalid"),
+            )
+        }
+    }
+
+    private fun CredentialRequest.withAccessTokenClient(tokenClaims: JsonObject?): CredentialRequest {
+        val clientId = tokenClaims?.get(JwtPayloadClaims.CLIENT_ID)
+            ?.jsonPrimitive
+            ?.contentOrNull
+            ?.takeIf { it.isNotBlank() }
+        val anonymousPreAuthorizedAccess = clientId == null &&
+            tokenClaims?.get(JwtPayloadClaims.PRE_AUTHORIZED_CODE)?.jsonPrimitive?.contentOrNull != null
+        return withAccessTokenClient(clientId, anonymousPreAuthorizedAccess)
+    }
+
+    private suspend fun verifyCredentialProofs(
+        request: CredentialRequest,
+        configuration: CredentialConfiguration,
+        proofValidationContext: CredentialProofValidationContext?,
+    ): CredentialProofVerification {
+        val shouldVerifyProofs = configuration.proofTypesSupported != null ||
+            (proofValidationContext != null && request.proofs != null)
+        if (!shouldVerifyProofs) return CredentialProofVerification.Success(emptyList())
+
+        val context = proofValidationContext
+            ?: return CredentialProofVerification.Failure(
+                CredentialError(CredentialErrorCodes.INVALID_PROOF, "Credential proof validation context is required"),
+            )
+        val verifier = config.credentialProofVerifier
+            ?: return CredentialProofVerification.Failure(
+                CredentialError(CredentialErrorCodes.INVALID_PROOF, "Credential proof verification is not configured"),
+            )
+
+        return try {
+            CredentialProofVerification.Success(
+                verifier.verify(
+                    credentialRequest = request,
+                    credentialConfiguration = configuration,
+                    context = context,
+                )
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: CredentialProofValidationException) {
+            CredentialProofVerification.Failure(CredentialError(e.errorCode, e.message))
+        } catch (e: Exception) {
+            CredentialProofVerification.Failure(
+                CredentialError(CredentialErrorCodes.INVALID_PROOF, e.message ?: "Invalid credential proof"),
+            )
         }
     }
 
@@ -663,14 +745,11 @@ class DefaultOAuth2Provider(
         claims: JsonObject,
     ): CredentialRequestResult.OAuthFailure? {
         val boundJwkThumbprint = claims.dpopJwkThumbprint()
-
-        if (boundJwkThumbprint == null) {
-            return if (context.authorization.scheme == AccessTokenAuthorizationScheme.BEARER) {
+            ?: return if (context.authorization.scheme == AccessTokenAuthorizationScheme.BEARER) {
                 null
             } else {
                 invalidCredentialAccessToken("Access token is not DPoP-bound")
             }
-        }
 
         if (context.authorization.scheme != AccessTokenAuthorizationScheme.DPOP) {
             return invalidCredentialAccessToken("DPoP-bound access token must use the DPoP authorization scheme")
@@ -714,6 +793,18 @@ class DefaultOAuth2Provider(
         CredentialRequestResult.OAuthFailure(
             OAuthError(OAuthErrorCodes.INVALID_DPOP_PROOF, description),
         )
+
+    private sealed class CredentialAccessTokenVerification {
+        data class Success(val claims: JsonObject?) : CredentialAccessTokenVerification()
+        data class Failure(val result: CredentialRequestResult) : CredentialAccessTokenVerification()
+    }
+
+    private sealed class CredentialProofVerification {
+        data class Success(val proofs: List<id.walt.openid4vci.proofs.VerifiedCredentialProof>) :
+            CredentialProofVerification()
+
+        data class Failure(val error: CredentialError) : CredentialProofVerification()
+    }
 
     private fun dpopAuthenticationChallenge(error: OAuthError): String = buildString {
         append(TOKEN_TYPE_DPOP)

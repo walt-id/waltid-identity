@@ -7,7 +7,6 @@ import id.walt.crypto.utils.ShaUtils
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import io.ktor.http.Url
-import io.ktor.http.encodedPath
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

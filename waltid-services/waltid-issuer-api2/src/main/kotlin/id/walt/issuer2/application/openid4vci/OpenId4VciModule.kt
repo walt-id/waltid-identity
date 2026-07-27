@@ -14,6 +14,9 @@ import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandle
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
+import id.walt.openid4vci.proofs.CredentialNonceService
+import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
+import id.walt.openid4vci.proofs.JwtCredentialNonceService
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.PARRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
@@ -32,6 +35,7 @@ import kotlinx.coroutines.runBlocking
 data class OpenId4VciModule(
     val oauth2Provider: OAuth2Provider,
     val preAuthorizedCodeIssuer: PreAuthorizedCodeIssuer,
+    val credentialNonceService: CredentialNonceService,
 ) {
 
     companion object {
@@ -52,6 +56,10 @@ data class OpenId4VciModule(
                 repository = preAuthorizedCodeRepository,
                 anonymousAccessSupported = config.supportsPreAuthAnonymous(),
             )
+            val credentialNonceService = JwtCredentialNonceService(
+                signingKeyResolver = signingKeyResolver,
+                verificationKeyResolver = verificationKeyResolver,
+            )
 
             val accessTokenVerifier = JwtAccessTokenVerifier(verificationKeyResolver)
             val provider = buildOAuth2Provider(
@@ -65,6 +73,7 @@ data class OpenId4VciModule(
 
                     accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
                     credentialRequestValidator = DefaultCredentialRequestValidator(),
+                    credentialProofVerifier = DefaultCredentialProofVerifier(),
 
                     authorizationCodeRepository = authorizationCodeRepository,
                     preAuthorizedCodeRepository = preAuthorizedCodeRepository,
@@ -93,6 +102,7 @@ data class OpenId4VciModule(
             return OpenId4VciModule(
                 oauth2Provider = provider,
                 preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,
+                credentialNonceService = credentialNonceService,
             )
         }
 

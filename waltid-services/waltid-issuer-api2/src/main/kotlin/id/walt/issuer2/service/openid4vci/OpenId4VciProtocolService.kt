@@ -10,13 +10,6 @@ import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.utils.JsonObjectPathMapper
-import id.walt.mdoc.dataelement.DataElement
-import id.walt.mdoc.dataelement.MapElement
-import id.walt.mdoc.dataelement.MapKey
-import id.walt.mdoc.dataelement.NumberElement
-import id.walt.mdoc.dataelement.StringElement
-import id.walt.mdoc.doc.MDoc
-import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.errors.CredentialError
@@ -32,6 +25,11 @@ import id.walt.openid4vci.requests.credential.CredentialRequestTargetResolution
 import id.walt.openid4vci.requests.credential.resolveCredentialConfigurationId
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.offers.AuthenticationMethod
+import id.walt.openid4vci.proofs.CredentialNonceBinding
+import id.walt.openid4vci.proofs.CredentialNonceService
+import id.walt.openid4vci.proofs.CredentialNonceValidationContext
+import id.walt.openid4vci.proofs.CredentialProofValidationContext
+import id.walt.openid4vci.proofs.IssuedCredentialNonce
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
@@ -71,6 +69,7 @@ class OpenId4VciProtocolService(
     private val profileService: CredentialProfileService,
     private val metadataService: MetadataService,
     private val notificationService: IssuanceNotificationService,
+    private val credentialNonceService: CredentialNonceService,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -330,7 +329,10 @@ class OpenId4VciProtocolService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            return oauth2Provider.writeCredentialError(credentialRequest, OAuthError(OAuthErrorCodes.INVALID_TOKEN, e.message))
+            return oauth2Provider.writeCredentialError(
+                credentialRequest,
+                OAuthError(OAuthErrorCodes.INVALID_TOKEN, e.message)
+            )
         }
 
         val sessionId = tokenClaims.stringClaim("sub")
@@ -411,12 +413,14 @@ class OpenId4VciProtocolService(
                         put("credentialStatus", status)
                     })
                 }
+
                 CredentialFormat.SD_JWT_VC -> {
                     // For SD-JWT VC, inject status at root level (as "status" claim)
                     JsonObject(session.credentialData.toMutableMap().apply {
                         put("status", status)
                     })
                 }
+
                 else -> session.credentialData
             }
         } ?: session.credentialData
@@ -428,6 +432,7 @@ class OpenId4VciProtocolService(
                 else -> null
             }
         }
+        val nonceBinding = credentialNonceBinding()
 
         val credentialResponse = try {
             when (val result = oauth2Provider.createCredentialResponse(
@@ -441,6 +446,15 @@ class OpenId4VciProtocolService(
                 x5Chain = x5Chain,
                 mDocNameSpacesDataMappingConfig = session.mDocNameSpacesDataMappingConfig,
                 credentialStatus = mDocStatus,
+                proofValidationContext = CredentialProofValidationContext(
+                    credentialIssuer = nonceBinding.credentialIssuer,
+                    clientId = requestWithSession.accessTokenClientId,
+                    anonymousPreAuthorizedAccess = requestWithSession.anonymousPreAuthorizedAccess,
+                    nonceValidation = CredentialNonceValidationContext(
+                        service = credentialNonceService,
+                        binding = nonceBinding,
+                    ),
+                ),
             )) {
                 is CredentialResponseResult.Success -> result.response
                 is CredentialResponseResult.Failure -> {
@@ -477,8 +491,19 @@ class OpenId4VciProtocolService(
         return oauth2Provider.writeCredentialResponse(requestWithSession, credentialResponse)
     }
 
-    fun createNonceResponse(): Map<String, String> =
-        mapOf("c_nonce" to UUID.randomUUID().toString())
+    suspend fun createNonceResponse(): IssuedCredentialNonce =
+        credentialNonceService.issue(credentialNonceBinding())
+
+    private fun credentialNonceBinding(): CredentialNonceBinding {
+        val metadata = metadataService.getCredentialIssuerMetadata()
+        return CredentialNonceBinding(
+            credentialIssuer = metadata.credentialIssuer,
+            credentialEndpoint = metadata.credentialEndpoint,
+            nonceEndpoint = requireNotNull(metadata.nonceEndpoint) {
+                "Credential issuer metadata must expose a nonce endpoint"
+            },
+        )
+    }
 
     private suspend fun createAuthorizationResponse(
         issuanceSession: IssuanceSession,
@@ -719,10 +744,14 @@ class OpenId4VciProtocolService(
             val uri = statusList["uri"]?.jsonPrimitive?.content
                 ?: return null
 
-            MdocStatus(statusList = MdocStatusListInfo(index = idx, uri = id.walt.mdoc.objects.mso.UniformResourceIdentifier(uri)))
+            MdocStatus(
+                statusList = MdocStatusListInfo(
+                    index = idx,
+                    uri = id.walt.mdoc.objects.mso.UniformResourceIdentifier(uri)
+                )
+            )
         } catch (e: Exception) {
             null
         }
     }
-
 }

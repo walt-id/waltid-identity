@@ -41,7 +41,5 @@ private fun PreAuthorizedCodeRecord.toDefaultRecord() = DefaultPreAuthorizedCode
     grantedAudience = grantedAudience,
     session = session,
     expiresAt = expiresAt,
-    credentialNonce = credentialNonce,
-    credentialNonceExpiresAt = credentialNonceExpiresAt,
     issuanceSessionId = issuanceSessionId,
 )
