@@ -62,9 +62,13 @@ kotlin {
         jsTest.dependencies {
         }
 
-        if (enableAndroidBuild) {
-            androidHostTest.get().dependsOn(jvmAndroidTest.get())
-        }
+    }
+}
+
+if (enableAndroidBuild) {
+    val jvmAndroidTest = kotlin.sourceSets.named("jvmAndroidTest")
+    kotlin.sourceSets.named("androidHostTest") {
+        dependsOn(jvmAndroidTest.get())
     }
 }
 
