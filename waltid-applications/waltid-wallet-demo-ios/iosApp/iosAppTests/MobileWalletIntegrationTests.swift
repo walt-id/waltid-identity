@@ -100,6 +100,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
                 requestObjectTrustAnchorPEMCertificates: [X509RequestObjectFixture.trustAnchorPEM]
             )
         )
+        _ = try await wallet.bootstrap()
 
         let preview = try await wallet.previewPresentation(
             request: X509RequestObjectFixture.authorizationRequestURL
