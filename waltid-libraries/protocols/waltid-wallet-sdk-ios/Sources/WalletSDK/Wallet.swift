@@ -232,6 +232,11 @@ public actor Wallet {
     }
 
     /// Retains Apple's parsed Annex C request until the user consents to raw request access.
+    ///
+    /// - Parameters:
+    ///   - parsedRequest: Apple's pre-consent parsed document request.
+    ///   - verifiedOrigin: Platform-verified origin bound to the request.
+    ///   - selectedRegistryEntryIDs: Optional platform-selected credential metadata IDs.
     public func previewAnnexCPresentation(
         parsedRequest: AnnexCParsedRequest,
         verifiedOrigin: String,
@@ -245,6 +250,13 @@ public actor Wallet {
     }
 
     /// Verifies the raw request against the retained preview and returns the HPKE response JSON.
+    ///
+    /// - Parameters:
+    ///   - requestID: Handle returned by ``previewAnnexCPresentation(parsedRequest:verifiedOrigin:selectedRegistryEntryIDs:)``.
+    ///   - verifiedOrigin: Platform-verified origin bound to the preview.
+    ///   - deviceRequestBase64URL: Raw post-consent device request.
+    ///   - encryptionInfoBase64URL: Raw post-consent encryption information.
+    ///   - selectedCredentialOptions: User-approved credentials, one per requested document.
     public func submitAnnexCPresentation(
         requestID: String,
         verifiedOrigin: String,

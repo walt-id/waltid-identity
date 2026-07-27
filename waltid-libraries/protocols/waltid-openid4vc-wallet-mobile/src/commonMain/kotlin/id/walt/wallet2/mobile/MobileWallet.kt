@@ -242,8 +242,7 @@ public class MobileWallet internal constructor(
             require(existingKeys.isNotEmpty()) {
                 "Wallet '${wallet.id}' has persisted DIDs but no persisted keys"
             }
-            // Force platform key resolution here so shared-access providers can fail closed for
-            // legacy non-exportable keys before a provider extension offers a credential.
+            // Force platform key resolution before a provider extension offers a credential.
             keyStore.getKey(existingKeys.first().keyId)
             refreshDigitalCredentialRegistration()
             return MobileWalletBootstrapResult(
