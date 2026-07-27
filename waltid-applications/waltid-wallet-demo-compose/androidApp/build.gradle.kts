@@ -65,6 +65,7 @@ dependencies {
     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
     implementation(identityLibs.androidx.activity.compose)
     implementation(identityLibs.androidx.credentials.registry.provider)
+    debugImplementation(identityLibs.androidx.credentials.play.services.auth)
     implementation(identityLibs.kotlinx.coroutines.android)
     implementation(identityLibs.kotlinx.serialization.json)
 
