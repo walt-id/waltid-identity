@@ -490,6 +490,43 @@ class MobileWalletTest {
         assertEquals("https://credentials.example/pid", record.type)
         assertEquals(listOf(listOf("given_name")), record.fields.map { it.path })
         assertFalse(record.fields.any { it.path.singleOrNull() == "iss" })
+        assertFalse(record.fields.single().selectivelyDisclosable)
+    }
+
+    @Test
+    fun digitalCredentialRegistryMarksOnlySdJwtDisclosureLocationsAsSelectable() = runTest {
+        val registry = RecordingMetadataRegistry()
+        val (_, credential) = CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2)
+        val sdJwt = assertIs<SdJwtCredential>(credential)
+        val selectivelyDisclosablePaths = requireNotNull(sdJwt.disclosures)
+            .mapNotNull { disclosure ->
+                disclosure.location?.mapNotNull { component -> component.jsonPrimitive.contentOrNull }
+            }
+            .toSet()
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "pid-1",
+                credential = credential,
+                label = "PID",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "registry-disclosures-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            keyGenerator = { error("Registry refresh must not generate keys") },
+            credentialRegistry = registry,
+        )
+
+        wallet.refreshDigitalCredentialRegistration()
+
+        val fields = registry.replacements.single().second.single().fields
+        assertTrue(fields.any { it.selectivelyDisclosable })
+        assertTrue(fields.any { !it.selectivelyDisclosable })
+        fields.forEach { field ->
+            assertEquals(field.path in selectivelyDisclosablePaths, field.selectivelyDisclosable)
+        }
     }
 
     @Test
@@ -631,16 +668,20 @@ class MobileWalletTest {
         )
 
         assertEquals(MobileWalletReaderTrust.Trusted("CN=Example"), preview.readerTrust)
+        val submission = MobileWalletAnnexCSubmission(
+            requestId = preview.requestId,
+            verifiedOrigin = origin,
+            deviceRequestBase64Url = SIGNED_READER_REQUEST,
+            encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+            selectedCredentialOptions = preview.credentialOptions.map {
+                MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
+            },
+        )
+        assertFailsWith<IllegalArgumentException> {
+            wallet.submitAnnexCPresentation(submission.copy(verifiedOrigin = "https://other.example"))
+        }
         val response = wallet.submitAnnexCPresentation(
-            MobileWalletAnnexCSubmission(
-                requestId = preview.requestId,
-                verifiedOrigin = origin,
-                deviceRequestBase64Url = SIGNED_READER_REQUEST,
-                encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
-                selectedCredentialOptions = preview.credentialOptions.map {
-                    MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
-                },
-            )
+            submission
         )
         assertEquals(MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C, response.protocol)
         assertTrue(

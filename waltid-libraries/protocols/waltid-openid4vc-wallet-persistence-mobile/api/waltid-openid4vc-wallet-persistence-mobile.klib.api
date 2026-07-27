@@ -214,8 +214,4 @@ sealed class id.walt.wallet2.persistence.encryption/WalletPersistenceException :
     final class EncryptionConfigurationFailed : id.walt.wallet2.persistence.encryption/WalletPersistenceException { // id.walt.wallet2.persistence.encryption/WalletPersistenceException.EncryptionConfigurationFailed|null[0]
         constructor <init>(kotlin/String, kotlin/Throwable? = ...) // id.walt.wallet2.persistence.encryption/WalletPersistenceException.EncryptionConfigurationFailed.<init>|<init>(kotlin.String;kotlin.Throwable?){}[0]
     }
-
-    final class LegacyKeyRequiresCredentialReissuance : id.walt.wallet2.persistence.encryption/WalletPersistenceException { // id.walt.wallet2.persistence.encryption/WalletPersistenceException.LegacyKeyRequiresCredentialReissuance|null[0]
-        constructor <init>(kotlin/String) // id.walt.wallet2.persistence.encryption/WalletPersistenceException.LegacyKeyRequiresCredentialReissuance.<init>|<init>(kotlin.String){}[0]
-    }
 }

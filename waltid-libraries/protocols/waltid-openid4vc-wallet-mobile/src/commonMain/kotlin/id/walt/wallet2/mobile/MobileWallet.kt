@@ -6,6 +6,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.ShaUtils
 import id.walt.credentials.formats.MdocsCredential
+import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
@@ -329,8 +330,8 @@ public class MobileWallet internal constructor(
         previewHandle: MobileWalletIssuancePreviewHandle,
         txCode: String? = null,
         clientId: String = "wallet-client",
-    ): List<String> =
-        WalletIssuanceHandler.receiveCredential(
+    ): List<String> {
+        val result = WalletIssuanceHandler.receiveCredential(
             wallet = wallet,
             request = ReceiveCredentialFromPreviewRequest(
                 previewHandle = id.walt.wallet2.handlers.IssuancePreviewHandle(previewHandle.value),
@@ -340,6 +341,9 @@ public class MobileWallet internal constructor(
             attestationAssembler = attestationAssembler,
             onEvent = ::emitSessionEvent,
         ).credentialIds
+        refreshDigitalCredentialRegistration()
+        return result
+    }
 
     /** Discards a reviewed issuance preview after local dismissal. */
     public suspend fun discardIssuancePreview(previewHandle: MobileWalletIssuancePreviewHandle) {
@@ -734,6 +738,13 @@ public class MobileWallet internal constructor(
                 else -> if (metadata.format in setOf("vc+sd-jwt", "dc+sd-jwt", "sd-jwt-vc")) {
                     val data = credential.credentialData
                     val type = data["vct"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                    val selectivelyDisclosablePaths = (credential as? SelectivelyDisclosableVerifiableCredential)
+                        ?.disclosures
+                        .orEmpty()
+                        .mapNotNull { disclosure ->
+                            disclosure.location?.mapNotNull { pathComponent -> pathComponent.jsonPrimitive.contentOrNull }
+                        }
+                        .toSet()
                     MobileWalletCredentialRegistryRecord(
                         registryEntryId = registryEntryId,
                         credentialId = stored.id,
@@ -741,7 +752,12 @@ public class MobileWallet internal constructor(
                         type = type,
                         fields = data
                             .filterKeys { it !in setOf("vct", "iss", "iat", "nbf", "exp", "cnf", "status") }
-                            .flatMap { (name, value) -> value.flattenRegistryFields(listOf(name), true) },
+                            .flatMap { (name, value) ->
+                                value.flattenRegistryFields(
+                                    path = listOf(name),
+                                    selectivelyDisclosablePaths = selectivelyDisclosablePaths,
+                                )
+                            },
                         displayName = metadata.label ?: type,
                     )
                 } else null
@@ -750,16 +766,16 @@ public class MobileWallet internal constructor(
 
     private fun JsonElement.flattenRegistryFields(
         path: List<String>,
-        selectivelyDisclosable: Boolean,
+        selectivelyDisclosablePaths: Set<List<String>>,
     ): List<MobileWalletCredentialRegistryField> = when (this) {
         is JsonObject -> entries.flatMap { (name, value) ->
-            value.flattenRegistryFields(path + name, selectivelyDisclosable)
+            value.flattenRegistryFields(path + name, selectivelyDisclosablePaths)
         }
         else -> listOf(
             MobileWalletCredentialRegistryField(
                 path = path,
                 valueJson = Json.encodeToString(JsonElement.serializer(), this),
-                selectivelyDisclosable = selectivelyDisclosable,
+                selectivelyDisclosable = path in selectivelyDisclosablePaths,
             )
         )
     }

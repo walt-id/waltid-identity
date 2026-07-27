@@ -3,7 +3,6 @@ package id.walt.wallet2.persistence.keys
 import id.walt.crypto.IosKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
@@ -19,10 +18,8 @@ import platform.CoreFoundation.kCFTypeDictionaryKeyCallBacks
 import platform.CoreFoundation.kCFTypeDictionaryValueCallBacks
 import platform.Foundation.CFBridgingRelease
 import platform.Foundation.CFBridgingRetain
-import platform.Security.SecItemCopyMatching
 import platform.Security.SecKeyGeneratePair
 import platform.Security.SecKeyRefVar
-import platform.Security.errSecItemNotFound
 import platform.Security.errSecSuccess
 import platform.Security.kSecAttrAccessGroup
 import platform.Security.kSecAttrAccessible
@@ -38,10 +35,6 @@ import platform.Security.kSecAttrKeyTypeECSECPrimeRandom
 import platform.Security.kSecAttrLabel
 import platform.Security.kSecAttrTokenID
 import platform.Security.kSecAttrTokenIDSecureEnclave
-import platform.Security.kSecClass
-import platform.Security.kSecClassKey
-import platform.Security.kSecMatchLimit
-import platform.Security.kSecMatchLimitOne
 import platform.Security.kSecPrivateKeyAttrs
 import platform.Security.kSecPublicKeyAttrs
 import kotlin.uuid.Uuid
@@ -94,11 +87,6 @@ public class IosPlatformKeyProvider(
             keyType = keyType,
             inSecureElement = useSecureElement && keyType == KeyType.secp256r1,
         )
-        if (accessGroup != null && keyType == KeyType.secp256r1 && !sharedKeyExists(keyId, accessGroup)) {
-            val legacyKeyExists = runCatching { IosKey.Platform.load(options) }.isSuccess
-            if (legacyKeyExists) throw WalletPersistenceException.LegacyKeyRequiresCredentialReissuance(keyId)
-            return null
-        }
         return runCatching { IosKey.Platform.load(options) }.getOrNull()
     }
 
@@ -161,27 +149,6 @@ public class IosPlatformKeyProvider(
             attributes.release()
             privateAttributes.release()
             publicAttributes.release()
-        }
-    }
-
-    private fun sharedKeyExists(keyId: String, group: String): Boolean {
-        val query = RetainedDictionary(9).apply {
-            add(kSecClass, kSecClassKey)
-            add(kSecAttrKeyClass, kSecAttrKeyClassPrivate)
-            add(kSecAttrKeyType, kSecAttrKeyTypeECSECPrimeRandom)
-            addRetained(kSecAttrApplicationLabel, keyId)
-            addRetained(kSecAttrApplicationTag, PRIVATE_KEY_TAG)
-            addRetained(kSecAttrAccessGroup, group)
-            add(kSecMatchLimit, kSecMatchLimitOne)
-        }
-        return try {
-            when (SecItemCopyMatching(query.dictionary, null)) {
-                errSecSuccess -> true
-                errSecItemNotFound -> false
-                else -> false
-            }
-        } finally {
-            query.release()
         }
     }
 

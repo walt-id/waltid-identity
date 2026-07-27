@@ -4,7 +4,6 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto.keys.DirectSerializedKey
-import id.walt.crypto.utils.UuidUtils
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatchException
 import id.walt.dcql.DcqlMatcher
@@ -39,8 +38,6 @@ import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -316,12 +313,10 @@ object WalletPresentationHandler {
 
     private val previewedAuthorizationRequests =
         PreviewSessionStore<PreviewedPresentation>(sessionName = "Presentation")
-    private const val MAX_PREVIEWED_DC_API_REQUESTS = 16
-    private val previewedDcApiRequests = LinkedHashMap<String, PreviewedDcApiRequest>()
-    private val previewedDcApiRequestsMutex = Mutex()
+    private val previewedDcApiRequests =
+        PreviewSessionStore<PreviewedDcApiRequest>(sessionName = "Digital Credentials presentation")
 
     private data class PreviewedDcApiRequest(
-        val walletId: String,
         val request: ResolvedDcApiRequest,
         val allowedCredentialIds: Set<String>,
     )
@@ -686,50 +681,51 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ): DcApiCredentialResponse {
         request.selectedCredentialOptions.requireValidPresentationCredentialSelection()
-        val previewedRequest = consumePreviewedDcApiRequest(wallet, request.requestId)
-        require(request.selectedCredentialOptions.all { it.credentialId in previewedRequest.allowedCredentialIds }) {
-            "A selected credential was not offered by the retained Digital Credentials preview"
-        }
-        val resolvedRequest = previewedRequest.request
-        val authorizationRequest = resolvedRequest.authorizationRequest
-        val key = wallet.resolveKey(keyId = null)
-            ?: error("No key available: wallet has no keyStores and no staticKey")
-        val did = request.did ?: wallet.defaultDid()
-        val selectedQueryIds = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.queryId }
-        validateSelectedTransactionDataCredentials(
-            authorizationRequest.transactionData.orEmpty(),
-            selectedQueryIds,
-        )
-        onEvent(WalletSessionEvent.presentation_request_parsed)
+        return previewedDcApiRequests.useRetainingOnFailure(wallet.id, request.requestId) { previewedRequest ->
+            require(request.selectedCredentialOptions.all { it.credentialId in previewedRequest.allowedCredentialIds }) {
+                "A selected credential was not offered by the retained Digital Credentials preview"
+            }
+            val resolvedRequest = previewedRequest.request
+            val authorizationRequest = resolvedRequest.authorizationRequest
+            val key = wallet.resolveKey(keyId = null)
+                ?: error("No key available: wallet has no keyStores and no staticKey")
+            val did = request.did ?: wallet.defaultDid()
+            val selectedQueryIds = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.queryId }
+            validateSelectedTransactionDataCredentials(
+                authorizationRequest.transactionData.orEmpty(),
+                selectedQueryIds,
+            )
+            onEvent(WalletSessionEvent.presentation_request_parsed)
 
-        return WalletPresentFunctionality2.walletPresentDcApiHandling(
-            holderKey = key,
-            holderDid = did,
-            request = resolvedRequest,
-            selectCredentialsForQuery = { query ->
-                val requirements = query.requiredCredentialRequirements()
-                require(requirements.satisfiedBy(selectedQueryIds)) {
-                    "Selected credential option(s) do not satisfy required DC API credential query constraints"
-                }
-                val selected = selectFromStores(
-                    wallet = wallet,
-                    query = query,
-                    useWalletCredentialIds = true,
-                ).selectCredentialOptions(
-                    selectedCredentialOptions = request.selectedCredentialOptions,
-                    selectedDisclosureOptions = request.selectedDisclosureOptions,
-                )
-                require(requirements.satisfiedBy(selected.keys)) {
-                    "Selected credential option(s) do not match required DC API credential query constraints"
-                }
-                selected.also { onEvent(WalletSessionEvent.presentation_credentials_selected) }
-            },
-            transactionDataTypeRegistry = transactionDataTypeRegistry,
-        ).getOrElse { error ->
-            onEvent(WalletSessionEvent.presentation_failed)
-            throw error
-        }.also {
-            onEvent(WalletSessionEvent.presentation_completed)
+            WalletPresentFunctionality2.walletPresentDcApiHandling(
+                holderKey = key,
+                holderDid = did,
+                request = resolvedRequest,
+                selectCredentialsForQuery = { query ->
+                    val requirements = query.requiredCredentialRequirements()
+                    require(requirements.satisfiedBy(selectedQueryIds)) {
+                        "Selected credential option(s) do not satisfy required DC API credential query constraints"
+                    }
+                    val selected = selectFromStores(
+                        wallet = wallet,
+                        query = query,
+                        useWalletCredentialIds = true,
+                    ).selectCredentialOptions(
+                        selectedCredentialOptions = request.selectedCredentialOptions,
+                        selectedDisclosureOptions = request.selectedDisclosureOptions,
+                    )
+                    require(requirements.satisfiedBy(selected.keys)) {
+                        "Selected credential option(s) do not match required DC API credential query constraints"
+                    }
+                    selected.also { onEvent(WalletSessionEvent.presentation_credentials_selected) }
+                },
+                transactionDataTypeRegistry = transactionDataTypeRegistry,
+            ).getOrElse { error ->
+                onEvent(WalletSessionEvent.presentation_failed)
+                throw error
+            }.also {
+                onEvent(WalletSessionEvent.presentation_completed)
+            }
         }
     }
     // ---------------------------------------------------------------------------
@@ -1072,31 +1068,14 @@ object WalletPresentationHandler {
     /** Clears every presentation preview and tombstone owned by [wallet] during wallet deletion. */
     suspend fun clearPreviews(wallet: Wallet) {
         previewedAuthorizationRequests.clearWallet(wallet.id)
-        previewedDcApiRequestsMutex.withLock {
-            previewedDcApiRequests.entries.removeAll { (_, preview) -> preview.walletId == wallet.id }
-        }
+        previewedDcApiRequests.clearWallet(wallet.id)
     }
 
     private suspend fun rememberPreviewedDcApiRequest(
         wallet: Wallet,
         request: ResolvedDcApiRequest,
         allowedCredentialIds: Set<String>,
-    ): String = previewedDcApiRequestsMutex.withLock {
-        if (previewedDcApiRequests.size >= MAX_PREVIEWED_DC_API_REQUESTS) {
-            previewedDcApiRequests.remove(previewedDcApiRequests.keys.first())
-        }
-        val requestId = UuidUtils.randomUUIDString()
-        previewedDcApiRequests[requestId] = PreviewedDcApiRequest(wallet.id, request, allowedCredentialIds)
-        requestId
-    }
-
-    private suspend fun consumePreviewedDcApiRequest(
-        wallet: Wallet,
-        requestId: String,
-    ): PreviewedDcApiRequest = previewedDcApiRequestsMutex.withLock {
-        previewedDcApiRequests.remove(requestId)
-            ?.takeIf { it.walletId == wallet.id }
-    } ?: throw MissingPresentationPreviewException()
+    ): String = previewedDcApiRequests.create(wallet.id, PreviewedDcApiRequest(request, allowedCredentialIds))
 
     internal fun DcqlMatcher.DcqlMatchResult.toPresentationDisclosures(): List<PresentationDisclosure> {
         val plan = originalQuery.claimSelectionPlan()

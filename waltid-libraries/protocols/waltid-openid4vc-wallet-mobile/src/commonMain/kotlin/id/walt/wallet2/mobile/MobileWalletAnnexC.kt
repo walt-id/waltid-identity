@@ -12,7 +12,6 @@ import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
-import id.walt.crypto.utils.UuidUtils
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.dcapi.DCAPIHandover
@@ -22,13 +21,12 @@ import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.mdoc.objects.sha256
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.handlers.PreviewSessionStore
 import id.waltid.openid4vp.wallet.DcApiWallet
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import id.walt.x509.CertificateDer
 import id.walt.x509.verifyOrderedCertificateChainSignatures
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
 import kotlinx.serialization.cbor.CborObjectAsArray
@@ -83,8 +81,7 @@ internal class MobileWalletAnnexCEngine(
         val allowedCredentialIds: Set<String>,
     )
 
-    private val mutex = Mutex()
-    private val retainedRequests: MutableMap<String, RetainedRequest> = linkedMapOf()
+    private val retainedRequests = PreviewSessionStore<RetainedRequest>(sessionName = "Annex C presentation")
 
     fun parseDeviceRequest(base64Url: String): MobileWalletAnnexCParsedRequest =
         decodeAndValidateDeviceRequest(base64Url).toParsedRequest()
@@ -126,16 +123,15 @@ internal class MobileWalletAnnexCEngine(
                 transcript = buildSessionTranscript(requireNotNull(request.encryptionInfoBase64Url), origin),
             )
         }
-        val requestId = UuidUtils.randomUUIDString()
-        mutex.withLock {
-            if (retainedRequests.size >= 32) retainedRequests.remove(retainedRequests.keys.first())
-            retainedRequests[requestId] = RetainedRequest(
+        val requestId = retainedRequests.create(
+            walletId = wallet.id,
+            value = RetainedRequest(
                 parsedRequest = request.parsedRequest.normalized(),
                 verifiedOrigin = origin,
                 encryptionInfoBase64Url = request.encryptionInfoBase64Url,
                 allowedCredentialIds = options.mapTo(mutableSetOf()) { it.credentialId },
-            )
-        }
+            ),
+        )
         return MobileWalletAnnexCPreview(
             requestId = requestId,
             verifiedOrigin = origin,
@@ -146,69 +142,69 @@ internal class MobileWalletAnnexCEngine(
     }
 
     suspend fun submit(submission: MobileWalletAnnexCSubmission): MobileWalletDigitalCredentialResponse {
-        val retained = mutex.withLock { retainedRequests.remove(submission.requestId) }
-            ?: throw IllegalArgumentException("Unknown or already consumed Annex C preview")
-        val origin = DcApiWallet.validatePlatformOrigin(submission.verifiedOrigin)
-        require(origin == retained.verifiedOrigin) { "Annex C origin changed after consent" }
-        if (retained.encryptionInfoBase64Url != null) {
-            require(submission.encryptionInfoBase64Url == retained.encryptionInfoBase64Url) {
-                "Annex C encryptionInfo changed after consent"
+        return retainedRequests.useRetainingOnFailure(wallet.id, submission.requestId) { retained ->
+            val origin = DcApiWallet.validatePlatformOrigin(submission.verifiedOrigin)
+            require(origin == retained.verifiedOrigin) { "Annex C origin changed after consent" }
+            if (retained.encryptionInfoBase64Url != null) {
+                require(submission.encryptionInfoBase64Url == retained.encryptionInfoBase64Url) {
+                    "Annex C encryptionInfo changed after consent"
+                }
             }
-        }
-        val deviceRequest = decodeAndValidateDeviceRequest(submission.deviceRequestBase64Url)
-        require(deviceRequest.toParsedRequest() == retained.parsedRequest) {
-            "Parsed and raw Annex C requests are inconsistent"
-        }
-        val encryptionInfo = decodeAndValidateEncryptionInfo(submission.encryptionInfoBase64Url)
-        val transcript = buildSessionTranscript(submission.encryptionInfoBase64Url, origin)
-        verifyReaderAuthentication(deviceRequest, transcript)
+            val deviceRequest = decodeAndValidateDeviceRequest(submission.deviceRequestBase64Url)
+            require(deviceRequest.toParsedRequest() == retained.parsedRequest) {
+                "Parsed and raw Annex C requests are inconsistent"
+            }
+            val encryptionInfo = decodeAndValidateEncryptionInfo(submission.encryptionInfoBase64Url)
+            val transcript = buildSessionTranscript(submission.encryptionInfoBase64Url, origin)
+            verifyReaderAuthentication(deviceRequest, transcript)
 
-        val selectionsByQuery = submission.selectedCredentialOptions.associateBy { it.queryId }
-        require(selectionsByQuery.size == retained.parsedRequest.documents.size) {
-            "Exactly one credential must be selected for every Annex C document request"
-        }
-        require(selectionsByQuery.values.all { it.credentialId in retained.allowedCredentialIds }) {
-            "An Annex C credential selection was not offered by the consent preview"
-        }
-        val holderKey = wallet.resolveKey()
-            ?: throw IllegalStateException("No wallet signing key is available")
-        val documents = retained.parsedRequest.documents.mapIndexed { index, requested ->
-            val queryId = annexCQueryId(index, requested.docType)
-            val selection = selectionsByQuery[queryId]
-                ?: throw IllegalArgumentException("Missing credential selection for $queryId")
-            val stored = wallet.findCredential(selection.credentialId)
-                ?: throw MobileWalletStaleRegistryEntryException(selection.credentialId)
-            require((stored.credential as? MdocsCredential)?.docType == requested.docType) {
-                "Selected credential no longer matches the Annex C document request"
+            val selectionsByQuery = submission.selectedCredentialOptions.associateBy { it.queryId }
+            require(selectionsByQuery.size == retained.parsedRequest.documents.size) {
+                "Exactly one credential must be selected for every Annex C document request"
             }
-            MdocPresenter.buildAnnexCDocument(
-                digitalCredential = stored.credential,
-                requestedElements = requested.namespaces,
-                sessionTranscript = transcript,
-                holderKey = holderKey,
+            require(selectionsByQuery.values.all { it.credentialId in retained.allowedCredentialIds }) {
+                "An Annex C credential selection was not offered by the consent preview"
+            }
+            val holderKey = wallet.resolveKey()
+                ?: throw IllegalStateException("No wallet signing key is available")
+            val documents = retained.parsedRequest.documents.mapIndexed { index, requested ->
+                val queryId = annexCQueryId(index, requested.docType)
+                val selection = selectionsByQuery[queryId]
+                    ?: throw IllegalArgumentException("Missing credential selection for $queryId")
+                val stored = wallet.findCredential(selection.credentialId)
+                    ?: throw MobileWalletStaleRegistryEntryException(selection.credentialId)
+                require((stored.credential as? MdocsCredential)?.docType == requested.docType) {
+                    "Selected credential no longer matches the Annex C document request"
+                }
+                MdocPresenter.buildAnnexCDocument(
+                    digitalCredential = stored.credential,
+                    requestedElements = requested.namespaces,
+                    sessionTranscript = transcript,
+                    holderKey = holderKey,
+                )
+            }
+            val plaintext = coseCompliantCbor.encodeToByteArray(
+                DeviceResponse.serializer(),
+                DeviceResponse(version = "1.0", documents = documents.toTypedArray(), status = 0u),
+            )
+            val hpkeInfo = coseCompliantCbor.encodeToByteArray(SessionTranscript.serializer(), transcript)
+            val ciphertext = encryptAnnexCHpke(
+                recipientPublicKey = encryptionInfo.encryptionParameters.recipientPublicKey,
+                plaintext = plaintext,
+                info = hpkeInfo,
+            )
+            val responseBase64Url = coseCompliantCbor.encodeToByteArray(
+                AnnexCEncryptedResponse.serializer(),
+                AnnexCEncryptedResponse(
+                    type = "dcapi",
+                    response = AnnexCEncryptedResponseData(ciphertext.enc, ciphertext.cipherText),
+                ),
+            ).encodeToBase64Url()
+            MobileWalletDigitalCredentialResponse(
+                protocol = MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
+                dataJson = buildJsonObject { put("response", JsonPrimitive(responseBase64Url)) }.toString(),
             )
         }
-        val plaintext = coseCompliantCbor.encodeToByteArray(
-            DeviceResponse.serializer(),
-            DeviceResponse(version = "1.0", documents = documents.toTypedArray(), status = 0u),
-        )
-        val hpkeInfo = coseCompliantCbor.encodeToByteArray(SessionTranscript.serializer(), transcript)
-        val ciphertext = encryptAnnexCHpke(
-            recipientPublicKey = encryptionInfo.encryptionParameters.recipientPublicKey,
-            plaintext = plaintext,
-            info = hpkeInfo,
-        )
-        val responseBase64Url = coseCompliantCbor.encodeToByteArray(
-            AnnexCEncryptedResponse.serializer(),
-            AnnexCEncryptedResponse(
-                type = "dcapi",
-                response = AnnexCEncryptedResponseData(ciphertext.enc, ciphertext.cipherText),
-            ),
-        ).encodeToBase64Url()
-        return MobileWalletDigitalCredentialResponse(
-            protocol = MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
-            dataJson = buildJsonObject { put("response", JsonPrimitive(responseBase64Url)) }.toString(),
-        )
     }
 
     private fun decodeAndValidateDeviceRequest(base64Url: String): DeviceRequest =

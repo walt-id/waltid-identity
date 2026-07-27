@@ -8,7 +8,6 @@ import co.touchlab.sqliter.DatabaseFileContext
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
-import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSFileManager
 
 /**
@@ -35,7 +34,6 @@ public actual class DriverFactory {
         isDeviceLocal: Boolean,
         walletId: String,
     ): SqlDriver {
-        val migratedLegacyDatabase = migrateLegacyDatabaseIfNeeded(databaseName, walletId)
         val driver = runCatching {
             NativeSqliteDriver(
                 schema = WalletPersistenceDatabase.Schema,
@@ -83,9 +81,6 @@ public actual class DriverFactory {
                 parameters = 0,
                 binders = null,
             )
-            if (migratedLegacyDatabase) {
-                DatabaseFileContext.deleteDatabase("$databaseName.db", null)
-            }
             driver
         }.getOrElse { cause ->
             driver.close()
@@ -118,34 +113,4 @@ public actual class DriverFactory {
             )
     }
 
-    @OptIn(ExperimentalForeignApi::class)
-    private fun migrateLegacyDatabaseIfNeeded(databaseName: String, walletId: String): Boolean {
-        val sharedPath = sharedDatabasePath(walletId) ?: return false
-        val fileName = "$databaseName.db"
-        val legacyDatabase = DatabaseFileContext.databasePath(fileName, null)
-        val sharedDatabase = DatabaseFileContext.databasePath(fileName, sharedPath)
-        val fileManager = NSFileManager.defaultManager
-        if (fileManager.fileExistsAtPath(sharedDatabase) || !fileManager.fileExistsAtPath(legacyDatabase)) {
-            return false
-        }
-
-        val suffixes = listOf("", "-wal", "-shm", "-journal")
-        val copied = mutableListOf<String>()
-        try {
-            suffixes.forEach { suffix ->
-                val source = legacyDatabase + suffix
-                if (fileManager.fileExistsAtPath(source)) {
-                    val destination = sharedDatabase + suffix
-                    check(fileManager.copyItemAtPath(source, destination, null)) {
-                        "Could not copy legacy wallet database file into the App Group"
-                    }
-                    copied += destination
-                }
-            }
-        } catch (cause: Throwable) {
-            copied.forEach { fileManager.removeItemAtPath(it, null) }
-            throw WalletPersistenceException.DatabaseUnlockFailed(walletId, cause)
-        }
-        return true
-    }
 }

@@ -58,15 +58,6 @@ public class IosDatabaseEncryptionKeyProvider(
             return DatabaseEncryptionKey(keyId = keyId, material = material)
         }
 
-        if (accessGroup != null) {
-            readKeyMaterial(walletId, keyId, includeAccessGroup = false)?.let { legacyMaterial ->
-                return DatabaseEncryptionKey(
-                    keyId = keyId,
-                    material = storeKeyMaterial(walletId, keyId, legacyMaterial),
-                )
-            }
-        }
-
         val material = generateKeyMaterial(walletId)
         return DatabaseEncryptionKey(keyId = keyId, material = storeKeyMaterial(walletId, keyId, material))
     }
@@ -90,13 +81,9 @@ public class IosDatabaseEncryptionKeyProvider(
         }
     }
 
-    private fun readKeyMaterial(
-        walletId: String,
-        keyId: String,
-        includeAccessGroup: Boolean = true,
-    ): ByteArray? = memScoped {
+    private fun readKeyMaterial(walletId: String, keyId: String): ByteArray? = memScoped {
         val result = alloc<CFTypeRefVar>()
-        val query = keychainQuery(keyId, returnData = true, includeAccessGroup = includeAccessGroup)
+        val query = keychainQuery(keyId, returnData = true)
         try {
             when (val status = SecItemCopyMatching(query.dictionary, result.ptr)) {
                 errSecSuccess -> (CFBridgingRelease(result.value) as NSData).toByteArray()
@@ -150,14 +137,13 @@ public class IosDatabaseEncryptionKeyProvider(
         keyId: String,
         returnData: Boolean = false,
         valueData: ByteArray? = null,
-        includeAccessGroup: Boolean = true,
     ): RetainedDictionary {
         val query = RetainedDictionary(capacity = 7)
         query.add(kSecClass, kSecClassGenericPassword)
         query.addRetained(kSecAttrService, KEYCHAIN_SERVICE)
         query.addRetained(kSecAttrAccount, keyId)
         query.add(kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
-        if (includeAccessGroup) accessGroup?.let { query.addRetained(kSecAttrAccessGroup, it) }
+        accessGroup?.let { query.addRetained(kSecAttrAccessGroup, it) }
         if (returnData) {
             query.add(kSecReturnData, kCFBooleanTrue)
             query.add(kSecMatchLimit, kSecMatchLimitOne)
