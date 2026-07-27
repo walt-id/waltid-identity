@@ -8,6 +8,7 @@ import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandle
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
+import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
@@ -46,6 +47,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler {
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult {
         return try {
             if (configuration.format !in supportedFormats) {
@@ -57,23 +59,29 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler {
                 )
             }
 
-            val jwtVc = W3cJwtVcCredentialSigner.generateW3CJwtVC(
-                credentialRequest = request,
-                credentialData = credentialData,
-                issuerId = issuerId,
-                issuerKey = issuerKey,
-                selectiveDisclosure = selectiveDisclosure,
-                dataMapping = dataMapping,
-                x5Chain = x5Chain,
-                display = display,
-                w3cVersion = w3cVersion,
-            )
+            val proofsToIssue = if (verifiedProofs.isEmpty()) {
+                listOf<VerifiedCredentialProof?>(null)
+            } else {
+                verifiedProofs
+            }
+            val jwtVcs = proofsToIssue.map { verifiedProof ->
+                W3cJwtVcCredentialSigner.generateW3CJwtVC(
+                    credentialRequest = request,
+                    credentialData = credentialData,
+                    issuerId = issuerId,
+                    issuerKey = issuerKey,
+                    selectiveDisclosure = selectiveDisclosure,
+                    dataMapping = dataMapping,
+                    x5Chain = x5Chain,
+                    display = display,
+                    w3cVersion = w3cVersion,
+                    verifiedProof = verifiedProof,
+                )
+            }
 
             CredentialResponseResult.Success(
                 CredentialResponse(
-                    credentials = listOf(
-                        IssuedCredential(credential = JsonPrimitive(jwtVc)),
-                    ),
+                    credentials = jwtVcs.map { IssuedCredential(credential = JsonPrimitive(it)) },
                 )
             )
         } catch (e: Exception) {

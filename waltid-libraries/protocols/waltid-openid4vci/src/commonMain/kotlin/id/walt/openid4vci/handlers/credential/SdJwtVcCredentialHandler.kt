@@ -11,6 +11,7 @@ import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
+import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.mdoc.objects.mso.Status
 import id.walt.sdjwt.SDMap
@@ -42,6 +43,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult {
         return try {
             if (configuration.format !in supportedFormats) {
@@ -61,24 +63,30 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
                     ),
                 )
 
-            val sdJwt = SdJwtVcCredentialSigner.generateSdJwtVC(
-                credentialRequest = request,
-                credentialData = credentialData,
-                issuerId = issuerId,
-                issuerKey = issuerKey,
-                vct = vct,
-                selectiveDisclosure = selectiveDisclosure,
-                dataMapping = dataMapping,
-                x5Chain = x5Chain,
-                display = display,
-                sdJwtTypeHeader = configuration.format.value,
-            )
+            val proofsToIssue = if (verifiedProofs.isEmpty()) {
+                listOf<VerifiedCredentialProof?>(null)
+            } else {
+                verifiedProofs
+            }
+            val sdJwts = proofsToIssue.map { verifiedProof ->
+                SdJwtVcCredentialSigner.generateSdJwtVC(
+                    credentialRequest = request,
+                    credentialData = credentialData,
+                    issuerId = issuerId,
+                    issuerKey = issuerKey,
+                    vct = vct,
+                    selectiveDisclosure = selectiveDisclosure,
+                    dataMapping = dataMapping,
+                    x5Chain = x5Chain,
+                    display = display,
+                    sdJwtTypeHeader = configuration.format.value,
+                    verifiedProof = verifiedProof,
+                )
+            }
 
             CredentialResponseResult.Success(
                 CredentialResponse(
-                    credentials = listOf(
-                        IssuedCredential(credential = JsonPrimitive(sdJwt)),
-                    ),
+                    credentials = sdJwts.map { IssuedCredential(credential = JsonPrimitive(it)) },
                 )
             )
         } catch (e: Exception) {

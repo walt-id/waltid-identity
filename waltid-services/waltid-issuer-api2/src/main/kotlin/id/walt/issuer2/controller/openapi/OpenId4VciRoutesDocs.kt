@@ -1,5 +1,6 @@
 package id.walt.issuer2.controller.openapi
 
+import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
@@ -156,6 +157,18 @@ object OpenId4VciRoutesDocs {
                 description = "Access token response"
                 body<JsonObject>()
             }
+            HttpStatusCode.BadRequest to {
+                description = "Invalid token request"
+                body<OAuthError>()
+            }
+            HttpStatusCode.Unauthorized to {
+                description = "Client authentication failed"
+                body<OAuthError>()
+            }
+            HttpStatusCode.InternalServerError to {
+                description = "Token processing failed"
+                body<OAuthError>()
+            }
         }
     }
 
@@ -188,12 +201,32 @@ object OpenId4VciRoutesDocs {
                     mediaTypes(ContentType.parse(CredentialEncryptionProfile.MEDIA_TYPE_JWT))
                 }
             }
+            HttpStatusCode.BadRequest to {
+                description = "Invalid credential request"
+                body<CredentialError>()
+            }
+            HttpStatusCode.Unauthorized to {
+                description = "Credential authorization failed"
+                body<OAuthError>()
+            }
+            HttpStatusCode.Forbidden to {
+                description = "Credential access is insufficiently scoped"
+                body<OAuthError>()
+            }
+            HttpStatusCode.UnsupportedMediaType to {
+                description = "Unsupported credential request media type"
+                body<CredentialError>()
+            }
+            HttpStatusCode.InternalServerError to {
+                description = "Credential processing failed"
+                body<OAuthError>()
+            }
         }
     }
 
     fun nonce(): RouteConfig.() -> Unit = {
         summary = "Nonce endpoint"
-        description = "Return a nonce."
+        description = "Return a signed nonce and its lifetime."
         response {
             HttpStatusCode.OK to {
                 description = "Nonce response"

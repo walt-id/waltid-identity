@@ -285,54 +285,20 @@ actual class JWKKey actual constructor(
         detachedPlaintext: ByteArray?,
         customSignatureAlgorithm: String?
     ): Result<ByteArray> {
-        /*runCatching {
-            require(detachedPlaintext != null) { "Detached plaintext cannot be null." }
-
-            // Assume a method exists to get the public key in PEM format.
-            val pemString = exportPEM()
-
-            // 1. Parse the public key from PEM format to a raw binary ArrayBuffer.
-            val publicKeyData = parsePemToBinary(pemString)
-
-            // 2. Get the algorithm parameters required by the Web Crypto API.
-            val jwsAlgorithm = keyType.jwsAlg
-            val cryptoParams = getVerificationWebCryptoParams()
-
-            // 3. Import the public key to create a CryptoKey object for verification.
-            val cryptoKey = WebCrypto.subtle.importKey(
-                "spki",              // Public key format for public keys
-                publicKeyData,       // The raw key data
-                cryptoParams.importAlgorithm,
-                true,
-                arrayOf("verify")    // Specify that this key will be used for verification.
-            ).await()
-
-            // 4. IMPORTANT: Ensure the signature is in the IEEE P1363 format required by `subtle.verify`.
-            val p1363Signature = convertDERtoIEEEP1363(signed)
-            val signatureBuffer = (p1363Signature as Int8Array).buffer
-
-            // 5. Call `subtle.verify` with the key, signature, and original data.
-            val isValid = WebCrypto.subtle.verify(
-                cryptoParams.signAlgorithm,
-                cryptoKey,
-                signatureBuffer,
-                Uint8Array(detachedPlaintext.toTypedArray())
-            ).await()
-
-            // 6. Check the result and return the plaintext or throw an exception.
-            if (isValid) {
-                detachedPlaintext
-            } else {
-                throw IllegalArgumentException("Signature verification failed.")
-            }*/
-
-
         return runCatching {
+            //needs to be same as in JVM implementation
+            val hashingAlgorithm = when (keyType) {
+                KeyType.Ed25519 -> null
+                KeyType.secp256k1 -> "SHA256"
+                KeyType.secp256r1 -> "SHA256"
+                KeyType.secp384r1 -> "SHA384"
+                KeyType.secp521r1 -> "SHA512"
+                KeyType.RSA -> "SHA256"
+                KeyType.RSA3072 -> "SHA384"
+                KeyType.RSA4096 -> "SHA512"
+            }
             val verified = crypto.verify(
-                when (keyType) {
-                    KeyType.Ed25519 -> null
-                    else -> "sha256"
-                },
+                hashingAlgorithm,
                 detachedPlaintext ?: signed,
                 getPublicKey().exportPEM(),
                 signed

@@ -7,6 +7,7 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
+import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDJwtVC
@@ -45,28 +46,29 @@ object SdJwtVcCredentialSigner {
         display: List<CredentialDisplay>? = null,
         sdJwtTypeHeader: String? = null,
         sdJwtCredentialClaims: JsonObject? = null,
+        verifiedProof: VerifiedCredentialProof? = null,
     ): String {
-        val proofHeader = credentialRequest.proofs?.jwt?.let { JwtUtils.parseJWTHeader(it.first()) }
+        val proofHeader = verifiedProof?.header ?: credentialRequest.proofs?.jwt?.let { JwtUtils.parseJWTHeader(it.first()) }
             ?: throw IllegalArgumentException("Missing JWT proof in proofs")
 
-        val holderKey = when {
+        val holderKey = verifiedProof?.holderKey ?: when {
 
             JWT_HEADER_JWK in proofHeader -> {
                 val holderJwk = requireNotNull(proofHeader[JWT_HEADER_JWK])
-                JWKKey.importJWK(holderJwk.toString()).getOrThrow()
+                JWKKey.importJWK(holderJwk.toString()).getOrThrow().getPublicKey()
             }
 
             JWT_HEADER_KID in proofHeader -> {
                 val holderKid = requireNotNull(proofHeader[JWT_HEADER_KID]?.jsonPrimitive).content
                 require(DidUtils.isDidUrl(holderKid))
-                DidService.resolveToKey(holderKid.substringBefore("#")).getOrThrow()
+                DidService.resolveToKey(holderKid.substringBefore("#")).getOrThrow().getPublicKey()
 
             }
 
             else -> throw IllegalArgumentException("Proof JWT header must contain kid or jwk claim")
         }
 
-        val holderDid = proofHeader[JWT_HEADER_KID]?.jsonPrimitive?.content.let {
+        val holderDid = verifiedProof?.holderDid ?: proofHeader[JWT_HEADER_KID]?.jsonPrimitive?.content.let {
             if (!it.isNullOrEmpty() && DidUtils.isDidUrl(it)) it.substringBefore("#") else null
         }
 

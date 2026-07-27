@@ -6,6 +6,7 @@ import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
+import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
@@ -48,6 +49,7 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult {
         return try {
             val docType = configuration.doctype
@@ -73,7 +75,7 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
                 )
             }
 
-            val holderKey = extractHolderKey(request)
+            val holderKey = extractHolderKey(request, verifiedProofs)
                 ?: return CredentialResponseResult.Failure(
                     CredentialError(CredentialErrorCodes.INVALID_PROOF, "Could not extract holder key from proof")
                 )
@@ -101,7 +103,10 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
      * Extracts the holder's public key from the credential request proof.
      * Override to extract the key from the proof JWT header `jwk` claim or CWT.
      */
-    protected open suspend fun extractHolderKey(request: CredentialRequest): Key? = null
+    protected open suspend fun extractHolderKey(
+        request: CredentialRequest,
+        verifiedProofs: List<VerifiedCredentialProof>,
+    ): Key? = verifiedProofs.firstOrNull()?.holderKey
 
     /**
      * Perform the actual mdoc CBOR/COSE signing.

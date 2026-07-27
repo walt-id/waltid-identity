@@ -150,9 +150,11 @@ class OpenId4VciController(
             }
 
             post("nonce", OpenId4VciRoutesDocs.nonce()) {
+                val issuedNonce = protocolService.createNonceResponse()
                 call.response.headers.append(HttpHeaders.CacheControl, "no-store")
                 call.respond(buildJsonObject {
-                    protocolService.createNonceResponse().forEach { (key, value) -> put(key, value) }
+                    put("c_nonce", issuedNonce.nonce)
+                    put("c_nonce_expires_in", issuedNonce.expiresInSeconds)
                 })
             }
 
