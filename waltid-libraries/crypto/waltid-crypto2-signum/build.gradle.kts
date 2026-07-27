@@ -2,6 +2,7 @@
 
 import org.jetbrains.kotlin.gradle.dsl.abi.BinariesSource
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
     id("waltid.full.library")
@@ -55,6 +56,20 @@ kotlin {
                 }
             }
         }
+    }
+}
+
+// IosSignumKeyBackendTest exercises the real iOS keychain, which is unavailable to a bundle-less executable: a
+// Kotlin/Native simulator test binary carries no application-identifier entitlement, so securityd rejects the very
+// first SecItemCopyMatching with errSecNotAvailable (-25291, "No keychain is available"). It therefore needs a real
+// device or an app host, exactly like AndroidSignumKeyBackendDeviceTest, which CI does not run either. The rest of
+// the module (13 tests against a fake backend) keeps running on the simulator.
+// Opt in with -PrunIosKeychainTests=true when running against a device or from an app host.
+val runIosKeychainTests = providers.gradleProperty("runIosKeychainTests").map(String::toBoolean).getOrElse(false)
+
+if (!runIosKeychainTests) {
+    tasks.withType<KotlinNativeSimulatorTest>().configureEach {
+        filter.excludeTestsMatching("id.walt.crypto2.signum.IosSignumKeyBackendTest")
     }
 }
 
