@@ -156,7 +156,7 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
         }.distinct()
         val credentialLines = selectedOptions.map(::credentialTitle).distinct()
         val message = buildString {
-            append("Requester: ${preview.request.verifierName ?: preview.verifiedOrigin}\n")
+            append("Requester: ${preview.request.verifierMetadata?.display?.name ?: preview.verifiedOrigin}\n")
             append("Protocol: ${preview.protocol}\n")
             append("Response encryption: ${if (preview.encryption.isRequired) "required" else "not requested"}\n")
             append("\nCredential${if (credentialLines.size == 1) "" else "s"}:\n${credentialLines.joinToString("\n")}\n")

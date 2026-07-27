@@ -229,7 +229,9 @@ class MobileWalletEncryptionTest {
         assertEquals(bootstrap.did, reopenedBootstrap.did, "Default DID store should survive wallet recreation")
         assertEquals(bootstrap.keyId, reopenedBootstrap.keyId, "Platform signing-key reference should survive wallet recreation")
         assertEquals(emptyList(), reopenedCredentials)
-        assertEquals(2, credentialStore.listCredentialsCalls)
+        // Each bootstrap refreshes the platform credential registry, in addition to the two
+        // explicit credentials() reads above.
+        assertEquals(4, credentialStore.listCredentialsCalls)
 
         wallet.deleteWallet()
         deleteDatabaseFiles(databaseFileName)
