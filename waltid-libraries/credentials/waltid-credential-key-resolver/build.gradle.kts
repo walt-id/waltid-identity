@@ -7,7 +7,7 @@ plugins {
 group = "id.walt.credentials"
 
 kotlin {
-    js(IR) {
+    js {
         outputModuleName.set("credential-key-resolver")
     }
 

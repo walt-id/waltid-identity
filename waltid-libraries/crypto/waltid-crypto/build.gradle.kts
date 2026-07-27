@@ -6,7 +6,7 @@ plugins {
 group = "id.walt.crypto"
 
 kotlin {
-    js(IR) {
+    js {
         outputModuleName = "crypto"
     }
 

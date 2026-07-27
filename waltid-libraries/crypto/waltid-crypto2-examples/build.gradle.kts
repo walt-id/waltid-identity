@@ -120,7 +120,7 @@ kotlin {
         }
     }
 
-    js(IR) {
+    js {
         outputModuleName = "waltid-crypto2-examples-node"
         useCommonJs()
         nodejs {

@@ -7,7 +7,7 @@ plugins {
 group = "id.walt.sdjwt"
 
 kotlin {
-    js(IR) {
+    js {
         compilerOptions {
             target.set("es2015")
         }

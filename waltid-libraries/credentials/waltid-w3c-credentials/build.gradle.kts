@@ -6,7 +6,7 @@ plugins {
 
 group = "id.walt.credentials"
 kotlin {
-    js(IR) {
+    js {
         outputModuleName.set("w3c-credentials")
     }
     if (enableIosBuild) {

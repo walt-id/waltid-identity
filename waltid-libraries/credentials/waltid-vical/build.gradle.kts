@@ -10,7 +10,7 @@ plugins {
 group = "id.walt.credentials"
 
 kotlin {
-    js(IR) {
+    js {
         outputModuleName = "vical"
     }
 

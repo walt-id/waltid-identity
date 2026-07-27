@@ -8,7 +8,7 @@ group = "id.walt.did"
 
 kotlin {
 
-    js(IR) {
+    js {
         outputModuleName = "dids"
     }
 
