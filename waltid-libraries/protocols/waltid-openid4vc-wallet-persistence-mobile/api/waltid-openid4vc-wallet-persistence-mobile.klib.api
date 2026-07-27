@@ -148,14 +148,14 @@ final class id.walt.wallet2.persistence.encryption/DatabaseEncryptionKey { // id
 }
 
 final class id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider : id.walt.wallet2.persistence.encryption/DatabaseEncryptionKeyProvider { // id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider|null[0]
-    constructor <init>() // id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider.<init>|<init>(){}[0]
+    constructor <init>(kotlin/String? = ...) // id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider.<init>|<init>(kotlin.String?){}[0]
 
     final suspend fun deleteKey(kotlin/String, kotlin/String) // id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider.deleteKey|deleteKey(kotlin.String;kotlin.String){}[0]
     final suspend fun getOrCreateKey(kotlin/String, kotlin/String): id.walt.wallet2.persistence.encryption/DatabaseEncryptionKey // id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider.getOrCreateKey|getOrCreateKey(kotlin.String;kotlin.String){}[0]
 }
 
 final class id.walt.wallet2.persistence.keys/IosPlatformKeyProvider : id.walt.wallet2.persistence.keys/PlatformKeyProvider { // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider|null[0]
-    constructor <init>(kotlin/Boolean = ...) // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.<init>|<init>(kotlin.Boolean){}[0]
+    constructor <init>(kotlin/Boolean = ..., kotlin/String? = ...) // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.<init>|<init>(kotlin.Boolean;kotlin.String?){}[0]
 
     final val supportedPlatformKeyTypes // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.supportedPlatformKeyTypes|{}supportedPlatformKeyTypes[0]
         final fun <get-supportedPlatformKeyTypes>(): kotlin.collections/Set<id.walt.crypto.keys/KeyType> // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.supportedPlatformKeyTypes.<get-supportedPlatformKeyTypes>|<get-supportedPlatformKeyTypes>(){}[0]
@@ -172,6 +172,7 @@ final class id.walt.wallet2.persistence.stores/DriverFactory { // id.walt.wallet
 
     final fun createEncryptedDriver(kotlin/String, id.walt.wallet2.persistence.encryption/DatabaseEncryptionKey, kotlin/Boolean = ..., kotlin/String = ...): app.cash.sqldelight.db/SqlDriver // id.walt.wallet2.persistence.stores/DriverFactory.createEncryptedDriver|createEncryptedDriver(kotlin.String;id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey;kotlin.Boolean;kotlin.String){}[0]
     final fun deleteDatabase(kotlin/String) // id.walt.wallet2.persistence.stores/DriverFactory.deleteDatabase|deleteDatabase(kotlin.String){}[0]
+    final fun useAppGroup(kotlin/String): id.walt.wallet2.persistence.stores/DriverFactory // id.walt.wallet2.persistence.stores/DriverFactory.useAppGroup|useAppGroup(kotlin.String){}[0]
 }
 
 final class id.walt.wallet2.persistence.stores/PlatformKeyStore : id.walt.wallet2.data/WalletKeyStore { // id.walt.wallet2.persistence.stores/PlatformKeyStore|null[0]
@@ -212,5 +213,9 @@ sealed class id.walt.wallet2.persistence.encryption/WalletPersistenceException :
 
     final class EncryptionConfigurationFailed : id.walt.wallet2.persistence.encryption/WalletPersistenceException { // id.walt.wallet2.persistence.encryption/WalletPersistenceException.EncryptionConfigurationFailed|null[0]
         constructor <init>(kotlin/String, kotlin/Throwable? = ...) // id.walt.wallet2.persistence.encryption/WalletPersistenceException.EncryptionConfigurationFailed.<init>|<init>(kotlin.String;kotlin.Throwable?){}[0]
+    }
+
+    final class LegacyKeyRequiresCredentialReissuance : id.walt.wallet2.persistence.encryption/WalletPersistenceException { // id.walt.wallet2.persistence.encryption/WalletPersistenceException.LegacyKeyRequiresCredentialReissuance|null[0]
+        constructor <init>(kotlin/String) // id.walt.wallet2.persistence.encryption/WalletPersistenceException.LegacyKeyRequiresCredentialReissuance.<init>|<init>(kotlin.String){}[0]
     }
 }
