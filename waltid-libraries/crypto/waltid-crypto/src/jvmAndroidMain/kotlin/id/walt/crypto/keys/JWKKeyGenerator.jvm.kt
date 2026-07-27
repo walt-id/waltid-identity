@@ -103,7 +103,10 @@ object JvmJWKKeyCreator : JWKKeyCreator() {
             val subjectPublicKeyObject = asn1PubKeySequence.getObjectAt(1)
             val subjectPublicKeyBitStr = ASN1BitString.getInstance(subjectPublicKeyObject)
             bcEC.decodePoint(subjectPublicKeyBitStr.bytes)
-        } catch (e: IllegalArgumentException) {
+        } catch (e: RuntimeException) {
+            // Not SPKI: a raw (compressed) point can still start with a byte sequence that BouncyCastle
+            // decodes as some other ASN.1 object, which surfaces as IllegalStateException instead of
+            // IllegalArgumentException. Any ASN.1 failure means the input is a plain curve point.
             //and this here is so that uniresolver tests in the did library don't break :)
             bcEC.decodePoint(rawEncodedPoint)
         }
