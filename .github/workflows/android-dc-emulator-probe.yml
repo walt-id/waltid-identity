@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   probe:
-    name: api-36-google-apis-playstore
+    name: api-37-google-apis-playstore-ps16k
     runs-on: ubuntu-24.04
     steps:
       - name: Enable KVM
@@ -21,11 +21,15 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Boot emulator and verify Play Services
-        uses: reactivecircus/android-emulator-runner@b530d96654c385303d652368551fb075bc2f0b6b # v2.35.0
+        uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
-          api-level: 36
+          api-level: 37
+          system-image-api-level: 37.0
           arch: x86_64
           profile: pixel_7
-          target: google_apis_playstore
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
-          script: 'version_code="$(adb shell dumpsys package com.google.android.gms | sed -n ''s/.*versionCode=\([0-9]*\).*/\1/p'' | head -n 1)"; version_name="$(adb shell dumpsys package com.google.android.gms | sed -n ''s/.*versionName=//p'' | head -n 1)"; printf ''Google Play services: versionName=%s versionCode=%s\n'' "${version_name:-missing}" "${version_code:-missing}"; test -n "$version_code" && test "$version_code" -ge 254900000 || { echo "::error::Digital Credentials requires Google Play services version 25.49 or newer"; exit 1; }'
+          target: google_apis_playstore_ps16k
+          ram-size: 4096M
+          emulator-boot-timeout: 600
+          emulator-options: >-
+            -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
+          script: 'adb shell dumpsys package com.google.android.gms | grep -E ''versionName|versionCode'''
