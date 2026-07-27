@@ -19,8 +19,17 @@ object EccUtils {
      * component sizes are unsupported.
      */
     fun convertDERtoIEEEP1363(derSignature: ByteArray): ByteArray {
-        if (!derSignature.isStrictDerEcdsaSignature()) {
-            if (derSignature.size in p1363Lengths) return derSignature
+        // Check if already in IEEE P1363 format (raw R||S)
+        // P1363 signatures have fixed lengths: 64 bytes (P-256/k1), 96 bytes (P-384), or 132 bytes (P-521)
+        // This check must come FIRST because P1363 signatures can start with any byte (including 0x30)
+        if (derSignature.size in p1363Lengths) {
+            // Signature is already in IEEE P1363 format
+            return derSignature
+        }
+
+        // A DER-encoded signature is an ASN.1 SEQUENCE.
+        // It must start with 0x30.
+        if (derSignature.isEmpty() || derSignature[0] != 0x30.toByte()) {
             throw IllegalArgumentException("Signature is not a valid DER sequence.")
         }
 
@@ -97,33 +106,6 @@ object EccUtils {
 
         // 5. Concatenate r and s to form the final IEEE P1363 signature.
         return fixedLengthR + fixedLengthS
-    }
-
-    /** Distinguishes a DER ECDSA sequence from a raw P1363 signature with the same byte length. */
-    private fun ByteArray.isStrictDerEcdsaSignature(): Boolean {
-        if (size < 8 || this[0] != 0x30.toByte()) return false
-        var index = 1
-        val sequenceLength = this[index++].toInt() and 0xFF
-        val contentLength = if (sequenceLength and 0x80 == 0) {
-            sequenceLength
-        } else {
-            val lengthBytes = sequenceLength and 0x7F
-            if (lengthBytes !in 1..2 || index + lengthBytes > size) return false
-            var value = 0
-            repeat(lengthBytes) { value = (value shl 8) or (this[index++].toInt() and 0xFF) }
-            if (value < 128) return false
-            value
-        }
-        if (index + contentLength != size) return false
-        repeat(2) {
-            if (index + 2 > size || this[index++] != 0x02.toByte()) return false
-            val integerLength = this[index++].toInt() and 0xFF
-            if (integerLength == 0 || integerLength and 0x80 != 0 || index + integerLength > size) return false
-            if (this[index].toInt() and 0x80 != 0) return false
-            if (integerLength > 1 && this[index] == 0.toByte() && this[index + 1].toInt() and 0x80 == 0) return false
-            index += integerLength
-        }
-        return index == size
     }
 
     fun convertDERtoIEEEP1363HandleExtra(derSignature: ByteArray): ByteArray {
