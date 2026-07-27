@@ -16,17 +16,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.time.Clock
 
-internal typealias CertificatePathValidator = (
-    leaf: id.walt.x509.CertificateDer,
-    chain: List<id.walt.x509.CertificateDer>,
-    trustAnchors: List<id.walt.x509.CertificateDer>,
-) -> Unit
-
 class X509ChainClientAttestationVerifierTest {
 
     @Test
     fun `authenticates client attestation backed by trusted x509 chain`() = runTest {
-        verifiesTrustedClientAttestation { _, _, _ -> }
+        verifiesTrustedClientAttestation(CertificatePathValidator { _, _, _ -> })
     }
 
     internal suspend fun verifiesTrustedClientAttestation(
@@ -62,7 +56,9 @@ class X509ChainClientAttestationVerifierTest {
 
     @Test
     fun `rejects client attestation backed by untrusted x509 chain`() = runTest {
-        rejectsUntrustedClientAttestation { _, _, _ -> error("Untrusted certificate chain") }
+        rejectsUntrustedClientAttestation(
+            CertificatePathValidator { _, _, _ -> error("Untrusted certificate chain") }
+        )
     }
 
     internal suspend fun rejectsUntrustedClientAttestation(
@@ -101,7 +97,10 @@ class X509ChainClientAttestationVerifierTest {
         attestationVerifier = if (certificatePathValidator == null) {
             X509ChainClientAttestationVerifier(trustedRootCertificatesPem)
         } else {
-            X509ChainClientAttestationVerifier(trustedRootCertificatesPem, certificatePathValidator)
+            X509ChainClientAttestationVerifier.withCertificatePathValidator(
+                trustedRootCertificatesPem,
+                certificatePathValidator,
+            )
         },
     )
 

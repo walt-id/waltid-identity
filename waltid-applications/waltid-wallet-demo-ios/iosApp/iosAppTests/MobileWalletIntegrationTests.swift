@@ -131,7 +131,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         }
     }
 
-    func testWalletAcceptsSystemRequestObjectTrustAnchors() async throws {
+    func testWalletConfigurationAcceptsSystemRequestObjectTrustAnchorOptIn() async throws {
         _ = try await Wallet(
             configuration: WalletConfiguration(
                 walletID: testWalletId,

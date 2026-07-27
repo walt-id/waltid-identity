@@ -9,8 +9,17 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
-class X509ChainClientAttestationVerifier(
+internal fun interface CertificatePathValidator {
+    fun validate(
+        leaf: CertificateDer,
+        chain: List<CertificateDer>,
+        trustAnchors: List<CertificateDer>,
+    )
+}
+
+class X509ChainClientAttestationVerifier private constructor(
     trustedRootCertificatesPem: List<String>,
+    private val certificatePathValidator: CertificatePathValidator,
 ) : ClientAttestationVerifier {
 
     private val trustedRootCertificates = trustedRootCertificatesPem.map { CertificateDer.fromPEMEncodedString(it) }
@@ -21,11 +30,9 @@ class X509ChainClientAttestationVerifier(
         }
     }
 
-    private var certificatePathValidator: (
-        leaf: CertificateDer,
-        chain: List<CertificateDer>,
-        trustAnchors: List<CertificateDer>,
-    ) -> Unit = { leaf, chain, trustAnchors ->
+    constructor(trustedRootCertificatesPem: List<String>) : this(
+        trustedRootCertificatesPem,
+        CertificatePathValidator { leaf, chain, trustAnchors ->
         validateCertificateChain(
             leaf = leaf,
             chain = chain,
@@ -34,17 +41,14 @@ class X509ChainClientAttestationVerifier(
             enableSystemTrustAnchors = false,
             enableRevocation = false,
         )
-    }
+        },
+    )
 
-    internal constructor(
-        trustedRootCertificatesPem: List<String>,
-        certificatePathValidator: (
-            leaf: CertificateDer,
-            chain: List<CertificateDer>,
-            trustAnchors: List<CertificateDer>,
-        ) -> Unit,
-    ) : this(trustedRootCertificatesPem) {
-        this.certificatePathValidator = certificatePathValidator
+    internal companion object {
+        fun withCertificatePathValidator(
+            trustedRootCertificatesPem: List<String>,
+            certificatePathValidator: CertificatePathValidator,
+        ) = X509ChainClientAttestationVerifier(trustedRootCertificatesPem, certificatePathValidator)
     }
 
     @Suppress("UNUSED_PARAMETER")
@@ -60,7 +64,7 @@ class X509ChainClientAttestationVerifier(
             ?: return ClientAttestationVerificationResult.Rejected("Client attestation x5c header is empty")
 
         val chainIsTrusted = runCatching {
-            certificatePathValidator(
+            certificatePathValidator.validate(
                 leafCertificate,
                 certificateChain.drop(1),
                 trustedRootCertificates,

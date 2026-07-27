@@ -7,6 +7,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletKeyInfo
+import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletEventPhase
 import id.walt.wallet2.mobile.MobileWalletEventStatus
@@ -602,6 +603,28 @@ class WalletSdkBridgeTest {
         assertEquals(MobileWalletPersistence(), config.persistence)
         assertEquals(emptyList(), config.preferredLocales)
         assertEquals(emptyList(), config.transactionDataProfiles)
+        assertNull(config.requestObjectX509Trust)
+    }
+
+    @Test
+    fun factoryMapsRequestObjectTrustConfiguration() {
+        val systemTrustConfig = WalletBridgeConfiguration(
+            requestObjectEnableSystemTrustAnchors = true,
+        ).toMobileWalletConfig()
+        val systemTrust = assertIs<WalletX509TrustConfig>(
+            systemTrustConfig.requestObjectX509Trust
+        )
+        assertEquals(emptyList(), systemTrust.trustAnchorPemCertificates)
+        assertEquals(true, systemTrust.enableSystemTrustAnchors)
+
+        val explicitAnchorConfig = WalletBridgeConfiguration(
+            requestObjectTrustAnchorPemCertificates = listOf("anchor"),
+        ).toMobileWalletConfig()
+        val explicitAnchorTrust = assertIs<WalletX509TrustConfig>(
+            explicitAnchorConfig.requestObjectX509Trust
+        )
+        assertEquals(listOf("anchor"), explicitAnchorTrust.trustAnchorPemCertificates)
+        assertEquals(false, explicitAnchorTrust.enableSystemTrustAnchors)
     }
 
     @Test
