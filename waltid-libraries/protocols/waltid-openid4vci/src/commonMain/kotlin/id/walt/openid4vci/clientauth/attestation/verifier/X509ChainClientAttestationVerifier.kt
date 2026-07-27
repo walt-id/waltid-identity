@@ -21,6 +21,32 @@ class X509ChainClientAttestationVerifier(
         }
     }
 
+    private var certificatePathValidator: (
+        leaf: CertificateDer,
+        chain: List<CertificateDer>,
+        trustAnchors: List<CertificateDer>,
+    ) -> Unit = { leaf, chain, trustAnchors ->
+        validateCertificateChain(
+            leaf = leaf,
+            chain = chain,
+            trustAnchors = trustAnchors,
+            enableTrustedChainRoot = false,
+            enableSystemTrustAnchors = false,
+            enableRevocation = false,
+        )
+    }
+
+    internal constructor(
+        trustedRootCertificatesPem: List<String>,
+        certificatePathValidator: (
+            leaf: CertificateDer,
+            chain: List<CertificateDer>,
+            trustAnchors: List<CertificateDer>,
+        ) -> Unit,
+    ) : this(trustedRootCertificatesPem) {
+        this.certificatePathValidator = certificatePathValidator
+    }
+
     @Suppress("UNUSED_PARAMETER")
     override suspend fun verifyAttestationJwt(
         jwt: String,
@@ -34,13 +60,10 @@ class X509ChainClientAttestationVerifier(
             ?: return ClientAttestationVerificationResult.Rejected("Client attestation x5c header is empty")
 
         val chainIsTrusted = runCatching {
-            validateCertificateChain(
-                leaf = leafCertificate,
-                chain = certificateChain.drop(1),
-                trustAnchors = trustedRootCertificates,
-                enableTrustedChainRoot = false,
-                enableSystemTrustAnchors = false,
-                enableRevocation = false,
+            certificatePathValidator(
+                leafCertificate,
+                certificateChain.drop(1),
+                trustedRootCertificates,
             )
         }.isSuccess
         if (!chainIsTrusted) {

@@ -65,13 +65,6 @@ kotlin {
     }
 }
 
-if (enableAndroidBuild) {
-    val jvmAndroidTest = kotlin.sourceSets.named("jvmAndroidTest")
-    kotlin.sourceSets.named("androidHostTest") {
-        dependsOn(jvmAndroidTest.get())
-    }
-}
-
 mavenPublishing {
     pom {
         name.set("walt.id OpenID4VCI library")

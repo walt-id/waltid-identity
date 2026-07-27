@@ -17,20 +17,31 @@ import kotlin.test.assertIs
 import kotlin.time.Clock
 
 /** Exercises explicit-chain client attestation on JVM and Android host. */
+internal typealias CertificatePathValidator = (
+    leaf: id.walt.x509.CertificateDer,
+    chain: List<id.walt.x509.CertificateDer>,
+    trustAnchors: List<id.walt.x509.CertificateDer>,
+) -> Unit
+
 class X509ChainClientAttestationVerifierTest {
 
     @Test
     fun `authenticates client attestation backed by trusted x509 chain`() = runTest {
+        verifiesTrustedClientAttestation { _, _, _ -> }
+    }
+
+    internal suspend fun verifiesTrustedClientAttestation(
+        certificatePathValidator: CertificatePathValidator? = null,
+    ) {
         val clientId = "wallet-client"
         val issuer = "https://issuer.example/openid4vci"
         val material = createClientAttestationMaterial(
             clientId = clientId,
             audience = issuer,
         )
-        val method = AttestationBasedClientAuthenticationMethod(
-            attestationVerifier = X509ChainClientAttestationVerifier(
-                trustedRootCertificatesPem = listOf(TRUSTED_ROOT_CERTIFICATE_PEM),
-            ),
+        val method = authenticationMethod(
+            trustedRootCertificatesPem = listOf(TRUSTED_ROOT_CERTIFICATE_PEM),
+            certificatePathValidator = certificatePathValidator,
         )
 
         val result = method.authenticate(
@@ -52,16 +63,21 @@ class X509ChainClientAttestationVerifierTest {
 
     @Test
     fun `rejects client attestation backed by untrusted x509 chain`() = runTest {
+        rejectsUntrustedClientAttestation { _, _, _ -> error("Untrusted certificate chain") }
+    }
+
+    internal suspend fun rejectsUntrustedClientAttestation(
+        certificatePathValidator: CertificatePathValidator? = null,
+    ) {
         val clientId = "wallet-client"
         val issuer = "https://issuer.example/openid4vci"
         val material = createClientAttestationMaterial(
             clientId = clientId,
             audience = issuer,
         )
-        val method = AttestationBasedClientAuthenticationMethod(
-            attestationVerifier = X509ChainClientAttestationVerifier(
-                trustedRootCertificatesPem = listOf(UNTRUSTED_ROOT_CERTIFICATE_PEM),
-            ),
+        val method = authenticationMethod(
+            trustedRootCertificatesPem = listOf(UNTRUSTED_ROOT_CERTIFICATE_PEM),
+            certificatePathValidator = certificatePathValidator,
         )
 
         val result = method.authenticate(
@@ -78,6 +94,17 @@ class X509ChainClientAttestationVerifierTest {
         assertEquals("invalid_client", failure.error.error)
         assertEquals("Client attestation x5c chain is not trusted", failure.error.description)
     }
+
+    private fun authenticationMethod(
+        trustedRootCertificatesPem: List<String>,
+        certificatePathValidator: CertificatePathValidator?,
+    ) = AttestationBasedClientAuthenticationMethod(
+        attestationVerifier = if (certificatePathValidator == null) {
+            X509ChainClientAttestationVerifier(trustedRootCertificatesPem)
+        } else {
+            X509ChainClientAttestationVerifier(trustedRootCertificatesPem, certificatePathValidator)
+        },
+    )
 
     private suspend fun createClientAttestationMaterial(
         clientId: String,
