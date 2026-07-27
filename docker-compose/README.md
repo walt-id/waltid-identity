@@ -77,6 +77,7 @@ Update the `VERSION_TAG` variable to version `1.0.0-SNAPSHOT`
 API Services Docker Images are build with the ktor gradle plugin. This
 requires Java SDK 21 installed. You build the images by
 executing the commands:
+
 ```shell
 $ cd waltid-identity/
 $
@@ -133,25 +134,27 @@ will start automatically:
 `COMPOSE_PROFILES` environment variable located in the .env file allows the selection of
 profiles to start the services for. The services are available with the following profiles:
 
-- **identity** - for all waltid-identity services (includes both `services` and `apps` profiles)
+- **identity** - for all waltid-identity services (includes both `services` and `apps` profiles) for the new v1 protocol 
+- **identity-old** - for the original waltid-identity services (utilising the draft protocols
 - **services** - for API services (wallet-api, issuer-api, issuer-api2, verifier-api, verifier-api2, vc-repo)
 - **apps** - for web applications (waltid-demo-wallet, waltid-dev-wallet, web-portal, web-portal2)
 - **valkey** - for the Valkey/Redis service (required when using valkey for session storage in wallet-api)
 - **tse** - for the Hashicorp vault service, will be initialized with:
-    - a transit secrets engine
-    - and authentication methods
-        - approle - for my-role, where role-id and secret-id will be output in the console<sup>1</sup>
-        - userpass - for myuser with mypassword
-        - access-token - with dev-only-token
+  - a transit secrets engine
+  - and authentication methods
+    - approle - for my-role, where role-id and secret-id will be output in the console1
+    - userpass - for myuser with mypassword
+    - access-token - with dev-only-token
 - **opa** - for the Open Policy Agent service
 - **all** - starts all services (equivalent to combining all profiles)
 
 Profiles can be combined, e.g.:
+
 - `COMPOSE_PROFILES=identity,tse` - will start the waltid-identity services and the vault
 - `COMPOSE_PROFILES=identity,valkey` - will start the waltid-identity services with valkey for session storage
 - `COMPOSE_PROFILES=all` - will start all services including vault, valkey, and opa
 
-<sup>1</sup> - example output:
+1 - example output:
 
 ```console
 vault-init            | Role ID: 66f3f095-74c9-b270-9d1f-1f842aa6bf3f
@@ -174,77 +177,53 @@ $ docker-compose down -v
 
 ### Services
 
+Old Services
+
 - Wallet API: [http://localhost:7001](http://localhost:7001)
 - Issuer API: [http://localhost:7002](http://localhost:7002)
-- Issuer API2: [http://localhost:7005](http://localhost:7005)
 - Verifier API: [http://localhost:7003](http://localhost:7003)
+
+New Services
+
+- Issuer API2: [http://localhost:7005](http://localhost:7005)
 - Verifier API2: [http://localhost:7004](http://localhost:7004)
+- Wallet API2: [http://localhost:7006](http://localhost:7005)
+
+Dependencies
+
 - Valkey (Redis-compatible): `localhost:6379` (requires `--profile valkey` or `--profile all`)
 - Hashicorp vault: [http://localhost:8200](http://localhost:8200)
 - Open Policy Agent: [http://localhost:8181](http://localhost:8181)
 
 ### Apps
 
+Old Apps
+
 - Demo Web Wallet: [http://localhost:7101](http://localhost:7101)
 - Dev Web Wallet: [http://localhost:7104](http://localhost:7104)
 - Web Portal: [http://localhost:7102](http://localhost:7102)
-- Web Portal2: [http://localhost:7105](http://localhost:7105)
 - Credential Repo: [http://localhost:7103](http://localhost:7103)
+
+New Apps
+
+- Web Portal2: [http://localhost:7105](http://localhost:7105)
 
 ## Configurations
 
 - wallet API:
-    - `wallet-api/config` - wallet configuration
+  - `wallet-api/config` - wallet configuration
 - issuer API:
-    - `issuer-api/config`
+  - `issuer-api/config`
 - verifier API:
-    - `verifier-api/config`
+  - `verifier-api/config`
 - verifier API2:
   - `verifier-api2/config`
 - ingress:
-    - `Caddyfile`
+  - `Caddyfile`
 
-[//]: # (## Environment)
-
-[//]: # ()
-
-[//]: # (- main:)
-
-[//]: # (    - `.env` - stores the common environment variables, such as port numbers,)
-
-[//]: # (      version-tag, database-engine selection, etc.)
-
-[//]: # (- postgres:)
-
-[//]: # (    - `postgres/postgres.env` - stores postgres specific variables, e.g. admin user, etc.)
-
-[//]: # (    - `pgadmin.env` - stores pgAdmin specific variables, e.g. admin user, etc.)
-
-[//]: # (- microsoft sql-server:)
-
-[//]: # (    - `mssql/mssql.env` - stores mssql specific variables, e.g. sql-server edition, etc.)
-
-[//]: # ()
-
-[//]: # (Variables from `.env` are propagated automatically down to reverse proxy configurations)
-
-[//]: # (&#40;Caddyfile&#41; and also api configurations &#40;wallet, issuer, verifier&#41;.)
+[//](#): # ((Caddyfile) and also api configurations (wallet, issuer, verifier).)
 
 ## How to
-
-[//]: # (### Select a database engine)
-
-[//]: # ()
-
-[//]: # (- browse `.env` file)
-
-[//]: # (- set `DATABASE_ENGINE` to one of:)
-
-[//]: # (    - sqlite)
-
-[//]: # (    - postgres)
-
-[//]: # (    - mssql)
 
 This value will be used also by compose profile so only the required services are started.
 
@@ -266,7 +245,7 @@ This value is used for public frontend configuration such as web-portal2 issuer2
 
 - browse `.env` file
 - update `VERSION_TAG` to a specific image version (e.g. a release version)
-    - if not set, `latest` tag is used
+  - if not set, `latest` tag is used
 
 ## Troubleshooting
 
@@ -276,17 +255,17 @@ Make sure the ports are also updated in:
 
 - Caddyfile
 - issuer-api/config
-    - issuer-service.conf
-    - web.conf
+  - issuer-service.conf
+  - web.conf
 - verifier-api/config
-    - verifier-service.conf
-    - web.conf
+  - verifier-service.conf
+  - web.conf
 - verifier-api2/config
   - verifier-service.conf
   - web.conf
 - wallet-api/config
-    - web.conf
-    - db.conf
+  - web.conf
+  - db.conf
 
 #### Removing the DB volume
 
@@ -300,3 +279,4 @@ docker volume rm docker-compose_wallet-api-db
 pg_dump -U your_user_name -h your_host -d your_db_name > backup.sql
 psql -U your_user_name -h your_host -d your_db_name < backup.sql
 ```
+
