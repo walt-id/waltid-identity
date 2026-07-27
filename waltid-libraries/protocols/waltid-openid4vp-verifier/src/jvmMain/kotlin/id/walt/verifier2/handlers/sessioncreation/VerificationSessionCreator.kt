@@ -465,6 +465,12 @@ object VerificationSessionCreator {
             requestSigningKey.signJws(Json.encodeToString(payloadWithAud).encodeToByteArray(), headers)
         } else null
 
+        if (isSignedRequest) {
+            requireNotNull(signedAuthorizationRequest) {
+                "Signed authorization request could not be created although signedRequest=true"
+            }
+        }
+
         val effectiveVpPolicies = (setup.core.policies.vp_policies ?: defaultVpPolicies())
             .withMandatoryTransactionDataPolicies(transactionDataFormats)
         val effectivePolicies = Verification2Session.DefinedVerificationPolicies(
