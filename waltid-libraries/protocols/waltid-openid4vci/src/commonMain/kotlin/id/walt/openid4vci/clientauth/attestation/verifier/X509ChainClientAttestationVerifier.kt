@@ -33,14 +33,14 @@ class X509ChainClientAttestationVerifier private constructor(
     constructor(trustedRootCertificatesPem: List<String>) : this(
         trustedRootCertificatesPem,
         CertificatePathValidator { leaf, chain, trustAnchors ->
-        validateCertificateChain(
-            leaf = leaf,
-            chain = chain,
-            trustAnchors = trustAnchors,
-            enableTrustedChainRoot = false,
-            enableSystemTrustAnchors = false,
-            enableRevocation = false,
-        )
+            validateCertificateChain(
+                leaf = leaf,
+                chain = chain,
+                trustAnchors = trustAnchors,
+                enableTrustedChainRoot = false,
+                enableSystemTrustAnchors = false,
+                enableRevocation = false,
+            )
         },
     )
 
@@ -48,7 +48,8 @@ class X509ChainClientAttestationVerifier private constructor(
         fun withCertificatePathValidator(
             trustedRootCertificatesPem: List<String>,
             certificatePathValidator: CertificatePathValidator,
-        ) = X509ChainClientAttestationVerifier(trustedRootCertificatesPem, certificatePathValidator)
+        ): X509ChainClientAttestationVerifier =
+            X509ChainClientAttestationVerifier(trustedRootCertificatesPem, certificatePathValidator)
     }
 
     @Suppress("UNUSED_PARAMETER")
