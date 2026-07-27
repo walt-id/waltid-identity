@@ -18,10 +18,8 @@ jobs:
       matrix:
         include:
           - api_level: '35'
-            target: google_apis_playstore
+            target: google_apis
           - api_level: '36'
-            target: google_apis_playstore
-          - api_level: '37.0'
             target: google_apis
     steps:
       - name: Boot emulator and verify Play Services
@@ -31,15 +29,16 @@ jobs:
           arch: x86_64
           target: ${{ matrix.target }}
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          emulator-boot-timeout: 300
           disable-animations: true
           script: |
-            set -euo pipefail
+            set -eu
 
             version_code="$(adb shell dumpsys package com.google.android.gms | sed -n 's/.*versionCode=\([0-9]*\).*/\1/p' | head -n 1)"
             version_name="$(adb shell dumpsys package com.google.android.gms | sed -n 's/.*versionName=//p' | head -n 1)"
             printf 'Google Play services: versionName=%s versionCode=%s\n' "${version_name:-missing}" "${version_code:-missing}"
 
-            if [[ -z "$version_code" || "$version_code" -lt 243100000 ]]; then
+            if [ -z "$version_code" ] || [ "$version_code" -lt 243100000 ]; then
               echo "::error::Digital Credentials requires Google Play services version 243100000 or newer"
               exit 1
             fi
