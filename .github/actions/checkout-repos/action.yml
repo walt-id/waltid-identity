@@ -20,6 +20,14 @@ inputs:
 runs:
   using: "composite"
   steps:
+    # waltid-identity tracks generated SwiftPM linkage files with paths beyond 260 characters
+    # (waltid-wallet-demo-compose/iosApp/KotlinMultiplatformLinkedPackage/...), which Windows Git
+    # refuses to create unless long paths are enabled.
+    - name: Enable Git long paths on Windows
+      if: runner.os == 'Windows'
+      shell: bash
+      run: git config --global core.longpaths true
+
     - name: Determine ref for waltid-unified-build
       id: ref_unified
       shell: bash

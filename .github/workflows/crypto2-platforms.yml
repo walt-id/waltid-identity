@@ -85,6 +85,13 @@ jobs:
   windows:
     runs-on: windows-2025
     steps:
+      # waltid-identity tracks generated SwiftPM linkage files whose paths exceed 260 characters
+      # (waltid-wallet-demo-compose/iosApp/KotlinMultiplatformLinkedPackage/...). Windows Git cannot
+      # check those out otherwise. Configured here because the checkout action below is pinned.
+      - name: Enable Git long paths
+        shell: bash
+        run: git config --global core.longpaths true
+
       - name: Checkout all repositories
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
         with:
