@@ -18,6 +18,7 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.sendDeepLink
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForStatus
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -81,7 +82,15 @@ class DigitalCredentialSharingE2ETest {
         )
 
         val candidate = device.wait(Until.findObject(By.text("org.iso.18013.5.1.mDL")), UI_ELEMENT_TIMEOUT)
-        if (candidate == null) captureFailureDiagnostics(instrumentation, device, "candidate-not-found")
+        if (candidate == null) {
+            captureFailureDiagnostics(instrumentation, device, "candidate-not-found")
+            val verifierFailure = withTimeoutOrNull(1_000) {
+                DigitalCredentialTestVerifier.await().exceptionOrNull()
+            }
+            if (verifierFailure != null) {
+                throw AssertionError("Credential Manager failed before surfacing the mDL candidate", verifierFailure)
+            }
+        }
         assertNotNull("Credential Manager did not surface the mDL candidate", candidate)
         val continueButton = device.wait(Until.findObject(By.text("Agree and continue")), UI_ELEMENT_TIMEOUT)
             ?: device.wait(Until.findObject(By.text("Continue")), UI_ELEMENT_TIMEOUT)
