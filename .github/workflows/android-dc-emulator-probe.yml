@@ -24,7 +24,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
           api-level: 36
-          system-image-api-level: 37.0
+          system-image-api-level: "37.0"
           arch: x86_64
           profile: pixel_7
           target: google_apis_playstore_ps16k
