@@ -22,7 +22,7 @@ case "$phase" in
     script="ANDROID_TEST_CLASS=id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest ./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
     emulator_options="-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
     report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**/*.xml"
-    artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**'
+    artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/connected_android_test_additional_output/**'
     emulator_target="google_apis"
     ;;
   enterprise-mobile)

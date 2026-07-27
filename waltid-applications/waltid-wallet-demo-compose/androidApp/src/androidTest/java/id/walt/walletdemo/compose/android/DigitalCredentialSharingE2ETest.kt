@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.android
 
 import android.content.Intent
+import android.util.Log
 import androidx.credentials.DigitalCredential
 import androidx.credentials.ExperimentalDigitalCredentialApi
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -26,6 +27,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 
 /**
  * OS-mediated Digital Credentials sharing E2E.
@@ -78,16 +80,17 @@ class DigitalCredentialSharingE2ETest {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
 
-        assertNotNull(
-            "Credential Manager did not surface the mDL candidate",
-            device.wait(Until.findObject(By.text("org.iso.18013.5.1.mDL")), UI_ELEMENT_TIMEOUT),
-        )
+        val candidate = device.wait(Until.findObject(By.text("org.iso.18013.5.1.mDL")), UI_ELEMENT_TIMEOUT)
+        if (candidate == null) captureFailureDiagnostics(instrumentation, device, "candidate-not-found")
+        assertNotNull("Credential Manager did not surface the mDL candidate", candidate)
         val continueButton = device.wait(Until.findObject(By.text("Agree and continue")), UI_ELEMENT_TIMEOUT)
             ?: device.wait(Until.findObject(By.text("Continue")), UI_ELEMENT_TIMEOUT)
+        if (continueButton == null) captureFailureDiagnostics(instrumentation, device, "selector-consent-not-found")
         assertNotNull("Credential Manager did not offer consent", continueButton)
         continueButton!!.click()
 
         val shareButton = device.wait(Until.findObject(By.text("SHARE")), UI_ELEMENT_TIMEOUT)
+        if (shareButton == null) captureFailureDiagnostics(instrumentation, device, "provider-consent-not-found")
         assertNotNull("Wallet provider consent did not open", shareButton)
         shareButton!!.click()
 
@@ -103,4 +106,25 @@ class DigitalCredentialSharingE2ETest {
 
     private fun hasGooglePlayServices(context: android.content.Context): Boolean =
         runCatching { context.packageManager.getPackageInfo("com.google.android.gms", 0) }.isSuccess
+
+    private fun captureFailureDiagnostics(
+        instrumentation: android.app.Instrumentation,
+        device: UiDevice,
+        label: String,
+    ) {
+        val outputDirectory = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")
+            ?.let(::File)
+            ?: instrumentation.targetContext.getExternalFilesDir("dc-api-e2e")
+            ?: return
+        if (!outputDirectory.exists() && !outputDirectory.mkdirs()) return
+
+        runCatching { device.dumpWindowHierarchy(File(outputDirectory, "$label.xml")) }
+            .onFailure { Log.w(TAG, "Could not capture DC API UI hierarchy", it) }
+        runCatching { device.takeScreenshot(File(outputDirectory, "$label.png")) }
+            .onFailure { Log.w(TAG, "Could not capture DC API screenshot", it) }
+    }
+
+    private companion object {
+        const val TAG = "DigitalCredentialE2E"
+    }
 }
