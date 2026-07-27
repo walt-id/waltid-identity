@@ -14,7 +14,13 @@ public final class id/walt/crypto2/CryptoRuntime {
 	public static synthetic fun generateSoftwareKey$default (Lid/walt/crypto2/CryptoRuntime;Lid/walt/crypto2/providers/GenerateSoftwareKeyRequest;Lid/walt/crypto2/providers/ProviderSelection;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun resolveSoftwareProvider (Lid/walt/crypto2/providers/CryptoRequirement;Lid/walt/crypto2/providers/ProviderSelection;)Lid/walt/crypto2/providers/SoftwareKeyProvider;
 	public static synthetic fun resolveSoftwareProvider$default (Lid/walt/crypto2/CryptoRuntime;Lid/walt/crypto2/providers/CryptoRequirement;Lid/walt/crypto2/providers/ProviderSelection;ILjava/lang/Object;)Lid/walt/crypto2/providers/SoftwareKeyProvider;
+	public final fun restore (Lid/walt/crypto2/keys/ManagedKey;Lid/walt/crypto2/providers/ProviderSelection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun restore (Lid/walt/crypto2/keys/SoftwareKey;Lid/walt/crypto2/providers/ProviderSelection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun restore (Lid/walt/crypto2/keys/StorableKey;Lid/walt/crypto2/providers/ProviderSelection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun restore (Lid/walt/crypto2/keys/StoredKey;Lid/walt/crypto2/providers/ProviderSelection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun restore$default (Lid/walt/crypto2/CryptoRuntime;Lid/walt/crypto2/keys/ManagedKey;Lid/walt/crypto2/providers/ProviderSelection;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun restore$default (Lid/walt/crypto2/CryptoRuntime;Lid/walt/crypto2/keys/SoftwareKey;Lid/walt/crypto2/providers/ProviderSelection;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun restore$default (Lid/walt/crypto2/CryptoRuntime;Lid/walt/crypto2/keys/StorableKey;Lid/walt/crypto2/providers/ProviderSelection;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public static synthetic fun restore$default (Lid/walt/crypto2/CryptoRuntime;Lid/walt/crypto2/keys/StoredKey;Lid/walt/crypto2/providers/ProviderSelection;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
@@ -1108,10 +1114,15 @@ public final class id/walt/crypto2/keys/JwkStoredKeyKt {
 }
 
 public abstract interface class id/walt/crypto2/keys/Key {
+	public static final field Companion Lid/walt/crypto2/keys/Key$Companion;
 	public fun getCapabilities ()Lid/walt/crypto2/keys/KeyCapabilities;
 	public abstract fun getId-1AhpoWA ()Ljava/lang/String;
 	public abstract fun getSpec ()Lid/walt/crypto2/keys/KeySpec;
 	public abstract fun getUsages ()Ljava/util/Set;
+}
+
+public final class id/walt/crypto2/keys/Key$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public final class id/walt/crypto2/keys/Key$DefaultImpls {
@@ -1240,6 +1251,15 @@ public final synthetic class id/walt/crypto2/keys/KeyId$$serializer : kotlinx/se
 
 public final class id/walt/crypto2/keys/KeyId$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/KeySerializer : kotlinx/serialization/KSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/keys/KeySerializer;
+	public fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/keys/Key;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/keys/Key;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
 }
 
 public abstract interface class id/walt/crypto2/keys/KeySpec {
@@ -1458,6 +1478,7 @@ public final class id/walt/crypto2/keys/KeyWrappingKey$DefaultImpls {
 }
 
 public abstract interface class id/walt/crypto2/keys/ManagedKey : id/walt/crypto2/keys/StorableKey {
+	public static final field Companion Lid/walt/crypto2/keys/ManagedKey$Companion;
 	public fun getId-1AhpoWA ()Ljava/lang/String;
 	public fun getSpec ()Lid/walt/crypto2/keys/KeySpec;
 	public abstract fun getStoredKey ()Lid/walt/crypto2/keys/StoredKey$Managed;
@@ -1465,11 +1486,24 @@ public abstract interface class id/walt/crypto2/keys/ManagedKey : id/walt/crypto
 	public fun getUsages ()Ljava/util/Set;
 }
 
+public final class id/walt/crypto2/keys/ManagedKey$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class id/walt/crypto2/keys/ManagedKey$DefaultImpls {
 	public static fun getCapabilities (Lid/walt/crypto2/keys/ManagedKey;)Lid/walt/crypto2/keys/KeyCapabilities;
 	public static fun getId-1AhpoWA (Lid/walt/crypto2/keys/ManagedKey;)Ljava/lang/String;
 	public static fun getSpec (Lid/walt/crypto2/keys/ManagedKey;)Lid/walt/crypto2/keys/KeySpec;
 	public static fun getUsages (Lid/walt/crypto2/keys/ManagedKey;)Ljava/util/Set;
+}
+
+public final class id/walt/crypto2/keys/ManagedKeySerializer : kotlinx/serialization/KSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/keys/ManagedKeySerializer;
+	public fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/keys/ManagedKey;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/keys/ManagedKey;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
 }
 
 public final class id/walt/crypto2/keys/MontgomeryCurve {
@@ -1625,11 +1659,16 @@ public final class id/walt/crypto2/keys/SoftwareEncryptionKey$DefaultImpls {
 }
 
 public abstract interface class id/walt/crypto2/keys/SoftwareKey : id/walt/crypto2/keys/StorableKey {
+	public static final field Companion Lid/walt/crypto2/keys/SoftwareKey$Companion;
 	public fun getId-1AhpoWA ()Ljava/lang/String;
 	public fun getSpec ()Lid/walt/crypto2/keys/KeySpec;
 	public abstract fun getStoredKey ()Lid/walt/crypto2/keys/StoredKey$Software;
 	public synthetic fun getStoredKey ()Lid/walt/crypto2/keys/StoredKey;
 	public fun getUsages ()Ljava/util/Set;
+}
+
+public final class id/walt/crypto2/keys/SoftwareKey$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public final class id/walt/crypto2/keys/SoftwareKey$DefaultImpls {
@@ -1649,6 +1688,15 @@ public final class id/walt/crypto2/keys/SoftwareKeyAgreementKey$DefaultImpls {
 	public static fun getId-1AhpoWA (Lid/walt/crypto2/keys/SoftwareKeyAgreementKey;)Ljava/lang/String;
 	public static fun getSpec (Lid/walt/crypto2/keys/SoftwareKeyAgreementKey;)Lid/walt/crypto2/keys/KeySpec;
 	public static fun getUsages (Lid/walt/crypto2/keys/SoftwareKeyAgreementKey;)Ljava/util/Set;
+}
+
+public final class id/walt/crypto2/keys/SoftwareKeySerializer : kotlinx/serialization/KSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/keys/SoftwareKeySerializer;
+	public fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/keys/SoftwareKey;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/keys/SoftwareKey;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
 }
 
 public abstract interface class id/walt/crypto2/keys/SoftwareSigningAndVerificationKey : id/walt/crypto2/keys/SoftwareSigningKey, id/walt/crypto2/keys/SoftwareVerificationKey {

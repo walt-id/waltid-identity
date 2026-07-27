@@ -89,6 +89,29 @@ class CryptographySoftwareKeyProviderTest {
     }
 
     @Test
+    fun `advertised RSA PSS salt lengths can actually sign`() = runTest {
+        val key = generate(KeySpec.Rsa(2048), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
+        val message = "pss-salt".encodeToByteArray()
+        // Digest-sized (JOSE PS384), explicit default, and a shorter custom salt. Whatever the key
+        // reports as supported has to work: Apple rejects every explicit salt size, so advertising it
+        // would break signing at runtime instead of at capability check time.
+        val algorithms = listOf(
+            SignatureAlgorithm.RsaPss(DigestAlgorithm.SHA_384, saltLengthBytes = null),
+            SignatureAlgorithm.RsaPss(DigestAlgorithm.SHA_384, saltLengthBytes = DigestAlgorithm.SHA_384.sizeBytes),
+            SignatureAlgorithm.RsaPss(DigestAlgorithm.SHA_384, saltLengthBytes = 20),
+        )
+
+        algorithms.forEach { algorithm ->
+            if (!key.capabilities.supportsSignatureAlgorithm(algorithm)) return@forEach
+            val signature = key.capabilities.signer!!.sign(message, algorithm)
+            assertTrue(
+                key.capabilities.verifier!!.verify(message, signature, algorithm),
+                "PSS signature with salt ${algorithm.saltLengthBytes} did not verify",
+            )
+        }
+    }
+
+    @Test
     fun `one P-256 key signs and performs ECDH`() = runTest {
         val first = generate(
             KeySpec.Ec(EcCurve.P256),

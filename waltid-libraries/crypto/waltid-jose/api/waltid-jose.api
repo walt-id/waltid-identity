@@ -138,6 +138,11 @@ public final class id/walt/crypto2/jose/JwsAlgorithmKt {
 	public static final fun supportsJwsAlgorithm (Lid/walt/crypto2/keys/KeySpec;Lid/walt/crypto2/jose/JwsAlgorithm;)Z
 }
 
+public final class id/walt/crypto2/jose/PublicJwkExportKt {
+	public static final fun exportPublicJwk (Lid/walt/crypto2/keys/Key;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static final fun exportPublicJwkObject (Lid/walt/crypto2/keys/Key;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public final class id/walt/crypto2/jose/UnverifiedJws {
 	public fun <init> (Lkotlinx/serialization/json/JsonObject;[BLid/walt/crypto2/jose/JwsAlgorithm;)V
 	public final fun component1 ()Lkotlinx/serialization/json/JsonObject;

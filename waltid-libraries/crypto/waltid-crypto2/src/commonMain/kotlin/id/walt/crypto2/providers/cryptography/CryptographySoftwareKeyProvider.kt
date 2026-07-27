@@ -321,7 +321,10 @@ class CryptographySoftwareKeyProvider(
                 algorithm.digest in knownCryptographyDigests &&
                 algorithm.digest in profile.digests &&
                 algorithm.mgfDigest == algorithm.digest &&
-                algorithm.saltLengthBytes?.let { it <= maxPssSaltLength(spec.bits, algorithm.digest) } != false &&
+                algorithm.saltLengthBytes?.let {
+                    it <= maxPssSaltLength(spec.bits, algorithm.digest) &&
+                        (platformSupportsCustomPssSaltLengths || it == algorithm.digest.sizeBytes)
+                } != false &&
                 provider.getOrNull(RSA.PSS) != null
         is SignatureAlgorithm.Custom -> false
     }
@@ -781,7 +784,10 @@ private suspend fun decodeRsaPss(
         privateKey?.getPublicKey()
             ?: rsa.publicKeyDecoder(digest).decodeFromByteArray(RSA.PublicKey.Format.JWK, bytes),
         privateKey,
-        algorithm.saltLengthBytes,
+        // A digest-sized salt is the PSS default (and the only length JOSE PS256/384/512 allows), so it
+        // uses the provider default. Requesting it explicitly fails on Apple, where any explicit salt
+        // size is rejected with "custom saltLength is not supported".
+        algorithm.saltLengthBytes?.takeUnless { it == algorithm.digest.sizeBytes },
     )
 }
 
