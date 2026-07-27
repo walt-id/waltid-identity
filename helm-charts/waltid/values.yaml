@@ -24,7 +24,7 @@ issuer:
 
 issuer2:
   api:
-    containerPort: 7002
+    containerPort: 7005
     image:
       repository: waltid/issuer-api2
       tag: latest
@@ -74,7 +74,7 @@ verifier:
 
 verifier2:
   api:
-    containerPort: 7003
+    containerPort: 7004
     image:
       repository: waltid/verifier-api2
       tag: latest

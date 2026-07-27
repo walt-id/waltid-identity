@@ -8,8 +8,8 @@ You can either run the latest release using pre-built Docker images or build you
 
 Ensure you have the following tools installed:
 
-- [Docker]()
-- [Docker Compose]()
+- [Docker](https://docs.docker.com/engine/install/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
 
 ---
 
@@ -35,9 +35,8 @@ Once the images are pulled, start the services by running:
 $ docker compose up
 ```
 
-*Note:* If you are facing issues with the containers, try running the following command to remove the existing
-containers and then run the
-above command again.
+*Note:* If you are facing issues with the containers, remove the existing ones with `docker compose down` (add `-v` to
+also drop the volumes) and run the command above again.
 
 ### Stop the Services
 
@@ -59,13 +58,13 @@ pulling the images.
 
 ## Building and Running Services Locally
 
-## Prerequisites
+### Prerequisites
 
 Ensure you have the following tools installed:
 
-- [Docker]()
-- [Docker Compose]()
-- [Java 21 SDK]()
+- [Docker](https://docs.docker.com/engine/install/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+- [Java 21 SDK](https://adoptium.net/temurin/releases/?version=21)
 
 ### Update the VERSION_TAG
 
@@ -74,7 +73,7 @@ Update the `VERSION_TAG` variable to version `1.0.0-SNAPSHOT`
 
 ### Build API Services Docker Images Locally (development)
 
-API Services Docker Images are build with the ktor gradle plugin. This
+API Services Docker Images are built with the Ktor Gradle plugin. This
 requires Java SDK 21 installed. You build the images by
 executing the commands:
 
@@ -85,16 +84,14 @@ $ nano docker-compose/.env # set variable VERSION_TAG=1.0.0-SNAPSHOT so the buil
 $
 $ ./gradlew jibDockerBuild # build docker images
 $
-$ docker image ls # verify image is build and published in local docker registry
-REPOSITORY            TAG              IMAGE ID       CREATED        SIZE
-waltid/issuer-api     1.0.0-SNAPSHOT   0d8752382eae   55 years ago   359MB
-waltid/issuer-api     latest           0d8752382eae   55 years ago   359MB
-waltid/verifier-api   1.0.0-SNAPSHOT   5ce8428d031a   55 years ago   353MB
-waltid/verifier-api   latest           5ce8428d031a   55 years ago   353MB
-waltid/wallet-api     1.0.0-SNAPSHOT   712427b1f532   55 years ago   575MB
-waltid/wallet-api     latest           712427b1f532   55 years ago   575MB
-<none>                <none>           7bab5e2240b9   55 years ago   306MB
-ktor-docker-image     latest           989205060031   55 years ago   377MB
+$ docker image ls # verify images are built and published in the local docker registry
+REPOSITORY             TAG              IMAGE ID       CREATED        SIZE
+waltid/issuer-api      1.0.0-SNAPSHOT   0d8752382eae   55 years ago   359MB
+waltid/issuer-api2     1.0.0-SNAPSHOT   1a4b62c9f0de   55 years ago   361MB
+waltid/verifier-api    1.0.0-SNAPSHOT   5ce8428d031a   55 years ago   353MB
+waltid/verifier-api2   1.0.0-SNAPSHOT   9c1de4470bb8   55 years ago   355MB
+waltid/wallet-api      1.0.0-SNAPSHOT   712427b1f532   55 years ago   575MB
+waltid/wallet-api2     1.0.0-SNAPSHOT   3fa0c7185ed2   55 years ago   578MB
 
 $
 ```
@@ -116,7 +113,7 @@ $ docker compose up
 
 It is possible to start services selectively, including their dependencies.
 
-#### Start the demo wallet and all dependant services
+#### Start the demo wallet and all dependent services
 
 ```console
 $ docker compose up waltid-demo-wallet
@@ -127,22 +124,25 @@ will start automatically:
 - caddy
 - postgres
 - wallet-api
-- and waltid-web-wallet
+- and waltid-demo-wallet itself
 
 #### Start services using compose profiles
 
 `COMPOSE_PROFILES` environment variable located in the .env file allows the selection of
 profiles to start the services for. The services are available with the following profiles:
 
-- **identity** - for all waltid-identity services (includes both `services` and `apps` profiles) for the new v1 protocol 
-- **identity-old** - for the original waltid-identity services (utilising the draft protocols
-- **services** - for API services (wallet-api, issuer-api, issuer-api2, verifier-api, verifier-api2, vc-repo)
-- **apps** - for web applications (waltid-demo-wallet, waltid-dev-wallet, web-portal, web-portal2)
+- **identity** - the current stack implementing the final v1 protocols (issuer-api2, verifier-api2, wallet-api2,
+  web-portal2)
+- **identity-old** - the original stack implementing the draft protocols (wallet-api, issuer-api, verifier-api,
+  waltid-demo-wallet, waltid-dev-wallet, web-portal, vc-repo)
+- **services** - for API services of both stacks (wallet-api, issuer-api, verifier-api, vc-repo, issuer-api2,
+  verifier-api2, wallet-api2)
+- **apps** - for web applications of both stacks (waltid-demo-wallet, waltid-dev-wallet, web-portal, web-portal2)
 - **valkey** - for the Valkey/Redis service (required when using valkey for session storage in wallet-api)
 - **tse** - for the Hashicorp vault service, will be initialized with:
   - a transit secrets engine
   - and authentication methods
-    - approle - for my-role, where role-id and secret-id will be output in the console1
+    - approle - for my-role, where role-id and secret-id will be output in the console <sup>1</sup>
     - userpass - for myuser with mypassword
     - access-token - with dev-only-token
 - **opa** - for the Open Policy Agent service
@@ -154,7 +154,7 @@ Profiles can be combined, e.g.:
 - `COMPOSE_PROFILES=identity,valkey` - will start the waltid-identity services with valkey for session storage
 - `COMPOSE_PROFILES=all` - will start all services including vault, valkey, and opa
 
-1 - example output:
+<sup>1</sup> - example output:
 
 ```console
 vault-init            | Role ID: 66f3f095-74c9-b270-9d1f-1f842aa6bf3f
@@ -164,13 +164,13 @@ vault-init            | Secret ID: 3abf1e00-2dc1-9e77-0705-9a81a95c7c59
 ### Stop the Services
 
 ```bash
-$ docker-compose down
+$ docker compose down
 ```
 
 ### Tear down the Services
 
 ```bash
-$ docker-compose down -v
+$ docker compose down -v
 ```
 
 ## Port mapping
@@ -187,7 +187,7 @@ New Services
 
 - Issuer API2: [http://localhost:7005](http://localhost:7005)
 - Verifier API2: [http://localhost:7004](http://localhost:7004)
-- Wallet API2: [http://localhost:7006](http://localhost:7005)
+- Wallet API2: [http://localhost:7006](http://localhost:7006)
 
 Dependencies
 
@@ -210,22 +210,23 @@ New Apps
 
 ## Configurations
 
-- wallet API:
-  - `wallet-api/config` - wallet configuration
-- issuer API:
-  - `issuer-api/config`
-- verifier API:
-  - `verifier-api/config`
-- verifier API2:
-  - `verifier-api2/config`
-- ingress:
-  - `Caddyfile`
+Each API service reads the configuration files mounted from its own directory:
 
-[//](#): # ((Caddyfile) and also api configurations (wallet, issuer, verifier).)
+- wallet API: `wallet-api/config`
+- issuer API: `issuer-api/config`
+- verifier API: `verifier-api/config`
+- issuer API2: `issuer-api2/config`
+- verifier API2: `verifier-api2/config`
+- wallet API2: `wallet-api2/config`
+- ingress: `Caddyfile`
 
 ## How to
 
-This value will be used also by compose profile so only the required services are started.
+### Select the services to start
+
+- browse `.env` file
+- update `COMPOSE_PROFILES` so only the required services are started (see
+  [Start services using compose profiles](#start-services-using-compose-profiles))
 
 ### Update port number
 
@@ -249,7 +250,7 @@ This value is used for public frontend configuration such as web-portal2 issuer2
 
 ## Troubleshooting
 
-#### Updating ports doesn't work
+### Updating ports doesn't work
 
 Make sure the ports are also updated in:
 
@@ -260,20 +261,26 @@ Make sure the ports are also updated in:
 - verifier-api/config
   - verifier-service.conf
   - web.conf
-- verifier-api2/config
-  - verifier-service.conf
-  - web.conf
 - wallet-api/config
   - web.conf
   - db.conf
+- issuer-api2/config
+  - issuer-service.conf
+  - web.conf
+- verifier-api2/config
+  - verifier-service.conf
+  - web.conf
+- wallet-api2/config
+  - wallet-service.conf
+  - web.conf
 
-#### Removing the DB volume
+### Removing the DB volume
 
 ```
 docker volume rm docker-compose_wallet-api-db
 ```
 
-#### DB Backup / Restore
+### DB Backup / Restore
 
 ```
 pg_dump -U your_user_name -h your_host -d your_db_name > backup.sql
