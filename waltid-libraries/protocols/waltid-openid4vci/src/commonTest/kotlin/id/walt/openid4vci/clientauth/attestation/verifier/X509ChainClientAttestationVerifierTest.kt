@@ -16,7 +16,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.time.Clock
 
-/** Exercises explicit-chain client attestation on JVM and Android host. */
 internal typealias CertificatePathValidator = (
     leaf: id.walt.x509.CertificateDer,
     chain: List<id.walt.x509.CertificateDer>,
