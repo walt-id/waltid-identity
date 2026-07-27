@@ -91,6 +91,7 @@ jobs:
         with:
           api-level: ${{ steps.android-device-phase.outputs.emulator_api_level }}
           arch: x86_64
+          profile: ${{ steps.android-device-phase.outputs.emulator_profile }}
           target: ${{ steps.android-device-phase.outputs.emulator_target }}
           disk-size: 4G
           emulator-options: ${{ steps.android-device-phase.outputs.emulator_options }}
