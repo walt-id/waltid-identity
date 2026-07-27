@@ -66,6 +66,9 @@ object VerificationSessionCreator {
     private val log = KotlinLogging.logger { }
     private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
 
+    /** Fully specified COSE algorithm identifier for Ed25519 (IANA COSE Algorithms). */
+    private const val FULLY_SPECIFIED_ED25519 = -50
+
     private fun defaultVpPolicies() = VPPolicyList(
         jwtVcJson = VPVerificationPolicyManager.defaultJwtVcJsonPolicies,
         dcSdJwt = VPVerificationPolicyManager.defaultDcSdJwtPolicies,
@@ -225,8 +228,26 @@ object VerificationSessionCreator {
                 put("kb-jwt_alg_values", supportedJwsAlgorithms)
             },
             "mso_mdoc" to buildJsonObject {
-                put("issuerauth_alg_values", JsonArray(listOf(Cose.Algorithm.ESP256.toJsonElement())))
-                put("deviceauth_alg_values", JsonArray(listOf(Cose.Algorithm.ESP256.toJsonElement())))
+                // Advertise both the legacy and the fully specified COSE identifiers, plus EdDSA
+                // device authentication (-19 is not used; -50 is fully specified Ed25519).
+                put(
+                    "issuerauth_alg_values",
+                    JsonArray(
+                        listOf(Cose.Algorithm.ES256, Cose.Algorithm.ESP256, FULLY_SPECIFIED_ED25519)
+                            .map { it.toJsonElement() },
+                    ),
+                )
+                put(
+                    "deviceauth_alg_values",
+                    JsonArray(
+                        listOf(
+                            Cose.Algorithm.ES256,
+                            Cose.Algorithm.ESP256,
+                            Cose.Algorithm.EdDSA,
+                            FULLY_SPECIFIED_ED25519,
+                        ).map { it.toJsonElement() },
+                    ),
+                )
             },
         )
 
@@ -288,7 +309,7 @@ object VerificationSessionCreator {
         } else {
             val baseMetadata = clientMetadata ?: ClientMetadata()
             baseMetadata.copy(
-                vpFormatsSupported = baseMetadata.vpFormatsSupported ?: defaultVpFormatsSupported,
+                vpFormatsSupported = baseMetadata.vpFormatsSupported ?: defaultVpFormatsSupported
             )
         }).let { metadata ->
             if (isSiop) {

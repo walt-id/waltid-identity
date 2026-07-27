@@ -3,6 +3,7 @@ package id.walt.wallet2.server.handlers
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.did.dids.DidService
+import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.StoredCredential
@@ -15,6 +16,7 @@ import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.handlers.BuildVpTokenRequest
 import id.walt.wallet2.handlers.BuildVpTokenResult
+import id.walt.wallet2.handlers.CredentialEndpointException
 import id.walt.wallet2.handlers.ExchangeCodeRequest
 import id.walt.wallet2.handlers.FetchCredentialRequest
 import id.walt.wallet2.handlers.FetchCredentialResult
@@ -29,6 +31,8 @@ import id.walt.wallet2.handlers.PresentCredentialIsolatedRequest
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
 import id.walt.wallet2.handlers.ReceiveCredentialResult
+import id.walt.wallet2.handlers.RequestNonceRequest
+import id.walt.wallet2.handlers.RequestNonceResult
 import id.walt.wallet2.handlers.RequestTokenRequest
 import id.walt.wallet2.handlers.RequestTokenResult
 import id.walt.wallet2.handlers.ResolveOfferRequest
@@ -637,6 +641,17 @@ object Wallet2RouteHandler {
                         )
                     }
 
+                    post("/request-nonce", {
+                        summary = "Isolated: obtain a fresh credential proof nonce"
+                        request { pathParameter<String>("walletId"); body<RequestNonceRequest>() }
+                        response { HttpStatusCode.OK to { body<RequestNonceResult>() } }
+                    }) {
+                        val req = call.receive<RequestNonceRequest>()
+                        call.respond(
+                            WalletIssuanceHandler.requestNonce(request = req)
+                        )
+                    }
+
                     post("/sign-proof", {
                         summary = "Isolated: sign a proof-of-possession JWT"
                         request { pathParameter<String>("walletId"); body<SignProofRequest>() }
@@ -650,13 +665,23 @@ object Wallet2RouteHandler {
                     post("/fetch-credential", {
                         summary = "Isolated: fetch a credential from the issuer's credential endpoint"
                         description = "When storeInWallet is true the fetched credential(s) are automatically " +
-                                "stored in the wallet, removing the need to call the import endpoint afterwards."
+                                "stored in the wallet, removing the need to call the import endpoint afterwards. " +
+                                "If the issuer returns invalid_nonce, request a fresh nonce, sign a new proof, " +
+                                "and repeat this isolated fetch step."
                         request { pathParameter<String>("walletId"); body<FetchCredentialRequest>() }
-                        response { HttpStatusCode.OK to { body<FetchCredentialResult>() } }
+                        response {
+                            HttpStatusCode.OK to { body<FetchCredentialResult>() }
+                            HttpStatusCode.BadRequest to { body<CredentialError>() }
+                        }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<FetchCredentialRequest>()
-                        call.respond(WalletIssuanceHandler.fetchCredential(wallet, req))
+                        try {
+                            call.respond(WalletIssuanceHandler.fetchCredential(wallet, req))
+                        } catch (error: CredentialEndpointException) {
+                            if (!error.isInvalidNonce) throw error
+                            call.respond(HttpStatusCode.BadRequest, requireNotNull(error.credentialError))
+                        }
                     }
 
                     // Auth-code grant isolated steps

@@ -1,11 +1,31 @@
-name: Build on every push
+name: Build and test
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+    paths-ignore: &docs-and-assets
+      - '**/*.md'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.webp'
+      - '**/*.svg'
+      - '**/*.ico'
+      - '**/LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - 'docs/**'
   push:
+    branches: [main]
+    paths-ignore: *docs-and-assets
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: read
 
 jobs:
   android-eligibility:
@@ -17,48 +37,38 @@ jobs:
       pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
       pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
       pr-draft: ${{ github.event.pull_request.draft || false }}
-  version:
-    uses: walt-id/waltid-identity/.github/workflows/version.yml@main
-  gradle-build:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@main
-    secrets: inherit
-    needs:
-      - android-eligibility
-      - version
+  macos-eligibility:
+    uses: ./.github/workflows/macos-eligibility.yml
     with:
-      version: ${{ needs.version.outputs.release_version }}
+      event-name: ${{ github.event_name }}
+      ref: ${{ github.ref }}
+      pr-number: ${{ github.event.pull_request.number || '' }}
+      pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
+      pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
+      pr-draft: ${{ github.event.pull_request.draft || false }}
+  sdk-docs:
+    uses: ./.github/workflows/mobile-sdk-docs.yml
+    needs: macos-eligibility
+    if: ${{ needs.macos-eligibility.outputs.should-run == 'true' }}
+    secrets: inherit
+  ios-tests:
+    uses: ./.github/workflows/gradle-macos.yml
+    needs: macos-eligibility
+    if: ${{ needs.macos-eligibility.outputs.should-run == 'true' }}
+    secrets: inherit
+    with:
+      job_name_prefix: ios-tests
+  android-device-tests:
+    uses: ./.github/workflows/android-device-tests.yml
+    needs: android-eligibility
+    if: ${{ needs.android-eligibility.outputs.should-run == 'true' }}
+    secrets: inherit
+    with:
+      job_name_prefix: android-device-tests
+  gradle-build:
+    uses: ./.github/workflows/gradle.yml
+    secrets: inherit
+    needs: android-eligibility
+    with:
       enable-android-build: ${{ needs.android-eligibility.outputs.should-run == 'true' }}
       report-check-name: 'gradle-build / gradle (ubuntu-22.04)'
-  docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
-    with:
-      jsonpath: ".github/workflows/data/docker-matrix.json"
-  docker:
-    uses: walt-id/waltid-identity/.github/workflows/docker.yml@main
-    secrets: inherit
-    needs: [ version, docker-matrix ]
-    with:
-      images: ${{ needs.docker-matrix.outputs.json }}
-      version: ${{ needs.version.outputs.release_version }}
-      artifact: true
-  api-docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
-    with:
-      jsonpath: ".github/workflows/data/api-docker-matrix.json"
-  api-docker:
-    uses: walt-id/waltid-identity/.github/workflows/api-docker.yml@main
-    secrets: inherit
-    needs: [ version, api-docker-matrix ]
-    with:
-      images: ${{ needs.api-docker-matrix.outputs.json }}
-      version: ${{ needs.version.outputs.release_version }}
-      artifact: true
-  ebsi-ct-v3:
-    # disabled job because of ebsi certificate issues (expired certificate)
-    if: false
-    uses: walt-id/waltid-identity/.github/workflows/ebsictv3.yml@main
-    needs: [ version, docker, api-docker ]
-    secrets: inherit
-    with:
-      artifact: issuer-api
-      tag: "waltid/issuer-api:${{ needs.version.outputs.release_version }}"

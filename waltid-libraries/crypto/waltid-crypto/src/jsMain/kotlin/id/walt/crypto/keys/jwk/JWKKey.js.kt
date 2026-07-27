@@ -251,11 +251,13 @@ actual class JWKKey actual constructor(
     ): Result<ByteArray> {
         return runCatching {
             requireNotNull(detachedPlaintext) { "Detached plaintext is required for verification" }
+            // needs to be same as in the JVM implementation: derived from the shared KeyType digest mapping
+            val hashingAlgorithm = when (keyType) {
+                KeyType.Ed25519 -> null
+                else -> keyType.signatureDigestName.lowercase().replace("-", "")
+            }
             val verified = crypto.verify(
-                when (keyType) {
-                    KeyType.Ed25519 -> null
-                    else -> keyType.signatureDigestName.lowercase().replace("-", "")
-                },
+                hashingAlgorithm,
                 detachedPlaintext,
                 getPublicKey().exportPEM(),
                 signed

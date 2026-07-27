@@ -47,8 +47,8 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         let session = try await fixture.createVerifierSession(scenario: selectedScenario, platform: .ios)
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
         let presentResult = try await wallet2.present(request: presentationURL, did: bootstrapResult.did)
-        XCTAssertTrue(
-            presentResult.success,
+        assertTransmittedSuccess(
+            presentResult,
             "Should present persisted Enterprise credential for \(selectedScenario.displayName). Credentials: \(credentials), Result: \(presentResult)"
         )
         try await fixture.waitForVerifierSuccess(sessionID: session.sessionID, timeoutSeconds: verifierPollingTimeout)
@@ -135,8 +135,8 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         let session = try await fixture.createVerifierSession(scenario: scenario, platform: .ios)
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
         let presentResult = try await wallet.present(request: presentationURL, did: bootstrapResult.did)
-        XCTAssertTrue(
-            presentResult.success,
+        assertTransmittedSuccess(
+            presentResult,
             "Enterprise verifier2 presentation should succeed for \(scenario.displayName). Credentials: \(credentials), Result: \(presentResult)"
         )
 
@@ -152,5 +152,17 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
     ) async throws -> EnterpriseMobileScenario {
         let scenarios = try await fixture.scenarios()
         return try XCTUnwrap(scenarios.first { $0.id == scenarioID })
+    }
+}
+
+private func assertTransmittedSuccess(
+    _ result: PresentationResult,
+    _ message: @autoclosure () -> String,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) {
+    guard case .transmitted(.succeeded) = result else {
+        XCTFail(message(), file: file, line: line)
+        return
     }
 }

@@ -134,6 +134,14 @@ public final class DemoBackend {
         )
     }
 
+    public func createResponseBoundVerifierSession(scenario: DemoCredentialScenario) async throws -> DemoVerifierSession {
+        try await createVerifierSession(
+            scenario: scenario,
+            transactionData: [],
+            bindClientIDToResponseURI: true
+        )
+    }
+
     public func createTransactionDataVerifierSession(
         scenario: DemoCredentialScenario = DemoBackend.transactionDataPresentationScenario
     ) async throws -> DemoVerifierSession {
@@ -172,18 +180,29 @@ public final class DemoBackend {
 
     private func createVerifierSession(
         scenario: DemoCredentialScenario,
-        transactionData: [[String: Any]]
+        transactionData: [[String: Any]],
+        bindClientIDToResponseURI: Bool = false
     ) async throws -> DemoVerifierSession {
         let endpoint = Self.verifierBaseURL
             .appendingPathComponent("verification-session")
             .appendingPathComponent("create")
+        let requestedSessionID = bindClientIDToResponseURI ? UUID().uuidString.lowercased() : nil
+        var coreFlow: [String: Any] = [
+            "dcql_query": [
+                "credentials": [scenario.verifierCredentialQuery],
+            ],
+        ]
+        if let requestedSessionID {
+            let responseURI = Self.verifierBaseURL
+                .appendingPathComponent("verification-session")
+                .appendingPathComponent(requestedSessionID)
+                .appendingPathComponent("response")
+            coreFlow["sessionId"] = requestedSessionID
+            coreFlow["clientId"] = "redirect_uri:\(responseURI.absoluteString)"
+        }
         var payload: [String: Any] = [
             "flow_type": "cross_device",
-            "core_flow": [
-                "dcql_query": [
-                    "credentials": [scenario.verifierCredentialQuery],
-                ],
-            ],
+            "core_flow": coreFlow,
         ]
         if !transactionData.isEmpty {
             payload["openid"] = ["transactionData": transactionData]
@@ -201,6 +220,13 @@ public final class DemoBackend {
                 domain: "WalletE2E",
                 code: 301,
                 userInfo: [NSLocalizedDescriptionKey: "Missing sessionId in public demo verifier2 response: \(response)"]
+            )
+        }
+        guard requestedSessionID == nil || requestedSessionID == sessionID else {
+            throw NSError(
+                domain: "WalletE2E",
+                code: 308,
+                userInfo: [NSLocalizedDescriptionKey: "Public demo verifier2 did not preserve the requested session ID"]
             )
         }
         let requestURL = response["bootstrapAuthorizationRequestUrl"] as? String
@@ -258,6 +284,51 @@ public final class DemoBackend {
             domain: "WalletE2E",
             code: 304,
             userInfo: [NSLocalizedDescriptionKey: "public demo verifier2 timeout after \(timeoutSeconds)s for session \(sessionID); last status: \(lastStatus)"]
+        )
+    }
+
+    public func waitForVerifierFailure(
+        sessionID: String,
+        expectedError: String,
+        timeoutSeconds: TimeInterval
+    ) async throws -> [String: Any] {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+
+        while Date() < deadline {
+            let url = Self.verifierBaseURL
+                .appendingPathComponent("verification-session")
+                .appendingPathComponent(sessionID)
+                .appendingPathComponent("info")
+            let response = try await client.jsonRequest(url: url, retryTransientFailures: true)
+            let status = (response["status"] as? String)
+                ?? ((response["session"] as? [String: Any])?["status"] as? String)
+
+            switch status?.uppercased() {
+            case "FAILED":
+                guard let failure = response["failure"] as? [String: Any],
+                      failure["error"] as? String == expectedError else {
+                    throw NSError(
+                        domain: "WalletE2E",
+                        code: 305,
+                        userInfo: [NSLocalizedDescriptionKey: "public demo verifier2 omitted \(expectedError) failure details for session \(sessionID): \(response)"]
+                    )
+                }
+                return response
+            case "SUCCESSFUL", "ERROR", "EXPIRED":
+                throw NSError(
+                    domain: "WalletE2E",
+                    code: 306,
+                    userInfo: [NSLocalizedDescriptionKey: "public demo verifier2 reported \(status ?? "UNKNOWN") instead of \(expectedError) for session \(sessionID): \(response)"]
+                )
+            default:
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+            }
+        }
+
+        throw NSError(
+            domain: "WalletE2E",
+            code: 307,
+            userInfo: [NSLocalizedDescriptionKey: "public demo verifier2 did not report \(expectedError) within \(timeoutSeconds)s for session \(sessionID)"]
         )
     }
 

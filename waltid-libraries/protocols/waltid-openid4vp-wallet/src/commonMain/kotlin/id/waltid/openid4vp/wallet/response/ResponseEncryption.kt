@@ -19,11 +19,37 @@ import kotlinx.serialization.json.jsonPrimitive
 object ResponseEncryption {
     private const val SUPPORTED_ALGORITHM = "ECDH-ES"
 
+    /**
+     * Immutable description of the response-encryption selection used by the wallet.
+     *
+     * The selected key is represented only by its protocol identifier and public-key
+     * thumbprint. No key material is exposed through this model.
+     *
+     * @property keyManagementAlgorithm JWE `alg` value selected for the response.
+     * @property contentEncryptionAlgorithm JWE `enc` value selected for the response.
+     * @property verifierKeyId Verifier-provided identifier of the selected public key.
+     * @property verifierKeyThumbprint RFC 7638 thumbprint of the selected public key.
+     */
+    data class Metadata(
+        val keyManagementAlgorithm: String,
+        val contentEncryptionAlgorithm: String,
+        val verifierKeyId: String?,
+        val verifierKeyThumbprint: String,
+    )
+
     @Deprecated("Use Crypto2Config")
     data class Config(
         val key: JWKKey,
         val encryptionMethod: String,
     ) {
+        /** Describes this selection without exposing the selected public key. */
+        suspend fun metadata(): Metadata = Metadata(
+            keyManagementAlgorithm = SUPPORTED_ALGORITHM,
+            contentEncryptionAlgorithm = encryptionMethod,
+            verifierKeyId = key.exportJWKObject()["kid"]?.jsonPrimitive?.contentOrNull,
+            verifierKeyThumbprint = key.getPublicKey().getThumbprint().substringAfterLast(':'),
+        )
+
         suspend fun thumbprintBytes(): ByteArray = key.getPublicKey().getThumbprint().decodeFromBase64Url()
     }
 
@@ -41,6 +67,14 @@ object ResponseEncryption {
         suspend fun thumbprint(): String = Jwk.sha256Thumbprint(recipientPublicKey)
 
         suspend fun thumbprintBytes(): ByteArray = thumbprint().decodeFromBase64Url()
+
+        /** Describes this selection without exposing the selected public key. */
+        suspend fun metadata(): Metadata = Metadata(
+            keyManagementAlgorithm = SUPPORTED_ALGORITHM,
+            contentEncryptionAlgorithm = contentEncryption.identifier,
+            verifierKeyId = Jwk.parse(recipientPublicKey)["kid"]?.jsonPrimitive?.contentOrNull,
+            verifierKeyThumbprint = thumbprint(),
+        )
     }
 
     @Deprecated("Use resolveCrypto2")

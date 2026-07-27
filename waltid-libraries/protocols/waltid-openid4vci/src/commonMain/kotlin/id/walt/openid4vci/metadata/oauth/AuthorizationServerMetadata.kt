@@ -1,6 +1,7 @@
 package id.walt.openid4vci.metadata.oauth
 
 import id.walt.openid4vci.GrantType
+import id.walt.openid4vci.dpop.DPoPConstants
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.ResponseType
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
@@ -222,7 +223,7 @@ data class AuthorizationServerMetadata(
                 ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
             clientAttestationPopSigningAlgValuesSupported: Set<String>? =
                 ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
-            dpopSigningAlgValuesSupported: Set<String>? = setOf("ES256"),
+            dpopSigningAlgValuesSupported: Set<String>? = DPoPConstants.SUPPORTED_SIGNING_ALGORITHMS,
             codeChallengeMethodsSupported: List<String>? = null,
             requirePushedAuthorizationRequests: Boolean? = false,
             pushedAuthorizationRequestEndpointPath: String? = "/par",

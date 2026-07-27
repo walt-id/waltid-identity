@@ -16,6 +16,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ResponseEncryptionTest {
@@ -38,6 +39,19 @@ class ResponseEncryptionTest {
         assertEquals(JweContentEncryption.A256GCM, config.contentEncryption)
         assertFalse(config.recipientPublicKey.privateMaterial)
         assertEquals(Jwk.sha256Thumbprint(config.recipientPublicKey), config.thumbprint())
+
+        val metadata = config.metadata()
+        assertEquals("ECDH-ES", metadata.keyManagementAlgorithm)
+        assertEquals("A256GCM", metadata.contentEncryptionAlgorithm)
+        assertEquals("enc-key", metadata.verifierKeyId)
+        assertEquals("ds5PaVMO_C5Ig-uE8M4pwTsYdA9LLbT2D8mHERDXudE", metadata.verifierKeyThumbprint)
+    }
+
+    @Test
+    fun `returns no encryption metadata for an unencrypted response`() = runTest {
+        val request = request(publicKey).copy(responseMode = OpenID4VPResponseMode.DIRECT_POST)
+
+        assertNull(ResponseEncryption.resolveCrypto2(request))
     }
 
     @Test

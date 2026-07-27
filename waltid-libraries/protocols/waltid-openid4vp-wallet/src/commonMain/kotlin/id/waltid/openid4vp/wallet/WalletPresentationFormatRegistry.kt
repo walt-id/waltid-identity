@@ -7,6 +7,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.supportsJwsAlgorithm
 import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.keys.KeySpec
 import id.walt.dcql.models.CredentialFormat
@@ -15,6 +16,8 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Single source of truth for VP format support in this wallet implementation.
@@ -57,11 +60,10 @@ object WalletPresentationFormatRegistry {
             .map(JwsAlgorithm::identifier)
             .distinct()
             .sorted()
-        val supportedMdocCoseAlgorithms = if (signingKeys.any { key ->
-                key.spec == KeySpec.Ec(EcCurve.P256) &&
-                    key.capabilities.supportsSignatureAlgorithm(JwsAlgorithm.ES256.toSignatureAlgorithm())
-            }
-        ) listOf(Cose.Algorithm.ESP256) else emptyList()
+        val supportedMdocCoseAlgorithms = signingKeys
+            .mapNotNull { it.spec.toMdocDeviceAuthCoseAlgorithm() }
+            .distinct()
+            .sorted()
 
         return capabilities(supportedJwsAlgorithms, supportedMdocCoseAlgorithms)
     }
@@ -92,11 +94,30 @@ object WalletPresentationFormatRegistry {
             .distinct()
             .sorted()
 
-        val supportedMdocCoseAlgorithms = if (KeyType.secp256r1 in keyTypes) {
-            listOf(Cose.Algorithm.ESP256)
-        } else emptyList()
+        val supportedMdocCoseAlgorithms = keyTypes
+            .mapNotNull { it.toMdocDeviceAuthCoseAlgorithm() }
+            .distinct()
+            .sorted()
 
         return capabilities(supportedJwsAlgorithms, supportedMdocCoseAlgorithms)
+    }
+
+    /**
+     * COSE algorithms this wallet can use for ISO 18013-5 device authentication.
+     *
+     * P-256 device authentication is advertised with the fully specified identifier (ESP256);
+     * Ed25519 device authentication uses EdDSA.
+     */
+    private fun KeySpec.toMdocDeviceAuthCoseAlgorithm(): Int? = when (this) {
+        KeySpec.Ec(EcCurve.P256) -> Cose.Algorithm.ESP256
+        KeySpec.Edwards(EdwardsCurve.ED25519) -> Cose.Algorithm.EdDSA
+        else -> null
+    }
+
+    private fun KeyType.toMdocDeviceAuthCoseAlgorithm(): Int? = when (this) {
+        KeyType.secp256r1 -> Cose.Algorithm.ESP256
+        KeyType.Ed25519 -> Cose.Algorithm.EdDSA
+        else -> null
     }
 
     private fun capabilities(
@@ -125,6 +146,19 @@ object WalletPresentationFormatRegistry {
             }
         }
 
+    /** Returns whether the wallet and verifier share at least one compatible presentation format. */
+    fun supportsAny(
+        verifierFormats: Map<String, JsonObject>,
+        capabilities: RuntimeCapabilities = defaultCapabilities(),
+        requestedFormats: Set<SupportedFormat> = capabilities.supportedFormats,
+    ): Boolean = verifierFormats.any { (formatId, verifierMetadata) ->
+        val format = resolve(formatId) ?: return@any false
+        format in requestedFormats && format in capabilities.supportedFormats && verifierMetadata.algorithmsMatch(
+            walletMetadata = buildVpFormatMetadata(format, capabilities),
+            fields = format.holderAlgorithmFields,
+        )
+    }
+
     private fun buildVpFormatMetadata(
         format: SupportedFormat,
         capabilities: RuntimeCapabilities,
@@ -146,6 +180,29 @@ object WalletPresentationFormatRegistry {
                 put("deviceauth_alg_values", algorithms)
             }
         }
+    }
+
+    /**
+     * Algorithm constraints that apply to keys controlled by this wallet.
+     * Issuer-signature constraints are credential properties and are handled by credential matching.
+     */
+    private val SupportedFormat.holderAlgorithmFields: Set<String>
+        get() = when (this) {
+            SupportedFormat.JWT_VC_JSON -> setOf("alg_values")
+            SupportedFormat.DC_SD_JWT -> setOf("kb-jwt_alg_values")
+            SupportedFormat.MSO_MDOC -> setOf("deviceauth_alg_values")
+        }
+
+    private fun JsonObject.algorithmsMatch(
+        walletMetadata: JsonObject,
+        fields: Set<String>,
+    ): Boolean = fields.all { field ->
+        val requested = get(field)?.let { value ->
+            runCatching { value.jsonArray.map { it.jsonPrimitive.content }.toSet() }.getOrNull()
+                ?: return false
+        } ?: return@all true
+        val supported = walletMetadata[field]?.jsonArray?.map { it.jsonPrimitive.content }?.toSet().orEmpty()
+        requested.isNotEmpty() && supported.any(requested::contains)
     }
 
     private fun <T> Iterable<T>.toJsonArray(toPrimitive: (T) -> JsonPrimitive): JsonArray =

@@ -32,8 +32,8 @@ data class W3C2(
 ) : AbstractW3C() {
 
     override val format: String = when (signature) {
-        is JwtCredentialSignature -> "jwt_vc_json"
-        is SdJwtCredentialSignature -> "dc+sd-jwt"
+        // See W3C11: SD-JWT-secured W3C credentials keep the W3C jwt_vc_json format identifier.
+        is JwtCredentialSignature, is SdJwtCredentialSignature -> "jwt_vc_json"
         is DataIntegrityProofCredentialSignature -> "ldp_vc"
         is CoseCredentialSignature -> "vc+cose"  // W3C VCDM secured with COSE_Sign1 (vc-jose-cose)
         null -> "unsigned"

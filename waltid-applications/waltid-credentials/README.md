@@ -33,9 +33,11 @@ Each credential includes example structures, available claims, and usage guidanc
 
 ## Setup
 
+Requires Node.js 22.
+
 ```shell
 # Install dependencies
-npm install
+npm ci
 
 # Start development server
 npm run dev

@@ -4,14 +4,15 @@ import id.walt.cose.CoseCertificate
 import id.walt.crypto.keys.Key
 import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
-import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialEndpointHandler
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
+import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
@@ -51,12 +52,13 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult {
         return try {
             if (configuration.format != CredentialFormat.MSO_MDOC) {
                 return CredentialResponseResult.Failure(
-                    OAuthError(
-                        CredentialErrorCodes.UNSUPPORTED_CREDENTIAL_CONFIGURATION,
+                    CredentialError(
+                        CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
                         "Unsupported format ${configuration.format.value}"
                     )
                 )
@@ -65,7 +67,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
             computeCredentialResult(
                 request = request,
                 configuration = configuration,
-                issue = { certificateChain, docType, effectiveValidUntil ->
+                issue = { certificateChain, docType, effectiveValidUntil, verifiedProof ->
                     MdocCredentialSigner.generateMdocCredential(
                         credentialRequest = request,
                         credentialData = credentialData,
@@ -76,17 +78,19 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
                         validUntil = effectiveValidUntil,
                         status = credentialStatus,
                         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+                        verifiedProof = verifiedProof,
                     )
                 },
                 credentialData = credentialData,
                 x5Chain = x5Chain,
                 mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
                 validUntil = validUntil,
+                verifiedProofs = verifiedProofs,
             )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            CredentialResponseResult.Failure(OAuthError("invalid_request", e.message))
+            CredentialResponseResult.Failure(e.toCredentialHandlerError())
         }
     }
 
@@ -105,6 +109,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult = try {
         computeCredentialResult(
             request = request,
@@ -113,7 +118,8 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
             x5Chain = x5Chain,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             validUntil = validUntil,
-            issue = { certificateChain, docType, effectiveValidUntil ->
+            verifiedProofs = verifiedProofs,
+            issue = { certificateChain, docType, effectiveValidUntil, verifiedProof ->
                 MdocCredentialSigner.generateMdocCredential(
                     credentialRequest = request,
                     credentialData = credentialData,
@@ -125,13 +131,14 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
                     validUntil = effectiveValidUntil,
                     status = credentialStatus,
                     mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+                    verifiedProof = verifiedProof,
                 )
             },
         )
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        CredentialResponseResult.Failure(OAuthError("invalid_request", e.message))
+        CredentialResponseResult.Failure(e.toCredentialHandlerError())
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -142,7 +149,13 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
         x5Chain: List<CertificateDer>?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         validUntil: Instant?,
-        issue: suspend (certificateChain: List<CoseCertificate>, docType: String, validUntil: Instant) -> String,
+        verifiedProofs: List<VerifiedCredentialProof>,
+        issue: suspend (
+            certificateChain: List<CoseCertificate>,
+            docType: String,
+            validUntil: Instant,
+            verifiedProof: VerifiedCredentialProof?,
+        ) -> String,
     ): CredentialResponseResult.Success {
         val docType = configuration.doctype
             ?: throw IllegalArgumentException("Missing doctype for mDoc credential configuration")
@@ -167,13 +180,15 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
             "mDoc issuance requests require that the x5Chain parameter contains at least one entry"
         }.map { CoseCertificate(it.bytes.toByteArray()) }
 
-        val issuedCredential = issue(issuerCertificateChain, docType, resolveValidUntil(request, validUntil))
+        // Issues one credential per verified proof, or a single credential bound to the request proof.
+        val effectiveValidUntil = resolveValidUntil(request, validUntil)
+        val issuedCredentials = verifiedProofs.ifEmpty { listOf(null) }.map { verifiedProof ->
+            issue(issuerCertificateChain, docType, effectiveValidUntil, verifiedProof)
+        }
 
         return CredentialResponseResult.Success(
             CredentialResponse(
-                credentials = listOf(
-                    IssuedCredential(credential = JsonPrimitive(issuedCredential)),
-                ),
+                credentials = issuedCredentials.map { IssuedCredential(credential = JsonPrimitive(it)) },
             ),
         )
     }

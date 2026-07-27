@@ -2,14 +2,15 @@ package id.walt.openid4vci.handlers.credential
 
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
-import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialEndpointHandler
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
+import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
@@ -50,7 +51,8 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
-    ): CredentialResponseResult = sign(configuration) {
+        verifiedProofs: List<VerifiedCredentialProof>,
+    ): CredentialResponseResult = sign(configuration, verifiedProofs) { verifiedProof ->
         W3cJwtVcCredentialSigner.generateW3CJwtVC(
             credentialRequest = request,
             credentialData = credentialData,
@@ -61,6 +63,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
             x5Chain = x5Chain,
             display = display,
             w3cVersion = w3cVersion,
+            verifiedProof = verifiedProof,
         )
     }
 
@@ -79,7 +82,8 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
-    ): CredentialResponseResult = sign(configuration) {
+        verifiedProofs: List<VerifiedCredentialProof>,
+    ): CredentialResponseResult = sign(configuration, verifiedProofs) { verifiedProof ->
         W3cJwtVcCredentialSigner.generateW3CJwtVC(
             credentialRequest = request,
             credentialData = credentialData,
@@ -91,36 +95,41 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
             x5Chain = x5Chain,
             display = display,
             w3cVersion = w3cVersion,
+            verifiedProof = verifiedProof,
         )
     }
 
+    /**
+     * Issues one credential per verified proof, or a single credential bound to the
+     * request proof when no proof was verified upfront.
+     */
     private suspend fun sign(
         configuration: CredentialConfiguration,
-        issue: suspend () -> String,
+        verifiedProofs: List<VerifiedCredentialProof>,
+        issue: suspend (VerifiedCredentialProof?) -> String,
     ): CredentialResponseResult {
         return try {
             if (configuration.format !in supportedFormats) {
                 return CredentialResponseResult.Failure(
-                    OAuthError(
-                        CredentialErrorCodes.UNSUPPORTED_CREDENTIAL_CONFIGURATION,
+                    CredentialError(
+                        CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
                         "Unsupported format ${configuration.format.value}"
                     )
                 )
             }
 
-            val jwtVc = issue()
+            val proofsToIssue = verifiedProofs.ifEmpty { listOf(null) }
+            val jwtVcs = proofsToIssue.map { verifiedProof -> issue(verifiedProof) }
 
             CredentialResponseResult.Success(
                 CredentialResponse(
-                    credentials = listOf(
-                        IssuedCredential(credential = JsonPrimitive(jwtVc)),
-                    ),
+                    credentials = jwtVcs.map { IssuedCredential(credential = JsonPrimitive(it)) },
                 )
             )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            CredentialResponseResult.Failure(OAuthError("invalid_request", e.message))
+            CredentialResponseResult.Failure(e.toCredentialHandlerError())
         }
     }
 }

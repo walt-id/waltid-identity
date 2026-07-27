@@ -24,7 +24,7 @@ private struct ClaimValueView: View {
     var body: some View {
         switch value {
         case .bool(let value):
-            Text(value ? "true" : "false")
+            Text(value ? "Yes" : "No")
                 .font(.caption)
         case .decodedText(let value), .text(let value), .number(let value):
             Text(value)

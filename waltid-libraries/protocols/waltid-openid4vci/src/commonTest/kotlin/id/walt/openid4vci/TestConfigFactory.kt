@@ -3,7 +3,10 @@ package id.walt.openid4vci
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.openid4vci.core.OAuth2ProviderConfig
+import id.walt.openid4vci.dpop.DPoPProofVerifier
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
+import id.walt.openid4vci.proofs.CredentialProofVerifier
+import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
@@ -35,11 +38,13 @@ internal fun createTestConfig(
     credentialRequestValidator: CredentialRequestValidator = DefaultCredentialRequestValidator(),
     accessTokenIssuer: AccessTokenIssuer = StubTokenIssuer(),
     accessTokenVerifier: AccessTokenVerifier? = null,
+    dpopProofVerifier: DPoPProofVerifier? = null,
     refreshTokenIssuer: RefreshTokenIssuer = TestRefreshTokenIssuer(),
     refreshTokenVerifier: RefreshTokenVerifier = refreshTokenIssuer as? RefreshTokenVerifier ?: TestRefreshTokenIssuer(),
     refreshTokenRepository: RefreshTokenRepository = InMemoryRefreshTokenRepository(),
     issuerStateValidator: IssuerStateValidator? = null,
     credentialRequestDecryptor: CredentialRequestDecryptor? = null,
+    credentialProofVerifier: CredentialProofVerifier? = DefaultCredentialProofVerifier(),
 ): OAuth2ProviderConfig {
     val authorizationCodeRepository = InMemoryAuthorizationCodeRepository()
     val preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository()
@@ -54,11 +59,13 @@ internal fun createTestConfig(
         preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
         accessTokenIssuer = accessTokenIssuer,
         accessTokenVerifier = accessTokenVerifier,
+        dpopProofVerifier = dpopProofVerifier,
         refreshTokenIssuer = refreshTokenIssuer,
         refreshTokenVerifier = refreshTokenVerifier,
         refreshTokenRepository = refreshTokenRepository,
         credentialRequestValidator = credentialRequestValidator,
         credentialRequestDecryptor = credentialRequestDecryptor,
+        credentialProofVerifier = credentialProofVerifier,
         credentialEndpointHandlers = CredentialEndpointHandlers(),
     )
 }

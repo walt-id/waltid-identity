@@ -19,8 +19,10 @@ object JweCredentialResponseEncryptor : CredentialResponseEncryptor {
             jwk = encryption.jwk.toString(),
             alg = CredentialEncryptionProfile.ALG_ECDH_ES,
             enc = CredentialEncryptionProfile.ENC_A128GCM,
-            headerParams = buildMap<String, JsonElement> {
-                put("kid", JsonPrimitive(requireNotNull(encryption.jwk["kid"]?.jsonPrimitive?.contentOrNull)))
+            headerParams = buildMap {
+                encryption.jwk["kid"]?.jsonPrimitive?.contentOrNull?.let { kid ->
+                    put("kid", JsonPrimitive(kid))
+                }
             },
         )
 }

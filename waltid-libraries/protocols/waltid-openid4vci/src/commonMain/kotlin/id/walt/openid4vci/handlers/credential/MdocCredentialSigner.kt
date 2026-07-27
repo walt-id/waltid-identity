@@ -3,8 +3,10 @@ package id.walt.openid4vci.handlers.credential
 import id.walt.cose.CoseCertificate
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
+import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeySpec
@@ -14,6 +16,7 @@ import id.walt.mdoc.dataelement.DataElement as LegacyMdocDataElement
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.mso.Status
 import id.walt.mdoc.schema.MdocsSchemaMappingFunction.toCborElement
+import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
@@ -39,6 +42,7 @@ object MdocCredentialSigner {
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
         status: Status? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
+        verifiedProof: VerifiedCredentialProof? = null,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -55,6 +59,7 @@ object MdocCredentialSigner {
         validUntil = validUntil,
         status = status,
         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+        verifiedProof = verifiedProof,
         valueMappingFunction = valueMappingFunction,
     )
 
@@ -70,6 +75,7 @@ object MdocCredentialSigner {
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
         status: Status? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
+        verifiedProof: VerifiedCredentialProof? = null,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -86,6 +92,7 @@ object MdocCredentialSigner {
         validUntil = validUntil,
         status = status,
         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+        verifiedProof = verifiedProof,
         valueMappingFunction = valueMappingFunction,
     )
 
@@ -100,6 +107,7 @@ object MdocCredentialSigner {
         validUntil: Instant,
         status: Status?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
+        verifiedProof: VerifiedCredentialProof?,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -107,7 +115,8 @@ object MdocCredentialSigner {
             elementValueJson: JsonElement,
         ) -> CborElement?,
     ): String {
-        val holderKey = resolveHolderKey(credentialRequest)
+        // A proof verified upfront already carries the holder key, so it is not resolved twice.
+        val holderKey = verifiedProof?.toCosePublicKey() ?: resolveHolderKey(credentialRequest)
         validateIssuerKey(issuerSigningKey)
         val namespaces = credentialData.mapValues { (namespace, namespaceData) ->
             requireNotNull(namespaceData as? JsonObject) {
@@ -162,6 +171,9 @@ object MdocCredentialSigner {
             ?: throw IllegalArgumentException("Missing JWT proof in proofs")
         return JwtProofUtils.resolveHolderKey(jwtProof)
     }
+
+    private suspend fun VerifiedCredentialProof.toCosePublicKey(): CoseKey =
+        JWKKey.importJWK(holderKey.exportJWK()).getOrThrow().getCosePublicKey()
 
     private fun validateIssuerKey(issuerKey: IssuerSigningKey) {
         when (issuerKey) {

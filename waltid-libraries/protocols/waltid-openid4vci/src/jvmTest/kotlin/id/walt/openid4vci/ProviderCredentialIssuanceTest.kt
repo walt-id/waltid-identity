@@ -17,6 +17,7 @@ import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.credentials.keyresolver.resolvers.DidKeyResolver
 import id.walt.did.dids.DidService
 import id.walt.openid4vci.core.buildOAuth2Provider
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
@@ -252,5 +253,38 @@ class ProviderCredentialIssuanceTest {
                 ),
             )
         }
+    }
+
+    @Test
+    fun `missing jwt proof fails with invalid proof`() = runBlocking {
+        val credentialId = "test-credential"
+        val issuerId = "did:example:issuer"
+        val provider = buildOAuth2Provider(createTestConfig())
+        val credentialRequestResult = provider.createCredentialRequest(
+            parameters = mapOf(
+                "credential_configuration_id" to listOf(credentialId),
+            ),
+            session = DefaultSession(subject = "demo-subject"),
+        )
+
+        assertTrue(credentialRequestResult is CredentialRequestResult.Success)
+        val credentialResponseResult = provider.createCredentialResponse(
+            request = credentialRequestResult.request.withIssuer(issuerId),
+            configuration = CredentialConfiguration(
+                format = CredentialFormat.SD_JWT_VC,
+                vct = credentialId,
+            ),
+            issuerKey = JWKKey.generate(KeyType.Ed25519),
+            issuerId = issuerId,
+            credentialData = buildJsonObject {
+                put("given_name", "Alice")
+            },
+        )
+
+        assertTrue(credentialResponseResult is CredentialResponseResult.Failure)
+        assertEquals(CredentialErrorCodes.INVALID_PROOF, credentialResponseResult.error.error)
+        val http = provider.writeCredentialError(credentialResponseResult.error)
+        assertEquals(400, http.status)
+        assertEquals(CredentialErrorCodes.INVALID_PROOF, http.payload["error"]?.jsonPrimitive?.content)
     }
 }

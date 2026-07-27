@@ -1,9 +1,22 @@
 package id.walt.walletdemo.compose.logic
 
 import id.walt.wallet2.mobile.MobileWallet
+import id.walt.wallet2.mobile.MobileWalletCredentialClaimMetadata
+import id.walt.wallet2.mobile.MobileWalletMetadataDisplay
+import id.walt.wallet2.mobile.MobileWalletOfferedCredentialMetadata
+import id.walt.wallet2.mobile.MobileWalletIssuancePreviewHandle
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationPreview
+import id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle
+import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
+import id.walt.wallet2.mobile.MobileWalletPresentationRequestInfo
+import id.walt.wallet2.mobile.MobileWalletPresentationResult
+import id.walt.wallet2.mobile.MobileWalletResponseEncryption
+import id.walt.wallet2.mobile.MobileWalletTransactionCodeInputMode
+import id.walt.wallet2.mobile.MobileWalletTransactionCodeRequirement
+import id.walt.wallet2.mobile.MobileWalletTransactionDataItem
+import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
 import id.walt.wallet2.mobile.WalletAttestationConfig
 
 internal class MobileDemoWallet(
@@ -24,7 +37,7 @@ internal class MobileDemoWallet(
             WalletDemoCredential(
                 id = credential.id,
                 format = credential.format,
-                issuer = credential.issuer ?: CredentialDisplayText.Unknown,
+                issuer = credential.issuer,
                 subject = credential.subject,
                 label = credential.label ?: credential.format,
                 addedAt = credential.addedAt,
@@ -35,35 +48,63 @@ internal class MobileDemoWallet(
     override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferPreview =
         mobileWallet.resolveOffer(offerUrl).let { resolution ->
             WalletDemoOfferPreview(
-                transactionCodeRequired = resolution.transactionCodeRequired,
-                credentialIssuer = resolution.credentialIssuer,
-                offeredCredentials = resolution.offeredCredentials,
+                previewHandle = WalletDemoIssuancePreviewHandle(resolution.previewHandle.value),
+                issuer = WalletDemoIssuerMetadata(
+                    credentialIssuer = resolution.issuer.credentialIssuer,
+                    display = resolution.issuer.display?.toDemoMetadataDisplay(),
+                ),
+                offeredCredentials = resolution.offeredCredentials.map { it.toDemoMetadata() },
+                transactionCode = resolution.transactionCode?.toDemoRequirement(),
             )
         }
 
-    override suspend fun receive(offerUrl: String, txCode: String?): List<String> =
-        mobileWallet.receive(offerUrl, txCode = txCode)
+    override suspend fun receive(
+        previewHandle: WalletDemoIssuancePreviewHandle,
+        txCode: String?,
+    ): List<String> = mobileWallet.receive(
+        previewHandle = MobileWalletIssuancePreviewHandle(previewHandle.value),
+        txCode = txCode,
+    )
+
+    override suspend fun discardIssuancePreview(previewHandle: WalletDemoIssuancePreviewHandle) =
+        mobileWallet.discardIssuancePreview(MobileWalletIssuancePreviewHandle(previewHandle.value))
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
-        mobileWallet.present(requestUrl = requestUrl, did = did).let { result ->
-            if (result.success) {
-                WalletDemoOperationResult.Success(WalletDisplayText.PresentationSent)
-            } else {
-                WalletDemoOperationResult.Failure(WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation)
-            }
+        mobileWallet.present(requestUrl = requestUrl, did = did).toDemoOperationResult(
+            successMessage = WalletDisplayText.PresentationSent,
+            failureMessage = WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation,
+        )
+
+    override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult =
+        when (val result = mobileWallet.previewPresentation(requestUrl)) {
+            is MobileWalletPresentationPreviewResult.Ready ->
+                WalletDemoPresentationPreviewResult.Ready(result.preview.toDemoPreview())
+
+            is MobileWalletPresentationPreviewResult.Invalid ->
+                WalletDemoPresentationPreviewResult.Invalid(
+                WalletDemoPresentationError(
+                        previewHandle = WalletDemoPresentationPreviewHandle(result.previewHandle.value),
+                        verifierMetadata = result.request.verifierMetadata?.toDemoMetadata(),
+                        clientId = result.request.clientId,
+                        responseUri = result.request.responseUri,
+                        state = result.request.state,
+                        nonce = result.request.nonce,
+                        responseEncryption = result.request.responseEncryption.toDemoResponseEncryption(),
+                        transactionData = result.request.transactionData.toDemoTransactionDataGroups(),
+                        errorCode = result.errorCode.errorCode,
+                        message = result.message,
+                    )
+                )
         }
 
-    override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreview =
-        mobileWallet.previewPresentation(requestUrl).toDemoPreview()
-
     override suspend fun submitPresentation(
-        requestUrl: String,
+        previewHandle: WalletDemoPresentationPreviewHandle,
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String?,
     ): WalletDemoOperationResult =
         mobileWallet.submitPresentation(
-            requestUrl = requestUrl,
+            previewHandle = MobileWalletPresentationPreviewHandle(previewHandle.value),
             selectedCredentialOptions = selectedCredentialOptions.map {
                 MobileWalletPresentationCredentialSelection(
                     queryId = it.queryId,
@@ -78,15 +119,48 @@ internal class MobileDemoWallet(
                 )
             },
             did = did,
-        ).let { result ->
-            if (result.success) {
-                WalletDemoOperationResult.Success(WalletDisplayText.PresentationSent)
-            } else {
-                WalletDemoOperationResult.Failure(WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation)
-            }
-        }
+        ).toDemoOperationResult(
+            successMessage = WalletDisplayText.PresentationSent,
+            failureMessage = WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation,
+        )
+
+    override suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle) =
+        mobileWallet.discardPresentationPreview(MobileWalletPresentationPreviewHandle(previewHandle.value))
+
+    override suspend fun rejectPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+    ): WalletDemoOperationResult =
+        mobileWallet.rejectPresentation(
+            previewHandle = MobileWalletPresentationPreviewHandle(previewHandle.value),
+        ).toDemoOperationResult(
+            successMessage = WalletDisplayText.PresentationRejected,
+            failureMessage = WalletDisplayText.RejectionFinishedWithoutVerifierConfirmation,
+        )
 
 }
+
+private fun MobileWalletPresentationResult.toDemoOperationResult(
+    successMessage: String,
+    failureMessage: String,
+): WalletDemoOperationResult =
+    when (this) {
+        is MobileWalletPresentationResult.Prepared.OpenUrl -> WalletDemoOperationResult.Success(
+            successMessage,
+            WalletDemoPresentationContinuation.Url(url),
+        )
+
+        is MobileWalletPresentationResult.Prepared.SubmitForm -> WalletDemoOperationResult.Success(
+            successMessage,
+            WalletDemoPresentationContinuation.FormPostHtml(html),
+        )
+
+        is MobileWalletPresentationResult.Transmitted.Succeeded -> WalletDemoOperationResult.Success(
+            successMessage,
+            redirectUrl?.let(WalletDemoPresentationContinuation::Url),
+        )
+
+        is MobileWalletPresentationResult.Transmitted.Failed -> WalletDemoOperationResult.Failure(failureMessage)
+    }
 
 internal fun DemoWalletConfig.toWalletAttestationConfig(): WalletAttestationConfig? =
     attestationBaseUrl.takeIf { it.isNotBlank() }?.let {
@@ -100,30 +174,21 @@ internal fun DemoWalletConfig.toWalletAttestationConfig(): WalletAttestationConf
 
 private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentationPreview =
     WalletDemoPresentationPreview(
-        verifierName = request.verifierName,
+        previewHandle = WalletDemoPresentationPreviewHandle(previewHandle.value),
+        verifierMetadata = request.verifierMetadata?.toDemoMetadata(),
         clientId = request.clientId,
         responseUri = request.responseUri,
         state = request.state,
         nonce = request.nonce,
-        transactionData = CredentialDisplayNormalizer.transactionDataGroups(
-            request.transactionData.map { item ->
-                WalletDemoTransactionDataItem(
-                    type = item.type,
-                    displayName = item.displayName,
-                    credentialQueryIds = item.credentialQueryIds,
-                    supportedFields = item.supportedFields,
-                    rawJson = item.rawJson,
-                    detailsJson = item.detailsJson,
-                )
-            }
-        ),
+        responseEncryption = request.responseEncryption.toDemoResponseEncryption(),
+        transactionData = request.transactionData.toDemoTransactionDataGroups(),
         credentialOptions = credentialOptions.map { option ->
             WalletDemoPresentationCredentialOption(
                 queryId = option.queryId,
                 credentialId = option.credentialId,
                 multiple = option.multiple,
                 label = option.label ?: option.format,
-                issuer = option.issuer ?: CredentialDisplayText.Unknown,
+                issuer = option.issuer,
                 subject = option.subject,
                 format = option.format,
                 credentialDataJson = option.credentialDataJson,
@@ -143,4 +208,72 @@ private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentat
         credentialRequirements = credentialRequirements.map { requirement ->
             WalletDemoPresentationCredentialRequirement(options = requirement.options)
         },
+    )
+
+private fun List<MobileWalletTransactionDataItem>.toDemoTransactionDataGroups(): List<ClaimGroup> =
+    CredentialDisplayNormalizer.transactionDataGroups(
+        map { item ->
+            WalletDemoTransactionDataItem(
+                type = item.type,
+                displayName = item.displayName,
+                credentialQueryIds = item.credentialQueryIds,
+                supportedFields = item.supportedFields,
+                rawJson = item.rawJson,
+                detailsJson = item.detailsJson,
+            )
+        }
+    )
+
+private fun MobileWalletResponseEncryption.toDemoResponseEncryption(): WalletDemoResponseEncryption =
+    when (this) {
+        MobileWalletResponseEncryption.NotRequired -> WalletDemoResponseEncryption.NotRequired
+        is MobileWalletResponseEncryption.Required -> WalletDemoResponseEncryption.Required(
+            keyManagementAlgorithm = keyManagementAlgorithm,
+            contentEncryptionAlgorithm = contentEncryptionAlgorithm,
+            verifierKeyId = verifierKeyId,
+            verifierKeyThumbprint = verifierKeyThumbprint,
+        )
+    }
+
+private fun MobileWalletMetadataDisplay.toDemoMetadataDisplay(): WalletDemoMetadataDisplay =
+    WalletDemoMetadataDisplay(
+        name = name,
+        logoUri = logoUri,
+        logoAltText = logoAltText,
+        description = description,
+    )
+
+private fun MobileWalletOfferedCredentialMetadata.toDemoMetadata(): WalletDemoOfferedCredentialMetadata =
+    WalletDemoOfferedCredentialMetadata(
+        configurationId = configurationId,
+        format = format,
+        vct = vct,
+        doctype = doctype,
+        display = display?.toDemoMetadataDisplay(),
+        claims = claims.map(MobileWalletCredentialClaimMetadata::toDemoMetadata),
+    )
+
+private fun MobileWalletCredentialClaimMetadata.toDemoMetadata(): WalletDemoCredentialClaimMetadata =
+    WalletDemoCredentialClaimMetadata(
+        path = path,
+        mandatory = mandatory,
+        displayName = displayName,
+    )
+
+private fun MobileWalletTransactionCodeRequirement.toDemoRequirement(): WalletDemoTransactionCodeRequirement =
+    WalletDemoTransactionCodeRequirement(
+        inputMode = when (inputMode) {
+            MobileWalletTransactionCodeInputMode.Numeric -> WalletDemoTransactionCodeInputMode.Numeric
+            MobileWalletTransactionCodeInputMode.Text -> WalletDemoTransactionCodeInputMode.Text
+        },
+        length = length,
+        description = description,
+    )
+
+private fun MobileWalletVerifierMetadata.toDemoMetadata(): WalletDemoVerifierMetadata =
+    WalletDemoVerifierMetadata(
+        display = display?.toDemoMetadataDisplay(),
+        clientUri = clientUri,
+        policyUri = policyUri,
+        termsOfServiceUri = termsOfServiceUri,
     )

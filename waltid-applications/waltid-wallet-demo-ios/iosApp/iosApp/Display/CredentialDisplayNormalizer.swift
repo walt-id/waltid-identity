@@ -142,11 +142,13 @@ enum CredentialDisplayNormalizer {
             )
         }
 
-        let groupedItems = members.flatMap { member in
+        let displayMembers = format == mdocFormat ? members.compactMap(sanitizedMdocMember) : members
+        let groupedItems = displayMembers.flatMap { member in
             let path = DisplayClaimPath.topLevel(member.key)
             return claimRows(path: path, label: CredentialDisplayVocabulary.humanizedLabel(member.key), value: member.value)
                 .map { row in
-                    (CredentialDisplayVocabulary.groupKind(for: row.path.components), row)
+                    let displayRow = row.withMdocDisplaySemantics(format: format)
+                    return (CredentialDisplayVocabulary.groupKind(for: displayRow.path.components, format: format), displayRow)
                 }
         }
         let groups = Dictionary(grouping: groupedItems, by: { $0.0 })
@@ -157,9 +159,10 @@ enum CredentialDisplayNormalizer {
                     items: rows
                         .map(\.1)
                         .sorted { lhs, rhs in
-                            CredentialDisplayVocabulary.claimPathCompare(lhs.path.components, rhs.path.components) == .orderedAscending
+                            CredentialDisplayVocabulary.claimPathCompare(lhs.path.components, rhs.path.components, format: format) == .orderedAscending
                         }
-                        .map(\.item)
+                        .map(\.item),
+                    initiallyExpanded: group.initiallyExpanded
                 )
             }
 
@@ -338,6 +341,24 @@ enum CredentialDisplayNormalizer {
         value.rawJSON
     }
 
+    private static func sanitizedMdocMember(_ member: CredentialDisplayJSONMember) -> CredentialDisplayJSONMember? {
+        guard case .null = member.value else {
+            return CredentialDisplayJSONMember(key: member.key, value: sanitizeMdocValue(member.value))
+        }
+        return nil
+    }
+
+    private static func sanitizeMdocValue(_ value: CredentialDisplayJSONValue) -> CredentialDisplayJSONValue {
+        switch value {
+        case .object(let members):
+            return .object(members.compactMap(sanitizedMdocMember))
+        case .array(let values):
+            return .array(values.map(sanitizeMdocValue))
+        case .string, .number, .bool, .null:
+            return value
+        }
+    }
+
     private static func disclosurePath(index: Int, disclosure: PresentationDisclosure) -> DisplayClaimPath {
         let leaf = ClaimPathExpression.parse(disclosure.path).leafKey
             ?? disclosure.name?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
@@ -392,6 +413,7 @@ enum CredentialDisplayNormalizer {
     private static let minimumCredibleEpochSeconds: Int64 = 100_000_000
     private static let epochMillisecondsThreshold: Int64 = 10_000_000_000
     private static let imageWrapperClaimName = "elementValue"
+    private static let mdocFormat = "mso_mdoc"
 }
 
 private extension String {
@@ -403,6 +425,48 @@ private extension String {
 private struct ClaimRow {
     let path: DisplayClaimPath
     let item: ClaimItem
+
+    func withMdocDisplaySemantics(format: String) -> ClaimRow {
+        guard let semantics = MdocClaimDisplaySemantics.describe(format: format, path: path.components) else {
+            return self
+        }
+        let displayValue: DisplayValue
+        switch semantics.valueKind {
+        case .bool:
+            if case .bool = item.value {
+                displayValue = item.value
+            } else {
+                displayValue = .text("Unsupported value")
+            }
+        case .binary:
+            displayValue = item.value.binaryAvailability
+        case .other:
+            displayValue = item.value
+        }
+        return ClaimRow(
+            path: path,
+            item: item.replacing(label: semantics.label, value: displayValue)
+        )
+    }
+}
+
+private extension DisplayValue {
+    var binaryAvailability: DisplayValue {
+        let byteCount: Int?
+        switch self {
+        case .image(_, _, _, let count):
+            byteCount = count
+        case .list(let values) where !values.isEmpty && values.allSatisfy({ value in
+            if case .number = value { return true }
+            return false
+        }):
+            byteCount = values.count
+        default:
+            byteCount = nil
+        }
+        let detail = byteCount.map { $0 == 1 ? "1 byte" : "\($0) bytes" }
+        return .text(detail.map { "Available, \($0)" } ?? "Available")
+    }
 }
 
 private func hiddenClaimCommitmentsText(count: Int) -> String {
@@ -475,6 +539,17 @@ private extension Array where Element == CredentialDisplayJSONMember {
 
 private extension ClaimItem {
     func relabelled(_ label: String) -> ClaimItem {
+        ClaimItem(
+            path: path,
+            pathComponents: pathComponents,
+            label: label,
+            value: value,
+            rawValue: rawValue,
+            roles: roles
+        )
+    }
+
+    func replacing(label: String, value: DisplayValue) -> ClaimItem {
         ClaimItem(
             path: path,
             pathComponents: pathComponents,

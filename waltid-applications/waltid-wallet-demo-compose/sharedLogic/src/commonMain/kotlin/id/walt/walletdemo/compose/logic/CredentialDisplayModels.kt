@@ -8,6 +8,7 @@ data class CredentialDetails(
 data class ClaimGroup(
     val title: String,
     val items: List<ClaimItem>,
+    val initiallyExpanded: Boolean = true,
 )
 
 class ClaimItemPath private constructor(

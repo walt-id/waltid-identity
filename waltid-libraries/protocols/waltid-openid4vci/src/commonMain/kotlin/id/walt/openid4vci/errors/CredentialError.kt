@@ -1,10 +1,12 @@
 package id.walt.openid4vci.errors
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class CredentialError(
     val error: String,
+    @SerialName("error_description")
     val description: String? = null,
 )
 
@@ -12,13 +14,11 @@ data class CredentialError(
  * OpenID4VCI credential endpoint error codes.
  */
 object CredentialErrorCodes {
-    const val INVALID_REQUEST = "invalid_request"
-    const val INVALID_TOKEN = "invalid_token"
-    const val INSUFFICIENT_SCOPE = "insufficient_scope"
-    const val UNSUPPORTED_CREDENTIAL_TYPE = "unsupported_credential_type"
-    const val UNSUPPORTED_CREDENTIAL_FORMAT = "unsupported_credential_format"
-    const val UNSUPPORTED_CREDENTIAL_CONFIGURATION = "unsupported_credential_configuration"
-    const val INVALID_OR_MISSING_PROOF = "invalid_or_missing_proof"
-    const val ENCRYPTION_NOT_SUPPORTED = "encryption_not_supported"
-    const val SERVER_ERROR = "server_error"
+    const val INVALID_CREDENTIAL_REQUEST = "invalid_credential_request"
+    const val UNKNOWN_CREDENTIAL_CONFIGURATION = "unknown_credential_configuration"
+    const val UNKNOWN_CREDENTIAL_IDENTIFIER = "unknown_credential_identifier"
+    const val INVALID_PROOF = "invalid_proof"
+    const val INVALID_NONCE = "invalid_nonce"
+    const val INVALID_ENCRYPTION_PARAMETERS = "invalid_encryption_parameters"
+    const val CREDENTIAL_REQUEST_DENIED = "credential_request_denied"
 }

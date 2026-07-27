@@ -13,6 +13,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialRequestEncryption
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.IssuerDisplay
+import id.walt.openid4vci.metadata.issuer.toSignedJwt
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.sdjwt.metadata.issuer.JWTVCIssuerMetadata
@@ -64,6 +65,11 @@ class MetadataService(
                 display = issuerDisplay,
             )
         }
+
+    suspend fun getSignedCredentialIssuerMetadata(): String =
+        getCredentialIssuerMetadata().toSignedJwt(
+            signingKey = KeyManager.resolveSerializedKey(tokenSigningKeyConfig),
+        )
 
     fun getAuthorizationServerMetadata(): AuthorizationServerMetadata =
         AuthorizationServerMetadata.fromBaseUrl(

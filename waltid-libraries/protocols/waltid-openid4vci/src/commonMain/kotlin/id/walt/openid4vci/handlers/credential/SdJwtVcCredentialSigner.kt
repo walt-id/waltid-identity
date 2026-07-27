@@ -10,6 +10,7 @@ import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.credentials.keyresolver.resolvers.DidKeyResolver
 import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
+import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDJwtVC
@@ -49,6 +50,7 @@ object SdJwtVcCredentialSigner {
         display: List<CredentialDisplay>? = null,
         sdJwtTypeHeader: String? = null,
         sdJwtCredentialClaims: JsonObject? = null,
+        verifiedProof: VerifiedCredentialProof? = null,
     ): String = generateSdJwtVC(
         credentialRequest = credentialRequest,
         credentialData = credentialData,
@@ -61,6 +63,7 @@ object SdJwtVcCredentialSigner {
         display = display,
         sdJwtTypeHeader = sdJwtTypeHeader,
         sdJwtCredentialClaims = sdJwtCredentialClaims,
+        verifiedProof = verifiedProof,
     )
 
     suspend fun generateSdJwtVC(
@@ -76,6 +79,7 @@ object SdJwtVcCredentialSigner {
         display: List<CredentialDisplay>? = null,
         sdJwtTypeHeader: String? = null,
         sdJwtCredentialClaims: JsonObject? = null,
+        verifiedProof: VerifiedCredentialProof? = null,
     ): String = generateSdJwtVC(
         credentialRequest = credentialRequest,
         credentialData = credentialData,
@@ -88,6 +92,7 @@ object SdJwtVcCredentialSigner {
         display = display,
         sdJwtTypeHeader = sdJwtTypeHeader,
         sdJwtCredentialClaims = sdJwtCredentialClaims,
+        verifiedProof = verifiedProof,
     )
 
     private suspend fun generateSdJwtVC(
@@ -102,12 +107,14 @@ object SdJwtVcCredentialSigner {
         display: List<CredentialDisplay>?,
         sdJwtTypeHeader: String?,
         sdJwtCredentialClaims: JsonObject?,
+        verifiedProof: VerifiedCredentialProof?,
     ): String {
-        val proofHeader = credentialRequest.proofs?.jwt?.let { JwtUtils.parseJWTHeader(it.first()) }
+        val proofHeader = verifiedProof?.header ?: credentialRequest.proofs?.jwt?.let { JwtUtils.parseJWTHeader(it.first()) }
             ?: throw IllegalArgumentException("Missing JWT proof in proofs")
-        val holderKeyJson = resolveHolderJwk(proofHeader)
+        // A proof verified upfront already carries the holder key, so it is not resolved twice.
+        val holderKeyJson = resolveHolderJwk(proofHeader, verifiedProof?.holderKey)
 
-        val holderDid = proofHeader[JWT_HEADER_KID]?.jsonPrimitive?.content.let {
+        val holderDid = verifiedProof?.holderDid ?: proofHeader[JWT_HEADER_KID]?.jsonPrimitive?.content.let {
             if (!it.isNullOrEmpty() && DidUtils.isDidUrl(it)) it.substringBefore("#") else null
         }
 
@@ -151,7 +158,8 @@ object SdJwtVcCredentialSigner {
 
 
         val extraClaims = sdJwtCredentialClaims ?: emptyMap()
-        val undisclosedPayload = sdPayload.undisclosedPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
+        val undisclosedPayload =
+            sdPayload.undisclosedPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
 
         val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
 
@@ -194,8 +202,8 @@ object SdJwtVcCredentialSigner {
         return sdJwtVC.toString().plus(SEPARATOR_STR)
     }
 
-    private suspend fun resolveHolderJwk(proofHeader: JsonObject): JsonObject {
-        val holderKey = when {
+    private suspend fun resolveHolderJwk(proofHeader: JsonObject, verifiedHolderKey: Key?): JsonObject {
+        val holderKey = verifiedHolderKey ?: when {
             JWT_HEADER_JWK in proofHeader ->
                 JWKKey.importJWK(requireNotNull(proofHeader[JWT_HEADER_JWK]).toString()).getOrThrow().getPublicKey()
 

@@ -34,28 +34,40 @@ class WalletDemoAppIosTest {
         scenarios.transactionCodeOfferCanBeDeclinedWithoutCode()
 
     @Test
+    fun offerClaimsUseSemanticGroupsAndInclusionLabels() =
+        scenarios.offerClaimsUseSemanticGroupsAndInclusionLabels()
+
+    @Test
     fun receiveAndPresentTabsExposeQrScanActions() =
         scenarios.receiveAndPresentTabsExposeQrScanActions()
 
     @Test
-    fun presentTabExplainsWhyPreviewIsUnavailableWithoutCredentials() =
-        scenarios.presentTabExplainsWhyPreviewIsUnavailableWithoutCredentials()
+    fun presentTabAllowsPreviewAndDeclineWithoutCredentials() =
+        scenarios.presentTabAllowsPreviewAndDeclineWithoutCredentials()
+
+    @Test
+    fun invalidPresentationCanBeDismissedLocallyOrReportedToVerifier() =
+        scenarios.invalidPresentationCanBeDismissedLocallyOrReportedToVerifier()
 
     @Test
     fun presentTabPreviewsCredentialsAndCanStartNewFlowAfterSuccess() =
         scenarios.presentTabPreviewsCredentialsAndCanStartNewFlowAfterSuccess()
 
     @Test
+    fun presentTabDeclineSendsProtocolRejection() =
+        scenarios.presentTabDeclineSendsProtocolRejection()
+
+    @Test
+    fun presentTabShowsUnencryptedResponseState() =
+        scenarios.presentTabShowsUnencryptedResponseState()
+
+    @Test
     fun presentationDisclosureImagesRenderAsImages() =
         scenarios.presentationDisclosureImagesRenderAsImages()
 
     @Test
-    fun presentTabShowsReadableVerifierFallbackForDidClientIds() =
-        scenarios.presentTabShowsReadableVerifierFallbackForDidClientIds()
-
-    @Test
-    fun presentTabShowsReadableVerifierFallbackForX509SanDnsClientIds() =
-        scenarios.presentTabShowsReadableVerifierFallbackForX509SanDnsClientIds()
+    fun presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails() =
+        scenarios.presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails()
 
     @Test
     fun presentationDetailsResolveDuplicateCredentialOptionsIndependently() =

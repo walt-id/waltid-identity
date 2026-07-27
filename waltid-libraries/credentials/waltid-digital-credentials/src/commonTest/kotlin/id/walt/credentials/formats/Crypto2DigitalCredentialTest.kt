@@ -49,12 +49,13 @@ class Crypto2DigitalCredentialTest {
     private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
 
     @Test
-    fun `W3C credential secured with SD-JWT uses dc+sd-jwt presentation format`() {
+    fun `W3C credential secured with SD-JWT keeps the W3C jwt_vc_json format`() {
         val signature = SdJwtCredentialSignature("issuer.jwt~", JsonObject(emptyMap()))
         val credentialData = buildJsonObject { put("type", JsonArray(listOf(JsonPrimitive("VerifiableCredential")))) }
 
-        assertEquals("dc+sd-jwt", W3C11(credentialData = credentialData, signature = signature, signed = "issuer.jwt~").format)
-        assertEquals("dc+sd-jwt", W3C2(credentialData = credentialData, signature = signature, signed = "issuer.jwt~").format)
+        // dc+sd-jwt is reserved for IETF SD-JWT VC; W3C credentials stay queryable as jwt_vc_json.
+        assertEquals("jwt_vc_json", W3C11(credentialData = credentialData, signature = signature, signed = "issuer.jwt~").format)
+        assertEquals("jwt_vc_json", W3C2(credentialData = credentialData, signature = signature, signed = "issuer.jwt~").format)
     }
 
     @Test

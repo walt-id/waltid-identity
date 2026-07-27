@@ -88,31 +88,38 @@ fun initWallet2Database(
         validate()
     }
 
-    val db = Database.connect(HikariDataSource(hikari))
-
-    synchronized(schemaMigrationLock) {
+    // Pool warm-up already opens a connection (and runs connectionInitSql), which can contend with
+    // a concurrent migration on the same SQLite database, so it is serialized and retried as well.
+    return synchronized(schemaMigrationLock) {
+        val db = retryOnSchemaRace { Database.connect(HikariDataSource(hikari)) }
         createOrMigrateSchema(db, config.jdbcUrl)
+        db
     }
-
-    return db
 }
 
 private fun createOrMigrateSchema(db: Database, jdbcUrl: String) {
-    repeat(SCHEMA_MIGRATION_ATTEMPTS) { attempt ->
-        try {
-            transaction(db) {
-                if (jdbcUrl.startsWith("jdbc:postgresql:")) {
-                    exec("SELECT pg_advisory_xact_lock($SCHEMA_MIGRATION_LOCK_ID)")
-                }
-                SchemaUtils.createMissingTablesAndColumns(*Wallet2Tables.ALL)
+    retryOnSchemaRace {
+        transaction(db) {
+            if (jdbcUrl.startsWith("jdbc:postgresql:")) {
+                exec("SELECT pg_advisory_xact_lock($SCHEMA_MIGRATION_LOCK_ID)")
             }
-            log.info { "wallet2 schema ready" }
-            return
+            SchemaUtils.createMissingTablesAndColumns(*Wallet2Tables.ALL)
+        }
+    }
+    log.info { "wallet2 schema ready" }
+}
+
+/** Runs [block], retrying while it fails with a transient concurrent-schema-change error. */
+private fun <T> retryOnSchemaRace(block: () -> T): T {
+    repeat(SCHEMA_MIGRATION_ATTEMPTS - 1) { attempt ->
+        try {
+            return block()
         } catch (cause: Exception) {
-            if (attempt == SCHEMA_MIGRATION_ATTEMPTS - 1 || !cause.isRetryableSchemaRace()) throw cause
+            if (!cause.isRetryableSchemaRace()) throw cause
             Thread.sleep(SCHEMA_MIGRATION_RETRY_MILLIS * (attempt + 1))
         }
     }
+    return block()
 }
 
 private fun Throwable.isRetryableSchemaRace(): Boolean {

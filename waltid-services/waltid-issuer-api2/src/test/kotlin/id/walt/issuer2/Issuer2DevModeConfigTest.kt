@@ -34,7 +34,7 @@ class Issuer2DevModeConfigTest {
 
     @Test
     fun devModeConfigMatchesIssuer1DevelopmentDefaults() {
-        System.setProperty("config.file.dev-mode", issuer2ConfigFile("dev-mode.conf").toString())
+        System.setProperty("config.file.dev-mode", issuer2ConfigFile().toString())
 
         ConfigManager.registerConfig("dev-mode", DevModeConfig::class)
         ConfigManager.loadConfigs()
@@ -43,7 +43,7 @@ class Issuer2DevModeConfigTest {
         assertFalse(devModeConfig.enableDidWebResolverHttps)
     }
 
-    private fun issuer2ConfigFile(fileName: String): Path =
+    private fun issuer2ConfigFile(fileName: String = "dev-mode.conf"): Path =
         listOf(
             Path.of("config"),
             Path.of("waltid-services/waltid-issuer-api2/config"),

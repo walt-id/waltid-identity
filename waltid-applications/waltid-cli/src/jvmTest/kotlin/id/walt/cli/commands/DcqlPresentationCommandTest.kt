@@ -61,7 +61,7 @@ class DcqlPresentationCommandTest {
 
         val original = Json.parseToJsonElement(vp.readText()).jsonObject
         val token = original.getValue("badge").jsonArray.single().toString().trim('"')
-        val badToken = token.dropLast(1) + if (token.last() == 'A') "B" else "A"
+        val badToken = token.withTamperedSignature()
         vp.writeText(Json.encodeToString(JsonObject(mapOf("badge" to JsonArray(listOf(JsonPrimitive(badToken)))))))
         val badSignature = VPVerifyCmd().test(verifyArguments(query.toString(), vp.toString()))
         assertEquals(1, badSignature.statusCode)
@@ -224,6 +224,21 @@ class DcqlPresentationCommandTest {
         assertFalse(build.contains("crypto:waltid-crypto\")"))
         assertFalse(build.contains("credentials:waltid-verification-policies\")"))
         assertFalse(build.contains("protocols:waltid-openid4vc\")"))
+    }
+
+    /**
+     * Flips one signature bit of a compact JWS.
+     *
+     * The signature bytes are decoded and re-encoded instead of editing base64url characters
+     * directly: the trailing character can carry unused padding bits, so a character flip there
+     * may decode to the very same signature.
+     */
+    private fun String.withTamperedSignature(): String {
+        val parts = split('.')
+        require(parts.size == 3) { "Expected a compact JWS, got $this" }
+        val base64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
+        val signature = base64.decode(parts[2]).also { it[0] = (it[0].toInt() xor 0x01).toByte() }
+        return "${parts[0]}.${parts[1]}.${base64.encode(signature)}"
     }
 
     private fun createArguments(
