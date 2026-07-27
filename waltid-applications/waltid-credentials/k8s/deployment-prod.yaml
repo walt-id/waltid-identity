@@ -21,7 +21,7 @@ spec:
                     type: RuntimeDefault
             containers:
                 - name: vc-repository-prod
-                  image: waltid/vc-repository:latest
+                  image: waltid/vc-repository:__DEFAULT_IMAGE_TAG__
                   securityContext:
                       allowPrivilegeEscalation: false
                       capabilities:

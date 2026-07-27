@@ -9,6 +9,7 @@ import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
 import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenVerifier
 import id.walt.openid4vci.tokens.jwt.JwtSigningKeyResolver
+import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import java.lang.ThreadLocal
@@ -228,6 +229,7 @@ class TokenIssuerTest {
                 subject = "alice",
                 issuer = "https://issuer.example",
                 audience = "https://audience.example",
+                additional = mapOf(JwtPayloadClaims.CLIENT_ID to "wallet-client"),
             )
         )
 
@@ -245,7 +247,9 @@ class TokenIssuerTest {
             )
         )
 
-        assertTrue(result is CredentialRequestResult.Success)
+        val success = result as CredentialRequestResult.Success
+        assertEquals("wallet-client", success.request.accessTokenClientId)
+        assertTrue(!success.request.anonymousPreAuthorizedAccess)
     }
 
     @Test
