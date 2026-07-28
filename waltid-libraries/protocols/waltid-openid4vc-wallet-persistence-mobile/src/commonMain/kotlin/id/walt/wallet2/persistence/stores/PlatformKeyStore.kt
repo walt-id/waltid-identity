@@ -60,6 +60,11 @@ public class PlatformKeyStore(
         return loadLegacyKey(keyId, keyType, ref.is_platform_backed == 1L, ref.key_material)
     }
 
+    /**
+     * Restores the managed key associated with [keyId].
+     *
+     * The key must permit every requested [usages] entry.
+     */
     override suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage>): Crypto2Key? {
         val ref = queries.selectByKeyId(keyId).executeAsOneOrNull() ?: return null
         return restoreOrBackfillCrypto2Key(
@@ -73,6 +78,11 @@ public class PlatformKeyStore(
         }
     }
 
+    /**
+     * Loads the managed and compatibility key material associated with [keyId].
+     *
+     * Any managed key must permit every requested [usages] entry.
+     */
     override suspend fun getKeyMaterial(keyId: String, usages: Set<KeyUsage>): WalletKeyStoreEntry? {
         val ref = queries.selectByKeyId(keyId).executeAsOneOrNull() ?: return null
         val keyType = KeyType.valueOf(ref.key_type)
