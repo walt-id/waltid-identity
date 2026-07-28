@@ -403,7 +403,7 @@ class Issuer2MetadataEndpointTest {
             ?: error("Could not locate waltid-issuer-api2 config directory")
 
     private companion object {
-        const val ISSUER_AUTHORITY_BASE_URL = "http://localhost:7002"
+        const val ISSUER_AUTHORITY_BASE_URL = "http://localhost:7005"
         const val OPENID4VCI_PREFIX = "/openid4vci"
         const val ISSUER_BASE_URL = "$ISSUER_AUTHORITY_BASE_URL/openid4vci"
         const val AUTHORIZATION_SERVER_METADATA_PATH = "/.well-known/oauth-authorization-server/openid4vci"

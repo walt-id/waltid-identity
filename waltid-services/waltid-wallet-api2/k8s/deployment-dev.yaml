@@ -1,4 +1,21 @@
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallet2-web-config
+data:
+  web.conf: |
+    webHost = "0.0.0.0"
+    webPort = 3000
+  wallet-service.conf: |
+    publicBaseUrl = "https://wallet-api2.test.waltid.cloud"
+    attestationConfig {
+      attesterUrl = "https://wallet-provider.eudiw.dev/wallet-instance-attestation/jwk"
+      requestBody {
+        jwk = "{{public_jwk}}"
+      }
+    }
+---
+apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: wallet-api2-data-volume-claim
@@ -42,12 +59,23 @@ spec:
               drop:
                 - ALL
           volumeMounts:
+            - name: wallet2-web-config
+              mountPath: "/waltid-wallet-api2/config/web.conf"
+              subPath: web.conf
+              readOnly: true
+            - name: wallet2-web-config
+              mountPath: "/waltid-wallet-api2/config/wallet-service.conf"
+              subPath: wallet-service.conf
+              readOnly: true
             - mountPath: "/waltid-wallet-api2/data/"
               name: wallet-data
           ports:
-            - containerPort: 7005
+            - containerPort: 3000
               name: http-api
       volumes:
+        - name: wallet2-web-config
+          configMap:
+            name: wallet2-web-config
         - name: wallet-data
           persistentVolumeClaim:
             claimName: wallet-api2-data-volume-claim

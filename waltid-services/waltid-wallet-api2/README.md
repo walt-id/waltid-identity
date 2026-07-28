@@ -283,16 +283,22 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/requ
   }'
 
 ACCESS_TOKEN="..."
+
+# Step 3 (only when nonceEndpoint is advertised): obtain a fresh proof nonce
+curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/request-nonce \
+  -H "Content-Type: application/json" \
+  -d '{"credentialIssuer":"https://issuer.example.com"}'
+
 C_NONCE="..."
 
-# Step 3: Sign a proof of possession
+# Step 4: Sign a proof of possession; omit nonce when request-nonce returned null
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/sign-proof \
   -H "Content-Type: application/json" \
   -d "{\"issuerUrl\":\"https://issuer.example.com\",\"nonce\":\"$C_NONCE\",\"keyId\":\"$KEY_ID\"}"
 
 PROOF_JWT="..."
 
-# Step 4: Fetch the credential
+# Step 5: Fetch the credential
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/fetch-credential \
   -H "Content-Type: application/json" \
   -d "{
@@ -323,7 +329,13 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/exch
     "codeVerifier": "<pkce-verifier>",
     "redirectUri": "openid://"
   }'
-# → {"accessToken":"...","cNonce":"..."}
+# → {"accessToken":"..."}
+
+# Step 3 (only when nonceEndpoint is advertised): obtain a fresh proof nonce
+curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/request-nonce \
+  -H "Content-Type: application/json" \
+  -d '{"credentialIssuer":"https://issuer.example.com"}'
+# → {"nonce":"..."}; when no endpoint is advertised, proof JWTs omit the nonce claim
 ```
 
 ### Present credentials (OID4VP 1.0 / DCQL)

@@ -164,13 +164,6 @@ class PreAuthorizedCodeTokenEndpoint(
         }
 
         val scope = clientRequest.grantedScopes.takeIf { it.isNotEmpty() }?.joinToString(" ")
-        val extra = buildMap<String, Any?> {
-            consumed.credentialNonce?.let { put("c_nonce", it) }
-            consumed.credentialNonceExpiresAt?.let { expiresAt ->
-                put("c_nonce_expires_in", computeRemainingSeconds(expiresAt))
-            }
-        }
-
         // If no explicit session expiry is configured, return the default lifetime exactly.
         // If an explicit expiry exists, return the real remaining lifetime from now.
         val expiresIn = if (sessionExpiresAt == null) {
@@ -187,7 +180,6 @@ class PreAuthorizedCodeTokenEndpoint(
                 expiresIn = expiresIn,
                 refreshToken = refreshToken,
                 scope = scope,
-                extra = extra,
             ),
         )
     }

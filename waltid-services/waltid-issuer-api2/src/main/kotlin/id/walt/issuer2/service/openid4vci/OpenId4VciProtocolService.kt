@@ -10,15 +10,9 @@ import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.utils.JsonObjectPathMapper
-import id.walt.mdoc.dataelement.DataElement
-import id.walt.mdoc.dataelement.MapElement
-import id.walt.mdoc.dataelement.MapKey
-import id.walt.mdoc.dataelement.NumberElement
-import id.walt.mdoc.dataelement.StringElement
-import id.walt.mdoc.doc.MDoc
-import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
+import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
@@ -27,8 +21,15 @@ import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
+import id.walt.openid4vci.requests.credential.CredentialRequestTargetResolution
+import id.walt.openid4vci.requests.credential.resolveCredentialConfigurationId
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.offers.AuthenticationMethod
+import id.walt.openid4vci.proofs.CredentialNonceBinding
+import id.walt.openid4vci.proofs.CredentialNonceService
+import id.walt.openid4vci.proofs.CredentialNonceValidationContext
+import id.walt.openid4vci.proofs.CredentialProofValidationContext
+import id.walt.openid4vci.proofs.IssuedCredentialNonce
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
@@ -68,6 +69,7 @@ class OpenId4VciProtocolService(
     private val profileService: CredentialProfileService,
     private val metadataService: MetadataService,
     private val notificationService: IssuanceNotificationService,
+    private val credentialNonceService: CredentialNonceService,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -308,7 +310,7 @@ class OpenId4VciProtocolService(
 
     private fun invalidCredentialAuthorization(): CredentialResponseHttp =
         oauth2Provider.writeCredentialError(
-            OAuthError(CredentialErrorCodes.INVALID_TOKEN, "Credential request has invalid authorization credentials"),
+            OAuthError(OAuthErrorCodes.INVALID_TOKEN, "Credential request has invalid authorization credentials"),
         )
 
     private suspend fun processCredentialRequest(
@@ -320,28 +322,23 @@ class OpenId4VciProtocolService(
         ) {
             is CredentialRequestResult.Success -> result.request
             is CredentialRequestResult.Failure -> return oauth2Provider.writeCredentialError(result.error)
+            is CredentialRequestResult.OAuthFailure -> return oauth2Provider.writeCredentialError(result.error)
         }
         val tokenClaims = try {
             accessToken.decodeJws().payload
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            return oauth2Provider.writeCredentialError(credentialRequest, e.toCredentialError())
+            return oauth2Provider.writeCredentialError(
+                credentialRequest,
+                OAuthError(OAuthErrorCodes.INVALID_TOKEN, e.message)
+            )
         }
 
-        val credentialConfigurationId = credentialRequest.credentialConfigurationId
-            ?: credentialRequest.credentialIdentifier
-            ?: return oauth2Provider.writeCredentialError(
-                credentialRequest,
-                OAuthError(
-                    OAuthErrorCodes.INVALID_REQUEST,
-                    "credential_configuration_id or credential_identifier is required",
-                ),
-            )
         val sessionId = tokenClaims.stringClaim("sub")
             ?: return oauth2Provider.writeCredentialError(
                 credentialRequest,
-                OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Access token has no session id"),
+                OAuthError(OAuthErrorCodes.INVALID_TOKEN, "Access token has no session id"),
             )
         val session = try {
             sessionService.getSession(sessionId)
@@ -350,7 +347,7 @@ class OpenId4VciProtocolService(
         } catch (e: Exception) {
             return oauth2Provider.writeCredentialError(
                 credentialRequest.withSession(DefaultSession(subject = sessionId)),
-                e.toCredentialError(),
+                OAuthError(OAuthErrorCodes.INVALID_TOKEN, e.message),
             )
         }
         val issuerId = session.issuerDid ?: metadataService.issuerBaseUrl()
@@ -358,12 +355,26 @@ class OpenId4VciProtocolService(
             .withSession(DefaultSession(subject = sessionId))
             .withIssuer(issuerId)
 
+        val credentialConfigurationId = when (
+            val resolution = credentialRequest.resolveCredentialConfigurationId(
+                credentialConfigurationExists = { metadataService.getCredentialConfiguration(it) != null },
+                resolveCredentialIdentifier = { identifier ->
+                    session.credentialConfigurationId.takeIf { it == identifier }
+                },
+            )
+        ) {
+            is CredentialRequestTargetResolution.Success -> resolution.credentialConfigurationId
+            is CredentialRequestTargetResolution.Failure -> {
+                return failCredentialRequest(requestWithSession, session, resolution.error)
+            }
+        }
+
         if (session.credentialConfigurationId != credentialConfigurationId) {
             return failCredentialRequest(
                 requestWithSession,
                 session,
-                OAuthError(
-                    OAuthErrorCodes.INVALID_REQUEST,
+                CredentialError(
+                    CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
                     "Credential request references $credentialConfigurationId, but session ${session.sessionId} is for ${session.credentialConfigurationId}",
                 ),
             )
@@ -373,8 +384,8 @@ class OpenId4VciProtocolService(
             ?: return failCredentialRequest(
                 requestWithSession,
                 session,
-                OAuthError(
-                    OAuthErrorCodes.INVALID_REQUEST,
+                CredentialError(
+                    CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
                     "Unsupported credential_configuration_id: $credentialConfigurationId",
                 ),
             )
@@ -383,14 +394,14 @@ class OpenId4VciProtocolService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            return failCredentialRequest(requestWithSession, session, e.toCredentialError())
+            return failCredentialRequest(requestWithSession, session, e.toCredentialServerError())
         }
         val x5Chain = try {
             session.x5Chain?.map { id.walt.x509.CertificateDer.fromPEMEncodedString(it) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            return failCredentialRequest(requestWithSession, session, e.toCredentialError())
+            return failCredentialRequest(requestWithSession, session, e.toCredentialServerError())
         }
 
         // Prepare credential data with status injection for W3C/IETF formats
@@ -402,12 +413,14 @@ class OpenId4VciProtocolService(
                         put("credentialStatus", status)
                     })
                 }
+
                 CredentialFormat.SD_JWT_VC -> {
                     // For SD-JWT VC, inject status at root level (as "status" claim)
                     JsonObject(session.credentialData.toMutableMap().apply {
                         put("status", status)
                     })
                 }
+
                 else -> session.credentialData
             }
         } ?: session.credentialData
@@ -419,6 +432,7 @@ class OpenId4VciProtocolService(
                 else -> null
             }
         }
+        val nonceBinding = credentialNonceBinding()
 
         val credentialResponse = try {
             when (val result = oauth2Provider.createCredentialResponse(
@@ -432,6 +446,15 @@ class OpenId4VciProtocolService(
                 x5Chain = x5Chain,
                 mDocNameSpacesDataMappingConfig = session.mDocNameSpacesDataMappingConfig,
                 credentialStatus = mDocStatus,
+                proofValidationContext = CredentialProofValidationContext(
+                    credentialIssuer = nonceBinding.credentialIssuer,
+                    clientId = requestWithSession.accessTokenClientId,
+                    anonymousPreAuthorizedAccess = requestWithSession.anonymousPreAuthorizedAccess,
+                    nonceValidation = CredentialNonceValidationContext(
+                        service = credentialNonceService,
+                        binding = nonceBinding,
+                    ),
+                ),
             )) {
                 is CredentialResponseResult.Success -> result.response
                 is CredentialResponseResult.Failure -> {
@@ -441,7 +464,7 @@ class OpenId4VciProtocolService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            return failCredentialRequest(requestWithSession, session, e.toCredentialError())
+            return failCredentialRequest(requestWithSession, session, e.toCredentialServerError())
         }
 
         val issuedCredential = credentialResponse.credentials
@@ -468,8 +491,19 @@ class OpenId4VciProtocolService(
         return oauth2Provider.writeCredentialResponse(requestWithSession, credentialResponse)
     }
 
-    fun createNonceResponse(): Map<String, String> =
-        mapOf("c_nonce" to UUID.randomUUID().toString())
+    suspend fun createNonceResponse(): IssuedCredentialNonce =
+        credentialNonceService.issue(credentialNonceBinding())
+
+    private fun credentialNonceBinding(): CredentialNonceBinding {
+        val metadata = metadataService.getCredentialIssuerMetadata()
+        return CredentialNonceBinding(
+            credentialIssuer = metadata.credentialIssuer,
+            credentialEndpoint = metadata.credentialEndpoint,
+            nonceEndpoint = requireNotNull(metadata.nonceEndpoint) {
+                "Credential issuer metadata must expose a nonce endpoint"
+            },
+        )
+    }
 
     private suspend fun createAuthorizationResponse(
         issuanceSession: IssuanceSession,
@@ -607,6 +641,21 @@ class OpenId4VciProtocolService(
     private suspend fun failCredentialRequest(
         request: CredentialRequest,
         session: IssuanceSession,
+        error: CredentialError,
+    ): CredentialResponseHttp {
+        val updatedSession = sessionService.updateStatus(
+            session.sessionId,
+            IssuanceSessionStatus.UNSUCCESSFUL,
+            error.description ?: error.error,
+            close = true,
+        )
+        notificationService.emitIssuanceStatus(updatedSession)
+        return oauth2Provider.writeCredentialError(request, error)
+    }
+
+    private suspend fun failCredentialRequest(
+        request: CredentialRequest,
+        session: IssuanceSession,
         error: OAuthError,
     ): CredentialResponseHttp {
         val updatedSession = sessionService.updateStatus(
@@ -672,16 +721,11 @@ class OpenId4VciProtocolService(
             )
         }
 
-    private fun Exception.toCredentialError(): OAuthError =
-        when (this) {
-            is IllegalArgumentException,
-            is NotFoundException -> OAuthError(OAuthErrorCodes.INVALID_REQUEST, message)
-
-            else -> OAuthError(
-                OAuthErrorCodes.SERVER_ERROR,
-                message ?: "Credential request processing failed",
-            )
-        }
+    private fun Exception.toCredentialServerError(): OAuthError =
+        OAuthError(
+            OAuthErrorCodes.SERVER_ERROR,
+            message ?: "Credential request processing failed",
+        )
 
     /**
      * Parse JsonElement to Status object for mDoc credentials.
@@ -700,10 +744,14 @@ class OpenId4VciProtocolService(
             val uri = statusList["uri"]?.jsonPrimitive?.content
                 ?: return null
 
-            MdocStatus(statusList = MdocStatusListInfo(index = idx, uri = id.walt.mdoc.objects.mso.UniformResourceIdentifier(uri)))
+            MdocStatus(
+                statusList = MdocStatusListInfo(
+                    index = idx,
+                    uri = id.walt.mdoc.objects.mso.UniformResourceIdentifier(uri)
+                )
+            )
         } catch (e: Exception) {
             null
         }
     }
-
 }

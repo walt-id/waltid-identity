@@ -1,6 +1,6 @@
 package id.walt.openid4vci.responses.credential
 
-import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -84,7 +84,7 @@ sealed class CredentialResponseResult {
         val response: CredentialResponse,
     ) : CredentialResponseResult()
 
-    data class Failure(val error: OAuthError) : CredentialResponseResult()
+    data class Failure(val error: CredentialError) : CredentialResponseResult()
 
     fun isSuccess(): Boolean = this is Success
 }
