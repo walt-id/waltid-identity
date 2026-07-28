@@ -65,7 +65,7 @@ jobs:
           :waltid-libraries:crypto:waltid-crypto2:macosX64Test
           :waltid-libraries:crypto:waltid-crypto2-kms:macosX64Test
 
-  macos-arm64:
+  macos-arm64-ios:
     runs-on: macos-26
     steps:
       - name: Checkout all repositories
@@ -77,8 +77,10 @@ jobs:
       - name: Configure Gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
 
-      - name: Run macOS arm64 tests
+      - name: Run macOS arm64 and iOS simulator tests
         run: >-
-          ./gradlew
+          ./gradlew -PenableIosBuild=true
           :waltid-libraries:crypto:waltid-crypto2:macosArm64Test
           :waltid-libraries:crypto:waltid-crypto2-kms:macosArm64Test
+          :waltid-libraries:crypto:waltid-crypto2:iosSimulatorArm64Test
+          :waltid-libraries:crypto:waltid-crypto2-kms:iosSimulatorArm64Test
