@@ -61,6 +61,9 @@ kotlin {
                 chromeExecutable?.let { environment("CHROME_BIN", it) }
                 useKarma {
                     useChromeHeadless()
+                    // Explicit rather than convention-discovered: the fragment raises the 2s Mocha default that
+                    // the algorithm support matrix exceeds, and discovery did not apply it to every browser task.
+                    useConfigDirectory(project.file("karma.config.d"))
                 }
             }
         }
@@ -78,7 +81,10 @@ kotlin {
             testTask {
                 enabled = chromeExecutable != null
                 chromeExecutable?.let { environment("CHROME_BIN", it) }
-                useKarma { useChromeHeadless() }
+                useKarma {
+                    useChromeHeadless()
+                    useConfigDirectory(project.file("karma.config.d"))
+                }
             }
         }
         nodejs {
@@ -106,7 +112,7 @@ kotlin {
         }
         jvmMain.dependencies {
             implementation(identityLibs.cryptography.provider.jdk)
-            implementation(identityLibs.bcprov.jdk18on)
+            implementation(identityLibs.bouncycastle.prov)
         }
 
         val opensslMain by creating {
