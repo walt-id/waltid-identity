@@ -135,8 +135,9 @@ actual class JWKKey actual constructor(
             KeyType.secp521r1 -> js("{ name: 'ECDSA', namedCurve: 'P-521' }")
 
             // For RSA, it's an object with name and hash
-            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 ->
-                js("{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }")
+            KeyType.RSA -> js("{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }")
+            KeyType.RSA3072 -> js("{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-384' }")
+            KeyType.RSA4096 -> js("{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' }")
 
             else -> throw IllegalArgumentException("Unsupported key type for Web Crypto: $keyType")
         }
