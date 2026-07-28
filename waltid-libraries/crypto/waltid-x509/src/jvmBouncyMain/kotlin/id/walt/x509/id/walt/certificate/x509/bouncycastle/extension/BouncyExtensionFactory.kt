@@ -1,5 +1,6 @@
 package id.walt.x509.id.walt.certificate.x509.bouncycastle.extension
 
+import id.walt.certificate.x509.PublicKeyInfo
 import id.walt.certificate.x509.extension.*
 import org.bouncycastle.asn1.ASN1BitString
 import org.bouncycastle.asn1.ASN1Object
@@ -48,13 +49,19 @@ object BouncyExtensionFactory {
             BouncyCrlDistributionPointsExtension.createExtension(extension)
         )
 
-
         else -> error("Unknown BouncyCastleExtension type: ${extension::class.qualifiedName}")
     }
 
+    fun createAuthorityKeyIdentifierExtension(
+        extension: AuthorityKeyIdentifierExtension,
+        authorityPublicKey: PublicKeyInfo
+    ): BouncyCastleExtension =
+        createExtension(extension, BouncyAuthorityKeyIdentifierExtension.createExtension(extension, authorityPublicKey))
+
+
     fun createSubjectKeyIdentifierExtension(
         extension: SubjectKeyIdentifierExtension,
-        subjectPublicKey: ASN1BitString
+        subjectPublicKey: PublicKeyInfo
     ): BouncyCastleExtension =
         createExtension(extension, BouncySubjectKeyIdentifierExtension.createExtension(extension, subjectPublicKey))
 

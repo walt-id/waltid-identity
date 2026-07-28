@@ -81,73 +81,88 @@ object TestData {
         -----END CERTIFICATE-----""".trimIndent()
 
     val caIssuerPrivateKey = """
-        -----BEGIN RSA PRIVATE KEY-----
-        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
-        -----END RSA PRIVATE KEY-----""".trimIndent()
+        -----BEGIN PRIVATE KEY-----
+        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
+        rM4q71uirTzhbTu9DC/XCaqus8+HGC0=
+        -----END PRIVATE KEY-----""".trimIndent()
 
-    val intermediateIssuerPrivateKey = """
-        -----BEGIN EC PRIVATE KEY-----
-        MHcCAQEEIHMSqUBLc5jykCXKC2ue/HvEmuUZ6nmF2/ME/nKogZx3oAoGCCqGSM49
-        AwEHoUQDQgAED2LUa7lbsK75ysPikRkQQoOe1GcMHAEh5Y7/Jpg1Eb3vODz541LL
-        1PUgq+vSYgcrUUytmIl5hT/WncJbAOl3kw==
-        -----END EC PRIVATE KEY-----            
+    val intermediateIssuerPrivateKeyPem = """
+        -----BEGIN PRIVATE KEY-----
+        MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgpCx4+BY+9c+2CRpO
+        b1r1KiBXU2WwyN85svFYSaH9O8WhRANCAATj3KZxtouhG7C7t3wrAkdDY9W/ppM0
+        7WfhnOH8Uz7oL2AYyKf49GR6yQsrD4WsMeZ/rdpF+aOA7Di8/nYwlJyY
+        -----END PRIVATE KEY-----
         """.trimIndent()
 
-    val intermediateIssuerPublicKeyHex = """
-        04:0f:62:d4:6b:b9:5b:b0:ae:f9:ca:c3:e2:91:19:
-        10:42:83:9e:d4:67:0c:1c:01:21:e5:8e:ff:26:98:
-        35:11:bd:ef:38:3c:f9:e3:52:cb:d4:f5:20:ab:eb:
-        d2:62:07:2b:51:4c:ad:98:89:79:85:3f:d6:9d:c2:
-        5b:00:e9:77:93
-    """.replace("[\\s:]".toRegex(),"")
+    val intermediateIssuerPublicKeyPem = """
+        -----BEGIN PUBLIC KEY-----
+        MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE49ymcbaLoRuwu7d8KwJHQ2PVv6aT
+        NO1n4Zzh/FM+6C9gGMin+PRkeskLKw+FrDHmf63aRfmjgOw4vP52MJScmA==
+        -----END PUBLIC KEY-----
+        """.trimIndent()
+
+    val intermediateIssuerKeyPem = intermediateIssuerPrivateKeyPem +
+            "\n" +
+            intermediateIssuerPublicKeyPem
+
+    val intermediateIssuerPublicKeyValueHex = """
+        04:e3:dc:a6:71:b6:8b:a1:1b:b0:bb:b7:7c:2b:02:
+        47:43:63:d5:bf:a6:93:34:ed:67:e1:9c:e1:fc:53:
+        3e:e8:2f:60:18:c8:a7:f8:f4:64:7a:c9:0b:2b:0f:
+        85:ac:31:e6:7f:ad:da:45:f9:a3:80:ec:38:bc:fe:
+        76:30:94:9c:98""".trimIndent().replace("[\\s:]".toRegex(), "")
+
+    val intermediateIssuerPublicKeyIdHex = """
+         a7:97:e8:20:1f:a9:32:29:98:9d:ae:73:2d:3a:a6:ec:ba:e5:81:09
+    """.trimIndent().replace("[\\s:]".toRegex(), "")
 
     val csrPem = """
         -----BEGIN CERTIFICATE REQUEST-----

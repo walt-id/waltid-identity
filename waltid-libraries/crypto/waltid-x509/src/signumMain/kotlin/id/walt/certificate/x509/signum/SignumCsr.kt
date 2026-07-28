@@ -2,7 +2,6 @@ package id.walt.certificate.x509.signum
 
 import at.asitplus.signum.indispensable.asn1.Asn1BitString
 import at.asitplus.signum.indispensable.asn1.KnownOIDs
-import at.asitplus.signum.indispensable.asn1.ObjectIdentifier
 import at.asitplus.signum.indispensable.asn1.extensionRequest
 import id.walt.certificate.x509.Pkcs10CertificateSigningRequest
 import id.walt.certificate.x509.extension.Extension
@@ -35,11 +34,13 @@ class SignumCsr(val csr: SignumCertificateRequest) : Pkcs10CertificateSigningReq
             get() = csr.tbsCsr.attributes.firstOrNull {
                 it.oid == KnownOIDs.extensionRequest
             }?.let { extensionRequestAttributes ->
-                extensionRequestAttributes.value.map { extensionAttributeValueRaw ->
-                    extensionAttributeValueRaw.asSequence().children[0]
-                }.map { extensionRaw ->
-                    SignumExtensionFactory.parseExtension(extensionRaw)
-                }.associateBy { it.oid }
+                extensionRequestAttributes.value
+                    .firstOrNull()
+                    ?.asSequence()
+                    ?.children?.map {
+                        SignumExtensionFactory.parseExtension(it)
+                    }
+                    ?.associateBy { it.oid }
             } ?: emptyMap()
 
     }

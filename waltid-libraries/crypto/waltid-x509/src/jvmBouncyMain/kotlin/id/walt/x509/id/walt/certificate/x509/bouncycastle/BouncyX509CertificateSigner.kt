@@ -8,6 +8,7 @@ import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateSigner
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder
+import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension
 import id.walt.crypto.keys.Key
 import id.walt.x509.id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory
@@ -46,10 +47,11 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
         val notAfter = Date(builder.validity.notAfter.toEpochMilliseconds())
         val subject = X500Name(builder.subjectDn)
 
-        val keyInfo =
+        val issuerPublicKeyInfo = BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(issuerKey)
+        val subjectPublicKeyInfo =
             (builder.subjectPublicKeyInfo as WaltIdKeySubjectPublicKeyInfoBuilder).let { builder ->
                 if (builder.selfSigned) {
-                    BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(issuerKey)
+                    issuerPublicKeyInfo
                 } else {
                     checkNotNull(builder.key) { "Certificate subject public key missing" }
                     BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(builder.key)
@@ -61,7 +63,7 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
             notBefore,
             notAfter,
             subject,
-            keyInfo.bouncyCastleSubjectPublicKeyInfo
+            subjectPublicKeyInfo.bouncyCastleSubjectPublicKeyInfo
         )
 
         builder.extensions.values.forEach {
@@ -69,7 +71,14 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
                 bouncyBuilder.addExtension(
                     BouncyExtensionFactory.createSubjectKeyIdentifierExtension(
                         it,
-                        keyInfo.bouncyCastleSubjectPublicKeyInfo.publicKeyData
+                        subjectPublicKeyInfo
+                    )
+                )
+            } else if (it is AuthorityKeyIdentifierExtension) {
+                bouncyBuilder.addExtension(
+                    BouncyExtensionFactory.createAuthorityKeyIdentifierExtension(
+                        it,
+                        issuerPublicKeyInfo
                     )
                 )
             } else {

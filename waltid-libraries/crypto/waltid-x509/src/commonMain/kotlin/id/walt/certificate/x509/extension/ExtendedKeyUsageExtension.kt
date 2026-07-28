@@ -1,8 +1,5 @@
 package id.walt.certificate.x509.extension
 
-import id.walt.certificate.x509.X509Certificate
-import id.walt.certificate.x509.builder.X509CertificateDataBuilder
-
 interface ExtendedKeyUsageExtension : Extension {
 
     val keyPurposeIdList: Set<KeyUsage>

@@ -2,6 +2,7 @@ package id.walt.certificate.x509.signum.extension
 
 import at.asitplus.signum.indispensable.CryptoPublicKey
 import at.asitplus.signum.indispensable.asn1.Asn1Element
+import at.asitplus.signum.indispensable.asn1.Asn1EncapsulatingOctetString
 import at.asitplus.signum.indispensable.asn1.Asn1PrimitiveOctetString
 import at.asitplus.signum.indispensable.asn1.ObjectIdentifier
 import at.asitplus.signum.indispensable.pki.X509CertificateExtension
@@ -17,12 +18,12 @@ object SignumExtensionFactory {
         when (extension.oid.toString()) {
             BasicConstraintsExtension.OID -> SignumBasicConstraintsExtension(extension)
             KeyUsageExtension.OID -> SignumKeyUsageExtension(extension)
-            //ExtendedKeyUsageExtension.OID -> BouncyExtendedKeyUsageExtension(extension)
+            ExtendedKeyUsageExtension.OID -> SignumExtendedKeyUsageExtension(extension)
             SubjectAlternativeNameExtension.OID -> SignumSubjectAlternativeNameExtension(extension)
             AuthorityKeyIdentifierExtension.OID -> SignumAuthorityKeyIdentifierExtension(extension)
-            //IssuerAlternativeNameExtension.OID -> BouncyIssuerAlternativeNameExtension(extension)
+            IssuerAlternativeNameExtension.OID -> SignumIssuerAlternativeNameExtension(extension)
             SubjectKeyIdentifierExtension.OID -> SignumSubjectKeyIdentifierExtension(extension)
-            //CrlDistributionPointsExtension.OID -> BouncyCrlDistributionPointsExtension(extension)
+            CrlDistributionPointsExtension.OID -> SignumCrlDistributionPointsExtension(extension)
             else -> SignumGenericExtension(extension)
         }
 
@@ -36,20 +37,21 @@ object SignumExtensionFactory {
             extension,
             SignumKeyUsageExtension.createExtension(extension as KeyUsageExtension)
         )
-        //is ExtendedKeyUsageExtension -> id.walt.x509.id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory.createExtension(
-        //   extension,
-        //  BouncyExtendedKeyUsageExtension.createExtension(extension)
-        //)
+
+        ExtendedKeyUsageExtension.OID -> createExtension(
+            extension,
+            SignumExtendedKeyUsageExtension.createExtension(extension as ExtendedKeyUsageExtension)
+        )
 
         SubjectAlternativeNameExtension.OID -> createExtension(
             extension,
             SignumSubjectAlternativeNameExtension.createExtension(extension as SubjectAlternativeNameExtension)
         )
 
-        //is IssuerAlternativeNameExtension -> id.walt.x509.id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory.createExtension(
-        //    extension,
-        //    BouncyIssuerAlternativeNameExtension.createExtension(extension)
-        //)
+        IssuerAlternativeNameExtension.OID -> createExtension(
+            extension,
+            SignumIssuerAlternativeNameExtension.createExtension(extension as IssuerAlternativeNameExtension)
+        )
 
         //is CrlDistributionPointsExtension -> id.walt.x509.id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory.createExtension(
         //    extension,
@@ -59,6 +61,21 @@ object SignumExtensionFactory {
 
         else -> error("Unknown Signum Extension type OID: ${extension.oid}")
     }
+
+    fun createAuthorityKeyIdentifierExtension(
+        extension: Extension,
+        authorityPublicKeyInfo: CryptoPublicKey
+    ): X509CertificateExtension {
+        check(extension.oid == AuthorityKeyIdentifierExtension.OID) { "Extension OID must be ${AuthorityKeyIdentifierExtension.OID}" }
+        return createExtension(
+            extension,
+            SignumAuthorityKeyIdentifierExtension.createExtension(
+                extension as AuthorityKeyIdentifierExtension,
+                SignumPublicKeyInfo.ofCryptoPublicKey(authorityPublicKeyInfo)
+            )
+        )
+    }
+
 
     fun createSubjectKeyIdentifierExtension(
         extension: Extension,
@@ -83,4 +100,15 @@ object SignumExtensionFactory {
             extension.critical,
             extensionData
         )
+
+    private fun createExtension(
+        extension: Extension,
+        extensionData: Asn1EncapsulatingOctetString
+    ): X509CertificateExtension =
+        X509CertificateExtension(
+            ObjectIdentifier(extension.oid),
+            extension.critical,
+            extensionData
+        )
+
 }

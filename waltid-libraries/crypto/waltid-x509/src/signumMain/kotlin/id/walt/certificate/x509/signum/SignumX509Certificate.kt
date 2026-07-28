@@ -1,5 +1,6 @@
 package id.walt.certificate.x509.signum
 
+import at.asitplus.signum.indispensable.asn1.Asn1BitString
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.extension.Extension
 import id.walt.certificate.x509.signum.dn.toDistinguishedName
@@ -15,13 +16,15 @@ class SignumX509Certificate(
 
     override val signatureAlgorithmOid: String = certificate.signatureAlgorithm.oid.toString()
 
-    override val signatureValueRaw: ByteString = ByteString(certificate.rawSignature.content)
+    override val signatureValueRaw: ByteString =
+        ByteString(Asn1BitString.decodeFromDer(certificate.rawSignature.derEncoded).rawBytes)
 
     override val encodedDer: ByteString
         get() = ByteString(certificate.encodeToDer())
 
     inner class CertData : X509Certificate.CertificateData {
-        override val version: Int = certificate.tbsCertificate.version ?: error("certificate version is null")
+        override val version: Int = certificate.tbsCertificate.version
+            ?.let { it + 1 } ?: error("certificate version is null")
 
         override val serialNumberRaw: ByteString = ByteString(certificate.tbsCertificate.serialNumber)
 

@@ -68,7 +68,7 @@ data class AttributeType(
             AttributeType("2.5.4.8", Encoding.notSupported, listOf("st", "stateOrProvinceName")),
             AttributeType("2.5.4.9", Encoding.notSupported, listOf("street", "streetAddress")),
             AttributeType("2.5.4.10", Encoding.utf8String, listOf("o", "organizationName")),
-            AttributeType("2.5.4.11", Encoding.notSupported, listOf("ou", "organizationalUnitName")),
+            AttributeType("2.5.4.11", Encoding.utf8String, listOf("ou", "organizationalUnitName")),
             AttributeType("2.5.4.12", Encoding.notSupported, listOf("t", "title")),
             AttributeType("2.5.4.13", Encoding.notSupported, listOf("description")),
             AttributeType("2.5.4.15", Encoding.notSupported, listOf("businessCategory")),

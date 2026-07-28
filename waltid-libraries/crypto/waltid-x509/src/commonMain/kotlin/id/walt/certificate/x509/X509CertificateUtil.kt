@@ -2,6 +2,7 @@ package id.walt.certificate.x509
 
 import id.walt.certificate.x509.builder.Pkcs10CertificateSigningRequestBuilder
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
+import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.X509CertificateChainValidator
 import id.walt.crypto.keys.Key
@@ -39,6 +40,7 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
             subjectDn = "DC=client,O=Walt.id",
         )
         block.invoke(builder)
+        builder.extensionAuthorityKeyIdentifier()
         return services.certificateSigner.signCertificate(issuerKey, builder)
     }
 
@@ -55,6 +57,7 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         block.invoke(builder)
         requireNotNull((builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder).key)
         { "Certificate subject public key missing" }
+        builder.extensionAuthorityKeyIdentifier()
         return services.certificateSigner.signCertificate(issuerKey, builder)
     }
 

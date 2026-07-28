@@ -13,7 +13,7 @@ import kotlin.test.assertNull
 class X509CertificateUtilParsingTest {
 
     @Test
-    fun shouldParseCertificate() {
+    fun shouldParseGoogleCertificateWithCrl() {
         X509CertificateUtil.parseCertificatePem(GOOGLE_CERTIFICATE_PEM).also { cert ->
             assertEquals(3, cert.data.version)
             assertEquals("4bfc99602f79066f12ca86719fe05960", cert.data.serialNumberHex)
@@ -43,10 +43,14 @@ class X509CertificateUtilParsingTest {
                 val ep = crlDistributionPoints.distributionPoints.first()
                 assertNull(ep.cRLIssuer)
                 assertNull(ep.reason)
-                assertNotNull(ep.distributionPointFullName)
+                assertNotNull(ep.distributionPointFullName).also { dp ->
+                    assertEquals(1, dp.size)
+                    assertEquals("http://c.pki.goog/we2/yK5nPhtHKQs.crl", dp.first().value)
+                }
             }
         }
     }
+
 
     @Test
     fun shouldParseVtrust() {

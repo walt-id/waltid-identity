@@ -9,6 +9,7 @@ import id.walt.certificate.x509.X509CertificateSigner
 import id.walt.certificate.x509.X509SigningAlgorithmInfo
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.dn.DistinguishedName
+import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension
 import id.walt.certificate.x509.signum.SignumSignatureAlgorithmUtil.toSignatureAlgorithm
 import id.walt.certificate.x509.signum.dn.toSignumDn
@@ -24,10 +25,15 @@ class SignumCertificateSigner : X509CertificateSigner {
     ): X509Certificate {
         require(builder.version == 3) { "Only version 3 certificates are supported by Signum" }
         // 1. Evaluate public key material
-        val publicKeyInfo =
+        val authorityPublicKeyInfo = issuerKey.toSignumPublicKey()
+        val subjectPublicKeyInfo =
             (builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder).let {
-                require(it.selfSigned) { "Only self-signed certificates are supported by Signum" }
-                issuerKey.toSignumPublicKey()
+                if (it.selfSigned) {
+                    authorityPublicKeyInfo
+                } else {
+                    requireNotNull(it.key) {"Subject key must be provided for non-self-signed certificates."}
+                    it.key.toSignumPublicKey()
+                }
             }
 
         // 2. Define the Identity (Subject & Issuer are identical for self-signed)
@@ -43,13 +49,14 @@ class SignumCertificateSigner : X509CertificateSigner {
             if (value.oid == SubjectKeyIdentifierExtension.OID) {
                 SignumExtensionFactory.createSubjectKeyIdentifierExtension(
                     value,
-                    publicKeyInfo
+                    subjectPublicKeyInfo
                 )
+            } else if (value.oid == AuthorityKeyIdentifierExtension.OID) {
+                SignumExtensionFactory.createAuthorityKeyIdentifierExtension(value, authorityPublicKeyInfo)
             } else {
                 SignumExtensionFactory.createExtension(value)
             }
         }
-
 
         // 5. Construct the Certificate Structure (TBSCertificate)
         val sigAlgorithm = X509SigningAlgorithmInfo.ofKey(issuerKey)
@@ -66,7 +73,7 @@ class SignumCertificateSigner : X509CertificateSigner {
             validFrom = notBefore,
             validUntil = notAfter,
             subjectName = subjectDn.toSignumDn(),
-            publicKey = publicKeyInfo,
+            publicKey = subjectPublicKeyInfo,
             issuerUniqueID = null,
             subjectUniqueID = null,
             extensions = extensions

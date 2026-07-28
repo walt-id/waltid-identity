@@ -1,6 +1,6 @@
 package id.walt.certificate.x509.profile
 
-import id.walt.certificate.TestData.intermediateIssuerPrivateKey
+import id.walt.certificate.TestData.intermediateIssuerKeyPem
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile.profileIaCaRootCertificate
 import id.walt.certificate.x509.validation.ValidationResult
@@ -64,7 +64,7 @@ class IsoIaCaRootX509CertificateProfileTest {
 
     companion object {
         val key = runBlocking {
-            JvmJWKKeyCreator.importPEM(intermediateIssuerPrivateKey).getOrThrow()
+            JvmJWKKeyCreator.importPEM(intermediateIssuerKeyPem).getOrThrow()
         }
 
         val validator = X509SingleCertificateValidator(listOf(IsoIaCaRootX509CertificateProfile))

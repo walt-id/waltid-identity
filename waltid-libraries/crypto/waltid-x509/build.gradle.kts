@@ -103,7 +103,6 @@ kotlin {
             }
         }
 
-
         jsMain {
             dependsOn(signumMain)
             dependencies {
@@ -111,18 +110,18 @@ kotlin {
             }
         }
 
+        jsTest {
+            dependencies {
+                // crs signature validation
+                implementation(npm("node-forge", "1.4.0"))
+            }
+        }
+
         /*
-
-
-                jvmMain.get().dependsOn(jvmIosMain)
                 if (enableIosBuild) {
                     iosMain.get().dependsOn(jvmIosMain)
-                }
-
-
-                jsTest {
-                    dependsOn(commonSignumMain)
-                }*/
+               }
+*/
     }
 
 //    if (enableAndroidBuild) {

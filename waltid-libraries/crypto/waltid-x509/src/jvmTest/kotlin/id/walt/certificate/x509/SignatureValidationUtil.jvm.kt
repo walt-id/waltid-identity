@@ -1,11 +1,18 @@
 package id.walt.certificate.x509
 
+import org.bouncycastle.asn1.pkcs.CertificationRequest
+import org.bouncycastle.openssl.PEMParser
+import org.bouncycastle.operator.ContentVerifierProvider
+import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder
+import org.bouncycastle.pkcs.PKCS10CertificationRequest
 import java.io.ByteArrayInputStream
+import java.io.StringReader
 import java.security.KeyStore
 import java.security.cert.CertPathValidator
 import java.security.cert.CertificateFactory
 import java.security.cert.PKIXParameters
 import java.security.cert.X509Certificate
+import kotlin.test.assertTrue
 
 actual object SignatureValidationUtil {
 
@@ -42,12 +49,28 @@ actual object SignatureValidationUtil {
         validator.validate(certPath, params)
     }
 
-    actual suspend fun validateCertificateSignature(
-        issuerPublicKey: id.walt.certificate.x509.X509Certificate.SubjectPublicKeyInfo,
-        certificate: id.walt.certificate.x509.X509Certificate
-    ): Boolean {
-        TODO("Not yet implemented")
+    actual fun verifyCsrPem(csrPem: String) {
+        StringReader(csrPem).use { csrReader ->
+            PEMParser(csrReader).use { pemParser ->
+                // Read object from PEM file
+                val parsedObject = pemParser.readObject()
+
+                val csr: PKCS10CertificationRequest =
+                    parsedObject as? PKCS10CertificationRequest
+                        ?: if (parsedObject is CertificationRequest) {
+                            PKCS10CertificationRequest(parsedObject as CertificationRequest?)
+                        } else {
+                            throw IllegalArgumentException("Provided file is not a valid CSR")
+                        }
+
+                // Build the verifier provider using standard JCA providers
+                val verifierProvider: ContentVerifierProvider? = JcaContentVerifierProviderBuilder()
+                    .setProvider("BC") // Uses Bouncy Castle
+                    .build(csr.getSubjectPublicKeyInfo())
+
+                // Validate the signature against the embedded public key
+                assertTrue(csr.isSignatureValid(verifierProvider))
+            }
+        }
     }
-
-
 }

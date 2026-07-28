@@ -35,10 +35,10 @@ class SignumKeyUsageExtension(extension: X509CertificateExtension) :
                 keyUsageValue.add(KeyUsageExtension.KeyUsage.keyAgreement)
             }
             if (bits[5]) {
-                keyUsageValue.add(KeyUsageExtension.KeyUsage.cRLSign)
+                keyUsageValue.add(KeyUsageExtension.KeyUsage.keyCertSign)
             }
             if (bits[6]) {
-                keyUsageValue.add(KeyUsageExtension.KeyUsage.keyCertSign)
+                keyUsageValue.add(KeyUsageExtension.KeyUsage.cRLSign)
             }
             if (bits[7]) {
                 keyUsageValue.add(KeyUsageExtension.KeyUsage.encipherOnly)
@@ -66,10 +66,10 @@ class SignumKeyUsageExtension(extension: X509CertificateExtension) :
             if (ext.keyPurposeIdList.contains(KeyUsageExtension.KeyUsage.keyAgreement)) {
                 keyUsageValue.set(4)
             }
-            if (ext.keyPurposeIdList.contains(KeyUsageExtension.KeyUsage.cRLSign)) {
+            if (ext.keyPurposeIdList.contains(KeyUsageExtension.KeyUsage.keyCertSign)) {
                 keyUsageValue.set(5)
             }
-            if (ext.keyPurposeIdList.contains(KeyUsageExtension.KeyUsage.keyCertSign)) {
+            if (ext.keyPurposeIdList.contains(KeyUsageExtension.KeyUsage.cRLSign)) {
                 keyUsageValue.set(6)
             }
             if (ext.keyPurposeIdList.contains(KeyUsageExtension.KeyUsage.encipherOnly)) {
