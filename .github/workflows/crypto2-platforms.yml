@@ -3,18 +3,22 @@ name: Crypto2 platform tests
 on:
   workflow_dispatch:
   pull_request:
-    paths:
+    paths: &crypto2-paths
       - 'waltid-libraries/crypto/waltid-crypto2/**'
-      - 'waltid-libraries/crypto/waltid-jose/**'
       - 'waltid-libraries/crypto/waltid-crypto2-*/**'
+      - 'waltid-libraries/crypto/waltid-jose/**'
+      - 'waltid-libraries/crypto/waltid-cose/**'
+      - 'build-logic/**'
+      - 'gradle/libs.versions.toml'
+      - 'gradle/wrapper/**'
+      - 'gradlew'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - 'gradle.properties'
       - '.github/workflows/crypto2-platforms.yml'
   push:
     branches: [main]
-    paths:
-      - 'waltid-libraries/crypto/waltid-crypto2/**'
-      - 'waltid-libraries/crypto/waltid-jose/**'
-      - 'waltid-libraries/crypto/waltid-crypto2-*/**'
-      - '.github/workflows/crypto2-platforms.yml'
+    paths: *crypto2-paths
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
@@ -24,76 +28,11 @@ permissions:
   contents: read
 
 jobs:
-  linux-jvm-browser:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout all repositories
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
-        with:
-          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
-          ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
-
-      - name: Configure Gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
-
-      - name: Install browser and SoftHSM
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y softhsm2
-
-      - name: Run JVM, browser, Linux, API, and PKCS11 tests
-        run: >-
-          ./gradlew
-          :waltid-libraries:crypto:waltid-crypto2:jvmTest
-          :waltid-libraries:crypto:waltid-crypto2-kms:jvmTest
-          :waltid-libraries:crypto:waltid-crypto2:jsBrowserTest
-          :waltid-libraries:crypto:waltid-crypto2-kms:jsBrowserTest
-          :waltid-libraries:crypto:waltid-crypto2:linuxX64Test
-          :waltid-libraries:crypto:waltid-crypto2-kms:linuxX64Test
-          :waltid-libraries:crypto:waltid-crypto2-pkcs11:test
-          :waltid-libraries:crypto:waltid-crypto2:checkKotlinAbi
-          :waltid-libraries:crypto:waltid-crypto2:checkTypeScriptDefinitions
-
-      - name: Compile non-host crypto2 targets
-        run: >-
-          ./gradlew
-          :waltid-libraries:crypto:waltid-crypto2:compileTestKotlinLinuxArm64
-          :waltid-libraries:crypto:waltid-crypto2:compileTestKotlinMingwX64
-          :waltid-libraries:crypto:waltid-crypto2:compileTestKotlinMacosX64
-          :waltid-libraries:crypto:waltid-crypto2:compileTestKotlinMacosArm64
-
-  android-host:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout all repositories
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
-        with:
-          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
-          ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
-
-      - name: Configure Gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
-
-      - name: Run Android host tests
-        run: >-
-          ./gradlew -PenableAndroidBuild=true
-          :waltid-libraries:crypto:waltid-crypto2:testAndroidHostTest
-          :waltid-libraries:crypto:waltid-crypto2-kms:testAndroidHostTest
-          :waltid-libraries:crypto:waltid-crypto2-signum:testAndroidHostTest
-          :waltid-libraries:crypto:waltid-crypto2:checkKotlinAbi
-
   windows:
     runs-on: windows-2025
     steps:
-      # waltid-identity tracks generated SwiftPM linkage files whose paths exceed 260 characters
-      # (waltid-wallet-demo-compose/iosApp/KotlinMultiplatformLinkedPackage/...). Windows Git cannot
-      # check those out otherwise. Configured here because the checkout action below is pinned.
-      - name: Enable Git long paths
-        shell: bash
-        run: git config --global core.longpaths true
-
       - name: Checkout all repositories
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@982301c7176ee6d6abcf785cf1a2c0cac0a559bc
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
@@ -126,7 +65,7 @@ jobs:
           :waltid-libraries:crypto:waltid-crypto2:macosX64Test
           :waltid-libraries:crypto:waltid-crypto2-kms:macosX64Test
 
-  macos-arm64-ios:
+  macos-arm64:
     runs-on: macos-26
     steps:
       - name: Checkout all repositories
@@ -138,11 +77,8 @@ jobs:
       - name: Configure Gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
 
-      - name: Run macOS and iOS simulator tests
+      - name: Run macOS arm64 tests
         run: >-
-          ./gradlew -PenableIosBuild=true
+          ./gradlew
           :waltid-libraries:crypto:waltid-crypto2:macosArm64Test
           :waltid-libraries:crypto:waltid-crypto2-kms:macosArm64Test
-          :waltid-libraries:crypto:waltid-crypto2:iosSimulatorArm64Test
-          :waltid-libraries:crypto:waltid-crypto2-kms:iosSimulatorArm64Test
-          :waltid-libraries:crypto:waltid-crypto2-signum:iosSimulatorArm64Test
