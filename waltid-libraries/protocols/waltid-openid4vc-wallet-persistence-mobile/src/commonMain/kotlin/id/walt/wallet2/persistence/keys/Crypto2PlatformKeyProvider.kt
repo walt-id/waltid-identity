@@ -5,6 +5,7 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyEncodingFormat
 import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
@@ -12,6 +13,8 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.providers.CryptoOperation
+import id.walt.crypto2.providers.CryptoRequirement
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.signum.SignumKeyPolicy
@@ -53,7 +56,8 @@ public interface Crypto2PlatformKeyProvider {
 internal class MobileStoredKeyMigration(
     private val platformProvider: Crypto2PlatformKeyProvider?,
 ) {
-    private val softwareRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
+    private val softwareProviders = defaultSoftwareKeyProviders()
+    private val softwareRuntime = CryptoRuntime(softwareProviders)
 
     suspend fun migrate(
         id: KeyId,
@@ -66,7 +70,7 @@ internal class MobileStoredKeyMigration(
             val provider = platformProvider ?: return null
             provider.migratePlatformKey(id, keyType, usages)
         } else {
-            if (keyType == KeyType.secp256k1) return null
+            if (!supportsSoftwareMigration(keyType, usages)) return null
             val material = requireNotNull(keyMaterial) { "Mobile software key has no material: ${id.value}" }
             EncodedKey.Jwk(
                 data = BinaryData(material.encodeToByteArray()),
@@ -93,6 +97,18 @@ internal class MobileStoredKeyMigration(
             "No crypto2 platform provider is available for ${stored.provider.value}"
         }.deleteManagedKey(stored)
     }
+
+    private fun supportsSoftwareMigration(keyType: KeyType, usages: Set<KeyUsage>): Boolean =
+        softwareProviders.any { provider ->
+            provider.supports(
+                CryptoRequirement(
+                    operation = CryptoOperation.IMPORT_KEY,
+                    spec = keyType.toCrypto2KeySpec(),
+                    usages = usages,
+                    keyEncoding = KeyEncodingFormat.JWK,
+                ),
+            )
+        }
 }
 
 internal fun KeyType.toCrypto2KeySpec(): KeySpec = when (this) {

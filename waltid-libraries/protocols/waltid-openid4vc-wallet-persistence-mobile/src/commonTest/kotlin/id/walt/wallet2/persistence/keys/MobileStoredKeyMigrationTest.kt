@@ -29,7 +29,7 @@ class MobileStoredKeyMigrationTest {
         val source = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("software-key"),
-                spec = KeyType.Ed25519.toCrypto2KeySpec(),
+                spec = KeyType.RSA.toCrypto2KeySpec(),
                 usages = KEY_USAGES,
             )
         ).storedKey
@@ -38,7 +38,7 @@ class MobileStoredKeyMigrationTest {
         val stored = assertIs<StoredKey.Software>(
             migration.migrate(
                 id = source.id,
-                keyType = KeyType.Ed25519,
+                keyType = KeyType.RSA,
                 platformBacked = false,
                 keyMaterial = assertIs<EncodedKey.Jwk>(source.material).data.toByteArray().decodeToString(),
                 usages = KEY_USAGES,

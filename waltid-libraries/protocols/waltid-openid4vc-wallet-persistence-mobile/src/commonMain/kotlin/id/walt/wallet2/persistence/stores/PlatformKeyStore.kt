@@ -251,7 +251,8 @@ public class PlatformKeyStore(
                 keyMaterial = keyMaterial,
                 usages = KEY_USAGES,
             )
-            if (expected != null && stored != expected) {
+            if (expected == null) return null
+            if (stored != expected) {
                 stored = expected
                 queries.updateCrypto2StoredKey(StoredKeyCodec.encodeToString(expected), keyId)
             }
