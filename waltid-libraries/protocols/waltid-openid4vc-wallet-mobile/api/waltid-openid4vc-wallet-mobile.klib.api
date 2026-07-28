@@ -647,15 +647,6 @@ final class id.walt.wallet2.mobile/MobileWalletConfig { // id.walt.wallet2.mobil
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletConfig.toString|toString(){}[0]
 }
 
-final class id.walt.wallet2.mobile/MobileWalletCrypto2Config { // id.walt.wallet2.mobile/MobileWalletCrypto2Config|null[0]
-    constructor <init>(id.walt.did.dids/Crypto2DidService = ..., id.walt.crypto2.signum/SignumKeyPolicy? = ...) // id.walt.wallet2.mobile/MobileWalletCrypto2Config.<init>|<init>(id.walt.did.dids.Crypto2DidService;id.walt.crypto2.signum.SignumKeyPolicy?){}[0]
-
-    final val didService // id.walt.wallet2.mobile/MobileWalletCrypto2Config.didService|{}didService[0]
-        final fun <get-didService>(): id.walt.did.dids/Crypto2DidService // id.walt.wallet2.mobile/MobileWalletCrypto2Config.didService.<get-didService>|<get-didService>(){}[0]
-    final val keyPolicy // id.walt.wallet2.mobile/MobileWalletCrypto2Config.keyPolicy|{}keyPolicy[0]
-        final fun <get-keyPolicy>(): id.walt.crypto2.signum/SignumKeyPolicy? // id.walt.wallet2.mobile/MobileWalletCrypto2Config.keyPolicy.<get-keyPolicy>|<get-keyPolicy>(){}[0]
-}
-
 final class id.walt.wallet2.mobile/MobileWalletCredential { // id.walt.wallet2.mobile/MobileWalletCredential|null[0]
     constructor <init>(kotlin/String, kotlin/String, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String) // id.walt.wallet2.mobile/MobileWalletCredential.<init>|<init>(kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String){}[0]
 
@@ -706,6 +697,15 @@ final class id.walt.wallet2.mobile/MobileWalletCredentialClaimMetadata { // id.w
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCredentialClaimMetadata.toString|toString(){}[0]
 }
 
+final class id.walt.wallet2.mobile/MobileWalletCrypto2Config { // id.walt.wallet2.mobile/MobileWalletCrypto2Config|null[0]
+    constructor <init>(id.walt.did.dids/Crypto2DidService = ..., id.walt.crypto2.signum/SignumKeyPolicy? = ...) // id.walt.wallet2.mobile/MobileWalletCrypto2Config.<init>|<init>(id.walt.did.dids.Crypto2DidService;id.walt.crypto2.signum.SignumKeyPolicy?){}[0]
+
+    final val didService // id.walt.wallet2.mobile/MobileWalletCrypto2Config.didService|{}didService[0]
+        final fun <get-didService>(): id.walt.did.dids/Crypto2DidService // id.walt.wallet2.mobile/MobileWalletCrypto2Config.didService.<get-didService>|<get-didService>(){}[0]
+    final val keyPolicy // id.walt.wallet2.mobile/MobileWalletCrypto2Config.keyPolicy|{}keyPolicy[0]
+        final fun <get-keyPolicy>(): id.walt.crypto2.signum/SignumKeyPolicy? // id.walt.wallet2.mobile/MobileWalletCrypto2Config.keyPolicy.<get-keyPolicy>|<get-keyPolicy>(){}[0]
+}
+
 final class id.walt.wallet2.mobile/MobileWalletEvent { // id.walt.wallet2.mobile/MobileWalletEvent|null[0]
     constructor <init>(kotlin/String, id.walt.wallet2.mobile/MobileWalletEventPhase, id.walt.wallet2.mobile/MobileWalletEventStatus) // id.walt.wallet2.mobile/MobileWalletEvent.<init>|<init>(kotlin.String;id.walt.wallet2.mobile.MobileWalletEventPhase;id.walt.wallet2.mobile.MobileWalletEventStatus){}[0]
 
@@ -730,8 +730,8 @@ final class id.walt.wallet2.mobile/MobileWalletFactory { // id.walt.wallet2.mobi
 
     final suspend fun create(id.walt.wallet2.mobile/MobileWalletConfig = ...): id.walt.wallet2.mobile/MobileWallet // id.walt.wallet2.mobile/MobileWalletFactory.create|create(id.walt.wallet2.mobile.MobileWalletConfig){}[0]
     final suspend fun create(id.walt.wallet2.mobile/MobileWalletConfig, id.walt.openid4vp.clientidprefix/ClientIdTrustConfiguration): id.walt.wallet2.mobile/MobileWallet // id.walt.wallet2.mobile/MobileWalletFactory.create|create(id.walt.wallet2.mobile.MobileWalletConfig;id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration){}[0]
-    final suspend fun create(id.walt.wallet2.mobile/MobileWalletConfig, id.walt.wallet2.mobile/MobileWalletCrypto2Config): id.walt.wallet2.mobile/MobileWallet // id.walt.wallet2.mobile/MobileWalletFactory.create|create(id.walt.wallet2.mobile.MobileWalletConfig;id.walt.wallet2.mobile.MobileWalletCrypto2Config){}[0]
     final suspend fun create(id.walt.wallet2.mobile/MobileWalletConfig, id.walt.openid4vp.clientidprefix/ClientIdTrustConfiguration, id.walt.wallet2.mobile/MobileWalletCrypto2Config): id.walt.wallet2.mobile/MobileWallet // id.walt.wallet2.mobile/MobileWalletFactory.create|create(id.walt.wallet2.mobile.MobileWalletConfig;id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration;id.walt.wallet2.mobile.MobileWalletCrypto2Config){}[0]
+    final suspend fun create(id.walt.wallet2.mobile/MobileWalletConfig, id.walt.wallet2.mobile/MobileWalletCrypto2Config): id.walt.wallet2.mobile/MobileWallet // id.walt.wallet2.mobile/MobileWalletFactory.create|create(id.walt.wallet2.mobile.MobileWalletConfig;id.walt.wallet2.mobile.MobileWalletCrypto2Config){}[0]
 }
 
 final class id.walt.wallet2.mobile/MobileWalletIssuancePreviewHandle { // id.walt.wallet2.mobile/MobileWalletIssuancePreviewHandle|null[0]
