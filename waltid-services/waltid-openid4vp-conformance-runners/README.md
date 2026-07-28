@@ -71,11 +71,19 @@ Conformance test runners for OpenID4VCI and OpenID4VP against the [OpenID Founda
 
 ### Running Tests
 
+The wrapper resolves the standalone `waltid-identity` Gradle root from its own
+location, so it can be invoked from any working directory. The examples use the
+runner directory so their relative paths, including HAIP certificate paths, are
+unambiguous. It starts the conformance-suite and Nginx Docker Compose stack,
+creates the temporary local TLS truststore, then runs the Gradle
+issuer-conformance test. Do not start this Docker Compose stack manually. Start
+issuer2 separately on the host first.
+
 ```bash
-cd waltid-unified-build
+cd waltid-identity/waltid-services/waltid-openid4vp-conformance-runners
 
 # Default VCI issuer run: 12 variants, metadata and positive modules only.
-./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
+./run-issuer-conformance-local.sh
 ```
 
 ### Default selection
@@ -105,7 +113,7 @@ run every module returned by the conformance plan:
 
 ```bash
 OPENID4VCI_CONFORMANCE_MODULE_GROUPS=all \
-  ./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
+  ./run-issuer-conformance-local.sh
 ```
 
 Run all 288 generated base-plan variants and every returned module:
@@ -113,7 +121,7 @@ Run all 288 generated base-plan variants and every returned module:
 ```bash
 OPENID4VCI_CONFORMANCE_PRESET=all-basic-plan \
 OPENID4VCI_CONFORMANCE_MODULE_GROUPS=all \
-  ./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
+  ./run-issuer-conformance-local.sh
 ```
 
 Use `OPENID4VCI_CONFORMANCE_PRESET=custom` with the matrix filter variables documented under
@@ -125,7 +133,7 @@ Use `OPENID4VCI_CONFORMANCE_PRESET=custom` with the matrix filter variables docu
 
 # A remote issuer can still be selected explicitly.
 export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://issuer.example.com/openid4vci"
-./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
+./run-issuer-conformance-local.sh
 
 # Direct Gradle execution, if the suite, proxy, and truststore are already configured
 export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://localhost.emobix.co.uk:9443/openid4vci"
@@ -133,13 +141,13 @@ export OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE="$PWD/waltid-identity/wa
 export OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION=true
 export OPENID4VCI_CONFORMANCE_AUTH_USERNAME="jane@walt.id"
 export OPENID4VCI_CONFORMANCE_AUTH_PASSWORD="jane"
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+../../gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers
+../../gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
   --tests "id.walt.openid4vp.conformance.IssuerConformanceTests.runIssuerConformanceTests"
 
 # VP Verifier tests
 export VERIFIER_NGROK_URL="https://YOUR-NGROK.ngrok-free.app"
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VerifierConformanceTests"
+../../gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VerifierConformanceTests"
 ```
 
 ---
@@ -456,8 +464,8 @@ export OPENID4VCI_CONFORMANCE_MATRIX="all" && \
 export OPENID4VCI_CONFORMANCE_MODULE_GROUPS="metadata,positive,negative" && \
 export OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID="identity_credential_haip" && \
 export OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID="org.iso.18013.5.1.mDL.haip" && \
-export OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE="$PWD/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem" && \
-export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE="$PWD/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem" && \
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE="$PWD/src/test/resources/certs/issuer2-haip-root-ca.pem" && \
+export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE="$PWD/src/test/resources/certs/issuer2-haip-root-ca.pem" && \
 export OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION="true" && \
 export OPENID4VCI_CONFORMANCE_AUTH_USERNAME="jane@walt.id" && \
 export OPENID4VCI_CONFORMANCE_AUTH_PASSWORD="jane" && \
@@ -466,7 +474,7 @@ export OPENID4VCI_CONFORMANCE_INSTALL_PLAYWRIGHT="false" && \
 unset OPENID4VCI_CONFORMANCE_VARIANT_ID \
       OPENID4VCI_CONFORMANCE_VARIANTS \
       OPENID4VCI_CONFORMANCE_MODULES && \
-./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
+./run-issuer-conformance-local.sh
 ```
 
 Reuse the same root for `OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE`
@@ -523,8 +531,8 @@ export OPENID4VCI_CONFORMANCE_FILTER_SENDER_CONSTRAINTS="dpop"
 # HAIP-specific credential configuration IDs and required x5c trust anchors
 export OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID="identity_credential_haip"
 export OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID="org.iso.18013.5.1.mDL.haip"
-export OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE="$PWD/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem"
-export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE="$PWD/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem"
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE="$PWD/src/test/resources/certs/issuer2-haip-root-ca.pem"
+export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE="$PWD/src/test/resources/certs/issuer2-haip-root-ca.pem"
 
 # Filter conformance-suite modules returned by the selected plan
 export OPENID4VCI_CONFORMANCE_MODULE_GROUPS="metadata,positive"

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 RUNNER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$RUNNER_DIR/../../.." && pwd)"
+IDENTITY_ROOT="$(cd "$RUNNER_DIR/../.." && pwd)"
 COMPOSE_FILE="${CONFORMANCE_COMPOSE_FILE:-$RUNNER_DIR/docker-compose-walt.yml}"
 BASE_TRUSTSTORE="$RUNNER_DIR/conformance-truststore.jks"
 TRUSTSTORE="$RUNNER_DIR/build/conformance/conformance-truststore.jks"
@@ -414,7 +414,7 @@ echo "and trust this root certificate:"
 echo "$CLIENT_ATTESTER_TRUST_ROOT"
 echo
 
-cd "$REPO_ROOT"
+cd "$IDENTITY_ROOT"
 
 PLAYWRIGHT_GRADLE_ARGS=(
   "-Pplaywright.browser=${PLAYWRIGHT_BROWSER:-chromium}"

@@ -128,10 +128,13 @@ export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE=/path/to/status-
 
 ### 4. Start Services
 
+Start issuer2 separately on the host. The wrapper starts the conformance-suite
+and Nginx Docker Compose stack itself; do not run `docker compose up` manually.
+
 ```bash
-# Terminal 1: start enterprise issuer2 on host port 7005
-# Terminal 2: run the wrapper from the unified-build root
-./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
+# Terminal 1: start issuer2 on host port 7005
+# Terminal 2: run the wrapper from this conformance-runner directory
+./run-issuer-conformance-local.sh
 ```
 
 With no selection overrides, this runs the metadata and positive modules for 12 variants: SD-JWT VC and
@@ -141,7 +144,7 @@ all 288 generated variants and all returned modules instead:
 ```bash
 OPENID4VCI_CONFORMANCE_PRESET=all-basic-plan \
 OPENID4VCI_CONFORMANCE_MODULE_GROUPS=all \
-  ./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
+  ./run-issuer-conformance-local.sh
 ```
 
 Verify metadata endpoint:
@@ -154,9 +157,9 @@ curl -ks "https://localhost.emobix.co.uk:9443/.well-known/openid-credential-issu
 ## Running Tests
 
 ```bash
-cd waltid-unified-build
+cd waltid-identity/waltid-services/waltid-openid4vp-conformance-runners
 
-./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
+./run-issuer-conformance-local.sh
 ```
 
 ### Test Execution Flow
