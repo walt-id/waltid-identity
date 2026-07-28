@@ -43,6 +43,10 @@ kotlin {
                     dependencies {
                         implementation(kotlin("test"))
                         implementation(identityLibs.kotlinx.coroutines.test)
+                        // Without these the instrumentation APK has no AndroidJUnitRunner and the run crashes
+                        // before a single test starts ("Unable to instantiate instrumentation").
+                        implementation(identityLibs.androidx.test.runner)
+                        implementation(identityLibs.androidx.test.ext.junit)
                     }
                 }
             }

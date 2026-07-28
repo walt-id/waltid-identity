@@ -8,4 +8,4 @@ private val providers: List<SoftwareKeyProvider> by lazy {
     listOf(CryptographySoftwareKeyProvider(), Openssl3Secp256k1SoftwareKeyProvider())
 }
 
-actual fun defaultSoftwareKeyProviders(): List<SoftwareKeyProvider> = providers
+internal actual fun platformSoftwareKeyProviders(): List<SoftwareKeyProvider> = providers

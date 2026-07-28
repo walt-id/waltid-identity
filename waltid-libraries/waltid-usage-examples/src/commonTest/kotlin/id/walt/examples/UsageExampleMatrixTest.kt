@@ -76,17 +76,10 @@ class UsageExampleMatrixTest {
     }
 
     /**
-     * Scenarios that are known not to work on a platform yet, asserted exactly so that fixing one makes this test
-     * fail until the entry is removed.
-     *
-     * Web Crypto: resolving a `did:key` rebuilds the public key as SPKI DER from the multibase identifier, which
-     * Web Crypto rejects ("spki must be SPKI formatted string"). `did:jwk` is unaffected because it carries a JWK,
-     * and the W3C VC-JWT scenario only fails as a consequence of verifying through a `did:key` issuer.
+     * No known gaps: did:key material is decoded by crypto2 in common code now, so every platform resolves the
+     * same way. An entry reappearing here means a platform-specific regression, and the assertion above names it.
      */
-    private val knownGaps: Set<String> = when (CryptographyProvider.Default.name) {
-        "WebCrypto" -> setOf("did:key", "W3C VC-JWT")
-        else -> emptySet()
-    }
+    private val knownGaps: Set<String> = emptySet()
 
     private fun render(rows: List<Triple<String, String, Outcome>>): String = buildString {
         appendLine()

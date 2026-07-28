@@ -37,12 +37,17 @@ data class TSEAuth(
 ) {
 
     companion object {
-        private val http = HttpClient {
-            install(ContentNegotiation) {
-                json()
-            }
-            defaultRequest {
-                header(HttpHeaders.ContentType, ContentType.Application.Json)
+        // Lazily: constructing a Ktor client in a companion initialiser fails on Kotlin/Native, where no engine is
+        // registered by default, and the whole file then fails to initialise (FileFailedToInitializeException) even
+        // for callers that never perform a request.
+        private val http: HttpClient by lazy {
+            HttpClient {
+                install(ContentNegotiation) {
+                    json()
+                }
+                defaultRequest {
+                    header(HttpHeaders.ContentType, ContentType.Application.Json)
+                }
             }
         }
 

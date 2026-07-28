@@ -2165,7 +2165,7 @@ public final class id/walt/crypto2/providers/cryptography/CryptographySoftwareKe
 public final class id/walt/crypto2/providers/cryptography/CryptographySoftwareKeyProvider$Companion {
 }
 
-public final class id/walt/crypto2/providers/cryptography/DefaultSoftwareKeyProviders_jvmKt {
+public final class id/walt/crypto2/providers/cryptography/DefaultSoftwareKeyProvidersKt {
 	public static final fun defaultSoftwareKeyProviders ()Ljava/util/List;
 }
 

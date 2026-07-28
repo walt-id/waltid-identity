@@ -4,11 +4,14 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
+import id.walt.did.dids.document.MultibasePublicKeys
 import id.walt.did.utils.KeyMaterial
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /** Resolves DID verification methods to crypto2 keys. */
@@ -28,14 +31,27 @@ class DidDocumentCrypto2KeyResolver(
             ?: throw IllegalArgumentException("DID document has no verification methods: $did")
         val keys = methods.mapNotNull { element ->
             val method = element as? JsonObject ?: return@mapNotNull null
-            // Crypto2 has no raw/multibase decoder yet. Keep v1 normalization explicit for legacy DID material.
-            val jwk = (method["publicKeyJwk"] as? JsonObject) ?: try {
-                KeyMaterial.get(method).getOrThrow().getPublicKey().exportJWKObject()
-            } catch (cause: CancellationException) {
-                throw cause
-            } catch (_: Exception) {
-                return@mapNotNull null
-            }
+            val jwk = (method["publicKeyJwk"] as? JsonObject)
+                ?: (method["publicKeyMultibase"] as? JsonPrimitive)?.content?.let { multibase ->
+                    // crypto2-native: no v1 key import, which is what fails on JS.
+                    try {
+                        Json.parseToJsonElement(
+                            MultibasePublicKeys.decode(multibase).jwk.data.toByteArray().decodeToString()
+                        ).jsonObject
+                    } catch (cause: CancellationException) {
+                        throw cause
+                    } catch (_: Throwable) {
+                        null
+                    }
+                }
+                ?: try {
+                    // Legacy material only (publicKeyBase58/Hex), which carries no multicodec prefix.
+                    KeyMaterial.get(method).getOrThrow().getPublicKey().exportJWKObject()
+                } catch (cause: CancellationException) {
+                    throw cause
+                } catch (_: Exception) {
+                    return@mapNotNull null
+                }
             val verificationMethodId = method["id"]?.jsonPrimitive?.content?.takeIf(String::isNotBlank)
                 ?: throw IllegalArgumentException("DID verification method has no ID")
             val stored = EncodedKey.Jwk(
