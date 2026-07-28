@@ -123,8 +123,8 @@ class ConformanceInterface(
         val response = conformanceHttp.post("/api/runner/browser/$testId/visit") {
             parameter("url", url)
         }
-        if (response.status.value !in 200..299) {
-            throw IllegalStateException("Conformance suite returned ${response.status} while marking browser URL as visited")
+        check(!(response.status.value !in 200..299)) {
+            "Conformance suite returned ${response.status} while marking browser URL as visited"
         }
     }
 
@@ -139,8 +139,8 @@ class ConformanceInterface(
         }.build()
 
         val response = conformanceHttp.get(url)
-        if (response.status.value !in 200..299) {
-            throw IllegalStateException("Conformance suite returned ${response.status} while delivering credential offer")
+        check(!(response.status.value !in 200..299)) {
+            "Conformance suite returned ${response.status} while delivering credential offer"
         }
     }
 
