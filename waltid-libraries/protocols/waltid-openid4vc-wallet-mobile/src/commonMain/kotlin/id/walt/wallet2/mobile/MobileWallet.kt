@@ -39,6 +39,8 @@ import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResul
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.ktor.http.Url
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
@@ -48,6 +50,18 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+
+private object MobileDidSupport {
+    private val initializationMutex = Mutex()
+    private var initialized = false
+
+    suspend fun ensureInitialized() = initializationMutex.withLock {
+        if (!initialized) {
+            DidService.minimalInit()
+            initialized = true
+        }
+    }
+}
 
 /**
  * Result returned after a mobile wallet has been initialized with signing material and a DID.
@@ -224,6 +238,7 @@ public class MobileWallet internal constructor(
         keyType: MobileWalletKeyType? = null,
         didMethod: String = "key",
     ): MobileWalletBootstrapResult {
+        MobileDidSupport.ensureInitialized()
         val existingDids = didStore.listDids().toList()
         if (existingDids.isNotEmpty()) {
             val existingKeys = keyStore.listKeys().toList()
@@ -310,10 +325,7 @@ public class MobileWallet internal constructor(
     private suspend fun registerDidByKey(didMethod: String, key: Key) =
         when (didMethod.lowercase()) {
             "key" -> DidKeyRegistrar().registerByKey(key, DidKeyCreateOptions(keyType = key.keyType))
-            else -> {
-                DidService.minimalInit()
-                DidService.registerByKey(didMethod, key)
-            }
+            else -> DidService.registerByKey(didMethod, key)
         }
 
     /**
