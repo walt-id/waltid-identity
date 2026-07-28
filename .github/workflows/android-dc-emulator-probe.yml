@@ -23,13 +23,17 @@ jobs:
       - name: Boot emulator and verify Play Services
         uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
-          api-level: 37
-          system-image-api-level: "37.0"
+          api-level: "37.0"
           arch: x86_64
           profile: pixel_7
-          target: google_apis_playstore_ps16k
-          ram-size: 4096M
+          target: playstore_ps16k
           emulator-boot-timeout: 600
           emulator-options: >-
-            -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics
+            -no-window
+            -gpu auto
+            -noaudio
+            -no-boot-anim
+            -camera-back none
+            -memory 4096
+            -feature GLDirectMem,HasSharedSlotsHostMemoryAllocator
           script: 'adb shell dumpsys package com.google.android.gms | grep -E ''versionName|versionCode'''
