@@ -20,7 +20,7 @@
 
 ## Overview
 
-This library provides Android/iOS persistence implementations for the wallet store interfaces defined in [waltid-openid4vc-wallet](../waltid-openid4vc-wallet). It uses SQLDelight for credential and DID storage, SQLCipher-capable platform drivers for encrypted wallet databases, plus platform key stores for non-exportable platform-backed key references.
+This library provides Android/iOS persistence implementations for the wallet store interfaces defined in [waltid-openid4vc-wallet](../waltid-openid4vc-wallet). It uses SQLDelight for credential and DID storage, SQLCipher-capable platform drivers for encrypted wallet databases, and platform-managed signing keys.
 
 Use this library when you need persistent wallet storage inside a mobile wallet application.
 
@@ -91,7 +91,7 @@ The mobile facade opens encrypted databases by default and keeps managed databas
 
 | Interface | Implementation | Description |
 |-----------|----------------|-------------|
-| `WalletKeyStore` | `PlatformKeyStore` | Platform-backed key references and persisted software key material |
+| `WalletKeyStore` | `PlatformKeyStore` | Managed Android KeyStore or iOS Keychain / Secure Enclave keys |
 | `WalletCredentialStore` | `SqlDelightCredentialStore` | Stored credentials with metadata |
 | `WalletDidStore` | `SqlDelightDidStore` | DIDs and their documents |
 
@@ -99,11 +99,11 @@ The mobile facade opens encrypted databases by default and keeps managed databas
 
 The mobile schema includes the following tables:
 
-- `key_references` - Platform aliases, software key material, and versioned crypto2 descriptors
+- `key_references` - Versioned managed-key descriptors
 - `credentials` - Stored credentials
 - `dids` - Stored DIDs
 
-Schema creation and migration are managed by SQLDelight on the target platform driver.
+This is a fresh mobile schema; it does not migrate or retain legacy key references. Schema creation is managed by SQLDelight on the target platform driver.
 
 ## API documentation
 
