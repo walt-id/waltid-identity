@@ -7,14 +7,8 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.StoredKey
-import id.walt.crypto2.keys.toPublicJwk
-import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.keys.Key as Crypto2Key
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
-import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.*
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
@@ -23,14 +17,9 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.time.Clock
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 /**
  * Handles the `request_uri_method=post` flow per OID4VP 1.0 §5.6.
@@ -49,7 +38,7 @@ import kotlin.time.Clock
 object Verifier2RequestUriPostHandler {
 
     private val log = KotlinLogging.logger { }
-    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     suspend fun RoutingCall.respondRequestUriPostCrypto2(
         verificationSession: Verification2Session,
@@ -86,7 +75,7 @@ object Verifier2RequestUriPostHandler {
 
         log.debug {
             "Request URI POST for session ${verificationSession.id}: " +
-                "wallet_nonce=${walletNonce?.take(16)}, wallet_metadata=${walletMetadataJson?.take(50)}"
+                    "wallet_nonce=${walletNonce?.take(16)}, wallet_metadata=${walletMetadataJson?.take(50)}"
         }
 
         val isSigned = verificationSession.requestMode == Verification2Session.RequestMode.REQUEST_URI_SIGNED

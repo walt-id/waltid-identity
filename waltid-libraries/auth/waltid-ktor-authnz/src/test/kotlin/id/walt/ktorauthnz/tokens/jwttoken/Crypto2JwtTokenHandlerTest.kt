@@ -9,20 +9,16 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.ktorauthnz.sessions.AuthSession
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 class Crypto2JwtTokenHandlerTest {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val now = Instant.parse("2026-07-18T12:00:00Z")
     private val clock = object : Clock {
         override fun now(): Instant = this@Crypto2JwtTokenHandlerTest.now

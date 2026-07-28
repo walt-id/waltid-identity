@@ -2,13 +2,9 @@ import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.sdjwt.SDMap
 import id.walt.w3c.PresentationBuilder
 import id.walt.w3c.issuance.Issuer
@@ -18,19 +14,14 @@ import id.walt.w3c.issuance.Issuer.mergingSdJwtIssue
 import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.w3c.vc.vcs.W3CVC
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class Crypto2W3cCredentialTest {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
     fun `W3C credential signs and verifies directly and through inline JWK resolver`() = runTest {

@@ -1,7 +1,7 @@
 package id.walt.openid4vci.clientauth.attestation.verifier
 
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
@@ -13,7 +13,7 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
 import id.walt.openid4vci.clientauth.ClientAuthenticationContext
 import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
@@ -26,12 +26,7 @@ import id.walt.x509.GenericX509CertificateProfileData
 import id.walt.x509.X509DistinguishedName
 import id.walt.x509.X509KeyUsage
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -131,7 +126,7 @@ class X509ChainClientAttestationVerifierTest {
 
     @Test
     fun `accepts wallet unit attestation EKU without requiring TLS clientAuth`() = runTest {
-        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val rootKey = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("wallet-attestation-root"),
@@ -183,7 +178,7 @@ class X509ChainClientAttestationVerifierTest {
                     "x5c",
                     JsonArray(
                         listOf(leafCertificate, rootCertificate).map {
-                            JsonPrimitive(Base64.Default.encode(it.bytes.toByteArray()))
+                            JsonPrimitive(Base64.encode(it.bytes.toByteArray()))
                         }
                     ),
                 )

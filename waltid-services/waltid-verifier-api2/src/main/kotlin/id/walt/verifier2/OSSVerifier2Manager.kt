@@ -15,26 +15,21 @@ import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toPublicJwk
-import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.migration.v1.V1KeyMigration
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
-import id.walt.verifier2.data.DcApiAnnexCFlowSetup
-import id.walt.verifier2.data.DcApiAnnexDFlowSetup
-import id.walt.verifier2.data.UrlBearingDeviceFlowSetup
-import id.walt.verifier2.data.Verification2Session
-import id.walt.verifier2.data.VerificationSessionSetup
+import id.walt.verifier2.data.*
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreator
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 object OSSVerifier2Manager {
     private val config get() = ConfigManager.getConfig<OSSVerifier2ServiceConfig>()
-    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val keyMutex = Mutex()
     private var cachedSigningKey: ConfiguredSigningKey? = null
 
@@ -52,6 +47,7 @@ object OSSVerifier2Manager {
             is UrlBearingDeviceFlowSetup -> setup.urlConfig.urlHost ?: config.urlHost
             is DcApiAnnexDFlowSetup -> setup.expectedOrigins.firstOrNull()
                 ?: throw IllegalArgumentException("Missing expected origins (at '$.expectedOrigins')")
+
             is DcApiAnnexCFlowSetup -> setup.origin
         }
         val x5c = setup.core.x5c ?: config.x5c

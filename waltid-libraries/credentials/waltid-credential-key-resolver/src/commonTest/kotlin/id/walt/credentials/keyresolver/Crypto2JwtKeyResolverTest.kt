@@ -6,7 +6,7 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.resolver.Crypto2DidKeyResolver
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
@@ -72,7 +72,7 @@ class Crypto2JwtKeyResolverTest {
     }
 
     private suspend fun resolver(vararg keyIds: String): Crypto2JwtKeyResolver {
-        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val keys = keyIds.map { keyId ->
             runtime.generateSoftwareKey(
                 GenerateSoftwareKeyRequest(

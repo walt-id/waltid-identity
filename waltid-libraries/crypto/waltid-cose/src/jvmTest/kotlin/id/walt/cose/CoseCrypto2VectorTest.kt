@@ -1,13 +1,8 @@
 package id.walt.cose
 
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.StoredKey
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.keys.*
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -16,8 +11,9 @@ import kotlin.test.assertTrue
 class CoseCrypto2VectorTest {
     @Test
     fun `crypto2 verifies COSE working-group ES256 vector`() = runTest {
-        val publicJwk = """{"kty":"EC","crv":"P-256","x":"usWxHK2PmfnHKwXPS54m0kTcGJ90UiglWiGahtagnv8","y":"IBOL-C3BttVivg-lSreASjpkttcsz-1rb7btKLv8EX4"}"""
-        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val publicJwk =
+            """{"kty":"EC","crv":"P-256","x":"usWxHK2PmfnHKwXPS54m0kTcGJ90UiglWiGahtagnv8","y":"IBOL-C3BttVivg-lSreASjpkttcsz-1rb7btKLv8EX4"}"""
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val key = runtime.restore(
             StoredKey.Software(
                 version = StoredKey.CURRENT_VERSION,

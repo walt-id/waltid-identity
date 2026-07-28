@@ -6,22 +6,13 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.keys.*
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
-import io.ktor.http.Url
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.longOrNull
+import io.ktor.http.*
+import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -32,7 +23,7 @@ class DefaultDPoPProofVerifier(
     private val now: () -> Instant = { Clock.System.now() },
 ) : DPoPProofVerifier {
 
-    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     init {
         require(proofMaxAgeSeconds > 0) { "DPoP proof maximum age must be positive" }

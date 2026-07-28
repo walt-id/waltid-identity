@@ -7,7 +7,7 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -17,7 +17,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class Crypto2AsyncJWTCryptoProviderTest {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
     fun `sign verify tamper and requested key selection`() = runTest {

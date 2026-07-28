@@ -19,14 +19,9 @@ import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.Key
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
@@ -35,22 +30,15 @@ import id.walt.x509.GenericX509CertificateBuilder
 import id.walt.x509.GenericX509CertificateProfileData
 import id.walt.x509.X509DistinguishedName
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToByteArray
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CredentialSignaturePolicyTest {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val base64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
 
     @Test
@@ -178,7 +166,7 @@ class CredentialSignaturePolicyTest {
             algorithm = JwsAlgorithm.ES256,
             protectedHeader = buildJsonObject {
                 put("typ", if (sdJwt) "dc+sd-jwt" else "JWT")
-                put("x5c", JsonArray(listOf(JsonPrimitive(Base64.Default.encode(certificate.bytes.toByteArray())))))
+                put("x5c", JsonArray(listOf(JsonPrimitive(Base64.encode(certificate.bytes.toByteArray())))))
             },
         )
         val header = CompactJws.decodeUnverified(signed).protectedHeader
@@ -216,10 +204,12 @@ class CredentialSignaturePolicyTest {
                 signed = tampered,
                 signature = JwtCredentialSignature(tampered, (this.signature as JwtCredentialSignature).jwtHeader),
             )
+
             is SdJwtCredential -> copy(
                 signed = tampered,
                 signature = SdJwtCredentialSignature(tampered, (this.signature as SdJwtCredentialSignature).jwtHeader),
             )
+
             else -> error("Unsupported JWT credential type: ${this::class.simpleName}")
         }
     }

@@ -7,31 +7,20 @@ import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.supportsJwsAlgorithm
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.Key
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.keys.*
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.ProofType
-import id.walt.openid4vci.prooftypes.Proofs
 import id.walt.openid4vci.prooftypes.ProofTypeId
+import id.walt.openid4vci.prooftypes.Proofs
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -41,7 +30,7 @@ class DefaultCredentialProofVerifier(
     private val now: () -> Instant = { Clock.System.now() },
 ) : CredentialProofVerifier {
 
-    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val didKeyResolver = Crypto2JwtKeyResolver()
 
     init {
@@ -366,6 +355,7 @@ class DefaultCredentialProofVerifier(
                         "Credential proof audience claim must be a non-empty string or string array",
                     )
             }.toSet()
+
             is JsonPrimitive -> element.contentOrNull?.let(::setOf).orEmpty()
             else -> emptySet()
         }.also { audiences ->

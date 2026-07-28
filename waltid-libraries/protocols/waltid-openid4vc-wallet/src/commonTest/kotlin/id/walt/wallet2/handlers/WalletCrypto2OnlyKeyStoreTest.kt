@@ -9,7 +9,7 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
@@ -17,15 +17,10 @@ import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
-import kotlin.test.assertSame
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class WalletCrypto2OnlyKeyStoreTest {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
     fun `in-memory store supports crypto2-only add lookup default list and remove`() = runTest {

@@ -4,7 +4,7 @@ import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.openid4vci.offers.AuthenticationMethod
 import kotlinx.coroutines.test.runTest
@@ -19,7 +19,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 
 class OpenId4VciProtocolServiceCrypto2KeyTest {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
     fun `JWK session without validated sidecar cannot downgrade to v1`() = runTest {

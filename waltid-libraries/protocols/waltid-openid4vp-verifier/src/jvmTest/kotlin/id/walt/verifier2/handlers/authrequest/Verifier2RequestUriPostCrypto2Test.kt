@@ -9,22 +9,15 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.migration.v1.V1KeyMigration
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class Verifier2RequestUriPostCrypto2Test {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val migration = V1KeyMigration()
 
     @Test
@@ -90,7 +83,7 @@ class Verifier2RequestUriPostCrypto2Test {
             serialized = KeySerialization.serializeKeyToJson(publicKey).jsonObject,
             usages = setOf(KeyUsage.VERIFY),
         )
-        val verificationKey = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).restore(verificationStoredKey)
+        val verificationKey = CryptoRuntime(defaultSoftwareKeyProviders()).restore(verificationStoredKey)
         val verified = CompactJws.verify(token, verificationKey, JwsAlgorithm.ES256)
 
         assertEquals("oauth-authz-req+jwt", verified.protectedHeader["typ"]?.jsonPrimitive?.content)

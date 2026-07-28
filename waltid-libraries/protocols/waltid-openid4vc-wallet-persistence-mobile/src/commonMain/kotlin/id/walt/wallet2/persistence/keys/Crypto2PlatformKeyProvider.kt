@@ -12,7 +12,7 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.signum.SignumKeyPolicy
 
@@ -53,7 +53,7 @@ public interface Crypto2PlatformKeyProvider {
 internal class MobileStoredKeyMigration(
     private val platformProvider: Crypto2PlatformKeyProvider?,
 ) {
-    private val softwareRuntime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val softwareRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     suspend fun migrate(
         id: KeyId,
@@ -84,6 +84,7 @@ internal class MobileStoredKeyMigration(
         is StoredKey.Managed -> requireNotNull(platformProvider) {
             "No crypto2 platform provider is available for ${stored.provider.value}"
         }.restoreManagedKey(stored)
+
         is StoredKey.Software -> softwareRuntime.restore(stored)
     }
 
@@ -113,18 +114,21 @@ internal fun KeySpec.toLegacyKeyType(): KeyType = when (this) {
         EcCurve.SECP256K1 -> KeyType.secp256k1
         else -> throw IllegalArgumentException("Mobile key schema cannot represent crypto2 EC curve: ${curve.name}")
     }
+
     is KeySpec.Edwards -> when (curve) {
         EdwardsCurve.ED25519 -> KeyType.Ed25519
         else -> throw IllegalArgumentException("Mobile key schema cannot represent crypto2 Edwards curve: ${curve.name}")
     }
+
     is KeySpec.Rsa -> when (bits) {
         2048 -> KeyType.RSA
         3072 -> KeyType.RSA3072
         4096 -> KeyType.RSA4096
         else -> throw IllegalArgumentException("Mobile key schema cannot represent crypto2 RSA size: $bits")
     }
+
     is KeySpec.Montgomery,
     is KeySpec.Symmetric,
     is KeySpec.Custom,
-    -> throw IllegalArgumentException("Mobile key schema cannot represent crypto2 key spec: $this")
+        -> throw IllegalArgumentException("Mobile key schema cannot represent crypto2 key spec: $this")
 }

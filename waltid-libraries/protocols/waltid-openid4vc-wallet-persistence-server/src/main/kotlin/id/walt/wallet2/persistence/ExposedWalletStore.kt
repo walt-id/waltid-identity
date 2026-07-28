@@ -6,10 +6,9 @@ import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.StoredKey
-import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.migration.v1.V1KeyMigration
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.wallet2.data.WalletDescriptor
 import id.walt.wallet2.stores.WalletStore
@@ -23,13 +22,9 @@ import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.isNull
-import org.jetbrains.exposed.v1.jdbc.Database
-import org.jetbrains.exposed.v1.jdbc.deleteWhere
-import org.jetbrains.exposed.v1.jdbc.insert
-import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
-import org.jetbrains.exposed.v1.jdbc.update
-import org.jetbrains.exposed.v1.jdbc.upsert
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 /**
  * Exposed-backed [WalletStore].
@@ -38,7 +33,7 @@ import org.jetbrains.exposed.v1.jdbc.upsert
  * Also implements [id.walt.wallet2.stores.WalletAccountMapping] for account-ownership tracking.
  */
 class ExposedWalletStore(private val db: Database) : WalletStore {
-    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val migration = V1KeyMigration()
 
     override suspend fun loadDescriptor(walletId: String): WalletDescriptor? =
@@ -182,7 +177,7 @@ class ExposedWalletStore(private val db: Database) : WalletStore {
         }
     }
 
-    override suspend fun getWalletIdsForAccount(accountId: String): List<String>? =
+    override suspend fun getWalletIdsForAccount(accountId: String): List<String> =
         suspendTransaction(db) {
             Wallet2Tables.AccountWallets.selectAll()
                 .where { Wallet2Tables.AccountWallets.accountId eq accountId }
@@ -270,9 +265,9 @@ class ExposedWalletStore(private val db: Database) : WalletStore {
         restored: Crypto2Key,
         expected: MigratedStaticKey,
     ): Boolean = persisted.id == expected.stored.id &&
-        persisted.spec == expected.stored.spec &&
-        persisted.usages == expected.stored.usages &&
-        publicThumbprint(restored) == publicThumbprint(expected.key)
+            persisted.spec == expected.stored.spec &&
+            persisted.usages == expected.stored.usages &&
+            publicThumbprint(restored) == publicThumbprint(expected.key)
 
     private suspend fun publicThumbprint(key: Crypto2Key): String {
         val publicKey = requireNotNull(key.capabilities.publicKeyExporter) {
@@ -291,8 +286,8 @@ class ExposedWalletStore(private val db: Database) : WalletStore {
             ?: Wallet2Tables.Wallets.crypto2StaticKey.isNull()
         return Wallet2Tables.Wallets.update({
             (Wallet2Tables.Wallets.id eq walletId) and
-                (Wallet2Tables.Wallets.serializedStaticKey eq serializedStaticKey) and
-                crypto2Condition
+                    (Wallet2Tables.Wallets.serializedStaticKey eq serializedStaticKey) and
+                    crypto2Condition
         }) {
             it[Wallet2Tables.Wallets.crypto2StaticKey] = replacement
         }

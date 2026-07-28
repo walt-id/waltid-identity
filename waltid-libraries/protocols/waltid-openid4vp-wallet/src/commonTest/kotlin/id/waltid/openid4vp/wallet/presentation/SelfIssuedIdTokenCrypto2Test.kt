@@ -8,17 +8,10 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.Key as Crypto2Key
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.PublicKeyExporter
-import id.walt.crypto2.keys.toSpkiDer
-import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.migration.v1.V1KeyMigration
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidService
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
@@ -26,23 +19,14 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.waltid.openid4vp.wallet.WalletCrypto2KeyAdapter
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFails
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlinx.serialization.json.*
+import kotlin.test.*
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 class SelfIssuedIdTokenCrypto2Test {
     @Test
     fun `SPKI-exporting managed key builds JWK thumbprint subject`() = runTest {
-        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val generated = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("managed-key"),
@@ -106,7 +90,7 @@ class SelfIssuedIdTokenCrypto2Test {
             },
             usages = setOf(KeyUsage.VERIFY),
         )
-        val verificationKey = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).restore(verificationStoredKey)
+        val verificationKey = CryptoRuntime(defaultSoftwareKeyProviders()).restore(verificationStoredKey)
         val verified = CompactJws.verify(token, verificationKey, JwsAlgorithm.ED25519)
 
         assertEquals("JWT", verified.protectedHeader["typ"]?.jsonPrimitive?.content)

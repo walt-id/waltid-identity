@@ -11,7 +11,7 @@ import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.ProviderId
 import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.signum.SignumKeyPolicy
 import kotlinx.coroutines.test.runTest
@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
 class MobileStoredKeyMigrationTest {
     @Test
     fun `software JWK migrates and restores after restart`() = runTest {
-        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val source = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("software-key"),
@@ -122,7 +122,7 @@ class MobileStoredKeyMigrationTest {
 
         override suspend fun restoreManagedKey(stored: StoredKey.Managed): Key {
             restoreCount++
-            return CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).generateSoftwareKey(
+            return CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
                 GenerateSoftwareKeyRequest(
                     id = stored.id,
                     spec = stored.spec,

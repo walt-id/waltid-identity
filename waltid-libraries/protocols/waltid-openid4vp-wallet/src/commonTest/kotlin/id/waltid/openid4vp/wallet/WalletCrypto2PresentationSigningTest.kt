@@ -2,59 +2,33 @@
 
 package id.waltid.openid4vp.wallet
 
+import id.walt.cose.*
+import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.cose.Cose
-import id.walt.cose.coseCompliantCbor
-import id.walt.cose.protectedAlgorithm
-import id.walt.cose.verifyDetached
-import id.walt.cose.toCoseKey
-import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.jose.CompactJws
-import id.walt.crypto2.jose.CompactJwe
-import id.walt.crypto2.jose.JweContentEncryption
-import id.walt.crypto2.jose.Jwk
-import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EdwardsCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.jose.*
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.migration.v1.V1KeyMigration
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.crypto.MdocCrypto
+import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToByteArray
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertFails
-import kotlin.test.assertNotNull
-import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
+import kotlinx.serialization.json.*
+import kotlin.test.*
 
 class WalletCrypto2PresentationSigningTest {
     @Test
     fun `persisted crypto2 key signs when legacy platform adapter cannot`() = runTest {
         val issuerKey = JWKKey.generate(KeyType.Ed25519)
-        val crypto2Key = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).generateSoftwareKey(
+        val crypto2Key = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("platform-key"),
                 spec = KeySpec.Edwards(EdwardsCurve.ED25519),
@@ -104,7 +78,7 @@ class WalletCrypto2PresentationSigningTest {
             },
             usages = setOf(KeyUsage.VERIFY),
         )
-        val verificationKey = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).restore(storedVerificationKey)
+        val verificationKey = CryptoRuntime(defaultSoftwareKeyProviders()).restore(storedVerificationKey)
         val verified = CompactJws.verify(token, verificationKey, JwsAlgorithm.ED25519)
         val payload = Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject
 
@@ -116,7 +90,7 @@ class WalletCrypto2PresentationSigningTest {
 
     @Test
     fun `direct post response encrypts with strict crypto2 JWE`() = runTest {
-        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val recipientKey = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("response-key"),
@@ -236,7 +210,7 @@ class WalletCrypto2PresentationSigningTest {
         val legacyKey = JWKKey.generate(KeyType.secp256r1)
         val crypto2Key = assertNotNull(WalletCrypto2KeyAdapter.signingKey(legacyKey))
         val publicJwk = crypto2Key.capabilities.publicKeyExporter?.exportPublicKey() as EncodedKey.Jwk
-        val verificationKey = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).restore(
+        val verificationKey = CryptoRuntime(defaultSoftwareKeyProviders()).restore(
             V1KeyMigration().migrate(
                 recordId = KeyId("mdoc-device-auth-verification"),
                 serialized = buildJsonObject {

@@ -7,23 +7,15 @@ import com.nimbusds.jose.crypto.ECDHDecrypter
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.Jwk
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -31,7 +23,7 @@ import kotlin.test.assertFalse
 class ResponseEncryptionInteropTest {
     @Test
     fun `Nimbus decrypts production direct post response`() = runTest {
-        val recipient = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).generateSoftwareKey(
+        val recipient = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("response-key"),
                 spec = KeySpec.Ec(EcCurve.P256),

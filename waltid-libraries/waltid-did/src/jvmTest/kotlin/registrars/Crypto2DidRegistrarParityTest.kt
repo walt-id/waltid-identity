@@ -3,14 +3,9 @@ package registrars
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EdwardsCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
@@ -34,7 +29,7 @@ class Crypto2DidRegistrarParityTest {
     }
 
     private suspend fun assertV1Parity(spec: KeySpec, keyType: KeyType, useJwkJcsPub: Boolean) {
-        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val crypto2Key = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("parity-${keyType.name}-$useJwkJcsPub"),

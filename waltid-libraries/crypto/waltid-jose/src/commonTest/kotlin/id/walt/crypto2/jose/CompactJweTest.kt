@@ -2,15 +2,9 @@ package id.walt.crypto2.jose
 
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.KeyAgreementAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.Key
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.SoftwareKey
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -21,7 +15,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 
 class CompactJweTest {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
     fun `ECDH-ES AES-GCM round trips with agreement info`() = runTest {

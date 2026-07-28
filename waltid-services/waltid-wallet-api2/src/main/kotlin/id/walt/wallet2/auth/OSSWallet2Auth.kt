@@ -12,14 +12,10 @@ import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toPublicJwk
-import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.migration.v1.V1KeyMigration
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
-import id.walt.wallet2.server.WalletResolver
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.hours
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.Account
@@ -36,6 +32,7 @@ import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
 import id.walt.ktorauthnz.methods.storeddata.EmailPassStoredData
 import id.walt.ktorauthnz.tokens.jwttoken.JwtTokenHandler
 import id.walt.wallet2.OSSWallet2AuthConfig
+import id.walt.wallet2.server.WalletResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -44,11 +41,13 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 private val authLog = KotlinLogging.logger {}
 
@@ -137,6 +136,7 @@ object OSSWallet2AccountStore : EditableAccountStore {
 
 @Serializable
 data class RegisterRequest(val email: String, val password: String)
+
 @Serializable
 data class AccountInfoResponse(
     val accountId: String,
@@ -194,7 +194,7 @@ internal suspend fun resolveWallet2AuthSigningKey(config: OSSWallet2AuthConfig):
     require(storedKey.usages == walletAuthKeyUsages) {
         "Wallet auth signing StoredKey usages must be exactly $walletAuthKeyUsages"
     }
-    val key = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).restore(storedKey)
+    val key = CryptoRuntime(defaultSoftwareKeyProviders()).restore(storedKey)
     val algorithm = JwsAlgorithm.parse(legacyKey.keyType.jwsAlg)
     require(key.usages == walletAuthKeyUsages) {
         "Wallet auth signing StoredKey usages must be exactly $walletAuthKeyUsages"

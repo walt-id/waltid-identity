@@ -1,54 +1,23 @@
 package id.walt.crypto2.kms.vault
 
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.algorithms.AsymmetricEncryptionAlgorithm
-import id.walt.crypto2.algorithms.DigestAlgorithm
-import id.walt.crypto2.algorithms.DigestValue
-import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
-import id.walt.crypto2.algorithms.SignatureAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.AsymmetricCiphertext
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeyDeletionResult
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.ManagedKey
-import id.walt.crypto2.keys.StoredKey
-import id.walt.crypto2.keys.toSpkiDer
+import id.walt.crypto2.algorithms.*
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.kms.CredentialReference
 import id.walt.crypto2.kms.KmsProviderException
 import id.walt.crypto2.providers.GenerateManagedKeyRequest
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.mock.MockEngine
-import io.ktor.client.engine.mock.MockRequestHandleScope
-import io.ktor.client.engine.mock.respond
-import io.ktor.client.engine.mock.respondError
-import io.ktor.client.request.HttpRequestData
-import io.ktor.client.request.HttpResponseData
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpMethod
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.OutgoingContent
-import io.ktor.http.headersOf
+import io.ktor.client.*
+import io.ktor.client.engine.mock.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.boolean
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class VaultTransitKeyProviderTest {
     private val options = VaultTransitOptions(
@@ -64,7 +33,7 @@ class VaultTransitKeyProviderTest {
     @Test
     fun `existing remote key descriptor pins version and contains no Vault token`() = runTest {
         val spec = KeySpec.Ec(EcCurve.P256)
-        val publicKey = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).generateSoftwareKey(
+        val publicKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("source"),
                 spec = spec,
@@ -104,35 +73,40 @@ class VaultTransitKeyProviderTest {
                     assertEquals("ecdsa-p256", request.bodyJson().requiredString("type"))
                     respond("", HttpStatusCode.NoContent)
                 }
+
                 1 -> {
                     assertEquals(HttpMethod.Get, request.method)
                     assertEquals("/v1/transit/keys/logical-key", request.url.encodedPath)
                     respondJson(keyResponse())
                 }
+
                 2 -> {
                     assertEquals("/v1/transit/sign/logical-key", request.url.encodedPath)
                     val body = request.bodyJson()
-                    assertContentEquals("message".encodeToByteArray(), Base64.Default.decode(body.requiredString("input")))
+                    assertContentEquals("message".encodeToByteArray(), Base64.decode(body.requiredString("input")))
                     assertFalse(body.requiredBoolean("prehashed"))
                     assertEquals(3, body.requiredInt("key_version"))
                     assertEquals("sha2-256", body.requiredString("hash_algorithm"))
                     assertEquals("jws", body.requiredString("marshaling_algorithm"))
                     respondJson(signatureResponse(signature))
                 }
+
                 3 -> {
                     val body = request.bodyJson()
-                    assertContentEquals(ByteArray(32) { 4 }, Base64.Default.decode(body.requiredString("input")))
+                    assertContentEquals(ByteArray(32) { 4 }, Base64.decode(body.requiredString("input")))
                     assertTrue(body.requiredBoolean("prehashed"))
                     assertEquals("sha2-256", body.requiredString("hash_algorithm"))
                     respondJson(signatureResponse(signature))
                 }
+
                 4 -> {
                     assertEquals("/v1/transit/verify/logical-key", request.url.encodedPath)
                     val body = request.bodyJson()
-                    assertEquals("vault:v3:${Base64.Default.encode(signature)}", body.requiredString("signature"))
+                    assertEquals("vault:v3:${Base64.encode(signature)}", body.requiredString("signature"))
                     assertFalse(body.requiredBoolean("prehashed"))
                     respondJson("""{"data":{"valid":true}}""")
                 }
+
                 else -> error("Unexpected Vault request: ${request.url}")
             }
         }
@@ -189,14 +163,17 @@ class VaultTransitKeyProviderTest {
                     assertEquals("secret", request.bodyJson().requiredString("secret_id"))
                     respondJson("""{"auth":{"client_token":"leased-token"}}""")
                 }
+
                 1 -> {
                     assertEquals("leased-token", request.headers["X-Vault-Token"])
                     respond("", HttpStatusCode.NoContent)
                 }
+
                 3 -> {
                     assertEquals("leased-token", request.headers["X-Vault-Token"])
                     respondJson(keyResponse())
                 }
+
                 else -> error("Unexpected Vault request")
             }
         }
@@ -234,27 +211,31 @@ class VaultTransitKeyProviderTest {
                     assertEquals("oaep", body.requiredString("padding_scheme"))
                     assertEquals("sha256", body.requiredString("oaep_hash"))
                     assertEquals(3, body.requiredInt("key_version"))
-                    assertContentEquals(plaintext, Base64.Default.decode(body.requiredString("plaintext")))
+                    assertContentEquals(plaintext, Base64.decode(body.requiredString("plaintext")))
                     respondJson("""{"data":{"ciphertext":"$ciphertextEnvelope"}}""")
                 }
+
                 3 -> {
                     assertEquals("/v1/transit/decrypt/rsa-key", request.url.encodedPath)
                     val body = request.bodyJson()
                     assertEquals(ciphertextEnvelope, body.requiredString("ciphertext"))
                     assertEquals("oaep", body.requiredString("padding_scheme"))
                     assertEquals("sha256", body.requiredString("oaep_hash"))
-                    respondJson("""{"data":{"plaintext":"${Base64.Default.encode(plaintext)}"}}""")
+                    respondJson("""{"data":{"plaintext":"${Base64.encode(plaintext)}"}}""")
                 }
+
                 4 -> {
                     assertEquals("/v1/transit/keys/rsa-key/config", request.url.encodedPath)
                     assertTrue(request.bodyJson().requiredBoolean("deletion_allowed"))
                     respond("", HttpStatusCode.NoContent)
                 }
+
                 5 -> {
                     assertEquals(HttpMethod.Delete, request.method)
                     assertEquals("/v1/transit/keys/rsa-key", request.url.encodedPath)
                     respond("", HttpStatusCode.NoContent)
                 }
+
                 else -> error("Unexpected Vault request")
             }
         }
@@ -308,7 +289,7 @@ class VaultTransitKeyProviderTest {
             when (requestIndex++) {
                 0 -> respond("", HttpStatusCode.NoContent)
                 1 -> respondJson(keyResponse())
-                2 -> respondJson("""{"data":{"signature":"vault:v4:${Base64.Default.encode(ByteArray(64))}"}}""")
+                2 -> respondJson("""{"data":{"signature":"vault:v4:${Base64.encode(ByteArray(64))}"}}""")
                 else -> error("Unexpected Vault request")
             }
         }
@@ -351,14 +332,14 @@ class VaultTransitKeyProviderTest {
             "type": "$type",
             "latest_version": 3,
             "keys": {
-              "3": {"public_key": "-----BEGIN PUBLIC KEY-----\n${Base64.Default.encode(TEST_SPKI)}\n-----END PUBLIC KEY-----"}
+              "3": {"public_key": "-----BEGIN PUBLIC KEY-----\n${Base64.encode(TEST_SPKI)}\n-----END PUBLIC KEY-----"}
             }
           }
         }
     """.trimIndent()
 
     private fun signatureResponse(signature: ByteArray): String =
-        """{"data":{"signature":"vault:v3:${Base64.Default.encode(signature)}"}}"""
+        """{"data":{"signature":"vault:v3:${Base64.encode(signature)}"}}"""
 
     companion object {
         private val TEST_SPKI = byteArrayOf(0x30, 0x03, 0x02, 0x01, 0x01)

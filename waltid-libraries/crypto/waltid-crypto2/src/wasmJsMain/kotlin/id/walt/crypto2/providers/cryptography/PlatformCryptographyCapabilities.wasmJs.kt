@@ -1,3 +1,4 @@
 package id.walt.crypto2.providers.cryptography
 
-internal actual fun CryptographyCapabilityProfile.withPlatformCapabilities(): CryptographyCapabilityProfile = this
+internal actual fun CryptographyCapabilityProfile.withPlatformCapabilities(): CryptographyCapabilityProfile =
+    this.without448Curves()

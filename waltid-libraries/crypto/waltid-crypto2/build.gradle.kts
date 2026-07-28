@@ -1,12 +1,8 @@
 @file:OptIn(ExperimentalAbiValidation::class, ExperimentalWasmDsl::class)
 
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.abi.BinariesSource
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.gradle.api.DefaultTask
-import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.tasks.InputFile
-import org.gradle.api.tasks.TaskAction
 
 abstract class CheckTypeScriptBaseline : DefaultTask() {
     @get:InputFile
@@ -68,6 +64,13 @@ kotlin {
                 }
             }
         }
+        nodejs {
+            testTask {
+                // The algorithm support matrix generates keys for every specification, which outlasts the 2s
+                // Mocha default.
+                useMocha { timeout = "600s" }
+            }
+        }
     }
 
     wasmJs {
@@ -78,7 +81,11 @@ kotlin {
                 useKarma { useChromeHeadless() }
             }
         }
-        nodejs()
+        nodejs {
+            testTask {
+                useMocha { timeout = "600s" }
+            }
+        }
     }
 
     linuxX64()
@@ -146,6 +153,12 @@ val checkSerializationApiPublication by tasks.registering(CheckSerializationApiP
 
 tasks.named("check") {
     dependsOn(checkSerializationApiPublication, checkTypeScriptDefinitions)
+}
+
+// SoftwareKeyAlgorithmMatrixTest reports the per-platform algorithm support matrix on stdout, which is only
+// worth having if it reaches the console of whoever ran the test.
+tasks.withType<AbstractTestTask>().configureEach {
+    testLogging.showStandardStreams = true
 }
 
 mavenPublishing {

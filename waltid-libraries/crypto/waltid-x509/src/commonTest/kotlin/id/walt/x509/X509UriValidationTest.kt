@@ -9,7 +9,7 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -29,7 +29,7 @@ class X509UriValidationTest {
 
     @Test
     fun rejectsMalformedCrlDistributionPoint() = runTest {
-        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val key = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("issuer"),

@@ -4,26 +4,15 @@ import id.walt.credentials.keyresolver.resolvers.WellKnownKeyResolver
 import id.walt.credentials.keyresolver.resolvers.X5CKeyResolver
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.Jwk
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.Key
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.keys.*
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.resolver.Crypto2DidKeyResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 
 enum class JwtKeyResolutionSource {
     DID,
@@ -48,7 +37,7 @@ class Crypto2JwtKeyResolver(
     private val didResolver: Crypto2DidKeyResolver = Crypto2DidKeyResolver { did ->
         DidService.resolveToCrypto2Keys(did).getOrThrow()
     },
-    private val runtime: CryptoRuntime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())),
+    private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
     private val allowInlineJwk: Boolean = false,
 ) : Crypto2JwtVerificationKeyResolver {
     override suspend fun resolveFromJwt(jwtHeader: JsonObject?, jwtPayload: JsonObject): ResolvedJwtVerificationKey? {
@@ -88,6 +77,7 @@ class Crypto2JwtKeyResolver(
                         keyId = kid,
                     )
                 }
+
                 else -> null
             }
         } catch (cause: CancellationException) {

@@ -6,23 +6,12 @@ import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.providers.GenerateManagedKeyRequest
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.ManagedKeyProvider
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertContains
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class KeySerializationTest {
     private val algorithm = SignatureAlgorithm.RsaPkcs1(DigestAlgorithm.SHA_256)
@@ -153,7 +142,7 @@ class KeySerializationTest {
         assertTrue(assertNotNull(restoredPublic.capabilities.verifier).verify(message, signature, algorithm))
     }
 
-    private fun softwareRuntime() = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private fun softwareRuntime() = CryptoRuntime(defaultSoftwareKeyProviders())
 
     private fun softwareRequest() = GenerateSoftwareKeyRequest(
         id = KeyId("software-serialization"),

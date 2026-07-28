@@ -4,12 +4,8 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.StorableKey
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
-import id.walt.wallet2.data.Wallet
-import id.walt.wallet2.data.WalletCredentialStore
-import id.walt.wallet2.data.WalletDescriptor
-import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.data.WalletKeyStore
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.wallet2.data.*
 import id.walt.wallet2.stores.WalletStore
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
@@ -18,7 +14,7 @@ import io.ktor.http.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
-private val walletCrypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+private val walletCrypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
 /**
  * Factory for creating named store instances.
@@ -122,6 +118,7 @@ interface WalletResolver {
     suspend fun listWalletIds(): Flow<String> = walletStore.listWalletIds()
     suspend fun linkWalletToAccount(accountId: String, walletId: String) =
         walletStore.linkWalletToAccount(accountId, walletId)
+
     suspend fun getWalletIdsForAccount(accountId: String): List<String>? =
         walletStore.getWalletIdsForAccount(accountId)
 
@@ -136,18 +133,21 @@ interface WalletResolver {
     suspend fun storeKeyStore(storeId: String, store: WalletKeyStore) {}
     suspend fun createKeyStore(storeId: String): WalletKeyStore =
         InMemoryKeyStore().also { storeKeyStore(storeId, it) }
+
     fun listKeyStoreIds(): Flow<String> = emptyFlow()
 
     suspend fun resolveCredentialStore(storeId: String): WalletCredentialStore? = null
     suspend fun storeCredentialStore(storeId: String, store: WalletCredentialStore) {}
     suspend fun createCredentialStore(storeId: String): WalletCredentialStore =
         InMemoryCredentialStore().also { storeCredentialStore(storeId, it) }
+
     fun listCredentialStoreIds(): Flow<String> = emptyFlow()
 
     suspend fun resolveDidStore(storeId: String): WalletDidStore? = null
     suspend fun storeDidStore(storeId: String, store: WalletDidStore) {}
     suspend fun createDidStore(storeId: String): WalletDidStore =
         InMemoryDidStore().also { storeDidStore(storeId, it) }
+
     fun listDidStoreIds(): Flow<String> = emptyFlow()
 
     // ---------------------------------------------------------------------------
@@ -199,16 +199,20 @@ interface WalletResolver {
     suspend fun setWalletDefaults(walletId: String, defaultKeyId: String?, defaultDidId: String?) {
         val liveWallet = walletStore.loadWallet(walletId)
         if (liveWallet != null) {
-            walletStore.saveWallet(liveWallet.copy(
-                defaultKeyId = defaultKeyId ?: liveWallet.defaultKeyId,
-                defaultDidId = defaultDidId ?: liveWallet.defaultDidId,
-            ))
+            walletStore.saveWallet(
+                liveWallet.copy(
+                    defaultKeyId = defaultKeyId ?: liveWallet.defaultKeyId,
+                    defaultDidId = defaultDidId ?: liveWallet.defaultDidId,
+                )
+            )
             return
         }
         val descriptor = walletStore.loadDescriptor(walletId) ?: return
-        walletStore.saveDescriptor(descriptor.copy(
-            defaultKeyId = defaultKeyId ?: descriptor.defaultKeyId,
-            defaultDidId = defaultDidId ?: descriptor.defaultDidId,
-        ))
+        walletStore.saveDescriptor(
+            descriptor.copy(
+                defaultKeyId = defaultKeyId ?: descriptor.defaultKeyId,
+                defaultDidId = defaultDidId ?: descriptor.defaultDidId,
+            )
+        )
     }
 }

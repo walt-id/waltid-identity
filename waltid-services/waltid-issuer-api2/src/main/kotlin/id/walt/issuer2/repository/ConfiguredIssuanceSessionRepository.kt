@@ -2,7 +2,6 @@ package id.walt.issuer2.repository
 
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.commons.persistence.Persistence
-import id.walt.issuer2.domain.IssuanceSession
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.Jwk
@@ -11,9 +10,10 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.migration.v1.V1KeyMigration
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
+import id.walt.issuer2.domain.IssuanceSession
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
@@ -35,7 +35,7 @@ class ConfiguredIssuanceSessionRepository(
         decoding = { it },
     ),
 ) : IssuanceSessionRepository {
-    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val migration = V1KeyMigration()
     override suspend fun save(session: IssuanceSession): IssuanceSession {
         val ttl = ttlUntil(session.expiresAt)

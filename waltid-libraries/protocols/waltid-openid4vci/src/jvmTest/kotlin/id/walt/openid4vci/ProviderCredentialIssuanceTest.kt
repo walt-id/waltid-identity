@@ -1,5 +1,6 @@
 package id.walt.openid4vci
 
+import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -13,8 +14,7 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
-import id.walt.credentials.keyresolver.resolvers.DidKeyResolver
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.errors.CredentialErrorCodes
@@ -25,29 +25,20 @@ import id.walt.openid4vci.metadata.issuer.SigningAlgId
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.CredentialOfferRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
-import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
+import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
-import io.ktor.http.Url
-import io.ktor.util.toMap
+import io.ktor.http.*
+import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlinx.serialization.json.*
+import kotlin.test.*
 
 class ProviderCredentialIssuanceTest {
-    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
     fun `authorization flow issues signed sd-jwt credential`() = runBlocking {
@@ -133,7 +124,7 @@ class ProviderCredentialIssuanceTest {
         val holderDid = DidService.registerByKey("key", holderKey).did
         val holderKid = "$holderDid#${holderDid.removePrefix("did:key:")}"
         assertFailsWith<NoSuchElementException> {
-            DidKeyResolver.resolveKeyFromDid(holderDid, "$holderDid#unknown")
+            Crypto2JwtKeyResolver().resolveFromDid(holderDid, "$holderDid#unknown")
         }
         val proofPayload = buildJsonObject {
             put("aud", issuerId)

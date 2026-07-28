@@ -1,30 +1,20 @@
 package id.walt.crypto2.jose
 
-import com.nimbusds.jose.EncryptionMethod
-import com.nimbusds.jose.JWEAlgorithm
-import com.nimbusds.jose.JWEHeader
-import com.nimbusds.jose.JWEObject
-import com.nimbusds.jose.Payload
+import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.ECDHDecrypter
 import com.nimbusds.jose.crypto.ECDHEncrypter
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.algorithms.KeyAgreementAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.SoftwareKey
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
 class NimbusJweInteropTest {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
     fun `crypto2 decrypts Nimbus ECDH-ES A128GCM`() = runTest {

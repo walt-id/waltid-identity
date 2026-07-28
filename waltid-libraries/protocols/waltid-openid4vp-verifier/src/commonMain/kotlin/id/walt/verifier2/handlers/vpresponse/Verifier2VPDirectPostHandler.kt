@@ -3,29 +3,25 @@
 package id.walt.verifier2.handlers.vpresponse
 
 import id.walt.cose.coseCompliantCbor
-import id.walt.dcql.DcqlCredential
-import id.walt.dcql.models.TrustedAuthoritiesQuery
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJwe
 import id.walt.crypto2.jose.JweContentEncryption
 import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
+import id.walt.dcql.DcqlCredential
+import id.walt.dcql.models.TrustedAuthoritiesQuery
 import id.walt.iso18013.annexc.AnnexCResponseVerifier
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.sha256
 import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
-import id.walt.verifier2.data.DcApiAnnexCFlowSetup
-import id.walt.verifier2.data.SessionEvent
-import id.walt.verifier2.data.SessionFailure
-import id.walt.verifier2.data.Verification2Session
+import id.walt.verifier2.data.*
 import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus.FAILED
 import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus.SUCCESSFUL
-import id.walt.verifier2.data.Verifier2Response
 import id.walt.verifier2.utils.JsonUtils.parseAsJsonObject
 import id.walt.verifier2.verification2.PresentationVerificationEngine
 import id.walt.verifier2.verification2.SelfIssuedIdTokenValidator
@@ -34,6 +30,7 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToHexString
@@ -41,7 +38,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.coroutines.CancellationException
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -50,7 +46,7 @@ import kotlin.uuid.Uuid
 object Verifier2VPDirectPostHandler {
 
     private val log = KotlinLogging.logger {}
-    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     /**
      * Optional callback for `trusted_authorities` verification per OID4VP §6.1.1.
@@ -225,6 +221,7 @@ object Verifier2VPDirectPostHandler {
                 null
             }
         }
+
         else -> null
     }
 
@@ -258,7 +255,13 @@ object Verifier2VPDirectPostHandler {
                 val receivedState = urlParameters["state"]
                 val errorCode = urlParameters["error"]
 
-                log.trace { "Verification session data: state = $receivedState, vp_token = $vpTokenString, id_token = ${idTokenString?.take(20)}, response = $responseString, error = $errorCode" }
+                log.trace {
+                    "Verification session data: state = $receivedState, vp_token = $vpTokenString, id_token = ${
+                        idTokenString?.take(
+                            20
+                        )
+                    }, response = $responseString, error = $errorCode"
+                }
 
                 when {
                     errorCode != null -> ErrorResponseDirectPost(
@@ -531,10 +534,12 @@ object Verifier2VPDirectPostHandler {
                 .decodeToString(),
         ).jsonObject
         require(header["alg"]?.jsonPrimitive?.content == "ECDH-ES") { "Unsupported JWE key-management algorithm" }
-        require(JweContentEncryption.parse(requireNotNull(header["enc"]?.jsonPrimitive?.content)) in setOf(
-            JweContentEncryption.A128GCM,
-            JweContentEncryption.A256GCM,
-        )) { "JWE content-encryption algorithm is not allowed" }
+        require(
+            JweContentEncryption.parse(requireNotNull(header["enc"]?.jsonPrimitive?.content)) in setOf(
+                JweContentEncryption.A128GCM,
+                JweContentEncryption.A256GCM,
+            )
+        ) { "JWE content-encryption algorithm is not allowed" }
         require(header["kid"]?.jsonPrimitive?.content == expectedKeyId) { "JWE kid does not match response decryption key" }
     }
 
@@ -542,7 +547,7 @@ object Verifier2VPDirectPostHandler {
      * Generates a fresh response_code per OID4VP 1.0 §1758.
      * Uses multiplatform UUID (backed by SecureRandom on JVM) for cryptographic randomness.
      */
-        private fun generateResponseCode(): String = Uuid.random().toHexString()
+    private fun generateResponseCode(): String = Uuid.random().toHexString()
 
     fun parseVpToken(vpTokenString: String): ParsedVpToken = try {
         Json.Default.decodeFromString(vpTokenString)

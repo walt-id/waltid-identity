@@ -5,16 +5,13 @@ import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.keys.Key as Crypto2Key
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.decodeFromByteArray
-import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.elements.IssuerSignedList
@@ -23,17 +20,14 @@ import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.x509.CertificateDer
 import id.walt.x509.crypto2PublicJwk
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.Contextual
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.putJsonObject
-import kotlinx.serialization.json.put
 import kotlin.io.encoding.Base64
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 /**
  * Represents the `IssuerSigned` structure within a `Document`, containing data elements attested to
@@ -160,8 +154,8 @@ data class IssuerSigned private constructor(
 
 
     companion object {
-        val log = KotlinLogging.logger {  }
-        private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val log = KotlinLogging.logger { }
+        private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
         /**
          * The primary factory method for creating an [IssuerSigned] instance.

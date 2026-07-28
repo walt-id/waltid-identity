@@ -8,7 +8,7 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
@@ -19,10 +19,9 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
-import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
-import io.ktor.http.Url
-import io.ktor.http.URLBuilder
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
+import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
@@ -30,11 +29,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.io.encoding.Base64
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 @OptIn(ExperimentalSerializationApi::class)
 class WalletPresentFunctionality2Test {
@@ -106,7 +101,7 @@ class WalletPresentFunctionality2Test {
 
     @Test
     fun vpOnlyRequestWithCrypto2OnlyKeyNeverRequiresALegacyKey() = runTest {
-        val holderKey = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).generateSoftwareKey(
+        val holderKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("crypto2-only-holder"),
                 spec = KeySpec.Edwards(EdwardsCurve.ED25519),

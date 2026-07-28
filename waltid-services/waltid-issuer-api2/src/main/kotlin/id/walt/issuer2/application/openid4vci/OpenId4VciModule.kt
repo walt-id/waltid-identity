@@ -10,7 +10,7 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.migration.v1.V1KeyMigration
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.issuer2.config.CredentialEncryptionKeyConfig
@@ -33,16 +33,11 @@ import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.PARRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
-import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenVerifier
+import id.walt.openid4vci.tokens.jwt.*
 import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
+import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenVerifier
 import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenIssuer
 import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenVerifier
-import id.walt.openid4vci.tokens.jwt.JwtSigningKeyResolver
-import id.walt.openid4vci.tokens.jwt.JwtVerificationKeyResolver
-import id.walt.openid4vci.tokens.jwt.Crypto2JwtSigningKey
-import id.walt.openid4vci.tokens.jwt.Crypto2JwtSigningKeyResolver
-import id.walt.openid4vci.tokens.jwt.Crypto2JwtVerificationKey
-import id.walt.openid4vci.tokens.jwt.Crypto2JwtVerificationKeyResolver
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 import id.walt.openid4vci.validation.DefaultCredentialRequestValidator
@@ -162,7 +157,7 @@ data class OpenId4VciModule(
                 return@runBlocking null
             }
             val legacyKey = KeyManager.resolveSerializedKey(serializedObject)
-            val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+            val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
             val stored = config.ciTokenStoredKey?.let(StoredKeyCodec::decodeFromString)
                 ?: V1KeyMigration().migrate(
                     recordId = KeyId(legacyKey.getKeyId()),

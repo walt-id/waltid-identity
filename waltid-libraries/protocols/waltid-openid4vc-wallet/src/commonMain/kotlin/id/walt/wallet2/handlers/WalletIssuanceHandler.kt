@@ -11,9 +11,8 @@ import id.walt.crypto2.jose.selectJwsAlgorithm
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidService
 import id.walt.openid4vci.CryptographicBindingMethod
@@ -27,15 +26,10 @@ import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.prooftypes.Proofs
 import id.walt.openid4vci.responses.credential.CredentialResponse
-import id.walt.wallet2.data.StoredCredential
-import id.walt.wallet2.data.Wallet
-import id.walt.wallet2.data.WalletKeyStoreEntry
-import id.walt.wallet2.data.WalletSessionEvent
-import id.walt.wallet2.data.resolveKeyMaterial
+import id.walt.wallet2.data.*
 import id.walt.wallet2.handlers.WalletIssuanceHandler.exchangeCode
-import id.walt.wallet2.handlers.WalletIssuanceHandler.generateAuthorizationUrl
 import id.walt.wallet2.handlers.WalletIssuanceHandler.pollDeferredFlow
-import id.walt.wallet2.handlers.WalletIssuanceHandler.receiveCredentialFlow
+import id.walt.wallet2.handlers.WalletIssuanceHandler.resolveOffer
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
@@ -58,9 +52,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import kotlin.jvm.JvmInline
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
-import kotlin.jvm.JvmInline
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 private val log = KotlinLogging.logger {}
 private const val DEFAULT_CLIENT_ID = "eudiw-abca"
@@ -152,7 +147,9 @@ data class ReceiveCredentialRequest(
      */
     val tokenRequestHeaders: Map<String, String> = emptyMap()
 ) : CredentialOfferSource {
-    init { checkOfferSource() }
+    init {
+        checkOfferSource()
+    }
 }
 
 /** Opaque identifier binding an issuance action to one reviewed credential-offer resolution. */
@@ -205,7 +202,9 @@ data class ResolveOfferRequest(
     override val offerUrl: Url? = null,
     override val offerJson: JsonObject? = null
 ) : CredentialOfferSource {
-    init { checkOfferSource() }
+    init {
+        checkOfferSource()
+    }
 }
 
 @Serializable
@@ -372,7 +371,9 @@ data class GenerateAuthorizationUrlRequest(
     val redirectUri: Url = Url("openid://"),
     val usePkce: Boolean = true
 ) : CredentialOfferSource {
-    init { checkOfferSource() }
+    init {
+        checkOfferSource()
+    }
 }
 
 @Serializable
@@ -408,7 +409,7 @@ data class ExchangeCodeRequest(
  * react to each credential as it arrives (useful for streaming UIs).
  */
 object WalletIssuanceHandler {
-    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val lenientJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
     private val previewedOffers = PreviewSessionStore<ResolvedIssuanceOffer>(sessionName = "Issuance")
 
@@ -442,11 +443,14 @@ object WalletIssuanceHandler {
      */
     private suspend fun resolveOffer(source: CredentialOfferSource, httpClient: HttpClient) =
         if (source.offerJson != null) {
-            val inlineOffer = lenientJson.decodeFromString<id.walt.openid4vci.offers.CredentialOffer>(source.getEffectiveOfferString())
+            val inlineOffer = lenientJson.decodeFromString<CredentialOffer>(source.getEffectiveOfferString())
             CredentialOfferResolver(httpClient).resolveCredentialOffer(credentialOffer = inlineOffer, credentialOfferUri = null)
         } else {
             val req = CredentialOfferParser.parseCredentialOfferUrl(source.getEffectiveOfferString())
-            CredentialOfferResolver(httpClient).resolveCredentialOffer(credentialOffer = req.credentialOffer, credentialOfferUri = req.credentialOfferUri)
+            CredentialOfferResolver(httpClient).resolveCredentialOffer(
+                credentialOffer = req.credentialOffer,
+                credentialOfferUri = req.credentialOfferUri
+            )
         }
 
     /** Immediate, non-previewed pre-authorized-code issuance flow. */
@@ -455,7 +459,7 @@ object WalletIssuanceHandler {
         request: ReceiveCredentialRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         /**
          * Called whenever the issuer defers a credential.
          * [credentialConfigurationId] identifies which credential was deferred;
@@ -482,7 +486,7 @@ object WalletIssuanceHandler {
         request: ReceiveCredentialFromPreviewRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit = { _, _ -> },
     ): Flow<StoredCredential> = channelFlow {
         previewedOffers.useRetainingOnFailure(
@@ -626,7 +630,10 @@ object WalletIssuanceHandler {
             }
 
             for (issuedCredential in rawCredentials) {
-                val entry = wallet.parseAndStore(issuedCredential, label = offeredCredential.configuration.credentialMetadata?.display?.firstOrNull()?.name)
+                val entry = wallet.parseAndStore(
+                    issuedCredential,
+                    label = offeredCredential.configuration.credentialMetadata?.display?.firstOrNull()?.name
+                )
                 onEvent(WalletSessionEvent.issuance_credential_stored)
                 send(entry)
             }
@@ -644,7 +651,7 @@ object WalletIssuanceHandler {
         request: ReceiveCredentialRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = defaultHttpClient()
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient
     ): ReceiveCredentialResult {
         val ids = mutableListOf<String>()
         val deferredIds = mutableMapOf<String, String>()
@@ -665,7 +672,7 @@ object WalletIssuanceHandler {
         request: ReceiveCredentialFromPreviewRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): ReceiveCredentialResult {
         val ids = mutableListOf<String>()
         val deferredIds = mutableMapOf<String, String>()
@@ -694,7 +701,7 @@ object WalletIssuanceHandler {
     suspend fun previewOffer(
         wallet: Wallet,
         request: ResolveOfferRequest,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): WalletOfferPreviewResult {
         val resolvedOffer = resolveIssuanceOffer(request, httpClient)
         val previewHandle = IssuancePreviewHandle(
@@ -720,7 +727,7 @@ object WalletIssuanceHandler {
 
     private suspend fun resolveIssuanceOffer(
         request: ResolveOfferRequest,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): ResolvedIssuanceOffer {
         val offer = resolveOffer(request, httpClient)
         val metadataResolver = IssuerMetadataResolver(httpClient)
@@ -791,7 +798,7 @@ object WalletIssuanceHandler {
         wallet: Wallet,
         request: RequestTokenRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         onAttestationObtained: suspend () -> Unit = {},
     ): RequestTokenResult {
         val credentialIssuer = request.credentialIssuer?.takeIf { it.isNotBlank() }
@@ -813,9 +820,9 @@ object WalletIssuanceHandler {
         }
         val anonymousPreAuthorizedCode =
             request.anonymousPreAuthorizedCode ||
-                (asMetadata?.preAuthorizedGrantAnonymousAccessSupported == true &&
-                    request.tokenRequestHeaders.isEmpty() &&
-                    attestationHeaders == null)
+                    (asMetadata?.preAuthorizedGrantAnonymousAccessSupported == true &&
+                            request.tokenRequestHeaders.isEmpty() &&
+                            attestationHeaders == null)
 
         return requestToken(
             request = request,
@@ -829,7 +836,7 @@ object WalletIssuanceHandler {
         request: RequestTokenRequest,
         attestationHeaders: ClientAttestationHeaders?,
         anonymousPreAuthorizedCode: Boolean,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): RequestTokenResult {
         val clientConfig = ClientConfiguration(
             clientId = request.clientId,
@@ -851,7 +858,7 @@ object WalletIssuanceHandler {
 
     suspend fun requestNonce(
         request: RequestNonceRequest,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): RequestNonceResult {
         val issuerMetadata = IssuerMetadataResolver(httpClient)
             .resolveCredentialIssuerMetadata(request.credentialIssuer.toString())
@@ -878,7 +885,7 @@ object WalletIssuanceHandler {
     }
 
     suspend fun fetchCredential(request: FetchCredentialRequest): FetchCredentialResult =
-        fetchCredential(request, defaultHttpClient())
+        fetchCredential(request, httpClient)
 
     internal suspend fun fetchCredential(
         request: FetchCredentialRequest,
@@ -1134,7 +1141,7 @@ object WalletIssuanceHandler {
      * Wraps [TokenRequestBuilder.exchangeAuthorizationCode].
      */
     suspend fun exchangeCode(request: ExchangeCodeRequest): RequestTokenResult {
-        val httpClient = defaultHttpClient()
+        val httpClient = httpClient
         val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
             ?: error("credentialIssuerBaseUrl must be provided")
         val asMetadata = resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient)
@@ -1151,7 +1158,7 @@ object WalletIssuanceHandler {
         wallet: Wallet,
         request: ExchangeCodeRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         onAttestationObtained: suspend () -> Unit = {},
     ): RequestTokenResult {
         val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
@@ -1180,7 +1187,7 @@ object WalletIssuanceHandler {
         request: ExchangeCodeRequest,
         tokenEndpoint: String,
         attestationHeaders: ClientAttestationHeaders?,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): RequestTokenResult {
         val clientConfig = ClientConfiguration(
             clientId = request.clientId,
@@ -1216,7 +1223,7 @@ object WalletIssuanceHandler {
         wallet: Wallet,
         request: PollDeferredRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = defaultHttpClient()
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient
     ): Flow<StoredCredential> = channelFlow {
         val response = httpClient.post(request.deferredCredentialEndpoint.toString()) {
             header(HttpHeaders.Authorization, "Bearer ${request.accessToken}")
@@ -1283,7 +1290,7 @@ object WalletIssuanceHandler {
         inlineDid: String? = null,
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = defaultHttpClient()
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient
     ): Flow<StoredCredential> = channelFlow {
         val keyMaterial = inlineKey?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))

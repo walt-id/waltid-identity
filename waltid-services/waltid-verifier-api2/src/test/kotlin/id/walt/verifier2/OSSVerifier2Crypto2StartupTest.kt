@@ -13,9 +13,9 @@ import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.crypto2.migration.v1.V1KeyMigration
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.verifier2.config.ClientMetadataHopliteDecoder
 import id.walt.verifier2.data.CrossDeviceFlowSetup
@@ -48,7 +48,7 @@ class OSSVerifier2Crypto2StartupTest {
 
     @Test
     fun `stored key config signs request through startup path`() = runTest {
-        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val key = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("configured-verifier"),

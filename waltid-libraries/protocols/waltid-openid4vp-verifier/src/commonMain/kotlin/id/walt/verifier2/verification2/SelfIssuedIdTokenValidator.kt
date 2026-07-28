@@ -8,16 +8,15 @@ import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
-import id.walt.did.dids.resolver.Crypto2DidKeyResolver
-import id.walt.did.dids.DidService
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
+import id.walt.did.dids.DidService
+import id.walt.did.dids.resolver.Crypto2DidKeyResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -42,7 +41,7 @@ object SelfIssuedIdTokenValidator {
     private val log = KotlinLogging.logger { }
 
     private const val JWK_THUMBPRINT_PREFIX = "urn:ietf:params:oauth:jwk-thumbprint"
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     /**
      * Validates the Self-Issued ID Token.
@@ -112,6 +111,7 @@ object SelfIssuedIdTokenValidator {
                 val verificationKey = when {
                     kid != null -> keys.singleOrNull { it.id.value == kid }
                         ?: throw IllegalArgumentException("id_token kid does not identify a DID verification method: $kid")
+
                     keys.size == 1 -> keys.single()
                     else -> throw IllegalArgumentException("id_token with multiple DID keys must include kid")
                 }
@@ -170,7 +170,7 @@ object SelfIssuedIdTokenValidator {
             else -> {
                 throw IllegalArgumentException(
                     "id_token 'sub' ($sub) uses an unrecognized Subject Syntax Type. " +
-                        "Expected 'did:...' or '$JWK_THUMBPRINT_PREFIX:...' (SIOPv2 §4.1)"
+                            "Expected 'did:...' or '$JWK_THUMBPRINT_PREFIX:...' (SIOPv2 §4.1)"
                 )
             }
         }

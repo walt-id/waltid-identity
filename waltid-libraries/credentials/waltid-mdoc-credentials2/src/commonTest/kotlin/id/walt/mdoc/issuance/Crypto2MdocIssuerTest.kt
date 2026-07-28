@@ -8,13 +8,9 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.credsdata.DrivingPrivilege
 import id.walt.mdoc.credsdata.Mdl
 import id.walt.mdoc.crypto.MdocCrypto.getSharedSecret
@@ -34,7 +30,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class Crypto2MdocIssuerTest {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
     fun `mdoc issuance and issuer verification use crypto2`() = runTest {

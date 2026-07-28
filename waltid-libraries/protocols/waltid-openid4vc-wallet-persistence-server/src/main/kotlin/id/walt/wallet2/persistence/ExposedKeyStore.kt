@@ -6,9 +6,8 @@ import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.migration.v1.V1KeyMigration
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
@@ -20,16 +19,13 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.isNull
-import org.jetbrains.exposed.v1.core.ResultRow
-import org.jetbrains.exposed.v1.jdbc.Database
-import org.jetbrains.exposed.v1.jdbc.deleteWhere
-import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
-import org.jetbrains.exposed.v1.jdbc.update
-import org.jetbrains.exposed.v1.jdbc.upsert
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 /**
  * Exposed-backed [WalletKeyStore].
@@ -41,7 +37,7 @@ class ExposedKeyStore(
     val storeId: String,
     private val db: Database,
 ) : WalletKeyStore {
-    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val migration = V1KeyMigration()
 
     override suspend fun getKey(keyId: String): Key? =
@@ -173,9 +169,9 @@ class ExposedKeyStore(
             ?: Wallet2Tables.Keys.crypto2StoredKey.isNull()
         return Wallet2Tables.Keys.update({
             (Wallet2Tables.Keys.storeId eq storeId) and
-                (Wallet2Tables.Keys.keyId eq keyId) and
-                (Wallet2Tables.Keys.serializedKey eq serializedKey) and
-                crypto2Condition
+                    (Wallet2Tables.Keys.keyId eq keyId) and
+                    (Wallet2Tables.Keys.serializedKey eq serializedKey) and
+                    crypto2Condition
         }) {
             it[Wallet2Tables.Keys.crypto2StoredKey] = encoded
         }

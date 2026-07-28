@@ -3,20 +3,20 @@ package id.walt.iso18013.annexc
 import com.nimbusds.jose.jwk.Curve
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.util.Base64URL
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.migration.v1.V1KeyMigration
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import kotlinx.serialization.json.jsonObject
 import org.bouncycastle.jce.ECNamedCurveTable
 import org.bouncycastle.util.encoders.Hex
 import java.math.BigInteger
 
 object TestResources {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
 
     /**

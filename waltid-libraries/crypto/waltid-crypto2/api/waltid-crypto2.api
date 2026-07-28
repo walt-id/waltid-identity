@@ -2165,6 +2165,10 @@ public final class id/walt/crypto2/providers/cryptography/CryptographySoftwareKe
 public final class id/walt/crypto2/providers/cryptography/CryptographySoftwareKeyProvider$Companion {
 }
 
+public final class id/walt/crypto2/providers/cryptography/DefaultSoftwareKeyProviders_jvmKt {
+	public static final fun defaultSoftwareKeyProviders ()Ljava/util/List;
+}
+
 public final class id/walt/crypto2/providers/cryptography/SignatureFamily : java/lang/Enum {
 	public static final field ECDSA Lid/walt/crypto2/providers/cryptography/SignatureFamily;
 	public static final field EDDSA Lid/walt/crypto2/providers/cryptography/SignatureFamily;

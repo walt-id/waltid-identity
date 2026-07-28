@@ -8,11 +8,10 @@ import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.keys.Key as Crypto2Key
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.vical.serializers.VicalInstantSerializer
 import id.walt.x509.CertificateDer
 import id.walt.x509.crypto2PublicJwk
-import id.walt.vical.serializers.VicalInstantSerializer
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -20,6 +19,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Instant
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 /**
  * Represents the payload of a VICAL. This data class is aligned with the CDDL structure
@@ -148,14 +148,14 @@ data class CertificateInfo(
         // result = 31 * result + serialNumber.contentHashCode()
         result = 31 * result + ski.contentHashCode()
         result = 31 * result + docType.hashCode()
-        result = 31 * result + (certificateProfile?.hashCode() ?: 0)
-        result = 31 * result + (issuingAuthority?.hashCode() ?: 0)
-        result = 31 * result + (issuingCountry?.hashCode() ?: 0)
-        result = 31 * result + (stateOrProvinceName?.hashCode() ?: 0)
+        result = 31 * result + certificateProfile.hashCode()
+        result = 31 * result + issuingAuthority.hashCode()
+        result = 31 * result + issuingCountry.hashCode()
+        result = 31 * result + stateOrProvinceName.hashCode()
         result = 31 * result + (issuer?.contentHashCode() ?: 0)
         result = 31 * result + (subject?.contentHashCode() ?: 0)
-        result = 31 * result + (notBefore?.hashCode() ?: 0)
-        result = 31 * result + (notAfter?.hashCode() ?: 0)
+        result = 31 * result + notBefore.hashCode()
+        result = 31 * result + notAfter.hashCode()
         return result
     }
 
@@ -178,7 +178,7 @@ data class CertificateInfo(
             """.trimMargin()
 
     companion object {
-        private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     }
 }
 

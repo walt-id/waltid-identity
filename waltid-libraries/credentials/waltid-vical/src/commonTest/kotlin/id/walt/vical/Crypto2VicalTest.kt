@@ -11,7 +11,7 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.x509.GenericX509CertificateBuilder
 import id.walt.x509.GenericX509CertificateProfileData
 import id.walt.x509.X509DistinguishedName
@@ -24,7 +24,7 @@ import kotlin.time.Clock
 class Crypto2VicalTest {
     @Test
     fun `crypto2 signs verifies and resolves VICAL certificate key`() = runTest {
-        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val key = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("vical-key"),
@@ -65,7 +65,7 @@ class Crypto2VicalTest {
         assertTrue(signed.verify(certificateKey, setOf(Cose.Algorithm.ES256)))
         assertTrue(
             VicalService.validateVical(
-                Base64.Default.encode(signed.toTaggedCbor()),
+                Base64.encode(signed.toTaggedCbor()),
                 certificateKey,
                 setOf(Cose.Algorithm.ES256),
             ).vicalValid

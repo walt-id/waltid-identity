@@ -1,23 +1,11 @@
 package id.walt.did.dids.registrar
 
-import id.walt.crypto.keys.Key as V1Key
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.MultiCodecUtils
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EdwardsCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.Key
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.ManagedKey
-import id.walt.crypto2.keys.PrivateKeyExporter
-import id.walt.crypto2.keys.ProviderId
-import id.walt.crypto2.keys.PublicKeyExporter
-import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
@@ -27,19 +15,12 @@ import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.resolver.DidDocumentCrypto2KeyResolver
 import id.walt.did.dids.resolver.DidResolver
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlinx.serialization.json.*
+import kotlin.test.*
+import id.walt.crypto.keys.Key as V1Key
 
 class Crypto2DidRegistrarTest {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
     fun `built-in did key registry supports Ed25519 P-256 and RSA`() = runTest {

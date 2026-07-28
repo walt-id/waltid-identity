@@ -1,15 +1,11 @@
 package id.waltid.openid4vci.wallet.attestation
 
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.Key
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 
-private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
 suspend fun attestationTestKey(
     id: String,

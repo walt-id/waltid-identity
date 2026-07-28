@@ -14,12 +14,12 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
-import id.walt.did.dids.DidService
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.NoMeta
+import id.walt.did.dids.DidService
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.wallet2.data.StoredCredential
@@ -27,12 +27,7 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -41,7 +36,7 @@ class WalletCrypto2OnlyPresentationTest {
     fun `wallet builds presentation with crypto2-only key`() = runTest {
         DidService.minimalInit()
         val did = DidService.registerByKey("key", JWKKey.generate(KeyType.Ed25519)).did
-        val key = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).generateSoftwareKey(
+        val key = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("crypto2-only-presentation"),
                 spec = KeySpec.Edwards(EdwardsCurve.ED25519),
@@ -95,7 +90,9 @@ class WalletCrypto2OnlyPresentationTest {
             .getValue("pid").jsonArray.single().jsonPrimitive.content
 
         val verified = CompactJws.verify(presentationJwt, key, JwsAlgorithm.ED25519)
-        assertEquals("verifier", Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject["aud"]
-            ?.jsonPrimitive?.content)
+        assertEquals(
+            "verifier", Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject["aud"]
+                ?.jsonPrimitive?.content
+        )
     }
 }

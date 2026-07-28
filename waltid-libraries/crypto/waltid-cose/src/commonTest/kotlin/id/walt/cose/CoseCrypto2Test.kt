@@ -1,25 +1,14 @@
 package id.walt.cose
 
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EdwardsCurve
-import id.walt.crypto2.keys.Key
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.KeyCapabilities
-import id.walt.crypto2.keys.Signer
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFails
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class CoseCrypto2Test {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
     fun `protected ES256 signs and verifies attached and detached payloads`() = runTest {

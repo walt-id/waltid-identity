@@ -8,15 +8,11 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticatedData.TokenValidationData
 import id.walt.ktorauthnz.methods.sessiondata.OidcTokenValidationPolicyData
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -101,7 +97,7 @@ class OidcTokenValidationTest {
 
     @Test
     fun `same-kid signing key rotation refreshes JWKS once`() = runTest {
-        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val staleKey = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("stale"),

@@ -3,13 +3,9 @@ package id.walt.openid4vci.tokens.jwt
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.Key
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
 import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenVerifier
 import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenIssuer
@@ -23,7 +19,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 
 class Crypto2JwtTokenTest {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
     fun `access token signs and verifies with explicit crypto2 algorithm and kid`() = runTest {
@@ -94,8 +90,10 @@ class Crypto2JwtTokenTest {
             )
         )
 
-        assertEquals("refresh-token-key", CompactJws.decodeUnverified(token).protectedHeader[JwtHeaderParams.KEY_ID]
-            ?.toString()?.trim('"'))
+        assertEquals(
+            "refresh-token-key", CompactJws.decodeUnverified(token).protectedHeader[JwtHeaderParams.KEY_ID]
+                ?.toString()?.trim('"')
+        )
         assertEquals("subject", verifier.verify(token, "https://issuer.example", "client").subject)
     }
 

@@ -7,7 +7,7 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test
@@ -17,7 +17,7 @@ class Crypto2JWTCryptoProviderTest {
     @Test
     fun `synchronous provider delegates crypto2 signing`() {
         val key = runBlocking {
-            CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).generateSoftwareKey(
+            CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
                 GenerateSoftwareKeyRequest(
                     id = KeyId("sync-key"),
                     spec = KeySpec.Ec(EcCurve.P256),

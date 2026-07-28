@@ -8,14 +8,13 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.ktorauthnz.AuthContext
+import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
-import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.methods.config.OidcAuthConfiguration
 import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticatedData
 import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticatedData.TokenValidationData
@@ -40,16 +39,17 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import kotlinx.coroutines.CancellationException
 import org.kotlincrypto.hash.sha2.SHA256
 import org.kotlincrypto.random.CryptoRand
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 
 object OIDC : AuthenticationMethod("oidc") {
@@ -70,7 +70,7 @@ object OIDC : AuthenticationMethod("oidc") {
     private val configurationCache = mutableMapOf<Url, OpenIdConfiguration>()
 
     private val jwksCache = mutableMapOf<String, List<JsonObject>>()
-    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     suspend fun resolveConfiguration(configUrl: Url): OpenIdConfiguration {
         return configurationCache.getOrPut(configUrl) {
@@ -403,10 +403,12 @@ object OIDC : AuthenticationMethod("oidc") {
 
                 // Build response
                 if (endSessionEndpoint == null) {
-                    call.respond(HttpStatusCode.OK, mapOf(
-                        "status" to "logged_out",
-                        "message" to "Local session terminated. No IdP end_session_endpoint available."
-                    ))
+                    call.respond(
+                        HttpStatusCode.OK, mapOf(
+                            "status" to "logged_out",
+                            "message" to "Local session terminated. No IdP end_session_endpoint available."
+                        )
+                    )
                     return@get
                 }
 
@@ -418,11 +420,13 @@ object OIDC : AuthenticationMethod("oidc") {
 
                 log.trace { "OIDC: IdP end_session_endpoint: $endSessionUrl" }
 
-                call.respond(HttpStatusCode.OK, mapOf(
-                    "status" to "logged_out",
-                    "end_session_url" to endSessionUrl.toString(),
-                    "message" to "Local session terminated. Redirect to end_session_url for full SSO logout."
-                ))
+                call.respond(
+                    HttpStatusCode.OK, mapOf(
+                        "status" to "logged_out",
+                        "end_session_url" to endSessionUrl.toString(),
+                        "message" to "Local session terminated. Redirect to end_session_url for full SSO logout."
+                    )
+                )
             }
         }
     }

@@ -4,19 +4,15 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
 class CertificateIssuerConstraintsTest {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val signatureAlgorithm = SignatureAlgorithm.Ecdsa(
         DigestAlgorithm.SHA_256,
         EcdsaSignatureEncoding.DER,

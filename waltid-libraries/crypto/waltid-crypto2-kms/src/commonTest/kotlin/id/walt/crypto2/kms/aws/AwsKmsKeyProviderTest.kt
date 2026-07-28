@@ -5,40 +5,23 @@ import id.walt.crypto2.algorithms.AsymmetricEncryptionAlgorithm
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureCodec
 import id.walt.crypto2.algorithms.SignatureAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.AsymmetricCiphertext
-import id.walt.crypto2.keys.KeyDeletionResult
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toSpkiDer
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.kms.CredentialReference
 import id.walt.crypto2.providers.GenerateManagedKeyRequest
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.mock.MockEngine
-import io.ktor.client.engine.mock.MockRequestHandleScope
-import io.ktor.client.engine.mock.respond
-import io.ktor.client.request.HttpRequestData
-import io.ktor.client.request.HttpResponseData
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.OutgoingContent
-import io.ktor.http.headersOf
+import io.ktor.client.*
+import io.ktor.client.engine.mock.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Instant
 
 class AwsKmsKeyProviderTest {
@@ -86,30 +69,35 @@ class AwsKmsKeyProviderTest {
                     assertEquals("ECC_NIST_P256", request.bodyJson().requiredString("KeySpec"))
                     respondJson("""{"KeyMetadata":{"KeyId":"remote-key"}}""")
                 }
+
                 1 -> {
                     assertEquals("TrentService.GetPublicKey", request.headers["X-Amz-Target"])
                     respondJson(
-                        """{"KeySpec":"ECC_NIST_P256","PublicKey":"${Base64.Default.encode(testSpki.data.toByteArray())}"}"""
+                        """{"KeySpec":"ECC_NIST_P256","PublicKey":"${Base64.encode(testSpki.data.toByteArray())}"}"""
                     )
                 }
+
                 2 -> {
                     assertEquals("TrentService.Sign", request.headers["X-Amz-Target"])
                     val body = request.bodyJson()
                     assertEquals("DIGEST", body.requiredString("MessageType"))
                     assertEquals("ECDSA_SHA_256", body.requiredString("SigningAlgorithm"))
-                    assertEquals(32, Base64.Default.decode(body.requiredString("Message")).size)
-                    respondJson("""{"Signature":"${Base64.Default.encode(der)}"}""")
+                    assertEquals(32, Base64.decode(body.requiredString("Message")).size)
+                    respondJson("""{"Signature":"${Base64.encode(der)}"}""")
                 }
+
                 3 -> {
                     assertEquals("TrentService.Verify", request.headers["X-Amz-Target"])
-                    assertContentEquals(der, Base64.Default.decode(request.bodyJson().requiredString("Signature")))
+                    assertContentEquals(der, Base64.decode(request.bodyJson().requiredString("Signature")))
                     respondJson("""{"SignatureValid":true}""")
                 }
+
                 4 -> {
                     assertEquals("TrentService.ScheduleKeyDeletion", request.headers["X-Amz-Target"])
                     assertEquals("7", request.bodyJson().requiredString("PendingWindowInDays"))
                     respondJson("""{"DeletionDate":1784894400}""")
                 }
+
                 else -> error("Unexpected AWS request")
             }
         }
@@ -149,20 +137,23 @@ class AwsKmsKeyProviderTest {
             when (requestIndex++) {
                 0 -> respondJson("""{"KeyMetadata":{"KeyId":"remote-rsa"}}""")
                 1 -> respondJson(
-                    """{"KeySpec":"RSA_2048","PublicKey":"${Base64.Default.encode(testSpki.data.toByteArray())}"}"""
+                    """{"KeySpec":"RSA_2048","PublicKey":"${Base64.encode(testSpki.data.toByteArray())}"}"""
                 )
+
                 2 -> {
                     assertEquals("TrentService.Encrypt", request.headers["X-Amz-Target"])
                     val body = request.bodyJson()
                     assertEquals("RSAES_OAEP_SHA_256", body.requiredString("EncryptionAlgorithm"))
-                    assertContentEquals(plaintext, Base64.Default.decode(body.requiredString("Plaintext")))
-                    respondJson("""{"CiphertextBlob":"${Base64.Default.encode(encrypted)}"}""")
+                    assertContentEquals(plaintext, Base64.decode(body.requiredString("Plaintext")))
+                    respondJson("""{"CiphertextBlob":"${Base64.encode(encrypted)}"}""")
                 }
+
                 3 -> {
                     assertEquals("TrentService.Decrypt", request.headers["X-Amz-Target"])
-                    assertContentEquals(encrypted, Base64.Default.decode(request.bodyJson().requiredString("CiphertextBlob")))
-                    respondJson("""{"Plaintext":"${Base64.Default.encode(plaintext)}"}""")
+                    assertContentEquals(encrypted, Base64.decode(request.bodyJson().requiredString("CiphertextBlob")))
+                    respondJson("""{"Plaintext":"${Base64.encode(plaintext)}"}""")
                 }
+
                 else -> error("Unexpected AWS request")
             }
         }
@@ -201,7 +192,7 @@ class AwsKmsKeyProviderTest {
     private fun mockClient(handler: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData): HttpClient =
         HttpClient(MockEngine) { engine { addHandler(handler) } }
 
-    private suspend fun testSpki(spec: KeySpec) = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private suspend fun testSpki(spec: KeySpec) = CryptoRuntime(defaultSoftwareKeyProviders())
         .generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("public-key-source"),

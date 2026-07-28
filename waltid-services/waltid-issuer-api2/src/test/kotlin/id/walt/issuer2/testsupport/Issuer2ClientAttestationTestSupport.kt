@@ -5,13 +5,9 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.Jwk
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.openid4vci.clientauth.ClientAuthenticationConfig
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethodConfig
@@ -23,12 +19,7 @@ import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.WalletAttestationProvider
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
 import kotlin.time.Clock
 
 data class Issuer2ClientAttestationTestMaterial(
@@ -36,7 +27,7 @@ data class Issuer2ClientAttestationTestMaterial(
     val attestationAssembler: ClientAttestationAssembler,
 )
 
-private val walletCryptoRuntime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+private val walletCryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
 
 suspend fun generateIssuer2WalletInstanceKey(id: String = "issuer2-wallet-instance") =
     walletCryptoRuntime.generateSoftwareKey(

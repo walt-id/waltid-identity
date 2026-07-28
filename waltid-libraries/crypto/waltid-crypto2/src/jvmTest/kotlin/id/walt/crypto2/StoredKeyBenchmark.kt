@@ -2,14 +2,9 @@ package id.walt.crypto2
 
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.Key
-import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
 import kotlinx.coroutines.runBlocking
 import kotlin.system.measureNanoTime
@@ -17,7 +12,7 @@ import kotlin.system.measureNanoTime
 object StoredKeyBenchmark {
     @JvmStatic
     fun main(args: Array<String>) = runBlocking {
-        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)
         val generated = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(

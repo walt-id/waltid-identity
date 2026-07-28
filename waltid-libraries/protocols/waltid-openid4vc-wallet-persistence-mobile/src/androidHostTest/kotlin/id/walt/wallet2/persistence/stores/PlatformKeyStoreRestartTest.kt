@@ -21,7 +21,7 @@ import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.crypto2.signum.SignumKeyPolicy
@@ -47,13 +47,13 @@ class PlatformKeyStoreRestartTest {
             driver.execute(
                 null,
                 "CREATE TABLE key_references (key_id TEXT NOT NULL PRIMARY KEY, key_type TEXT NOT NULL, " +
-                    "created_at INTEGER NOT NULL, is_platform_backed INTEGER NOT NULL DEFAULT 1, key_material TEXT)",
+                        "created_at INTEGER NOT NULL, is_platform_backed INTEGER NOT NULL DEFAULT 1, key_material TEXT)",
                 0,
             )
             driver.execute(
                 null,
                 "CREATE TABLE credentials (id TEXT NOT NULL PRIMARY KEY, serialized_credential TEXT NOT NULL, " +
-                    "format TEXT NOT NULL DEFAULT '', label TEXT, added_at INTEGER NOT NULL)",
+                        "format TEXT NOT NULL DEFAULT '', label TEXT, added_at INTEGER NOT NULL)",
                 0,
             )
             driver.execute(null, "CREATE TABLE dids (did TEXT NOT NULL PRIMARY KEY, document TEXT NOT NULL)", 0)
@@ -196,7 +196,7 @@ class PlatformKeyStoreRestartTest {
     fun `crypto2 software JWK persists without legacy material and restores`() = runTest {
         database().use { database ->
             val provider = FakePlatformKeyProvider()
-            val softwareKey = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).generateSoftwareKey(
+            val softwareKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
                 GenerateSoftwareKeyRequest(
                     id = KeyId("crypto2-software"),
                     spec = KeySpec.Edwards(EdwardsCurve.ED25519),

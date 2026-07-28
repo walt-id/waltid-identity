@@ -3,8 +3,7 @@ package id.walt.issuer2.service.openid4vci
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.keys.Key as Crypto2Key
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
@@ -16,12 +15,14 @@ import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.utils.JsonObjectPathMapper
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
+import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
-import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
+import id.walt.openid4vci.offers.AuthenticationMethod
+import id.walt.openid4vci.proofs.*
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequest
@@ -29,12 +30,6 @@ import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestTargetResolution
 import id.walt.openid4vci.requests.credential.resolveCredentialConfigurationId
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
-import id.walt.openid4vci.offers.AuthenticationMethod
-import id.walt.openid4vci.proofs.CredentialNonceBinding
-import id.walt.openid4vci.proofs.CredentialNonceService
-import id.walt.openid4vci.proofs.CredentialNonceValidationContext
-import id.walt.openid4vci.proofs.CredentialProofValidationContext
-import id.walt.openid4vci.proofs.IssuedCredentialNonce
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
@@ -45,23 +40,16 @@ import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.tokens.access.parseAccessTokenAuthorization
-import id.walt.mdoc.objects.mso.Status as MdocStatus
-import id.walt.mdoc.objects.mso.Status.StatusListInfo as MdocStatusListInfo
-import io.ktor.http.parseQueryString
-import io.ktor.server.plugins.NotFoundException
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
+import io.ktor.http.*
+import io.ktor.server.plugins.*
+import kotlinx.serialization.json.*
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.mdoc.objects.mso.Status as MdocStatus
+import id.walt.mdoc.objects.mso.Status.StatusListInfo as MdocStatusListInfo
 
 private const val INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER = "_issuer2_session_id"
 private const val TOKEN_ENDPOINT_PATH = "token"
@@ -94,7 +82,7 @@ class OpenId4VciProtocolService(
         ignoreUnknownKeys = true
         explicitNulls = false
     }
-    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     suspend fun processPushedAuthorizationRequest(
         parameters: Map<String, List<String>>,

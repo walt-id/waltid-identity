@@ -1,16 +1,11 @@
 package id.walt.did.dids.resolver
 
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.Key
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.keys.*
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.utils.KeyMaterial
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -23,7 +18,7 @@ fun interface Crypto2DidKeyResolver {
 
 class DidDocumentCrypto2KeyResolver(
     private val resolver: DidResolver,
-    private val runtime: CryptoRuntime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())),
+    private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
 ) : Crypto2DidKeyResolver {
     override suspend fun resolveToKeys(did: String): Set<Key> {
         val document = resolver.resolve(did).getOrElse { cause ->

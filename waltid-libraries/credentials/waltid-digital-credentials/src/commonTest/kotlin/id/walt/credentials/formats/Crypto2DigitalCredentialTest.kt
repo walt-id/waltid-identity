@@ -2,6 +2,11 @@ package id.walt.credentials.formats
 
 import id.walt.credentials.CredentialDetectorTypes
 import id.walt.credentials.presentations.formats.DcSdJwtPresentation
+import id.walt.credentials.signatures.JwtCredentialSignature
+import id.walt.credentials.signatures.SdJwtCredentialSignature
+import id.walt.crypto.utils.MultiBaseUtils
+import id.walt.crypto.utils.MultiCodecUtils
+import id.walt.crypto.utils.ShaUtils
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
@@ -9,44 +14,22 @@ import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
-import id.walt.crypto.utils.MultiBaseUtils
-import id.walt.crypto.utils.MultiCodecUtils
-import id.walt.crypto.utils.ShaUtils
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
 import id.walt.did.utils.JsonCanonicalization
-import id.walt.credentials.signatures.JwtCredentialSignature
-import id.walt.credentials.signatures.SdJwtCredentialSignature
 import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.x509.GenericX509CertificateBuilder
 import id.walt.x509.GenericX509CertificateProfileData
 import id.walt.x509.X509DistinguishedName
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFails
-import kotlin.test.assertFailsWith
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class Crypto2DigitalCredentialTest {
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
     fun `W3C credential secured with SD-JWT keeps the W3C jwt_vc_json format`() {
@@ -90,7 +73,7 @@ class Crypto2DigitalCredentialTest {
             subjectDid = "did:example:holder",
             additionalJwtHeader = mapOf(
                 "x5c" to JsonArray(
-                    listOf(JsonPrimitive(Base64.Default.encode(certificate.bytes.toByteArray())))
+                    listOf(JsonPrimitive(Base64.encode(certificate.bytes.toByteArray())))
                 )
             ),
         )
@@ -197,7 +180,8 @@ class Crypto2DigitalCredentialTest {
     @Test
     fun `holder cnf kid resolves did jwk as verification-only key`() = runTest {
         DidService.minimalInit()
-        val did = "did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9"
+        val did =
+            "did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9"
 
         assertHolderKidResolves("$did#0")
     }
@@ -205,7 +189,8 @@ class Crypto2DigitalCredentialTest {
     @Test
     fun `holder cnf kid resolves JWK JCS did key as verification-only key`() = runTest {
         DidService.minimalInit()
-        val publicJwk = """{"crv":"P-256","kty":"EC","x":"acbIQiuMs3i8_uszEjJ2tpTtRM4EU3yz91PH6CdH2V0","y":"_KcyLj9vWMptnmKtm46GqDz8wf74I5LKgrl2GzH3nSE"}"""
+        val publicJwk =
+            """{"crv":"P-256","kty":"EC","x":"acbIQiuMs3i8_uszEjJ2tpTtRM4EU3yz91PH6CdH2V0","y":"_KcyLj9vWMptnmKtm46GqDz8wf74I5LKgrl2GzH3nSE"}"""
         val identifier = MultiBaseUtils.convertRawKeyToMultiBase58Btc(
             JsonCanonicalization.getCanonicalBytes(publicJwk),
             MultiCodecUtils.JwkJcsPubMultiCodecKeyCode,

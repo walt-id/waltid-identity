@@ -1,43 +1,18 @@
 package id.walt.crypto2.providers.cryptography
 
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.algorithms.DigestAlgorithm
-import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
-import id.walt.crypto2.algorithms.AsymmetricEncryptionAlgorithm
-import id.walt.crypto2.algorithms.KeyAgreementAlgorithm
-import id.walt.crypto2.algorithms.SignatureAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.AsymmetricCiphertext
-import id.walt.crypto2.keys.EdwardsCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyEncodingFormat
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.MontgomeryCurve
-import id.walt.crypto2.keys.ProviderId
-import id.walt.crypto2.keys.SoftwareKey
-import id.walt.crypto2.keys.StoredKey
-import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.algorithms.*
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.CryptoOperation
 import id.walt.crypto2.providers.CryptoRequirement
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertFails
-import kotlin.test.assertFalse
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlinx.serialization.json.*
+import kotlin.test.*
 
 class CryptographySoftwareKeyProviderTest {
     private val provider = CryptographySoftwareKeyProvider()
@@ -185,11 +160,25 @@ class CryptographySoftwareKeyProviderTest {
 
     @Test
     fun `provider advertises exact profile and rejects unsupported digest`() = runTest {
-        val key = generate(KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN))
-        val unsupported = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA3_256)
+        // Narrowed on purpose: which digests a platform can do is discovered from the cryptography-kotlin
+        // provider, so pinning a concrete "unsupported" digest here would only hold on some platforms. What must
+        // hold everywhere is that the profile is an upper bound on what gets advertised and accepted.
+        val narrowedProvider = CryptographySoftwareKeyProvider(
+            profile = CryptographyCapabilityProfile.Portable.copy(digests = setOf(DigestAlgorithm.SHA_256)),
+        )
+        val key = CryptoRuntime(listOf(narrowedProvider)).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("narrowed-key"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN),
+            ),
+        )
+        val outsideProfile = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_512)
 
-        assertFalse(unsupported in key.capabilities.signatureAlgorithms)
-        assertFails { key.capabilities.signer!!.sign(byteArrayOf(1), unsupported) }
+        assertTrue(SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256) in key.capabilities.signatureAlgorithms)
+        assertFalse(outsideProfile in key.capabilities.signatureAlgorithms)
+        assertFalse(key.capabilities.supportsSignatureAlgorithm(outsideProfile))
+        assertFails { key.capabilities.signer!!.sign(byteArrayOf(1), outsideProfile) }
     }
 
     @Test

@@ -1,9 +1,10 @@
 package id.walt.iso18013.annexc
 
-import id.walt.cose.toCoseKey
 import id.walt.cose.coseCompliantCbor
+import id.walt.cose.toCoseKey
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.hpke.Hpke
 import id.walt.crypto2.keys.HpkeCiphertext
@@ -11,9 +12,8 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.migration.v1.V1KeyMigration
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.jsonObject
@@ -81,7 +81,7 @@ object AnnexCResponseVerifier {
             serialized = serialized,
             usages = setOf(KeyUsage.KEY_AGREEMENT),
         )
-        val key = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).restore(migrated)
+        val key = CryptoRuntime(defaultSoftwareKeyProviders()).restore(migrated)
         return decryptToDeviceResponse(encryptedResponseB64, encryptionInfoB64, origin, key)
     }
 }

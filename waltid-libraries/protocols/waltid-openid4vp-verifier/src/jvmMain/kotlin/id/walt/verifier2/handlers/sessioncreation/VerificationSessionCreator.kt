@@ -1,27 +1,20 @@
 package id.walt.verifier2.handlers.sessioncreation
 
 import id.walt.cose.*
-import id.walt.cose.toCoseKey
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.SoftwareKey
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
-import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.dcql.models.CredentialFormat
 import id.walt.iso18013.annexc.AnnexC
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
@@ -33,12 +26,7 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceRequestInfo
 import id.walt.mdoc.objects.deviceretrieval.UseCase
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
-import id.walt.policies2.vp.policies.TransactionDataHashCheckSdJwtVPPolicy
-import id.walt.policies2.vp.policies.TransactionDataHashesVPPolicy
-import id.walt.policies2.vp.policies.TransactionDataMdocVpPolicy
-import id.walt.policies2.vp.policies.VPPolicy2
-import id.walt.policies2.vp.policies.VPPolicyList
-import id.walt.policies2.vp.policies.VPVerificationPolicyManager
+import id.walt.policies2.vp.policies.*
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
@@ -59,12 +47,13 @@ import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 @OptIn(ExperimentalSerializationApi::class)
 object VerificationSessionCreator {
 
     private val log = KotlinLogging.logger { }
-    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     /** Fully specified COSE algorithm identifier for Ed25519 (IANA COSE Algorithms). */
     private const val FULLY_SPECIFIED_ED25519 = -50
@@ -650,6 +639,7 @@ object VerificationSessionCreator {
             is VerifierSigningKey.Legacy -> requireNotNull(key.keyType.toCoseAlgorithm()) {
                 "Verifier signing key type has no COSE algorithm: ${key.keyType}"
             }
+
             is VerifierSigningKey.Crypto2 -> coseAlgorithm
         }
 

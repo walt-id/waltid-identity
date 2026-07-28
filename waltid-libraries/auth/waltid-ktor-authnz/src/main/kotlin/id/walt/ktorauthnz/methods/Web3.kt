@@ -11,7 +11,7 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.Web3Identifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
@@ -33,11 +33,12 @@ import org.web3j.utils.Numeric
 import java.math.BigInteger
 import java.security.SecureRandom
 import kotlin.time.Clock
+
 object Web3 : AuthenticationMethod("web3") {
     private val log = logger<Web3>()
 
     private val nonceKey = runBlocking {
-        CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).generateSoftwareKey(
+        CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("web3-nonce"),
                 spec = KeySpec.Edwards(EdwardsCurve.ED25519),

@@ -2,25 +2,15 @@
 
 package id.walt.mdoc.crypto
 
-import id.walt.cose.CoseKey
-import id.walt.cose.CoseMac0
-import id.walt.cose.CoseSign1
-import id.walt.cose.toCoseVerifier
-import id.walt.cose.toEncodedJwk
-import id.walt.cose.verifyDetached
+import id.walt.cose.*
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
-import id.walt.crypto2.algorithms.KeyAgreementAlgorithm
 import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.algorithms.KeyAgreementAlgorithm
 import id.walt.crypto2.jose.Jwk
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.keys.Key as Crypto2Key
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.keys.*
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.encoding.MdocCbor
 import id.walt.mdoc.encoding.startsWith
 import id.walt.mdoc.objects.SessionTranscript
@@ -33,6 +23,7 @@ import org.kotlincrypto.hash.sha2.SHA256
 import org.kotlincrypto.hash.sha2.SHA384
 import org.kotlincrypto.hash.sha2.SHA512
 import org.kotlincrypto.macs.hmac.sha2.HmacSHA256
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 /**
  * Provides cryptographic functions required for mdoc verification, such as hashing and signature validation.
@@ -40,7 +31,7 @@ import org.kotlincrypto.macs.hmac.sha2.HmacSHA256
 object MdocCrypto {
 
     private val log = KotlinLogging.logger { }
-    private val crypto2Runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     val mdocDigests = listOf(
         "SHA-256",

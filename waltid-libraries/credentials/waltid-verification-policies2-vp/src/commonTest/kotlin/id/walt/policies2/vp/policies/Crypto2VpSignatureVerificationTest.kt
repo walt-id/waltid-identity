@@ -9,29 +9,13 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.keys.EdwardsCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertIs
-import kotlin.test.assertTrue
+import kotlinx.serialization.json.*
+import kotlin.test.*
 
 class Crypto2VpSignatureVerificationTest {
     @Test
@@ -54,7 +38,7 @@ class Crypto2VpSignatureVerificationTest {
 
     @Test
     fun `KB-JWT holder signature verifies through crypto2 and rejects tampering`() = runTest {
-        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val key = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("holder"),
@@ -80,7 +64,7 @@ class Crypto2VpSignatureVerificationTest {
 
     @Test
     fun `KB-JWT signature policy uses credential crypto2 holder key`() = runTest {
-        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val key = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("policy-holder"),

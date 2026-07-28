@@ -1,7 +1,7 @@
 package id.walt.crypto2.kms.oci
 
-import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.BinarySize.Companion.bits
+import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.RSA
 import dev.whyoleg.cryptography.algorithms.SHA256
 import id.walt.crypto2.CryptoRuntime
@@ -9,47 +9,25 @@ import id.walt.crypto2.algorithms.AsymmetricEncryptionAlgorithm
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureCodec
 import id.walt.crypto2.algorithms.SignatureAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.AsymmetricCiphertext
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyDeletionResult
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.StoredKey
-import id.walt.crypto2.keys.encodePem
-import id.walt.crypto2.keys.toSpkiDer
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.kms.CredentialReference
 import id.walt.crypto2.providers.GenerateManagedKeyRequest
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.mock.MockEngine
-import io.ktor.client.engine.mock.MockRequestHandleScope
-import io.ktor.client.engine.mock.respond
-import io.ktor.client.request.HttpRequestData
-import io.ktor.client.request.HttpResponseData
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpMethod
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.OutgoingContent
-import io.ktor.http.headersOf
+import io.ktor.client.*
+import io.ktor.client.engine.mock.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.http.content.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertFailsWith
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Instant
 
 class OciKmsKeyProviderTest {
@@ -64,7 +42,7 @@ class OciKmsKeyProviderTest {
     fun `existing key discovery pins current remote version and public key`() = runTest {
         val apiKeyPem = apiKeyPem()
         val spec = KeySpec.Ec(EcCurve.P256)
-        val publicKey = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).generateSoftwareKey(
+        val publicKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("source"),
                 spec = spec,
@@ -80,6 +58,7 @@ class OciKmsKeyProviderTest {
                         """{"id":"ocid1.key.existing","currentKeyVersion":"version-7","keyShape":{"algorithm":"ECDSA","length":32,"curveId":"NIST_P256"}}"""
                     )
                 }
+
                 1 -> {
                     assertEquals(
                         "/20180608/keys/ocid1.key.existing/keyVersions/version-7",
@@ -89,6 +68,7 @@ class OciKmsKeyProviderTest {
                         """{"publicKey":"${publicKey.encodePem().replace("\n", "\\n")}"}"""
                     )
                 }
+
                 else -> error("Unexpected OCI request: ${request.url}")
             }
         }
@@ -134,6 +114,7 @@ class OciKmsKeyProviderTest {
                         """{"id":"ocid1.key.remote","currentKeyVersion":"version-4","keyShape":{"algorithm":"ECDSA","length":48,"curveId":"NIST_P384"}}"""
                     )
                 }
+
                 1 -> {
                     assertEquals(HttpMethod.Get, request.method)
                     assertEquals("/20180608/keys/ocid1.key.remote/keyVersions/version-4", request.url.encodedPath)
@@ -141,6 +122,7 @@ class OciKmsKeyProviderTest {
                     val pem = EncodedKey.SpkiDer(BinaryData(TEST_SPKI)).encodePem().replace("\n", "\\n")
                     respondJson("""{"publicKey":"$pem"}""")
                 }
+
                 2 -> {
                     assertEquals("https://crypto.test/20180608/sign", request.url.toString())
                     assertSignedBody(request)
@@ -148,22 +130,25 @@ class OciKmsKeyProviderTest {
                     assertEquals("version-4", body.requiredString("keyVersionId"))
                     assertEquals("ECDSA_SHA_384", body.requiredString("signingAlgorithm"))
                     assertEquals("DIGEST", body.requiredString("messageType"))
-                    assertEquals(48, Base64.Default.decode(body.requiredString("message")).size)
-                    respondJson("""{"signature":"${Base64.Default.encode(der)}"}""")
+                    assertEquals(48, Base64.decode(body.requiredString("message")).size)
+                    respondJson("""{"signature":"${Base64.encode(der)}"}""")
                 }
+
                 3 -> {
                     assertEquals("https://crypto.test/20180608/verify", request.url.toString())
                     val body = request.bodyJson()
                     assertEquals("version-4", body.requiredString("keyVersionId"))
                     assertEquals("DIGEST", body.requiredString("messageType"))
-                    assertContentEquals(der, Base64.Default.decode(body.requiredString("signature")))
+                    assertContentEquals(der, Base64.decode(body.requiredString("signature")))
                     respondJson("""{"isSignatureValid":true}""")
                 }
+
                 4 -> {
                     assertEquals("/20180608/keys/ocid1.key.remote/actions/scheduleDeletion", request.url.encodedPath)
                     assertEquals("2026-07-24T12:00:00Z", request.bodyJson().requiredString("timeOfDeletion"))
                     respondJson("{}")
                 }
+
                 else -> error("Unexpected OCI request: ${request.url}")
             }
         }
@@ -205,26 +190,30 @@ class OciKmsKeyProviderTest {
                 0 -> respondJson(
                     """{"id":"ocid1.key.rsa","currentKeyVersion":"version-rsa","keyShape":{"algorithm":"RSA","length":256}}"""
                 )
+
                 1 -> respondJson(
-                    """{"publicKey":"-----BEGIN PUBLIC KEY-----\n${Base64.Default.encode(TEST_SPKI)}\n-----END PUBLIC KEY-----"}"""
+                    """{"publicKey":"-----BEGIN PUBLIC KEY-----\n${Base64.encode(TEST_SPKI)}\n-----END PUBLIC KEY-----"}"""
                 )
+
                 2 -> {
                     assertEquals("https://crypto.test/20180608/encrypt", request.url.toString())
                     val body = request.bodyJson()
                     assertEquals("version-rsa", body.requiredString("keyVersionId"))
                     assertEquals("RSA_OAEP_SHA_256", body.requiredString("encryptionAlgorithm"))
-                    assertContentEquals(plaintext, Base64.Default.decode(body.requiredString("plaintext")))
+                    assertContentEquals(plaintext, Base64.decode(body.requiredString("plaintext")))
                     respondJson(
-                        """{"ciphertext":"${Base64.Default.encode(encrypted)}","keyId":"ocid1.key.rsa","keyVersionId":"version-rsa"}"""
+                        """{"ciphertext":"${Base64.encode(encrypted)}","keyId":"ocid1.key.rsa","keyVersionId":"version-rsa"}"""
                     )
                 }
+
                 3 -> {
                     assertEquals("https://crypto.test/20180608/decrypt", request.url.toString())
                     val body = request.bodyJson()
                     assertEquals("version-rsa", body.requiredString("keyVersionId"))
-                    assertContentEquals(encrypted, Base64.Default.decode(body.requiredString("ciphertext")))
-                    respondJson("""{"plaintext":"${Base64.Default.encode(plaintext)}"}""")
+                    assertContentEquals(encrypted, Base64.decode(body.requiredString("ciphertext")))
+                    respondJson("""{"plaintext":"${Base64.encode(plaintext)}"}""")
                 }
+
                 else -> error("Unexpected OCI request")
             }
         }

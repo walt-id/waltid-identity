@@ -8,71 +8,20 @@ import dev.whyoleg.cryptography.CryptographyAlgorithmId
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.CryptographyProviderApi
 import dev.whyoleg.cryptography.DelicateCryptographyApi
-import dev.whyoleg.cryptography.algorithms.Digest
-import dev.whyoleg.cryptography.algorithms.EC
-import dev.whyoleg.cryptography.algorithms.ECDH
-import dev.whyoleg.cryptography.algorithms.ECDSA
-import dev.whyoleg.cryptography.algorithms.EdDSA
-import dev.whyoleg.cryptography.algorithms.MD5
-import dev.whyoleg.cryptography.algorithms.RIPEMD160
-import dev.whyoleg.cryptography.algorithms.RSA
-import dev.whyoleg.cryptography.algorithms.SHA1
-import dev.whyoleg.cryptography.algorithms.SHA224
-import dev.whyoleg.cryptography.algorithms.SHA256
-import dev.whyoleg.cryptography.algorithms.SHA384
-import dev.whyoleg.cryptography.algorithms.SHA3_224
-import dev.whyoleg.cryptography.algorithms.SHA3_256
-import dev.whyoleg.cryptography.algorithms.SHA3_384
-import dev.whyoleg.cryptography.algorithms.SHA3_512
-import dev.whyoleg.cryptography.algorithms.SHA512
-import dev.whyoleg.cryptography.algorithms.XDH
-import id.walt.crypto2.algorithms.DigestAlgorithm
-import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
-import id.walt.crypto2.algorithms.AsymmetricEncryptionAlgorithm
-import id.walt.crypto2.algorithms.KeyAgreementAlgorithm
-import id.walt.crypto2.algorithms.SignatureAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EdwardsCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.AsymmetricCiphertext
-import id.walt.crypto2.keys.KeyCapabilities
-import id.walt.crypto2.keys.KeyEncodingFormat
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.JWK_ALGORITHM_METADATA_KEY
-import id.walt.crypto2.keys.normalizeJwk
-import id.walt.crypto2.keys.toPkcs8Der
-import id.walt.crypto2.keys.toPrivateJwk
-import id.walt.crypto2.keys.toPublicJwk
-import id.walt.crypto2.keys.toSpkiDer
-import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.keys.validatePrivatePublicConsistency
-import id.walt.crypto2.keys.MontgomeryCurve
-import id.walt.crypto2.keys.PrivateKeyExporter
-import id.walt.crypto2.keys.ProviderId
-import id.walt.crypto2.keys.PublicKeyExporter
-import id.walt.crypto2.keys.publicOnly
-import id.walt.crypto2.keys.requireCompatibleJwkAlgorithm
-import id.walt.crypto2.keys.toCryptographyCurve
-import id.walt.crypto2.keys.Decryptor
-import id.walt.crypto2.keys.Encryptor
-import id.walt.crypto2.keys.KeyAgreement
-import id.walt.crypto2.keys.Signer
-import id.walt.crypto2.keys.SoftwareKey
-import id.walt.crypto2.keys.StoredKey
-import id.walt.crypto2.keys.Verifier
+import dev.whyoleg.cryptography.algorithms.*
+import id.walt.crypto2.algorithms.*
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.CryptoOperation
 import id.walt.crypto2.providers.CryptoRequirement
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.SoftwareKeyProvider
 import id.walt.crypto2.serialization.BinaryData
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.serialization.encodeToString
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 enum class SignatureFamily {
     ECDSA,
@@ -106,12 +55,33 @@ data class CryptographyCapabilityProfile(
     }
 
     companion object {
+        /**
+         * Every digest [toCryptographyDigest] can map, most modern first. A profile only states policy: whether a
+         * digest is actually usable is decided per platform by asking the cryptography-kotlin provider for it, so
+         * SHA-3 on WebCrypto or RIPEMD-160 on the JDK simply never gets advertised.
+         */
+        private val allKnownDigests = linkedSetOf(
+            DigestAlgorithm.SHA_256,
+            DigestAlgorithm.SHA_384,
+            DigestAlgorithm.SHA_512,
+            DigestAlgorithm.SHA3_256,
+            DigestAlgorithm.SHA3_384,
+            DigestAlgorithm.SHA3_512,
+            DigestAlgorithm.SHA3_224,
+            DigestAlgorithm.SHA_224,
+            DigestAlgorithm.SHA_1,
+            DigestAlgorithm.RIPEMD_160,
+            DigestAlgorithm.MD5,
+        )
+
         private val portableKeySpecs = setOf(
             KeySpec.Ec(EcCurve.P256),
             KeySpec.Ec(EcCurve.P384),
             KeySpec.Ec(EcCurve.P521),
             KeySpec.Edwards(EdwardsCurve.ED25519),
+            KeySpec.Edwards(EdwardsCurve.ED448),
             KeySpec.Montgomery(MontgomeryCurve.X25519),
+            KeySpec.Montgomery(MontgomeryCurve.X448),
             KeySpec.Rsa(2048),
             KeySpec.Rsa(3072),
             KeySpec.Rsa(4096),
@@ -119,14 +89,12 @@ data class CryptographyCapabilityProfile(
 
         val Portable = CryptographyCapabilityProfile(
             keySpecs = portableKeySpecs,
-            digests = setOf(DigestAlgorithm.SHA_256, DigestAlgorithm.SHA_384, DigestAlgorithm.SHA_512),
+            digests = allKnownDigests,
             signatureFamilies = SignatureFamily.entries.toSet(),
             ecdsaEncodings = EcdsaSignatureEncoding.entries.toSet(),
-            encryptionAlgorithms = setOf(
-                AsymmetricEncryptionAlgorithm.RsaOaep(DigestAlgorithm.SHA_256),
-                AsymmetricEncryptionAlgorithm.RsaOaep(DigestAlgorithm.SHA_384),
-                AsymmetricEncryptionAlgorithm.RsaOaep(DigestAlgorithm.SHA_512),
-            ),
+            encryptionAlgorithms = allKnownDigests.mapTo(linkedSetOf()) {
+                AsymmetricEncryptionAlgorithm.RsaOaep(it)
+            },
             keyAgreementAlgorithms = setOf(KeyAgreementAlgorithm.Ecdh, KeyAgreementAlgorithm.Xdh),
             keyGenerationFormats = setOf(KeyEncodingFormat.JWK, KeyEncodingFormat.PKCS8_DER),
             keyImportFormats = KeyEncodingFormat.entries.toSet(),
@@ -137,6 +105,8 @@ data class CryptographyCapabilityProfile(
 
         internal val Secp256k1Signatures = CryptographyCapabilityProfile(
             keySpecs = setOf(KeySpec.Ec(EcCurve.SECP256K1)),
+            // Deliberately SHA-256 only: this profile exists to serve ES256K, and no other secp256k1 digest
+            // combination has an interoperability use in JOSE, COSE, or DID methods.
             digests = setOf(DigestAlgorithm.SHA_256),
             signatureFamilies = setOf(SignatureFamily.ECDSA),
             ecdsaEncodings = EcdsaSignatureEncoding.entries.toSet(),
@@ -161,37 +131,44 @@ class CryptographySoftwareKeyProvider(
 
     override fun supports(requirement: CryptoRequirement): Boolean =
         requirement.spec in profile.keySpecs &&
-            supportsEncoding(requirement) &&
-            when (requirement.operation) {
-                CryptoOperation.GENERATE_KEY ->
-                    supportsUsages(requirement.spec, requirement.usages) &&
-                        requirement.usages.any { it in privateUsages } &&
-                        supportsGeneration(requirement.spec, requirement.usages)
-                CryptoOperation.IMPORT_KEY ->
-                    supportsUsages(requirement.spec, requirement.usages) &&
-                        supportsImportedMaterial(requirement.spec, requirement.keyEncoding, requirement.usages) &&
-                        supportsCapabilities(requirement.spec, requirement.usages)
-                CryptoOperation.SIGN, CryptoOperation.VERIFY ->
-                    requirement.signatureAlgorithm?.let { supportsSignature(requirement.spec, it) } == true &&
-                        operationUsage(requirement.operation) in requirement.usages
-                CryptoOperation.ENCRYPT, CryptoOperation.DECRYPT ->
-                    requirement.encryptionAlgorithm?.let { supportsEncryption(requirement.spec, it) } == true &&
-                        operationUsage(requirement.operation) in requirement.usages
-                CryptoOperation.KEY_AGREEMENT ->
-                    requirement.keyAgreementAlgorithm?.let { supportsAgreement(requirement.spec, it) } == true &&
-                        KeyUsage.KEY_AGREEMENT in requirement.usages
-                CryptoOperation.WRAP,
-                CryptoOperation.UNWRAP,
-                CryptoOperation.DELETE,
-                -> false
-                CryptoOperation.EXPORT_PUBLIC ->
-                    supportsUsages(requirement.spec, requirement.usages) &&
-                        supportsCapabilities(requirement.spec, requirement.usages)
-                CryptoOperation.EXPORT_PRIVATE ->
-                    supportsUsages(requirement.spec, requirement.usages) &&
-                        requirement.usages.any { it in privateUsages } &&
-                        supportsCapabilities(requirement.spec, requirement.usages)
-            }
+                supportsEncoding(requirement) &&
+                when (requirement.operation) {
+                    CryptoOperation.GENERATE_KEY ->
+                        supportsUsages(requirement.spec, requirement.usages) &&
+                                requirement.usages.any { it in privateUsages } &&
+                                supportsGeneration(requirement.spec, requirement.usages)
+
+                    CryptoOperation.IMPORT_KEY ->
+                        supportsUsages(requirement.spec, requirement.usages) &&
+                                supportsImportedMaterial(requirement.spec, requirement.keyEncoding, requirement.usages) &&
+                                supportsCapabilities(requirement.spec, requirement.usages)
+
+                    CryptoOperation.SIGN, CryptoOperation.VERIFY ->
+                        requirement.signatureAlgorithm?.let { supportsSignature(requirement.spec, it) } == true &&
+                                operationUsage(requirement.operation) in requirement.usages
+
+                    CryptoOperation.ENCRYPT, CryptoOperation.DECRYPT ->
+                        requirement.encryptionAlgorithm?.let { supportsEncryption(requirement.spec, it) } == true &&
+                                operationUsage(requirement.operation) in requirement.usages
+
+                    CryptoOperation.KEY_AGREEMENT ->
+                        requirement.keyAgreementAlgorithm?.let { supportsAgreement(requirement.spec, it) } == true &&
+                                KeyUsage.KEY_AGREEMENT in requirement.usages
+
+                    CryptoOperation.WRAP,
+                    CryptoOperation.UNWRAP,
+                    CryptoOperation.DELETE,
+                        -> false
+
+                    CryptoOperation.EXPORT_PUBLIC ->
+                        supportsUsages(requirement.spec, requirement.usages) &&
+                                supportsCapabilities(requirement.spec, requirement.usages)
+
+                    CryptoOperation.EXPORT_PRIVATE ->
+                        supportsUsages(requirement.spec, requirement.usages) &&
+                                requirement.usages.any { it in privateUsages } &&
+                                supportsCapabilities(requirement.spec, requirement.usages)
+                }
 
     override suspend fun generate(request: GenerateSoftwareKeyRequest): SoftwareKey {
         request.spec.requireCompatibleJwkAlgorithm(request.metadata[JWK_ALGORITHM_METADATA_KEY])
@@ -218,6 +195,7 @@ class CryptographySoftwareKeyProvider(
         return CryptographySoftwareKey(
             provider = provider,
             profile = profile,
+            adapter = this,
             storedKey = StoredKey.Software(
                 version = StoredKey.CURRENT_VERSION,
                 id = request.id,
@@ -259,9 +237,15 @@ class CryptographySoftwareKeyProvider(
                 BinaryData(normalizeJwk(material.data.toByteArray())),
                 material.privateMaterial,
             )
+
             else -> material
         }
-        return CryptographySoftwareKey(provider, profile, stored.copy(material = normalized, metadata = validated.metadata))
+        return CryptographySoftwareKey(
+            provider = provider,
+            profile = profile,
+            storedKey = stored.copy(material = normalized, metadata = validated.metadata),
+            adapter = this,
+        )
     }
 
     private fun supportsEncoding(requirement: CryptoRequirement): Boolean = when (requirement.operation) {
@@ -269,8 +253,10 @@ class CryptographySoftwareKeyProvider(
         CryptoOperation.IMPORT_KEY -> requirement.keyEncoding in profile.keyImportFormats
         CryptoOperation.EXPORT_PUBLIC ->
             (requirement.keyEncoding ?: KeyEncodingFormat.JWK) in profile.publicKeyExportFormats
+
         CryptoOperation.EXPORT_PRIVATE ->
             (requirement.keyEncoding ?: KeyEncodingFormat.JWK) in profile.privateKeyExportFormats
+
         else -> true
     }
 
@@ -300,49 +286,52 @@ class CryptographySoftwareKeyProvider(
     internal fun supportsSignature(spec: KeySpec, algorithm: SignatureAlgorithm): Boolean = when (algorithm) {
         is SignatureAlgorithm.Ecdsa ->
             spec is KeySpec.Ec &&
-                SignatureFamily.ECDSA in profile.signatureFamilies &&
-                algorithm.digest in knownCryptographyDigests &&
-                algorithm.digest in profile.digests &&
-                algorithm.encoding in profile.ecdsaEncodings &&
-                provider.getOrNull(ECDSA) != null
+                    SignatureFamily.ECDSA in profile.signatureFamilies &&
+                    supportsDigest(algorithm.digest) &&
+                    algorithm.encoding in profile.ecdsaEncodings &&
+                    provider.getOrNull(ECDSA) != null
+
         SignatureAlgorithm.EdDsa ->
             spec is KeySpec.Edwards && spec.curve in supportedEdwardsCurves &&
-                SignatureFamily.EDDSA in profile.signatureFamilies &&
-                provider.getOrNull(EdDSA) != null
+                    SignatureFamily.EDDSA in profile.signatureFamilies &&
+                    provider.getOrNull(EdDSA) != null
+
         is SignatureAlgorithm.RsaPkcs1 ->
             spec is KeySpec.Rsa &&
-                SignatureFamily.RSA_PKCS1 in profile.signatureFamilies &&
-                algorithm.digest in knownCryptographyDigests &&
-                algorithm.digest in profile.digests &&
-                provider.getOrNull(RSA.PKCS1) != null
+                    SignatureFamily.RSA_PKCS1 in profile.signatureFamilies &&
+                    supportsDigest(algorithm.digest) &&
+                    provider.getOrNull(RSA.PKCS1) != null
+
         is SignatureAlgorithm.RsaPss ->
             spec is KeySpec.Rsa &&
-                SignatureFamily.RSA_PSS in profile.signatureFamilies &&
-                algorithm.digest in knownCryptographyDigests &&
-                algorithm.digest in profile.digests &&
-                algorithm.mgfDigest == algorithm.digest &&
-                algorithm.saltLengthBytes?.let {
-                    it <= maxPssSaltLength(spec.bits, algorithm.digest) &&
-                        (platformSupportsCustomPssSaltLengths || it == algorithm.digest.sizeBytes)
-                } != false &&
-                provider.getOrNull(RSA.PSS) != null
+                    SignatureFamily.RSA_PSS in profile.signatureFamilies &&
+                    supportsDigest(algorithm.digest) &&
+                    algorithm.mgfDigest == algorithm.digest &&
+                    algorithm.saltLengthBytes?.let {
+                        it <= maxPssSaltLength(spec.bits, algorithm.digest) &&
+                                (platformSupportsCustomPssSaltLengths || it == algorithm.digest.sizeBytes)
+                    } != false &&
+                    provider.getOrNull(RSA.PSS) != null
+
         is SignatureAlgorithm.Custom -> false
     }
 
     internal fun supportsEncryption(spec: KeySpec, algorithm: AsymmetricEncryptionAlgorithm): Boolean =
         spec is KeySpec.Rsa &&
-            algorithm in profile.encryptionAlgorithms &&
-            algorithm is AsymmetricEncryptionAlgorithm.RsaOaep &&
-            algorithm.digest in knownCryptographyDigests &&
-            algorithm.mgfDigest == algorithm.digest &&
-            provider.getOrNull(RSA.OAEP) != null
+                algorithm in profile.encryptionAlgorithms &&
+                algorithm is AsymmetricEncryptionAlgorithm.RsaOaep &&
+                supportsDigest(algorithm.digest) &&
+                algorithm.mgfDigest == algorithm.digest &&
+                provider.getOrNull(RSA.OAEP) != null
 
     internal fun supportsAgreement(spec: KeySpec, algorithm: KeyAgreementAlgorithm): Boolean = when (algorithm) {
         KeyAgreementAlgorithm.Ecdh -> spec is KeySpec.Ec &&
-            algorithm in profile.keyAgreementAlgorithms && provider.getOrNull(ECDH) != null
+                algorithm in profile.keyAgreementAlgorithms && provider.getOrNull(ECDH) != null
+
         KeyAgreementAlgorithm.Xdh -> spec is KeySpec.Montgomery &&
-            spec.curve in supportedMontgomeryCurves &&
-            algorithm in profile.keyAgreementAlgorithms && provider.getOrNull(XDH) != null
+                spec.curve in supportedMontgomeryCurves &&
+                algorithm in profile.keyAgreementAlgorithms && provider.getOrNull(XDH) != null
+
         is KeyAgreementAlgorithm.Named -> false
         is KeyAgreementAlgorithm.Custom -> false
     }
@@ -357,10 +346,12 @@ class CryptographySoftwareKeyProvider(
             if (includePrivate) pair.privateKey.encodeToByteArray(EdDSA.PrivateKey.Format.JWK)
             else pair.publicKey.encodeToByteArray(EdDSA.PublicKey.Format.JWK)
         }
+
         is KeySpec.Montgomery -> provider.get(XDH).keyPairGenerator(spec.curve.toCryptographyCurve()).generateKey().let { pair ->
             if (includePrivate) pair.privateKey.encodeToByteArray(XDH.PrivateKey.Format.JWK)
             else pair.publicKey.encodeToByteArray(XDH.PublicKey.Format.JWK)
         }
+
         is KeySpec.Rsa -> generateRsaJwk(spec, usages, includePrivate)
         is KeySpec.Symmetric, is KeySpec.Custom -> error("Unsupported software-key specification")
     }.let(::normalizeJwk)
@@ -392,17 +383,19 @@ class CryptographySoftwareKeyProvider(
         val keySize = spec.bits.bits
         return when {
             (KeyUsage.SIGN in usages || KeyUsage.VERIFY in usages) &&
-                provider.getOrNull(RSA.PKCS1) != null -> provider.get(RSA.PKCS1)
+                    provider.getOrNull(RSA.PKCS1) != null -> provider.get(RSA.PKCS1)
                 .keyPairGenerator(keySize, SHA256).generateKey().let { pair ->
                     if (includePrivate) pair.privateKey.encodeToByteArray(RSA.PrivateKey.Format.JWK)
                     else pair.publicKey.encodeToByteArray(RSA.PublicKey.Format.JWK)
                 }
+
             (KeyUsage.SIGN in usages || KeyUsage.VERIFY in usages) &&
-                provider.getOrNull(RSA.PSS) != null -> provider.get(RSA.PSS)
+                    provider.getOrNull(RSA.PSS) != null -> provider.get(RSA.PSS)
                 .keyPairGenerator(keySize, SHA256).generateKey().let { pair ->
                     if (includePrivate) pair.privateKey.encodeToByteArray(RSA.PrivateKey.Format.JWK)
                     else pair.publicKey.encodeToByteArray(RSA.PublicKey.Format.JWK)
                 }
+
             else -> provider.get(RSA.OAEP).keyPairGenerator(keySize, SHA256).generateKey().let { pair ->
                 if (includePrivate) pair.privateKey.encodeToByteArray(RSA.PrivateKey.Format.JWK)
                 else pair.publicKey.encodeToByteArray(RSA.PublicKey.Format.JWK)
@@ -415,25 +408,34 @@ class CryptographySoftwareKeyProvider(
     private fun supportsCapabilities(spec: KeySpec, usages: Set<KeyUsage>): Boolean = when (spec) {
         is KeySpec.Ec ->
             (KeyUsage.SIGN !in usages && KeyUsage.VERIFY !in usages ||
-                SignatureFamily.ECDSA in profile.signatureFamilies &&
-                profile.digests.any(knownCryptographyDigests::contains) && profile.ecdsaEncodings.isNotEmpty() &&
-                provider.getOrNull(ECDSA) != null) &&
-                (KeyUsage.KEY_AGREEMENT !in usages ||
-                    KeyAgreementAlgorithm.Ecdh in profile.keyAgreementAlgorithms && provider.getOrNull(ECDH) != null)
+                    SignatureFamily.ECDSA in profile.signatureFamilies &&
+                    profile.digests.any(::supportsDigest) && profile.ecdsaEncodings.isNotEmpty() &&
+                    provider.getOrNull(ECDSA) != null) &&
+                    (KeyUsage.KEY_AGREEMENT !in usages ||
+                            KeyAgreementAlgorithm.Ecdh in profile.keyAgreementAlgorithms && provider.getOrNull(ECDH) != null)
+
         is KeySpec.Edwards -> spec.curve in supportedEdwardsCurves &&
-            SignatureFamily.EDDSA in profile.signatureFamilies && provider.getOrNull(EdDSA) != null
+                SignatureFamily.EDDSA in profile.signatureFamilies && provider.getOrNull(EdDSA) != null
+
         is KeySpec.Montgomery ->
             spec.curve in supportedMontgomeryCurves &&
-                KeyAgreementAlgorithm.Xdh in profile.keyAgreementAlgorithms && provider.getOrNull(XDH) != null
+                    KeyAgreementAlgorithm.Xdh in profile.keyAgreementAlgorithms && provider.getOrNull(XDH) != null
+
         is KeySpec.Rsa ->
             (KeyUsage.SIGN !in usages && KeyUsage.VERIFY !in usages ||
-                profile.digests.any(knownCryptographyDigests::contains) &&
-                (SignatureFamily.RSA_PKCS1 in profile.signatureFamilies && provider.getOrNull(RSA.PKCS1) != null ||
-                    SignatureFamily.RSA_PSS in profile.signatureFamilies && provider.getOrNull(RSA.PSS) != null)) &&
-                (KeyUsage.ENCRYPT !in usages && KeyUsage.DECRYPT !in usages ||
-                    profile.encryptionAlgorithms.any { supportsEncryption(spec, it) })
+                    profile.digests.any(::supportsDigest) &&
+                    (SignatureFamily.RSA_PKCS1 in profile.signatureFamilies && provider.getOrNull(RSA.PKCS1) != null ||
+                            SignatureFamily.RSA_PSS in profile.signatureFamilies && provider.getOrNull(RSA.PSS) != null)) &&
+                    (KeyUsage.ENCRYPT !in usages && KeyUsage.DECRYPT !in usages ||
+                            profile.encryptionAlgorithms.any { supportsEncryption(spec, it) })
+
         is KeySpec.Symmetric, is KeySpec.Custom -> false
     }
+
+    /** A digest is usable only if the profile allows it and this cryptography-kotlin provider implements it. */
+    private fun supportsDigest(digest: DigestAlgorithm): Boolean =
+        digest in profile.digests && digest in cryptographyDigests &&
+                provider.getOrNull(digest.toCryptographyDigest()) != null
 
     companion object {
         private val privateUsages = setOf(
@@ -442,7 +444,7 @@ class CryptographySoftwareKeyProvider(
             KeyUsage.KEY_AGREEMENT,
             KeyUsage.UNWRAP,
         )
-        private val knownCryptographyDigests = setOf(
+        private val cryptographyDigests = setOf(
             DigestAlgorithm.MD5,
             DigestAlgorithm.SHA_1,
             DigestAlgorithm.SHA_224,
@@ -465,12 +467,13 @@ private class CryptographySoftwareKey(
     private val provider: CryptographyProvider,
     private val profile: CryptographyCapabilityProfile,
     override val storedKey: StoredKey.Software,
+    /** The provider that created this key, reused for capability queries instead of building another one. */
+    private val adapter: CryptographySoftwareKeyProvider,
 ) : SoftwareKey {
     private val materialMutex = Mutex()
     private val signatureMaterials = mutableMapOf<SignatureAlgorithm, SignatureMaterial>()
     private val encryptionMaterials = mutableMapOf<AsymmetricEncryptionAlgorithm, RsaOaepMaterial>()
     private val agreementMaterials = mutableMapOf<KeyAgreementAlgorithm, AgreementMaterial>()
-    private val adapter = CryptographySoftwareKeyProvider(provider, profile = profile)
 
     override val capabilities: KeyCapabilities = KeyCapabilities(
         signer = KeyUsage.SIGN.takeIf(usages::contains)?.let {
@@ -521,6 +524,7 @@ private class CryptographySoftwareKey(
                     return when (format) {
                         KeyEncodingFormat.JWK -> storedKey.material.toPublicJwk(spec, provider)
                             .withStoredAlgorithm(storedKey.metadata)
+
                         KeyEncodingFormat.SPKI_DER -> storedKey.material.toSpkiDer(spec, provider)
                         KeyEncodingFormat.PKCS8_DER -> error("PKCS8 is a private key format")
                     }
@@ -529,22 +533,23 @@ private class CryptographySoftwareKey(
         },
         privateKeyExporter = storedKey.material.hasPrivateMaterial()
             .takeIf { it && profile.privateKeyExportFormats.isNotEmpty() }?.let {
-            object : PrivateKeyExporter {
-                override suspend fun exportPrivateKey(): EncodedKey = exportPrivateKey(KeyEncodingFormat.JWK)
+                object : PrivateKeyExporter {
+                    override suspend fun exportPrivateKey(): EncodedKey = exportPrivateKey(KeyEncodingFormat.JWK)
 
-                override suspend fun exportPrivateKey(format: KeyEncodingFormat): EncodedKey {
-                    require(format in profile.privateKeyExportFormats) {
-                        "Private key export format is not supported: $format"
-                    }
-                    return when (format) {
-                        KeyEncodingFormat.JWK -> storedKey.material.toPrivateJwk(spec, provider)
-                            .withStoredAlgorithm(storedKey.metadata)
-                        KeyEncodingFormat.PKCS8_DER -> storedKey.material.toPkcs8Der(spec, provider)
-                        KeyEncodingFormat.SPKI_DER -> error("SPKI is a public key format")
+                    override suspend fun exportPrivateKey(format: KeyEncodingFormat): EncodedKey {
+                        require(format in profile.privateKeyExportFormats) {
+                            "Private key export format is not supported: $format"
+                        }
+                        return when (format) {
+                            KeyEncodingFormat.JWK -> storedKey.material.toPrivateJwk(spec, provider)
+                                .withStoredAlgorithm(storedKey.metadata)
+
+                            KeyEncodingFormat.PKCS8_DER -> storedKey.material.toPkcs8Der(spec, provider)
+                            KeyEncodingFormat.SPKI_DER -> error("SPKI is a public key format")
+                        }
                     }
                 }
-            }
-        },
+            },
         signatureAlgorithms = advertisedSignatureAlgorithms().takeIf {
             KeyUsage.SIGN in usages || KeyUsage.VERIFY in usages
         }.orEmpty(),
@@ -565,35 +570,20 @@ private class CryptographySoftwareKey(
         },
     )
 
-    private suspend fun signatureMaterial(algorithm: SignatureAlgorithm): SignatureMaterial {
-        materialMutex.lock()
-        return try {
-            signatureMaterials[algorithm] ?: decodeSignatureMaterial(provider, storedKey, algorithm)
-                .also { signatureMaterials[algorithm] = it }
-        } finally {
-            materialMutex.unlock()
+    private suspend fun signatureMaterial(algorithm: SignatureAlgorithm): SignatureMaterial =
+        materialMutex.withLock {
+            signatureMaterials.getOrPut(algorithm) { decodeSignatureMaterial(provider, storedKey, algorithm) }
         }
-    }
 
-    private suspend fun encryptionMaterial(algorithm: AsymmetricEncryptionAlgorithm): RsaOaepMaterial {
-        materialMutex.lock()
-        return try {
-            encryptionMaterials[algorithm] ?: decodeEncryptionMaterial(provider, storedKey, algorithm)
-                .also { encryptionMaterials[algorithm] = it }
-        } finally {
-            materialMutex.unlock()
+    private suspend fun encryptionMaterial(algorithm: AsymmetricEncryptionAlgorithm): RsaOaepMaterial =
+        materialMutex.withLock {
+            encryptionMaterials.getOrPut(algorithm) { decodeEncryptionMaterial(provider, storedKey, algorithm) }
         }
-    }
 
-    private suspend fun agreementMaterial(algorithm: KeyAgreementAlgorithm): AgreementMaterial {
-        materialMutex.lock()
-        return try {
-            agreementMaterials[algorithm] ?: decodeAgreementMaterial(provider, storedKey, algorithm)
-                .also { agreementMaterials[algorithm] = it }
-        } finally {
-            materialMutex.unlock()
+    private suspend fun agreementMaterial(algorithm: KeyAgreementAlgorithm): AgreementMaterial =
+        materialMutex.withLock {
+            agreementMaterials.getOrPut(algorithm) { decodeAgreementMaterial(provider, storedKey, algorithm) }
         }
-    }
 
     private fun advertisedSignatureAlgorithms(): Set<SignatureAlgorithm> {
         if (KeyUsage.SIGN !in usages && KeyUsage.VERIFY !in usages) return emptySet()
@@ -601,16 +591,16 @@ private class CryptographySoftwareKey(
             is KeySpec.Ec -> profile.digests.flatMap { digest ->
                 profile.ecdsaEncodings.map { encoding -> SignatureAlgorithm.Ecdsa(digest, encoding) }
             }.filterTo(mutableSetOf()) { adapter.supportsSignature(spec, it) }
+
             is KeySpec.Edwards -> setOf(SignatureAlgorithm.EdDsa).filterTo(mutableSetOf()) {
                 adapter.supportsSignature(spec, it)
             }
+            // RsaPss(digest) already means "salt length = digest size" on every supported platform, so the
+            // explicit-salt variant is only supported, not advertised as a second choice.
             is KeySpec.Rsa -> profile.digests.flatMap { digest ->
-                listOf(
-                    SignatureAlgorithm.RsaPkcs1(digest),
-                    SignatureAlgorithm.RsaPss(digest),
-                    SignatureAlgorithm.RsaPss(digest, saltLengthBytes = digest.sizeBytes),
-                )
+                listOf(SignatureAlgorithm.RsaPkcs1(digest), SignatureAlgorithm.RsaPss(digest))
             }.filterTo(mutableSetOf()) { adapter.supportsSignature(spec, it) }
+
             else -> emptySet()
         }
     }
@@ -634,6 +624,7 @@ private sealed interface SignatureMaterial {
     ) : SignatureMaterial {
         override suspend fun sign(data: ByteArray): ByteArray = requireNotNull(privateKey)
             .signatureGenerator(digest, format).generateSignature(data)
+
         override suspend fun verify(data: ByteArray, signature: ByteArray): Boolean =
             publicKey.signatureVerifier(digest, format).tryVerifySignature(data, signature)
     }
@@ -644,6 +635,7 @@ private sealed interface SignatureMaterial {
     ) : SignatureMaterial {
         override suspend fun sign(data: ByteArray): ByteArray = requireNotNull(privateKey)
             .signatureGenerator().generateSignature(data)
+
         override suspend fun verify(data: ByteArray, signature: ByteArray): Boolean =
             publicKey.signatureVerifier().tryVerifySignature(data, signature)
     }
@@ -654,6 +646,7 @@ private sealed interface SignatureMaterial {
     ) : SignatureMaterial {
         override suspend fun sign(data: ByteArray): ByteArray = requireNotNull(privateKey)
             .signatureGenerator().generateSignature(data)
+
         override suspend fun verify(data: ByteArray, signature: ByteArray): Boolean =
             publicKey.signatureVerifier().tryVerifySignature(data, signature)
     }
@@ -666,6 +659,7 @@ private sealed interface SignatureMaterial {
         override suspend fun sign(data: ByteArray): ByteArray = requireNotNull(privateKey).let { key ->
             saltLengthBytes?.let { key.signatureGenerator(it.bytes) } ?: key.signatureGenerator()
         }.generateSignature(data)
+
         override suspend fun verify(data: ByteArray, signature: ByteArray): Boolean =
             (saltLengthBytes?.let { publicKey.signatureVerifier(it.bytes) } ?: publicKey.signatureVerifier())
                 .tryVerifySignature(data, signature)
@@ -733,6 +727,7 @@ private suspend fun decodeSignatureMaterial(
                 algorithm.encoding.toCryptographyFormat(),
             )
         }
+
         SignatureAlgorithm.EdDsa -> {
             val curve = (stored.spec as KeySpec.Edwards).curve.toCryptographyCurve()
             val edDsa = provider.get(EdDSA)
@@ -745,6 +740,7 @@ private suspend fun decodeSignatureMaterial(
                 privateKey,
             )
         }
+
         is SignatureAlgorithm.RsaPkcs1 -> decodeRsaPkcs1(provider, bytes, jwk.privateMaterial, algorithm)
         is SignatureAlgorithm.RsaPss -> decodeRsaPss(provider, bytes, jwk.privateMaterial, algorithm)
         is SignatureAlgorithm.Custom -> error("Custom signature algorithm requires a custom provider")
@@ -826,12 +822,14 @@ private suspend fun decodeAgreementMaterial(
                 .decodeFromByteArray(EC.PrivateKey.Format.JWK, bytes)
             AgreementMaterial.Ecdh(key, curve)
         }
+
         KeyAgreementAlgorithm.Xdh -> {
             val curve = (stored.spec as KeySpec.Montgomery).curve.toCryptographyCurve()
             val key = provider.get(XDH).privateKeyDecoder(curve)
                 .decodeFromByteArray(XDH.PrivateKey.Format.JWK, bytes)
             AgreementMaterial.Xdh(key, curve)
         }
+
         is KeyAgreementAlgorithm.Custom -> error("Custom agreement algorithm requires a custom provider")
         is KeyAgreementAlgorithm.Named -> error("Named agreement algorithm requires another provider")
     }

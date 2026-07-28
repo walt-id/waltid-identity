@@ -13,29 +13,19 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.NoMeta
-import id.walt.policies2.vp.policies.AudienceCheckSdJwtVPPolicy
-import id.walt.policies2.vp.policies.DeviceAuthMdocVpPolicy
-import id.walt.policies2.vp.policies.TransactionDataHashCheckSdJwtVPPolicy
-import id.walt.policies2.vp.policies.TransactionDataHashesVPPolicy
-import id.walt.policies2.vp.policies.TransactionDataMdocVpPolicy
-import id.walt.policies2.vp.policies.VPPolicyList
+import id.walt.policies2.vp.policies.*
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.OpenId4VPConfig
 import id.walt.verifier2.data.Verification2Session
-import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -115,7 +105,7 @@ class VerificationSessionCreatorTransactionDataPolicyTest {
 
     @Test
     fun `signed authorization request uses crypto2 key`() = runTest {
-        val key = CryptoRuntime(listOf(CryptographySoftwareKeyProvider())).generateSoftwareKey(
+        val key = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("verifier-request-key"),
                 spec = KeySpec.Ec(EcCurve.P256),

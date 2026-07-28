@@ -1,21 +1,15 @@
 package id.walt.wallet2.handlers
 
-import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.keys.Key as Crypto2Key
-import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.migration.v1.V1KeyMigration
-import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidService
 import id.walt.openid4vci.metadata.issuer.ProofType
@@ -23,21 +17,13 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
-import io.ktor.http.Url
-import kotlinx.coroutines.test.runTest
+import io.ktor.http.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.*
+import kotlin.test.*
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 class WalletIssuanceCrypto2ProofTest {
     @Test
@@ -202,7 +188,7 @@ class WalletIssuanceCrypto2ProofTest {
         )
     }
 
-    private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     private class Crypto2BackedStore(
         private val storeKeyId: String,
