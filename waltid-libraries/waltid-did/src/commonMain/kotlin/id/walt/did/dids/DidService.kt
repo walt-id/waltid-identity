@@ -155,13 +155,8 @@ object DidService {
     }
 
 
-    private suspend fun getResolverForDid(did: String): DidResolver {
+    private fun getResolverForDid(did: String): DidResolver {
         val method = methodFromDid(did)
-        // Lazily fall back to the offline resolver set. Callers that never ran init - the mobile wallet builds JWT
-        // proofs before bootstrapping finishes - otherwise fail with "No resolver for did method: key" even though
-        // did:key needs no configuration at all. minimalInit is idempotent, so this only ever fills a gap.
-        resolverMethods[method]?.let { return it }
-        if (resolverMethods.isEmpty()) minimalInit()
         return resolverMethods[method] ?: throw IllegalArgumentException("No resolver for did method: $method")
     }
 
