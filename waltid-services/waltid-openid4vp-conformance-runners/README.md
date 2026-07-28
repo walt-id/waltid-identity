@@ -24,7 +24,7 @@ Conformance test runners for OpenID4VCI and OpenID4VP against the [OpenID Founda
 2. **issuer2** running directly on the host with this test-only runtime configuration:
    ```hocon
    webHost = "0.0.0.0"
-   webPort = 7002
+   webPort = 7005
    baseUrl = "https://localhost.emobix.co.uk:9443"
 
    ciTokenKey = """{"type":"jwk","jwk":{"kty":"EC","d":"KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}}"""
@@ -229,7 +229,7 @@ waltid-openid4vp-conformance-runners/
 
 | Issue | Solution |
 |-------|----------|
-| issuer2 is unreachable | Start issuer2 on `0.0.0.0:7002`; Docker Nginx reaches it through `host.docker.internal` |
+| issuer2 is unreachable | Start issuer2 on `0.0.0.0:7005`; Docker Nginx reaches it through `host.docker.internal` |
 | Local hostname is unresolved | Run `getent hosts localhost.emobix.co.uk` and confirm it returns a loopback address; the runner does not modify `/etc/hosts` |
 | "Invalid redirect_uri" | Add `https://localhost.emobix.co.uk:9443/openid4vci/external/oauth/callback` to the Keycloak client redirect URIs |
 | Tests stuck in WAITING | Enable `OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION=true` for authorization_code flows |
@@ -556,7 +556,7 @@ targeted wrapper exclusion only after the upstream module requests a fresh crede
 second pre-authorized client or marks that grant variant as inapplicable.
 
 For local issuer tests, Docker Nginx exposes `https://localhost.emobix.co.uk:9443` and proxies requests to
-the bare-metal issuer2 process at `http://host.docker.internal:7002`. The conformance-suite container
+the bare-metal issuer2 process at `http://host.docker.internal:7005`. The conformance-suite container
 resolves `localhost.emobix.co.uk` to Nginx through a Docker network alias, while host-side Gradle and
 Playwright use the published port. This removes the public tunnel and its connection limits from the
 local issuer workflow.

@@ -57,7 +57,7 @@ mdoc credential configuration IDs.
 
 3. **Keycloak** with the integration-test `issuer` realm for authorization-code variants. Pre-authorized-code variants do not need Keycloak.
 
-4. **issuer2** running directly on the host at `0.0.0.0:7002`.
+4. **issuer2** running directly on the host at `0.0.0.0:7005`.
 
 5. **Playwright system dependencies** for authorization-code variants. The wrapper runs Playwright
    `install --with-deps` by default, so the current user must be able to install system packages unless
@@ -124,7 +124,7 @@ export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE=/path/to/status-
 ### 4. Start Services
 
 ```bash
-# Terminal 1: start enterprise issuer2 on host port 7002
+# Terminal 1: start enterprise issuer2 on host port 7005
 # Terminal 2: run the wrapper from the unified-build root
 ./run-issuer-conformance-local.sh
 ```
@@ -205,7 +205,7 @@ The EUDI PID root certificate can only be used if the attester JWK also has a le
 Add `https://localhost.emobix.co.uk:9443/openid4vci/external/oauth/callback` to the client redirect URIs.
 
 ### "Connect timed out" errors
-Verify issuer2 listens on `0.0.0.0:7002`, then inspect the Nginx logs. Nginx reaches the host through `host.docker.internal`.
+Verify issuer2 listens on `0.0.0.0:7005`, then inspect the Nginx logs. Nginx reaches the host through `host.docker.internal`.
 
 ### "Unable to fetch credential issuer metadata"
 - Check issuer2's `baseUrl` is `https://localhost.emobix.co.uk:9443`
