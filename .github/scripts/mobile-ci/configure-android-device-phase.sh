@@ -21,13 +21,13 @@ case "$phase" in
     emulator_target="default"
     ;;
   dc-api-compose)
-    script="play_services_version=\$(adb shell dumpsys package com.google.android.gms | sed -n 's/.*versionCode=\\([0-9]*\\).*/\\1/p' | head -n 1); play_services_name=\$(adb shell dumpsys package com.google.android.gms | sed -n 's/.*versionName=//p' | head -n 1); echo \"Google Play services: versionName=\${play_services_name:-missing} versionCode=\${play_services_version:-missing}\"; if [ -z \"\$play_services_version\" ] || [ \"\$play_services_version\" -lt 254900000 ]; then echo \"::error::Digital Credentials requires Google Play services version 25.49 or newer; found \${play_services_name:-missing} (\${play_services_version:-missing})\"; exit 1; fi; ANDROID_TEST_CLASS=id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest ./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
-    emulator_options="-no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics"
+    script="ANDROID_TEST_CLASS=id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest ./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
+    emulator_options="-no-window -gpu auto -noaudio -no-boot-anim -camera-back none -memory 4096 -feature GLDirectMem,HasSharedSlotsHostMemoryAllocator"
     report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**/*.xml"
-    artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/connected_android_test_additional_output/**'
-    emulator_api_level="36"
+    artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**'
+    emulator_api_level="37.0"
     emulator_profile="pixel_7"
-    emulator_target="google_apis_playstore"
+    emulator_target="playstore_ps16k"
     ;;
   enterprise-mobile)
     script="./waltid-identity/.github/scripts/mobile-ci/run-enterprise-android-mobile-tests.sh"

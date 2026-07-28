@@ -87,6 +87,7 @@ jobs:
         run: ./waltid-identity/.github/scripts/mobile-ci/prepare-enterprise-android-mobile-tests.sh
 
       - name: Run Android device tests
+        if: matrix.phase != 'dc-api-compose'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ steps.android-device-phase.outputs.emulator_api_level }}
@@ -94,6 +95,19 @@ jobs:
           profile: ${{ steps.android-device-phase.outputs.emulator_profile }}
           target: ${{ steps.android-device-phase.outputs.emulator_target }}
           disk-size: 4G
+          emulator-options: ${{ steps.android-device-phase.outputs.emulator_options }}
+          disable-animations: true
+          script: ${{ steps.android-device-phase.outputs.script }}
+
+      - name: Run Digital Credentials device test
+        if: matrix.phase == 'dc-api-compose'
+        uses: reactivecircus/android-emulator-runner@v2.38.0
+        with:
+          api-level: ${{ steps.android-device-phase.outputs.emulator_api_level }}
+          arch: x86_64
+          profile: ${{ steps.android-device-phase.outputs.emulator_profile }}
+          target: ${{ steps.android-device-phase.outputs.emulator_target }}
+          emulator-boot-timeout: 600
           emulator-options: ${{ steps.android-device-phase.outputs.emulator_options }}
           disable-animations: true
           script: ${{ steps.android-device-phase.outputs.script }}
