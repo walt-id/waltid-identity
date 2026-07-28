@@ -142,21 +142,6 @@ class SoftwareKeyAlgorithmMatrixTest {
             }
         }
 
-        // Key-generation-only probes: the algorithm sweep above uses one representative RSA size, because RSA
-        // key generation dominates the runtime of this test on JS and Kotlin/Native.
-        generationOnlySpecs.forEach { spec ->
-            val result = when {
-                providers.none { it.supports(generationRequirement(spec, signUsages)) } -> Support.NO_KEY
-                else -> try {
-                    keys.getOrPut(spec to signUsages) { generate(spec, signUsages) }
-                    Support.OK
-                } catch (cause: Throwable) {
-                    Support.BROKEN
-                }
-            }
-            rows += Triple(spec.label(), "generate", result)
-        }
-
         println(rows.render())
 
         val broken = rows.filter { it.third == Support.BROKEN }
@@ -256,6 +241,11 @@ class SoftwareKeyAlgorithmMatrixTest {
             DigestAlgorithm.SHA_384,
             DigestAlgorithm.SHA_512,
         )
+        /**
+         * One representative RSA size on purpose. Generating RSA-3072/4096 here dominated the runtime and made the
+         * Karma browser runs flake against their 2s Mocha budget; key *sizes* are covered by
+         * CryptographySoftwareKeyProviderTest, whereas this test is about algorithm support.
+         */
         val rsaSweepSpec = KeySpec.Rsa(2048)
         val signingSpecs: List<KeySpec> = listOf(
             KeySpec.Ec(EcCurve.P256),
@@ -273,6 +263,5 @@ class SoftwareKeyAlgorithmMatrixTest {
             KeySpec.Montgomery(MontgomeryCurve.X25519) to KeyAgreementAlgorithm.Xdh,
             KeySpec.Montgomery(MontgomeryCurve.X448) to KeyAgreementAlgorithm.Xdh,
         )
-        val generationOnlySpecs: List<KeySpec> = listOf(KeySpec.Rsa(3072), KeySpec.Rsa(4096))
     }
 }

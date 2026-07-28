@@ -120,7 +120,7 @@ configurations.all {
     resolutionStrategy.force(
         identityLibs.jackson.core.tools,
         identityLibs.jackson.core,
-        identityLibs.bcprov.jdk18on,
+        identityLibs.bouncycastle.prov,
         identityLibs.netty.codec.compression,
         identityLibs.netty.codec.http.v2,
         identityLibs.netty.transport.classes.epoll,

@@ -185,8 +185,10 @@ public final class id/walt/crypto2/signum/SignumManagedKeyProvider : id/walt/cry
 	public final fun delete (Lid/walt/crypto2/keys/StoredKey$Managed;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun delete$default (Lid/walt/crypto2/signum/SignumManagedKeyProvider;Lid/walt/crypto2/keys/StoredKey$Managed;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public fun generate (Lid/walt/crypto2/providers/GenerateManagedKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun generateSignumKey (Lid/walt/crypto2/providers/GenerateManagedKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getId-v1VkqW4 ()Ljava/lang/String;
 	public fun restore (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun restoreSignumKey (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun storedKeyForExisting-FO05kzI (Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun storedKeyForExisting-FO05kzI$default (Lid/walt/crypto2/signum/SignumManagedKeyProvider;Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
