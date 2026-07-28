@@ -53,23 +53,28 @@ mdoc credential configuration IDs.
    getent hosts localhost.emobix.co.uk
    ```
 
-2. **Docker Compose** for the conformance suite and local Nginx TLS proxy. The wrapper starts both.
+2. **Host commands:** `docker` with Docker Compose, `openssl`, `keytool` from the JDK, and `curl`.
+   The wrapper uses them to start the suite, generate the local TLS certificate, prepare the temporary
+   truststore, and verify connectivity.
 
-3. **Keycloak** with the integration-test `issuer` realm for authorization-code variants. Pre-authorized-code variants do not need Keycloak.
+3. **issuer2 authentication service.** No conformance-specific Keycloak setup is needed when issuer2 is
+   already configured to use its normal reachable Keycloak realm. The wrapper completes the existing
+   authorization-code login with the issuer2 integration-test account. Pre-authorized-code variants do not
+   use the authorization server.
 
 4. **issuer2** running directly on the host at `0.0.0.0:7005`.
 
-5. **Playwright system dependencies** for authorization-code variants. The wrapper runs Playwright
-   `install --with-deps` by default, so the current user must be able to install system packages unless
-   the browser and its dependencies were provisioned in advance.
+5. **Playwright** for authorization-code variants. The wrapper installs Chromium by default, but does not
+   install operating-system packages because Gradle cannot answer an interactive `sudo` prompt. Provision
+   missing browser libraries once in an interactive terminal before running the wrapper.
 
 ---
 
 ## Setup
 
-### 1. Configure Keycloak
+### 1. Verify issuer2 Keycloak configuration
 
-The Keycloak client used by issuer2 must allow this redirect URI:
+For authorization-code variants, verify that issuer2's already-configured Keycloak client allows this redirect URI:
 
 ```text
 https://localhost.emobix.co.uk:9443/openid4vci/external/oauth/callback
@@ -126,7 +131,7 @@ export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE=/path/to/status-
 ```bash
 # Terminal 1: start enterprise issuer2 on host port 7005
 # Terminal 2: run the wrapper from the unified-build root
-./run-issuer-conformance-local.sh
+./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
 ```
 
 With no selection overrides, this runs the metadata and positive modules for 12 variants: SD-JWT VC and
@@ -136,7 +141,7 @@ all 288 generated variants and all returned modules instead:
 ```bash
 OPENID4VCI_CONFORMANCE_PRESET=all-basic-plan \
 OPENID4VCI_CONFORMANCE_MODULE_GROUPS=all \
-  ./run-issuer-conformance-local.sh
+  ./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
 ```
 
 Verify metadata endpoint:
@@ -151,7 +156,7 @@ curl -ks "https://localhost.emobix.co.uk:9443/.well-known/openid-credential-issu
 ```bash
 cd waltid-unified-build
 
-./run-issuer-conformance-local.sh
+./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
 ```
 
 ### Test Execution Flow

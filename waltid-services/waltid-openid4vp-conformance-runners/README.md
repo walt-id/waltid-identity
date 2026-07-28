@@ -51,20 +51,23 @@ Conformance test runners for OpenID4VCI and OpenID4VP against the [OpenID Founda
    https://localhost.emobix.co.uk:9443/.well-known/openid-credential-issuer/openid4vci
    ```
 
-3. **Docker Compose** for the conformance suite and its local HTTPS Nginx proxy.
+3. **Host commands:** `docker` with Docker Compose, `openssl`, `keytool` from the JDK, and `curl`.
+   The wrapper uses them to start the suite, generate the local TLS certificate, prepare the temporary
+   truststore, and verify connectivity.
 
-4. **Keycloak** for `authorization_code` flows. The pre-authorized-code wrapper preset does not need Keycloak.
-   Authorization-code presets use the same public Keycloak test user as issuer2 integration tests:
-   `jane@walt.id` / `jane`. The Keycloak client must allow this redirect URI:
+4. **issuer2 authentication service.** No conformance-specific Keycloak setup is needed when issuer2 is
+   already configured to use its normal reachable Keycloak realm. Authorization-code browser automation uses
+   the same public integration-test account as issuer2: `jane@walt.id` / `jane`. The issuer2 Keycloak client
+   must already allow this callback URI:
 
    ```text
    https://localhost.emobix.co.uk:9443/openid4vci/external/oauth/callback
    ```
 
-5. **Playwright system dependencies** for `authorization_code` flows. The wrapper installs Chromium and
-   its operating-system dependencies with Playwright `install --with-deps` by default, so the current user
-   must be able to install system packages. Set `OPENID4VCI_CONFORMANCE_INSTALL_PLAYWRIGHT=false` only when
-   the required browser and system libraries are already installed.
+5. **Playwright** for `authorization_code` flows. The wrapper installs Chromium by default, but does not
+   install operating-system packages because Gradle cannot answer an interactive `sudo` prompt. Install
+   missing system dependencies once in an interactive terminal, then set
+   `OPENID4VCI_CONFORMANCE_INSTALL_PLAYWRIGHT=false` when Chromium is already installed.
 
 ### Running Tests
 
@@ -72,7 +75,7 @@ Conformance test runners for OpenID4VCI and OpenID4VP against the [OpenID Founda
 cd waltid-unified-build
 
 # Default VCI issuer run: 12 variants, metadata and positive modules only.
-./run-issuer-conformance-local.sh
+./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
 ```
 
 ### Default selection
@@ -90,9 +93,10 @@ The invalid `pre_authorization_code` + `wallet_initiated` pair is not generated.
 the static transaction code, browser automation, Jane's test credentials, and Playwright installation are
 also enabled by the wrapper.
 
-The first authorization-code run installs Chromium and its operating-system dependencies and may require
-package-manager privileges. On success, inspect the suite at `https://localhost.emobix.co.uk:8443` and the
-matrix reports under `build/reports/openid4vci-issuer-matrix` in this module.
+The first authorization-code run installs Chromium. If Playwright reports missing operating-system libraries,
+install them once in an interactive terminal before retrying. On success, inspect the suite at
+`https://localhost.emobix.co.uk:8443` and the matrix reports under
+`build/reports/openid4vci-issuer-matrix` in this module.
 
 ### Changing the selection
 
@@ -101,7 +105,7 @@ run every module returned by the conformance plan:
 
 ```bash
 OPENID4VCI_CONFORMANCE_MODULE_GROUPS=all \
-  ./run-issuer-conformance-local.sh
+  ./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
 ```
 
 Run all 288 generated base-plan variants and every returned module:
@@ -109,7 +113,7 @@ Run all 288 generated base-plan variants and every returned module:
 ```bash
 OPENID4VCI_CONFORMANCE_PRESET=all-basic-plan \
 OPENID4VCI_CONFORMANCE_MODULE_GROUPS=all \
-  ./run-issuer-conformance-local.sh
+  ./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
 ```
 
 Use `OPENID4VCI_CONFORMANCE_PRESET=custom` with the matrix filter variables documented under
@@ -121,7 +125,7 @@ Use `OPENID4VCI_CONFORMANCE_PRESET=custom` with the matrix filter variables docu
 
 # A remote issuer can still be selected explicitly.
 export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://issuer.example.com/openid4vci"
-./run-issuer-conformance-local.sh
+./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
 
 # Direct Gradle execution, if the suite, proxy, and truststore are already configured
 export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://localhost.emobix.co.uk:9443/openid4vci"
@@ -462,12 +466,19 @@ export OPENID4VCI_CONFORMANCE_INSTALL_PLAYWRIGHT="false" && \
 unset OPENID4VCI_CONFORMANCE_VARIANT_ID \
       OPENID4VCI_CONFORMANCE_VARIANTS \
       OPENID4VCI_CONFORMANCE_MODULES && \
-./run-issuer-conformance-local.sh
+./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
 ```
 
 Reuse the same root for `OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE`
 only when issuer2 signs its status-list JWT under that CA; otherwise provide the
 separate status-list root certificate.
+
+To run the same eight HAIP variants with every module returned by the plan, including
+the dedicated FAPI module group, change the command's module selection to:
+
+```bash
+export OPENID4VCI_CONFORMANCE_MODULE_GROUPS="all"
+```
 
 The runner records unsupported or not-yet-wired combinations instead of hiding them:
 
@@ -561,7 +572,7 @@ resolves `localhost.emobix.co.uk` to Nginx through a Docker network alias, while
 Playwright use the published port. This removes the public tunnel and its connection limits from the
 local issuer workflow.
 
-Defaults used by `run-issuer-conformance-local.sh` for `all-basic-plan` and the mixed
+Defaults used by the wrapper for `all-basic-plan` and the mixed
 `vci-client-attestation-dpop-simple-unsigned` preset:
 
 ```bash
@@ -571,13 +582,14 @@ export OPENID4VCI_CONFORMANCE_AUTH_PASSWORD="jane"
 export OPENID4VCI_CONFORMANCE_AUTH_TIMEOUT_SECONDS=90
 export PLAYWRIGHT_BROWSER=chromium
 export PLAYWRIGHT_HEADLESS=true
-export PLAYWRIGHT_INSTALL_WITH_DEPS=true
+export PLAYWRIGHT_INSTALL_WITH_DEPS=false
 export OPENID4VCI_CONFORMANCE_INSTALL_PLAYWRIGHT=true
 ```
 
-Playwright now installs Chromium and its required operating-system packages with `install --with-deps` by
-default. The current user must be able to install system packages. Environments that already provide the
-browser dependencies can opt out with `PLAYWRIGHT_INSTALL_WITH_DEPS=false`.
+The wrapper installs Chromium without operating-system dependencies by default. Gradle cannot safely
+provide a password when Playwright invokes `sudo`; run Playwright `install-deps` in an interactive terminal
+if the browser reports missing libraries. Set `PLAYWRIGHT_INSTALL_WITH_DEPS=true` only where noninteractive
+privileged package installation is explicitly supported.
 
 If the Playwright install task hangs or the browser is already installed, skip that step:
 
