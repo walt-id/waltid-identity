@@ -23,7 +23,7 @@ jobs:
       - name: Boot emulator and verify Play Services
         uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
-          api-level: 36
+          api-level: 37
           system-image-api-level: "37.0"
           arch: x86_64
           profile: pixel_7
