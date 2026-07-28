@@ -12,7 +12,7 @@ import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
-import id.walt.wallet2.persistence.stores.PlatformKeyStore
+import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
@@ -163,16 +163,16 @@ internal fun createSqlDelightMobileWallet(
     deleteLocalPersistence: suspend () -> Unit,
 ): MobileWallet {
     val queries = db.walletPersistenceQueries
-    val platformKeyStore = PlatformKeyStore(keyProvider, queries)
+    val keyStore = SqlDelightKeyStore(keyProvider, queries)
     val credentialStore = config.persistence.credentialStore ?: SqlDelightCredentialStore(queries)
     val didStore = config.persistence.didStore ?: SqlDelightDidStore(queries)
     return MobileWallet(
         walletId = config.walletId,
-        keyStore = platformKeyStore,
+        keyStore = keyStore,
         didStore = didStore,
         credentialStore = credentialStore,
         generateAndPersistKey = { keyType ->
-            platformKeyStore.generateManagedKey(
+            keyStore.generateManagedKey(
                 id = KeyId("wallet_key_${Uuid.random()}"),
                 spec = keyType.toKeySpec(),
                 usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),

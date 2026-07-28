@@ -11,7 +11,7 @@ selectByKeyId:
 SELECT * FROM key_references WHERE key_id = ?;
 
 insert:
-INSERT OR REPLACE INTO key_references (
+INSERT INTO key_references (
     key_id,
     created_at,
     stored_key

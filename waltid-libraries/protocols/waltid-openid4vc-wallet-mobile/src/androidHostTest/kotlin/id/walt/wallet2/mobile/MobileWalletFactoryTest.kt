@@ -27,7 +27,7 @@ import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
-import id.walt.wallet2.persistence.stores.PlatformKeyStore
+import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -80,7 +80,7 @@ class MobileWalletFactoryTest {
                 assertEquals(1, provider.generateCount)
 
                 val restored = assertNotNull(
-                    PlatformKeyStore(provider, database.queries)
+                    SqlDelightKeyStore(provider, database.queries)
                         .getCrypto2Key(bootstrap.keyId, setOf(KeyUsage.SIGN))
                 )
                 val message = "mobile-key-bootstrap".encodeToByteArray()
@@ -245,7 +245,7 @@ class MobileWalletFactoryTest {
             )
         }
 
-        override suspend fun restoreManagedKey(stored: StoredKey.Managed): ManagedKeyMaterial {
+        override suspend fun restoreManagedKey(stored: StoredKey.Managed): ManagedKey {
             require(stored.provider == PROVIDER_ID)
             return managedKey(stored, requireNotNull(keys[stored.id]))
         }

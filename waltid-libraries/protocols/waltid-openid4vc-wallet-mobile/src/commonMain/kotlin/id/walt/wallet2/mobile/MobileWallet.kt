@@ -275,7 +275,7 @@ public class MobileWallet internal constructor(
         } catch (cause: Throwable) {
             try {
                 withContext(NonCancellable) {
-                    check(keyStore.removeKey(key.id.value)) { "Failed to remove managed key after DID bootstrap failure" }
+                    check(keyStore.removeKey(key.id.value)) { "Failed to remove signing key after DID bootstrap failure" }
                 }
             } catch (cleanupFailure: Throwable) {
                 cause.addSuppressed(cleanupFailure)

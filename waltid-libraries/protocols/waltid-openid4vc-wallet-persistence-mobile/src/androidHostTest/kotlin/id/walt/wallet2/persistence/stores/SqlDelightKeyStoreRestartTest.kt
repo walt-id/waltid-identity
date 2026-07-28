@@ -1,19 +1,19 @@
 package id.walt.wallet2.persistence.stores
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyCapabilities
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.ProviderId
-import id.walt.crypto2.keys.SoftwareKey
 import id.walt.crypto2.keys.StoredKey
-import id.walt.crypto2.keys.Key as ManagedKeyMaterial
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.crypto2.signum.SignumKeyPolicy
@@ -30,19 +30,19 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class PlatformKeyStoreRestartTest {
+class SqlDelightKeyStoreRestartTest {
     @Test
     fun `managed key descriptor restores after store recreation and is deleted atomically`() = runTest {
         database().use { database ->
             val provider = FakePlatformManagedKeyProvider()
-            val store = PlatformKeyStore(provider, database.queries)
+            val store = SqlDelightKeyStore(provider, database.queries)
             val key = store.generateManagedKey(KeyId("managed"), KeySpec.Ec(EcCurve.P256), KEY_USAGES)
 
             val persisted = database.queries.selectByKeyId(key.id.value).executeAsOne()
             assertIs<StoredKey.Managed>(StoredKeyCodec.decodeFromString(persisted.stored_key))
 
             val restored = assertNotNull(
-                PlatformKeyStore(provider, database.queries).getCrypto2Key(key.id.value, setOf(KeyUsage.SIGN))
+                SqlDelightKeyStore(provider, database.queries).getCrypto2Key(key.id.value, setOf(KeyUsage.SIGN))
             )
             val signature = assertNotNull(restored.capabilities.signer).sign(
                 "payload".encodeToByteArray(), SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)
@@ -57,35 +57,52 @@ class PlatformKeyStoreRestartTest {
 
     @Test
     fun `failed SQL persistence removes generated managed key`() = runTest {
-        val database = database()
-        val provider = FakePlatformManagedKeyProvider()
-        val store = PlatformKeyStore(provider, database.queries)
-        val id = KeyId("failed-insert")
-        database.close()
+        database().use { database ->
+            val provider = FakePlatformManagedKeyProvider()
+            val store = SqlDelightKeyStore(provider, database.queries)
+            val id = KeyId("failed-insert")
+            database.failKeyInserts()
 
-        assertFails {
-            store.generateManagedKey(id, KeySpec.Ec(EcCurve.P256), KEY_USAGES)
+            assertFails {
+                store.generateManagedKey(id, KeySpec.Ec(EcCurve.P256), KEY_USAGES)
+            }
+
+            assertEquals(1, provider.deleteCount)
+            assertTrue(id !in provider.managedIds)
         }
-
-        assertEquals(1, provider.deleteCount)
-        assertTrue(id !in provider.managedIds)
     }
 
     @Test
-    fun `software keys are rejected rather than persisted with an Android-incompatible fallback`() = runTest {
+    fun `software key descriptor restores after store recreation and deletes only the row`() = runTest {
         database().use { database ->
-            val softwareKey = object : SoftwareKey {
-                override val storedKey = StoredKey.Software(
-                    version = StoredKey.CURRENT_VERSION,
+            val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+            val softwareKey = runtime.generateSoftwareKey(
+                GenerateSoftwareKeyRequest(
                     id = KeyId("software"),
-                    spec = KeySpec.Ec(EcCurve.P256),
+                    spec = KeySpec.Rsa(2048),
                     usages = KEY_USAGES,
-                    material = EncodedKey.Jwk(BinaryData("{}".encodeToByteArray()), privateMaterial = true),
                 )
-            }
-            val store = PlatformKeyStore(FakePlatformManagedKeyProvider(), database.queries)
+            )
+            val provider = FakePlatformManagedKeyProvider()
+            val store = SqlDelightKeyStore(provider, database.queries)
 
-            assertFailsWith<IllegalArgumentException> { store.addCrypto2Key(softwareKey) }
+            assertEquals("software", store.addCrypto2Key(softwareKey))
+            val persisted = database.queries.selectByKeyId("software").executeAsOne()
+            assertIs<StoredKey.Software>(StoredKeyCodec.decodeFromString(persisted.stored_key))
+            assertFails { store.addCrypto2Key(softwareKey) }
+            assertEquals(persisted, database.queries.selectByKeyId("software").executeAsOne())
+
+            val restored = assertNotNull(
+                SqlDelightKeyStore(provider, database.queries)
+                    .getCrypto2Key("software", setOf(KeyUsage.SIGN))
+            )
+            val message = "software-key-restart".encodeToByteArray()
+            val algorithm = SignatureAlgorithm.RsaPkcs1(DigestAlgorithm.SHA_256)
+            val signature = assertNotNull(restored.capabilities.signer).sign(message, algorithm)
+            assertTrue(assertNotNull(restored.capabilities.verifier).verify(message, signature, algorithm))
+
+            assertTrue(store.removeKey("software"))
+            assertEquals(0, provider.deleteCount)
             assertNull(database.queries.selectByKeyId("software").executeAsOneOrNull())
         }
     }
@@ -94,7 +111,7 @@ class PlatformKeyStoreRestartTest {
     fun `corrupt descriptor fails closed and cannot be deleted through a legacy fallback`() = runTest {
         database().use { database ->
             database.queries.insert("corrupt", 0, "{not-a-stored-key")
-            val store = PlatformKeyStore(FakePlatformManagedKeyProvider(), database.queries)
+            val store = SqlDelightKeyStore(FakePlatformManagedKeyProvider(), database.queries)
 
             assertFails { store.getCrypto2Key("corrupt", setOf(KeyUsage.SIGN)) }
             assertFailsWith<IllegalArgumentException> { store.removeKey("corrupt") }
@@ -114,6 +131,20 @@ class PlatformKeyStoreRestartTest {
     ) : AutoCloseable {
         val queries = database.walletPersistenceQueries
 
+        fun failKeyInserts() {
+            driver.execute(
+                identifier = null,
+                sql = """
+                    CREATE TRIGGER fail_key_insert
+                    BEFORE INSERT ON key_references
+                    BEGIN
+                        SELECT RAISE(FAIL, 'forced key insert failure');
+                    END
+                """.trimIndent(),
+                parameters = 0,
+            )
+        }
+
         override fun close() = driver.close()
     }
 
@@ -131,7 +162,7 @@ class PlatformKeyStoreRestartTest {
             return managedKey(descriptor(id, spec, usages))
         }
 
-        override suspend fun restoreManagedKey(stored: StoredKey.Managed): ManagedKeyMaterial {
+        override suspend fun restoreManagedKey(stored: StoredKey.Managed): ManagedKey {
             require(stored.id in managedIds)
             return managedKey(stored)
         }

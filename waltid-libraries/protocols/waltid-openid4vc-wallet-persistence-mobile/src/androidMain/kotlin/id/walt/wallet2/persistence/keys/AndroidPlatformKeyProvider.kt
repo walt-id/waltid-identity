@@ -1,6 +1,5 @@
 package id.walt.wallet2.persistence.keys
 
-import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
@@ -32,7 +31,7 @@ public class AndroidPlatformKeyProvider : PlatformManagedKeyProvider {
         )
     )
 
-    override suspend fun restoreManagedKey(stored: StoredKey.Managed): Key =
+    override suspend fun restoreManagedKey(stored: StoredKey.Managed): ManagedKey =
         signumProvider.restore(stored)
 
     override suspend fun deleteManagedKey(stored: StoredKey.Managed) {

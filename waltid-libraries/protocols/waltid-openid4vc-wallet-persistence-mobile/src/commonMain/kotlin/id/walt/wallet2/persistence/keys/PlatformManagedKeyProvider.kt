@@ -1,6 +1,5 @@
 package id.walt.wallet2.persistence.keys
 
-import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
@@ -25,7 +24,7 @@ public interface PlatformManagedKeyProvider {
     /**
      * Restores a platform key from its persisted descriptor.
      */
-    public suspend fun restoreManagedKey(stored: StoredKey.Managed): Key
+    public suspend fun restoreManagedKey(stored: StoredKey.Managed): ManagedKey
 
     /**
      * Deletes a platform key using its descriptor without restoring the alias first.

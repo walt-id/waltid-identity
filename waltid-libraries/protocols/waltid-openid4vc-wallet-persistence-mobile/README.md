@@ -58,7 +58,7 @@ import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.AndroidDatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.AndroidPlatformKeyProvider
 import id.walt.wallet2.persistence.stores.DriverFactory
-import id.walt.wallet2.persistence.stores.PlatformKeyStore
+import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 
@@ -72,7 +72,7 @@ val driver = DriverFactory(context).createEncryptedDriver(
 val queries = WalletPersistenceDatabase(driver).walletPersistenceQueries
 
 val keyProvider = AndroidPlatformKeyProvider()
-val keyStore = PlatformKeyStore(keyProvider, queries)
+val keyStore = SqlDelightKeyStore(keyProvider, queries)
 val credentialStore = SqlDelightCredentialStore(queries)
 val didStore = SqlDelightDidStore(queries)
 ```
@@ -85,13 +85,13 @@ The mobile facade opens encrypted databases by default and keeps managed databas
 
 `DatabaseEncryptionKeyProvider` is the boundary for provided database keys. Implement it when an app needs KMS-backed recovery or enterprise key ownership. The SDK will request key material for opening the local SQLCipher database and call `deleteKey(walletId, databaseName)` when `MobileWallet.deleteWallet()` deletes local wallet data. External KMS recovery state remains the app's responsibility.
 
-`DriverFactory.deleteDatabase(databaseName)` removes the database file and SQLite sidecars used by the platform driver. For complete wallet deletion, close the driver first, remove platform signing keys referenced by `PlatformKeyStore`, delete database files, and then delete the database encryption key.
+`DriverFactory.deleteDatabase(databaseName)` removes the database file and SQLite sidecars used by the platform driver. For complete wallet deletion, close the driver first, remove managed signing keys referenced by `SqlDelightKeyStore`, delete database files, and then delete the database encryption key.
 
 ## Store Implementations
 
 | Interface | Implementation | Description |
 |-----------|----------------|-------------|
-| `WalletKeyStore` | `PlatformKeyStore` | Managed Android KeyStore or iOS Keychain / Secure Enclave keys |
+| `WalletKeyStore` | `SqlDelightKeyStore` | Versioned managed or software key descriptors |
 | `WalletCredentialStore` | `SqlDelightCredentialStore` | Stored credentials with metadata |
 | `WalletDidStore` | `SqlDelightDidStore` | DIDs and their documents |
 
@@ -99,7 +99,7 @@ The mobile facade opens encrypted databases by default and keeps managed databas
 
 The mobile schema includes the following tables:
 
-- `key_references` - Versioned managed-key descriptors
+- `key_references` - Versioned managed or software key descriptors
 - `credentials` - Stored credentials
 - `dids` - Stored DIDs
 
