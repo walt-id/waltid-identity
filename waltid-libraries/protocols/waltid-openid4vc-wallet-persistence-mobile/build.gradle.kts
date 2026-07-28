@@ -45,7 +45,6 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
-            api(project(":waltid-libraries:crypto:waltid-crypto"))
             api(project(":waltid-libraries:crypto:waltid-crypto2"))
             api(project(":waltid-libraries:crypto:waltid-crypto2-signum"))
             api(project(":waltid-libraries:waltid-did"))
