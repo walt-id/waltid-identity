@@ -338,16 +338,25 @@ class IssuerTestPlanRunner(
                 return
             }
 
-            if (testRunInfo.status == "WAITING" && browserAutomationConfig.enabled) {
-                if (attemptBrowserAutomation(testId, attemptedBrowserUrls, shouldLog = counter == 1 || counter % 10 == 0)) {
-                    counter = 0
-                }
+            if (
+                testRunInfo.status == "WAITING" &&
+                browserAutomationConfig.enabled &&
+                attemptBrowserAutomation(testId, attemptedBrowserUrls, shouldLog = counter == 1 || counter % 10 == 0)
+            ) {
+                counter = 0
             }
 
-            if (testRunInfo.status == "WAITING" && credentialOfferProvider != null) {
-                if (attemptCredentialOfferDelivery(testId, credentialOfferProvider, attemptedCredentialOfferEndpoints, shouldLog = counter == 1 || counter % 10 == 0)) {
-                    counter = 0
-                }
+            if (
+                testRunInfo.status == "WAITING" &&
+                credentialOfferProvider != null &&
+                attemptCredentialOfferDelivery(
+                    testId,
+                    credentialOfferProvider,
+                    attemptedCredentialOfferEndpoints,
+                    shouldLog = counter == 1 || counter % 10 == 0,
+                )
+            ) {
+                counter = 0
             }
 
             if (counter > 60) {
