@@ -51,7 +51,6 @@ kotlin {
         commonMain.dependencies {
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile"))
-            api(project(":waltid-libraries:crypto:waltid-crypto"))
             api(project(":waltid-libraries:waltid-did"))
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.serialization.json)

@@ -195,7 +195,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
     func testCustomCredentialStoreRetainsPlatformSigningKeys() async throws {
         let store = RecordingWalletCredentialStore()
         let persistence = WalletPersistence(
-            stores: WalletStores(credentials: store)
+            credentialStore: store
         )
         let wallet = try await makeWallet(persistence: persistence)
 
