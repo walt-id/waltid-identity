@@ -38,5 +38,5 @@ RUN yum install -y shadow-utils \
 COPY --chown=app:app --from=build /home/gradle/src/waltid-services/waltid-verifier-api2/build/libs/*.jar /waltid-verifier-api2/verifier-api2.jar
 
 USER app
-EXPOSE 7003
+EXPOSE 7004
 ENTRYPOINT ["java","-jar","/waltid-verifier-api2/verifier-api2.jar"]
