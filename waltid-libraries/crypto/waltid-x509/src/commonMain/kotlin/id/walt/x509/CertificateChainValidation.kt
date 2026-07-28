@@ -108,11 +108,12 @@ private fun buildValidatedPath(
     for (issuer in issuers) {
         if (!current.hasKeyIdentifierMatch(issuer)) continue
         val issuerCaCertificatesBelow = caCertificatesBelow + if (current.certificate.isCertificateAuthority) 1 else 0
+        val issuerRequiredExtendedKeyUsageOid = if (anchors.any { it.der == issuer.der }) null else requiredExtendedKeyUsageOid
         if (
             !issuer.certificate.canIssueCertificates(
                 issuerCaCertificatesBelow,
                 issuerProcessedCriticalExtensionOids,
-                requiredExtendedKeyUsageOid,
+                issuerRequiredExtendedKeyUsageOid,
             )
         ) continue
 

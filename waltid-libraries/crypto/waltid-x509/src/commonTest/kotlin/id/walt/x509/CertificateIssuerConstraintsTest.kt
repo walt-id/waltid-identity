@@ -124,6 +124,36 @@ class CertificateIssuerConstraintsTest {
         }
     }
 
+    @Test
+    fun `explicit trust anchor does not need client authentication EKU`() = runTest {
+        val rootKey = key("anchor-eku-root")
+        val rootName = X509DistinguishedName(commonName = "Constrained Trust Anchor")
+        val root = certificate(
+            subjectName = rootName,
+            subjectKey = rootKey,
+            signingKey = rootKey,
+            isCa = true,
+            pathLengthConstraint = 0,
+            extendedKeyUsageOids = setOf("1.3.130.2.0.0.1.7"),
+        )
+        val leaf = certificate(
+            subjectName = X509DistinguishedName(commonName = "Client Leaf"),
+            issuerName = rootName,
+            subjectKey = key("anchor-eku-leaf"),
+            signingKey = rootKey,
+            isCa = false,
+            extendedKeyUsageOids = setOf("1.3.6.1.5.5.7.3.2"),
+        )
+
+        validateCertificateChainWithExplicitTrust(
+            leaf = leaf,
+            chain = emptyList(),
+            trustAnchors = listOf(root),
+            enableTrustedChainRoot = false,
+            requiredExtendedKeyUsageOid = "1.3.6.1.5.5.7.3.2",
+        )
+    }
+
     private suspend fun key(id: String) = runtime.generateSoftwareKey(
         GenerateSoftwareKeyRequest(
             id = KeyId(id),
