@@ -57,6 +57,7 @@ jobs:
         run: ./waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh "${{ matrix.phase }}"
 
       - name: Preinstall Android emulator SDK packages
+        if: matrix.phase != 'dc-api-compose'
         shell: bash
         run: |
           set -euo pipefail
