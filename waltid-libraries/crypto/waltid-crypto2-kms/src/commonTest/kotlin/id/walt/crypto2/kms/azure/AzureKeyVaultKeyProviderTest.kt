@@ -37,6 +37,7 @@ import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -199,6 +200,43 @@ class AzureKeyVaultKeyProviderTest {
         assertContentEquals(plaintext, assertNotNull(key.capabilities.decryptor).decrypt(ciphertext, null))
         assertEquals(KeyDeletionResult.Deleted, assertNotNull(key.capabilities.deleter).delete())
         assertEquals(5, requestIndex)
+    }
+
+    @Test
+    fun `generate rejects a key ID outside the configured vault`() = runTest {
+        // The kid from the create response becomes the URL of every later operation, and each of those carries a Key
+        // Vault bearer token. An unchecked kid would exfiltrate that token to a host of the responder's choosing and
+        // persist the poisoned URL in providerData. restore() and storedKeyForExisting() already refused this.
+        listOf(
+            "https://attacker.example/keys/ec-key/version-1",
+            "https://vault.example.attacker.test/keys/ec-key/version-1",
+            "https://vault.example/secrets/ec-key/version-1",
+        ).forEach { hostileKeyId ->
+            var requestIndex = 0
+            val client = mockClient { request ->
+                when (requestIndex++) {
+                    0 -> respondToken(request)
+                    1 -> respondJson(ecKeyResponse().replace("https://vault.example/keys/ec-key/version-1", hostileKeyId))
+                    else -> error("Generation must stop once the key ID is rejected")
+                }
+            }
+
+            val failure = assertFails {
+                runtime(client).generateManagedKey(
+                    AzureKeyVaultKeyProvider.ID,
+                    GenerateManagedKeyRequest(
+                        id = KeyId("ec-key"),
+                        spec = KeySpec.Ec(EcCurve.P256),
+                        usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                        providerOptions = options.copy(keyName = "ec-key").encode(),
+                    ),
+                )
+            }
+            assertTrue(
+                "does not belong to the configured vault" in failure.message.orEmpty(),
+                "unexpected failure for $hostileKeyId: ${failure.message}",
+            )
+        }
     }
 
     private fun runtime(client: HttpClient): CryptoRuntime = CryptoRuntime(
