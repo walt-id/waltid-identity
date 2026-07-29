@@ -173,7 +173,13 @@ class SelfIssuedIdTokenCrypto2Test {
 
     @Test
     fun `compatible requested ID token algorithm overrides key default`() = runTest {
-        val key = JWKKey.generate(KeyType.RSA)
+        val key = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("self-issued-ps256"),
+                spec = KeySpec.Rsa(2048),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
         val token = SelfIssuedIdTokenBuilder.build(
             authorizationRequest = AuthorizationRequest(
                 clientId = "verifier",

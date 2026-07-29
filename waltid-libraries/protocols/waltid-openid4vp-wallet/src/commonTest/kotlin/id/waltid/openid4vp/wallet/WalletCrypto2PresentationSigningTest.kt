@@ -207,7 +207,7 @@ class WalletCrypto2PresentationSigningTest {
 
     @Test
     fun `mdoc device authentication signs through crypto2`() = runTest {
-        val legacyKey = JWKKey.generate(KeyType.secp256r1)
+        val legacyKey = JWKKey(legacyP256Jwk)
         val crypto2Key = assertNotNull(WalletCrypto2KeyAdapter.signingKey(legacyKey))
         val publicJwk = crypto2Key.capabilities.publicKeyExporter?.exportPublicKey() as EncodedKey.Jwk
         val verificationKey = CryptoRuntime(defaultSoftwareKeyProviders()).restore(
@@ -264,5 +264,11 @@ class WalletCrypto2PresentationSigningTest {
                 Cose.Algorithm.ES256,
             )
         }
+    }
+
+    private companion object {
+        val legacyP256Jwk = """
+            {"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}
+        """.trimIndent()
     }
 }
