@@ -46,6 +46,18 @@ tasks.withType<Test> {
         systemProperty("waltid.test.softhsm.executable", softHsmExecutable.absolutePath)
         systemProperty("waltid.test.softhsm.config", softHsmConfigPath)
     }
+    // Forwarded so VendorTokenSmokeTest can be pointed at a real token (Luna, tpm2-pkcs11, opencryptoki, ...) from
+    // the caller's environment. Gradle test JVMs do not inherit the daemon's environment, so without this the test
+    // would silently skip. TPM2_PKCS11_STORE and OPENCRYPTOKI_* are vendor library settings, not our own.
+    listOf(
+        "WALTID_PKCS11_LIBRARY",
+        "WALTID_PKCS11_PIN",
+        "WALTID_PKCS11_SLOT_ID",
+        "WALTID_PKCS11_SLOT_LIST_INDEX",
+        "TPM2_PKCS11_STORE",
+        "TPM2_PKCS11_TCTI",
+        "OPENCRYPTOKI_CONF",
+    ).forEach { name -> System.getenv(name)?.let { environment(name, it) } }
 }
 
 mavenPublishing {
