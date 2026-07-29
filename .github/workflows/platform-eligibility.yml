@@ -1,4 +1,4 @@
-name: Mobile eligibility
+name: Platform eligibility
 
 on:
   workflow_call:
@@ -62,7 +62,7 @@ jobs:
       should-run: ${{ steps.decide.outputs.should-run }}
       reason: ${{ steps.decide.outputs.reason }}
     steps:
-      - name: Decide whether mobile jobs should run
+      - name: Decide whether platform jobs should run
         id: decide
         env:
           EVENT_NAME: ${{ inputs.event-name }}
