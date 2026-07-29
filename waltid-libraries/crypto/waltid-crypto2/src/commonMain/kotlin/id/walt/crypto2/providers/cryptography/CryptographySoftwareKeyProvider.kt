@@ -56,11 +56,20 @@ data class CryptographyCapabilityProfile(
 
     companion object {
         /**
-         * Every digest [toCryptographyDigest] can map, most modern first. A profile only states policy: whether a
-         * digest is actually usable is decided per platform by asking the cryptography-kotlin provider for it, so
-         * SHA-3 on WebCrypto or RIPEMD-160 on the JDK simply never gets advertised.
+         * Digests usable to *construct a signature or OAEP algorithm*, most modern first - which is the only thing
+         * [CryptographyCapabilityProfile.digests] gates (see [supportsDigest] and [advertisedSignatureAlgorithms]).
+         *
+         * A profile only states policy: whether a digest is actually usable is decided per platform by asking the
+         * cryptography-kotlin provider for it, so SHA-3 on WebCrypto simply never gets advertised.
+         *
+         * MD5 and RIPEMD-160 are deliberately absent even though [toCryptographyDigest] can map them and every
+         * backend hands out a hasher for them. cryptography-kotlin only translates SHA-1/SHA-2/SHA-3 into a
+         * signature or OAEP parameter and throws "Unsupported hash algorithm" for the other two, on every backend.
+         * Listing them here made each EC key advertise ECDSA/MD5 and ECDSA/RIPEMD-160 and each RSA key advertise
+         * PKCS1, PSS and OAEP with both - 20 advertised algorithms per platform that threw on first use. Callers who
+         * want a bare MD5 or RIPEMD-160 digest use cryptography-kotlin directly; this module re-exports it as `api`.
          */
-        private val allKnownDigests = linkedSetOf(
+        private val signatureDigests = linkedSetOf(
             DigestAlgorithm.SHA_256,
             DigestAlgorithm.SHA_384,
             DigestAlgorithm.SHA_512,
@@ -70,8 +79,6 @@ data class CryptographyCapabilityProfile(
             DigestAlgorithm.SHA3_224,
             DigestAlgorithm.SHA_224,
             DigestAlgorithm.SHA_1,
-            DigestAlgorithm.RIPEMD_160,
-            DigestAlgorithm.MD5,
         )
 
         private val portableKeySpecs = setOf(
@@ -89,10 +96,10 @@ data class CryptographyCapabilityProfile(
 
         val Portable = CryptographyCapabilityProfile(
             keySpecs = portableKeySpecs,
-            digests = allKnownDigests,
+            digests = signatureDigests,
             signatureFamilies = SignatureFamily.entries.toSet(),
             ecdsaEncodings = EcdsaSignatureEncoding.entries.toSet(),
-            encryptionAlgorithms = allKnownDigests.mapTo(linkedSetOf()) {
+            encryptionAlgorithms = signatureDigests.mapTo(linkedSetOf()) {
                 AsymmetricEncryptionAlgorithm.RsaOaep(it)
             },
             keyAgreementAlgorithms = setOf(KeyAgreementAlgorithm.Ecdh, KeyAgreementAlgorithm.Xdh),
