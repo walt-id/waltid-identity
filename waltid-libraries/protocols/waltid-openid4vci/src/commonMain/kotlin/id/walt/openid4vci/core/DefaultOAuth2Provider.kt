@@ -705,7 +705,7 @@ class DefaultOAuth2Provider(
     override fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp =
         writeCredentialError(error)
 
-    override fun writeCredentialResponse(
+    override suspend fun writeCredentialResponse(
         request: CredentialRequest,
         response: CredentialResponse
     ): CredentialResponseHttp {
@@ -715,6 +715,8 @@ class DefaultOAuth2Provider(
 
         val encrypted = try {
             config.credentialResponseEncryptor.encrypt(payload, encryption)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             return writeCredentialError(
                 request,

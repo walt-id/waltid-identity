@@ -35,16 +35,21 @@ object CredentialIssuerMetadataJwt {
  *
  * The public JWK is embedded in the protected header. Key lookup, certificate-chain selection, trust policy, and HTTP
  * content negotiation intentionally remain responsibilities of the embedding issuer service.
+ *
+ * [keyId] is the published JOSE `kid` and defaults to the crypto2 key ID. They are not always the same thing: a crypto2
+ * `KeyId` identifies a stored record, which for a KMS-backed key is a resource path, whereas the `kid` a relying party
+ * resolves is whatever the issuer already publishes in its JWKS and its credentials - usually the RFC 7638 thumbprint.
+ * Callers whose record ID is not the published `kid` must pass it explicitly, or verifiers stop finding the key.
  */
 suspend fun CredentialIssuerMetadata.toSignedJwt(
     signingKey: Crypto2Key,
     algorithm: JwsAlgorithm,
     issuedAt: Instant = Clock.System.now(),
+    keyId: String = signingKey.id.value,
 ): String {
     require(!algorithm.identifier.startsWith("HS", ignoreCase = true)) {
         "Credential Issuer Metadata must use an asymmetric JWS algorithm"
     }
-    val keyId = signingKey.id.value
     require(keyId.isNotBlank()) {
         "Credential Issuer Metadata signing key must have a key ID"
     }
