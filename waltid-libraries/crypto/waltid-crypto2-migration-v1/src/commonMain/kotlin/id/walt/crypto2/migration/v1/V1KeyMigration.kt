@@ -1,21 +1,8 @@
 package id.walt.crypto2.migration.v1
 
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EdwardsCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.StoredKey
-import id.walt.crypto2.keys.inferKeySpec
-import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.serialization.BinaryData
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 
 class V1KeyMigration(
     managedMigrators: Map<String, V1ManagedKeyMigrator> = emptyMap(),
@@ -36,7 +23,7 @@ class V1KeyMigration(
     ): StoredKey {
         require(usages.isNotEmpty()) { "Migration requires explicit key usages" }
         return when (val type = serialized.requiredString("type")) {
-            "jwk" -> migrateJwk(recordId, serialized.requiredObject("jwk"), usages)
+            "jwk" -> migrateJwk(recordId, serialized.requiredObject("jwk"), usages, serialized.legacyKeyId())
             else -> migrateManaged(recordId, type, serialized, usages)
         }
     }
@@ -52,11 +39,17 @@ class V1KeyMigration(
             }
         } else {
             val material = record.keyMaterial ?: throw V1KeyMigrationException.MissingKeyMaterial(record.id)
-            migrateJwk(record.id, parseObject(material), record.usages)
+            val source = parseObject(material)
+            migrateJwk(record.id, source, record.usages, source.legacyKeyId())
         }
     }
 
-    private fun migrateJwk(recordId: KeyId, jwk: JsonObject, usages: Set<KeyUsage>): StoredKey.Software {
+    private fun migrateJwk(
+        recordId: KeyId,
+        jwk: JsonObject,
+        usages: Set<KeyUsage>,
+        legacyKeyId: String?,
+    ): StoredKey.Software {
         val privateMaterial = jwk.containsPrivateMaterial()
         return EncodedKey.Jwk(
             data = BinaryData(json.encodeToString(jwk).encodeToByteArray()),
@@ -64,6 +57,11 @@ class V1KeyMigration(
         ).toStoredSoftwareKey(
             id = recordId,
             usages = usages,
+            // A v1 key that carried an explicit _keyId published that value as its `kid`, so already-issued
+            // credentials, DID documents and JWKS entries reference it. Dropping it here would make those
+            // references unresolvable after migration, so carry it over even though the new record is keyed by
+            // recordId.
+            metadata = legacyKeyId?.let { mapOf(V1_LEGACY_KEY_ID_METADATA_KEY to it) } ?: emptyMap(),
         )
     }
 
@@ -101,6 +99,60 @@ class V1KeyMigration(
         private val json = Json { ignoreUnknownKeys = false; explicitNulls = true }
     }
 }
+
+/**
+ * StoredKey metadata key holding the explicit `_keyId` of the v1 record, when it had one. v1 `Key.getKeyId()` returned
+ * `_keyId ?: thumbprint`, so this is what previously issued artifacts reference as their `kid`. Absent means the v1 key
+ * used its RFC 7638 thumbprint, which crypto2 can recompute from the public JWK.
+ */
+const val V1_LEGACY_KEY_ID_METADATA_KEY = "v1.keyId"
+
+/** The `kid` a migrated key must keep publishing, or `null` when the RFC 7638 thumbprint should be used. */
+fun StoredKey.legacyKeyId(): String? = metadata[V1_LEGACY_KEY_ID_METADATA_KEY]
+
+/**
+ * The published public half of a v1 key, with the `kid` it was published under.
+ *
+ * [keyId] is `null` when the v1 record had no explicit `_keyId`, in which case v1 published the RFC 7638 thumbprint of
+ * [publicJwk] - recomputable with `Jwk.sha256Thumbprint`.
+ */
+data class V1PublicKeyReference(
+    val publicJwk: JsonObject,
+    val keyId: String?,
+)
+
+/**
+ * Reads the published public JWK of a v1 serialized key without resolving any provider.
+ *
+ * Publishing a JWKS, or matching a `kid`, needs public material only - never an operational key. That distinction
+ * matters because a v1 `tse`/`aws-rest-api`/`azure-rest-api`/`oci-rest-api` record cannot be turned into an operational
+ * crypto2 key without a registered [V1ManagedKeyMigrator], while its cached `_publicKey` is always readable. So this
+ * deliberately does not go through [V1KeyMigration.migrate]: it lets a deployment publish a correct JWKS for remote KMS
+ * keys that have no migrator yet.
+ *
+ * Returns `null` when the record carries no public material at all (a managed v1 key whose `_publicKey` was never
+ * cached), because there is nothing to publish and no way to obtain it offline.
+ */
+fun v1PublicKeyReference(serialized: JsonObject): V1PublicKeyReference? {
+    val keyId = serialized.legacyKeyId()
+    val publicJwk = when (serialized.requiredString("type")) {
+        "jwk" -> serialized.requiredObject("jwk").publicJwkOnly()
+        else -> serialized.cachedPublicJwk()?.publicJwkOnly()
+    } ?: return null
+    return V1PublicKeyReference(publicJwk, keyId)
+}
+
+/** @see v1PublicKeyReference */
+fun v1PublicKeyReference(serialized: String): V1PublicKeyReference? = v1PublicKeyReference(parseObject(serialized))
+
+private fun JsonObject.publicJwkOnly(): JsonObject = EncodedKey.Jwk(
+    data = BinaryData(Json.encodeToString(this).encodeToByteArray()),
+    privateMaterial = containsPrivateMaterial(),
+).publicOnly().parsePublicJwk()
+
+private fun EncodedKey.Jwk.parsePublicJwk(): JsonObject =
+    Json.parseToJsonElement(data.toByteArray().decodeToString()) as? JsonObject
+        ?: throw IllegalArgumentException("V1 public key is not a JSON object")
 
 data class V1ManagedKeyRecord(
     val id: KeyId,
@@ -149,6 +201,9 @@ private fun JsonObject.requiredObject(name: String): JsonObject =
 private fun JsonObject.requiredString(name: String): String =
     this[name]?.jsonPrimitive?.content?.takeIf(String::isNotBlank)
         ?: throw IllegalArgumentException("V1 key is missing string: $name")
+
+private fun JsonObject.legacyKeyId(): String? =
+    (this["_keyId"] as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf(String::isNotBlank)
 
 private fun JsonObject.containsPrivateMaterial(): Boolean = when (requiredString("kty")) {
     "oct" -> "k" in this
