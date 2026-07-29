@@ -49,6 +49,10 @@ class V1KeyMigrationTest {
         assertEquals(KeyId("database-id"), migrated.id)
         assertEquals(KeySpec.Ec(EcCurve.P256), migrated.spec)
         assertTrue(assertIs<EncodedKey.Jwk>(migrated.material).privateMaterial)
+        // v1 getKeyId() returned _keyId when present, so that value is the `kid` in every credential, DID document
+        // and JWKS entry issued before the migration. It must survive, or those references stop resolving.
+        assertEquals("legacy-kid", migrated.legacyKeyId())
+        assertEquals("legacy-kid", migrated.metadata[V1_LEGACY_KEY_ID_METADATA_KEY])
 
         val runtime = CryptoRuntime(listOf(provider))
         val restored = runtime.restore(
