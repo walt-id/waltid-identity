@@ -43,7 +43,7 @@ abstract interface id.walt.wallet2.persistence.keys/PlatformKeyProvider { // id.
 }
 
 final class id.walt.wallet2.persistence.db/Credentials { // id.walt.wallet2.persistence.db/Credentials|null[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long) // id.walt.wallet2.persistence.db/Credentials.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.Long){}[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, kotlin/String?) // id.walt.wallet2.persistence.db/Credentials.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.Long;kotlin.String?){}[0]
 
     final val added_at // id.walt.wallet2.persistence.db/Credentials.added_at|{}added_at[0]
         final fun <get-added_at>(): kotlin/Long // id.walt.wallet2.persistence.db/Credentials.added_at.<get-added_at>|<get-added_at>(){}[0]
@@ -53,6 +53,8 @@ final class id.walt.wallet2.persistence.db/Credentials { // id.walt.wallet2.pers
         final fun <get-id>(): kotlin/String // id.walt.wallet2.persistence.db/Credentials.id.<get-id>|<get-id>(){}[0]
     final val label // id.walt.wallet2.persistence.db/Credentials.label|{}label[0]
         final fun <get-label>(): kotlin/String? // id.walt.wallet2.persistence.db/Credentials.label.<get-label>|<get-label>(){}[0]
+    final val metadata // id.walt.wallet2.persistence.db/Credentials.metadata|{}metadata[0]
+        final fun <get-metadata>(): kotlin/String? // id.walt.wallet2.persistence.db/Credentials.metadata.<get-metadata>|<get-metadata>(){}[0]
     final val serialized_credential // id.walt.wallet2.persistence.db/Credentials.serialized_credential|{}serialized_credential[0]
         final fun <get-serialized_credential>(): kotlin/String // id.walt.wallet2.persistence.db/Credentials.serialized_credential.<get-serialized_credential>|<get-serialized_credential>(){}[0]
 
@@ -61,7 +63,8 @@ final class id.walt.wallet2.persistence.db/Credentials { // id.walt.wallet2.pers
     final fun component3(): kotlin/String // id.walt.wallet2.persistence.db/Credentials.component3|component3(){}[0]
     final fun component4(): kotlin/String? // id.walt.wallet2.persistence.db/Credentials.component4|component4(){}[0]
     final fun component5(): kotlin/Long // id.walt.wallet2.persistence.db/Credentials.component5|component5(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/Long = ...): id.walt.wallet2.persistence.db/Credentials // id.walt.wallet2.persistence.db/Credentials.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.Long){}[0]
+    final fun component6(): kotlin/String? // id.walt.wallet2.persistence.db/Credentials.component6|component6(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/Long = ..., kotlin/String? = ...): id.walt.wallet2.persistence.db/Credentials // id.walt.wallet2.persistence.db/Credentials.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.Long;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.db/Credentials.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.db/Credentials.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.persistence.db/Credentials.toString|toString(){}[0]
@@ -112,16 +115,16 @@ final class id.walt.wallet2.persistence.db/WalletPersistenceQueries : app.cash.s
     constructor <init>(app.cash.sqldelight.db/SqlDriver) // id.walt.wallet2.persistence.db/WalletPersistenceQueries.<init>|<init>(app.cash.sqldelight.db.SqlDriver){}[0]
 
     final fun <#A1: kotlin/Any> selectAll(kotlin/Function5<kotlin/String, kotlin/String, kotlin/Long, kotlin/Long, kotlin/String?, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectAll|selectAll(kotlin.Function5<kotlin.String,kotlin.String,kotlin.Long,kotlin.Long,kotlin.String?,0:0>){0§<kotlin.Any>}[0]
-    final fun <#A1: kotlin/Any> selectAllCredentials(kotlin/Function5<kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectAllCredentials|selectAllCredentials(kotlin.Function5<kotlin.String,kotlin.String,kotlin.String,kotlin.String?,kotlin.Long,0:0>){0§<kotlin.Any>}[0]
+    final fun <#A1: kotlin/Any> selectAllCredentials(kotlin/Function6<kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, kotlin/String?, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectAllCredentials|selectAllCredentials(kotlin.Function6<kotlin.String,kotlin.String,kotlin.String,kotlin.String?,kotlin.Long,kotlin.String?,0:0>){0§<kotlin.Any>}[0]
     final fun <#A1: kotlin/Any> selectAllDids(kotlin/Function2<kotlin/String, kotlin/String, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectAllDids|selectAllDids(kotlin.Function2<kotlin.String,kotlin.String,0:0>){0§<kotlin.Any>}[0]
     final fun <#A1: kotlin/Any> selectByKeyId(kotlin/String, kotlin/Function5<kotlin/String, kotlin/String, kotlin/Long, kotlin/Long, kotlin/String?, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectByKeyId|selectByKeyId(kotlin.String;kotlin.Function5<kotlin.String,kotlin.String,kotlin.Long,kotlin.Long,kotlin.String?,0:0>){0§<kotlin.Any>}[0]
-    final fun <#A1: kotlin/Any> selectCredentialById(kotlin/String, kotlin/Function5<kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectCredentialById|selectCredentialById(kotlin.String;kotlin.Function5<kotlin.String,kotlin.String,kotlin.String,kotlin.String?,kotlin.Long,0:0>){0§<kotlin.Any>}[0]
+    final fun <#A1: kotlin/Any> selectCredentialById(kotlin/String, kotlin/Function6<kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, kotlin/String?, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectCredentialById|selectCredentialById(kotlin.String;kotlin.Function6<kotlin.String,kotlin.String,kotlin.String,kotlin.String?,kotlin.Long,kotlin.String?,0:0>){0§<kotlin.Any>}[0]
     final fun <#A1: kotlin/Any> selectDidByDid(kotlin/String, kotlin/Function2<kotlin/String, kotlin/String, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectDidByDid|selectDidByDid(kotlin.String;kotlin.Function2<kotlin.String,kotlin.String,0:0>){0§<kotlin.Any>}[0]
     final fun deleteByKeyId(kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.deleteByKeyId|deleteByKeyId(kotlin.String){}[0]
     final fun deleteCredentialById(kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.deleteCredentialById|deleteCredentialById(kotlin.String){}[0]
     final fun deleteDidByDid(kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.deleteDidByDid|deleteDidByDid(kotlin.String){}[0]
     final fun insert(kotlin/String, kotlin/String, kotlin/Long, kotlin/Long, kotlin/String?): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.insert|insert(kotlin.String;kotlin.String;kotlin.Long;kotlin.Long;kotlin.String?){}[0]
-    final fun insertCredential(kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.insertCredential|insertCredential(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.Long){}[0]
+    final fun insertCredential(kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, kotlin/String?): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.insertCredential|insertCredential(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.Long;kotlin.String?){}[0]
     final fun insertDid(kotlin/String, kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.insertDid|insertDid(kotlin.String;kotlin.String){}[0]
     final fun selectAll(): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Key_references> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectAll|selectAll(){}[0]
     final fun selectAllCredentials(): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Credentials> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectAllCredentials|selectAllCredentials(){}[0]
