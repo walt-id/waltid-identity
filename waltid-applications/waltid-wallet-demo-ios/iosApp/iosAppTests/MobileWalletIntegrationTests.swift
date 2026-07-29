@@ -80,6 +80,18 @@ final class MobileWalletIntegrationTests: XCTestCase {
         )
     }
 
+    private func makeEudiWallet(walletId: String? = nil) async throws -> Wallet {
+        try await Wallet(
+            configuration: WalletConfiguration(
+                walletID: walletId ?? testWalletId,
+                clientIDTrustConfiguration: WalletClientIDTrustConfiguration(
+                    x509TrustAnchorsPEM: [EudiTestBackend.verifierTrustAnchorPEM]
+                ),
+                transactionDataProfiles: Self.demoTransactionDataProfiles
+            )
+        )
+    }
+
     private func makeWallet(persistence: WalletPersistence) async throws -> Wallet {
         try await Wallet(
             configuration: WalletConfiguration(
@@ -232,7 +244,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
     }
 
     func testReceiveEudiPidSdJwtFromEudi() async throws {
-        let wallet = try await makeWallet()
+        let wallet = try await makeEudiWallet()
         _ = try await wallet.bootstrap()
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: Self.eudiPidSdJwtCredentialID)
@@ -359,7 +371,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
     func testEudiPidSdJwtPersistsAcrossControllerRecreation() async throws {
         let walletId = "ios-eudi-pid-sd-jwt-persistence-\(UUID().uuidString)"
         await clearTestData(walletId: walletId)
-        let wallet1 = try await makeWallet(walletId: walletId)
+        let wallet1 = try await makeEudiWallet(walletId: walletId)
         _ = try await wallet1.bootstrap()
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: Self.eudiPidSdJwtCredentialID)
@@ -368,7 +380,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
 
         // Recreate wallet facade (simulates app restart)
-        let wallet2 = try await makeWallet(walletId: walletId)
+        let wallet2 = try await makeEudiWallet(walletId: walletId)
 
         _ = try await wallet2.bootstrap()
         let credentials = try await wallet2.credentials()
@@ -419,7 +431,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
     private func receiveAndPresentEudiCredential(credentialID: String) async throws {
         let walletId = "ios-eudi-present-\(UUID().uuidString)"
         await clearTestData(walletId: walletId)
-        let wallet = try await makeWallet(walletId: walletId)
+        let wallet = try await makeEudiWallet(walletId: walletId)
         let bootstrapResult = try await wallet.bootstrap()
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: credentialID)
@@ -448,7 +460,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
     private func previewAndSubmitEudiCredential(credentialID: String) async throws {
         let walletId = "ios-eudi-preview-submit-\(UUID().uuidString)"
         await clearTestData(walletId: walletId)
-        let wallet = try await makeWallet(walletId: walletId)
+        let wallet = try await makeEudiWallet(walletId: walletId)
         let bootstrapResult = try await wallet.bootstrap()
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: credentialID)

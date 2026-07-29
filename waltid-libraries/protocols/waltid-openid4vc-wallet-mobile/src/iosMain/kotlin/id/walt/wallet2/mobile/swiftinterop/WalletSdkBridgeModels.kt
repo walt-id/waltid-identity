@@ -7,6 +7,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -25,6 +26,7 @@ import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
+import id.walt.x509.CertificateDer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
@@ -45,6 +47,7 @@ import kotlin.time.Instant
  * @property attestation Optional client-attestation configuration for issuers that require it.
  * @property preferredLocales Ordered BCP 47 locale preferences used to select display metadata.
  * @property transactionDataProfiles Transaction data profiles this wallet accepts.
+ * @property clientIdTrustConfiguration Trust anchors used to authenticate verifier Request Objects.
  */
 public data class WalletBridgeConfiguration(
     public val walletId: String = "default",
@@ -54,7 +57,22 @@ public data class WalletBridgeConfiguration(
     public val attestation: WalletAttestationConfig? = null,
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    public val clientIdTrustConfiguration: WalletBridgeClientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(),
 )
+
+/**
+ * Verifier Request Object trust configuration exposed to the Swift wallet bridge.
+ *
+ * @property x509TrustAnchorsPem PEM-encoded trust anchors pinned by the hosting application.
+ */
+public data class WalletBridgeClientIdTrustConfiguration(
+    public val x509TrustAnchorsPem: List<String> = emptyList(),
+)
+
+internal fun WalletBridgeClientIdTrustConfiguration.toClientIdTrustConfiguration(): ClientIdTrustConfiguration =
+    ClientIdTrustConfiguration(
+        x509TrustAnchors = x509TrustAnchorsPem.map(CertificateDer::fromPEMEncodedString),
+    )
 
 internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConfig(
     walletId = walletId,

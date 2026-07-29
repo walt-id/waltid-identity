@@ -11,6 +11,9 @@ public struct WalletConfiguration: Sendable {
     /// Optional enterprise attestation configuration.
     public var attestation: WalletAttestationConfiguration?
 
+    /// Trust anchors used to authenticate verifier Request Objects.
+    public var clientIDTrustConfiguration: WalletClientIDTrustConfiguration
+
     /// Wallet-local persistence configuration.
     public var persistence: WalletPersistence
 
@@ -29,6 +32,8 @@ public struct WalletConfiguration: Sendable {
     ///     when no operation-specific override is supplied.
     ///   - attestation: Optional wallet attestation configuration for issuers
     ///     that require client attestation.
+    ///   - clientIDTrustConfiguration: Trust anchors used to authenticate verifier
+    ///     Request Objects. The default trusts no X.509 verifier by configuration.
     ///   - persistence: Local persistence configuration for wallet-owned state.
     ///   - transactionDataProfiles: OpenID4VP transaction data profiles this
     ///     wallet accepts before previewing or submitting a presentation.
@@ -38,6 +43,7 @@ public struct WalletConfiguration: Sendable {
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
         attestation: WalletAttestationConfiguration? = nil,
+        clientIDTrustConfiguration: WalletClientIDTrustConfiguration = .init(),
         persistence: WalletPersistence = WalletPersistence(),
         transactionDataProfiles: [WalletTransactionDataProfile] = [],
         preferredLocales: [String] = Locale.preferredLanguages
@@ -45,9 +51,21 @@ public struct WalletConfiguration: Sendable {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
         self.attestation = attestation
+        self.clientIDTrustConfiguration = clientIDTrustConfiguration
         self.persistence = persistence
         self.transactionDataProfiles = transactionDataProfiles
         self.preferredLocales = preferredLocales
+    }
+}
+
+/// Trust configuration used to authenticate verifier Request Objects.
+public struct WalletClientIDTrustConfiguration: Sendable, Equatable {
+    /// PEM-encoded X.509 trust anchors pinned by the hosting application.
+    public var x509TrustAnchorsPEM: [String]
+
+    /// Creates client-ID trust configuration.
+    public init(x509TrustAnchorsPEM: [String] = []) {
+        self.x509TrustAnchorsPEM = x509TrustAnchorsPEM
     }
 }
 

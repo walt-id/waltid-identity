@@ -4,6 +4,7 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletKeyInfo
@@ -37,6 +38,7 @@ import id.walt.wallet2.mobile.MobileWalletTransactionCodeInputMode
 import id.walt.wallet2.mobile.MobileWalletTransactionCodeRequirement
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
+import id.walt.x509.CertificateDer
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.mobile.toKeyType
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -311,10 +313,13 @@ class WalletSdkBridgeTest {
     @Test
     fun factoryMapsSwiftFriendlyConfigurationToMobileWalletConfig() = runTest {
         var capturedConfig: MobileWalletConfig? = null
-        val factory = WalletSdkBridgeFactory.forOperationsFactory { config ->
+        var capturedTrustConfiguration: ClientIdTrustConfiguration? = null
+        val factory = WalletSdkBridgeFactory.forOperationsFactoryWithTrust { config, trustConfiguration ->
             capturedConfig = config
+            capturedTrustConfiguration = trustConfiguration
             FakeWalletSdkBridgeOperations()
         }
+        val trustAnchor = CertificateDer(byteArrayOf(1, 2, 3)).toPEMEncodedString()
 
         val result = factory.create(
             WalletBridgeConfiguration(
@@ -328,6 +333,9 @@ class WalletSdkBridgeTest {
                     attesterPath = "/wallet-attestation",
                     bearerToken = "token",
                     hostHeader = "attestation.example",
+                ),
+                clientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(
+                    x509TrustAnchorsPem = listOf(trustAnchor),
                 ),
                 preferredLocales = listOf("de-AT", "en"),
                 transactionDataProfiles = listOf(
@@ -351,6 +359,7 @@ class WalletSdkBridgeTest {
         assertEquals("/wallet-attestation", capturedConfig?.attestationConfig?.attesterPath)
         assertEquals("token", capturedConfig?.attestationConfig?.bearerToken)
         assertEquals("attestation.example", capturedConfig?.attestationConfig?.hostHeader)
+        assertEquals(listOf(CertificateDer(byteArrayOf(1, 2, 3))), capturedTrustConfiguration?.x509TrustAnchors)
         assertEquals(listOf("de-AT", "en"), capturedConfig?.preferredLocales)
         assertEquals(
             listOf(
