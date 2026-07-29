@@ -73,7 +73,14 @@ data class OpenId4VciModule(
                 repository = preAuthorizedCodeRepository,
                 anonymousAccessSupported = config.supportsPreAuthAnonymous(),
             )
-            val credentialNonceService = JwtCredentialNonceService(
+            val credentialNonceService = crypto2TokenKey?.let { signingKey ->
+                JwtCredentialNonceService.crypto2(
+                    signingKeyResolver = Crypto2JwtSigningKeyResolver { signingKey },
+                    verificationKeyResolver = Crypto2JwtVerificationKeyResolver {
+                        Crypto2JwtVerificationKey(signingKey.key, setOf(signingKey.algorithm))
+                    },
+                )
+            } ?: JwtCredentialNonceService(
                 signingKeyResolver = signingKeyResolver,
                 verificationKeyResolver = verificationKeyResolver,
             )
