@@ -18,6 +18,7 @@ import id.walt.crypto2.keys.SoftwareKey
 import id.walt.crypto2.providers.CryptoOperation
 import id.walt.crypto2.providers.CryptoRequirement
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -54,7 +55,7 @@ class SoftwareKeyAlgorithmMatrixTest {
 
     @Test
     fun `software key algorithm support matrix`() = runTest(timeout = 10.minutes) {
-        val rows = mutableListOf<Triple<String, String, Support>>()
+        val rows = mutableListOf<Row>()
         // One key per specification and usage set: probing every algorithm with a fresh key would make RSA key
         // generation dominate the runtime, which is slow enough in browsers to trip their test timeout.
         val keys = mutableMapOf<Pair<KeySpec, Set<KeyUsage>>, SoftwareKey>()
@@ -67,26 +68,31 @@ class SoftwareKeyAlgorithmMatrixTest {
             block: suspend (SoftwareKey) -> Unit,
         ) {
             if (providers.none { it.supports(generationRequirement(spec, usages)) }) {
-                rows += Triple(spec.label(), label, Support.NO_KEY)
+                rows += Row(spec.label(), label, Support.NO_KEY)
                 return
             }
             val key = try {
                 keys.getOrPut(spec to usages) { generate(spec, usages) }
+            } catch (cause: CancellationException) {
+                throw cause
             } catch (cause: Throwable) {
-                rows += Triple(spec.label(), label, Support.BROKEN)
+                rows += Row(spec.label(), label, Support.BROKEN, cause)
                 return
             }
             if (!advertises(key)) {
-                rows += Triple(spec.label(), label, Support.UNAVAILABLE)
+                rows += Row(spec.label(), label, Support.UNAVAILABLE)
                 return
             }
-            val result = try {
+            // Rethrowing CancellationException matters: catching it would swallow runTest's timeout and report it as
+            // a bogus BROKEN row. The cause is kept so a BROKEN row is actually diagnosable from CI output.
+            try {
                 block(key)
-                Support.OK
+                rows += Row(spec.label(), label, Support.OK)
+            } catch (cause: CancellationException) {
+                throw cause
             } catch (cause: Throwable) {
-                Support.BROKEN
+                rows += Row(spec.label(), label, Support.BROKEN, cause)
             }
-            rows += Triple(spec.label(), label, result)
         }
 
         signingSpecs.forEach { spec ->
@@ -144,25 +150,38 @@ class SoftwareKeyAlgorithmMatrixTest {
 
         println(rows.render())
 
-        val broken = rows.filter { it.third == Support.BROKEN }
-        assertTrue(broken.isEmpty(), "Advertised algorithms that do not work: $broken")
+        val broken = rows.filter { it.support == Support.BROKEN }
+        assertTrue(
+            broken.isEmpty(),
+            broken.joinToString(prefix = "Advertised algorithms that do not work:\n", separator = "\n") { row ->
+                "  ${row.key} ${row.algorithm}: ${row.cause?.message ?: "no cause captured"}"
+            },
+        )
     }
 
-    private fun List<Triple<String, String, Support>>.render(): String {
+    /** One matrix cell. Carries the failure cause so a BROKEN row is diagnosable from CI output alone. */
+    private data class Row(
+        val key: String,
+        val algorithm: String,
+        val support: Support,
+        val cause: Throwable? = null,
+    )
+
+    private fun List<Row>.render(): String {
         val rows = this
         return buildString {
             appendLine()
             appendLine("Software-key algorithm support")
             appendLine("  cryptography-kotlin default provider: ${CryptographyProvider.Default.name}")
             appendLine("  registered providers: " + providers.joinToString { it.id.value })
-            val keyWidth = maxOf(rows.maxOfOrNull { it.first.length } ?: 0, 3)
-            val algorithmWidth = maxOf(rows.maxOfOrNull { it.second.length } ?: 0, 9)
-            rows.groupBy { it.first }.forEach { (key, entries) ->
-                entries.forEach { (_, algorithm, support) ->
-                    appendLine("  ${key.padEnd(keyWidth)}  ${algorithm.padEnd(algorithmWidth)}  $support")
+            val keyWidth = maxOf(rows.maxOfOrNull { it.key.length } ?: 0, 3)
+            val algorithmWidth = maxOf(rows.maxOfOrNull { it.algorithm.length } ?: 0, 9)
+            rows.groupBy { it.key }.forEach { (key, entries) ->
+                entries.forEach { row ->
+                    appendLine("  ${key.padEnd(keyWidth)}  ${row.algorithm.padEnd(algorithmWidth)}  ${row.support}")
                 }
             }
-            val counts = rows.groupingBy { it.third }.eachCount()
+            val counts = rows.groupingBy { it.support }.eachCount()
             appendLine("  summary: " + Support.entries.joinToString { "$it=${counts[it] ?: 0}" })
         }
     }
@@ -228,18 +247,27 @@ class SoftwareKeyAlgorithmMatrixTest {
         val tamperedMessage = "algorithm matrix prob3".encodeToByteArray()
         val signUsages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
         val encryptUsages = setOf(KeyUsage.ENCRYPT, KeyUsage.DECRYPT)
+        /**
+         * Includes MD5 and RIPEMD-160 on purpose. They are in the portable profile, so if a platform advertises them
+         * for signing or OAEP the matrix has to say so - probing only the digests that are known to work is how an
+         * over-advertisement stays invisible.
+         */
         val digests: List<DigestAlgorithm> = listOf(
             DigestAlgorithm.SHA_1,
             DigestAlgorithm.SHA_256,
             DigestAlgorithm.SHA_384,
             DigestAlgorithm.SHA_512,
             DigestAlgorithm.SHA3_256,
+            DigestAlgorithm.RIPEMD_160,
+            DigestAlgorithm.MD5,
         )
         val oaepDigests: List<DigestAlgorithm> = listOf(
             DigestAlgorithm.SHA_1,
             DigestAlgorithm.SHA_256,
             DigestAlgorithm.SHA_384,
             DigestAlgorithm.SHA_512,
+            DigestAlgorithm.RIPEMD_160,
+            DigestAlgorithm.MD5,
         )
         /**
          * One representative RSA size on purpose. Generating RSA-3072/4096 here dominated the runtime and made the
