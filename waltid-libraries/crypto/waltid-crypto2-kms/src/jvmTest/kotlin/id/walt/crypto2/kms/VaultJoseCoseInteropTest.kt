@@ -45,7 +45,9 @@ class VaultJoseCoseInteropTest {
                         )
                         2, 4 -> {
                             assertTrue(request.url.encodedPath.endsWith("/sign/vault-protocol-key"))
-                            respondJson("""{"data":{"signature":"vault:v1:${Base64.Default.encode(signature)}"}}""")
+                            // JOSE and COSE need IEEE P1363, which the provider requests as marshaling_algorithm=jws;
+                            // Vault returns that payload in unpadded base64url, not the standard alphabet.
+                            respondJson("""{"data":{"signature":"vault:v1:${vaultJwsBase64.encode(signature)}"}}""")
                         }
                         3, 5 -> {
                             assertTrue(request.url.encodedPath.endsWith("/verify/vault-protocol-key"))
@@ -88,4 +90,8 @@ class VaultJoseCoseInteropTest {
         status = HttpStatusCode.OK,
         headers = headersOf(HttpHeaders.ContentType, "application/json"),
     )
+
+    private companion object {
+        val vaultJwsBase64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
+    }
 }
