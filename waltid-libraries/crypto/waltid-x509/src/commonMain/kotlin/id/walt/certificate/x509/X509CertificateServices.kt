@@ -6,6 +6,7 @@ class X509CertificateServices(
     val certificateParser: X509CertificateParser,
     val csrParser: Pkcs10CertificateSigningRequestParser,
     val csrSigner: Pkcs10CertificateSigningRequestSigner,
+    val signatureValidator: SignatureValidator,
     val serialNumberGenerator: X509CertificateSerialNumberGenerator,
     val certificateSigner: X509CertificateSigner,
     val certificateChainValidator: X509CertificateChainValidator
@@ -14,6 +15,7 @@ class X509CertificateServices(
         certificateParser: X509CertificateParser? = null,
         csrParser: Pkcs10CertificateSigningRequestParser? = null,
         csrSigner: Pkcs10CertificateSigningRequestSigner? = null,
+        signatureValidator: SignatureValidator? = null,
         serialNumberGenerator: X509CertificateSerialNumberGenerator? = null,
         certificateSigner: X509CertificateSigner? = null,
         certificateChainValidator: X509CertificateChainValidator? = null
@@ -22,6 +24,7 @@ class X509CertificateServices(
             certificateParser ?: this.certificateParser,
             csrParser ?: this.csrParser,
             csrSigner ?: this.csrSigner,
+            signatureValidator ?: this.signatureValidator,
             serialNumberGenerator ?: this.serialNumberGenerator,
             certificateSigner ?: this.certificateSigner,
             certificateChainValidator ?: this.certificateChainValidator

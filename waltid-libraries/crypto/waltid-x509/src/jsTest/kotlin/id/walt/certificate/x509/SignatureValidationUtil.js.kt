@@ -1,9 +1,15 @@
 package id.walt.certificate.x509
 
+import at.asitplus.signum.indispensable.asn1.Asn1BitString
+import at.asitplus.signum.indispensable.asn1.encodeToPEM
+import at.asitplus.signum.indispensable.pki.Pkcs10CertificationRequest
+import kotlin.test.assertTrue
 
 @JsModule("crypto")
 @JsNonModule
 external object NodeCrypto {
+    fun verify(algorithm: String?, data: ByteArray, key: String, signature: ByteArray): Boolean
+
     class X509Certificate(pem: String) {
         val subject: String
         val issuer: String
@@ -73,7 +79,24 @@ actual object SignatureValidationUtil {
     }
 
     actual fun verifyCsrPem(csrPem: String) {
-        TODO()
+        // Parse the CSR structure
+        val csr = Pkcs10CertificationRequest.decodeFromPem(csrPem).getOrThrow()
+        val hashingAlgorithm = when (csr.tbsCsr.publicKey.oid.toString()) {
+            "1.2.840.10045.2.1" -> "SHA256"
+            else -> error("Unsupported CSR public key algorithm: ${csr.tbsCsr.publicKey.oid}")
+        }
+        val signatureValue = Asn1BitString.decodeFromTlv(csr.rawSignature).rawBytes
+        val isValidSignature = NodeCrypto.verify(
+            hashingAlgorithm,
+            csr.rawTbsCsr.derEncoded,
+            csr.tbsCsr.publicKey.encodeToPEM().getOrThrow(),
+            signatureValue
+        )
+        assertTrue(
+            isValidSignature, "CSR signature is not valid: " +
+                    "\nSignature: ${signatureValue.toHexString()}" +
+                    "\n$csrPem"
+        )
     }
 
     private val marker = "-----END CERTIFICATE-----"

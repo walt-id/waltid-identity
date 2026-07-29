@@ -13,15 +13,17 @@ import id.walt.x509.id.walt.certificate.x509.bouncycastle.BouncyX509CertificateS
 import id.walt.x509.id.walt.certificate.x509.javasec.JavaDefaultTrustStore
 
 fun X509CertificateUtilBuilder.signumImplementation() {
+    val signatureValidator = SignumSignatureValidator()
     setServices(
         certificateParser = SignumCertificateParser(),
         csrParser = SignumCsrParser(),
         csrSigner = SignumCsrSigner(),
+        signatureValidator = signatureValidator,
         certificateSigner = SignumCertificateSigner(),
         certificateChainValidator = X509CertificateChainValidator(
             listOf(
                 X509CertificateValidityValidator(),
-                X509CertificateSignatureValidator(SignumSignatureValidator())
+                X509CertificateSignatureValidator(signatureValidator)
             ),
             InMemoryTrustStore()
         )
@@ -32,10 +34,10 @@ actual fun platformDefaultServices(): X509CertificateServices {
     val certificateParser = BouncyX509CertificateParser()
     val certificateSigner = BouncyX509CertificateSigner()
     return X509CertificateServices(
-
         csrParser = BouncyPkcs10CertificateSigningRequestParser(),
         csrSigner = BouncyPkcs10CertificateSigningRequestSigner(),
         certificateParser = certificateParser,
+        signatureValidator = certificateSigner,
         serialNumberGenerator = JavaX509CertificateSerialNumberGenerator(),
         certificateSigner = certificateSigner,
         certificateChainValidator = X509CertificateChainValidator(

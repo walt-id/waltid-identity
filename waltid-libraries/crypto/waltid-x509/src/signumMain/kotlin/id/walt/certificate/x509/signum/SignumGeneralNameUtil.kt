@@ -1,11 +1,9 @@
 package id.walt.certificate.x509.signum
 
-import at.asitplus.signum.indispensable.asn1.Asn1Element
-import at.asitplus.signum.indispensable.asn1.Asn1Sequence
-import at.asitplus.signum.indispensable.asn1.Asn1String
-import at.asitplus.signum.indispensable.asn1.Asn1Structure
+import at.asitplus.signum.indispensable.asn1.*
 import at.asitplus.signum.indispensable.asn1.encoding.Asn1
 import at.asitplus.signum.indispensable.pki.SubjectAltNameImplicitTags
+import id.walt.certificate.x509.IpAddressUtil
 import id.walt.certificate.x509.model.GeneralName
 
 object SignumGeneralNameUtil {
@@ -34,6 +32,11 @@ object SignumGeneralNameUtil {
                     it.asPrimitive().content.decodeToString()
                 )
 
+                SubjectAltNameImplicitTags.iPAddress -> GeneralName(
+                    GeneralName.NameType.IPAddress,
+                    IpAddressUtil.byteArrayToIpAddress(it.asPrimitive().content),
+                )
+
                 else -> GeneralName(
                     GeneralName.NameType.otherName,
                     "Alternative Name Type '${it.tag.tagValue}' ${it.tag.name?.let { "('${it}') " }}is not implemented"
@@ -41,7 +44,7 @@ object SignumGeneralNameUtil {
             }
         }
 
-    fun List<GeneralName>.toAsn1Sequence() = Asn1.Sequence {
+    fun Collection<GeneralName>.toAsn1Sequence() = Asn1.Sequence {
         this@toAsn1Sequence.map {
             it.toAsn1Element()
         }.forEach {
@@ -60,7 +63,13 @@ object SignumGeneralNameUtil {
             }
 
             GeneralName.NameType.uniformResourceIdentifier -> {
-                Asn1String.IA5(value).encodeToTlv().withImplicitTag(SubjectAltNameImplicitTags.uniformResourceIdentifier)
+                Asn1String.IA5(value).encodeToTlv()
+                    .withImplicitTag(SubjectAltNameImplicitTags.uniformResourceIdentifier)
+            }
+
+            GeneralName.NameType.IPAddress -> {
+                Asn1OctetString(IpAddressUtil.parseString(value))
+                    .withImplicitTag(SubjectAltNameImplicitTags.iPAddress)
             }
 
             else -> throw IllegalArgumentException("Unsupported GeneralName type ${type}")

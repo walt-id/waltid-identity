@@ -1,10 +1,12 @@
 package id.walt.certificate.x509.signum.extension
 
 import at.asitplus.signum.indispensable.asn1.*
+import at.asitplus.signum.indispensable.asn1.encoding.Asn1
 import at.asitplus.signum.indispensable.pki.X509CertificateExtension
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension.ReasonFlag
 import id.walt.certificate.x509.model.GeneralName
+import id.walt.certificate.x509.signum.SignumGeneralNameUtil.toAsn1Sequence
 import id.walt.certificate.x509.signum.SignumGeneralNameUtil.toGeneralNames
 import id.walt.certificate.x509.signum.dn.toDistinguishedName
 import at.asitplus.signum.indispensable.pki.RelativeDistinguishedName as SignumRdn
@@ -92,7 +94,30 @@ class SignumCrlDistributionPointsExtension(extension: X509CertificateExtension) 
             )
         }
 
-        fun decodeReasonFlags(value: BitSet): Set<ReasonFlag> {
+        fun createExtension(extension: CrlDistributionPointsExtension) = Asn1.OctetStringEncapsulating {
+            +Asn1.Sequence {
+                extension.distributionPoints.forEach { distributionPoint ->
+                    +Asn1.Sequence {
+                        if (distributionPoint.distributionPointFullName != null || distributionPoint.distributionPointNameRelativeToCrlIssuer != null) {
+                            +Asn1.ExplicitlyTagged(0uL) {
+                                if (distributionPoint.distributionPointFullName != null) {
+                                    require(distributionPoint.distributionPointNameRelativeToCrlIssuer == null) { "DistributionPointName can only be set once" }
+                                    +distributionPoint.distributionPointFullName.toAsn1Sequence().withImplicitTag(0uL)
+                                }
+                            }
+                        }
+                        if (distributionPoint.reason != null) {
+                            +Asn1.BitString(encodeReasonFlags(distributionPoint.reason)).withImplicitTag(1uL)
+                        }
+                        if (distributionPoint.cRLIssuer != null) {
+                            +distributionPoint.cRLIssuer.toAsn1Sequence().withImplicitTag(2uL)
+                        }
+                    }
+                }
+            }
+        }
+
+        private fun decodeReasonFlags(value: BitSet): Set<ReasonFlag> {
             val reasonFlags = mutableSetOf<ReasonFlag>()
             //if (value[0]) {
             // unused
@@ -123,11 +148,35 @@ class SignumCrlDistributionPointsExtension(extension: X509CertificateExtension) 
             }
             return reasonFlags
         }
-    }
 
-
-    fun createExtension(ext: CrlDistributionPointsExtension): Asn1PrimitiveOctetString {
-        // aHR0cDovL2MucGtpLmdvb2cvd2UyL3lLNW5QaHRIS1FzLmNybA==
-        TODO()
+        private fun encodeReasonFlags(flags: Set<ReasonFlag>): BitSet {
+            val bitSet = BitSet(9)
+            // 0 is not used
+            if (flags.contains(ReasonFlag.keyCompromise)) {
+                bitSet.set(1)
+            }
+            if (flags.contains(ReasonFlag.cACompromise)) {
+                bitSet.set(2)
+            }
+            if (flags.contains(ReasonFlag.affiliationChanged)) {
+                bitSet.set(3)
+            }
+            if (flags.contains(ReasonFlag.superseded)) {
+                bitSet.set(4)
+            }
+            if (flags.contains(ReasonFlag.cessationOfOperation)) {
+                bitSet.set(5)
+            }
+            if (flags.contains(ReasonFlag.certificateHold)) {
+                bitSet.set(6)
+            }
+            if (flags.contains(ReasonFlag.privilegeWithdrawn)) {
+                bitSet.set(7)
+            }
+            if (flags.contains(ReasonFlag.aACompromise)) {
+                bitSet.set(8)
+            }
+            return bitSet
+        }
     }
 }

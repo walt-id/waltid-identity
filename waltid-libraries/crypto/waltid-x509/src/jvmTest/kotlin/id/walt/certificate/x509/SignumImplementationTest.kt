@@ -5,8 +5,8 @@ import id.walt.certificate.TestData.caIssuerPrivateKey
 import id.walt.certificate.TestData.intermediateIssuerKeyPem
 import id.walt.certificate.TestData.intermediateIssuerPublicKeyIdHex
 import id.walt.certificate.TestData.intermediateIssuerPublicKeyValueHex
-import id.walt.certificate.TestKeys
 import id.walt.certificate.TestKeys.opensslHexFormat
+import id.walt.certificate.x509.BuildCertificateWithCrlExtensionTest.Companion.key
 import id.walt.certificate.x509.SignatureValidationUtil.verifyPemChain
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension
@@ -29,6 +29,173 @@ import kotlin.test.*
  * Java is easier to debug
  */
 class SignumImplementationTest {
+
+    //CRL distribution point crlIssuer is not implemented yet
+    @Ignore
+    @Test
+    fun shouldCreateCrlWithDistributionPointWithCrlIssuer(): Unit = runTest {
+        val cert = signumCertUtil.createSelfSignedCertificate(key) {
+            extensionCrlDistributionPoints {
+                addDistributionPointRelativeName(
+                    "ou = Walt.id ",
+                    setOf(CrlDistributionPointsExtension.ReasonFlag.keyCompromise),
+                    listOf(GeneralName(GeneralName.NameType.directoryName, "cn=Test"))
+                )
+            }
+        }
+        assertNotNull(cert.data.extensionCrlDistributionPoints) { distributionPoints ->
+            assertEquals(1, distributionPoints.distributionPoints.size)
+            val dp = distributionPoints.distributionPoints.first()
+            assertNull(dp.distributionPointFullName)
+            assertEquals("OU=Walt.id", dp.distributionPointNameRelativeToCrlIssuer)
+            assertNotNull(dp.reason) { reason ->
+                assertEquals(1, reason.size)
+                assertTrue(reason.contains(CrlDistributionPointsExtension.ReasonFlag.keyCompromise))
+            }
+        }
+    }
+
+
+    @Test
+    fun shouldCreateCrlWithMultipleUrls(): Unit = runTest {
+        val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
+            extensionCrlDistributionPoints {
+                addUriDistributionPoint(
+                    listOf(
+                        "https://walt.id/crl",
+                        "https://walt-id.com/crl"
+                    ),
+                    setOf(CrlDistributionPointsExtension.ReasonFlag.privilegeWithdrawn)
+                )
+            }
+        }
+
+        assertNotNull(cert.data.extensionCrlDistributionPoints) { distributionPoints ->
+            assertEquals(1, distributionPoints.distributionPoints.size)
+            val dp = distributionPoints.distributionPoints.first()
+            assertNull(dp.distributionPointNameRelativeToCrlIssuer)
+            assertNotNull(dp.reason) { reason ->
+                assertEquals(1, reason.size)
+                assertTrue(reason.contains(CrlDistributionPointsExtension.ReasonFlag.privilegeWithdrawn))
+            }
+            assertNull(dp.cRLIssuer)
+            assertNotNull(dp.distributionPointFullName?.toList()) { fullName ->
+                assertEquals(2, fullName.size)
+                assertEquals("https://walt.id/crl", fullName[0].value)
+                assertEquals(GeneralName.NameType.uniformResourceIdentifier, fullName[0].type)
+                assertEquals("https://walt-id.com/crl", fullName[1].value)
+                assertEquals(GeneralName.NameType.uniformResourceIdentifier, fullName[1].type)
+            }
+        }
+
+        X509CertificateUtil.parseCertificatePem(cert.encodedPem).also { parsedCert ->
+            assertNotNull(parsedCert.data.extensionCrlDistributionPoints) { distributionPoints ->
+                assertEquals(1, distributionPoints.distributionPoints.size)
+                val dp = distributionPoints.distributionPoints.first()
+                assertNull(dp.distributionPointNameRelativeToCrlIssuer)
+                assertNotNull(dp.reason) { reason ->
+                    assertEquals(1, reason.size)
+                    assertTrue(reason.contains(CrlDistributionPointsExtension.ReasonFlag.privilegeWithdrawn))
+                }
+                assertNull(dp.cRLIssuer)
+                assertNotNull(dp.distributionPointFullName?.toList()) { fullName ->
+                    assertEquals(2, fullName.size)
+                    assertEquals("https://walt.id/crl", fullName[0].value)
+                    assertEquals(GeneralName.NameType.uniformResourceIdentifier, fullName[0].type)
+                    assertEquals("https://walt-id.com/crl", fullName[1].value)
+                    assertEquals(GeneralName.NameType.uniformResourceIdentifier, fullName[1].type)
+                }
+            }
+        }
+    }
+
+
+    @Test
+    fun shouldSignCsr() = runTest {
+
+        val key = JWKKey.importPEM(intermediateIssuerKeyPem).getOrThrow()
+        val csr = signumCertUtil.createCsr(key) {
+            requestedCertificate.apply {
+                subjectDn = "OU=unit test, O=Walt.id"
+
+                extensionSan {
+                    addDnsName("www.walt.id")
+                    addIpAddress("127.0.0.1")
+                }
+            }
+        }
+        assertNotNull(csr).also { csr ->
+            assertNotNull(csr.requestedCertificate).also { data ->
+                assertEquals("OU=unit test,O=Walt.id", data.subjectDn)
+                assertNotNull(data.subjectPublicKeyInfo) { pk ->
+                    assertEquals("1.2.840.10045.2.1", pk.algorithmOid)
+                    assertEquals("id-ecPublicKey", pk.algorithmName)
+                    assertEquals(intermediateIssuerPublicKeyValueHex, pk.keyValueHex)
+                }
+                assertNotNull(data.extensionSan) { san ->
+                    assertEquals(2, san.alternativeNames.size)
+                    san.alternativeNames.get(0).also {
+                        assertEquals(GeneralName.NameType.dNSName, it.type)
+                        assertEquals("www.walt.id", it.value)
+                    }
+                    san.alternativeNames.get(1).also {
+                        assertEquals(GeneralName.NameType.IPAddress, it.type)
+                        assertEquals("127.0.0.1", it.value)
+                    }
+                }
+            }
+        }
+        SignatureValidationUtil.verifyCsrPem(csr.encodedPem)
+        X509CertificateUtil.parseCsrPem(csr.encodedPem).also { parsedCsr ->
+            assertNotNull(parsedCsr.requestedCertificate.extensionSan) { san ->
+                assertEquals(2, san.alternativeNames.size)
+                san.alternativeNames.get(0).also {
+                    assertEquals(GeneralName.NameType.dNSName, it.type)
+                    assertEquals("www.walt.id", it.value)
+                }
+                san.alternativeNames.get(1).also {
+                    assertEquals(GeneralName.NameType.IPAddress, it.type)
+                    assertEquals("127.0.0.1", it.value)
+                }
+            }
+        }
+    }
+
+
+    @Test
+    fun shouldParseCsrPem() {
+        signumCertUtil.parseCsrPem(TestData.csrPem).also { csr ->
+            assertEquals("C=AT,ST=Vienna,L=Vienna,O=Walt.id,CN=://walt.id", csr.requestedCertificate.subjectDn)
+            assertEquals("1.2.840.10045.2.1", csr.requestedCertificate.subjectPublicKeyInfo.algorithmOid)
+            assertEquals("id-ecPublicKey", csr.requestedCertificate.subjectPublicKeyInfo.algorithmName)
+            assertEquals(
+                "040f62d46bb95bb0aef9cac3e291191042839ed4670c1c0121e58eff26983511bdef383cf9e352cbd4f520abebd262072b514cad988979853fd69dc25b00e97793",
+                csr.requestedCertificate.subjectPublicKeyInfo.keyValueHex
+            )
+            assertEquals("1.2.840.10045.4.3.2", csr.signatureAlgorithmOid)
+            assertEquals("ecdsa-with-SHA256", csr.signatureAlgorithmName)
+            assertEquals(
+                "3046022100ed434954325834e6b6108f9bd28f5a038409866dee4b470e92f709d21c0c221a022100e7ac8154cd9d2928f98deb08c3b7821c2be2a1edbd92186cacb177f2476a42a8",
+                csr.signatureValueHex
+            )
+
+            val extensions = csr.requestedCertificate.extensions
+            assertEquals(1, extensions.size)
+
+            assertNotNull(csr.requestedCertificate.extensionSan) { san ->
+                assertEquals(3, san.alternativeNames.size)
+                assertEquals(GeneralName.NameType.dNSName, san.alternativeNames[0].type)
+                assertEquals("://waltid.com", san.alternativeNames[0].value)
+
+                assertEquals(GeneralName.NameType.dNSName, san.alternativeNames[1].type)
+                assertEquals("://waltid.cloud", san.alternativeNames[1].value)
+
+                assertEquals(GeneralName.NameType.IPAddress, san.alternativeNames[2].type)
+                assertEquals("192.168.1.100", san.alternativeNames[2].value)
+            }
+        }
+    }
+
 
     @Test
     fun shouldParseCrsWithCrlDistributionPoint() {
@@ -179,33 +346,6 @@ class SignumImplementationTest {
         assertEquals("CN=*.google.com", cert.data.subjectDn)
     }
 
-    @Test
-    fun shouldSignCsr() = runTest {
-        val key = JWKKey.importPEM(TestKeys.ecP256KeyPem).getOrThrow()
-        val csr = signumCertUtil.createCsr(key) {
-            requestedCertificate.apply {
-                subjectDn = "CN=Example Leaf,O=Example Org,C=US"
-                extensionSan {
-                    addDnsName("leaf.example.com")
-                }
-            }
-        }
-
-        val pem = csr.encodedPem
-        assertTrue(pem.contains("BEGIN CERTIFICATE REQUEST"))
-
-        val parsed = signumCertUtil.parseCsrPem(pem)
-
-        assertEquals("CN=Example Leaf,O=Example Org,C=US", parsed.requestedCertificate.subjectDn)
-        assertNotNull(parsed.requestedCertificate.extensionSan)
-        assertEquals(
-            listOf("leaf.example.com"), parsed.requestedCertificate.extensionSan
-                ?.alternativeNames
-                ?.filter { it.type == GeneralName.NameType.dNSName }
-                ?.map { it.value })
-
-        SignatureValidationUtil.verifyCsrPem(pem)
-    }
 
     companion object {
         val trustStore = InMemoryTrustStore(

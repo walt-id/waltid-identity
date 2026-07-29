@@ -24,7 +24,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+            api(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.io.core)
             implementation(identityLibs.kotlinx.io.bytestring)
@@ -42,8 +42,8 @@ kotlin {
             dependsOn(commonMain.get())
             dependencies {
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
-                implementation(identityLibs.bouncycastle.prov)
-                implementation(identityLibs.bouncycastle.pkix)
+                compileOnly(identityLibs.bouncycastle.prov)
+                compileOnly(identityLibs.bouncycastle.pkix)
             }
         }
 

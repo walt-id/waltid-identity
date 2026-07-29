@@ -1,6 +1,6 @@
 package id.walt.certificate.x509.javasec
 
-import id.walt.certificate.x509.PublicKeyInfo
+import id.walt.certificate.x509.Pkcs10CertificateSigningRequest
 import id.walt.certificate.x509.SignatureValidator
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509SigningAlgorithmInfo
@@ -41,8 +41,7 @@ class JavaSignatureValidator : SignatureValidator {
     }
 
     override suspend fun validateCsrSignature(
-        subjectPublicKey: PublicKeyInfo,
-        certificate: X509Certificate
+        csr: Pkcs10CertificateSigningRequest
     ): Boolean {
         TODO("Not yet implemented")
     }

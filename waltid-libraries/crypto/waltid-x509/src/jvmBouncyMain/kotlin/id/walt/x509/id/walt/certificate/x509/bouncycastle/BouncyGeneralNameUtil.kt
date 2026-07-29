@@ -32,7 +32,7 @@ object BouncyGeneralNameUtil {
                 val address = InetAddress.getByAddress(ipBytes)
                 GeneralName(
                     GeneralName.NameType.IPAddress,
-                    address.hostAddress
+                    address.hostAddress!!
                 )
             }
 

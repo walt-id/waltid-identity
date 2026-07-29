@@ -10,7 +10,6 @@ interface SignatureValidator {
     ): Boolean
 
     suspend fun validateCsrSignature(
-        subjectPublicKey: PublicKeyInfo,
-        certificate: X509Certificate
+        csr: Pkcs10CertificateSigningRequest
     ): Boolean
 }

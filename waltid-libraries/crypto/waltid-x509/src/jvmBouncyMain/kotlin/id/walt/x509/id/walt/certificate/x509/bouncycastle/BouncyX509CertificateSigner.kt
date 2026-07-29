@@ -2,7 +2,7 @@ package id.walt.x509.id.walt.certificate.x509.bouncycastle
 
 import id.walt.certificate.x509.BouncyPublicKeyInfoUtil
 import id.walt.certificate.x509.BouncyPublicKeyInfoUtil.bouncyCastleSubjectPublicKeyInfo
-import id.walt.certificate.x509.PublicKeyInfo
+import id.walt.certificate.x509.Pkcs10CertificateSigningRequest
 import id.walt.certificate.x509.SignatureValidator
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateSigner
@@ -21,6 +21,7 @@ import org.bouncycastle.cert.X509v3CertificateBuilder
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.ContentVerifierProvider
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder
+import org.bouncycastle.pkcs.PKCS10CertificationRequest
 import java.math.BigInteger
 import java.security.Security
 import java.util.*
@@ -117,9 +118,20 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
     }
 
     override suspend fun validateCsrSignature(
-        subjectPublicKey: PublicKeyInfo,
-        certificate: X509Certificate
+        csr: Pkcs10CertificateSigningRequest
     ): Boolean {
-        TODO("Not yet implemented")
+        val bouncyCsr = if (csr is BouncyPkcs10CertificateSigningRequest) {
+            csr.csr
+        } else {
+            PKCS10CertificationRequest(csr.encodedDer.toByteArray())
+        }
+
+        // Build the provider-backed verifier using the public key embedded inside the CSR
+        val verifierProvider: ContentVerifierProvider? = JcaContentVerifierProviderBuilder()
+            .setProvider("BC")
+            .build(bouncyCsr.getSubjectPublicKeyInfo())
+
+        // Cryptographically validate the signature
+        return bouncyCsr.isSignatureValid(verifierProvider)
     }
 }

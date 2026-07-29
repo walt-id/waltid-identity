@@ -4,11 +4,12 @@ import id.walt.certificate.TestData.intermediateIssuerKeyPem
 import id.walt.certificate.TestData.intermediateIssuerPublicKeyValueHex
 import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
 import id.walt.certificate.x509.model.GeneralName
-import id.walt.crypto.keys.JvmJWKKeyCreator
+import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 
 class Pkcs10CertificateUtilCsrSigningTest {
@@ -16,8 +17,7 @@ class Pkcs10CertificateUtilCsrSigningTest {
     @Test
     fun shouldSignCsr() = runTest {
 
-        val key = JvmJWKKeyCreator.importPEM(intermediateIssuerKeyPem).getOrThrow()
-
+        val key = JWKKey.importPEM(intermediateIssuerKeyPem).getOrThrow()
         val csr = X509CertificateUtil.createCsr(key) {
             requestedCertificate.apply {
                 subjectDn = "OU=unit test, O=Walt.id"
@@ -49,6 +49,7 @@ class Pkcs10CertificateUtilCsrSigningTest {
                 }
             }
         }
+        assertTrue(X509CertificateUtil.validateCsrSignature(csr))
         SignatureValidationUtil.verifyCsrPem(csr.encodedPem)
     }
 }

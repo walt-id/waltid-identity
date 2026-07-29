@@ -1,6 +1,7 @@
 package id.walt.certificate.x509.signum
 
-import id.walt.certificate.x509.PublicKeyInfo
+import at.asitplus.signum.indispensable.pki.Pkcs10CertificationRequest
+import id.walt.certificate.x509.Pkcs10CertificateSigningRequest
 import id.walt.certificate.x509.SignatureValidator
 import id.walt.certificate.x509.X509Certificate
 import id.walt.crypto.keys.jwk.JWKKey
@@ -30,9 +31,22 @@ class SignumSignatureValidator : SignatureValidator {
     }
 
     override suspend fun validateCsrSignature(
-        subjectPublicKey: PublicKeyInfo,
-        certificate: X509Certificate
+        csr: Pkcs10CertificateSigningRequest
     ): Boolean {
-        TODO("Not yet implemented")
+        val csrPem = csr.encodedPem
+        val signumCsr = Pkcs10CertificationRequest.decodeFromPem(csrPem).getOrThrow()
+
+        val publicKey = JWKKey.importPEM(csr.requestedCertificate.subjectPublicKeyInfo.encodedPem).getOrThrow()
+        val tbsData: ByteArray = signumCsr.tbsCsr.encodeToDer()
+        val signature = signumCsr.decodedSignature.getOrThrow()
+        // Bad API, hard to distinct between invalid signature and verification failure
+        val result = publicKey.verifyRaw(signature.encodeToDer(), tbsData)
+        return result.getOrElse {
+            if (it.message?.contains("verification") == true) {
+                null
+            } else {
+                throw it
+            }
+        } != null
     }
 }

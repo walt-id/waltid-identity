@@ -3,12 +3,15 @@ package id.walt.certificate.x509
 import id.walt.certificate.TestData
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension.Companion.extensionCrlDistributionPoints
+import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
+import id.walt.certificate.x509.model.GeneralName
+import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class Pkcs10CertificateSigningRequestParserTest {
 
     @Test
-    fun shouldParseCsrPem() {
+    fun shouldParseCsrPem() = runTest {
         X509CertificateUtil.parseCsrPem(TestData.csrPem).also { csr ->
             assertEquals("C=AT,ST=Vienna,L=Vienna,O=Walt.id,CN=://walt.id", csr.requestedCertificate.subjectDn)
             assertEquals("1.2.840.10045.2.1", csr.requestedCertificate.subjectPublicKeyInfo.algorithmOid)
@@ -26,11 +29,26 @@ class Pkcs10CertificateSigningRequestParserTest {
 
             val extensions = csr.requestedCertificate.extensions
             assertEquals(1, extensions.size)
+
+            assertNotNull(csr.requestedCertificate.extensionSan) { san ->
+                assertEquals(3, san.alternativeNames.size)
+                assertEquals(GeneralName.NameType.dNSName, san.alternativeNames[0].type)
+                assertEquals("://waltid.com", san.alternativeNames[0].value)
+
+                assertEquals(GeneralName.NameType.dNSName, san.alternativeNames[1].type)
+                assertEquals("://waltid.cloud", san.alternativeNames[1].value)
+
+                assertEquals(GeneralName.NameType.IPAddress, san.alternativeNames[2].type)
+                assertEquals("192.168.1.100", san.alternativeNames[2].value)
+            }
+            assertTrue(X509CertificateUtil.validateCsrSignature(csr))
+            SignatureValidationUtil.verifyCsrPem(csr.encodedPem)
         }
+
     }
 
     @Test
-    fun shouldParseCrsWithCrlDistributionPoint() {
+    fun shouldParseCrsWithCrlDistributionPoint() = runTest {
         X509CertificateUtil.parseCsrPem(TestData.csrWithCrlPem).also { csr ->
             assertEquals(
                 "C=AT,ST=Lower Austria,L=Ober-Grafendorf,O=My Organization,OU=IT Department,CN=yourdomain.com",
@@ -65,6 +83,8 @@ class Pkcs10CertificateSigningRequestParserTest {
                     assertFalse(flags.contains(CrlDistributionPointsExtension.ReasonFlag.aACompromise))
                 }
             }
+            assertTrue(X509CertificateUtil.validateCsrSignature(csr))
+            SignatureValidationUtil.verifyCsrPem(csr.encodedPem)
         }
     }
 }

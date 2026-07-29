@@ -19,6 +19,7 @@ private fun AttributeTypeAndValue.toSignumTypeAndValue(): SignumTypeAndValue {
 
     val value: SignumAsn1String = when (this.type.defaultEncoding) {
         AttributeType.Encoding.printableString -> SignumAsn1String.Printable(this.value)
+        AttributeType.Encoding.ia5String -> SignumAsn1String.IA5(this.value)
         AttributeType.Encoding.utf8String -> runCatching {
             SignumAsn1String.Printable(this.value)
         }.getOrElse { SignumAsn1String.UTF8(this.value) }

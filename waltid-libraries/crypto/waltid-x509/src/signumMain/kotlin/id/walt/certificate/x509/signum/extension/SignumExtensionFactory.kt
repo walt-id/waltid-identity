@@ -53,10 +53,10 @@ object SignumExtensionFactory {
             SignumIssuerAlternativeNameExtension.createExtension(extension as IssuerAlternativeNameExtension)
         )
 
-        //is CrlDistributionPointsExtension -> id.walt.x509.id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory.createExtension(
-        //    extension,
-        //   BouncyCrlDistributionPointsExtension.createExtension(extension)
-        // )
+        CrlDistributionPointsExtension.OID -> createExtension(
+            extension,
+            SignumCrlDistributionPointsExtension.createExtension(extension as CrlDistributionPointsExtension)
+        )
 
 
         else -> error("Unknown Signum Extension type OID: ${extension.oid}")

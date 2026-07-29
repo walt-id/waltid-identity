@@ -75,6 +75,9 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         return validateCertificateChain(certificates, additionalTrust)
     }
 
+    suspend fun validateCsrSignature(csr : Pkcs10CertificateSigningRequest): Boolean =
+        services.signatureValidator.validateCsrSignature(csr)
+
     suspend fun validateCertificateChain(
         certificateChain: Collection<X509Certificate>,
         additionalTrust: X509CertificateTrustStore? = null
@@ -106,6 +109,7 @@ class X509CertificateUtilBuilder internal constructor(val from: X509CertificateU
     //services
     private var certificateParser: X509CertificateParser = from.services.certificateParser
     private var csrParser: Pkcs10CertificateSigningRequestParser = from.services.csrParser
+    private var signatureValidator: SignatureValidator = from.services.signatureValidator
     private var csrSigner: Pkcs10CertificateSigningRequestSigner = from.services.csrSigner
     private var certificateSigner: X509CertificateSigner = from.services.certificateSigner
     private var certificateChainValidator: X509CertificateChainValidator = from.services.certificateChainValidator
@@ -116,6 +120,7 @@ class X509CertificateUtilBuilder internal constructor(val from: X509CertificateU
     fun setServices(
         csrParser: Pkcs10CertificateSigningRequestParser,
         csrSigner: Pkcs10CertificateSigningRequestSigner,
+        signatureValidator: SignatureValidator,
         certificateParser: X509CertificateParser,
         certificateSigner: X509CertificateSigner,
         certificateChainValidator: X509CertificateChainValidator
@@ -124,6 +129,7 @@ class X509CertificateUtilBuilder internal constructor(val from: X509CertificateU
         this.csrSigner = csrSigner
         this.certificateParser = certificateParser
         this.certificateSigner = certificateSigner
+        this.signatureValidator = signatureValidator
         this.certificateChainValidator = X509CertificateChainValidator(
             certificateChainValidator.validators,
             this.trustStore
