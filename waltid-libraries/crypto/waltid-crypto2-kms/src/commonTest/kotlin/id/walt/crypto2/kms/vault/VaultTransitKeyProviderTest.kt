@@ -102,7 +102,7 @@ class VaultTransitKeyProviderTest {
                 4 -> {
                     assertEquals("/v1/transit/verify/logical-key", request.url.encodedPath)
                     val body = request.bodyJson()
-                    assertEquals("vault:v3:${Base64.encode(signature)}", body.requiredString("signature"))
+                    assertEquals("vault:v3:${vaultJwsBase64.encode(signature)}", body.requiredString("signature"))
                     assertFalse(body.requiredBoolean("prehashed"))
                     respondJson("""{"data":{"valid":true}}""")
                 }
@@ -289,7 +289,7 @@ class VaultTransitKeyProviderTest {
             when (requestIndex++) {
                 0 -> respond("", HttpStatusCode.NoContent)
                 1 -> respondJson(keyResponse())
-                2 -> respondJson("""{"data":{"signature":"vault:v4:${Base64.encode(ByteArray(64))}"}}""")
+                2 -> respondJson("""{"data":{"signature":"vault:v4:${vaultJwsBase64.encode(ByteArray(64))}"}}""")
                 else -> error("Unexpected Vault request")
             }
         }
@@ -305,6 +305,101 @@ class VaultTransitKeyProviderTest {
         assertFailsWith<IllegalArgumentException> {
             assertNotNull(key.capabilities.signer).sign(byteArrayOf(1), algorithm)
         }
+    }
+
+    @Test
+    fun `jws marshaling uses base64url and asn1 uses the standard alphabet`() = runTest {
+        // Signature bytes chosen so that the base64 alphabets actually differ: 0xFB 0xEF encodes to "++8" under the
+        // standard alphabet and "--8" under base64url. Decoding a jws payload with the standard alphabet therefore
+        // throws on any real Vault response, which is why this needs a fixture that is not symmetric.
+        val distinguishing = ByteArray(64) { index -> if (index % 2 == 0) 0xFB.toByte() else 0xEF.toByte() }
+        assertTrue('-' in vaultJwsBase64.encode(distinguishing))
+        assertTrue('+' in Base64.encode(distinguishing))
+
+        mapOf(
+            EcdsaSignatureEncoding.IEEE_P1363 to ("jws" to vaultJwsBase64),
+            EcdsaSignatureEncoding.DER to ("asn1" to Base64.Default),
+        ).forEach { (encoding, expectation) ->
+            val (marshaling, codec) = expectation
+            val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, encoding)
+            var requestIndex = 0
+            val client = mockClient { request ->
+                when (requestIndex++) {
+                    0 -> respond("", HttpStatusCode.NoContent)
+                    1 -> respondJson(keyResponse())
+                    2 -> {
+                        assertEquals(marshaling, request.bodyJson().requiredString("marshaling_algorithm"))
+                        respondJson("""{"data":{"signature":"vault:v3:${codec.encode(distinguishing)}"}}""")
+                    }
+                    3 -> {
+                        // Round trip: the same codec must be used when handing a signature back for verification.
+                        assertEquals(
+                            "vault:v3:${codec.encode(distinguishing)}",
+                            request.bodyJson().requiredString("signature"),
+                        )
+                        respondJson("""{"data":{"valid":true}}""")
+                    }
+                    else -> error("Unexpected Vault request: ${request.url}")
+                }
+            }
+            val key = runtime(client).generateManagedKey(
+                VaultTransitKeyProvider.ID,
+                GenerateManagedKeyRequest(
+                    id = KeyId("logical-key"),
+                    spec = KeySpec.Ec(EcCurve.P256),
+                    usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                    providerOptions = options.encode(),
+                ),
+            )
+
+            assertContentEquals(
+                distinguishing,
+                assertNotNull(key.capabilities.signer).sign("message".encodeToByteArray(), algorithm),
+            )
+            assertTrue(
+                assertNotNull(key.capabilities.verifier)
+                    .verify("message".encodeToByteArray(), distinguishing, algorithm)
+            )
+        }
+    }
+
+    @Test
+    fun `RSA-PSS requests the salt length it advertises`() = runTest {
+        // The provider advertises RsaPss(saltLengthBytes = digest.outputSizeBytes) and rejects anything else, but
+        // Vault defaults to salt_length=auto (the maximum). Without asking for "hash" the signature is not
+        // PS256-conformant while the API contract claims it is.
+        var requestIndex = 0
+        val signature = ByteArray(256) { 7 }
+        val client = mockClient { request ->
+            when (requestIndex++) {
+                0 -> respond("", HttpStatusCode.NoContent)
+                1 -> respondJson(keyResponse(type = "rsa-2048"))
+                2 -> {
+                    val body = request.bodyJson()
+                    assertEquals("pss", body.requiredString("signature_algorithm"))
+                    assertEquals("hash", body.requiredString("salt_length"))
+                    respondJson("""{"data":{"signature":"vault:v3:${Base64.encode(signature)}"}}""")
+                }
+                else -> error("Unexpected Vault request: ${request.url}")
+            }
+        }
+        val key = runtime(client).generateManagedKey(
+            VaultTransitKeyProvider.ID,
+            GenerateManagedKeyRequest(
+                id = KeyId("logical-key"),
+                spec = KeySpec.Rsa(2048),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                providerOptions = options.encode(),
+            ),
+        )
+
+        assertContentEquals(
+            signature,
+            assertNotNull(key.capabilities.signer).sign(
+                "message".encodeToByteArray(),
+                SignatureAlgorithm.RsaPss(DigestAlgorithm.SHA_256, saltLengthBytes = 32),
+            ),
+        )
     }
 
     private fun runtime(
@@ -338,11 +433,17 @@ class VaultTransitKeyProviderTest {
         }
     """.trimIndent()
 
+    /**
+     * Real Vault emits the `jws` marshaling payload with Go's base64.RawURLEncoding (unpadded base64url) and the
+     * `asn1` payload with base64.StdEncoding. Encoding both with the standard alphabet made the mock agree with a
+     * bug in the provider instead of with Vault.
+     */
     private fun signatureResponse(signature: ByteArray): String =
-        """{"data":{"signature":"vault:v3:${Base64.encode(signature)}"}}"""
+        """{"data":{"signature":"vault:v3:${vaultJwsBase64.encode(signature)}"}}"""
 
     companion object {
         private val TEST_SPKI = byteArrayOf(0x30, 0x03, 0x02, 0x01, 0x01)
+        private val vaultJwsBase64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
     }
 }
 
