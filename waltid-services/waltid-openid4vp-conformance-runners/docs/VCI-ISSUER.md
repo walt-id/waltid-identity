@@ -9,13 +9,16 @@ This document covers setup, execution, and status of OpenID4VCI Issuer conforman
 | Base VCI issuer | `oid4vci-1_0-issuer-test-plan` | 288 generated combinations |
 | HAIP VCI issuer | `oid4vci-1_0-issuer-haip-test-plan` | 8 generated combinations |
 
+`IssuerVariantMatrix.all()` contains all 296 variants. Wrapper presets select either the base or HAIP
+profile; they do not mix both profiles unless a direct Gradle invocation is explicitly left unfiltered.
+
 ---
 
 ## Matrix Behavior
 
 The runner creates one conformance-suite plan for each selected matrix variant.
-The available axes and filters are documented in the main README. The resulting
-config includes:
+The complete matrix, presets, filters, and result states are documented in this
+guide. The resulting config includes:
 
 - `vci.credential_issuer_url`
 - `vci.credential_configuration_id`
@@ -86,13 +89,61 @@ Authorization-code automation uses the existing integration-test account:
 jane@walt.id / jane
 ```
 
-### 2. Configure Issuer Base URL
+### 2. Configure Issuer2
 
-Set the base URL in the issuer2 service configuration used for the conformance run:
+In `waltid-services/waltid-issuer-api2`, configure these local conformance
+defaults in the following two files.
+
+`config/web.conf`:
+
+```hocon
+webHost = "0.0.0.0"
+webPort = "7005"
+```
+
+`config/issuer-service.conf`:
 
 ```hocon
 baseUrl = "https://localhost.emobix.co.uk:9443"
+
+ciTokenKey = """{"type":"jwk","jwk":{"kty":"EC","d":"KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}}"""
+
+credentialEncryptionKey = """{"type":"jwk","jwk":{"kty":"EC","d":"ZSHgIcRvbwV9s224kHUaFqkEPShCAdwXocGl_w3M42Q","crv":"P-256","kid":"issuer2-credential-encryption-key","x":"GWKpdL3jPoPJ5wKgSA-jxS2jgp-ZUDE6sIQbeB86vF0","y":"F3xAwH96_xVciV7mFQslU_eRQgP-5pSZiNf8bjMoGfo"}}"""
+
+clientAuthenticationConfig {
+  supportedMethods = [
+    {
+      type = "preauth-anonymous"
+    },
+    {
+      type = "client-attestation"
+      config {
+        verificationMethod {
+          type = "x509-chain"
+          trustedRootCertificatesPem = [
+"""-----BEGIN CERTIFICATE-----
+MIICCTCCAa6gAwIBAgIUd2OgSqKSx5bt1dwVpxyOsdBrCwEwCgYIKoZIzj0EAwIw
+UDEvMC0GA1UEAwwmd2FsdC5pZCBPcGVuSUQ0VkNJIENvbmZvcm1hbmNlIFRlc3Qg
+Q0ExEDAOBgNVBAoMB3dhbHQuaWQxCzAJBgNVBAYTAlVUMB4XDTI2MDcxMzE2MTYz
+M1oXDTM2MDcxMDE2MTYzM1owUDEvMC0GA1UEAwwmd2FsdC5pZCBPcGVuSUQ0VkNJ
+IENvbmZvcm1hbmNlIFRlc3QgQ0ExEDAOBgNVBAoMB3dhbHQuaWQxCzAJBgNVBAYT
+AlVUMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcKWoEYWPMA8sMHQt4Whhdnyb
+eGY4uxNJ61K8qEkR7yjxpDPlTUwMLoFY4LwvDZbmrd1wuAQzC19vN3ZCKy0waqNm
+MGQwHwYDVR0jBBgwFoAUUGfw1hxU8WtLHa5RnP+dVRINVTYwEgYDVR0TAQH/BAgw
+BgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFFBn8NYcVPFrSx2uUZz/
+nVUSDVU2MAoGCCqGSM49BAMCA0kAMEYCIQC/45X54n1VyZuAN8vmin6cluuoNBD5
+VACJ445Tx9FAuQIhAN6yqTj1u30N51FsULyrdbwXRgBRo7CgE1CZC9ejeD1E
+-----END CERTIFICATE-----"""
+          ]
+        }
+      }
+    }
+  ]
+}
 ```
+
+These private keys and certificates are conformance fixtures and must not be
+used in production.
 
 ### 3. Configure HAIP Issuer Profiles
 
@@ -131,15 +182,85 @@ export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE=/path/to/status-
 Start issuer2 separately on the host. The wrapper starts the conformance-suite
 and Nginx Docker Compose stack itself; do not run `docker compose up` manually.
 
+In Terminal 1, from the `waltid-identity` repository root, start issuer2:
+
 ```bash
-# Terminal 1: start issuer2 on host port 7005
-# Terminal 2: run the wrapper from this conformance-runner directory
+./gradlew :waltid-services:waltid-issuer-api2:run
+```
+
+Leave issuer2 running. In Terminal 2, from
+`waltid-services/waltid-openid4vp-conformance-runners`, run the wrapper:
+
+```bash
 ./run-issuer-conformance-local.sh
 ```
 
-With no selection overrides, this runs the metadata and positive modules for 12 variants: SD-JWT VC and
-mdoc, the three valid authorization/grant-flow pairs, and plain and encrypted credential responses. To run
-all 288 generated variants and all returned modules instead:
+The wrapper creates the local TLS truststore, starts the conformance-suite and
+Nginx containers, then runs the issuer conformance test. It does not start
+issuer2 or Keycloak.
+
+It copies the committed `conformance-truststore.jks` to
+`build/conformance/conformance-truststore.jks` before importing the generated
+local certificate. The committed truststore remains unchanged. Do not include
+local runtime artifacts such as `build/` or `mongo/` in a handover commit.
+
+The wrapper verifies issuer metadata through Nginx itself. Once the wrapper has
+started the local stack, you can verify the externally visible issuer metadata:
+
+```bash
+curl -ksf "https://localhost.emobix.co.uk:9443/.well-known/openid-credential-issuer/openid4vci"
+```
+
+---
+
+## Run Locally
+
+The wrapper resolves the standalone `waltid-identity` Gradle root from its own
+location. The commands below intentionally use the runner directory so all
+relative paths, including HAIP certificate paths, are unambiguous.
+
+```bash
+# From the waltid-identity repository root. If using the unified build,
+# first run: cd waltid-identity
+cd waltid-services/waltid-openid4vp-conformance-runners
+
+# Default run: 12 variants, metadata and positive modules.
+./run-issuer-conformance-local.sh
+```
+
+Do not use `./gradlew build` as the local conformance command. It neither starts
+the conformance Docker stack nor issuer2, and the issuer conformance test is
+skipped when no issuer target is configured.
+
+### Default Selection
+
+With no selection variables set, the wrapper uses
+`vci-client-attestation-dpop-simple-unsigned` and runs the
+`metadata,positive` module groups. This produces 12 valid variants:
+
+- 2 credential formats: `sd_jwt_vc`, `mdoc`
+- 3 grant/flow pairs: `authorization_code` with both flow variants, and
+  `pre_authorization_code` with `issuer_initiated`
+- 2 credential-response modes: `plain`, `encrypted`
+- `client_attestation`, `dpop`, `simple`, and `unsigned` for the remaining axes
+
+The invalid `pre_authorization_code` + `wallet_initiated` pair is not generated.
+The wrapper also enables strict result checking, the static transaction code,
+browser automation, Jane's test credentials, and Playwright installation.
+
+On success, inspect the suite at `https://localhost.emobix.co.uk:8443` and the
+matrix reports under `build/reports/openid4vci-issuer-matrix`.
+
+### Change the Selection
+
+Run every module returned by the conformance plan for the default 12 variants:
+
+```bash
+OPENID4VCI_CONFORMANCE_MODULE_GROUPS=all \
+  ./run-issuer-conformance-local.sh
+```
+
+Run every generated base-plan variant and every returned module:
 
 ```bash
 OPENID4VCI_CONFORMANCE_PRESET=all-basic-plan \
@@ -147,30 +268,76 @@ OPENID4VCI_CONFORMANCE_MODULE_GROUPS=all \
   ./run-issuer-conformance-local.sh
 ```
 
-Verify metadata endpoint:
+Use `OPENID4VCI_CONFORMANCE_PRESET=custom` with the filter variables in
+[Useful Controls](#useful-controls) for a narrower selection.
+
+### Other Execution Modes
+
 ```bash
-curl -ks "https://localhost.emobix.co.uk:9443/.well-known/openid-credential-issuer/openid4vci" | jq .
+# A remote issuer can be selected explicitly.
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://issuer.example.com/openid4vci"
+./run-issuer-conformance-local.sh
+
+# Advanced diagnosis only. This does not prepare Docker, Nginx, or the truststore.
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://localhost.emobix.co.uk:9443/openid4vci"
+export OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE="$PWD/src/test/resources/keys/attester-key.json"
+export OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION=true
+export OPENID4VCI_CONFORMANCE_AUTH_USERNAME="jane@walt.id"
+export OPENID4VCI_CONFORMANCE_AUTH_PASSWORD="jane"
+../../gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers
+../../gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+  --tests "id.walt.openid4vp.conformance.IssuerConformanceTests.runIssuerConformanceTests"
 ```
 
 ---
 
-## Running Tests
-
-```bash
-cd waltid-identity/waltid-services/waltid-openid4vp-conformance-runners
-
-./run-issuer-conformance-local.sh
-```
-
-### Test Execution Flow
+### Execution Flow
 
 1. The test fetches issuer metadata from `/.well-known/openid-credential-issuer/openid4vci`.
-2. The runner generates and filters the base VCI issuer matrix.
-3. The runner creates `oid4vci-1_0-issuer-test-plan` for each selected variant.
+2. The runner generates and filters the base or HAIP VCI issuer matrix selected by the preset.
+3. The runner creates the corresponding issuer plan for each selected variant.
 4. Issuer-initiated modules receive a fresh issuer2 credential offer.
 5. The runner executes the suite modules and writes matrix reports.
 
 ---
+
+## Variant Matrix
+
+The base `oid4vci-1_0-issuer-test-plan` contributes 288 valid
+`fapi_profile=vci` variants. Its selectable axes are:
+
+| Dimension | Values |
+|-----------|--------|
+| FAPI profile | `vci` |
+| Credential format | `sd_jwt_vc`, `mdoc` |
+| Grant type | `authorization_code`, `pre_authorization_code` |
+| Auth code flow variant | `wallet_initiated`, `issuer_initiated` |
+| Client authentication | `client_attestation`, `private_key_jwt`, `mtls` |
+| Sender constraint | `dpop`, `mtls` |
+| Authorization request type | `simple`, `rar` |
+| Request method | `unsigned`, `signed_non_repudiation` |
+| Credential response encryption | `plain`, `encrypted` |
+
+The base plan permits `pre_authorization_code` only with
+`issuer_initiated`. `openid` and `fapi_response_mode` are not matrix axes because
+the suite marks them inapplicable to `fapi_profile=vci`. The suite spelling is
+`pre_authorization_code`.
+
+The HAIP `oid4vci-1_0-issuer-haip-test-plan` contributes 8 variants:
+
+- `fapi_profile=vci_haip`
+- `credential_format=sd_jwt_vc,mdoc`
+- `vci_grant_type=authorization_code`
+- `vci_authorization_code_flow_variant=issuer_initiated,wallet_initiated`
+- `client_auth_type=client_attestation`
+- `sender_constrain=dpop`
+- `authorization_request_type=simple`
+- `fapi_request_method=unsigned`
+- `vci_credential_encryption=plain,encrypted`
+
+`IssuerVariantMatrix.all()` contains all 296 variants. Wrapper presets select a
+single profile: base presets select `vci`; the HAIP preset selects `vci_haip`.
+An unfiltered direct Gradle invocation selects the complete 296-variant matrix.
 
 ## Environment Variables
 
@@ -207,6 +374,210 @@ The EUDI PID root certificate can only be used if the attester JWK also has a le
 
 ---
 
+## HAIP Certificate Material
+
+HAIP validates the `x5c` certificate chain in the issued credential. The
+credential trust anchor is separate from the client-attestation trust root.
+
+The committed test certificates are:
+
+- [HAIP credential root](../src/test/resources/certs/issuer2-haip-root-ca.pem), supplied to the conformance suite as a trust anchor
+- [HAIP credential leaf](../src/test/resources/certs/issuer2-haip-leaf.pem), placed in issuer2's `defaultHaipIssuerX5chain`
+
+Do not put the root certificate into issuer2's `x5Chain`. It must contain the
+leaf and any intermediates only. The leaf key must match `defaultHaipIssuerKey`.
+
+From the runner directory, verify the committed chain before a HAIP run:
+
+```bash
+openssl verify \
+  -CAfile src/test/resources/certs/issuer2-haip-root-ca.pem \
+  src/test/resources/certs/issuer2-haip-leaf.pem
+```
+
+The command must print `issuer2-haip-leaf.pem: OK`.
+
+If the original HAIP root is unavailable in a local test setup, generate a new
+test-only root and a leaf certificate for the existing `defaultHaipIssuerKey`
+JWK. This optional regeneration command requires Node.js in addition to the
+normal prerequisites:
+
+```bash
+CERT_DIR="$PWD/src/test/resources/certs" && \
+WORK_DIR="$PWD/build/conformance/issuer2-haip-ca" && \
+mkdir -p "$CERT_DIR" "$WORK_DIR" && \
+node -e 'const { createPublicKey } = require("crypto"); console.log(createPublicKey({ key: { kty: "EC", crv: "P-256", x: "4GbYM-GfrL8u9J4bPUMd21CiXH2t6PDWVcepxhPtopU", y: "a2Z7QWgvLz0nl4KOjstBcowX47VmhUQgaJi_8cMCqas" }, format: "jwk" }).export({ type: "spki", format: "pem" }));' > "$WORK_DIR/issuer2-haip-public-key.pem" && \
+openssl ecparam -name prime256v1 -genkey -noout -out "$WORK_DIR/issuer2-haip-root-ca.key" && \
+openssl req -x509 -new -sha256 -days 3650 \
+  -key "$WORK_DIR/issuer2-haip-root-ca.key" \
+  -out "$CERT_DIR/issuer2-haip-root-ca.pem" \
+  -subj '/C=UT/O=walt.id/CN=walt.id HAIP Conformance Root CA' \
+  -addext 'basicConstraints=critical,CA:true' \
+  -addext 'keyUsage=critical,keyCertSign,cRLSign' && \
+openssl x509 -new -sha256 -days 3650 \
+  -force_pubkey "$WORK_DIR/issuer2-haip-public-key.pem" \
+  -CA "$CERT_DIR/issuer2-haip-root-ca.pem" \
+  -CAkey "$WORK_DIR/issuer2-haip-root-ca.key" \
+  -CAcreateserial \
+  -out "$CERT_DIR/issuer2-haip-leaf.pem" \
+  -subj '/C=UT/O=walt.id/CN=issuer2-haip-conformance' \
+  -extfile <(printf '%s\n' \
+    'basicConstraints=critical,CA:false' \
+    'keyUsage=critical,digitalSignature' \
+    'extendedKeyUsage=clientAuth') && \
+openssl verify -CAfile "$CERT_DIR/issuer2-haip-root-ca.pem" "$CERT_DIR/issuer2-haip-leaf.pem"
+```
+
+Replace issuer2's leaf PEM with the regenerated leaf, and pass the regenerated
+root only to the conformance runner. The generated root private key remains
+under `build/conformance` and must not be committed.
+
+### Full HAIP Run Without Dedicated FAPI Modules
+
+Run this command from the runner directory to execute metadata, positive, and
+negative modules for all eight HAIP variants. It intentionally excludes the
+dedicated FAPI module group.
+
+```bash
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://localhost.emobix.co.uk:9443/openid4vci" && \
+export OPENID4VCI_CONFORMANCE_PRESET="vci-haip-client-attestation-dpop-simple-unsigned" && \
+export OPENID4VCI_CONFORMANCE_MATRIX="all" && \
+export OPENID4VCI_CONFORMANCE_MODULE_GROUPS="metadata,positive,negative" && \
+export OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID="identity_credential_haip" && \
+export OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID="org.iso.18013.5.1.mDL.haip" && \
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE="$PWD/src/test/resources/certs/issuer2-haip-root-ca.pem" && \
+export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE="$PWD/src/test/resources/certs/issuer2-haip-root-ca.pem" && \
+export OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION="true" && \
+export OPENID4VCI_CONFORMANCE_AUTH_USERNAME="jane@walt.id" && \
+export OPENID4VCI_CONFORMANCE_AUTH_PASSWORD="jane" && \
+export OPENID4VCI_CONFORMANCE_AUTH_TIMEOUT_SECONDS="90" && \
+export OPENID4VCI_CONFORMANCE_INSTALL_PLAYWRIGHT="false" && \
+unset OPENID4VCI_CONFORMANCE_VARIANT_ID \
+      OPENID4VCI_CONFORMANCE_VARIANTS \
+      OPENID4VCI_CONFORMANCE_MODULES && \
+./run-issuer-conformance-local.sh
+```
+
+Reuse the same root for `OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE`
+only when issuer2 signs its status-list JWT under that CA; otherwise supply the
+separate status-list root. Set `OPENID4VCI_CONFORMANCE_MODULE_GROUPS=all` to
+also run the dedicated FAPI module group.
+
+## Results and Selection Controls
+
+The runner writes artifacts to `build/reports/openid4vci-issuer-matrix`:
+
+```text
+matrix.json
+results.json
+summary.md
+```
+
+Result states have these meanings:
+
+- `generated`: variant was generated but not executed, usually discovery-only mode
+- `suite_invalid`: the suite rejected the variant before creating a plan
+- `not_applicable`: the suite created a plan with no modules
+- `blocked`: required local setup is missing, such as an offer, login automation, mTLS material, or a reachable endpoint
+- `failed`: suite modules ran but did not pass
+- `passed`: suite modules ran and passed
+
+### Useful Controls
+
+```bash
+# Wrapper presets
+export OPENID4VCI_CONFORMANCE_PRESET=vci-client-attestation-dpop-simple-unsigned-preauth
+export OPENID4VCI_CONFORMANCE_PRESET=all-basic-plan
+export OPENID4VCI_CONFORMANCE_PRESET=vci-client-attestation-dpop-simple-unsigned
+export OPENID4VCI_CONFORMANCE_PRESET=vci-haip-client-attestation-dpop-simple-unsigned
+export OPENID4VCI_CONFORMANCE_PRESET=custom
+
+# Generate and report the matrix without running suite modules
+export OPENID4VCI_CONFORMANCE_MATRIX=discovery
+
+# Run one generated variant
+export OPENID4VCI_CONFORMANCE_VARIANT_ID="vci-sdjwt-preauth-issuer-clientatt-dpop-simple-unsigned-plain"
+
+# Filter comma-separated dimension values when using the custom preset
+export OPENID4VCI_CONFORMANCE_FILTER_FAPI_PROFILES="vci"
+export OPENID4VCI_CONFORMANCE_FILTER_FORMATS="sd_jwt_vc"
+export OPENID4VCI_CONFORMANCE_FILTER_GRANT_TYPES="pre_authorization_code"
+export OPENID4VCI_CONFORMANCE_FILTER_FLOW_VARIANTS="issuer_initiated"
+export OPENID4VCI_CONFORMANCE_FILTER_CLIENT_AUTH_TYPES="client_attestation"
+export OPENID4VCI_CONFORMANCE_FILTER_SENDER_CONSTRAINTS="dpop"
+export OPENID4VCI_CONFORMANCE_FILTER_AUTH_REQUEST_TYPES="simple"
+export OPENID4VCI_CONFORMANCE_FILTER_REQUEST_METHODS="unsigned"
+export OPENID4VCI_CONFORMANCE_FILTER_CREDENTIAL_ENCRYPTION="plain"
+
+# Select module groups or exact suite modules
+export OPENID4VCI_CONFORMANCE_MODULE_GROUPS="metadata,positive"
+export OPENID4VCI_CONFORMANCE_MODULES="oid4vci-1_0-issuer-happy-flow,oid4vci-1_0-issuer-batch-issuance"
+
+# Static transaction code for pre-authorized happy-flow modules
+export OPENID4VCI_CONFORMANCE_STATIC_TX_CODE="493536"
+
+# Exploration mode and output controls
+export OPENID4VCI_CONFORMANCE_STRICT=false
+export OPENID4VCI_CONFORMANCE_REPORT_DIR="$PWD/build/issuer-conformance"
+export OPENID4VCI_CONFORMANCE_TIMEOUT_MINUTES=480
+```
+
+For progressive conformance work, run the full matrix in exploration mode,
+review `summary.md`, then select one blocked or failed variant family with the
+filter variables while adding issuer2 support.
+
+## Browser Automation and Credential Offers
+
+For `authorization_code` modules, the runner opens conformance-suite
+front-channel authorization URLs with Playwright and completes the existing
+Keycloak login. The browser must follow the redirect back to the conformance
+suite callback because the suite, not issuer2, is the OAuth client/wallet.
+
+The wrapper defaults for authorization-code runs are:
+
+```bash
+export OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION=true
+export OPENID4VCI_CONFORMANCE_AUTH_USERNAME="jane@walt.id"
+export OPENID4VCI_CONFORMANCE_AUTH_PASSWORD="jane"
+export OPENID4VCI_CONFORMANCE_AUTH_TIMEOUT_SECONDS=90
+export PLAYWRIGHT_BROWSER=chromium
+export PLAYWRIGHT_HEADLESS=true
+export PLAYWRIGHT_INSTALL_WITH_DEPS=false
+export OPENID4VCI_CONFORMANCE_INSTALL_PLAYWRIGHT=true
+```
+
+The wrapper installs Chromium without operating-system dependencies because
+Playwright's dependency installer invokes interactive `sudo`. Install any
+missing libraries in an interactive terminal. If Chromium is already installed,
+skip the installation step:
+
+```bash
+export OPENID4VCI_CONFORMANCE_INSTALL_PLAYWRIGHT=false
+```
+
+Issuer-initiated modules expose a `credential_offer_endpoint`. The runner creates
+a fresh issuer2 offer per module and forwards either its raw `credential_offer`
+JSON or the inner HTTPS `credential_offer_uri` from the OpenID Credential Offer
+deep link. This avoids reuse of a one-time pre-authorized code.
+
+For pre-authorized-code variants, the wrapper sets
+`OPENID4VCI_CONFORMANCE_STATIC_TX_CODE=493536` by default and passes it both to
+issuer2 while creating the offer and to the conformance suite. This avoids a
+manual `/tx_code` interaction.
+
+The wrapper excludes `oid4vci-1_0-issuer-happy-flow-multiple-clients` only for
+`pre_authorization_code` variants. The upstream module reuses client 1's consumed
+pre-authorized code for client 2; issuer2 correctly rejects it with
+`invalid_grant`. The same module remains enabled for `authorization_code`.
+
+For local issuer tests, Docker Nginx exposes
+`https://localhost.emobix.co.uk:9443` and proxies to issuer2 at
+`http://host.docker.internal:7005`. The conformance-suite container resolves the
+hostname through its Docker network alias; Gradle and Playwright use the
+published host port.
+
+---
+
 ## Troubleshooting
 
 ### "Invalid parameter: redirect_uri" in Keycloak
@@ -219,7 +590,7 @@ Verify issuer2 listens on `0.0.0.0:7005`, then inspect the Nginx logs. Nginx rea
 - Check issuer2's `baseUrl` is `https://localhost.emobix.co.uk:9443`
 - Run `getent hosts localhost.emobix.co.uk` and confirm the hostname resolves to a loopback address
 - After Docker Compose starts, run `curl -ksf https://localhost.emobix.co.uk:8443/api/server`
-- Run `docker compose -f waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/docker-compose-walt.yml logs --tail=100 nginx server`
+- From this runner directory, run `docker compose -f docker-compose-walt.yml logs --tail=100 nginx server`
 
 ### Metadata path structure
 ```
@@ -244,5 +615,5 @@ https://localhost.emobix.co.uk:8443/log-detail.html?log=<LOG_ID>
 Stop and remove the local conformance containers when their logs are no longer needed:
 
 ```bash
-docker compose -f waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/docker-compose-walt.yml down
+docker compose -f docker-compose-walt.yml down
 ```

@@ -1,5 +1,11 @@
 # OpenID4VC Conformance Test Plans & Profiles
 
+> **Issuer2 users:** This document is a test-plan inventory, not the local issuer2 setup guide. For
+> prerequisites, issuer2 configuration, Docker lifecycle, wrapper commands, and reports, follow
+> [docs/VCI-ISSUER.md](docs/VCI-ISSUER.md). In particular, use
+> `run-issuer-conformance-local.sh` for an issuer2 conformance run; a plain Gradle test command does not
+> prepare the local suite, proxy, truststore, or issuer2.
+
 ## Naming Convention
 
 Test plan classes follow this pattern:
@@ -345,6 +351,9 @@ All test plans validate HAIP (High Assurance Interoperability Profile) requireme
 
 ## Test Execution
 
+Except for the issuer2 wrapper command below, these Gradle commands are run
+from the `waltid-identity` repository root.
+
 ### Run All Tests
 ```bash
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test
@@ -355,9 +364,8 @@ All test plans validate HAIP (High Assurance Interoperability Profile) requireme
 # VCI Wallet (profile runner)
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VciWalletConformanceTests"
 
-# VCI Issuer (mostly passing)
-export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://YOUR-NGROK.ngrok-free.app/openid4vc"
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "IssuerConformanceTests"
+# VCI Issuer: from the conformance-runner module after completing docs/VCI-ISSUER.md setup
+./run-issuer-conformance-local.sh
 
 # VP Verifier (partial)
 export VERIFIER_NGROK_URL="https://YOUR-NGROK.ngrok-free.app"
