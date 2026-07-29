@@ -3,7 +3,7 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 plugins {
-    id("waltid.multiplatform.library")
+    id("waltid.full.library")
     id("waltid.publish.maven")
     id("waltid.publish.npm")
 }
@@ -57,8 +57,11 @@ kotlin {
             dependencies {
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(identityLibs.signum.indispensable)
-                implementation(identityLibs.kotlinx.io.bytestring)
             }
+        }
+
+        val jvmCommon by creating {
+            dependsOn(commonMain.get())
         }
 
         val jvmIosMain by creating {
@@ -71,16 +74,13 @@ kotlin {
         }
 
         jvmMain {
+            dependsOn(jvmCommon)
             dependsOn(jvmBouncyMain)
             dependsOn(signumMain)
             dependsOn(jvmIosMain)
             dependencies {
-                implementation(identityLibs.signum.indispensable)
-                implementation(identityLibs.signum.supreme)
                 implementation(identityLibs.nimbus.jose.jwt)
                 implementation(identityLibs.kotlinx.coroutines.core)
-                implementation(identityLibs.bouncycastle.prov) //needs to be here to make intellij happy (and not in bouncy source set)
-                implementation(identityLibs.bouncycastle.pkix) //needs to be here to make intellij happy (and not in bouncy source set)
             }
         }
 
@@ -111,9 +111,16 @@ kotlin {
         }
 
         jsTest {
-            dependencies {
-                // crs signature validation
-                implementation(npm("node-forge", "1.4.0"))
+        }
+
+        if (enableAndroidBuild) {
+            named("androidMain") {
+                dependsOn(jvmCommon)
+                dependsOn(jvmBouncyMain)
+                dependencies {
+                    implementation(identityLibs.kotlinx.coroutines.android)
+                    implementation(identityLibs.cryptography.provider.jdk)
+                }
             }
         }
 
