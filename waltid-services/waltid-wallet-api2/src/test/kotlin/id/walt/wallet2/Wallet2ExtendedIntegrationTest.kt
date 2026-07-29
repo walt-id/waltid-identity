@@ -577,6 +577,7 @@ class Wallet2ExtendedIntegrationTest {
                                 credentialConfigurationId = credentialConfigId,
                                 proofJwt = signResult.proofJwt,
                                 storeInWallet = true,
+                                credentialIssuerBaseUrl = issuerBase,
                             )
                         )
                     }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }

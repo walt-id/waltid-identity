@@ -620,6 +620,8 @@ object Wallet2RouteHandler {
                         summary = "Isolated: fetch a credential from the issuer's credential endpoint"
                         description = "When storeInWallet is true the fetched credential(s) are automatically " +
                                 "stored in the wallet, removing the need to call the import endpoint afterwards. " +
+                                "Pass credentialIssuerBaseUrl when storing so issuer display metadata and labels " +
+                                "are persisted like the full receive path. " +
                                 "If the issuer returns invalid_nonce, request a fresh nonce, sign a new proof, " +
                                 "and repeat this isolated fetch step."
                         request { pathParameter<String>("walletId"); body<FetchCredentialRequest>() }
@@ -678,7 +680,9 @@ object Wallet2RouteHandler {
                         summary = "Poll deferred credential endpoint"
                         description =
                             "Polls the issuer's deferred credential endpoint for a previously " +
-                                    "deferred credential. Returns immediately with empty list if still pending."
+                                    "deferred credential. Returns immediately with empty list if still pending. " +
+                                    "Pass credentialIssuerBaseUrl (and optionally credentialConfigurationId) so " +
+                                    "issuer display metadata and labels are stored like the full receive path."
                         request { pathParameter<String>("walletId"); body<PollDeferredRequest>() }
                         response { HttpStatusCode.OK to { body<ReceiveCredentialResult>() } }
                     }) {
