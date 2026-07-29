@@ -11,7 +11,7 @@ class IssuerVariantMatrixTest {
 
     @Test
     fun generatesOnlyBaseIssuerPlanVariants() {
-        val variants = IssuerVariantMatrix.all()
+        val variants = IssuerVariantMatrix.base()
 
         assertEquals(288, variants.size)
         assertTrue(variants.all { it.isDefinedByBaseIssuerPlan })
@@ -23,8 +23,17 @@ class IssuerVariantMatrixTest {
     }
 
     @Test
+    fun addsHaipVariantsToTheCombinedMatrix() {
+        val variants = IssuerVariantMatrix.all()
+
+        assertEquals(296, variants.size)
+        assertEquals(8, variants.count { it.isHaip })
+        assertTrue(variants.filter { it.isHaip }.all { it.fapiProfile == "vci_haip" })
+    }
+
+    @Test
     fun variantJsonContainsOnlyActiveBaseIssuerPlanAxes() {
-        val variant = IssuerVariantMatrix.all().first()
+        val variant = IssuerVariantMatrix.base().first()
         val keys = variant.toJsonObject().keys
 
         assertEquals(
