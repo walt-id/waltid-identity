@@ -83,6 +83,11 @@ class AzureKeyVaultKeyProvider(
         )
         val publicJwk = response.requiredObject("key").toPublicJwk(request.spec)
         val remoteId = response.requiredObject("key").requiredString("kid")
+        // The kid comes back from the server and every later operation derives its request URL from it while attaching
+        // a Key Vault bearer token, so an unchecked value would let a hostile or misconfigured response redirect that
+        // token to an arbitrary host - and the poisoned URL would be persisted in providerData. restore() and
+        // storedKeyForExisting() already check this; generate() must not be the gap.
+        requireVaultKeyId(remoteId, options.keyVaultUrl)
         val version = remoteId.substringAfterLast('/').takeIf(String::isNotBlank)
             ?: throw KmsProviderException("Azure key response contains an invalid key ID")
         val providerData = AzureStoredKeyData(
@@ -115,9 +120,7 @@ class AzureKeyVaultKeyProvider(
         EncodedKeyMaterial(stored.spec, publicKey as? EncodedKey.Jwk
             ?: throw IllegalArgumentException("Stored Azure public key must be a JWK"))
         val providerData = AzureStoredKeyData.decode(stored.providerData)
-        require(providerData.keyIdUrl.startsWith(providerData.options.keyVaultUrl.trimEnd('/') + "/keys/")) {
-            "Stored Azure key ID does not belong to the configured vault"
-        }
+        requireVaultKeyId(providerData.keyIdUrl, providerData.options.keyVaultUrl)
         require(providerData.keyIdUrl.substringAfterLast('/') == providerData.keyVersion) {
             "Stored Azure key version does not match its key ID"
         }
@@ -305,8 +308,7 @@ class AzureKeyVaultKeyProvider(
             }
             val normalizedPublicKey = publicKey.normalizeAzureCurve(spec)
             EncodedKeyMaterial(spec, normalizedPublicKey)
-            val vaultPrefix = options.keyVaultUrl.trimEnd('/') + "/keys/"
-            require(keyIdUrl.startsWith(vaultPrefix)) { "Azure key ID does not belong to the configured vault" }
+            requireVaultKeyId(keyIdUrl, options.keyVaultUrl)
             val keyVersion = keyIdUrl.substringAfterLast('/').takeIf(String::isNotBlank)
                 ?: throw IllegalArgumentException("Azure key ID does not contain a version")
             return StoredKey.Managed(
@@ -498,3 +500,14 @@ private fun JsonObject.requiredObject(name: String): JsonObject =
 private fun JsonObject.requiredString(name: String): String =
     this[name]?.jsonPrimitive?.content?.takeIf(String::isNotBlank)
         ?: throw KmsProviderException("Azure response is missing string: $name")
+
+/**
+ * Every Azure key ID must be inside the configured vault, because it becomes the request URL that a Key Vault bearer
+ * token is attached to. Single implementation shared by generate(), restore() and storedKeyForExisting(), so that no
+ * entry point can be left out.
+ */
+private fun requireVaultKeyId(keyIdUrl: String, keyVaultUrl: String) {
+    require(keyIdUrl.startsWith(keyVaultUrl.trimEnd('/') + "/keys/")) {
+        "Azure key ID does not belong to the configured vault"
+    }
+}
