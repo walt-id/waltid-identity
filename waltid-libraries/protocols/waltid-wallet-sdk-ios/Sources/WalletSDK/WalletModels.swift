@@ -64,6 +64,9 @@ public struct WalletClientIDTrustConfiguration: Sendable, Equatable {
     public var x509TrustAnchorsPEM: [String]
 
     /// Creates client-ID trust configuration.
+    ///
+    /// - Parameter x509TrustAnchorsPEM: PEM-encoded X.509 trust anchors pinned
+    ///   by the hosting application.
     public init(x509TrustAnchorsPEM: [String] = []) {
         self.x509TrustAnchorsPEM = x509TrustAnchorsPEM
     }
