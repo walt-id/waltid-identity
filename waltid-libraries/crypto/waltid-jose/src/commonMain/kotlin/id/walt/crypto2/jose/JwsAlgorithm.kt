@@ -43,6 +43,25 @@ enum class JwsAlgorithm(val identifier: String) {
     companion object {
         val fullySpecified: Set<JwsAlgorithm> = entries.filterTo(mutableSetOf()) { it != EDDSA }
 
+        /**
+         * Negotiation order, strongest first. Declaration order must not be used for this: it puts RS* before PS*, so
+         * a peer advertising both would silently negotiate PKCS#1 v1.5 instead of PSS. RSASSA-PSS is preferred over
+         * RSASSA-PKCS1-v1_5 (RFC 8017 recommends PSS for new applications), and the fully specified Edwards
+         * identifiers are preferred over the ambiguous EdDSA one.
+         */
+        internal val negotiationPreference: List<JwsAlgorithm> = listOf(
+            ES256, ES384, ES512, ES256K,
+            ED25519, ED448, EDDSA,
+            PS256, PS384, PS512,
+            RS256, RS384, RS512,
+        )
+
+        init {
+            require(negotiationPreference.toSet() == entries.toSet()) {
+                "JwsAlgorithm.negotiationPreference must cover every algorithm exactly once"
+            }
+        }
+
         fun parse(identifier: String): JwsAlgorithm = entries.firstOrNull { it.identifier == identifier }
             ?: throw IllegalArgumentException("Unsupported JWS algorithm: $identifier")
     }
@@ -77,7 +96,7 @@ fun Key.selectJwsAlgorithm(acceptedAlgorithms: Set<String>?): JwsAlgorithm {
     if ((this as? StorableKey)?.storedKey?.metadata?.containsKey(JWK_ALGORITHM_METADATA_KEY) == true) {
         throw IllegalArgumentException("JWK algorithm ${preferred.identifier} is not accepted")
     }
-    return JwsAlgorithm.entries.firstOrNull { candidate ->
+    return JwsAlgorithm.negotiationPreference.firstOrNull { candidate ->
         candidate.identifier in acceptedAlgorithms &&
             spec.supportsJwsAlgorithm(candidate) &&
             capabilities.supportsSignatureAlgorithm(candidate.toSignatureAlgorithm())

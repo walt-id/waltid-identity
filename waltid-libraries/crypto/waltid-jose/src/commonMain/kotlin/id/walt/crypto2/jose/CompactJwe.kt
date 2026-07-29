@@ -8,19 +8,13 @@ import dev.whyoleg.cryptography.algorithms.AES
 import dev.whyoleg.cryptography.algorithms.EC
 import dev.whyoleg.cryptography.algorithms.ECDH
 import dev.whyoleg.cryptography.algorithms.SHA256
-import id.walt.crypto2.algorithms.KeyAgreementAlgorithm
 import id.walt.crypto2.algorithms.AeadAlgorithm
-import id.walt.crypto2.keys.AeadCiphertext
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.Key
-import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.algorithms.KeyAgreementAlgorithm
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.serialization.BinaryData
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
 
 enum class JweContentEncryption(val identifier: String, val keySizeBytes: Int) {
@@ -61,11 +55,6 @@ object CompactJwe {
         val curve = recipientSpec.toCryptographyCurve()
         val recipientKey = validateEcPoint(recipientPublicKey, recipientSpec, provider)
         validateAgreementMetadata(recipientPublicKey)
-        require(
-            agreementPartyUInfo.isEmpty() ||
-                agreementPartyVInfo.isEmpty() ||
-                !agreementPartyUInfo.contentEquals(agreementPartyVInfo),
-        ) { "JWE apu and apv values must be distinct" }
         require(protectedHeader.keys.none { it in reservedHeaderNames }) { "JWE protected header overrides reserved members" }
         val ephemeral = provider.get(ECDH).keyPairGenerator(curve).generateKey()
         val exportedEphemeral = Jwk.parse(
@@ -150,7 +139,8 @@ object CompactJwe {
             BinaryData(json.encodeToString(ephemeralJwk).encodeToByteArray()),
             privateMaterial = false,
         )
-        validateAgreementMetadata(encodedEphemeral)
+        validateEphemeralMetadata(encodedEphemeral)
+        validateRecipientMetadata(recipientKey)
         val ephemeralSpec = ecSpec(encodedEphemeral)
         require(ephemeralSpec == recipientKey.spec) { "JWE ephemeral and recipient curves do not match" }
         validateEcPoint(encodedEphemeral, ephemeralSpec, provider)
@@ -160,9 +150,6 @@ object CompactJwe {
         val agreement = requireNotNull(recipientKey.capabilities.keyAgreement) { "JWE recipient key cannot perform agreement" }
         val partyUInfo = optionalBase64Header(header, "apu")
         val partyVInfo = optionalBase64Header(header, "apv")
-        require("apu" !in header || "apv" !in header || !partyUInfo.contentEquals(partyVInfo)) {
-            "JWE apu and apv values must be distinct"
-        }
         val sharedSecret = agreement.generateSharedSecret(encodedEphemeral, KeyAgreementAlgorithm.Ecdh).toByteArray()
         val contentEncryptionKey = concatKdf(
             sharedSecret,
@@ -221,6 +208,10 @@ object CompactJwe {
         return spec
     }
 
+    /**
+     * Enforces the RFC 7517 use/key_ops/alg policy of a recipient JWK on the encryption path, where the caller hands
+     * over the full JWK and every member is still available.
+     */
     private fun validateAgreementMetadata(jwk: EncodedKey.Jwk) {
         val metadata = Jwk.metadata(jwk)
         require(metadata.use == null || metadata.use == JwkUse.ENCRYPTION) {
@@ -233,6 +224,37 @@ object CompactJwe {
         ) { "JWE agreement key does not permit derivation" }
         require(metadata.algorithm == null || metadata.algorithm == KEY_MANAGEMENT_ALGORITHM) {
             "JWE agreement key algorithm must be ECDH-ES"
+        }
+    }
+
+    /**
+     * Enforces the recipient key policy on the decryption path. A [Key] is not a JWK: `use` and `key_ops` are checked
+     * against the key usages once at import time (see JwkStoredKey.validateMetadata) and are not retained afterwards,
+     * so `jwk.alg` is the declaration that is still checkable here. The usage gate itself is covered by
+     * [Key.capabilities] - `keyAgreement` is only non-null when KEY_AGREEMENT was permitted.
+     *
+     * Previously this call passed the attacker-supplied `epk` instead of the recipient, which made the whole check
+     * vacuous because an ephemeral key carries no use/key_ops/alg members.
+     */
+    private fun validateRecipientMetadata(key: Key) {
+        (key as? StorableKey)?.storedKey?.metadata?.get(JWK_ALGORITHM_METADATA_KEY)?.let { declared ->
+            require(declared == KEY_MANAGEMENT_ALGORITHM) {
+                "JWE recipient key algorithm $declared does not permit $KEY_MANAGEMENT_ALGORITHM"
+            }
+        }
+    }
+
+    /**
+     * An `epk` is a bare public value; RFC 7518 section 4.6.1.1 defines no use/key_ops for it. Reject only the
+     * declarations that contradict its single purpose, so that a conformant `epk` is never refused.
+     */
+    private fun validateEphemeralMetadata(jwk: EncodedKey.Jwk) {
+        val metadata = Jwk.metadata(jwk)
+        require(metadata.use == null || metadata.use == JwkUse.ENCRYPTION) {
+            "JWE ephemeral key use must be enc"
+        }
+        require(metadata.algorithm == null || metadata.algorithm == KEY_MANAGEMENT_ALGORITHM) {
+            "JWE ephemeral key algorithm must be ECDH-ES"
         }
     }
 
@@ -260,8 +282,8 @@ object CompactJwe {
         EcCurve.P256 -> EC.Curve.P256
         EcCurve.P384 -> EC.Curve.P384
         EcCurve.P521 -> EC.Curve.P521
-        EcCurve.SECP256K1 -> throw IllegalArgumentException("secp256k1 is not supported for JWE")
-        else -> EC.Curve(curve.name)
+        // ecSpec() only ever yields the three NIST curves above, so anything else means a caller bypassed it.
+        else -> throw IllegalArgumentException("Unsupported JWE elliptic curve: ${curve.name}")
     }
 
     private fun stringHeader(header: JsonObject, name: String): String {

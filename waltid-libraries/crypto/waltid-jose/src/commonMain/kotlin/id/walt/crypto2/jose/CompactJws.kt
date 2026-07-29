@@ -148,6 +148,10 @@ object CompactJws {
             ?: throw IllegalArgumentException("JWS alg header is missing or invalid")
         require(algorithmHeader.isString) { "JWS alg header must be a string" }
         val algorithm = JwsAlgorithm.parse(algorithmHeader.content)
+        // kotlin.io.encoding.Base64 rejects non-zero pad bits ("The pad bits must be zeros"), so a signature has
+        // exactly one base64url spelling and the compact token is not malleable. No extra canonicality check is
+        // needed here; CompactJwsTest pins this so a laxer decoder would fail the build rather than reintroduce
+        // malleable tokens (which would break every replay defence keyed on the serialized JWS).
         val signature = base64Url.decode(parts[2])
         validateSignatureLength(algorithm, signature)
         return ParsedJws(
