@@ -3,6 +3,7 @@ package id.walt.x509.id.walt.certificate.x509.bouncycastle
 import id.walt.certificate.x509.model.GeneralName
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.ASN1OctetString
+import org.bouncycastle.asn1.x500.X500Name
 import java.net.InetAddress
 import org.bouncycastle.asn1.x509.GeneralName as BouncyCastleGeneralName
 import org.bouncycastle.asn1.x509.GeneralNames as BouncyCastleGeneralNames
@@ -40,6 +41,13 @@ object BouncyGeneralNameUtil {
                 GeneralName(
                     GeneralName.NameType.registeredID,
                     (name as ASN1ObjectIdentifier).id
+                )
+            }
+
+            BouncyCastleGeneralName.directoryName -> {
+                GeneralName(
+                    GeneralName.NameType.directoryName,
+                    (name as X500Name).toString()
                 )
             }
 

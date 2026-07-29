@@ -3,12 +3,14 @@ package id.walt.certificate.x509.signum.extension
 import at.asitplus.signum.indispensable.asn1.*
 import at.asitplus.signum.indispensable.asn1.encoding.Asn1
 import at.asitplus.signum.indispensable.pki.X509CertificateExtension
+import id.walt.certificate.x509.dn.DistinguishedName
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension.ReasonFlag
 import id.walt.certificate.x509.model.GeneralName
 import id.walt.certificate.x509.signum.SignumGeneralNameUtil.toAsn1Sequence
 import id.walt.certificate.x509.signum.SignumGeneralNameUtil.toGeneralNames
 import id.walt.certificate.x509.signum.dn.toDistinguishedName
+import id.walt.certificate.x509.signum.dn.toSignumDn
 import at.asitplus.signum.indispensable.pki.RelativeDistinguishedName as SignumRdn
 
 
@@ -82,7 +84,7 @@ class SignumCrlDistributionPointsExtension(extension: X509CertificateExtension) 
 
                     2uL -> {
                         // cRLIssuer [2] GeneralNames OPTIONAL
-                        TODO()
+                        cRLIssuer = dpSequenceElement.asStructure().toGeneralNames()
                     }
                 }
             }
@@ -103,6 +105,14 @@ class SignumCrlDistributionPointsExtension(extension: X509CertificateExtension) 
                                 if (distributionPoint.distributionPointFullName != null) {
                                     require(distributionPoint.distributionPointNameRelativeToCrlIssuer == null) { "DistributionPointName can only be set once" }
                                     +distributionPoint.distributionPointFullName.toAsn1Sequence().withImplicitTag(0uL)
+                                }
+                                if (distributionPoint.distributionPointNameRelativeToCrlIssuer != null) {
+                                    require(distributionPoint.distributionPointFullName == null) { "DistributionPointName can only be set once" }
+                                    val dn =
+                                        DistinguishedName.ofString(distributionPoint.distributionPointNameRelativeToCrlIssuer)
+                                            .toSignumDn()
+                                    require(dn.size == 1) { "Illegal Distribution Point Name Relative To Crl Issuer - expected one RDN but found ${dn.size}" }
+                                    +dn.first().withImplicitTag(1uL)
                                 }
                             }
                         }

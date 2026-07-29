@@ -26,14 +26,13 @@ import kotlin.test.*
 
 /**
  * This test is to debug the Signum implementation.
- * Java is easier to debug
+ * Also check if Signum implementation is compatible with BouncyCastle.
  */
 class SignumImplementationTest {
 
-    //CRL distribution point crlIssuer is not implemented yet
-    @Ignore
     @Test
     fun shouldCreateCrlWithDistributionPointWithCrlIssuer(): Unit = runTest {
+
         val cert = signumCertUtil.createSelfSignedCertificate(key) {
             extensionCrlDistributionPoints {
                 addDistributionPointRelativeName(
@@ -51,6 +50,41 @@ class SignumImplementationTest {
             assertNotNull(dp.reason) { reason ->
                 assertEquals(1, reason.size)
                 assertTrue(reason.contains(CrlDistributionPointsExtension.ReasonFlag.keyCompromise))
+                assertEquals(1, dp.cRLIssuer?.size)
+                assertEquals(GeneralName.NameType.directoryName, dp.cRLIssuer?.first()?.type)
+                assertEquals("CN=Test", dp.cRLIssuer?.first()?.value)
+            }
+        }
+
+        signumCertUtil.parseCertificatePem(cert.encodedPem).also { signumCert ->
+            assertNotNull(signumCert.data.extensionCrlDistributionPoints) { distributionPoints ->
+                assertEquals(1, distributionPoints.distributionPoints.size)
+                val dp = distributionPoints.distributionPoints.first()
+                assertNull(dp.distributionPointFullName)
+                assertEquals("OU=Walt.id", dp.distributionPointNameRelativeToCrlIssuer)
+                assertNotNull(dp.reason) { reason ->
+                    assertEquals(1, reason.size)
+                    assertTrue(reason.contains(CrlDistributionPointsExtension.ReasonFlag.keyCompromise))
+                    assertEquals(1, dp.cRLIssuer?.size)
+                    assertEquals(GeneralName.NameType.directoryName, dp.cRLIssuer?.first()?.type)
+                    assertEquals("CN=Test", dp.cRLIssuer?.first()?.value)
+                }
+            }
+        }
+
+        X509CertificateUtil.parseCertificatePem(cert.encodedPem).also { bouncyCert ->
+            assertNotNull(bouncyCert.data.extensionCrlDistributionPoints) { distributionPoints ->
+                assertEquals(1, distributionPoints.distributionPoints.size)
+                val dp = distributionPoints.distributionPoints.first()
+                assertNull(dp.distributionPointFullName)
+                assertEquals("OU=Walt.id", dp.distributionPointNameRelativeToCrlIssuer)
+                assertNotNull(dp.reason) { reason ->
+                    assertEquals(1, reason.size)
+                    assertTrue(reason.contains(CrlDistributionPointsExtension.ReasonFlag.keyCompromise))
+                    assertEquals(1, dp.cRLIssuer?.size)
+                    assertEquals(GeneralName.NameType.directoryName, dp.cRLIssuer?.first()?.type)
+                    assertEquals("CN=Test", dp.cRLIssuer?.first()?.value)
+                }
             }
         }
     }

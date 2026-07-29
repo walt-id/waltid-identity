@@ -4,7 +4,11 @@ import at.asitplus.signum.indispensable.asn1.*
 import at.asitplus.signum.indispensable.asn1.encoding.Asn1
 import at.asitplus.signum.indispensable.pki.SubjectAltNameImplicitTags
 import id.walt.certificate.x509.IpAddressUtil
+import id.walt.certificate.x509.dn.DistinguishedName
 import id.walt.certificate.x509.model.GeneralName
+import id.walt.certificate.x509.signum.dn.toDistinguishedName
+import id.walt.certificate.x509.signum.dn.toSignumDn
+import at.asitplus.signum.indispensable.pki.RelativeDistinguishedName as SignumRdn
 
 object SignumGeneralNameUtil {
 
@@ -16,26 +20,39 @@ object SignumGeneralNameUtil {
 
     fun List<Asn1Element>.toGeneralNames(): List<GeneralName> =
         map {
-            when (it.tag) {
-                SubjectAltNameImplicitTags.dNSName -> GeneralName(
+            when (it.tag.tagValue) {
+                SubjectAltNameImplicitTags.dNSName.tagValue -> GeneralName(
                     GeneralName.NameType.dNSName,
                     it.asPrimitive().content.decodeToString()
                 )
 
-                SubjectAltNameImplicitTags.rfc822Name -> GeneralName(
+                SubjectAltNameImplicitTags.rfc822Name.tagValue -> GeneralName(
                     GeneralName.NameType.rfc822Name,
                     it.asPrimitive().content.decodeToString()
                 )
 
-                SubjectAltNameImplicitTags.uniformResourceIdentifier -> GeneralName(
+                SubjectAltNameImplicitTags.uniformResourceIdentifier.tagValue -> GeneralName(
                     GeneralName.NameType.uniformResourceIdentifier,
                     it.asPrimitive().content.decodeToString()
                 )
 
-                SubjectAltNameImplicitTags.iPAddress -> GeneralName(
+                SubjectAltNameImplicitTags.iPAddress.tagValue -> GeneralName(
                     GeneralName.NameType.IPAddress,
                     IpAddressUtil.byteArrayToIpAddress(it.asPrimitive().content),
                 )
+
+                SubjectAltNameImplicitTags.directoryName.tagValue -> {
+                    val dn = it.asStructure()
+                        .children
+                        .first()
+                        .asSequence().map { rdn ->
+                            SignumRdn.decodeFromTlv(rdn.asSet())
+                        }.toDistinguishedName()
+                    GeneralName(
+                        GeneralName.NameType.directoryName,
+                        dn.toString()
+                    )
+                }
 
                 else -> GeneralName(
                     GeneralName.NameType.otherName,
@@ -70,6 +87,17 @@ object SignumGeneralNameUtil {
             GeneralName.NameType.IPAddress -> {
                 Asn1OctetString(IpAddressUtil.parseString(value))
                     .withImplicitTag(SubjectAltNameImplicitTags.iPAddress)
+            }
+
+            GeneralName.NameType.directoryName -> {
+                val dn = DistinguishedName.ofString(value)
+                Asn1.ExplicitlyTagged(SubjectAltNameImplicitTags.directoryName.tagValue) {
+                    +Asn1.Sequence {
+                        dn.toSignumDn().forEach {
+                            +it.encodeToTlv()
+                        }
+                    }
+                }
             }
 
             else -> throw IllegalArgumentException("Unsupported GeneralName type ${type}")

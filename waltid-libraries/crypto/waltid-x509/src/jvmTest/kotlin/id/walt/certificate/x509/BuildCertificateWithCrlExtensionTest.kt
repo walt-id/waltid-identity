@@ -68,6 +68,7 @@ class BuildCertificateWithCrlExtensionTest {
 
     @Test
     fun shouldCreateCrlWithDistributionPointWithCrlIssuer(): Unit = runTest {
+
         val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
             extensionCrlDistributionPoints {
                 addDistributionPointRelativeName(
@@ -85,10 +86,12 @@ class BuildCertificateWithCrlExtensionTest {
             assertNotNull(dp.reason) { reason ->
                 assertEquals(1, reason.size)
                 assertTrue(reason.contains(CrlDistributionPointsExtension.ReasonFlag.keyCompromise))
+                assertEquals(1, dp.cRLIssuer?.size)
+                assertEquals(GeneralName.NameType.directoryName, dp.cRLIssuer?.first()?.type)
+                assertEquals("CN=Test", dp.cRLIssuer?.first()?.value)
             }
         }
     }
-
 
     companion object {
         val key = runBlocking {
