@@ -190,7 +190,8 @@ class VaultTransitKeyProvider(
                 providerData.options.transitEndpoint("sign", providerData.remoteName),
                 signatureRequest(input, algorithm, prehashed),
             )
-            return response.requiredString("signature").decodeVaultSignature(providerData.keyVersion)
+            return response.requiredString("signature")
+                .decodeVaultSignature(providerData.keyVersion, algorithm.vaultSignatureBase64())
         }
 
         private suspend fun verify(
@@ -202,7 +203,10 @@ class VaultTransitKeyProvider(
             val body = signatureRequest(input, algorithm, prehashed = false).toMutableMap().apply {
                 put(
                     "signature",
-                    JsonPrimitive("vault:v${providerData.keyVersion}:${Base64.Default.encode(signature)}"),
+                    JsonPrimitive(
+                        "vault:v${providerData.keyVersion}:" +
+                            algorithm.vaultSignatureBase64().encode(signature),
+                    ),
                 )
             }
             return authorizedData(
@@ -301,7 +305,14 @@ class VaultTransitKeyProvider(
                     },
                 )
                 is SignatureAlgorithm.RsaPkcs1 -> put("signature_algorithm", "pkcs1v15")
-                is SignatureAlgorithm.RsaPss -> put("signature_algorithm", "pss")
+                is SignatureAlgorithm.RsaPss -> {
+                    put("signature_algorithm", "pss")
+                    // Vault defaults to salt_length=auto (rsa.PSSSaltLengthAuto, i.e. the maximum), but this provider
+                    // advertises RsaPss(saltLengthBytes = digest.outputSizeBytes) and rejects anything else, so it has
+                    // to ask for the salt length it promises. Without this the produced signature is not PS256/384/512
+                    // conformant and a strict JOSE verifier rejects it.
+                    put("salt_length", "hash")
+                }
                 SignatureAlgorithm.EdDsa -> Unit
                 is SignatureAlgorithm.Custom -> error("Unsupported Vault signature algorithm")
             }
@@ -539,11 +550,29 @@ private fun String.toPublicKey(spec: KeySpec): EncodedKey.SpkiDer {
     return EncodedKey.SpkiDer(BinaryData(spki))
 }
 
-private fun String.decodeVaultSignature(expectedVersion: Int): ByteArray {
+private fun String.decodeVaultSignature(expectedVersion: Int, codec: Base64): ByteArray {
     val prefix = "vault:v$expectedVersion:"
     require(startsWith(prefix)) { "Vault signature key version does not match the stored key version" }
-    return Base64.Default.decode(removePrefix(prefix))
+    return codec.decode(removePrefix(prefix))
 }
+
+/**
+ * Vault encodes the signature payload with a different alphabet per marshaling algorithm: `asn1` uses Go's
+ * `base64.StdEncoding` while `jws` uses `base64.RawURLEncoding`, i.e. unpadded base64url. Using the standard alphabet
+ * for both means any `jws` signature containing `-` or `_` fails to decode, which breaks exactly the ECDSA encoding
+ * that JOSE and COSE need.
+ *
+ * @see signatureRequest for where the marshaling algorithm is selected.
+ */
+private fun SignatureAlgorithm.vaultSignatureBase64(): Base64 = when (this) {
+    is SignatureAlgorithm.Ecdsa -> when (encoding) {
+        EcdsaSignatureEncoding.DER -> Base64.Default
+        EcdsaSignatureEncoding.IEEE_P1363 -> vaultRawUrlBase64
+    }
+    else -> Base64.Default
+}
+
+private val vaultRawUrlBase64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
 
 private fun String.vaultVersion(): Int {
     require(startsWith("vault:v")) { "Vault value has an invalid envelope" }
