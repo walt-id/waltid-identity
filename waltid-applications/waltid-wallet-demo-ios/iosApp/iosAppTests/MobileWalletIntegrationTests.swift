@@ -1,4 +1,5 @@
 import XCTest
+import Security
 @testable import iosApp
 import TestHelpers
 import WalletSDK
@@ -123,6 +124,60 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         XCTAssertNotEqual(second.did, first.did, "Deleting local data should remove the persisted DID state")
         XCTAssertNotEqual(second.keyID, first.keyID, "Deleting local data should remove the persisted platform key reference")
+    }
+
+    func testAppHostedKeychainKeySurvivesLookupAndDeletion() throws {
+        let tag = Data("id.walt.wallet.tests.keychain.\(UUID().uuidString)".utf8)
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassKey,
+            kSecAttrApplicationTag: tag,
+            kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
+        ]
+        defer {
+            SecItemDelete(query as CFDictionary)
+        }
+
+        var createError: Unmanaged<CFError>?
+        let attributes: [CFString: Any] = [
+            kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeySizeInBits: 256,
+            kSecPrivateKeyAttrs: [
+                kSecAttrIsPermanent: true,
+                kSecAttrApplicationTag: tag,
+            ],
+        ]
+        let createdKey = try XCTUnwrap(
+            SecKeyCreateRandomKey(attributes as CFDictionary, &createError),
+            "Could not create a permanent app-hosted Keychain key: \(String(describing: createError?.takeRetainedValue()))"
+        )
+
+        var lookupResult: CFTypeRef?
+        var lookupQuery = query
+        lookupQuery[kSecReturnRef] = true
+        XCTAssertEqual(SecItemCopyMatching(lookupQuery as CFDictionary, &lookupResult), errSecSuccess)
+        let restoredKey = try XCTUnwrap(lookupResult, "Keychain lookup should return the persisted key") as! SecKey
+
+        let algorithm = SecKeyAlgorithm.ecdsaSignatureMessageX962SHA256
+        XCTAssertTrue(SecKeyIsAlgorithmSupported(restoredKey, .sign, algorithm))
+        let message = Data("app-hosted keychain lifecycle".utf8)
+        var signingError: Unmanaged<CFError>?
+        let signature = try XCTUnwrap(
+            SecKeyCreateSignature(restoredKey, algorithm, message as CFData, &signingError) as Data?,
+            "Could not sign with the restored Keychain key: \(String(describing: signingError?.takeRetainedValue()))"
+        )
+        let publicKey = try XCTUnwrap(SecKeyCopyPublicKey(createdKey), "Keychain key should have a public key")
+        XCTAssertTrue(
+            SecKeyVerifySignature(publicKey, algorithm, message as CFData, signature as CFData, nil),
+            "A signature from the restored Keychain key should verify"
+        )
+
+        XCTAssertEqual(SecItemDelete(query as CFDictionary), errSecSuccess)
+        var deletedLookupResult: CFTypeRef?
+        XCTAssertEqual(
+            SecItemCopyMatching(lookupQuery as CFDictionary, &deletedLookupResult),
+            errSecItemNotFound,
+            "Deleted Keychain keys must not be restorable"
+        )
     }
 
     func testCustomCredentialStoreRetainsPlatformSigningKeys() async throws {

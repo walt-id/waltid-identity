@@ -181,9 +181,15 @@ class MobileWalletTest {
 
     @Test
     fun walletCanUseInjectedStoresAndAtomicKeyConfiguration() = runTest {
+        val crypto2Key = object : Crypto2Key {
+            override val id = KeyId("custom-key")
+            override val spec = KeySpec.Ec(EcCurve.P256)
+            override val usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
+        }
         val keyStore = PreloadedKeyStore(
             WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1"),
-            JWKKey.generate(KeyType.secp256r1),
+            crypto2Key = crypto2Key,
+            failOnLegacyGet = true,
         )
         val didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap())))
         val credentialStore = RecordingCredentialStore()
@@ -205,6 +211,7 @@ class MobileWalletTest {
         assertEquals("did:key:custom", bootstrap.did)
         assertEquals(1, keyStore.listKeysCalls)
         assertEquals(1, didStore.listDidsCalls)
+        assertEquals(1, keyStore.getCrypto2KeyCalls)
     }
 
     @Test
