@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.io.encoding.Base64
 import kotlin.test.*
 
 class CompactJwsTest {
@@ -185,6 +186,44 @@ class CompactJwsTest {
         assertEquals("predicate", CompactJws.verify(signed, key, JwsAlgorithm.ES256).payload.decodeToString())
     }
 
+    @Test
+    fun `non-canonical signature encodings are rejected so the token is not malleable`() = runTest {
+        val key = generate(KeySpec.Ec(EcCurve.P256), SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256))
+        val signed = CompactJws.sign("malleable".encodeToByteArray(), key, JwsAlgorithm.ES256)
+        val parts = signed.split('.')
+
+        // A 64-byte ES256 signature encodes to 86 base64url characters whose last character carries only four
+        // significant bits, so a lax decoder would accept 15 further spellings of the same signature and every one
+        // of them would verify - making the serialized token malleable and breaking jti/nonce/DPoP replay caches.
+        // Base64 rejects non-zero pad bits, so each of those spellings must fail. Pinned here because the guarantee
+        // comes from the decoder rather than from code in this module.
+        val alternatives = base64UrlAlphabet.filter { it != parts[2].last() }
+            .map { "${parts[0]}.${parts[1]}.${parts[2].dropLast(1)}$it" }
+        assertEquals(63, alternatives.size)
+        alternatives.forEach { mutated ->
+            assertNotEquals(signed, mutated)
+            assertFails { CompactJws.verify(mutated, key, JwsAlgorithm.ES256) }
+        }
+
+        // The conformant token must still verify - strictness must not reject valid input.
+        assertEquals("malleable", CompactJws.verify(signed, key, JwsAlgorithm.ES256).payload.decodeToString())
+    }
+
+    @Test
+    fun `algorithm negotiation prefers PSS over PKCS1 when the default is not accepted`() = runTest {
+        val key = generate(KeySpec.Rsa(2048), SignatureAlgorithm.RsaPss(DigestAlgorithm.SHA_256, saltLengthBytes = 32))
+
+        // RS256 stays the RSA default because it is what the OAuth/OpenID deployed base supports; a peer that
+        // accepts it therefore still gets it.
+        assertEquals(JwsAlgorithm.RS256, key.preferredJwsAlgorithm())
+        assertEquals(JwsAlgorithm.RS256, key.selectJwsAlgorithm(setOf("RS256", "PS256")))
+        // Once the default is off the table, negotiation must not fall back on enum declaration order, which puts
+        // every RS* before every PS* and would silently pick PKCS#1 v1.5 over PSS.
+        assertEquals(JwsAlgorithm.PS256, key.selectJwsAlgorithm(setOf("RS384", "PS256")))
+        assertEquals(JwsAlgorithm.PS384, key.selectJwsAlgorithm(setOf("RS512", "PS384")))
+        assertEquals(JwsAlgorithm.RS384, key.selectJwsAlgorithm(setOf("RS384")))
+    }
+
     private suspend fun generate(
         spec: KeySpec,
         algorithm: SignatureAlgorithm,
@@ -195,4 +234,9 @@ class CompactJwsTest {
             usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
         ),
     )
+
+    private companion object {
+        val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
+        const val base64UrlAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+    }
 }

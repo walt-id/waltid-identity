@@ -7,8 +7,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFails
+import kotlin.test.assertTrue
 import kotlin.io.encoding.Base64
 
 class JwkTest {
@@ -48,7 +48,10 @@ class JwkTest {
 
         assertEquals(metadata, Jwk.metadata(updated))
         assertEquals(true, updated.privateMaterial)
-        assertFalse("private" in updated.data.toString())
+        // withMetadata rewrites only the metadata members, so private material is deliberately preserved. The old
+        // assertion tested BinaryData.toString(), which only ever prints a byte count and so could never fail.
+        assertTrue("private" in updated.data.toByteArray().decodeToString())
+        assertTrue(Jwk.containsPrivateMaterial(Jwk.parse(updated)))
     }
 
     @Test

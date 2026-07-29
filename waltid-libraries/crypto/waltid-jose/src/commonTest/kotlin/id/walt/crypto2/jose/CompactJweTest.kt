@@ -9,6 +9,7 @@ import id.walt.crypto2.serialization.BinaryData
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -16,6 +17,7 @@ import kotlin.test.assertFails
 
 class CompactJweTest {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+    private val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
 
     @Test
     fun `ECDH-ES AES-GCM round trips with agreement info`() = runTest {
@@ -54,19 +56,28 @@ class CompactJweTest {
     }
 
     @Test
-    fun `party info and recipient JWK restrictions are enforced`() = runTest {
+    fun `identical party info round trips because RFC 7518 does not require apu and apv to differ`() = runTest {
         val recipient = recipientKey()
         val publicKey = recipient.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk
 
-        assertFails {
-            CompactJwe.encrypt(
-                plaintext = byteArrayOf(),
-                recipientPublicKey = publicKey,
-                contentEncryption = JweContentEncryption.A128GCM,
-                agreementPartyUInfo = "same".encodeToByteArray(),
-                agreementPartyVInfo = "same".encodeToByteArray(),
-            )
-        }
+        val compact = CompactJwe.encrypt(
+            plaintext = "same party info".encodeToByteArray(),
+            recipientPublicKey = publicKey,
+            contentEncryption = JweContentEncryption.A128GCM,
+            agreementPartyUInfo = "same".encodeToByteArray(),
+            agreementPartyVInfo = "same".encodeToByteArray(),
+        )
+
+        assertEquals(
+            "same party info",
+            CompactJwe.decrypt(compact, recipient, setOf(JweContentEncryption.A128GCM)).plaintext.decodeToString(),
+        )
+    }
+
+    @Test
+    fun `recipient JWK restrictions are enforced`() = runTest {
+        val recipient = recipientKey()
+        val publicKey = recipient.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk
 
         val restricted = Jwk.withMetadata(
             publicKey,
@@ -85,6 +96,29 @@ class CompactJweTest {
         )
         assertFails {
             CompactJwe.encrypt(byteArrayOf(), malformed, JweContentEncryption.A128GCM)
+        }
+    }
+
+    @Test
+    fun `epk carrying a signature use is rejected on decryption`() = runTest {
+        val recipient = recipientKey()
+        val compact = CompactJwe.encrypt(
+            plaintext = "payload".encodeToByteArray(),
+            recipientPublicKey = recipient.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk,
+            contentEncryption = JweContentEncryption.A128GCM,
+        )
+        val parts = compact.split('.').toMutableList()
+        val header = Jwk.parse(base64Url.decode(parts[0])).toMutableMap()
+        val epk = (header["epk"] as JsonObject).toMutableMap().apply {
+            this["use"] = JsonPrimitive("sig")
+        }
+        header["epk"] = JsonObject(epk)
+        parts[0] = base64Url.encode(JsonObject(header).toString().encodeToByteArray())
+
+        // Before the fix the recipient-policy check was applied to the epk, which made it vacuous; now the epk gets
+        // its own check and the recipient gets one bound to its stored jwk.alg.
+        assertFails {
+            CompactJwe.decrypt(parts.joinToString("."), recipient, setOf(JweContentEncryption.A128GCM))
         }
     }
 
