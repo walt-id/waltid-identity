@@ -19,6 +19,7 @@ sealed interface ResolvedCredentialIssuerMetadata {
 
 /** Stable provenance of the signer trusted by the embedding wallet. */
 data class MetadataSigner(
+    /** Identifier of the trusted verification key, as reported by the trust resolver. */
     val keyId: String?,
     val algorithm: String,
     val trustType: MetadataSignerTrustType,
