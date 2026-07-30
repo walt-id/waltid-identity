@@ -2,8 +2,6 @@
 
 package id.walt.verifier2.handlers.sessioncreation
 
-import id.walt.crypto.keys.DirectSerializedKey
-import id.walt.crypto.keys.KeyManager
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
@@ -17,6 +15,7 @@ import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.OpenId4VPConfig
 import id.walt.verifier2.data.Verification2Session
+import id.walt.verifier2.testVerifierSigningKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -37,7 +36,7 @@ class VerificationSessionCreatorTransactionDataPolicyTest {
     @Test
     fun `signed authorization request payload includes issuer matching client id`() = runTest {
         val clientId = "x509_san_dns:verifier.example.com"
-        val signingKey = testSigningKey()
+        val signingKey = testVerifierSigningKey()
         val session = VerificationSessionCreator.createVerificationSession(
             setup = CrossDeviceFlowSetup(
                 core = GeneralFlowConfig(
@@ -72,7 +71,7 @@ class VerificationSessionCreatorTransactionDataPolicyTest {
 
     @Test
     fun `signed session retains its opaque signing key reference`() = runTest {
-        val signingKey = testSigningKey()
+        val signingKey = testVerifierSigningKey()
         val session = VerificationSessionCreator.createVerificationSession(
             setup = CrossDeviceFlowSetup(
                 core = GeneralFlowConfig(signedRequest = true)
@@ -215,9 +214,4 @@ class VerificationSessionCreatorTransactionDataPolicyTest {
         put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
     }
 
-    private fun testSigningKey() = DirectSerializedKey(
-        KeyManager.resolveSerializedKeyBlocking(
-            """{"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}"""
-        )
-    )
 }
