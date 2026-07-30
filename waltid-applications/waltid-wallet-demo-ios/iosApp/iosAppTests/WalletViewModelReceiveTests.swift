@@ -274,7 +274,8 @@ private actor TransactionCodeWalletClient: WalletClient {
                     locale: "en",
                     logoURI: nil,
                     logoAltText: nil
-                )
+                ),
+                provenance: .unsigned
             ),
             offeredCredentials: [
                 OfferedCredentialMetadata(
@@ -317,6 +318,7 @@ private actor TransactionCodeWalletClient: WalletClient {
                 request: PresentationRequestInfo(
                     clientID: "https://verifier.example",
                     nonce: "nonce-1",
+                    verifierMetadataProvenance: .unsignedRequest,
                     responseEncryption: .notRequired,
                 ),
                 credentialOptions: [

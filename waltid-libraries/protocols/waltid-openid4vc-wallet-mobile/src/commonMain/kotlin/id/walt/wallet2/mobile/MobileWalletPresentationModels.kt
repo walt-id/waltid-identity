@@ -110,6 +110,7 @@ public data class MobileWalletPresentationCredentialRequirement(
  *
  * @property clientId Required OpenID4VP `client_id` value.
  * @property verifierMetadata Typed verifier metadata supplied by the OpenID4VP client, when available.
+ * @property verifierMetadataProvenance Whether verifier metadata came from an unsigned request or signed request object.
  * @property responseUri Verifier response URI to which the wallet will submit the presentation, when provided.
  * @property state OpenID4VP state value supplied by the verifier, when provided.
  * @property nonce Required OpenID4VP nonce value supplied by the verifier.
@@ -138,6 +139,12 @@ public sealed interface MobileWalletVerifierMetadataProvenance {
     public data object UnsignedRequest : MobileWalletVerifierMetadataProvenance
 
     /** Verifier metadata came from the authenticated request object retained by wallet core. */
+    /**
+     * @property compactRequestObject Exact compact request object.
+     * @property algorithm JWS algorithm carried by the request object.
+     * @property keyId Request-object signing key identifier when supplied.
+     * @property clientIdPrefix OpenID4VP client identifier prefix used for authentication.
+     */
     public data class SignedRequest(
         /** Exact compact request object received from the verifier. */
         public val compactRequestObject: String,

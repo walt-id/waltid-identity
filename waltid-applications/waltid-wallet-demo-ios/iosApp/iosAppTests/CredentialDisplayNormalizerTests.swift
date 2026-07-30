@@ -880,6 +880,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let request = PresentationRequestInfo(
             clientID: "https://verifier.example",
             nonce: "nonce-1",
+            verifierMetadataProvenance: .unsignedRequest,
             responseEncryption: .notRequired,
             transactionData: [
                 PresentationTransactionData(

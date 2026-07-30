@@ -32,6 +32,7 @@ import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolve
  * @property preferredLocales Ordered BCP 47 locale preferences used for progressive language-tag lookup.
  * When no preference matches, selection falls back to an unlocalized entry and then the first entry.
  * @property transactionDataProfiles Transaction data profiles this mobile wallet accepts in OpenID4VP requests.
+ * @property credentialIssuerMetadataTrustResolver Optional verifier and authority policy for signed Credential Issuer Metadata.
  */
 public data class MobileWalletConfig(
     public val walletId: String = "default",

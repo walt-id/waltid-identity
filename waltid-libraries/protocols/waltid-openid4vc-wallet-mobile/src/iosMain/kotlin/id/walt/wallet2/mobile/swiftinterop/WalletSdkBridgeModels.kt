@@ -87,8 +87,11 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConf
 
 /** Trusted signer details returned after Swift verifies signed Credential Issuer Metadata. */
 public data class WalletBridgeIssuerMetadataSigner(
+    /** Identifier of the trusted verification key, as reported by the trust resolver. */
     public val keyId: String?,
+    /** JWS algorithm verified by the trust resolver. */
     public val algorithm: String,
+    /** Authority category established by the trust resolver. */
     public val trustType: WalletBridgeIssuerMetadataSignerTrustType,
 )
 
@@ -101,10 +104,17 @@ public enum class WalletBridgeIssuerMetadataSignerTrustType {
 /**
  * Swift-facing trust boundary for signed Credential Issuer Metadata.
  *
- * Implementations must verify the JWS and establish that its signer is authorized for
- * [expectedCredentialIssuer]. Returning normally authorizes the metadata for wallet use.
+ * Implementations must verify the JWS and establish that its signer is authorized for the requested issuer.
+ * Returning normally authorizes the metadata for wallet use.
  */
 public interface WalletBridgeIssuerMetadataTrustResolver {
+    /**
+     * Verifies signed metadata and its signer authority.
+     *
+     * @param compactJwt Compact JWS returned by the Credential Issuer Metadata endpoint.
+     * @param expectedCredentialIssuer Credential issuer for which signer authority must be established.
+     * @return Trusted signer details used to retain metadata provenance.
+     */
     public suspend fun verify(
         compactJwt: String,
         expectedCredentialIssuer: String,

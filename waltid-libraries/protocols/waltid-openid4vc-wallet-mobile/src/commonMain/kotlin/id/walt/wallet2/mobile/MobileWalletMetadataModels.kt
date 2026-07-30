@@ -46,6 +46,7 @@ public data class MobileWalletMetadataDisplay(
  *
  * @property credentialIssuer Canonical credential issuer identifier from issuer metadata.
  * @property display Best localized display entry selected using [MobileWalletConfig.preferredLocales].
+ * @property provenance Whether metadata was unsigned JSON or verified signed metadata.
  */
 public data class MobileWalletIssuerMetadata(
     public val credentialIssuer: String,
@@ -55,7 +56,17 @@ public data class MobileWalletIssuerMetadata(
 
 /** Whether issuer metadata was received as JSON or as a verified, trusted signed JWT. */
 public sealed interface MobileWalletMetadataProvenance {
+    /** Metadata was received as an unsigned JSON document. */
     public data object Unsigned : MobileWalletMetadataProvenance
+
+    /**
+     * Metadata was received in a JWS verified by the configured trust resolver.
+     *
+     * @property compactJwt Exact compact JWS returned by the issuer.
+     * @property algorithm Verified JWS algorithm.
+     * @property keyId Identifier of the trusted verification key, as reported by the trust resolver.
+     * @property trustType Authority category established by the trust resolver.
+     */
     public data class Signed(
         public val compactJwt: String,
         public val algorithm: String,
@@ -64,6 +75,7 @@ public sealed interface MobileWalletMetadataProvenance {
     ) : MobileWalletMetadataProvenance
 }
 
+/** Authority category established by the trust resolver for signed issuer metadata. */
 public enum class MobileWalletMetadataTrustType { TrustedIssuer, TrustedDelegate }
 
 /**
