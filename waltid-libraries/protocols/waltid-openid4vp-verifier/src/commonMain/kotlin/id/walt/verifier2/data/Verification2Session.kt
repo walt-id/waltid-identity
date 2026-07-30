@@ -78,6 +78,8 @@ data class Verification2Session(
     val authorizationRequestUrl: Url?,
 
     val signedAuthorizationRequestJwt: String? = null,
+    /** Opaque service-level reference used to resolve the request-object signing key after session creation. */
+    val requestSigningKeyReference: String? = null,
     val ephemeralDecryptionKey: DirectSerializedKey? = null,
     /** JWK Thumbprint for [ephemeralDecryptionKey] */
     val jwkThumbprint: String? = null,

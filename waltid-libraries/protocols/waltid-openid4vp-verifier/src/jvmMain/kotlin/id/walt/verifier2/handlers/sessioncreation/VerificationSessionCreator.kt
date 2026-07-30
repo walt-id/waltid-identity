@@ -101,6 +101,7 @@ object VerificationSessionCreator {
         // Both are required for signed requests:
         key: Key? = null,
         x5c: List<String>? = null,
+        signingKeyReference: String? = null,
     ): Verification2Session {
         val sessionId = setup.core.sessionId ?: Uuid.random().toString()
 
@@ -467,6 +468,7 @@ object VerificationSessionCreator {
             authorizationRequest = authorizationRequest,
             authorizationRequestUrl = if (!isAnnexC) authorizationRequestUrl else null,
             signedAuthorizationRequestJwt = signedAuthorizationRequest,
+            requestSigningKeyReference = signingKeyReference,
             ephemeralDecryptionKey = ephemeralKey?.let { DirectSerializedKey(it) },
             jwkThumbprint = ephemeralKey?.getPublicKey()?.getThumbprint(),
 

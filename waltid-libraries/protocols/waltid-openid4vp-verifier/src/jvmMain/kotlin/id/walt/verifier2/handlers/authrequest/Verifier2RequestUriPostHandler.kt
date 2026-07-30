@@ -1,5 +1,6 @@
 package id.walt.verifier2.handlers.authrequest
 
+import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
@@ -44,6 +45,7 @@ object Verifier2RequestUriPostHandler {
     suspend fun RoutingCall.respondRequestUriPost(
         verificationSession: Verification2Session,
         updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
+        resolveSigningKey: suspend (Verification2Session) -> Key? = { it.setup.core.key?.key },
     ) {
         val call = this
 
@@ -68,15 +70,12 @@ object Verifier2RequestUriPostHandler {
             return
         }
 
-        // Re-sign the request object including wallet_nonce per OID4VP 1.0 §5.6
-        val coreSetup = verificationSession.setup.core
-
-        val signingKey = coreSetup.key?.key
-            ?: run {
-                log.warn { "No signing key available for re-sign, returning pre-built JWT (no wallet_nonce)" }
-                call.respondText(existingJwt, ContentType.parse("application/oauth-authz-req+jwt"))
-                return
-            }
+        // Re-sign the request object including wallet_nonce per OID4VP 1.0 §5.6.
+        // A signed response without the supplied nonce is not a valid fallback.
+        val signingKey = requireNotNull(resolveSigningKey(verificationSession)) {
+            "No signing key available to bind wallet_nonce to the signed request"
+        }
+        signingKey.getPublicKey().verifyJws(existingJwt).getOrThrow()
 
         // Decode existing JWT to get headers and payload
         val parts = existingJwt.split(".")

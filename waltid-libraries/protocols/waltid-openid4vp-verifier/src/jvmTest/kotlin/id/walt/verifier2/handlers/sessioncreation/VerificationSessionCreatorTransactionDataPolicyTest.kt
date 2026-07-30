@@ -71,6 +71,23 @@ class VerificationSessionCreatorTransactionDataPolicyTest {
     }
 
     @Test
+    fun `signed session retains its opaque signing key reference`() = runTest {
+        val signingKey = testSigningKey()
+        val session = VerificationSessionCreator.createVerificationSession(
+            setup = CrossDeviceFlowSetup(
+                core = GeneralFlowConfig(signedRequest = true)
+            ),
+            clientId = "verifier.example.com",
+            urlPrefix = "https://verifier.example.com/verification-session",
+            urlHost = "openid4vp://authorize",
+            key = signingKey.key,
+            signingKeyReference = "tenant.kms.request-signing-key",
+        )
+
+        assertEquals("tenant.kms.request-signing-key", session.requestSigningKeyReference)
+    }
+
+    @Test
     fun `transaction data policies are mandatory when custom vp policies are supplied`() = runTest {
         val session = VerificationSessionCreator.createVerificationSession(
             setup = CrossDeviceFlowSetup(
