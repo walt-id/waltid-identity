@@ -321,11 +321,17 @@ public class MobileWallet internal constructor(
         offerUrl: String,
         txCode: String? = null,
         clientId: String = "wallet-client",
-    ): List<String> = receive(
-        previewHandle = resolveOffer(offerUrl).previewHandle,
-        txCode = txCode,
-        clientId = clientId,
-    )
+    ): List<String> = WalletIssuanceHandler.receiveCredential(
+        wallet = wallet,
+        request = ReceiveCredentialRequest(
+            offerUrl = Url(offerUrl.trim()),
+            txCode = txCode?.ifBlank { null },
+            clientId = clientId,
+        ),
+        attestationAssembler = attestationAssembler,
+        onEvent = ::emitSessionEvent,
+        metadataTrustResolver = credentialIssuerMetadataTrustResolver,
+    ).credentialIds
 
     /** Receives credentials using exactly one reviewed offer preview. */
     public suspend fun receive(
@@ -623,9 +629,9 @@ internal fun WalletPresentResult.toMobilePresentationResult(): MobileWalletPrese
         }
     }
 
-private fun AuthorizationRequest.toMobileRequestInfo(
+internal fun AuthorizationRequest.toMobileRequestInfo(
     preferredLocales: List<String>,
-    resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
+    resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
     responseEncryption: ResponseEncryption.Metadata? = null,
     transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
 ): MobileWalletPresentationRequestInfo {
@@ -661,7 +667,7 @@ private fun AuthorizationRequest.toMobileRequestContext(
         responseEncryption = null.toMobileResponseEncryption(),
     )
 
-private fun ResolvedAuthorizationRequest?.toMobileVerifierMetadataProvenance(
+internal fun ResolvedAuthorizationRequest.toMobileVerifierMetadataProvenance(
     clientId: String?,
 ): MobileWalletVerifierMetadataProvenance = when (this) {
     is ResolvedAuthorizationRequest.WithRequestObject -> {
@@ -673,7 +679,7 @@ private fun ResolvedAuthorizationRequest?.toMobileVerifierMetadataProvenance(
             clientIdPrefix = requireNotNull(clientId).substringBefore(':'),
         )
     }
-    else -> MobileWalletVerifierMetadataProvenance.UnsignedRequest
+    is ResolvedAuthorizationRequest.Plain -> MobileWalletVerifierMetadataProvenance.UnsignedRequest
 }
 
 private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {

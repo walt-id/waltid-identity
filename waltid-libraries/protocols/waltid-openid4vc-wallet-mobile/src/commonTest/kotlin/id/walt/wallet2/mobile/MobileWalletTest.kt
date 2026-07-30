@@ -17,6 +17,7 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -29,6 +30,8 @@ import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.ktor.http.URLBuilder
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
+import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -57,6 +60,35 @@ import kotlin.time.Duration.Companion.milliseconds
 import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 
 class MobileWalletTest {
+
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @Test
+    fun signedRequestObjectProvenanceRetainsExactJwtHeaderAndClientIdPrefix() {
+        val requestObject = listOf(
+            """{"alg":"ES256","kid":"verifier-key-1"}""".encodeToByteArray().encodeToBase64Url(),
+            "{}".encodeToByteArray().encodeToBase64Url(),
+            "signature",
+        ).joinToString(".")
+        val authorizationRequest = AuthorizationRequest(clientId = "x509_san_dns:https://verifier.example")
+
+        val info = authorizationRequest.toMobileRequestInfo(
+            preferredLocales = emptyList(),
+            resolvedAuthorizationRequest = ResolvedAuthorizationRequest.WithRequestObject(
+                authorizationRequest = authorizationRequest,
+                requestObject = requestObject,
+            ),
+        )
+
+        assertEquals(
+            MobileWalletVerifierMetadataProvenance.SignedRequest(
+                compactRequestObject = requestObject,
+                algorithm = "ES256",
+                keyId = "verifier-key-1",
+                clientIdPrefix = "x509_san_dns",
+            ),
+            info.verifierMetadataProvenance,
+        )
+    }
 
     @Test
     fun presentationErrorCodesMatchOAuthAndOpenId4VpValues() {

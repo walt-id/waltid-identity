@@ -192,6 +192,38 @@ class WalletSdkBridgeTest {
     }
 
     @Test
+    fun bridgePresentationPreviewPreservesSignedVerifierProvenance() = runTest {
+        val provenance = MobileWalletVerifierMetadataProvenance.SignedRequest(
+            compactRequestObject = "header.payload.signature",
+            algorithm = "ES256",
+            keyId = "verifier-key-1",
+            clientIdPrefix = "x509_san_dns",
+        )
+        val preview = MobileWalletPresentationPreviewResult.Ready(
+            MobileWalletPresentationPreview(
+                previewHandle = MobileWalletPresentationPreviewHandle("presentation-preview"),
+                request = MobileWalletPresentationRequestInfo(
+                    clientId = "x509_san_dns:https://verifier.example",
+                    verifierMetadata = null,
+                    verifierMetadataProvenance = provenance,
+                    responseUri = null,
+                    state = null,
+                    nonce = null,
+                    responseEncryption = MobileWalletResponseEncryption.NotRequired,
+                ),
+                credentialOptions = emptyList(),
+            ),
+        )
+
+        val result = WalletSdkBridge.forOperations(
+            FakeWalletSdkBridgeOperations(previewResult = preview),
+        ).previewPresentation("openid4vp://request")
+
+        val bridged = assertIs<WalletBridgeResult.Success<MobileWalletPresentationPreviewResult.Ready>>(result)
+        assertEquals(provenance, bridged.value.preview.request.verifierMetadataProvenance)
+    }
+
+    @Test
     fun bridgePresentationPreviewPreservesDetectedProtocolError() = runTest {
         val expected = MobileWalletPresentationPreviewResult.Invalid(
             previewHandle = MobileWalletPresentationPreviewHandle("presentation-preview"),
