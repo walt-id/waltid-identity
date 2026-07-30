@@ -2,13 +2,21 @@
 
 package id.walt.openid4vp.clientidprefix.prefix
 
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
 import id.walt.openid4vp.clientidprefix.*
 import id.walt.openid4vp.clientidprefix.prefixes.*
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -94,12 +102,20 @@ class PrefixTests {
     @Test
     fun `did should succeed with valid signature from a resolved key`() = runTest {
         DidService.minimalInit()
-        val key = JWKKey.generate(KeyType.secp256r1)
+        val key = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("client-authentication"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
         val did = DidService.registerByKey("key", key).did
-        val kid = DidService.resolveAuthenticationMethodId(did, key.getKeyId())
-        val signedJws = key.signJws(
-            """{"response_type":"vp_token","nonce":"xyz"}""".encodeToByteArray(),
-            mapOf("kid" to JsonPrimitive(kid)),
+        val kid = DidService.resolveToCrypto2Keys(did).getOrThrow().single().id.value
+        val signedJws = CompactJws.sign(
+            payload = """{"response_type":"vp_token","nonce":"xyz"}""".encodeToByteArray(),
+            key = key,
+            algorithm = JwsAlgorithm.ES256,
+            protectedHeader = JsonObject(mapOf("kid" to JsonPrimitive(kid))),
         )
 
         // Create context and authenticate

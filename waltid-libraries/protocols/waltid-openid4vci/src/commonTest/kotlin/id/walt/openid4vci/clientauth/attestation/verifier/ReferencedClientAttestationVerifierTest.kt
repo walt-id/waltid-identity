@@ -43,7 +43,7 @@ class ReferencedClientAttestationVerifierTest {
 
     @Test
     fun `legacy-only key reference verifies`() = runTest {
-        val key = JWKKey.generate(KeyType.secp256r1)
+        val key = JWKKey.generate(KeyType.Ed25519)
         val jwt = key.signJws("{}".encodeToByteArray(), emptyMap())
         val decoded = CompactJws.decodeUnverified(jwt)
         val resolver = ClientAttestationKeyReferenceResolver { _, _, _ -> listOf(key.getPublicKey()) }
@@ -61,7 +61,6 @@ class ReferencedClientAttestationVerifierTest {
 
     @Test
     fun `crypto2 key reference is authoritative when both are configured`() = runTest {
-        val legacyKey = JWKKey.generate(KeyType.secp256r1)
         val crypto2Key = crypto2Key("trusted")
         val jwt = CompactJws.sign("{}".encodeToByteArray(), crypto2Key, JwsAlgorithm.ES256)
         val decoded = CompactJws.decodeUnverified(jwt)
@@ -71,7 +70,7 @@ class ReferencedClientAttestationVerifierTest {
             crypto2Resolver = Crypto2ClientAttestationKeyReferenceResolver { _, _, _ -> listOf(crypto2Key) },
             legacyResolver = ClientAttestationKeyReferenceResolver { _, _, _ ->
                 legacyInvocations++
-                listOf(legacyKey.getPublicKey())
+                emptyList()
             },
         )
 
@@ -84,7 +83,6 @@ class ReferencedClientAttestationVerifierTest {
 
     @Test
     fun `invalid crypto2 signature does not downgrade to legacy key`() = runTest {
-        val attacker = JWKKey.generate(KeyType.secp256r1)
         val attackerCrypto2 = crypto2Key("attacker")
         val jwt = CompactJws.sign("{}".encodeToByteArray(), attackerCrypto2, JwsAlgorithm.ES256)
         val decoded = CompactJws.decodeUnverified(jwt)
@@ -94,7 +92,7 @@ class ReferencedClientAttestationVerifierTest {
             crypto2Resolver = Crypto2ClientAttestationKeyReferenceResolver { _, _, _ -> listOf(crypto2Key("trusted")) },
             legacyResolver = ClientAttestationKeyReferenceResolver { _, _, _ ->
                 legacyInvocations++
-                listOf(attacker.getPublicKey())
+                emptyList()
             },
         )
 
@@ -107,8 +105,8 @@ class ReferencedClientAttestationVerifierTest {
 
     @Test
     fun `empty crypto2 resolution rejects without legacy fallback`() = runTest {
-        val key = JWKKey.generate(KeyType.secp256r1)
-        val jwt = key.signJws("{}".encodeToByteArray(), emptyMap())
+        val key = crypto2Key("attester")
+        val jwt = CompactJws.sign("{}".encodeToByteArray(), key, JwsAlgorithm.ES256)
         val decoded = CompactJws.decodeUnverified(jwt)
         var legacyInvocations = 0
         val verifier = ReferencedClientAttestationVerifier(
@@ -116,7 +114,7 @@ class ReferencedClientAttestationVerifierTest {
             crypto2Resolver = Crypto2ClientAttestationKeyReferenceResolver { _, _, _ -> emptyList() },
             legacyResolver = ClientAttestationKeyReferenceResolver { _, _, _ ->
                 legacyInvocations++
-                listOf(key.getPublicKey())
+                emptyList()
             },
         )
 

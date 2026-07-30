@@ -114,7 +114,7 @@ class MobileWalletTest {
     }
 
     @Test
-    fun explicitTrustConfigurationAcceptsPreRegisteredVerifier() = runTest {
+    fun explicitTrustConfigurationAuthenticatesPreRegisteredVerifier() = runTest {
         val verifierKey = JWKKey.generate(KeyType.Ed25519)
         val requestUrl = preRegisteredRequestUrl(verifierKey)
         val wallet = walletWithTrust(
@@ -127,10 +127,12 @@ class MobileWalletTest {
             )
         )
 
-        val preview = wallet.previewPresentation(requestUrl)
+        val preview = assertIs<MobileWalletPresentationPreviewResult.Invalid>(
+            wallet.previewPresentation(requestUrl)
+        )
 
         assertEquals("verifier2", preview.request.clientId)
-        assertTrue(preview.credentialOptions.isEmpty())
+        assertEquals(MobileWalletPresentationErrorCode.invalidRequest, preview.errorCode)
     }
 
     @Test
@@ -179,9 +181,15 @@ class MobileWalletTest {
 
     @Test
     fun walletCanUseInjectedStoresAndAtomicKeyConfiguration() = runTest {
+        val crypto2Key = object : Crypto2Key {
+            override val id = KeyId("custom-key")
+            override val spec = KeySpec.Ec(EcCurve.P256)
+            override val usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
+        }
         val keyStore = PreloadedKeyStore(
             WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1"),
-            JWKKey.generate(KeyType.secp256r1),
+            crypto2Key = crypto2Key,
+            failOnLegacyGet = true,
         )
         val didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap())))
         val credentialStore = RecordingCredentialStore()
@@ -203,6 +211,7 @@ class MobileWalletTest {
         assertEquals("did:key:custom", bootstrap.did)
         assertEquals(1, keyStore.listKeysCalls)
         assertEquals(1, didStore.listDidsCalls)
+        assertEquals(1, keyStore.getCrypto2KeyCalls)
     }
 
     @Test
@@ -514,6 +523,9 @@ class MobileWalletTest {
             buildJsonObject {
                 put("client_id", "verifier2")
                 put("nonce", "nonce-123")
+                put("response_type", "vp_token")
+                put("response_mode", "direct_post")
+                put("response_uri", "https://verifier.example/direct-post")
                 put("dcql_query", buildJsonObject { put("credentials", buildJsonArray {}) })
             }.toString().encodeToByteArray(),
             mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),

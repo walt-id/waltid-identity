@@ -179,7 +179,7 @@ the data being wrapped by the `Result` object. This allows checking for
 a successful operation and handling the result accordingly.
 
 The DID Document data is represented as `JsonObject`. Key data is represented as crypto2 `Key`.
-`publicKeyJwk` methods are restored directly with crypto2. Legacy raw and multibase verification material is currently normalized to a public JWK through the v1 `KeyMaterial` compatibility path because crypto2 does not yet provide raw/multibase public-key decoding.
+`publicKeyJwk` methods are restored directly with crypto2. `did:key` identifiers and base58-btc `publicKeyMultibase` values are decoded natively with crypto2. Legacy raw representations (`publicKeyBase58` and `publicKeyHex`) continue to use the v1 `KeyMaterial` compatibility path.
 
 ## Local DID operations implemented natively
 

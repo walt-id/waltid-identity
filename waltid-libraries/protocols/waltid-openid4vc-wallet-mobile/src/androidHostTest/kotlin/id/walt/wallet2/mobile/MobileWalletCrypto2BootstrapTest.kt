@@ -79,9 +79,11 @@ class MobileWalletCrypto2BootstrapTest {
                 assertEquals(stored.id.value, bootstrap.keyId)
                 assertTrue(bootstrap.did.startsWith("did:${case.didMethod}:"))
                 assertStoredDidContainsPublicMaterialOnly(database, bootstrap.did)
+                assertTrue(DidService.resolverMethods.containsKey(case.didMethod))
 
                 val recreatedWallet = wallet(config, database, provider)
                 assertEquals(bootstrap, recreatedWallet.bootstrap(didMethod = case.didMethod))
+                assertTrue(DidService.resolverMethods.containsKey(case.didMethod))
                 assertEquals(1, provider.generateCount)
 
                 val restored = assertNotNull(
@@ -204,7 +206,6 @@ class MobileWalletCrypto2BootstrapTest {
     )
 
     private suspend fun assertDidMatchesPublicKey(did: String, original: Crypto2Key) {
-        DidService.minimalInit()
         val resolved = Crypto2DidService.resolveToKeys(did).getOrThrow().single()
         assertEquals(publicMembers(publicJwk(original)), publicMembers(publicJwk(resolved)))
     }

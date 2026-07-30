@@ -1,5 +1,5 @@
 // Klib ABI Dump
-// Targets: [js, linuxArm64, linuxX64, macosArm64, macosX64, mingwX64]
+// Targets: [iosArm64, iosSimulatorArm64, js, linuxArm64, linuxX64, macosArm64, macosX64, mingwX64]
 // Rendering settings:
 // - Signature version: 2
 // - Show manifest properties: true
@@ -91,6 +91,22 @@ final class id.walt.crypto2.migration.v1/V1MobileKeyReference { // id.walt.crypt
     final fun toString(): kotlin/String // id.walt.crypto2.migration.v1/V1MobileKeyReference.toString|toString(){}[0]
 }
 
+final class id.walt.crypto2.migration.v1/V1PublicKeyReference { // id.walt.crypto2.migration.v1/V1PublicKeyReference|null[0]
+    constructor <init>(kotlinx.serialization.json/JsonObject, kotlin/String?) // id.walt.crypto2.migration.v1/V1PublicKeyReference.<init>|<init>(kotlinx.serialization.json.JsonObject;kotlin.String?){}[0]
+
+    final val keyId // id.walt.crypto2.migration.v1/V1PublicKeyReference.keyId|{}keyId[0]
+        final fun <get-keyId>(): kotlin/String? // id.walt.crypto2.migration.v1/V1PublicKeyReference.keyId.<get-keyId>|<get-keyId>(){}[0]
+    final val publicJwk // id.walt.crypto2.migration.v1/V1PublicKeyReference.publicJwk|{}publicJwk[0]
+        final fun <get-publicJwk>(): kotlinx.serialization.json/JsonObject // id.walt.crypto2.migration.v1/V1PublicKeyReference.publicJwk.<get-publicJwk>|<get-publicJwk>(){}[0]
+
+    final fun component1(): kotlinx.serialization.json/JsonObject // id.walt.crypto2.migration.v1/V1PublicKeyReference.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // id.walt.crypto2.migration.v1/V1PublicKeyReference.component2|component2(){}[0]
+    final fun copy(kotlinx.serialization.json/JsonObject = ..., kotlin/String? = ...): id.walt.crypto2.migration.v1/V1PublicKeyReference // id.walt.crypto2.migration.v1/V1PublicKeyReference.copy|copy(kotlinx.serialization.json.JsonObject;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.migration.v1/V1PublicKeyReference.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.migration.v1/V1PublicKeyReference.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.migration.v1/V1PublicKeyReference.toString|toString(){}[0]
+}
+
 sealed class id.walt.crypto2.migration.v1/V1KeyMigrationException : kotlin/IllegalArgumentException { // id.walt.crypto2.migration.v1/V1KeyMigrationException|null[0]
     final class MissingKeyMaterial : id.walt.crypto2.migration.v1/V1KeyMigrationException { // id.walt.crypto2.migration.v1/V1KeyMigrationException.MissingKeyMaterial|null[0]
         constructor <init>(id.walt.crypto2.keys/KeyId) // id.walt.crypto2.migration.v1/V1KeyMigrationException.MissingKeyMaterial.<init>|<init>(id.walt.crypto2.keys.KeyId){}[0]
@@ -104,3 +120,10 @@ sealed class id.walt.crypto2.migration.v1/V1KeyMigrationException : kotlin/Illeg
         constructor <init>(id.walt.crypto2.migration.v1/V1MobilePlatform) // id.walt.crypto2.migration.v1/V1KeyMigrationException.MissingPlatformMigrator.<init>|<init>(id.walt.crypto2.migration.v1.V1MobilePlatform){}[0]
     }
 }
+
+final const val id.walt.crypto2.migration.v1/V1_LEGACY_KEY_ID_METADATA_KEY // id.walt.crypto2.migration.v1/V1_LEGACY_KEY_ID_METADATA_KEY|{}V1_LEGACY_KEY_ID_METADATA_KEY[0]
+    final fun <get-V1_LEGACY_KEY_ID_METADATA_KEY>(): kotlin/String // id.walt.crypto2.migration.v1/V1_LEGACY_KEY_ID_METADATA_KEY.<get-V1_LEGACY_KEY_ID_METADATA_KEY>|<get-V1_LEGACY_KEY_ID_METADATA_KEY>(){}[0]
+
+final fun (id.walt.crypto2.keys/StoredKey).id.walt.crypto2.migration.v1/legacyKeyId(): kotlin/String? // id.walt.crypto2.migration.v1/legacyKeyId|legacyKeyId@id.walt.crypto2.keys.StoredKey(){}[0]
+final fun id.walt.crypto2.migration.v1/v1PublicKeyReference(kotlin/String): id.walt.crypto2.migration.v1/V1PublicKeyReference? // id.walt.crypto2.migration.v1/v1PublicKeyReference|v1PublicKeyReference(kotlin.String){}[0]
+final fun id.walt.crypto2.migration.v1/v1PublicKeyReference(kotlinx.serialization.json/JsonObject): id.walt.crypto2.migration.v1/V1PublicKeyReference? // id.walt.crypto2.migration.v1/v1PublicKeyReference|v1PublicKeyReference(kotlinx.serialization.json.JsonObject){}[0]

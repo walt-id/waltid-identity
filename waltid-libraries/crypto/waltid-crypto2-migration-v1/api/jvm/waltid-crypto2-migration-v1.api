@@ -27,6 +27,13 @@ public final class id/walt/crypto2/migration/v1/V1KeyMigrationException$MissingP
 	public fun <init> (Lid/walt/crypto2/migration/v1/V1MobilePlatform;)V
 }
 
+public final class id/walt/crypto2/migration/v1/V1KeyMigrationKt {
+	public static final field V1_LEGACY_KEY_ID_METADATA_KEY Ljava/lang/String;
+	public static final fun legacyKeyId (Lid/walt/crypto2/keys/StoredKey;)Ljava/lang/String;
+	public static final fun v1PublicKeyReference (Ljava/lang/String;)Lid/walt/crypto2/migration/v1/V1PublicKeyReference;
+	public static final fun v1PublicKeyReference (Lkotlinx/serialization/json/JsonObject;)Lid/walt/crypto2/migration/v1/V1PublicKeyReference;
+}
+
 public abstract interface class id/walt/crypto2/migration/v1/V1ManagedKeyMigrator {
 	public abstract fun migrate (Lid/walt/crypto2/migration/v1/V1ManagedKeyRecord;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -83,5 +90,18 @@ public final class id/walt/crypto2/migration/v1/V1MobilePlatform : java/lang/Enu
 
 public abstract interface class id/walt/crypto2/migration/v1/V1PlatformKeyMigrator {
 	public abstract fun migrate (Lid/walt/crypto2/migration/v1/V1MobileKeyReference;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/migration/v1/V1PublicKeyReference {
+	public fun <init> (Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;)V
+	public final fun component1 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;)Lid/walt/crypto2/migration/v1/V1PublicKeyReference;
+	public static synthetic fun copy$default (Lid/walt/crypto2/migration/v1/V1PublicKeyReference;Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/crypto2/migration/v1/V1PublicKeyReference;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKeyId ()Ljava/lang/String;
+	public final fun getPublicJwk ()Lkotlinx/serialization/json/JsonObject;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 

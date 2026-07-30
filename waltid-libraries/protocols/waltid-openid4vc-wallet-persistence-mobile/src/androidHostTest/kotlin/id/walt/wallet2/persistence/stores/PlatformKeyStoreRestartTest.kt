@@ -71,17 +71,31 @@ class PlatformKeyStoreRestartTest {
     }
 
     @Test
-    fun `software key dual-write and legacy backfill survive store recreation`() = runTest {
+    fun `software key retains legacy fallback when Android cannot import it`() = runTest {
         database().use { database ->
             val provider = FakePlatformKeyProvider()
             val key = JWKKey.generate(KeyType.Ed25519)
             val keyId = PlatformKeyStore(provider, database.queries).addKey(key)
 
             val persisted = assertNotNull(database.queries.selectByKeyId(keyId).executeAsOneOrNull())
-            assertIs<StoredKey.Software>(StoredKeyCodec.decodeFromString(assertNotNull(persisted.crypto2_stored_key)))
+            assertEquals(null, persisted.crypto2_stored_key)
+            database.queries.updateCrypto2StoredKey(
+                StoredKeyCodec.encodeToString(
+                    StoredKey.Software(
+                        version = StoredKey.CURRENT_VERSION,
+                        id = KeyId(keyId),
+                        spec = KeySpec.Edwards(EdwardsCurve.ED25519),
+                        usages = KEY_USAGES,
+                        material = EncodedKey.Jwk(BinaryData(key.exportJWK().encodeToByteArray()), privateMaterial = true),
+                    )
+                ),
+                keyId,
+            )
             val recreated = PlatformKeyStore(provider, database.queries)
-            assertNotNull(recreated.getKey(keyId))
-            assertNotNull(recreated.getCrypto2Key(keyId, setOf(KeyUsage.SIGN)))
+            val restoredLegacyKey = assertNotNull(recreated.getKey(keyId))
+            assertTrue(assertIs<ByteArray>(restoredLegacyKey.signRaw("payload".encodeToByteArray())).isNotEmpty())
+            assertEquals(null, recreated.getCrypto2Key(keyId, setOf(KeyUsage.SIGN)))
+            assertNotNull(database.queries.selectByKeyId(keyId).executeAsOne().crypto2_stored_key)
 
             val legacyKey = JWKKey.generate(KeyType.Ed25519)
             val legacyKeyId = legacyKey.getKeyId()
@@ -95,7 +109,7 @@ class PlatformKeyStoreRestartTest {
             )
 
             assertNotNull(PlatformKeyStore(provider, database.queries).getKey(legacyKeyId))
-            assertNotNull(database.queries.selectByKeyId(legacyKeyId).executeAsOne().crypto2_stored_key)
+            assertEquals(null, database.queries.selectByKeyId(legacyKeyId).executeAsOne().crypto2_stored_key)
         }
     }
 
@@ -199,7 +213,7 @@ class PlatformKeyStoreRestartTest {
             val softwareKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
                 GenerateSoftwareKeyRequest(
                     id = KeyId("crypto2-software"),
-                    spec = KeySpec.Edwards(EdwardsCurve.ED25519),
+                    spec = KeySpec.Rsa(2048),
                     usages = KEY_USAGES,
                 )
             )
@@ -207,7 +221,7 @@ class PlatformKeyStoreRestartTest {
 
             assertEquals(softwareKey.id.value, store.addCrypto2Key(softwareKey))
             val persisted = database.queries.selectByKeyId(softwareKey.id.value).executeAsOne()
-            assertEquals(KeyType.Ed25519.name, persisted.key_type)
+            assertEquals(KeyType.RSA.name, persisted.key_type)
             assertEquals(null, persisted.key_material)
             val restored = assertNotNull(
                 PlatformKeyStore(provider, database.queries)
@@ -216,7 +230,7 @@ class PlatformKeyStoreRestartTest {
 
             assertTrue(
                 assertNotNull(restored.capabilities.signer)
-                    .sign("payload".encodeToByteArray(), SignatureAlgorithm.EdDsa)
+                    .sign("payload".encodeToByteArray(), SignatureAlgorithm.RsaPkcs1(DigestAlgorithm.SHA_256))
                     .isNotEmpty()
             )
             assertEquals(0, provider.softwareLoadCount)
@@ -301,9 +315,9 @@ class PlatformKeyStoreRestartTest {
         database().use { database ->
             val provider = FakePlatformKeyProvider()
             val store = PlatformKeyStore(provider, database.queries)
-            val keyId = store.addKey(JWKKey.generate(KeyType.Ed25519))
+            val keyId = store.addKey(JWKKey.generate(KeyType.RSA))
             val oldRow = database.queries.selectByKeyId(keyId).executeAsOne()
-            val replacement = JWKKey.generate(KeyType.Ed25519)
+            val replacement = JWKKey.generate(KeyType.RSA)
             database.queries.insert(
                 key_id = oldRow.key_id,
                 key_type = replacement.keyType.name,

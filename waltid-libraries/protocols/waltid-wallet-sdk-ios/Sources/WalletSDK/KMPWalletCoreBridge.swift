@@ -263,8 +263,15 @@ private extension WalletConfiguration {
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
             attestation: attestation?.toKMPAttestationConfiguration(),
             preferredLocales: preferredLocales,
-            transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() }
+            transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
+            clientIdTrustConfiguration: clientIDTrustConfiguration.toKMPClientIDTrustConfiguration()
         )
+    }
+}
+
+private extension WalletClientIDTrustConfiguration {
+    func toKMPClientIDTrustConfiguration() -> WalletBridgeClientIdTrustConfiguration {
+        WalletBridgeClientIdTrustConfiguration(x509TrustAnchorsPem: x509TrustAnchorsPEM)
     }
 }
 
