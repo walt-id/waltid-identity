@@ -25,10 +25,13 @@ import kotlin.time.Clock
 private val log = KotlinLogging.logger {}
 
 /**
- * Resolves issuer metadata from well-known endpoints.
- * Implements §11.2 of OpenID4VCI 1.0 specification (Credential Issuer Metadata).
- * 
- * @property httpClient The HTTP client to use for fetching metadata
+ * Resolves Credential Issuer Metadata from its well-known endpoint.
+ *
+ * Supports unsigned metadata defined by OpenID4VCI 1.0 section 11.2 and signed metadata defined by section 12.2.3.
+ * Signed metadata is accepted only when [metadataTrustResolver] verifies both its JWS and signer authority.
+ *
+ * @property httpClient HTTP client used to fetch metadata.
+ * @property metadataTrustResolver Optional trust boundary for signed metadata. Without it, only unsigned metadata is accepted.
  */
 class IssuerMetadataResolver(
     private val httpClient: HttpClient,
@@ -42,11 +45,11 @@ class IssuerMetadataResolver(
     }
 
     /**
-     * Resolves credential issuer metadata from the issuer's well-known endpoint
-     * 
-     * @param credentialIssuerUrl The credential issuer identifier URL
-     * @return CredentialIssuerMetadata
-     * @throws Exception if metadata cannot be fetched or parsed
+     * Resolves credential issuer metadata from the issuer's well-known endpoint.
+     *
+     * @param credentialIssuerUrl Credential issuer identifier URL.
+     * @return Metadata together with whether it was unsigned or verified signed metadata.
+     * @throws Exception If metadata cannot be fetched, parsed, or trusted.
      */
     suspend fun resolveCredentialIssuerMetadata(
         credentialIssuerUrl: String,
