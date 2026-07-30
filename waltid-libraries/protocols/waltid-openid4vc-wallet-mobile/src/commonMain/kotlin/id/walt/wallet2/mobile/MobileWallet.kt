@@ -287,17 +287,11 @@ public class MobileWallet internal constructor(
         offerUrl: String,
         txCode: String? = null,
         clientId: String = "wallet-client",
-    ): List<String> =
-        WalletIssuanceHandler.receiveCredential(
-            wallet = wallet,
-            request = ReceiveCredentialRequest(
-                offerUrl = Url(offerUrl.trim()),
-                txCode = txCode?.ifBlank { null },
-                clientId = clientId,
-            ),
-            attestationAssembler = attestationAssembler,
-            onEvent = ::emitSessionEvent,
-        ).credentialIds
+    ): List<String> = receive(
+        previewHandle = resolveOffer(offerUrl).previewHandle,
+        txCode = txCode,
+        clientId = clientId,
+    )
 
     /** Receives credentials using exactly one reviewed offer preview. */
     public suspend fun receive(

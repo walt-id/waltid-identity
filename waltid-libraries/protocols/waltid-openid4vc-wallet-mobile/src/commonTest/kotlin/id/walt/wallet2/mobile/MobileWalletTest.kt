@@ -330,6 +330,7 @@ class MobileWalletTest {
                     policyUri = null,
                     termsOfServiceUri = null,
                 ),
+                verifierMetadataProvenance = MobileWalletVerifierMetadataProvenance.UnsignedRequest,
                 responseUri = "https://verifier.example/direct-post",
                 state = "state-1",
                 nonce = "nonce-1",
