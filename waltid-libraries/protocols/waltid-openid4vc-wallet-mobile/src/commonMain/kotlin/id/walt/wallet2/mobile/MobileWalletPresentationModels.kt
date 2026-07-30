@@ -76,12 +76,23 @@ public data class MobileWalletPresentationCredentialRequirement(
 public data class MobileWalletPresentationRequestInfo(
     val clientId: String?,
     val verifierMetadata: MobileWalletVerifierMetadata?,
+    val verifierMetadataProvenance: MobileWalletVerifierMetadataProvenance,
     val responseUri: String?,
     val state: String?,
     val nonce: String?,
     val responseEncryption: MobileWalletResponseEncryption,
     val transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
 )
+
+public sealed interface MobileWalletVerifierMetadataProvenance {
+    public data object UnsignedRequest : MobileWalletVerifierMetadataProvenance
+    public data class SignedRequest(
+        public val compactRequestObject: String,
+        public val algorithm: String,
+        public val keyId: String?,
+        public val clientIdPrefix: String,
+    ) : MobileWalletVerifierMetadataProvenance
+}
 
 /**
  * A wallet credential that satisfies one DCQL credential query in the presentation request.

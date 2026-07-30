@@ -166,6 +166,7 @@ sealed interface PreviewPresentationResult {
 
     data class Ready(
         override val handle: PresentationPreviewHandle,
+        val resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
         val authorizationRequest: AuthorizationRequest,
         /** Response-encryption selection derived from this authenticated request, or `null` for a plain response. */
         val responseEncryption: ResponseEncryption.Metadata?,
@@ -176,6 +177,7 @@ sealed interface PreviewPresentationResult {
 
     data class Invalid(
         override val handle: PresentationPreviewHandle,
+        val resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
         val authorizationRequest: AuthorizationRequest,
         val error: PresentationRequestError,
     ) : PreviewPresentationResult
@@ -390,7 +392,7 @@ object WalletPresentationHandler {
                     error = validation.error,
                 ),
             )
-            return PreviewPresentationResult.Invalid(handle, authorizationRequest, validation.error)
+            return PreviewPresentationResult.Invalid(handle, resolvedAuthorizationRequest, authorizationRequest, validation.error)
         }
 
         val valid = validation as PresentationRequestValidationResult.Valid
@@ -424,7 +426,7 @@ object WalletPresentationHandler {
                     error = availabilityError,
                 ),
             )
-            return PreviewPresentationResult.Invalid(handle, authorizationRequest, availabilityError)
+            return PreviewPresentationResult.Invalid(handle, resolvedAuthorizationRequest, authorizationRequest, availabilityError)
         }
         onEvent(WalletSessionEvent.presentation_credentials_selected)
         val credentialOptions = matched.flatMap { (queryId, results) ->
@@ -454,6 +456,7 @@ object WalletPresentationHandler {
         )
         return PreviewPresentationResult.Ready(
             handle = handle,
+            resolvedAuthorizationRequest = resolvedAuthorizationRequest,
             authorizationRequest = authorizationRequest,
             responseEncryption = responseEncryption,
             credentialRequirements = query.requiredCredentialRequirements(),
