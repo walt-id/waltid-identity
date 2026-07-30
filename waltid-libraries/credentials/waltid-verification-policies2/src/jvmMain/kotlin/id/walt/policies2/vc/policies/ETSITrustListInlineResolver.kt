@@ -1,7 +1,6 @@
 package id.walt.policies2.vc.policies
 
-import id.walt.trust.model.TrustDecision
-import id.walt.trust.model.TrustedEntityType
+import id.walt.trust.model.*
 import id.walt.trust.service.DefaultTrustRegistryService
 import id.walt.trust.store.InMemoryTrustStore
 import id.walt.x509.CertificateDer
@@ -28,11 +27,20 @@ actual object ETSITrustListInlineResolver {
         expectedServiceType: String?,
         allowStaleSource: Boolean,
         requireAuthenticated: Boolean,
-        validateSignatures: Boolean
+        validateSignatures: Boolean,
+        trustedSourceSignerCertificates: List<String>
     ): Result<JsonElement> {
         // Create an ephemeral trust registry for this verification request
         val trustStore = InMemoryTrustStore()
         val trustService = DefaultTrustRegistryService(trustStore)
+        val loadOptions = SourceLoadOptions(
+            acceptancePolicy = when {
+                !validateSignatures -> SourceAcceptancePolicy.ALLOW_UNVERIFIED
+                trustedSourceSignerCertificates.isNotEmpty() -> SourceAcceptancePolicy.REQUIRE_AUTHENTICATED
+                else -> SourceAcceptancePolicy.ALLOW_UNSIGNED
+            },
+            trustedSignerCertificates = trustedSourceSignerCertificates
+        )
         
         // Load all trust lists, counting how many succeed
         var loadedCount = 0
@@ -45,7 +53,7 @@ actual object ETSITrustListInlineResolver {
                     trustService.loadSourceFromUrl(
                         sourceId = sourceId,
                         url = source,
-                        validateSignature = validateSignatures
+                        options = loadOptions
                     )
                 } else {
                     log.debug { "Loading trust list from inline content (${source.length} chars)" }
@@ -53,7 +61,7 @@ actual object ETSITrustListInlineResolver {
                         sourceId = sourceId,
                         content = source,
                         sourceUrl = null,
-                        validateSignature = validateSignatures
+                        options = loadOptions
                     )
                 }
 
@@ -82,43 +90,13 @@ actual object ETSITrustListInlineResolver {
             runCatching { TrustedEntityType.valueOf(it) }.getOrNull()
         }
         
-        // Resolve certificate chain
-        for ((index, certPem) in certificateChain.withIndex()) {
-            log.debug { "Checking certificate at index $index via inline resolution" }
-            
-            val decision = trustService.resolveByCertificate(
-                certificatePemOrDer = certPem,
-                instant = Clock.System.now(),
-                expectedEntityType = entityType,
-                expectedServiceType = expectedServiceType
-            )
-            
-            val decisionCode = decision.decision.name
-            
-            if (decisionCode == "TRUSTED" || (decisionCode == "STALE_SOURCE" && allowStaleSource)) {
-                // Security check: if the trusted certificate is not the leaf (index 0),
-                // we must verify the chain from leaf to this trusted certificate
-                if (index > 0) {
-                    val chainValidation = validateCertificateChainToIndex(certificateChain, index)
-                    if (!chainValidation.first) {
-                        log.warn { "Certificate chain validation failed: ${chainValidation.second}" }
-                        // Continue checking other certificates in the chain
-                        continue
-                    }
-                    log.debug { "Certificate chain validated from leaf to trusted cert at index $index" }
-                }
-                
-                log.debug { "Found trusted certificate at chain index $index" }
-                return evaluateAndBuildResult(decision, allowStaleSource, requireAuthenticated)
-            }
-            
-            log.debug { "Certificate at index $index not trusted (decision: $decisionCode)" }
-        }
-        
-        return Result.failure(ETSITrustListPolicyException(
-            "Certificate chain not trusted: no certificate in the chain (length: ${certificateChain.size}) " +
-            "was found in the inline trust lists (${trustLists.size} sources loaded), or chain validation failed"
-        ))
+        val decision = trustService.resolveCertificateChain(
+            certificateChainPemOrDer = certificateChain,
+            instant = Clock.System.now(),
+            expectedEntityType = entityType,
+            expectedServiceType = expectedServiceType
+        )
+        return evaluateAndBuildResult(decision, allowStaleSource, requireAuthenticated)
     }
     
     private fun isUrl(source: String): Boolean {
@@ -134,6 +112,15 @@ actual object ETSITrustListInlineResolver {
         val decisionCode = decision.decision.name
         val freshness = decision.sourceFreshness.name
         val authenticity = decision.authenticity.name
+
+        if (authenticity == "FAILED") {
+            return Result.failure(ETSITrustListPolicyException("Trust source authenticity validation failed"))
+        }
+        if (requireAuthenticated && authenticity != "AUTHENTICATED") {
+            return Result.failure(ETSITrustListPolicyException(
+                "Trust source authenticity not validated (got: $authenticity)"
+            ))
+        }
         
         return when (decisionCode) {
             "TRUSTED" -> {
@@ -144,10 +131,6 @@ actual object ETSITrustListInlineResolver {
                 } else if (freshness == "EXPIRED") {
                     Result.failure(ETSITrustListPolicyException(
                         "Trust source has expired"
-                    ))
-                } else if (requireAuthenticated && authenticity != "VALIDATED") {
-                    Result.failure(ETSITrustListPolicyException(
-                        "Trust source authenticity not validated (got: $authenticity)"
                     ))
                 } else {
                     Result.success(buildSuccessJson(decision))

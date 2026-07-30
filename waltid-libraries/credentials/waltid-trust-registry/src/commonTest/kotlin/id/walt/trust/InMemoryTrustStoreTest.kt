@@ -207,13 +207,19 @@ class InMemoryTrustStoreTest {
     }
 
     @Test
-    fun `update source authenticity`() = runTest {
+    fun `update source assurance`() = runTest {
         val store = createStore()
         store.upsertSource(testSource)
 
-        store.updateSourceAuthenticity("src-1", AuthenticityState.VALIDATED)
+        val assurance = SourceAssurance(
+            signatureStatus = SignatureStatus.VALID,
+            signerTrust = SignerTrust.NOT_EVALUATED,
+            authenticityState = AuthenticityState.INTEGRITY_VERIFIED,
+            accepted = true
+        )
+        store.updateSourceAssurance("src-1", assurance)
         val result = store.getSource("src-1")
-        assertEquals(AuthenticityState.VALIDATED, result?.authenticityState)
+        assertEquals(assurance, result?.assurance)
     }
 
     @Test
