@@ -11,6 +11,7 @@ import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.wallet2.handlers.WalletIssuanceMetadataProvenance
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletConfig
@@ -26,6 +27,7 @@ import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
+import id.walt.wallet2.mobile.MobileWalletVerifierMetadataProvenance
 import id.walt.x509.CertificateDer
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -132,6 +134,48 @@ class MobileWalletIntegrationTest {
     @Test
     fun receiveIsoMdlFromDemoIssuer2() = runBlocking {
         receiveCredentialFromDemoIssuer2("iso-mdl")
+    }
+
+    @Test
+    fun receiveAndPresentUsingSignedMetadataAgainstDemoIssuer2AndVerifier2() = runBlocking {
+        val scenario = demoPresentationScenario("eudi-pid-mdoc")
+        val client = MobileWalletFactory(context).create(
+            walletConfig("signed-${scenario.id}").copy(
+                credentialIssuerMetadataTrustResolver = DemoTestBackend.publicDemoIssuerMetadataTrustResolver,
+            ),
+        )
+        val bootstrap = client.bootstrap()
+        val offer = DemoTestBackend.createOffer(scenario)
+
+        val issuanceSession = client.startIssuance(
+            MobileWalletIssuanceRequest(offerUrl = offer.offerUrl),
+        )
+        val issuerProvenance = assertIs<WalletIssuanceMetadataProvenance.Signed>(
+            issuanceSession.offer.issuer.metadataProvenance,
+        )
+        assertTrue(issuerProvenance.compactJwt.isNotBlank())
+        assertTrue(issuerProvenance.algorithm.isNotBlank())
+        assertNotNull(issuerProvenance.keyId)
+
+        val credentialIds = client.continuePreAuthorizedIssuance(issuanceSession.id, offer.txCode).storedCredentialIds()
+        assertTrue(credentialIds.isNotEmpty(), "Should receive a credential from reviewed signed metadata")
+
+        val signedSession = DemoTestBackend.createVerifierSession(scenario, signedRequest = true)
+        val preview = client.previewPresentation(signedSession.authorizationRequestUri).requireReadyPreview()
+        val verifierProvenance = assertIs<MobileWalletVerifierMetadataProvenance.SignedRequest>(
+            preview.request.verifierMetadataProvenance,
+        )
+        assertTrue(verifierProvenance.compactRequestObject.isNotBlank())
+        assertTrue(verifierProvenance.algorithm.isNotBlank())
+        assertNotNull(verifierProvenance.keyId)
+
+        val result = client.submitPresentation(
+            previewHandle = preview.previewHandle,
+            selectedCredentialOptions = preview.credentialOptions.map { it.selection },
+            did = bootstrap.did,
+        )
+        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(result)
+        DemoTestBackend.waitForVerifierSuccess(signedSession.sessionId)
     }
 
     @Test

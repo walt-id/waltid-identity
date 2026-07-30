@@ -11,6 +11,9 @@ waltidMobile {
 kotlin {
     sourceSets {
         commonMain.dependencies {
+            implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+            implementation(project(":waltid-libraries:protocols:waltid-openid4vci"))
+            implementation(project(":waltid-libraries:protocols:waltid-openid4vci-wallet"))
             implementation(identityLibs.ktor.client.core)
             implementation(identityLibs.kotlinx.serialization.json)
         }
