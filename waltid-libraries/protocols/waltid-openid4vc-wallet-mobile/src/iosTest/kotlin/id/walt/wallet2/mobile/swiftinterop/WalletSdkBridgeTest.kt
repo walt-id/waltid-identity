@@ -16,6 +16,7 @@ import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletIssuerMetadata
 import id.walt.wallet2.mobile.MobileWalletMetadataDisplay
+import id.walt.wallet2.mobile.MobileWalletMetadataProvenance
 import id.walt.wallet2.mobile.MobileWalletOfferedCredentialMetadata
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialOption
@@ -35,6 +36,7 @@ import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.mobile.MobileWalletTransactionCodeInputMode
 import id.walt.wallet2.mobile.MobileWalletTransactionCodeRequirement
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
+import id.walt.wallet2.mobile.MobileWalletVerifierMetadataProvenance
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.x509.CertificateDer
@@ -206,6 +208,7 @@ class WalletSdkBridgeTest {
                     policyUri = null,
                     termsOfServiceUri = null,
                 ),
+                verifierMetadataProvenance = MobileWalletVerifierMetadataProvenance.UnsignedRequest,
                 responseUri = "https://verifier.example/direct-post",
                 state = "state-1",
                 nonce = null,
@@ -549,6 +552,36 @@ class WalletSdkBridgeTest {
     }
 
     @Test
+    fun bridgeConfigurationAdaptsSignedIssuerMetadataTrustResolver() = runTest {
+        var verifiedJwt: String? = null
+        var verifiedIssuer: String? = null
+        val config = WalletBridgeConfiguration(
+            issuerMetadataTrustResolver = object : WalletBridgeIssuerMetadataTrustResolver {
+                override suspend fun verify(
+                    compactJwt: String,
+                    expectedCredentialIssuer: String,
+                ) = WalletBridgeIssuerMetadataSigner(
+                    keyId = "issuer-key",
+                    algorithm = "EdDSA",
+                    trustType = WalletBridgeIssuerMetadataSignerTrustType.TrustedDelegate,
+                ).also {
+                    verifiedJwt = compactJwt
+                    verifiedIssuer = expectedCredentialIssuer
+                }
+            },
+        ).toMobileWalletConfig()
+
+        val signer = requireNotNull(config.credentialIssuerMetadataTrustResolver)
+            .verify("header.payload.signature", "https://issuer.example")
+
+        assertEquals("header.payload.signature", verifiedJwt)
+        assertEquals("https://issuer.example", verifiedIssuer)
+        assertEquals("issuer-key", signer.keyId)
+        assertEquals("EdDSA", signer.algorithm)
+        assertEquals(id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType.TRUSTED_DELEGATE, signer.trustType)
+    }
+
+    @Test
     fun factoryReturnsTypedFailureWhenWalletCreationFails() = runTest {
         val factory = WalletSdkBridgeFactory.forOperationsFactory {
             throw IllegalArgumentException("bad wallet config")
@@ -634,6 +667,7 @@ class WalletSdkBridgeTest {
                 issuer = MobileWalletIssuerMetadata(
                     credentialIssuer = "https://issuer.example",
                     display = null,
+                    provenance = MobileWalletMetadataProvenance.Unsigned,
                 ),
                 offeredCredentials = listOf(
                     MobileWalletOfferedCredentialMetadata(
@@ -719,6 +753,7 @@ class WalletSdkBridgeTest {
                         policyUri = null,
                         termsOfServiceUri = null,
                     ),
+                    verifierMetadataProvenance = MobileWalletVerifierMetadataProvenance.UnsignedRequest,
                     responseUri = "https://verifier.example/direct-post",
                     state = "state-1",
                     nonce = "nonce-1",

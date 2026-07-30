@@ -68,10 +68,10 @@ class IssuerMetadataResolverTest {
     }
 
     @Test
-    fun jsonMetadataProducesUnsignedResolutionAndAdvertisesJwtSupport() = runTest {
+    fun jsonMetadataProducesUnsignedResolutionWithoutAdvertisingJwtSupport() = runTest {
         val issuerUrl = "https://example.com"
         val client = createMockClient { request ->
-            assertEquals("application/jwt, application/json", request.headers[HttpHeaders.Accept])
+            assertEquals("application/json", request.headers[HttpHeaders.Accept])
             respond(
                 content = """{"credential_issuer":"$issuerUrl","credential_endpoint":"$issuerUrl/credential","credential_configurations_supported":{}}""",
                 status = HttpStatusCode.OK,
