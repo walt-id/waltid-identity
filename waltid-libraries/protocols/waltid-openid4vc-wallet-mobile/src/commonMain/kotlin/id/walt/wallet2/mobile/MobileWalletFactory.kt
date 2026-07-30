@@ -14,6 +14,7 @@ import id.walt.wallet2.persistence.stores.PlatformKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 
 /**
  * Configuration for creating a [MobileWallet].
@@ -35,6 +36,7 @@ public data class MobileWalletConfig(
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    public val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
 )
 
 /**
@@ -190,6 +192,7 @@ private fun createSqlDelightMobileWallet(
         attestationConfig = config.attestationConfig,
         preferredLocales = config.preferredLocales,
         transactionDataProfiles = config.transactionDataProfiles,
+        credentialIssuerMetadataTrustResolver = config.credentialIssuerMetadataTrustResolver,
         onEvent = config.onEvent,
         deleteLocalPersistence = deleteLocalPersistence,
     )

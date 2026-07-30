@@ -128,7 +128,7 @@ class WalletIssuanceHandlerPreviewTest {
             httpClient = client,
         )
 
-        assertEquals(ISSUER, preview.issuerMetadata.credentialIssuer)
+        assertEquals(ISSUER, preview.issuerMetadata.metadata.credentialIssuer)
         assertEquals("pid", preview.offeredCredentials.single().credentialConfigurationId)
         assertEquals("text", preview.transactionCode?.inputMode)
 

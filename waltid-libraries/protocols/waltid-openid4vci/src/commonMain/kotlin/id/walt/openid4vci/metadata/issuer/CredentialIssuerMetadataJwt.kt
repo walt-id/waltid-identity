@@ -17,7 +17,7 @@ object CredentialIssuerMetadataJwt {
     const val MEDIA_TYPE = "application/jwt"
     const val TYPED_MEDIA_TYPE = "application/openidvci-issuer-metadata+jwt"
 
-    internal val reservedPayloadClaims = setOf(
+    val reservedPayloadClaims = setOf(
         JwtPayloadClaims.ISSUER,
         JwtPayloadClaims.SUBJECT,
         JwtPayloadClaims.ISSUED_AT,

@@ -59,7 +59,7 @@ class Issuer2WalletFlowDriver(
             credentialOffer = offerRequest.credentialOffer,
             credentialOfferUri = offerRequest.credentialOfferUri,
         )
-        val issuerMetadata = IssuerMetadataResolver(client).resolveCredentialIssuerMetadata(offer.credentialIssuer)
+        val issuerMetadata = IssuerMetadataResolver(client).resolveCredentialIssuerMetadata(offer.credentialIssuer).metadata
         val authorizationServerMetadata = IssuerMetadataResolver(client)
             .resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
 
@@ -172,7 +172,7 @@ class Issuer2WalletFlowDriver(
         requestMode: Issuer2AuthorizationRequestMode,
         credentialIssuer: String = DEFAULT_CREDENTIAL_ISSUER,
     ): String {
-        val issuerMetadata = IssuerMetadataResolver(client).resolveCredentialIssuerMetadata(credentialIssuer)
+        val issuerMetadata = IssuerMetadataResolver(client).resolveCredentialIssuerMetadata(credentialIssuer).metadata
         val authorizationServerMetadata = IssuerMetadataResolver(client)
             .resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
         val authorizationUrl = buildAuthorizationRequestUrl(

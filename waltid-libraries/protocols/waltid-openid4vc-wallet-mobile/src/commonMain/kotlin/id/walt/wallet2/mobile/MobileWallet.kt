@@ -31,6 +31,7 @@ import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
@@ -169,6 +170,7 @@ public class MobileWallet internal constructor(
     attestationConfig: WalletAttestationConfig? = null,
     private val preferredLocales: List<String> = emptyList(),
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    private val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {
@@ -263,6 +265,7 @@ public class MobileWallet internal constructor(
         WalletIssuanceHandler.previewOffer(
             wallet = wallet,
             request = ResolveOfferRequest(offerUrl = Url(offerUrl.trim())),
+            metadataTrustResolver = credentialIssuerMetadataTrustResolver,
         ).toMobileOfferResolution(preferredLocales)
 
     /**
