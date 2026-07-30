@@ -1,17 +1,25 @@
 package id.walt.certificate.x509.profile
 
 import id.walt.certificate.TestData.intermediateIssuerKeyPem
+import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
+import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension.Companion.extensionIssuerAltName
+import id.walt.certificate.x509.extension.KeyUsageExtension
+import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
+import id.walt.certificate.x509.model.GeneralName
 import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile.profileIaCaRootCertificate
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.X509SingleCertificateValidator
 import id.walt.crypto.keys.JvmJWKKeyCreator
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.x509.iso.IsoSharedTestHarnessValidResources
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class IsoIaCaRootX509CertificateProfileTest {
 
@@ -62,11 +70,119 @@ class IsoIaCaRootX509CertificateProfileTest {
         assertFalse(validationResult.valid)
     }
 
+
+    @Test
+    fun `build should succeed when IACA signing key is of valid keyType`() = runTest {
+        IsoSharedTestHarnessValidResources
+            .iacaSigningKeyMap()
+            .values
+            .forEach { validSigningKey ->
+                val caCert = X509CertificateUtil.createSelfSignedCertificate(validSigningKey) {
+                    profileIaCaRootCertificate(
+                        issuerEmailAddress = "iaca@example.com",
+                        issuerUri = "https://iaca.example.com",
+                        issuerDnCountryCode = "US",
+                        issuerDnCommonName = "Example IACA",
+                    )
+                }
+                assertIaCaCertificateData(
+                    "CN=Example IACA,C=US",
+                    listOf(
+                        GeneralName(GeneralName.NameType.rfc822Name, "iaca@example.com"),
+                        GeneralName(GeneralName.NameType.uniformResourceIdentifier, "https://iaca.example.com"),
+                    ),
+                    caCert
+                )
+            }
+    }
+
+    @Test
+    fun `build should be safe when called concurrently`() = runTest {
+        val signingKey = IsoSharedTestHarnessValidResources.iacaSecp256r1SigningKey()
+        val bundles = List(20) { index ->
+            async {
+                X509CertificateUtil.createSelfSignedCertificate(signingKey) {
+                    profileIaCaRootCertificate(
+                        issuerEmailAddress = "iaca@example.com",
+                        issuerUri = "https://iaca.example.com",
+                        issuerDnCountryCode = "US",
+                        issuerDnCommonName = "Example IACA ${index}",
+                    )
+                }
+            }
+        }.awaitAll()
+
+        assertTrue {
+            bundles.all { it.encodedDer.size != 0 }
+        }
+        //all serial numbers are unique -> hence all generated certificates different
+        assertEquals(
+            bundles.size,
+            bundles.map { it.data.serialNumberRaw }.toSet().size,
+            "Not all serial numbers are unique."
+        )
+    }
+
+    @Test
+    fun `Validation should fail when IACA signing key is of invalid keyType`() = runTest {
+        listOf(
+            //KeyType.Ed25519, TODO: enable Ed25519 ... export PEM is not supported
+            KeyType.RSA,
+            KeyType.RSA3072,
+            KeyType.RSA4096,
+            KeyType.secp256k1,
+        ).forEach { invalidKeyType ->
+            val key = JWKKey.generate(invalidKeyType)
+            val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
+                profileIaCaRootCertificate(
+                    issuerEmailAddress = "illegal.key@example.com",
+                    issuerUri = "https://illegal-key.iaca.example.com",
+                    issuerDnCountryCode = "US",
+                    issuerDnCommonName = "Example IACA Illegal Key",
+                )
+            }
+            val result = validator.validate(cert)
+            assertTrue(
+                invalidKeyType == KeyType.secp256k1 || //EC is allowed but not the curve
+                        result.log.any { it.validatorId == "iso-iaca-root.signatureAlgorithm" && it.severity == ValidationResult.Severity.ERROR },
+                "Key: ${invalidKeyType}"
+            )
+            assertTrue(result.log.any { it.validatorId == "iso-iaca-root.subjectPublicKeyInfo" && it.severity == ValidationResult.Severity.ERROR })
+        }
+    }
+
+
     companion object {
         val key = runBlocking {
             JvmJWKKeyCreator.importPEM(intermediateIssuerKeyPem).getOrThrow()
         }
 
         val validator = X509SingleCertificateValidator(listOf(IsoIaCaRootX509CertificateProfile))
+
+        fun assertIaCaCertificateData(
+            expectedPrincipalDn: String,
+            expectedIssuerAltNames: List<GeneralName>?,
+            cert: X509Certificate,
+        ) {
+
+            assertEquals(expectedPrincipalDn, cert.data.subjectDn)
+            assertEquals(expectedPrincipalDn, cert.data.issuerDn)
+            assertNotNull(cert.data.extensionBasicConstraints).also { bc ->
+                assertTrue(bc.cA)
+                assertEquals(0, bc.pathLenConstraint)
+            }
+
+            expectedIssuerAltNames?.also { expIssAltNames ->
+                assertNotNull(cert.data.extensionIssuerAltName).also { issAltNames ->
+                    assertEquals(expIssAltNames, issAltNames.alternativeNames)
+                }
+            }
+
+            assertNotNull(cert.data.extensionKeyUsage).also { ku ->
+                assertTrue(ku.keyPurposeIdList.contains(KeyUsageExtension.KeyUsage.cRLSign))
+                assertTrue(ku.keyPurposeIdList.contains(KeyUsageExtension.KeyUsage.keyCertSign))
+            }
+        }
+
     }
 }
