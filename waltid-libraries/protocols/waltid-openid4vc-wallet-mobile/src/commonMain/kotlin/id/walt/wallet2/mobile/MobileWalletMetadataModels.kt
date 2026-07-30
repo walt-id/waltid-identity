@@ -6,6 +6,8 @@ import id.walt.openid4vci.metadata.issuer.IssuerDisplay
 import id.walt.openid4vci.offers.TxCode
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.wallet2.handlers.WalletOfferPreviewResult
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
+import id.waltid.openid4vci.wallet.metadata.ResolvedCredentialIssuerMetadata
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.experimental.ExperimentalObjCName
@@ -48,7 +50,21 @@ public data class MobileWalletMetadataDisplay(
 public data class MobileWalletIssuerMetadata(
     public val credentialIssuer: String,
     public val display: MobileWalletMetadataDisplay?,
+    public val provenance: MobileWalletMetadataProvenance,
 )
+
+/** Whether issuer metadata was received as JSON or as a verified, trusted signed JWT. */
+public sealed interface MobileWalletMetadataProvenance {
+    public data object Unsigned : MobileWalletMetadataProvenance
+    public data class Signed(
+        public val compactJwt: String,
+        public val algorithm: String,
+        public val keyId: String?,
+        public val trustType: MobileWalletMetadataTrustType,
+    ) : MobileWalletMetadataProvenance
+}
+
+public enum class MobileWalletMetadataTrustType { TrustedIssuer, TrustedDelegate }
 
 /**
  * Display metadata for one claim declared by an offered credential configuration.
@@ -196,8 +212,9 @@ internal fun WalletOfferPreviewResult.toMobileOfferResolution(
 ): MobileWalletOfferResolution = MobileWalletOfferResolution(
     previewHandle = MobileWalletIssuancePreviewHandle(previewHandle.value),
     issuer = MobileWalletIssuerMetadata(
-        credentialIssuer = issuerMetadata.credentialIssuer,
-        display = issuerMetadata.display.selectPreferred(preferredLocales)?.toMobileDisplay(),
+        credentialIssuer = issuerMetadata.metadata.credentialIssuer,
+        display = issuerMetadata.metadata.display.selectPreferred(preferredLocales)?.toMobileDisplay(),
+        provenance = issuerMetadata.toMobileProvenance(),
     ),
     offeredCredentials = offeredCredentials.map { offeredCredential ->
         val configuration = offeredCredential.configuration
@@ -220,6 +237,19 @@ internal fun WalletOfferPreviewResult.toMobileOfferResolution(
     },
     transactionCode = transactionCode?.toMobileRequirement(),
 )
+
+private fun ResolvedCredentialIssuerMetadata.toMobileProvenance(): MobileWalletMetadataProvenance = when (this) {
+    is ResolvedCredentialIssuerMetadata.Unsigned -> MobileWalletMetadataProvenance.Unsigned
+    is ResolvedCredentialIssuerMetadata.Signed -> MobileWalletMetadataProvenance.Signed(
+        compactJwt = compactJwt,
+        algorithm = signer.algorithm,
+        keyId = signer.keyId,
+        trustType = when (signer.trustType) {
+            MetadataSignerTrustType.TRUSTED_ISSUER -> MobileWalletMetadataTrustType.TrustedIssuer
+            MetadataSignerTrustType.TRUSTED_DELEGATE -> MobileWalletMetadataTrustType.TrustedDelegate
+        },
+    )
+}
 
 @OptIn(ExperimentalSerializationApi::class)
 internal fun ClientMetadata.toMobileVerifierMetadata(

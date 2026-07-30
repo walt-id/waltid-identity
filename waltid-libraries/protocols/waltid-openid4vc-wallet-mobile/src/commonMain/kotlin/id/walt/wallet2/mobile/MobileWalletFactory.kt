@@ -19,6 +19,7 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.uuid.Uuid
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 
 /**
  * Configuration for creating a [MobileWallet].
@@ -40,6 +41,7 @@ public data class MobileWalletConfig(
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    public val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
 )
 
 /**
@@ -184,6 +186,7 @@ internal fun createSqlDelightMobileWallet(
         preferredLocales = config.preferredLocales,
         transactionDataProfiles = config.transactionDataProfiles,
         clientIdTrustConfiguration = clientIdTrustConfiguration,
+        credentialIssuerMetadataTrustResolver = config.credentialIssuerMetadataTrustResolver,
         onEvent = config.onEvent,
         deleteLocalPersistence = deleteLocalPersistence,
     )

@@ -13,6 +13,9 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.wallet2.handlers.IssuancePreviewHandle
 import id.walt.wallet2.handlers.WalletOfferPreviewResult
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
+import id.waltid.openid4vci.wallet.metadata.MetadataSigner
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
+import id.waltid.openid4vci.wallet.metadata.ResolvedCredentialIssuerMetadata
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.test.Test
@@ -20,6 +23,37 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class MobileWalletMetadataModelsTest {
+    private fun unsigned(metadata: CredentialIssuerMetadata) = ResolvedCredentialIssuerMetadata.Unsigned(metadata)
+
+    @Test
+    fun signedIssuerMetadataProjectsVerifiedProvenance() {
+        val metadata = CredentialIssuerMetadata(
+            credentialIssuer = "https://issuer.example",
+            credentialEndpoint = "https://issuer.example/credential",
+            credentialConfigurationsSupported = emptyMap(),
+        )
+        val result = WalletOfferPreviewResult(
+            previewHandle = IssuancePreviewHandle("signed-preview"),
+            issuerMetadata = ResolvedCredentialIssuerMetadata.Signed(
+                metadata = metadata,
+                compactJwt = "header.payload.signature",
+                signer = MetadataSigner("issuer-key", "EdDSA", MetadataSignerTrustType.TRUSTED_ISSUER),
+            ),
+            offeredCredentials = emptyList(),
+            transactionCode = null,
+        ).toMobileOfferResolution(emptyList())
+
+        assertEquals(
+            MobileWalletMetadataProvenance.Signed(
+                compactJwt = "header.payload.signature",
+                algorithm = "EdDSA",
+                keyId = "issuer-key",
+                trustType = MobileWalletMetadataTrustType.TrustedIssuer,
+            ),
+            result.issuer.provenance,
+        )
+    }
+
     @Test
     fun offerPreviewMapsActualMetadataWithLocaleFallbacks() {
         val credential = CredentialConfiguration(
@@ -57,7 +91,7 @@ class MobileWalletMetadataModelsTest {
 
         val result = WalletOfferPreviewResult(
             previewHandle = IssuancePreviewHandle("metadata-locale-preview"),
-            issuerMetadata = issuer,
+            issuerMetadata = unsigned(issuer),
             offeredCredentials = listOf(
                 OfferedCredentialResolver.ResolvedCredentialOffer("pid", credential)
             ),
@@ -86,7 +120,7 @@ class MobileWalletMetadataModelsTest {
         )
         val preview = WalletOfferPreviewResult(
             previewHandle = IssuancePreviewHandle("metadata-script-preview"),
-            issuerMetadata = issuer,
+            issuerMetadata = unsigned(issuer),
             offeredCredentials = emptyList(),
             transactionCode = null,
         )
@@ -105,12 +139,12 @@ class MobileWalletMetadataModelsTest {
     fun localeLookupFallsBackToUnlocalizedThenFirstEntry() {
         fun resolve(display: List<IssuerDisplay>): String? = WalletOfferPreviewResult(
             previewHandle = IssuancePreviewHandle("metadata-fallback-preview"),
-            issuerMetadata = CredentialIssuerMetadata(
+            issuerMetadata = unsigned(CredentialIssuerMetadata(
                 credentialIssuer = "https://issuer.example",
                 credentialEndpoint = "https://issuer.example/credential",
                 display = display,
                 credentialConfigurationsSupported = emptyMap(),
-            ),
+            )),
             offeredCredentials = emptyList(),
             transactionCode = null,
         ).toMobileOfferResolution(listOf("en-AU")).issuer.display?.name
