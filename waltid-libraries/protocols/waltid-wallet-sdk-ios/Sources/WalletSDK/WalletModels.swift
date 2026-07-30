@@ -11,6 +11,9 @@ public struct WalletConfiguration: Sendable {
     /// Optional enterprise attestation configuration.
     public var attestation: WalletAttestationConfiguration?
 
+    /// Optional verifier for signed Credential Issuer Metadata.
+    public var issuerMetadataTrustResolver: (any IssuerMetadataTrustResolver)?
+
     /// Wallet-local persistence configuration.
     public var persistence: WalletPersistence
 
@@ -29,6 +32,7 @@ public struct WalletConfiguration: Sendable {
     ///     when no operation-specific override is supplied.
     ///   - attestation: Optional wallet attestation configuration for issuers
     ///     that require client attestation.
+    ///   - issuerMetadataTrustResolver: Verifies signed Credential Issuer Metadata and its signer's authority.
     ///   - persistence: Local persistence configuration for wallet-owned state.
     ///   - transactionDataProfiles: OpenID4VP transaction data profiles this
     ///     wallet accepts before previewing or submitting a presentation.
@@ -38,6 +42,7 @@ public struct WalletConfiguration: Sendable {
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
         attestation: WalletAttestationConfiguration? = nil,
+        issuerMetadataTrustResolver: (any IssuerMetadataTrustResolver)? = nil,
         persistence: WalletPersistence = WalletPersistence(),
         transactionDataProfiles: [WalletTransactionDataProfile] = [],
         preferredLocales: [String] = Locale.preferredLanguages
@@ -45,10 +50,39 @@ public struct WalletConfiguration: Sendable {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
         self.attestation = attestation
+        self.issuerMetadataTrustResolver = issuerMetadataTrustResolver
         self.persistence = persistence
         self.transactionDataProfiles = transactionDataProfiles
         self.preferredLocales = preferredLocales
     }
+}
+
+/// Trusted signer details returned after verifying signed Credential Issuer Metadata.
+public struct IssuerMetadataSigner: Equatable, Sendable {
+    /// Signer's JWS key identifier when supplied.
+    public let keyID: String?
+    /// JWS algorithm verified by the trust resolver.
+    public let algorithm: String
+    /// Authority category established by the trust resolver.
+    public let trustType: IssuerMetadataSignerTrustType
+
+    public init(keyID: String?, algorithm: String, trustType: IssuerMetadataSignerTrustType) {
+        self.keyID = keyID
+        self.algorithm = algorithm
+        self.trustType = trustType
+    }
+}
+
+/// Authority category established for a signer of Credential Issuer Metadata.
+public enum IssuerMetadataSignerTrustType: Equatable, Sendable {
+    case trustedIssuer
+    case trustedDelegate
+}
+
+/// Verifies signed Credential Issuer Metadata before the wallet reads its claims.
+public protocol IssuerMetadataTrustResolver: Sendable {
+    /// Verifies `compactJWT` and establishes that its signer is authorized for the expected issuer.
+    func verify(compactJWT: String, expectedCredentialIssuer: String) async throws -> IssuerMetadataSigner
 }
 
 /// OpenID4VP transaction data profile accepted by the wallet.
@@ -541,21 +575,58 @@ public struct MetadataDisplay: Equatable, Sendable {
     }
 }
 
+/// Provenance for Credential Issuer Metadata used by the wallet.
+public enum MetadataProvenance: Equatable, Sendable {
+    /// Metadata was received as an unsigned JSON document.
+    case unsigned
+    /// Metadata was received in a JWS verified by the configured trust resolver.
+    case signed(SignedMetadataProvenance)
+}
+
+/// Verified signed Credential Issuer Metadata provenance.
+public struct SignedMetadataProvenance: Equatable, Sendable {
+    /// Exact compact JWS returned by the issuer.
+    public let compactJWT: String
+    /// JWS algorithm verified by the configured trust resolver.
+    public let algorithm: String
+    /// Signing-key identifier when supplied in the JWS.
+    public let keyID: String?
+    /// Authority category established by the trust resolver.
+    public let trustType: MetadataTrustType
+
+    public init(compactJWT: String, algorithm: String, keyID: String?, trustType: MetadataTrustType) {
+        self.compactJWT = compactJWT
+        self.algorithm = algorithm
+        self.keyID = keyID
+        self.trustType = trustType
+    }
+}
+
+/// Authority category recorded for trusted signed metadata.
+public enum MetadataTrustType: Equatable, Sendable {
+    case trustedIssuer
+    case trustedDelegate
+}
+
 /// Typed credential issuer metadata shown during offer review.
 public struct IssuerMetadata: Equatable, Sendable {
     /// Canonical credential issuer identifier.
     public let credentialIssuer: String
     /// Best localized issuer display entry.
     public let display: MetadataDisplay?
+    /// Whether the metadata was unsigned JSON or verified signed metadata.
+    public let provenance: MetadataProvenance
 
     /// Creates typed issuer metadata.
     ///
     /// - Parameters:
     ///   - credentialIssuer: Canonical credential issuer identifier.
     ///   - display: Best localized issuer display entry.
-    public init(credentialIssuer: String, display: MetadataDisplay?) {
+    ///   - provenance: Source and verification provenance for this metadata.
+    public init(credentialIssuer: String, display: MetadataDisplay?, provenance: MetadataProvenance) {
         self.credentialIssuer = credentialIssuer
         self.display = display
+        self.provenance = provenance
     }
 }
 
@@ -997,6 +1068,19 @@ public struct ResponseEncryptionDetails: Equatable, Sendable {
     }
 }
 
+/// Provenance of verifier metadata carried by a presentation request.
+public enum VerifierMetadataProvenance: Equatable, Sendable {
+    /// Metadata came from an unsigned request.
+    case unsignedRequest
+    /// Metadata came from a signed request object retained by wallet core.
+    case signedRequest(
+        compactRequestObject: String,
+        algorithm: String,
+        keyID: String?,
+        clientIDPrefix: String
+    )
+}
+
 /// Verifier, transaction, and response-protection metadata extracted from a presentation request.
 public struct PresentationRequestInfo: Equatable, Sendable {
     /// OpenID4VP client identifier.
@@ -1004,6 +1088,9 @@ public struct PresentationRequestInfo: Equatable, Sendable {
 
     /// Typed metadata supplied by the OpenID4VP verifier when available.
     public let verifierMetadata: VerifierMetadata?
+
+    /// Whether verifier metadata was carried by an unsigned request or signed request object.
+    public let verifierMetadataProvenance: VerifierMetadataProvenance
 
     /// Response URI used for direct-post responses when available.
     public let responseURI: URL?
@@ -1025,6 +1112,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     /// - Parameters:
     ///   - clientID: OpenID4VP client identifier from the request.
     ///   - verifierMetadata: Typed metadata supplied by the verifier.
+    ///   - verifierMetadataProvenance: Source and signed-request provenance for verifier metadata.
     ///   - responseURI: Direct-post response URI when available.
     ///   - state: OpenID state value from the request.
     ///   - nonce: OpenID nonce value from the request.
@@ -1033,6 +1121,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     public init(
         clientID: String? = nil,
         verifierMetadata: VerifierMetadata? = nil,
+        verifierMetadataProvenance: VerifierMetadataProvenance,
         responseURI: URL? = nil,
         state: String? = nil,
         nonce: String? = nil,
@@ -1041,6 +1130,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     ) {
         self.clientID = clientID
         self.verifierMetadata = verifierMetadata
+        self.verifierMetadataProvenance = verifierMetadataProvenance
         self.responseURI = responseURI
         self.state = state
         self.nonce = nonce

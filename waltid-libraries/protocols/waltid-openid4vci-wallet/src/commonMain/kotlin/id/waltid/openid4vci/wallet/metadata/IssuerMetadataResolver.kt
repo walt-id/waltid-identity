@@ -15,7 +15,6 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlin.time.Clock
@@ -68,7 +67,12 @@ class IssuerMetadataResolver(
 
             val response: HttpResponse = try {
                 httpClient.get(metadataUrl) {
-                    header(HttpHeaders.Accept, "${CredentialIssuerMetadataJwt.MEDIA_TYPE}, ${ContentType.Application.Json}")
+                    header(
+                        HttpHeaders.Accept,
+                        metadataTrustResolver?.let {
+                            "${CredentialIssuerMetadataJwt.MEDIA_TYPE}, ${ContentType.Application.Json}"
+                        } ?: ContentType.Application.Json.toString(),
+                    )
                 }
             } catch (e: Exception) {
                 log.warn(e) { "Network error fetching credential issuer metadata from: $metadataUrl" }
@@ -127,34 +131,47 @@ class IssuerMetadataResolver(
     ): ResolvedCredentialIssuerMetadata.Signed {
         val decoded = runCatching { compactJwt.decodeJws() }
             .getOrElse { throw IllegalArgumentException("Invalid signed Credential Issuer Metadata", it) }
-        val algorithm = decoded.header[JwtHeaderParams.ALGORITHM]?.jsonPrimitive?.contentOrNull
-            ?: throw IllegalArgumentException("Signed Credential Issuer Metadata is missing alg")
+        val algorithm = decoded.header.requiredString(JwtHeaderParams.ALGORITHM, "alg")
         require(!algorithm.equals("none", true) && !algorithm.startsWith("HS", true)) {
             "Signed Credential Issuer Metadata must use an asymmetric JWS algorithm"
         }
-        require(decoded.header[JwtHeaderParams.TYPE]?.jsonPrimitive?.contentOrNull == CredentialIssuerMetadataJwt.TYPE) {
+        require(decoded.header.requiredString(JwtHeaderParams.TYPE, "typ") == CredentialIssuerMetadataJwt.TYPE) {
             "Signed Credential Issuer Metadata has an invalid typ"
         }
+        val signer = requireNotNull(metadataTrustResolver) {
+            "Signed Credential Issuer Metadata requires a configured trust resolver"
+        }.verify(compactJwt, expectedCredentialIssuer)
+        require(signer.algorithm == algorithm) { "Trusted signer algorithm does not match JWS alg" }
+
         val payload = decoded.payload as? JsonObject
             ?: throw IllegalArgumentException("Signed Credential Issuer Metadata payload must be an object")
-        val subject = payload[JwtPayloadClaims.SUBJECT]?.jsonPrimitive?.contentOrNull
-            ?: throw IllegalArgumentException("Signed Credential Issuer Metadata is missing sub")
-        val issuedAt = payload[JwtPayloadClaims.ISSUED_AT]?.jsonPrimitive?.longOrNull
-            ?: throw IllegalArgumentException("Signed Credential Issuer Metadata is missing iat")
-        require(issuedAt <= Clock.System.now().epochSeconds + 60) { "Signed Credential Issuer Metadata iat is in the future" }
-        payload[JwtPayloadClaims.EXPIRATION]?.jsonPrimitive?.longOrNull?.let { expiry ->
-            require(expiry >= Clock.System.now().epochSeconds) { "Signed Credential Issuer Metadata has expired" }
+        val subject = payload.requiredString(JwtPayloadClaims.SUBJECT, "sub")
+        val issuedAt = payload.requiredLong(JwtPayloadClaims.ISSUED_AT, "iat")
+        val now = Clock.System.now().epochSeconds
+        require(issuedAt <= now + 60) { "Signed Credential Issuer Metadata iat is in the future" }
+        payload.optionalLong(JwtPayloadClaims.EXPIRATION, "exp")?.let { expiry ->
+            require(expiry >= now) { "Signed Credential Issuer Metadata has expired" }
         }
         val metadata = parseAndValidateMetadata(
             JsonObject(payload.filterKeys { it !in CredentialIssuerMetadataJwt.reservedPayloadClaims }).toString(),
             expectedCredentialIssuer,
         )
         require(subject == metadata.credentialIssuer) { "Signed Credential Issuer Metadata sub must match credential_issuer" }
-        val signer = requireNotNull(metadataTrustResolver) {
-            "Signed Credential Issuer Metadata requires a configured trust resolver"
-        }.verify(compactJwt, expectedCredentialIssuer)
-        require(signer.algorithm == algorithm) { "Trusted signer algorithm does not match JWS alg" }
         return ResolvedCredentialIssuerMetadata.Signed(metadata, compactJwt, signer)
+    }
+
+    private fun JsonObject.requiredString(claim: String, label: String): String =
+        this[claim]?.jsonPrimitive?.takeIf { it.isString }?.content
+            ?: throw IllegalArgumentException("Signed Credential Issuer Metadata is missing or malformed $label")
+
+    private fun JsonObject.requiredLong(claim: String, label: String): Long =
+        this[claim]?.jsonPrimitive?.longOrNull
+            ?: throw IllegalArgumentException("Signed Credential Issuer Metadata is missing or malformed $label")
+
+    private fun JsonObject.optionalLong(claim: String, label: String): Long? = when (val value = this[claim]) {
+        null -> null
+        else -> value.jsonPrimitive.longOrNull
+            ?: throw IllegalArgumentException("Signed Credential Issuer Metadata has malformed $label")
     }
 
     private fun parseAndValidateMetadata(body: String, expectedCredentialIssuer: String): CredentialIssuerMetadata {

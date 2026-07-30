@@ -24,6 +24,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertNil(configuration.persistence.stores.dids)
         XCTAssertNil(configuration.persistence.stores.keys)
         XCTAssertNil(configuration.attestation)
+        XCTAssertNil(configuration.issuerMetadataTrustResolver)
         XCTAssertTrue(configuration.transactionDataProfiles.isEmpty)
         XCTAssertEqual(configuration.preferredLocales, Locale.preferredLanguages)
     }
@@ -177,6 +178,7 @@ final class WalletAPITests: XCTestCase {
             request: .init(
                 clientID: "https://verifier.example",
                 verifierMetadata: testVerifierMetadata,
+                verifierMetadataProvenance: .unsignedRequest,
                 responseURI: URL(string: "https://verifier.example/direct-post"),
                 state: "state-1",
                 nonce: "nonce-1",
@@ -367,6 +369,7 @@ final class WalletAPITests: XCTestCase {
                 request: .init(
                     clientID: "https://verifier.example",
                     verifierMetadata: testVerifierMetadata,
+                    verifierMetadataProvenance: .unsignedRequest,
                     responseURI: nil,
                     state: nil,
                     nonce: "nonce-1",
@@ -423,6 +426,7 @@ final class WalletAPITests: XCTestCase {
         let requestInfo = PresentationRequestInfo(
             clientID: "https://verifier.example",
             verifierMetadata: testVerifierMetadata,
+            verifierMetadataProvenance: .unsignedRequest,
             responseEncryption: .notRequired
         )
         let bridge = FakeWalletCoreBridge()
@@ -722,6 +726,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
             previewHandle: PresentationPreviewHandle(value: "fake-presentation-preview"),
             request: .init(
                 clientID: nil,
+                verifierMetadataProvenance: .unsignedRequest,
                 responseEncryption: .notRequired
             ),
             credentialOptions: []
@@ -890,7 +895,8 @@ private func testOfferResolution(transactionCodeRequired: Bool) -> OfferResoluti
                 locale: "en",
                 logoURI: nil,
                 logoAltText: nil
-            )
+            ),
+            provenance: .unsigned
         ),
         offeredCredentials: [
             OfferedCredentialMetadata(

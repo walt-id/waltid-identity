@@ -262,9 +262,43 @@ private extension WalletConfiguration {
             persistence: persistence.toKMPPersistence(),
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
             attestation: attestation?.toKMPAttestationConfiguration(),
+            issuerMetadataTrustResolver: issuerMetadataTrustResolver.map {
+                KMPIssuerMetadataTrustResolverAdapter(resolver: $0)
+            },
             preferredLocales: preferredLocales,
             transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() }
         )
+    }
+}
+
+private final class KMPIssuerMetadataTrustResolverAdapter: WalletBridgeIssuerMetadataTrustResolver, @unchecked Sendable {
+    private let resolver: any IssuerMetadataTrustResolver
+
+    init(resolver: any IssuerMetadataTrustResolver) {
+        self.resolver = resolver
+    }
+
+    func __verify(compactJwt: String, expectedCredentialIssuer: String) async throws -> WalletBridgeIssuerMetadataSigner {
+        let signer = try await resolver.verify(
+            compactJWT: compactJwt,
+            expectedCredentialIssuer: expectedCredentialIssuer
+        )
+        return WalletBridgeIssuerMetadataSigner(
+            keyId: signer.keyID,
+            algorithm: signer.algorithm,
+            trustType: signer.trustType.toKMPTrustType()
+        )
+    }
+}
+
+private extension IssuerMetadataSignerTrustType {
+    func toKMPTrustType() -> WalletBridgeIssuerMetadataSignerTrustType {
+        switch self {
+        case .trustedIssuer:
+            return .trustedIssuer
+        case .trustedDelegate:
+            return .trustedDelegate
+        }
     }
 }
 
@@ -670,6 +704,7 @@ private extension MobileWalletPresentationRequestInfo {
         PresentationRequestInfo(
             clientID: clientId,
             verifierMetadata: verifierMetadata?.toSwiftVerifierMetadata(),
+            verifierMetadataProvenance: verifierMetadataProvenance.toSwiftVerifierMetadataProvenance(),
             responseURI: responseUri.flatMap(URL.init(string:)),
             state: state,
             nonce: nonce,
@@ -718,8 +753,60 @@ private extension MobileWalletIssuerMetadata {
     func toSwiftIssuerMetadata() -> IssuerMetadata {
         IssuerMetadata(
             credentialIssuer: credentialIssuer,
-            display: display?.toSwiftMetadataDisplay()
+            display: display?.toSwiftMetadataDisplay(),
+            provenance: provenance.toSwiftMetadataProvenance()
         )
+    }
+}
+
+private extension MobileWalletMetadataProvenance {
+    func toSwiftMetadataProvenance() -> MetadataProvenance {
+        switch self {
+        case is MobileWalletMetadataProvenanceUnsigned:
+            return .unsigned
+        case let signed as MobileWalletMetadataProvenanceSigned:
+            return .signed(
+                SignedMetadataProvenance(
+                    compactJWT: signed.compactJwt,
+                    algorithm: signed.algorithm,
+                    keyID: signed.keyId,
+                    trustType: signed.trustType.toSwiftMetadataTrustType()
+                )
+            )
+        default:
+            preconditionFailure("Unsupported issuer metadata provenance: \(type(of: self))")
+        }
+    }
+}
+
+private extension MobileWalletMetadataTrustType {
+    func toSwiftMetadataTrustType() -> MetadataTrustType {
+        switch self {
+        case .trustedIssuer:
+            return .trustedIssuer
+        case .trustedDelegate:
+            return .trustedDelegate
+        default:
+            preconditionFailure("Unsupported issuer metadata trust type: \(self)")
+        }
+    }
+}
+
+private extension MobileWalletVerifierMetadataProvenance {
+    func toSwiftVerifierMetadataProvenance() -> VerifierMetadataProvenance {
+        switch self {
+        case is MobileWalletVerifierMetadataProvenanceUnsignedRequest:
+            return .unsignedRequest
+        case let signed as MobileWalletVerifierMetadataProvenanceSignedRequest:
+            return .signedRequest(
+                compactRequestObject: signed.compactRequestObject,
+                algorithm: signed.algorithm,
+                keyID: signed.keyId,
+                clientIDPrefix: signed.clientIdPrefix
+            )
+        default:
+            preconditionFailure("Unsupported verifier metadata provenance: \(type(of: self))")
+        }
     }
 }
 
