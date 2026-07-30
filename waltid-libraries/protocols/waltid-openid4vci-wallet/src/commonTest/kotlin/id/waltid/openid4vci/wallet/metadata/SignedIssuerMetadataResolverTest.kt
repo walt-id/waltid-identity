@@ -84,6 +84,22 @@ class SignedIssuerMetadataResolverTest {
     }
 
     @Test
+    fun quotedNumericClaimsAndMalformedOptionalIssuerAreRejected() = runTest {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        listOf(
+            payload(issuedAt = JsonPrimitive(Clock.System.now().epochSeconds.toString())),
+            payload(expiry = JsonPrimitive((Clock.System.now().epochSeconds + 60).toString())),
+            payload(signedIssuer = JsonPrimitive(7)),
+        ).forEach { claims ->
+            val jwt = key.signJws(claims.toString().encodeToByteArray(), signedMetadataHeaders())
+
+            assertFailsWith<Exception> {
+                trustedResolver(key, jwt).resolveCredentialIssuerMetadata(issuer)
+            }
+        }
+    }
+
+    @Test
     fun invalidTypeOrDisallowedAlgorithmRejectsBeforeTrust() = runTest {
         val key = JWKKey.generate(KeyType.Ed25519)
         listOf(
@@ -149,14 +165,17 @@ class SignedIssuerMetadataResolverTest {
     private fun payload(
         metadataIssuer: String = issuer,
         subject: String = issuer,
+        issuedAt: JsonPrimitive = JsonPrimitive(Clock.System.now().epochSeconds),
         expiry: JsonPrimitive? = null,
+        signedIssuer: JsonPrimitive? = null,
     ) = buildJsonObject {
         put("credential_issuer", metadataIssuer)
         put("credential_endpoint", "$metadataIssuer/credential")
         put("credential_configurations_supported", buildJsonObject { })
         put(JwtPayloadClaims.SUBJECT, subject)
-        put(JwtPayloadClaims.ISSUED_AT, Clock.System.now().epochSeconds)
+        put(JwtPayloadClaims.ISSUED_AT, issuedAt)
         expiry?.let { put(JwtPayloadClaims.EXPIRATION, it) }
+        signedIssuer?.let { put(JwtPayloadClaims.ISSUER, it) }
     }
 
     private fun signedMetadataHeaders() = mapOf(

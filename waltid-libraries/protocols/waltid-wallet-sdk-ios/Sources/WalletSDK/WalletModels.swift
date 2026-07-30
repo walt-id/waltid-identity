@@ -64,9 +64,15 @@ public struct IssuerMetadataSigner: Equatable, Sendable {
     /// JWS algorithm verified by the trust resolver.
     public let algorithm: String
     /// Authority category established by the trust resolver.
-    public let trustType: IssuerMetadataSignerTrustType
+    public let trustType: MetadataTrustType
 
-    public init(keyID: String?, algorithm: String, trustType: IssuerMetadataSignerTrustType) {
+    /// Creates trusted signer details.
+    ///
+    /// - Parameters:
+    ///   - keyID: Identifier of the trusted verification key, as reported by the trust resolver.
+    ///   - algorithm: JWS algorithm verified by the trust resolver.
+    ///   - trustType: Authority category established by the trust resolver.
+    public init(keyID: String?, algorithm: String, trustType: MetadataTrustType) {
         self.keyID = keyID
         self.algorithm = algorithm
         self.trustType = trustType
@@ -74,14 +80,21 @@ public struct IssuerMetadataSigner: Equatable, Sendable {
 }
 
 /// Authority category established for a signer of Credential Issuer Metadata.
-public enum IssuerMetadataSignerTrustType: Equatable, Sendable {
+public enum MetadataTrustType: Equatable, Sendable {
+    /// The signer is the trusted credential issuer.
     case trustedIssuer
+    /// The signer is a trusted delegate of the credential issuer.
     case trustedDelegate
 }
 
 /// Verifies signed Credential Issuer Metadata before the wallet reads its claims.
 public protocol IssuerMetadataTrustResolver: Sendable {
     /// Verifies `compactJWT` and establishes that its signer is authorized for the expected issuer.
+    ///
+    /// - Parameters:
+    ///   - compactJWT: Compact JWS returned by the Credential Issuer Metadata endpoint.
+    ///   - expectedCredentialIssuer: Credential issuer for which signer authority must be established.
+    /// - Returns: Trusted signer details used to retain metadata provenance.
     func verify(compactJWT: String, expectedCredentialIssuer: String) async throws -> IssuerMetadataSigner
 }
 
@@ -594,6 +607,13 @@ public struct SignedMetadataProvenance: Equatable, Sendable {
     /// Authority category established by the trust resolver.
     public let trustType: MetadataTrustType
 
+    /// Creates verified signed metadata provenance.
+    ///
+    /// - Parameters:
+    ///   - compactJWT: Exact compact JWS returned by the issuer.
+    ///   - algorithm: JWS algorithm verified by the trust resolver.
+    ///   - keyID: Identifier of the trusted verification key, as reported by the trust resolver.
+    ///   - trustType: Authority category established by the trust resolver.
     public init(compactJWT: String, algorithm: String, keyID: String?, trustType: MetadataTrustType) {
         self.compactJWT = compactJWT
         self.algorithm = algorithm
@@ -602,11 +622,6 @@ public struct SignedMetadataProvenance: Equatable, Sendable {
     }
 }
 
-/// Authority category recorded for trusted signed metadata.
-public enum MetadataTrustType: Equatable, Sendable {
-    case trustedIssuer
-    case trustedDelegate
-}
 
 /// Typed credential issuer metadata shown during offer review.
 public struct IssuerMetadata: Equatable, Sendable {

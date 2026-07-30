@@ -13,8 +13,11 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlin.time.Clock
@@ -75,6 +78,7 @@ class IssuerMetadataResolver(
                     )
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 log.warn(e) { "Network error fetching credential issuer metadata from: $metadataUrl" }
                 continue
             }
@@ -103,6 +107,7 @@ class IssuerMetadataResolver(
                     log.trace { "Supported credential configurations: ${metadata.credentialConfigurationsSupported.keys.joinToString()}" }
                     }
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     log.error(e) {
                         "Failed to parse credential issuer metadata from $metadataUrl"
                     }
@@ -143,9 +148,9 @@ class IssuerMetadataResolver(
         }.verify(compactJwt, expectedCredentialIssuer)
         require(signer.algorithm == algorithm) { "Trusted signer algorithm does not match JWS alg" }
 
-        val payload = decoded.payload as? JsonObject
-            ?: throw IllegalArgumentException("Signed Credential Issuer Metadata payload must be an object")
+        val payload = decoded.payload
         val subject = payload.requiredString(JwtPayloadClaims.SUBJECT, "sub")
+        payload.optionalString(JwtPayloadClaims.ISSUER, "iss")
         val issuedAt = payload.requiredLong(JwtPayloadClaims.ISSUED_AT, "iat")
         val now = Clock.System.now().epochSeconds
         require(issuedAt <= now + 60) { "Signed Credential Issuer Metadata iat is in the future" }
@@ -153,7 +158,7 @@ class IssuerMetadataResolver(
             require(now < expiry) { "Signed Credential Issuer Metadata has expired" }
         }
         val metadata = parseAndValidateMetadata(
-            JsonObject(payload.filterKeys { it !in CredentialIssuerMetadataJwt.reservedPayloadClaims }).toString(),
+            JsonObject(payload.filterKeys { it !in signedMetadataReservedPayloadClaims }).toString(),
             expectedCredentialIssuer,
         )
         require(subject == metadata.credentialIssuer) { "Signed Credential Issuer Metadata sub must match credential_issuer" }
@@ -165,17 +170,23 @@ class IssuerMetadataResolver(
             ?: throw IllegalArgumentException("Signed Credential Issuer Metadata is missing or malformed $label")
 
     private fun JsonObject.requiredLong(claim: String, label: String): Long =
-        this[claim]?.jsonPrimitive?.longOrNull
+        this[claim].strictLongOrNull()
             ?: throw IllegalArgumentException("Signed Credential Issuer Metadata is missing or malformed $label")
 
     private fun JsonObject.optionalLong(claim: String, label: String): Long? = when (val value = this[claim]) {
         null -> null
-        else -> value.jsonPrimitive.longOrNull
+        else -> value.strictLongOrNull()
+            ?: throw IllegalArgumentException("Signed Credential Issuer Metadata has malformed $label")
+    }
+
+    private fun JsonObject.optionalString(claim: String, label: String): String? = when (val value = this[claim]) {
+        null -> null
+        else -> (value as? JsonPrimitive)?.takeIf { it.isString }?.content
             ?: throw IllegalArgumentException("Signed Credential Issuer Metadata has malformed $label")
     }
 
     private fun parseAndValidateMetadata(body: String, expectedCredentialIssuer: String): CredentialIssuerMetadata {
-        val metadata = Json { ignoreUnknownKeys = true }.decodeFromString(CredentialIssuerMetadata.serializer(), body)
+        val metadata = lenientJson.decodeFromString(CredentialIssuerMetadata.serializer(), body)
         require(metadata.credentialIssuer == expectedCredentialIssuer) {
             "Credential Issuer Metadata credential_issuer does not match requested issuer"
         }
@@ -203,6 +214,7 @@ class IssuerMetadataResolver(
             val response: HttpResponse = try {
                 httpClient.get(metadataUrl)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 log.warn(e) { "Network error fetching authorization server metadata from: $metadataUrl" }
                 continue
             }
@@ -211,6 +223,7 @@ class IssuerMetadataResolver(
                 return try {
                     response.body<AuthorizationServerMetadata>()
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     val responseBody = response.bodyAsText()
                     log.error(e) { "Failed to parse authorization server metadata from $metadataUrl. Body: $responseBody" }
                     continue
@@ -247,6 +260,7 @@ class IssuerMetadataResolver(
             val response: HttpResponse = try {
                 httpClient.get(metadataUrl)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 log.warn(e) { "Network error fetching OpenID provider metadata from: $metadataUrl" }
                 continue
             }
@@ -255,6 +269,7 @@ class IssuerMetadataResolver(
                 return try {
                     response.body<OpenIDProviderMetadata>()
                 } catch (e: Exception) {
+                    if (e is CancellationException) throw e
                     val responseBody = response.bodyAsText()
                     log.error(e) { "Failed to parse OpenID provider metadata from $metadataUrl. Body: $responseBody" }
                     continue
@@ -303,3 +318,15 @@ class IssuerMetadataResolver(
         }
     }
 }
+
+private val signedMetadataReservedPayloadClaims = setOf(
+    JwtPayloadClaims.ISSUER,
+    JwtPayloadClaims.SUBJECT,
+    JwtPayloadClaims.ISSUED_AT,
+    JwtPayloadClaims.EXPIRATION,
+)
+
+private val lenientJson = Json { ignoreUnknownKeys = true }
+
+private fun JsonElement?.strictLongOrNull(): Long? =
+    (this as? JsonPrimitive)?.takeIf { !it.isString }?.longOrNull

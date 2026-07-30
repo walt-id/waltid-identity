@@ -291,7 +291,7 @@ private final class KMPIssuerMetadataTrustResolverAdapter: WalletBridgeIssuerMet
     }
 }
 
-private extension IssuerMetadataSignerTrustType {
+private extension MetadataTrustType {
     func toKMPTrustType() -> WalletBridgeIssuerMetadataSignerTrustType {
         switch self {
         case .trustedIssuer:

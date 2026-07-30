@@ -173,12 +173,18 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testPresentationPreviewModelsAreValueTypesAndEquatable() {
+        let signedProvenance = VerifierMetadataProvenance.signedRequest(
+            compactRequestObject: "eyJhbGciOiJFUzI1NiIsImtpZCI6InZlcmlmaWVyLWtleS0xIn0.e30.signature",
+            algorithm: "ES256",
+            keyID: "verifier-key-1",
+            clientIDPrefix: "x509_san_dns"
+        )
         let preview = PresentationPreview(
             previewHandle: PresentationPreviewHandle(value: "presentation-preview-1"),
             request: .init(
                 clientID: "https://verifier.example",
                 verifierMetadata: testVerifierMetadata,
-                verifierMetadataProvenance: .unsignedRequest,
+                verifierMetadataProvenance: signedProvenance,
                 responseURI: URL(string: "https://verifier.example/direct-post"),
                 state: "state-1",
                 nonce: "nonce-1",
@@ -211,6 +217,7 @@ final class WalletAPITests: XCTestCase {
         )
 
         acceptsSendable(preview)
+        XCTAssertEqual(preview.request.verifierMetadataProvenance, signedProvenance)
         XCTAssertEqual(preview.request.responseEncryption, .notRequired)
         XCTAssertEqual(preview.credentialOptions.single?.credentialID, "credential-1")
         XCTAssertEqual(preview.credentialOptions.single?.multiple, true)

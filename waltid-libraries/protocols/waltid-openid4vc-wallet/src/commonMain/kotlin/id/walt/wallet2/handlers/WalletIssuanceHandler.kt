@@ -448,6 +448,7 @@ object WalletIssuanceHandler {
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         httpClient: HttpClient = defaultHttpClient(),
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
         /**
          * Called whenever the issuer defers a credential.
          * [credentialConfigurationId] identifies which credential was deferred;
@@ -461,6 +462,7 @@ object WalletIssuanceHandler {
         attestationAssembler = attestationAssembler,
         onEvent = onEvent,
         httpClient = httpClient,
+        metadataTrustResolver = metadataTrustResolver,
         onDeferredTransactionId = onDeferredTransactionId,
     )
 
@@ -488,6 +490,7 @@ object WalletIssuanceHandler {
                 attestationAssembler = attestationAssembler,
                 onEvent = onEvent,
                 httpClient = httpClient,
+                metadataTrustResolver = null,
                 onDeferredTransactionId = onDeferredTransactionId,
             ).collect(::send)
         }
@@ -500,6 +503,7 @@ object WalletIssuanceHandler {
         attestationAssembler: ClientAttestationAssembler?,
         onEvent: suspend (WalletSessionEvent) -> Unit,
         httpClient: HttpClient,
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver?,
         onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit,
     ): Flow<StoredCredential> = channelFlow {
         val key = wallet.resolveKey(request.key, request.keyId)
@@ -518,6 +522,7 @@ object WalletIssuanceHandler {
         val effectiveResolvedOffer = resolvedOffer ?: resolveIssuanceOffer(
             request.toResolveOfferRequest(),
             httpClient,
+            metadataTrustResolver,
         )
 
         // 2. Reuse issuer metadata and offered configurations from that resolution.
@@ -631,7 +636,8 @@ object WalletIssuanceHandler {
         request: ReceiveCredentialRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = defaultHttpClient()
+        httpClient: HttpClient = defaultHttpClient(),
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     ): ReceiveCredentialResult {
         val ids = mutableListOf<String>()
         val deferredIds = mutableMapOf<String, String>()
@@ -641,6 +647,7 @@ object WalletIssuanceHandler {
             attestationAssembler,
             onEvent,
             httpClient,
+            metadataTrustResolver,
             onDeferredTransactionId = { configId, txId -> deferredIds[configId] = txId },
         ).collect { ids += it.id }
         return ReceiveCredentialResult(credentialIds = ids, deferredTransactionIds = deferredIds)
