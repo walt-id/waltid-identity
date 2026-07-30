@@ -150,7 +150,7 @@ class IssuerMetadataResolver(
         val now = Clock.System.now().epochSeconds
         require(issuedAt <= now + 60) { "Signed Credential Issuer Metadata iat is in the future" }
         payload.optionalLong(JwtPayloadClaims.EXPIRATION, "exp")?.let { expiry ->
-            require(expiry >= now) { "Signed Credential Issuer Metadata has expired" }
+            require(now < expiry) { "Signed Credential Issuer Metadata has expired" }
         }
         val metadata = parseAndValidateMetadata(
             JsonObject(payload.filterKeys { it !in CredentialIssuerMetadataJwt.reservedPayloadClaims }).toString(),
