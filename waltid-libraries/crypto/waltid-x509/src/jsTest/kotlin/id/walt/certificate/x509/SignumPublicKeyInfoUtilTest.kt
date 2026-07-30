@@ -1,5 +1,5 @@
 package id.walt.certificate.x509
-/*
+
 import id.walt.certificate.TestKeys
 import id.walt.certificate.TestKeys.opensslHexFormat
 import id.walt.certificate.x509.signum.SignumPublicKeyInfoUtil
@@ -11,7 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-class PublicKeyInfoUtilTest {
+class SignumPublicKeyInfoUtilTest {
 
     @Test
     fun shouldRetrieveKeyInfoOfRsaKey() = runTest {
@@ -57,4 +57,4 @@ class PublicKeyInfoUtilTest {
             info.keyId.toHexString(opensslHexFormat)
         )
     }
-}*/
+}
