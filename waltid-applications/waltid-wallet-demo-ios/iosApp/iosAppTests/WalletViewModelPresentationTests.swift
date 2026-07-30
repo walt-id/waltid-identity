@@ -24,6 +24,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
                     policyURI: nil,
                     termsOfServiceURI: nil
                 ),
+                verifierMetadataProvenance: .unsignedRequest,
                 responseEncryption: .notRequired
             ),
             code: .invalidTransactionData,

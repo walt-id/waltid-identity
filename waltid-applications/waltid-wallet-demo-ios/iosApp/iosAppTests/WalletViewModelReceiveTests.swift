@@ -274,7 +274,8 @@ private actor TransactionCodeWalletClient: WalletClient {
                     locale: "en",
                     logoURI: nil,
                     logoAltText: nil
-                )
+                ),
+                provenance: .unsigned
             ),
             offeredCredentials: [
                 OfferedCredentialMetadata(
@@ -316,6 +317,7 @@ private actor TransactionCodeWalletClient: WalletClient {
                 previewHandle: PresentationPreviewHandle(value: "transaction-code-presentation-preview"),
                 request: PresentationRequestInfo(
                     clientID: nil,
+                    verifierMetadataProvenance: .unsignedRequest,
                     responseEncryption: .notRequired
                 ),
                 credentialOptions: [

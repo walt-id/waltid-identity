@@ -47,6 +47,10 @@ class SignedIssuerMetadataResolverTest {
         assertEquals("application/jwt, application/json", accept)
         assertEquals(jwt, signed.compactJwt)
         assertEquals(issuer, signed.metadata.credentialIssuer)
+        assertEquals(
+            MetadataSigner(key.getKeyId(), "EdDSA", MetadataSignerTrustType.TRUSTED_ISSUER),
+            signed.signer,
+        )
     }
 
     @Test
@@ -63,7 +67,11 @@ class SignedIssuerMetadataResolverTest {
     @Test
     fun malformedOrExpiredExpirationRejectsSignedMetadata() = runTest {
         val key = JWKKey.generate(KeyType.Ed25519)
-        listOf(JsonPrimitive("tomorrow"), JsonPrimitive(Clock.System.now().epochSeconds - 1)).forEach { expiry ->
+        listOf(
+            JsonPrimitive("tomorrow"),
+            JsonPrimitive(Clock.System.now().epochSeconds),
+            JsonPrimitive(Clock.System.now().epochSeconds - 1),
+        ).forEach { expiry ->
             val jwt = key.signJws(
                 payload(subject = issuer, expiry = expiry).toString().encodeToByteArray(),
                 headers = signedMetadataHeaders(),

@@ -59,7 +59,7 @@ public struct WalletConfiguration: Sendable {
 
 /// Trusted signer details returned after verifying signed Credential Issuer Metadata.
 public struct IssuerMetadataSigner: Equatable, Sendable {
-    /// Signer's JWS key identifier when supplied.
+    /// Identifier of the trusted verification key, as reported by the trust resolver.
     public let keyID: String?
     /// JWS algorithm verified by the trust resolver.
     public let algorithm: String
@@ -589,7 +589,7 @@ public struct SignedMetadataProvenance: Equatable, Sendable {
     public let compactJWT: String
     /// JWS algorithm verified by the configured trust resolver.
     public let algorithm: String
-    /// Signing-key identifier when supplied in the JWS.
+    /// Identifier of the trusted verification key, as reported by the trust resolver.
     public let keyID: String?
     /// Authority category established by the trust resolver.
     public let trustType: MetadataTrustType

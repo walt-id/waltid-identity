@@ -878,6 +878,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
     func testTransactionDataGroupsRenderProfileAndDetailsReadably() throws {
         let request = PresentationRequestInfo(
+            verifierMetadataProvenance: .unsignedRequest,
             responseEncryption: .notRequired,
             transactionData: [
                 PresentationTransactionData(
