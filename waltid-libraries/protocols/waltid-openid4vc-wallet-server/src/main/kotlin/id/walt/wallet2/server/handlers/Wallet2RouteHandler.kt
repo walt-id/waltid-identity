@@ -94,7 +94,6 @@ data class CreateDidRequest(
      * Examples:
      * - did:web — `domain` (required), `path` (optional)
      * - did:key — `useJwkJcsPub` (optional boolean)
-     * - did:cheqd — `network` (`testnet` or `mainnet`)
      */
     val options: Map<String, JsonPrimitive> = emptyMap(),
 )

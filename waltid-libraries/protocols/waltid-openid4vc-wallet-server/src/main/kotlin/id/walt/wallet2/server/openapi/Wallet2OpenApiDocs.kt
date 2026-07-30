@@ -103,7 +103,6 @@ object Wallet2OpenApiDocs {
             Pass method-specific registrar arguments in `options`, for example:
             - did:web: `domain` (required), `path` (optional)
             - did:key: `useJwkJcsPub` (optional boolean)
-            - did:cheqd: `network` (`testnet` or `mainnet`)
 
             Wallets without a DID store (inline `staticDid` or `noDidStore`) will not be able to create DIDs.
         """.trimIndent()
