@@ -2,14 +2,11 @@
 
 package id.walt.wallet2.mobile
 
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.crypto2.keys.Key
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
-import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
@@ -72,11 +69,6 @@ private object MobileDidSupport {
 public data class MobileWalletBootstrapResult(
     public val keyId: String,
     public val did: String,
-)
-
-internal class MobileWalletCrypto2Bootstrap(
-    val generateAndPersistKey: suspend (MobileWalletKeyType) -> Crypto2Key,
-    val didService: Crypto2DidService,
 )
 
 /**
@@ -189,8 +181,8 @@ public class MobileWallet internal constructor(
     private val keyStore: WalletKeyStore,
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
-    private val keyGenerator: suspend (KeyType) -> Key,
-    private val crypto2Bootstrap: MobileWalletCrypto2Bootstrap? = null,
+    private val generateAndPersistKey: suspend (MobileWalletKeyType) -> Key,
+    private val didService: Crypto2DidService = Crypto2DidService,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     attestationConfig: WalletAttestationConfig? = null,
     private val preferredLocales: List<String> = emptyList(),
@@ -246,10 +238,7 @@ public class MobileWallet internal constructor(
                 "Wallet '${wallet.id}' has persisted DIDs but no persisted keys"
             }
             val existingKey = existingKeys.first()
-            val keyAvailable = keyStore.getCrypto2Key(existingKey.keyId) != null ||
-                keyStore.getKeyMaterial(existingKey.keyId)?.let {
-                    it.crypto2Key != null || it.legacyKey != null
-                } == true
+            val keyAvailable = keyStore.getCrypto2Key(existingKey.keyId) != null
             require(keyAvailable) {
                 "Wallet '${wallet.id}' persisted key '${existingKey.keyId}' is unavailable"
             }
@@ -260,28 +249,22 @@ public class MobileWallet internal constructor(
         }
 
         val effectiveKeyType = keyType ?: defaultKeyType
-        return crypto2Bootstrap?.let { bootstrap ->
-            bootstrapCrypto2(effectiveKeyType, didMethod, bootstrap)
-        } ?: bootstrapLegacy(effectiveKeyType, didMethod)
+        return createKeyAndDid(effectiveKeyType, didMethod)
     }
 
-    private suspend fun bootstrapCrypto2(
+    private suspend fun createKeyAndDid(
         keyType: MobileWalletKeyType,
         didMethod: String,
-        bootstrap: MobileWalletCrypto2Bootstrap,
     ): MobileWalletBootstrapResult {
         val normalizedMethod = didMethod.lowercase()
         val options = when (normalizedMethod) {
             "key" -> DidKeyCreateOptions()
             "jwk" -> DidJwkCreateOptions()
-            else -> throw IllegalArgumentException(
-                "Crypto2 mobile bootstrap supports only did:key and did:jwk; " +
-                    "configure MobileWalletKeys to explicitly use legacy DID compatibility"
-            )
+            else -> throw IllegalArgumentException("Mobile bootstrap supports only did:key and did:jwk")
         }
-        val key = bootstrap.generateAndPersistKey(keyType)
+        val key = generateAndPersistKey(keyType)
         try {
-            val didResult = bootstrap.didService.registerByKey(normalizedMethod, key, options)
+            val didResult = didService.registerByKey(normalizedMethod, key, options)
             didStore.addDid(
                 WalletDidEntry(
                     did = didResult.did,
@@ -292,7 +275,7 @@ public class MobileWallet internal constructor(
         } catch (cause: Throwable) {
             try {
                 withContext(NonCancellable) {
-                    check(keyStore.removeKey(key.id.value)) { "Failed to remove crypto2 key after DID bootstrap failure" }
+                    check(keyStore.removeKey(key.id.value)) { "Failed to remove signing key after DID bootstrap failure" }
                 }
             } catch (cleanupFailure: Throwable) {
                 cause.addSuppressed(cleanupFailure)
@@ -300,33 +283,6 @@ public class MobileWallet internal constructor(
             throw cause
         }
     }
-
-    private suspend fun bootstrapLegacy(
-        keyType: MobileWalletKeyType,
-        didMethod: String,
-    ): MobileWalletBootstrapResult {
-        val key = keyGenerator(keyType.toKeyType())
-        val keyId = keyStore.addKey(key)
-        val didResult = registerDidByKey(didMethod, key)
-
-        didStore.addDid(
-            WalletDidEntry(
-                did = didResult.did,
-                document = didResult.didDocument.toJsonObject(),
-            )
-        )
-
-        return MobileWalletBootstrapResult(
-            keyId = keyId,
-            did = didResult.did,
-        )
-    }
-
-    private suspend fun registerDidByKey(didMethod: String, key: Key) =
-        when (didMethod.lowercase()) {
-            "key" -> DidKeyRegistrar().registerByKey(key, DidKeyCreateOptions(keyType = key.keyType))
-            else -> DidService.registerByKey(didMethod, key)
-        }
 
     /**
      * Resolves a credential offer and reports any transaction code the app must collect.

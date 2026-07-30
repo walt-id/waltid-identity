@@ -1,6 +1,5 @@
 package id.walt.wallet2.mobile
 
-import id.walt.crypto.keys.KeyType
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.KeySpec
@@ -34,18 +33,8 @@ public enum class MobileWalletKeyType {
     RSA4096,
 }
 
-internal fun MobileWalletKeyType.toKeyType(): KeyType = when (this) {
-    MobileWalletKeyType.Ed25519 -> KeyType.Ed25519
-    MobileWalletKeyType.secp256k1 -> KeyType.secp256k1
-    MobileWalletKeyType.secp256r1 -> KeyType.secp256r1
-    MobileWalletKeyType.secp384r1 -> KeyType.secp384r1
-    MobileWalletKeyType.secp521r1 -> KeyType.secp521r1
-    MobileWalletKeyType.RSA -> KeyType.RSA
-    MobileWalletKeyType.RSA3072 -> KeyType.RSA3072
-    MobileWalletKeyType.RSA4096 -> KeyType.RSA4096
-}
 
-internal fun MobileWalletKeyType.toCrypto2KeySpec(): KeySpec = when (this) {
+internal fun MobileWalletKeyType.toKeySpec(): KeySpec = when (this) {
     MobileWalletKeyType.Ed25519 -> KeySpec.Edwards(EdwardsCurve.ED25519)
     MobileWalletKeyType.secp256k1 -> KeySpec.Ec(EcCurve.SECP256K1)
     MobileWalletKeyType.secp256r1 -> KeySpec.Ec(EcCurve.P256)

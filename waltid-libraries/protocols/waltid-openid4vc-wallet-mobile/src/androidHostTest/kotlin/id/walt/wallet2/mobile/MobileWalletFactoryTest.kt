@@ -3,16 +3,13 @@
 package id.walt.wallet2.mobile
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.KeyCapabilities
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.ProviderId
 import id.walt.crypto2.keys.SoftwareKey
@@ -22,7 +19,6 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
-import id.walt.crypto2.signum.SignumHardwarePolicy
 import id.walt.crypto2.signum.SignumKeyPolicy
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
@@ -30,10 +26,8 @@ import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
-import id.walt.wallet2.persistence.keys.Crypto2PlatformKeyProvider
-import id.walt.wallet2.persistence.keys.PlatformKeyProvider
-import id.walt.wallet2.persistence.stores.PlatformKeyStore
-import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
+import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
+import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -48,9 +42,9 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class MobileWalletCrypto2BootstrapTest {
+class MobileWalletFactoryTest {
     @Test
-    fun `default crypto2 bootstrap persists restarts and signs with public-only DIDs`() = runTest {
+    fun `default bootstrap persists restarts and signs with public-only DIDs`() = runTest {
         val cases = listOf(
             BootstrapCase(
                 keyType = MobileWalletKeyType.secp256r1,
@@ -66,16 +60,15 @@ class MobileWalletCrypto2BootstrapTest {
 
         cases.forEach { case ->
             database().use { database ->
-                val provider = FakeCrypto2PlatformKeyProvider()
+                val provider = FakePlatformManagedKeyProvider()
                 val config = MobileWalletConfig(defaultKeyType = case.keyType)
                 val wallet = wallet(config, database, provider)
 
                 val bootstrap = wallet.bootstrap(didMethod = case.didMethod)
                 val row = database.queries.selectByKeyId(bootstrap.keyId).executeAsOne()
                 val stored = assertIs<StoredKey.Managed>(
-                    StoredKeyCodec.decodeFromString(assertNotNull(row.crypto2_stored_key))
+                    StoredKeyCodec.decodeFromString(assertNotNull(row.stored_key))
                 )
-                assertEquals(null, row.key_material)
                 assertEquals(stored.id.value, bootstrap.keyId)
                 assertTrue(bootstrap.did.startsWith("did:${case.didMethod}:"))
                 assertStoredDidContainsPublicMaterialOnly(database, bootstrap.did)
@@ -87,10 +80,10 @@ class MobileWalletCrypto2BootstrapTest {
                 assertEquals(1, provider.generateCount)
 
                 val restored = assertNotNull(
-                    PlatformKeyStore(provider, database.queries)
+                    SqlDelightKeyStore(provider, database.queries)
                         .getCrypto2Key(bootstrap.keyId, setOf(KeyUsage.SIGN))
                 )
-                val message = "mobile-crypto2-bootstrap".encodeToByteArray()
+                val message = "mobile-key-bootstrap".encodeToByteArray()
                 val signature = assertNotNull(restored.capabilities.signer)
                     .sign(message, case.signatureAlgorithm)
                 assertTrue(
@@ -98,15 +91,14 @@ class MobileWalletCrypto2BootstrapTest {
                         .verify(message, signature, case.signatureAlgorithm)
                 )
                 assertDidMatchesPublicKey(bootstrap.did, restored)
-                assertEquals(0, provider.legacyCalls)
             }
         }
     }
 
     @Test
-    fun `unsupported DID method fails before crypto2 generation`() = runTest {
+    fun `unsupported DID method fails before key generation`() = runTest {
         database().use { database ->
-            val provider = FakeCrypto2PlatformKeyProvider()
+            val provider = FakePlatformManagedKeyProvider()
 
             val failure = assertFailsWith<IllegalArgumentException> {
                 wallet(MobileWalletConfig(), database, provider).bootstrap(didMethod = "web")
@@ -119,98 +111,68 @@ class MobileWalletCrypto2BootstrapTest {
     }
 
     @Test
-    fun `explicit MobileWalletKeys override retains legacy bootstrap`() = runTest {
+    fun `configured DID service registers the requested method`() = runTest {
         database().use { database ->
-            val provider = FakeCrypto2PlatformKeyProvider()
-            val legacyStore = InMemoryKeyStore()
-            val config = MobileWalletConfig(
-                persistence = MobileWalletPersistence(
-                    stores = MobileWalletStores(
-                        keys = MobileWalletKeys(
-                            store = legacyStore,
-                            generate = { JWKKey.generate(it) },
-                        )
-                    )
-                )
-            )
-
-            val bootstrap = wallet(config, database, provider).bootstrap()
-
-            assertNotNull(legacyStore.getKey(bootstrap.keyId))
-            assertTrue(bootstrap.did.startsWith("did:key:"))
-            assertEquals(0, provider.generateCount)
-            assertEquals(0, provider.legacyCalls)
-        }
-    }
-
-    @Test
-    fun `explicit crypto2 customization configures DID service and key policy`() = runTest {
-        database().use { database ->
-            val provider = FakeCrypto2PlatformKeyProvider()
-            val didService = RecordingCrypto2DidService()
-            val policy = SignumKeyPolicy(hardware = SignumHardwarePolicy.DISCOURAGED)
+            val provider = FakePlatformManagedKeyProvider()
+            val didService = RecordingDidService()
 
             val bootstrap = wallet(
-                config = MobileWalletConfig(),
                 database = database,
                 provider = provider,
-                crypto2Config = MobileWalletCrypto2Config(didService, policy),
+                config = MobileWalletConfig(),
+                didService = didService,
             ).bootstrap(didMethod = "jwk")
 
             assertTrue(bootstrap.did.startsWith("did:jwk:"))
             assertEquals(listOf("jwk"), didService.registeredMethods)
-            assertEquals(policy, provider.lastPolicy)
         }
     }
 
     @Test
-    fun `crypto2 DID registration failure removes persisted key without legacy fallback`() = runTest {
+    fun `DID registration failure removes the persisted key`() = runTest {
         database().use { database ->
-            val provider = FakeCrypto2PlatformKeyProvider()
+            val provider = FakePlatformManagedKeyProvider()
             val failure = assertFailsWith<IllegalStateException> {
                 wallet(
                     config = MobileWalletConfig(),
                     database = database,
                     provider = provider,
-                    crypto2Config = MobileWalletCrypto2Config(
-                        didService = object : Crypto2DidService by Crypto2DidService {
-                            override suspend fun registerByKey(
-                                method: String,
-                                key: Crypto2Key,
-                                options: DidCreateOptions,
-                            ): DidResult = error("DID registration failed")
-                        }
-                    ),
+                    didService = object : Crypto2DidService by Crypto2DidService {
+                        override suspend fun registerByKey(
+                            method: String,
+                            key: ManagedKeyMaterial,
+                            options: DidCreateOptions,
+                        ): DidResult = error("DID registration failed")
+                    },
                 ).bootstrap()
             }
 
             assertTrue(failure.message.orEmpty().contains("DID registration failed"))
             assertTrue(database.queries.selectAll().executeAsList().isEmpty())
             assertEquals(1, provider.deleteCount)
-            assertEquals(0, provider.legacyCalls)
         }
     }
 
     private fun wallet(
         config: MobileWalletConfig,
         database: TestDatabase,
-        provider: FakeCrypto2PlatformKeyProvider,
-        crypto2Config: MobileWalletCrypto2Config? = null,
+        provider: FakePlatformManagedKeyProvider,
+        didService: Crypto2DidService = Crypto2DidService,
     ): MobileWallet = createSqlDelightMobileWallet(
         config = config,
         clientIdTrustConfiguration = ClientIdTrustConfiguration(),
-        crypto2Config = crypto2Config,
         db = database.database,
         keyProvider = provider,
+        didService = didService,
         deleteLocalPersistence = {},
     )
 
-    private suspend fun assertDidMatchesPublicKey(did: String, original: Crypto2Key) {
+    private suspend fun assertDidMatchesPublicKey(did: String, original: ManagedKeyMaterial) {
         val resolved = Crypto2DidService.resolveToKeys(did).getOrThrow().single()
         assertEquals(publicMembers(publicJwk(original)), publicMembers(publicJwk(resolved)))
     }
 
-    private suspend fun publicJwk(key: Crypto2Key): JsonObject {
+    private suspend fun publicJwk(key: ManagedKeyMaterial): JsonObject {
         val encoded = assertNotNull(key.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(key.spec)
         return Json.parseToJsonElement(encoded.data.toByteArray().decodeToString()).jsonObject
     }
@@ -252,14 +214,11 @@ class MobileWalletCrypto2BootstrapTest {
         override fun close() = driver.close()
     }
 
-    private class FakeCrypto2PlatformKeyProvider : PlatformKeyProvider, Crypto2PlatformKeyProvider {
+    private class FakePlatformManagedKeyProvider : PlatformManagedKeyProvider {
         private val softwareProvider = CryptographySoftwareKeyProvider()
         private val keys = mutableMapOf<KeyId, SoftwareKey>()
-        override val supportedPlatformKeyTypes: Set<KeyType> = emptySet()
         var generateCount = 0
         var deleteCount = 0
-        var legacyCalls = 0
-        var lastPolicy: SignumKeyPolicy? = null
 
         override suspend fun generateManagedKey(
             id: KeyId,
@@ -268,7 +227,6 @@ class MobileWalletCrypto2BootstrapTest {
             policy: SignumKeyPolicy?,
         ): ManagedKey {
             generateCount++
-            lastPolicy = policy
             val software = softwareProvider.generate(GenerateSoftwareKeyRequest(id, spec, usages))
             keys[id] = software
             val publicKey = assertNotNull(software.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(spec)
@@ -287,7 +245,7 @@ class MobileWalletCrypto2BootstrapTest {
             )
         }
 
-        override suspend fun restoreManagedKey(stored: StoredKey.Managed): Crypto2Key {
+        override suspend fun restoreManagedKey(stored: StoredKey.Managed): ManagedKey {
             require(stored.provider == PROVIDER_ID)
             return managedKey(stored, requireNotNull(keys[stored.id]))
         }
@@ -295,37 +253,6 @@ class MobileWalletCrypto2BootstrapTest {
         override suspend fun deleteManagedKey(stored: StoredKey.Managed) {
             deleteCount++
             keys.remove(stored.id)
-        }
-
-        override suspend fun migratePlatformKey(
-            id: KeyId,
-            keyType: KeyType,
-            usages: Set<KeyUsage>,
-        ): StoredKey.Managed = error("Legacy key migration must not be used")
-
-        override suspend fun generateKey(keyType: KeyType, keyId: String?): Key {
-            legacyCalls++
-            error("Default crypto2 bootstrap must not generate a v1 key")
-        }
-
-        override suspend fun loadKey(keyId: String, keyType: KeyType): Key? {
-            legacyCalls++
-            return null
-        }
-
-        override suspend fun loadSoftwareKey(keyId: String, keyType: KeyType, jwkMaterial: ByteArray): Key? {
-            legacyCalls++
-            return null
-        }
-
-        override suspend fun exportSoftwareKeyMaterial(key: Key): ByteArray {
-            legacyCalls++
-            error("Default crypto2 bootstrap must not export v1 material")
-        }
-
-        override suspend fun deleteKey(keyId: String, keyType: KeyType): Boolean {
-            legacyCalls++
-            return false
         }
 
         private fun managedKey(stored: StoredKey.Managed, software: SoftwareKey): ManagedKey = object : ManagedKey {
@@ -338,12 +265,12 @@ class MobileWalletCrypto2BootstrapTest {
         }
     }
 
-    private class RecordingCrypto2DidService : Crypto2DidService by Crypto2DidService {
+    private class RecordingDidService : Crypto2DidService by Crypto2DidService {
         val registeredMethods = mutableListOf<String>()
 
         override suspend fun registerByKey(
             method: String,
-            key: Crypto2Key,
+            key: ManagedKeyMaterial,
             options: DidCreateOptions,
         ): DidResult {
             registeredMethods += method

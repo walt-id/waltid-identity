@@ -27,29 +27,16 @@ public actual class MobileWalletFactory(private val context: Context) {
     public actual suspend fun create(
         config: MobileWalletConfig,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
-    ): MobileWallet = createWallet(config, clientIdTrustConfiguration, null)
-
-    public actual suspend fun create(
-        config: MobileWalletConfig,
-        crypto2Config: MobileWalletCrypto2Config,
-    ): MobileWallet = createWallet(config, ClientIdTrustConfiguration(), crypto2Config)
-
-    public actual suspend fun create(
-        config: MobileWalletConfig,
-        clientIdTrustConfiguration: ClientIdTrustConfiguration,
-        crypto2Config: MobileWalletCrypto2Config,
-    ): MobileWallet = createWallet(config, clientIdTrustConfiguration, crypto2Config)
+    ): MobileWallet = createWallet(config, clientIdTrustConfiguration)
 
     private suspend fun createWallet(
         config: MobileWalletConfig,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
-        crypto2Config: MobileWalletCrypto2Config?,
     ): MobileWallet {
         val driverFactory = DriverFactory(context)
         return createEncryptedSqlDelightMobileWallet(
             config = config,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
-            crypto2Config = crypto2Config,
             managedDatabaseKeyProvider = AndroidDatabaseEncryptionKeyProvider(context),
             platformKeyProvider = AndroidPlatformKeyProvider(),
             openEncryptedDriver = driverFactory::createEncryptedDriver,
