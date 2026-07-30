@@ -44,6 +44,23 @@ class DefaultCredentialProofVerifierTest {
     }
 
     @Test
+    fun `verifies EdDSA jwt proof signature`() = runTest {
+        val holderKey = JWKKey.generate(KeyType.Ed25519)
+        val proof = createProof(holderKey)
+
+        val verified = verifier.verify(
+            credentialRequest = credentialRequest(proof),
+            credentialConfiguration = credentialConfiguration(
+                proofSigningAlgorithms = setOf("ES256", "EdDSA"),
+            ),
+            context = context(),
+        )
+
+        assertEquals("EdDSA", verified.single().algorithm)
+        assertEquals(holderKey.getPublicKey().getThumbprint(), verified.single().holderKey.getThumbprint())
+    }
+
+    @Test
     fun `rejects tampered jwt proof signature as invalid proof`() = runTest {
         val holderKey = JWKKey.generate(KeyType.secp256r1)
         val proof = tamperSignature(createProof(holderKey))
@@ -141,12 +158,14 @@ class DefaultCredentialProofVerifierTest {
         credentialResponseEncryption = null,
     )
 
-    private fun credentialConfiguration() = CredentialConfiguration(
+    private fun credentialConfiguration(
+        proofSigningAlgorithms: Set<String> = setOf("ES256"),
+    ) = CredentialConfiguration(
         format = CredentialFormat.SD_JWT_VC,
         vct = CREDENTIAL_CONFIGURATION_ID,
         cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
         proofTypesSupported = mapOf(
-            "jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256")),
+            "jwt" to ProofType(proofSigningAlgValuesSupported = proofSigningAlgorithms),
         ),
     )
 
