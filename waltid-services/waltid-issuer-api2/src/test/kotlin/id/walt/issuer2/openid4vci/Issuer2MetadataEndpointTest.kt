@@ -292,7 +292,10 @@ class Issuer2MetadataEndpointTest {
             assertEquals(JWT_PROOF_BINDING_METHODS, configuration.cryptographicBindingMethodsSupported)
             assertEquals(credentialConfigurationId, configuration.scope)
             assertEquals("$ISSUER_BASE_URL/$credentialConfigurationId", configuration.vct)
-            assertNotNull(configuration.proofTypesSupported?.get("jwt"))
+            assertEquals(
+                JWT_PROOF_SIGNING_ALGORITHMS,
+                assertNotNull(configuration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+            )
         }
     }
 
@@ -316,7 +319,10 @@ class Issuer2MetadataEndpointTest {
             setOf("VerifiableCredential", "OpenBadgeCredential"),
             openBadgeConfiguration.credentialDefinition?.type?.toSet(),
         )
-        assertNotNull(openBadgeConfiguration.proofTypesSupported?.get("jwt"))
+        assertEquals(
+            JWT_PROOF_SIGNING_ALGORITHMS,
+            assertNotNull(openBadgeConfiguration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+        )
     }
 
     private fun assertMdocConfiguration(
@@ -338,6 +344,10 @@ class Issuer2MetadataEndpointTest {
             )
             assertEquals(doctype, mdocConfiguration.doctype)
             assertEquals(credentialConfigurationId, mdocConfiguration.scope)
+            assertEquals(
+                JWT_PROOF_SIGNING_ALGORITHMS,
+                assertNotNull(mdocConfiguration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+            )
         }
     }
 
@@ -356,7 +366,10 @@ class Issuer2MetadataEndpointTest {
         assertEquals(JWT_PROOF_BINDING_METHODS, sdJwtConfiguration.cryptographicBindingMethodsSupported)
         assertEquals(SD_JWT_INTERNAL_CONFIG_ID, sdJwtConfiguration.scope)
         assertEquals(INTERNAL_SD_JWT_VCT, sdJwtConfiguration.vct)
-        assertNotNull(sdJwtConfiguration.proofTypesSupported?.get("jwt"))
+        assertEquals(
+            JWT_PROOF_SIGNING_ALGORITHMS,
+            assertNotNull(sdJwtConfiguration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+        )
     }
 
     private fun ApplicationTestBuilder.installIssuer2WithConfigFiles() {
@@ -403,7 +416,7 @@ class Issuer2MetadataEndpointTest {
             ?: error("Could not locate waltid-issuer-api2 config directory")
 
     private companion object {
-        const val ISSUER_AUTHORITY_BASE_URL = "http://localhost:7002"
+        const val ISSUER_AUTHORITY_BASE_URL = "http://localhost:7005"
         const val OPENID4VCI_PREFIX = "/openid4vci"
         const val ISSUER_BASE_URL = "$ISSUER_AUTHORITY_BASE_URL/openid4vci"
         const val AUTHORIZATION_SERVER_METADATA_PATH = "/.well-known/oauth-authorization-server/openid4vci"
@@ -439,6 +452,8 @@ class Issuer2MetadataEndpointTest {
             CryptographicBindingMethod.DidJwk,
             CryptographicBindingMethod.DidEbsi,
         )
+
+        val JWT_PROOF_SIGNING_ALGORITHMS = setOf("ES256", "EdDSA")
 
         val configFiles: List<Pair<String, KClass<out WaltConfig>>> = listOf(
             "issuer-service" to Issuer2ServiceConfig::class,

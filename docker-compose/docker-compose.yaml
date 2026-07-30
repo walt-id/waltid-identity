@@ -3,7 +3,7 @@ services:
     image: ${IMAGE_PREFIX}waltid/wallet-api:${VERSION_TAG:-latest}
     profiles:
       - services
-      - identity
+      - identity-old
       - all
     pull_policy: missing
     depends_on:
@@ -23,7 +23,7 @@ services:
     image: ${IMAGE_PREFIX}waltid/issuer-api:${VERSION_TAG:-latest}
     profiles:
       - services
-      - identity
+      - identity-old
       - all
     pull_policy: missing
     depends_on:
@@ -55,7 +55,7 @@ services:
     image: ${IMAGE_PREFIX}waltid/verifier-api:${VERSION_TAG:-latest}
     profiles:
       - services
-      - identity
+      - identity-old
       - all
     pull_policy: missing
     depends_on:
@@ -109,15 +109,19 @@ services:
     image: ${IMAGE_PREFIX}waltid/waltid-demo-wallet:${VERSION_TAG:-latest}
     profiles:
       - apps
-      - identity
+      - identity-old
       - all
     pull_policy: missing
     build:
       context: ../
       dockerfile: waltid-applications/waltid-web-wallet/apps/waltid-demo-wallet/Dockerfile
     depends_on:
-      - wallet-api
-      - caddy
+      # wallet-api is not part of the apps profile, so it may not be enabled
+      wallet-api:
+        condition: service_started
+        required: false
+      caddy:
+        condition: service_started
     environment:
       NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://$SERVICE_HOST:$DEMO_WALLET_FRONTEND_PORT"
       NUXT_PUBLIC_DEV_WALLET_URL: "http://$SERVICE_HOST:$DEV_WALLET_FRONTEND_PORT"
@@ -127,15 +131,19 @@ services:
     image: ${IMAGE_PREFIX}waltid/waltid-dev-wallet:${VERSION_TAG:-latest}
     profiles:
       - apps
-      - identity
+      - identity-old
       - all
     pull_policy: missing
     build:
       context: ../
       dockerfile: waltid-applications/waltid-web-wallet/apps/waltid-dev-wallet/Dockerfile
     depends_on:
-      - wallet-api
-      - caddy
+      # wallet-api is not part of the apps profile, so it may not be enabled
+      wallet-api:
+        condition: service_started
+        required: false
+      caddy:
+        condition: service_started
     environment:
       NUXT_PUBLIC_ISSUER_CALLBACK_URL: "http://$SERVICE_HOST:$DEV_WALLET_FRONTEND_PORT"
       NUXT_PUBLIC_DEMO_WALLET_URL: "http://$SERVICE_HOST:$DEMO_WALLET_FRONTEND_PORT"
@@ -145,7 +153,7 @@ services:
     image: ${IMAGE_PREFIX}waltid/portal:${VERSION_TAG:-latest}
     profiles:
       - apps
-      - identity
+      - identity-old
       - all
     pull_policy: missing
     build:
@@ -172,10 +180,15 @@ services:
       context: ../
       dockerfile: waltid-applications/waltid-web-portal2/Dockerfile
     depends_on:
-      - issuer-api2
-      - verifier-api2
-      - waltid-demo-wallet
-      - caddy
+      # The api2 services are not part of the apps profile, so they may not be enabled
+      issuer-api2:
+        condition: service_started
+        required: false
+      verifier-api2:
+        condition: service_started
+        required: false
+      caddy:
+        condition: service_started
     environment:
       NUXT_PUBLIC_ISSUER_BASE: "http://$PUBLIC_SERVICE_HOST:$ISSUER_API2_PORT"
       NUXT_PUBLIC_VERIFIER_BASE: "http://$PUBLIC_SERVICE_HOST:$VERIFIER_API2_PORT"
@@ -190,7 +203,7 @@ services:
     image: ${IMAGE_PREFIX}waltid/vc-repository:${VERSION_VC_REPO:-latest}
     profiles:
       - services
-      - identity
+      - identity-old
       - all
     pull_policy: missing
     build:
