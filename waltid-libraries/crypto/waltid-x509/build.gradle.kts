@@ -128,6 +128,9 @@ kotlin {
             iosMain {
                 dependsOn(jvmIosMain)
                 dependsOn(signumMain)
+                dependencies {
+                    implementation(identityLibs.signum.supreme)
+                }
             }
         }
     }
