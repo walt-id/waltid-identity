@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 public struct DemoCredentialScenario {
     public let id: String
@@ -17,6 +18,11 @@ public struct DemoOffer {
 public struct DemoVerifierSession {
     public let sessionID: String
     public let authorizationRequestUri: String
+}
+
+public struct DemoMetadataSigner {
+    public let keyID: String?
+    public let algorithm: String
 }
 
 public final class DemoBackend {
@@ -73,6 +79,7 @@ public final class DemoBackend {
     public static let persistenceScenario = scenarios.first { $0.id == "eudi-pid-mdoc" }!
 
     private static let issuerBaseURL = URL(string: "https://issuer2.demo.walt.id")!
+    public static let issuerIdentifier = "https://issuer2.demo.walt.id/openid4vci"
     private static let verifierBaseURL = URL(string: "https://verifier2.demo.walt.id")!
 
     private let client: WalletE2EClient
@@ -134,6 +141,51 @@ public final class DemoBackend {
         )
     }
 
+    public func createVerifierSession(
+        scenario: DemoCredentialScenario,
+        signedRequest: Bool
+    ) async throws -> DemoVerifierSession {
+        try await createVerifierSession(
+            scenario: scenario,
+            transactionData: [],
+            signedRequest: signedRequest
+        )
+    }
+
+    /** Verifies an ES256 signed-metadata JWS served by the public issuer2 demo. */
+    public static func verifySignedIssuerMetadata(
+        compactJWT: String,
+        expectedCredentialIssuer: String
+    ) throws -> DemoMetadataSigner {
+        guard expectedCredentialIssuer == issuerIdentifier else {
+            throw NSError(
+                domain: "WalletE2E",
+                code: 309,
+                userInfo: [NSLocalizedDescriptionKey: "Unexpected public demo Credential Issuer: \(expectedCredentialIssuer)"]
+            )
+        }
+        let parts = compactJWT.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3,
+              let headerData = base64URLData(String(parts[0])),
+              let header = try JSONSerialization.jsonObject(with: headerData) as? [String: Any],
+              let algorithm = header["alg"] as? String,
+              algorithm == "ES256",
+              let jwk = header["jwk"] as? [String: Any],
+              let x = jwk["x"] as? String,
+              let y = jwk["y"] as? String,
+              let xData = base64URLData(x),
+              let yData = base64URLData(y),
+              let signatureData = base64URLData(String(parts[2])) else {
+            throw NSError(domain: "WalletE2E", code: 310, userInfo: [NSLocalizedDescriptionKey: "Malformed public demo signed metadata"])
+        }
+        let publicKey = try P256.Signing.PublicKey(x963Representation: Data([0x04]) + xData + yData)
+        let signature = try P256.Signing.ECDSASignature(rawRepresentation: signatureData)
+        guard publicKey.isValidSignature(signature, for: Data("\(parts[0]).\(parts[1])".utf8)) else {
+            throw NSError(domain: "WalletE2E", code: 311, userInfo: [NSLocalizedDescriptionKey: "Invalid public demo signed metadata signature"])
+        }
+        return DemoMetadataSigner(keyID: header["kid"] as? String, algorithm: algorithm)
+    }
+
     public func createResponseBoundVerifierSession(scenario: DemoCredentialScenario) async throws -> DemoVerifierSession {
         try await createVerifierSession(
             scenario: scenario,
@@ -181,7 +233,8 @@ public final class DemoBackend {
     private func createVerifierSession(
         scenario: DemoCredentialScenario,
         transactionData: [[String: Any]],
-        bindClientIDToResponseURI: Bool = false
+        bindClientIDToResponseURI: Bool = false,
+        signedRequest: Bool = false
     ) async throws -> DemoVerifierSession {
         let endpoint = Self.verifierBaseURL
             .appendingPathComponent("verification-session")
@@ -191,6 +244,7 @@ public final class DemoBackend {
             "dcql_query": [
                 "credentials": [scenario.verifierCredentialQuery],
             ],
+            "signed_request": signedRequest,
         ]
         if let requestedSessionID {
             let responseURI = Self.verifierBaseURL
@@ -363,6 +417,14 @@ public final class DemoBackend {
         payload.putProfileField(fields: fields, key: "payee", value: "ACME Corp")
         return payload
     }
+}
+
+private func base64URLData(_ value: String) -> Data? {
+    let padded = value
+        .replacingOccurrences(of: "-", with: "+")
+        .replacingOccurrences(of: "_", with: "/")
+        .padding(toLength: ((value.count + 3) / 4) * 4, withPad: "=", startingAt: 0)
+    return Data(base64Encoded: padded)
 }
 
 private extension Dictionary where Key == String, Value == Any {

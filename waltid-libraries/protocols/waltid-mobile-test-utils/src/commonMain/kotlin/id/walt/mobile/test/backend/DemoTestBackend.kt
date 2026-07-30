@@ -1,5 +1,11 @@
 package id.walt.mobile.test.backend
 
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
+import id.waltid.openid4vci.wallet.metadata.MetadataSigner
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.*
@@ -30,6 +36,7 @@ import kotlin.uuid.Uuid
 object DemoTestBackend {
 
     private const val ISSUER_BASE_URL = "https://issuer2.demo.walt.id"
+    private const val ISSUER_IDENTIFIER = "$ISSUER_BASE_URL/openid4vci"
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
     const val TRANSACTION_DATA_PROFILES_URL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
     private const val EUDI_PID_SD_JWT_VCT = "$ISSUER_BASE_URL/openid4vci/urn:eudi:pid:1"
@@ -148,6 +155,34 @@ object DemoTestBackend {
         return createVerifierSession(scenario.verifierCredentialQuery)
     }
 
+    suspend fun createVerifierSession(
+        scenario: CredentialScenario,
+        signedRequest: Boolean,
+    ): VerifierSession = createVerifierSession(
+        credentialQuery = scenario.verifierCredentialQuery,
+        transactionData = emptyList(),
+        signedRequest = signedRequest,
+    )
+
+    /** Trust resolver for signed metadata served by the public issuer2 demo. */
+    val publicDemoIssuerMetadataTrustResolver = CredentialIssuerMetadataTrustResolver { compactJwt, expectedCredentialIssuer ->
+        require(expectedCredentialIssuer == ISSUER_IDENTIFIER) {
+            "Unexpected public demo Credential Issuer: $expectedCredentialIssuer"
+        }
+        val decoded = compactJwt.decodeJws()
+        val algorithm = decoded.header[JwtHeaderParams.ALGORITHM]?.jsonPrimitive?.contentOrNull
+            ?: error("Public demo signed metadata is missing alg")
+        val jwk = decoded.header[JwtHeaderParams.JSON_WEB_KEY]?.jsonObject
+            ?: error("Public demo signed metadata is missing jwk")
+        val verificationKey = JWKKey.importJWK(jwk.toString()).getOrThrow()
+        verificationKey.verifyJws(compactJwt).getOrThrow()
+        MetadataSigner(
+            keyId = decoded.header[JwtHeaderParams.KEY_ID]?.jsonPrimitive?.contentOrNull,
+            algorithm = algorithm,
+            trustType = MetadataSignerTrustType.TRUSTED_ISSUER,
+        )
+    }
+
     suspend fun createResponseBoundVerifierSession(scenario: CredentialScenario): VerifierSession {
         return createVerifierSession(
             credentialQuery = scenario.verifierCredentialQuery,
@@ -200,11 +235,13 @@ object DemoTestBackend {
         credentialQuery: JsonObject,
         transactionData: List<JsonObject>,
         bindClientIdToResponseUri: Boolean = false,
+        signedRequest: Boolean = false,
     ): VerifierSession {
         val requestedSessionId = Uuid.random().toString().takeIf { bindClientIdToResponseUri }
         val payload = buildJsonObject {
             put("flow_type", "cross_device")
             putJsonObject("core_flow") {
+                put("signed_request", signedRequest)
                 requestedSessionId?.let { sessionId ->
                     val responseUri = "$VERIFIER_BASE_URL/verification-session/$sessionId/response"
                     put("sessionId", sessionId)
