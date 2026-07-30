@@ -57,7 +57,10 @@ class DefaultCredentialProofVerifierTest {
         )
 
         assertEquals("EdDSA", verified.single().algorithm)
-        assertEquals(holderKey.getPublicKey().getThumbprint(), verified.single().holderKey.getThumbprint())
+        assertEquals(
+            holderKey.getPublicKey().getThumbprint(),
+            Jwk.sha256Thumbprint(verified.single().holderKey.exportPublicJwk()),
+        )
     }
 
     @Test
