@@ -2,12 +2,14 @@ package id.walt.crypto.keys.jwk
 
 import at.asitplus.signum.indispensable.CryptoPublicKey
 import at.asitplus.signum.indispensable.ECCurve
+import at.asitplus.signum.indispensable.asn1.*
+import at.asitplus.signum.indispensable.asn1.encoding.parse
 import at.asitplus.signum.indispensable.josef.JsonWebKey
 import at.asitplus.signum.indispensable.josef.JweAlgorithm
-import at.asitplus.signum.indispensable.pki.X509Certificate
 import at.asitplus.signum.indispensable.josef.JweEncrypted.Companion.deserialize
 import at.asitplus.signum.indispensable.josef.io.joseCompliantSerializer
 import at.asitplus.signum.indispensable.josef.toJsonWebKey
+import at.asitplus.signum.indispensable.pki.X509Certificate
 import at.asitplus.signum.supreme.SignatureResult
 import at.asitplus.signum.supreme.os.IosKeychainProvider
 import at.asitplus.signum.supreme.sign.Signer
@@ -17,25 +19,16 @@ import dev.whyoleg.cryptography.CryptographyProviderApi
 import dev.whyoleg.cryptography.algorithms.EC
 import dev.whyoleg.cryptography.algorithms.ECDSA
 import dev.whyoleg.cryptography.algorithms.EdDSA
-import id.walt.crypto.MobileSoftwareKey
+import id.walt.crypto.*
 import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.signJwsWithPlatformSigner
-import id.walt.crypto.toPlatformKeyStoreCurve
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.crypto.utils.JweEncryptionHelper
 import id.walt.crypto.utils.keyFromIntermediate
-import id.walt.crypto.verifyJwsWithPlatformSigner
-import id.walt.crypto.verifyRawWithPlatformSigner
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.uuid.Uuid
 
@@ -249,18 +242,79 @@ actual class JWKKey actual constructor(
         }
 
         actual override suspend fun importPEM(pem: String): Result<JWKKey> = runCatching {
-            val derBytes = pem.lines()
-                .filter { !it.startsWith("-----") }
-                .joinToString("")
-                .let { Base64.decode(it) }
+            val pemRegex = "^-----\\s*BEGIN\\s([^-]*)-----\\s*$([^-]+)^-----\\s*END\\s+([^-]+)-----".toRegex(
+                setOf(
+                    RegexOption.DOT_MATCHES_ALL,
+                    RegexOption.MULTILINE
+                )
+            )
+            val match = pemRegex.matchEntire(pem)
+            requireNotNull(match) { "Invalid PEM format" }
+            val headerType = match.groupValues[1].trim()
+            val base64 = match.groupValues[2].replace("\\s".toRegex(), "")
+            val footerType = match.groupValues[3].trim()
+            require(headerType == footerType) { "PEM header and footer do not match" }
+            when (headerType) {
+                "CERTIFICATE" -> X509Certificate.decodeFromPem(pem).getOrThrow()
+                    .decodedPublicKey.getOrThrow()
 
-            val cryptoPubKey = if (pem.contains("BEGIN CERTIFICATE")) {
-                X509Certificate.decodeFromDer(derBytes).decodedPublicKey.getOrThrow()
-            } else {
-                CryptoPublicKey.decodeFromDer(derBytes)
+                "RSA PRIVATE KEY" -> publicKeyFromPkcs1RsaPrivateKey(Base64.decode(base64))
+
+                "PRIVATE KEY" -> publicKeyFromPkcs8RsaPrivateKey(Base64.decode(base64))
+                    ?: throw IllegalArgumentException("Not a RSA private key")
+
+                else -> CryptoPublicKey.decodeFromPem(pem).getOrThrow()
+            }.let { cryptoPubKey ->
+                val jwkJson = joseCompliantSerializer.encodeToString(cryptoPubKey.toJsonWebKey())
+                JWKKey(jwkJson)
             }
-            val jwkJson = joseCompliantSerializer.encodeToString(cryptoPubKey.toJsonWebKey())
-            JWKKey(jwkJson)
+        }
+
+        fun publicKeyFromPkcs8RsaPrivateKey(pkcs8Bytes: ByteArray): CryptoPublicKey? {
+            // Unpack the outer PKCS#8 Sequence container
+            val pkcs8Sequence = Asn1Element.parse(pkcs8Bytes) as Asn1Sequence
+
+            // Structure indices for PrivateKeyInfo:
+            // index 0 -> Version
+            // index 1 -> AlgorithmIdentifier
+            // index 2 -> PrivateKey (housed inside an Asn1OctetString wrapper)
+            val algIdentifier =
+                ObjectIdentifier.decodeFromTlv(pkcs8Sequence.children[1].asSequence().children[0].asPrimitive())
+            if (!algIdentifier.toString().startsWith("1.2.840.113549.1.1.")) {
+                //Not an RSA private key
+                return null
+            }
+            val privateKeyOctetString = pkcs8Sequence.children[2] as Asn1OctetString
+
+            // 2. Extract the nested raw PKCS#1 byte payload from the octet string
+            return publicKeyFromPkcs1RsaPrivateKey(privateKeyOctetString.content)
+        }
+
+        fun publicKeyFromPkcs1RsaPrivateKey(pkcs1Bytes: ByteArray): CryptoPublicKey {
+            // Parse the extracted PKCS#1 payload structure
+            val pkcs1Sequence = Asn1Element.parse(pkcs1Bytes) as Asn1Sequence
+
+            // Representation of RSA private key with information for the CRT algorithm.
+            // RSAPrivateKey ::= SEQUENCE {
+            // [0] version           Version,
+            // [1] modulus           INTEGER,  -- n
+            // [2] publicExponent    INTEGER,  -- e
+            // [3] privateExponent   INTEGER,  -- d
+            // [4] prime1            INTEGER,  -- p
+            // [5] prime2            INTEGER,  -- q
+            // [6] exponent1         INTEGER,  -- d mod (p-1)
+            // [7] exponent2         INTEGER,  -- d mod (q-1)
+            // [8] coefficient       INTEGER,  -- (inverse of q) mod p
+            // [9] otherPrimeInfos   OtherPrimeInfos OPTIONAL
+            //}
+            val modulusInteger = Asn1Integer.decodeFromTlv(pkcs1Sequence.children[1].asPrimitive())
+            val publicExponentInteger = Asn1Integer.decodeFromTlv(pkcs1Sequence.children[2].asPrimitive())
+
+            // 4. Instantiate and return Signum's platform-agnostic RSA public key structural map
+            return CryptoPublicKey.RSA(
+                n = modulusInteger,
+                e = publicExponentInteger
+            )
         }
     }
 
