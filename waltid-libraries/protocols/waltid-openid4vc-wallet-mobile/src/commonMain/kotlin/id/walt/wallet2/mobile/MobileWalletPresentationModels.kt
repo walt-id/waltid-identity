@@ -59,6 +59,7 @@ public data class MobileWalletPresentationPreviewHandle(val value: String) {
  *
  * @property clientId Required OpenID4VP `client_id` value identifying the verifier.
  * @property verifierMetadata Typed verifier metadata supplied by the OpenID4VP client, when available.
+ * @property verifierMetadataProvenance Whether verifier metadata came from an unsigned request or a signed request object.
  * @property responseUri Verifier response URI to which the wallet would submit the presentation or error, when provided.
  * @property state OpenID4VP state value supplied by the verifier, when provided.
  * @property nonce OpenID4VP nonce value supplied by the verifier, when provided. May be null if the missing nonce is the validation error.
@@ -67,6 +68,7 @@ public data class MobileWalletPresentationPreviewHandle(val value: String) {
 public data class MobileWalletPresentationRequestContext(
     val clientId: String,
     val verifierMetadata: MobileWalletVerifierMetadata?,
+    val verifierMetadataProvenance: MobileWalletVerifierMetadataProvenance,
     val responseUri: String?,
     val state: String?,
     val nonce: String?,
@@ -117,6 +119,7 @@ public data class MobileWalletPresentationCredentialRequirement(
 public data class MobileWalletPresentationRequestInfo(
     val clientId: String,
     val verifierMetadata: MobileWalletVerifierMetadata?,
+    val verifierMetadataProvenance: MobileWalletVerifierMetadataProvenance,
     val responseUri: String?,
     val state: String?,
     val nonce: String,
@@ -127,6 +130,24 @@ public data class MobileWalletPresentationRequestInfo(
         require(clientId.isNotBlank()) { "A presentation request client ID must not be blank." }
         require(nonce.isNotBlank()) { "A presentation request nonce must not be blank." }
     }
+}
+
+/** Provenance of verifier metadata exposed by a presentation preview. */
+public sealed interface MobileWalletVerifierMetadataProvenance {
+    /** Verifier metadata came from an unsigned authorization request. */
+    public data object UnsignedRequest : MobileWalletVerifierMetadataProvenance
+
+    /** Verifier metadata came from the authenticated request object retained by wallet core. */
+    public data class SignedRequest(
+        /** Exact compact request object received from the verifier. */
+        public val compactRequestObject: String,
+        /** JWS algorithm carried by the request object. */
+        public val algorithm: String,
+        /** Request-object signing key identifier, when supplied. */
+        public val keyId: String?,
+        /** OpenID4VP client identifier prefix used for authentication. */
+        public val clientIdPrefix: String,
+    ) : MobileWalletVerifierMetadataProvenance
 }
 
 /**

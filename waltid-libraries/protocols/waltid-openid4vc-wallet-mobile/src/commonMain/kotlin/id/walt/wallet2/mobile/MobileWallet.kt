@@ -33,6 +33,9 @@ import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
+import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
@@ -48,6 +51,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 private object MobileDidSupport {
     private val initializationMutex = Mutex()
@@ -426,7 +430,10 @@ public class MobileWallet internal constructor(
             is PreviewPresentationResult.Invalid ->
                 MobileWalletPresentationPreviewResult.Invalid(
                     previewHandle = MobileWalletPresentationPreviewHandle(result.handle.value),
-                    request = result.authorizationRequest.toMobileRequestContext(preferredLocales),
+                    request = result.authorizationRequest.toMobileRequestContext(
+                        preferredLocales = preferredLocales,
+                        resolvedAuthorizationRequest = result.resolvedAuthorizationRequest,
+                    ),
                     errorCode = result.error.code.toMobileErrorCode(),
                     message = result.error.message,
                 )
@@ -449,6 +456,7 @@ public class MobileWallet internal constructor(
                         previewHandle = MobileWalletPresentationPreviewHandle(result.handle.value),
                         request = result.authorizationRequest.toMobileRequestInfo(
                             preferredLocales = preferredLocales,
+                            resolvedAuthorizationRequest = result.resolvedAuthorizationRequest,
                             responseEncryption = result.responseEncryption,
                             transactionData = transactionData,
                         ),
@@ -623,6 +631,7 @@ internal fun WalletPresentResult.toMobilePresentationResult(): MobileWalletPrese
 
 private fun AuthorizationRequest.toMobileRequestInfo(
     preferredLocales: List<String>,
+    resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
     responseEncryption: ResponseEncryption.Metadata? = null,
     transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
 ): MobileWalletPresentationRequestInfo {
@@ -631,6 +640,7 @@ private fun AuthorizationRequest.toMobileRequestInfo(
             "A validated presentation request must contain client_id."
         },
         verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
+        verifierMetadataProvenance = resolvedAuthorizationRequest.toMobileVerifierMetadataProvenance(clientId),
         responseUri = responseUri,
         state = state,
         nonce = requireNotNull(nonce) {
@@ -643,17 +653,34 @@ private fun AuthorizationRequest.toMobileRequestInfo(
 
 private fun AuthorizationRequest.toMobileRequestContext(
     preferredLocales: List<String>,
+    resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
 ): MobileWalletPresentationRequestContext =
     MobileWalletPresentationRequestContext(
         clientId = requireNotNull(clientId) {
             "A reportable invalid presentation request must contain client_id."
         },
         verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
+        verifierMetadataProvenance = resolvedAuthorizationRequest.toMobileVerifierMetadataProvenance(clientId),
         responseUri = responseUri,
         state = state,
         nonce = nonce,
         responseEncryption = null.toMobileResponseEncryption(),
     )
+
+private fun ResolvedAuthorizationRequest?.toMobileVerifierMetadataProvenance(
+    clientId: String?,
+): MobileWalletVerifierMetadataProvenance = when (this) {
+    is ResolvedAuthorizationRequest.WithRequestObject -> {
+        val header = requestObject.decodeJws().header
+        MobileWalletVerifierMetadataProvenance.SignedRequest(
+            compactRequestObject = requestObject,
+            algorithm = requireNotNull(header[JwtHeaderParams.ALGORITHM]?.jsonPrimitive?.contentOrNull),
+            keyId = header[JwtHeaderParams.KEY_ID]?.jsonPrimitive?.contentOrNull,
+            clientIdPrefix = requireNotNull(clientId).substringBefore(':'),
+        )
+    }
+    else -> MobileWalletVerifierMetadataProvenance.UnsignedRequest
+}
 
 private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {
     WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED -> MobileWalletPresentationErrorCode.accessDenied
