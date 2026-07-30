@@ -77,61 +77,6 @@ class V1KeyMigrationTest {
     }
 
     @Test
-    fun `mobile software and platform records use separate one-way paths`() = runTest {
-        val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
-        val x = base64Url.encode(ByteArray(32) { 1 })
-        val d = base64Url.encode(ByteArray(32) { 2 })
-        val softwareJwk = """{"kty":"OKP","crv":"Ed25519","x":"$x","d":"$d"}"""
-        val software = V1KeyMigration().migrateMobileReference(
-            V1MobileKeyReference(
-                id = KeyId("mobile-software"),
-                keyType = "Ed25519",
-                platform = V1MobilePlatform.ANDROID,
-                platformBacked = false,
-                keyMaterial = softwareJwk,
-                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-            )
-        )
-        assertIs<StoredKey.Software>(software)
-
-        val platformMigration = V1PlatformKeyMigrator { record ->
-            StoredKey.Managed(
-                version = StoredKey.CURRENT_VERSION,
-                id = record.id,
-                spec = KeySpec.Ec(EcCurve.P256),
-                usages = record.usages,
-                provider = ProviderId("android-keystore-signum"),
-                providerSchemaVersion = 1,
-                providerData = BinaryData("{}".encodeToByteArray()),
-            )
-        }
-        val platform = V1KeyMigration(platformMigrator = platformMigration).migrateMobileReference(
-            V1MobileKeyReference(
-                id = KeyId("alias"),
-                keyType = "secp256r1",
-                platform = V1MobilePlatform.ANDROID,
-                platformBacked = true,
-                keyMaterial = null,
-                usages = setOf(KeyUsage.SIGN),
-            )
-        )
-        assertIs<StoredKey.Managed>(platform)
-
-        assertFailsWith<V1KeyMigrationException.MissingPlatformMigrator> {
-            V1KeyMigration().migrateMobileReference(
-                V1MobileKeyReference(
-                    id = KeyId("alias"),
-                    keyType = "secp256r1",
-                    platform = V1MobilePlatform.ANDROID,
-                    platformBacked = true,
-                    keyMaterial = null,
-                    usages = setOf(KeyUsage.SIGN),
-                )
-            )
-        }
-    }
-
-    @Test
     fun `unknown malformed and policy-free records fail explicitly`() = runTest {
         assertFailsWith<V1KeyMigrationException.MissingManagedMigrator> {
             V1KeyMigration().migrate(

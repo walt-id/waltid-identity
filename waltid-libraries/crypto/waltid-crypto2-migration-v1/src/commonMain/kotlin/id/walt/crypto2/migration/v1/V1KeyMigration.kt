@@ -6,7 +6,6 @@ import kotlinx.serialization.json.*
 
 class V1KeyMigration(
     managedMigrators: Map<String, V1ManagedKeyMigrator> = emptyMap(),
-    private val platformMigrator: V1PlatformKeyMigrator? = null,
 ) {
     private val managedMigrators = managedMigrators.toMap()
 
@@ -25,22 +24,6 @@ class V1KeyMigration(
         return when (val type = serialized.requiredString("type")) {
             "jwk" -> migrateJwk(recordId, serialized.requiredObject("jwk"), usages, serialized.legacyKeyId())
             else -> migrateManaged(recordId, type, serialized, usages)
-        }
-    }
-
-    suspend fun migrateMobileReference(record: V1MobileKeyReference): StoredKey {
-        require(record.usages.isNotEmpty()) { "Migration requires explicit key usages" }
-        return if (record.platformBacked) {
-            val migrator = platformMigrator ?: throw V1KeyMigrationException.MissingPlatformMigrator(record.platform)
-            migrator.migrate(record).also { migrated ->
-                require(migrated.id == record.id) { "Platform migration changed the key ID" }
-                require(migrated.spec == record.keyType.toKeySpec()) { "Platform migration changed the key specification" }
-                require(migrated.usages == record.usages) { "Platform migration changed key usages" }
-            }
-        } else {
-            val material = record.keyMaterial ?: throw V1KeyMigrationException.MissingKeyMaterial(record.id)
-            val source = parseObject(material)
-            migrateJwk(record.id, source, record.usages, source.legacyKeyId())
         }
     }
 
@@ -167,29 +150,8 @@ fun interface V1ManagedKeyMigrator {
     suspend fun migrate(record: V1ManagedKeyRecord): StoredKey.Managed
 }
 
-enum class V1MobilePlatform {
-    ANDROID,
-    IOS,
-}
-
-data class V1MobileKeyReference(
-    val id: KeyId,
-    val keyType: String,
-    val platform: V1MobilePlatform,
-    val platformBacked: Boolean,
-    val keyMaterial: String?,
-    val usages: Set<KeyUsage>,
-)
-
-fun interface V1PlatformKeyMigrator {
-    suspend fun migrate(record: V1MobileKeyReference): StoredKey.Managed
-}
-
 sealed class V1KeyMigrationException(message: String) : IllegalArgumentException(message) {
     class MissingManagedMigrator(type: String) : V1KeyMigrationException("No v1 migrator is registered for: $type")
-    class MissingPlatformMigrator(platform: V1MobilePlatform) :
-        V1KeyMigrationException("No v1 platform migrator is registered for: $platform")
-    class MissingKeyMaterial(id: KeyId) : V1KeyMigrationException("Mobile software key has no material: ${id.value}")
 }
 
 private fun parseObject(value: String): JsonObject =
