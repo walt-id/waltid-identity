@@ -661,13 +661,13 @@ internal fun AuthorizationRequest.toMobileRequestContext(
             "A reportable invalid presentation request must contain client_id."
         }
         MobileWalletPresentationRequestContext(
-        clientId = verifiedClientId,
-        verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
-        verifierMetadataProvenance = resolvedAuthorizationRequest.toMobileVerifierMetadataProvenance(verifiedClientId),
-        responseUri = responseUri,
-        state = state,
-        nonce = nonce,
-        responseEncryption = null.toMobileResponseEncryption(),
+            clientId = verifiedClientId,
+            verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
+            verifierMetadataProvenance = resolvedAuthorizationRequest.toMobileVerifierMetadataProvenance(verifiedClientId),
+            responseUri = responseUri,
+            state = state,
+            nonce = nonce,
+            responseEncryption = null.toMobileResponseEncryption(),
         )
     }
 
