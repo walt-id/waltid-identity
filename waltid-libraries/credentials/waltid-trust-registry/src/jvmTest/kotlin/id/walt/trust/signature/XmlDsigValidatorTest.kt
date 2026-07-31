@@ -1,6 +1,7 @@
 package id.walt.trust.signature
 
 import id.walt.trust.model.AuthenticityState
+import id.walt.trust.model.SignatureStatus
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -43,7 +44,7 @@ class XmlDsigValidatorTest {
 
         // The EU LoTL should have a valid signature
         assertEquals(
-            AuthenticityState.VALIDATED, result.state,
+            AuthenticityState.INTEGRITY_VERIFIED, result.state,
             "EU LoTL signature should be valid: ${result.details}"
         )
         assertTrue(result.signatureValid, "Signature value should be valid")
@@ -76,7 +77,7 @@ class XmlDsigValidatorTest {
 
         // German TSL should also have a valid signature
         assertEquals(
-            AuthenticityState.VALIDATED, result.state,
+            AuthenticityState.INTEGRITY_VERIFIED, result.state,
             "German TSL signature should be valid: ${result.details}"
         )
     }
@@ -94,7 +95,8 @@ class XmlDsigValidatorTest {
 
         val result = XmlDsigValidator.validate(xmlWithoutSignature)
 
-        assertEquals(AuthenticityState.FAILED, result.state)
+        assertEquals(AuthenticityState.UNVERIFIED, result.state)
+        assertEquals(SignatureStatus.NOT_PRESENT, result.signatureStatus)
         assertTrue(
             result.details?.contains("No Signature element") == true,
             "Should report missing signature"
