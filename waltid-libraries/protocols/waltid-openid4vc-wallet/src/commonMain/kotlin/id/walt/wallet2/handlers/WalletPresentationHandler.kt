@@ -790,14 +790,14 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
         resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest = ::resolveAuthorizationRequest,
     ): BuildVpTokenResult {
+        val key = wallet.resolveKey(request.key, request.keyId)
+            ?: throw IllegalArgumentException("Wallet has no key available for VP token building")
         val authorizationRequest = resolveAndValidatePresentationRequest(
-            wallet = wallet,
             requestUrl = request.requestUrl,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             resolveAuthorizationRequest = resolveAuthorizationRequest,
+            formatCapabilities = WalletPresentationFormatRegistry.capabilitiesFromKeyTypes(setOf(key.keyType)),
         )
-        val key = wallet.resolveKey(request.key, request.keyId)
-            ?: throw IllegalArgumentException("Wallet has no key available for VP token building")
         val did = request.did ?: wallet.defaultDid()
 
         val dcqlQuery = authorizationRequest.dcqlQuery
@@ -848,7 +848,6 @@ object WalletPresentationHandler {
         resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest = ::resolveAuthorizationRequest,
     ): WalletPresentResult {
         val authorizationRequest = resolveAndValidatePresentationRequest(
-            wallet = wallet,
             requestUrl = request.requestUrl,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             resolveAuthorizationRequest = resolveAuthorizationRequest,
@@ -1054,20 +1053,22 @@ object WalletPresentationHandler {
      * Re-resolves [requestUrl] and runs [PresentationRequestValidator], failing closed when
      * the request is invalid. Used by HTTP continuation steps that must not trust a
      * client-echoed [AuthorizationRequest].
+     *
+     * Key-independent request checks always run. Pass [formatCapabilities] derived from the
+     * effective signing key when the caller will sign; omit it for non-signing steps such as
+     * [sendAuthorizationResponse].
      */
     private suspend fun resolveAndValidatePresentationRequest(
-        wallet: Wallet,
         requestUrl: Url,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest,
+        formatCapabilities: WalletPresentationFormatRegistry.RuntimeCapabilities? = null,
     ): AuthorizationRequest {
         val resolvedAuthorizationRequest = resolveAuthorizationRequest(requestUrl)
-        val key = wallet.resolveKey(keyId = null)
-            ?: error("No key available: wallet has no keyStores and no staticKey")
         val validation = PresentationRequestValidator.validate(
             resolvedRequest = resolvedAuthorizationRequest,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
-            formatCapabilities = WalletPresentationFormatRegistry.capabilitiesFromKeyTypes(setOf(key.keyType)),
+            formatCapabilities = formatCapabilities,
         )
         if (validation is PresentationRequestValidationResult.Invalid) {
             error(
