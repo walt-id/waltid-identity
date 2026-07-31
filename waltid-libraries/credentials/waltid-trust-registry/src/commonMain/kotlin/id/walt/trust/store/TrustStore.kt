@@ -5,8 +5,8 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Abstraction over the trust data store.
- * MVP implementation: [InMemoryTrustStore].
- * Enterprise extension: implement in waltid-identity-enterprise with DB backing.
+ * [InMemoryTrustStore] provides the default non-persistent implementation.
+ * Persistent implementations can provide database-backed storage.
  *
  * Query methods that return multiple items produce a [Flow] so callers can stream
  * results without first materialising the entire result set into a List.
@@ -32,9 +32,10 @@ interface TrustStore {
     suspend fun getSource(sourceId: String): TrustSource?
     suspend fun listSources(): Flow<TrustSource>
     suspend fun updateSourceFreshness(sourceId: String, freshnessState: FreshnessState)
-    suspend fun updateSourceAuthenticity(sourceId: String, authenticityState: AuthenticityState)
+    suspend fun updateSourceAssurance(sourceId: String, assurance: SourceAssurance)
 
     suspend fun findIdentitiesByCertificateSha256(sha256Hex: String): Flow<ServiceIdentity>
+    suspend fun listCertificateIdentities(): Flow<ServiceIdentity>
     suspend fun findIdentitiesBySubjectDn(subjectDn: String): Flow<ServiceIdentity>
     suspend fun findIdentitiesBySkiHex(skiHex: String): Flow<ServiceIdentity>
     suspend fun findIdentitiesByIssuerAndSerial(issuerDn: String, serialNumber: String): Flow<ServiceIdentity>

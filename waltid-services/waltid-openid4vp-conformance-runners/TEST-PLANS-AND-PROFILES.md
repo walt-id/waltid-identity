@@ -1,5 +1,11 @@
 # OpenID4VC Conformance Test Plans & Profiles
 
+> **Issuer2 users:** This document is a test-plan inventory, not the local issuer2 setup guide. For
+> prerequisites, issuer2 configuration, Docker lifecycle, wrapper commands, and reports, follow
+> [docs/VCI-ISSUER.md](docs/VCI-ISSUER.md). In particular, use
+> `run-issuer-conformance-local.sh` for an issuer2 conformance run; a plain Gradle test command does not
+> prepare the local suite, proxy, truststore, or issuer2.
+
 ## Naming Convention
 
 Test plan classes follow this pattern:
@@ -9,7 +15,7 @@ Test plan classes follow this pattern:
 
 Examples:
 - `VciWalletSdJwtDpop` - VCI Wallet with SD-JWT and DPoP
-- `Oid4vciIssuerClientAttestationDpop` - VCI Issuer with Client Attestation and DPoP
+- `Oid4vciIssuerVariantPlan` - VCI Issuer matrix variant
 - `SdJwtVcX509SanDnsRequestUriSignedDirectPost` - VP Verifier for SD-JWT VC with X.509 client ID
 - `VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost` - VP Wallet for SD-JWT VC with X.509 client ID
 
@@ -75,31 +81,33 @@ Examples:
 
 ### 2. OpenID4VCI - Issuer Role
 
-#### Oid4vciIssuerClientAttestationDpop
-**File:** `src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/vci/issuer/Oid4vciIssuerClientAttestationDpop.kt`  
+#### Oid4vciIssuerVariantPlan
+**File:** `src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/vci/issuer/Oid4vciIssuerVariantPlan.kt`
 **Test Class:** `IssuerConformanceTests.kt`
 
 **Configuration:**
 - **Protocol:** OpenID4VCI 1.0
 - **Role:** Issuer (Credential Provider)
-- **Credential Format:** SD-JWT VC (`vc+sd-jwt`)
-- **Authentication:** DPoP + Client Attestation
-- **Flow:** Authorization Code
-- **Key Binding:** openid4vci-proof+jwt
+- **Credential Formats:** SD-JWT VC and mdoc
+- **Grant Types:** Authorization Code and Pre-Authorized Code
+- **Authentication:** Client Attestation, private_key_jwt, and mTLS
+- **Sender Constraints:** DPoP and mTLS
 
-**Test Plan Name:** `oid4vci-1_0-issuer-test-credential-issuance-dpop-client_attestation-sd_jwt_vc-issuer_initiated-simple-immediate-unsigned-authorization_code-by_value-plain`
+**Test Plan Names:**
+- Base VCI: `oid4vci-1_0-issuer-test-plan`
+- HAIP VCI: `oid4vci-1_0-issuer-haip-test-plan`
 
-**Status:** ⚠️ **53/55 tests passing**
+The runner generates the 288 valid `fapi_profile=vci` combinations described in
+the README. Environment filters select subsets without introducing separate fixed
+plan classes. Issuer-initiated variants receive a fresh issuer2 credential offer
+for each module.
 
-**Known Issues:**
-1. Missing RFC 9207 `iss` in authorization response
-2. Unexpected HTTP status on credential endpoint
-
-**HAIP Features:**
-- ✅ DPoP support
-- ✅ Client attestation
-- ✅ Authorization code flow
-- ✅ SD-JWT VC issuance
+The runner also generates the 8 `fapi_profile=vci_haip` issuer variants supported
+by the HAIP issuer plan: SD-JWT VC/mdoc, issuer-initiated/wallet-initiated
+authorization code, plain/encrypted credential response, client attestation, DPoP,
+simple authorization request, and unsigned request method. HAIP variants can use
+dedicated credential configuration IDs so issuer2 selects profiles with `x5Chain`
+and emits credential `x5c` material.
 
 ---
 
@@ -294,11 +302,11 @@ Examples:
 1. **VciWalletSdJwtDpop** - stable SD-JWT VC reference profile
 2. **VciWalletMdocDpop** - stable ISO mdoc reference profile
 3. **VciWalletSdJwtHaip** - HAIP-oriented baseline profile
+4. **Oid4vciIssuerVariantPlan** - generated base VCI issuer matrix
 
 ### ⚠️ Mostly Working (Minor Issues)
-2. **Oid4vciIssuerClientAttestationDpop** - 53/55 tests passing
-3. **MdlX509SanDnsRequestUriSignedDirectPost** - mDL tests passing
-4. **SdJwtVcX509SanDnsRequestUriSignedDirectPost** - needs trust anchor config
+1. **MdlX509SanDnsRequestUriSignedDirectPost** - mDL tests passing
+2. **SdJwtVcX509SanDnsRequestUriSignedDirectPost** - needs trust anchor config
 
 ### 🚫 Framework Ready (Awaiting Implementation)
 5. **VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost** - awaiting WAL-896
@@ -343,6 +351,9 @@ All test plans validate HAIP (High Assurance Interoperability Profile) requireme
 
 ## Test Execution
 
+Except for the issuer2 wrapper command below, these Gradle commands are run
+from the `waltid-identity` repository root.
+
 ### Run All Tests
 ```bash
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test
@@ -353,9 +364,8 @@ All test plans validate HAIP (High Assurance Interoperability Profile) requireme
 # VCI Wallet (profile runner)
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VciWalletConformanceTests"
 
-# VCI Issuer (mostly passing)
-export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://YOUR-NGROK.ngrok-free.app/openid4vc"
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "IssuerConformanceTests"
+# VCI Issuer: from the conformance-runner module after completing docs/VCI-ISSUER.md setup
+./run-issuer-conformance-local.sh
 
 # VP Verifier (partial)
 export VERIFIER_NGROK_URL="https://YOUR-NGROK.ngrok-free.app"
@@ -384,7 +394,7 @@ export VERIFIER_NGROK_URL="https://YOUR-NGROK.ngrok-free.app"
 
 ## Files
 
-### Test Plan Classes (7 total)
+### Selected Test Plan Classes
 ```
 src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/
 ├── vci/
@@ -393,7 +403,7 @@ src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/
 │   │   ├── VciWalletMdocDpop.kt                                       ✅
 │   │   └── VciWalletSdJwtHaip.kt                                      ⚠️
 │   └── issuer/
-│       └── Oid4vciIssuerClientAttestationDpop.kt                       ⚠️
+│       └── Oid4vciIssuerVariantPlan.kt                                 ⚠️
 └── vp/
     ├── verifier/
     │   ├── SdJwtVcX509SanDnsRequestUriSignedDirectPost.kt              ⚠️
