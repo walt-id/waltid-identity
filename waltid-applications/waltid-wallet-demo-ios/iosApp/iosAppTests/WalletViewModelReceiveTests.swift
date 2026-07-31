@@ -317,8 +317,8 @@ private actor TransactionCodeWalletClient: WalletClient {
                 previewHandle: PresentationPreviewHandle(value: "transaction-code-presentation-preview"),
                 request: PresentationRequestInfo(
                     clientID: "https://verifier.example",
-                    nonce: "nonce-1",
                     verifierMetadataProvenance: .unsignedRequest,
+                    nonce: "nonce-1",
                     responseEncryption: .notRequired,
                 ),
                 credentialOptions: [
