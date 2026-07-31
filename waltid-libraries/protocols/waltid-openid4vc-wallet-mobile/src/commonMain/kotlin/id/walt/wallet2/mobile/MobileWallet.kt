@@ -355,7 +355,7 @@ public class MobileWallet internal constructor(
     public suspend fun receive(
         offerUrl: String,
         txCode: String? = null,
-        clientId: String = "wallet-client",
+        clientId: String = LEGACY_ISSUANCE_CLIENT_ID,
     ): List<String> {
         val normalizedOffer = offerUrl.trim()
         var cached = legacyIssuanceMutex.withLock { legacyIssuanceSessions.remove(normalizedOffer) }
@@ -413,7 +413,7 @@ public class MobileWallet internal constructor(
     public suspend fun receive(
         previewHandle: MobileWalletIssuancePreviewHandle,
         txCode: String? = null,
-        clientId: String = "wallet-client",
+        clientId: String = LEGACY_ISSUANCE_CLIENT_ID,
     ): List<String> =
         WalletIssuanceHandler.receiveCredential(
             wallet = wallet,
