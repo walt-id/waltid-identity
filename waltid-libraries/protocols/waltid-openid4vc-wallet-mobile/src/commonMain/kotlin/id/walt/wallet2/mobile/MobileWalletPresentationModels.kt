@@ -133,18 +133,19 @@ public data class MobileWalletPresentationRequestInfo(
     }
 }
 
-/** Provenance of verifier metadata exposed by a presentation preview. */
+/**
+ * Provenance of verifier metadata exposed by a presentation preview.
+ *
+ * @property compactRequestObject Exact compact request object for a signed request.
+ * @property algorithm JWS algorithm carried by a signed request object.
+ * @property keyId Request-object signing key identifier when supplied.
+ * @property clientIdPrefix OpenID4VP client identifier prefix used for authentication.
+ */
 public sealed interface MobileWalletVerifierMetadataProvenance {
     /** Verifier metadata came from an unsigned authorization request. */
     public data object UnsignedRequest : MobileWalletVerifierMetadataProvenance
 
     /** Verifier metadata came from the authenticated request object retained by wallet core. */
-    /**
-     * @property compactRequestObject Exact compact request object.
-     * @property algorithm JWS algorithm carried by the request object.
-     * @property keyId Request-object signing key identifier when supplied.
-     * @property clientIdPrefix OpenID4VP client identifier prefix used for authentication.
-     */
     public data class SignedRequest(
         /** Exact compact request object received from the verifier. */
         public val compactRequestObject: String,

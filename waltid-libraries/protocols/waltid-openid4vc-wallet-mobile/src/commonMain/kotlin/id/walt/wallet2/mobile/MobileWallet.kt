@@ -635,12 +635,13 @@ internal fun AuthorizationRequest.toMobileRequestInfo(
     responseEncryption: ResponseEncryption.Metadata? = null,
     transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
 ): MobileWalletPresentationRequestInfo {
+    val verifiedClientId = requireNotNull(clientId) {
+        "A validated presentation request must contain client_id."
+    }
     return MobileWalletPresentationRequestInfo(
-        clientId = requireNotNull(clientId) {
-            "A validated presentation request must contain client_id."
-        },
+        clientId = verifiedClientId,
         verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
-        verifierMetadataProvenance = resolvedAuthorizationRequest.toMobileVerifierMetadataProvenance(clientId),
+        verifierMetadataProvenance = resolvedAuthorizationRequest.toMobileVerifierMetadataProvenance(verifiedClientId),
         responseUri = responseUri,
         state = state,
         nonce = requireNotNull(nonce) {
@@ -651,24 +652,27 @@ internal fun AuthorizationRequest.toMobileRequestInfo(
     )
 }
 
-private fun AuthorizationRequest.toMobileRequestContext(
+internal fun AuthorizationRequest.toMobileRequestContext(
     preferredLocales: List<String>,
-    resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
+    resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
 ): MobileWalletPresentationRequestContext =
-    MobileWalletPresentationRequestContext(
-        clientId = requireNotNull(clientId) {
+    run {
+        val verifiedClientId = requireNotNull(clientId) {
             "A reportable invalid presentation request must contain client_id."
-        },
+        }
+        MobileWalletPresentationRequestContext(
+        clientId = verifiedClientId,
         verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
-        verifierMetadataProvenance = resolvedAuthorizationRequest.toMobileVerifierMetadataProvenance(clientId),
+        verifierMetadataProvenance = resolvedAuthorizationRequest.toMobileVerifierMetadataProvenance(verifiedClientId),
         responseUri = responseUri,
         state = state,
         nonce = nonce,
         responseEncryption = null.toMobileResponseEncryption(),
-    )
+        )
+    }
 
-internal fun ResolvedAuthorizationRequest?.toMobileVerifierMetadataProvenance(
-    clientId: String?,
+internal fun ResolvedAuthorizationRequest.toMobileVerifierMetadataProvenance(
+    clientId: String,
 ): MobileWalletVerifierMetadataProvenance = when (this) {
     is ResolvedAuthorizationRequest.WithRequestObject -> {
         val header = requestObject.decodeJws().header
@@ -676,10 +680,10 @@ internal fun ResolvedAuthorizationRequest?.toMobileVerifierMetadataProvenance(
             compactRequestObject = requestObject,
             algorithm = requireNotNull(header[JwtHeaderParams.ALGORITHM]?.jsonPrimitive?.contentOrNull),
             keyId = header[JwtHeaderParams.KEY_ID]?.jsonPrimitive?.contentOrNull,
-            clientIdPrefix = requireNotNull(clientId).substringBefore(':'),
+            clientIdPrefix = clientId.substringBefore(':'),
         )
     }
-    null, is ResolvedAuthorizationRequest.Plain -> MobileWalletVerifierMetadataProvenance.UnsignedRequest
+    is ResolvedAuthorizationRequest.Plain -> MobileWalletVerifierMetadataProvenance.UnsignedRequest
 }
 
 private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {

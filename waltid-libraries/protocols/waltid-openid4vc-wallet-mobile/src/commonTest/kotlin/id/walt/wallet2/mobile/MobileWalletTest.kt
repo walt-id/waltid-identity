@@ -93,6 +93,35 @@ class MobileWalletTest {
         )
     }
 
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @Test
+    fun signedInvalidRequestContextRetainsRequestObjectProvenance() {
+        val requestObject = listOf(
+            """{"alg":"ES256","kid":"verifier-key-1"}""".encodeToByteArray().encodeToBase64Url(),
+            "{}".encodeToByteArray().encodeToBase64Url(),
+            "signature".encodeToByteArray().encodeToBase64Url(),
+        ).joinToString(".")
+        val authorizationRequest = AuthorizationRequest(clientId = "x509_san_dns:https://verifier.example")
+
+        val context = authorizationRequest.toMobileRequestContext(
+            preferredLocales = emptyList(),
+            resolvedAuthorizationRequest = ResolvedAuthorizationRequest.WithRequestObject(
+                authorizationRequest = authorizationRequest,
+                requestObject = requestObject,
+            ),
+        )
+
+        assertEquals(
+            MobileWalletVerifierMetadataProvenance.SignedRequest(
+                compactRequestObject = requestObject,
+                algorithm = "ES256",
+                keyId = "verifier-key-1",
+                clientIdPrefix = "x509_san_dns",
+            ),
+            context.verifierMetadataProvenance,
+        )
+    }
+
     @Test
     fun presentationErrorCodesMatchOAuthAndOpenId4VpValues() {
         assertEquals(
