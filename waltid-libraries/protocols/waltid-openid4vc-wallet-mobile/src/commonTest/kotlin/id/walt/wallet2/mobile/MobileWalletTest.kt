@@ -67,7 +67,7 @@ class MobileWalletTest {
         val requestObject = listOf(
             """{"alg":"ES256","kid":"verifier-key-1"}""".encodeToByteArray().encodeToBase64Url(),
             "{}".encodeToByteArray().encodeToBase64Url(),
-            "signature",
+            "signature".encodeToByteArray().encodeToBase64Url(),
         ).joinToString(".")
         val authorizationRequest = AuthorizationRequest(clientId = "x509_san_dns:https://verifier.example")
 
