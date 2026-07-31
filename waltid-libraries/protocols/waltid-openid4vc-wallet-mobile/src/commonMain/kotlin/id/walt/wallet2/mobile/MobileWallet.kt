@@ -667,7 +667,7 @@ private fun AuthorizationRequest.toMobileRequestContext(
         responseEncryption = null.toMobileResponseEncryption(),
     )
 
-internal fun ResolvedAuthorizationRequest.toMobileVerifierMetadataProvenance(
+internal fun ResolvedAuthorizationRequest?.toMobileVerifierMetadataProvenance(
     clientId: String?,
 ): MobileWalletVerifierMetadataProvenance = when (this) {
     is ResolvedAuthorizationRequest.WithRequestObject -> {
@@ -679,7 +679,7 @@ internal fun ResolvedAuthorizationRequest.toMobileVerifierMetadataProvenance(
             clientIdPrefix = requireNotNull(clientId).substringBefore(':'),
         )
     }
-    is ResolvedAuthorizationRequest.Plain -> MobileWalletVerifierMetadataProvenance.UnsignedRequest
+    null, is ResolvedAuthorizationRequest.Plain -> MobileWalletVerifierMetadataProvenance.UnsignedRequest
 }
 
 private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {
