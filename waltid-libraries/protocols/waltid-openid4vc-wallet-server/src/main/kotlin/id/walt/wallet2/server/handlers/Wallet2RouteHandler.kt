@@ -770,9 +770,11 @@ object Wallet2RouteHandler {
                     post("/build-vp-token", {
                         summary = "Build VP token from selected credentials"
                         description =
-                            "Builds and signs the vp_token from an echoed authorizationRequest and the " +
-                                    "credential options (and optional claim disclosures) selected after /preview, " +
-                                    "or from selectedCredentialIds after /match-credentials-from-store. " +
+                            "Re-resolves and revalidates the original requestUrl, then builds and signs " +
+                                    "the vp_token from the credential options (and optional claim disclosures) " +
+                                    "selected after /preview, or from selectedCredentialIds after " +
+                                    "/match-credentials-from-store. Do not echo the preview authorizationRequest — " +
+                                    "pass the same requestUrl used for /preview. " +
                                     "Pass the result to /send-response to complete the flow."
                         request { pathParameter<String>("walletId"); body<BuildVpTokenRequest>() }
                         response { HttpStatusCode.OK to { body<BuildVpTokenResult>() } }
@@ -785,25 +787,29 @@ object Wallet2RouteHandler {
                     post("/send-response", {
                         summary = "Send authorization response to the verifier"
                         description =
-                            "Step 4 of the manual presentation flow. " +
-                                    "Transmits the vp_token (from /build-vp-token) to the verifier " +
-                                    "according to the response_mode in the authorization request."
+                            "Re-resolves and revalidates the original requestUrl, then transmits the " +
+                                    "vp_token (from /build-vp-token) to the verifier according to the " +
+                                    "response_mode / response_uri / encryption from that freshly resolved request. " +
+                                    "Do not echo the preview authorizationRequest."
                         request { pathParameter<String>("walletId"); body<SendAuthorizationResponseRequest>() }
                         response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<SendAuthorizationResponseRequest>()
-                        call.respond(WalletPresentationHandler.sendAuthorizationResponse(req))
+                        call.respond(WalletPresentationHandler.sendAuthorizationResponse(wallet, req))
                     }
 
                     post("/preview", {
                         summary = "Preview an OpenID4VP request for consent"
                         description =
-                            "Resolves and validates the VP request and returns the authorization request, " +
-                                    "verifier metadata, transaction data, response-encryption state, and the wallet " +
-                                    "credentials that satisfy each DCQL query with their per-claim selective-disclosure " +
-                                    "options. Stateless: no preview handle is retained. Complete with /build-vp-token " +
-                                    "+ /send-response, or /reject with the original requestUrl. If the request is " +
-                                    "invalid but a response can still be sent, the result has valid=false and an error."
+                            "Resolves and validates the VP request and returns the authorization request " +
+                                    "(display-only), verifier metadata, transaction data, response-encryption " +
+                                    "state, and the wallet credentials that satisfy each DCQL query with their " +
+                                    "per-claim selective-disclosure options. Stateless: no preview handle is " +
+                                    "retained. Complete with /build-vp-token + /send-response using the original " +
+                                    "requestUrl (do not echo authorizationRequest), or /reject with requestUrl. " +
+                                    "If the request is invalid but a response can still be sent, the result has " +
+                                    "valid=false and an error."
                         request { pathParameter<String>("walletId"); body<PreviewPresentationRequest>() }
                         response { HttpStatusCode.OK to { body<PresentationPreviewResponse>() } }
                     }) {

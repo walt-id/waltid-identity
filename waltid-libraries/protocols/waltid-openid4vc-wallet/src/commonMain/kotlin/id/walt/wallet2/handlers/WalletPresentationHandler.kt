@@ -184,8 +184,10 @@ sealed interface PreviewPresentationResult {
 /**
  * Stateless consent-preview result for HTTP APIs that must not retain a server-side preview session.
  *
- * Same UI payload as [PreviewPresentationResult], but without a [PresentationPreviewHandle]. Callers
- * complete the flow with [buildVpToken] + [sendAuthorizationResponse], or [rejectPresentationByRequestUrl].
+ * Same UI payload as [PreviewPresentationResult], but without a [PresentationPreviewHandle].
+ * [authorizationRequest] is returned for display / technical details only — callers must **not**
+ * echo it into [buildVpToken] or [sendAuthorizationResponse]. Complete the flow by passing the
+ * original `requestUrl` to those steps (or [rejectPresentationByRequestUrl]).
  */
 sealed interface StatelessPreviewPresentationResult {
     val authorizationRequest: AuthorizationRequest
@@ -772,20 +774,33 @@ object WalletPresentationHandler {
     }
 
     /**
-     * Isolated step 3: build the VP token from the wallet's stored credentials
-     * that were selected in step 2 (or from a consent preview).
+     * Builds a VP token after re-resolving and revalidating [BuildVpTokenRequest.requestUrl].
+     *
+     * Sensitive request fields (DCQL, nonce, transaction data) come from the freshly
+     * resolved [AuthorizationRequest], never from a client-echoed copy.
      *
      * Prefer [BuildVpTokenRequest.selectedCredentialOptions] (and optional
      * [BuildVpTokenRequest.selectedDisclosureOptions]) for the consent UI path.
      * [BuildVpTokenRequest.selectedCredentialIds] remains supported for the legacy
      * resolve → match → build flow.
      */
-    suspend fun buildVpToken(wallet: Wallet, request: BuildVpTokenRequest): BuildVpTokenResult {
+    suspend fun buildVpToken(
+        wallet: Wallet,
+        request: BuildVpTokenRequest,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+        resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest = ::resolveAuthorizationRequest,
+    ): BuildVpTokenResult {
+        val authorizationRequest = resolveAndValidatePresentationRequest(
+            wallet = wallet,
+            requestUrl = request.requestUrl,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+            resolveAuthorizationRequest = resolveAuthorizationRequest,
+        )
         val key = wallet.resolveKey(request.key, request.keyId)
             ?: throw IllegalArgumentException("Wallet has no key available for VP token building")
         val did = request.did ?: wallet.defaultDid()
 
-        val dcqlQuery = request.authorizationRequest.dcqlQuery
+        val dcqlQuery = authorizationRequest.dcqlQuery
             ?: throw IllegalArgumentException("AuthorizationRequest has no dcql_query")
 
         val selectedCredentialOptions = request.resolveSelectedCredentialOptions()
@@ -796,7 +811,7 @@ object WalletPresentationHandler {
             "Selected credential option(s) do not satisfy required presentation credential query constraints"
         }
         validateSelectedTransactionDataCredentials(
-            request.authorizationRequest.transactionData.orEmpty(),
+            authorizationRequest.transactionData.orEmpty(),
             selectedQueryIds,
         )
 
@@ -810,27 +825,40 @@ object WalletPresentationHandler {
         }
 
         val vpToken = WalletPresentFunctionality2.buildVpToken(
-            authorizationRequest = request.authorizationRequest,
+            authorizationRequest = authorizationRequest,
             matchedCredentials = selected,
             holderKey = key,
             holderDid = did,
         )
-        val idToken = WalletPresentFunctionality2.buildIdToken(request.authorizationRequest, key, did)
+        val idToken = WalletPresentFunctionality2.buildIdToken(authorizationRequest, key, did)
         return BuildVpTokenResult(vpToken = vpToken, idToken = idToken)
     }
 
     /**
      * Isolated step 4: send the authorization response to the verifier.
      *
-     * @param request Contains the authorization request, VP token, and optional ID token.
-     * @return The [WalletPresentResult] describing the transmission outcome.
+     * Re-resolves and revalidates [SendAuthorizationResponseRequest.requestUrl] so
+     * `response_uri` / `response_mode` / encryption parameters are never taken from a
+     * client-echoed [AuthorizationRequest].
      */
-    suspend fun sendAuthorizationResponse(request: SendAuthorizationResponseRequest): WalletPresentResult =
-        WalletPresentFunctionality2.sendAuthorizationResponse(
-            authorizationRequest = request.authorizationRequest,
+    suspend fun sendAuthorizationResponse(
+        wallet: Wallet,
+        request: SendAuthorizationResponseRequest,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+        resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest = ::resolveAuthorizationRequest,
+    ): WalletPresentResult {
+        val authorizationRequest = resolveAndValidatePresentationRequest(
+            wallet = wallet,
+            requestUrl = request.requestUrl,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+            resolveAuthorizationRequest = resolveAuthorizationRequest,
+        )
+        return WalletPresentFunctionality2.sendAuthorizationResponse(
+            authorizationRequest = authorizationRequest,
             vpToken = request.vpToken,
             idToken = request.idToken,
         ).getOrThrow()
+    }
 
     /**
      * Streams all credentials from all wallet credential stores, converts each
@@ -1022,6 +1050,33 @@ object WalletPresentationHandler {
         )
     }
 
+    /**
+     * Re-resolves [requestUrl] and runs [PresentationRequestValidator], failing closed when
+     * the request is invalid. Used by HTTP continuation steps that must not trust a
+     * client-echoed [AuthorizationRequest].
+     */
+    private suspend fun resolveAndValidatePresentationRequest(
+        wallet: Wallet,
+        requestUrl: Url,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest,
+    ): AuthorizationRequest {
+        val resolvedAuthorizationRequest = resolveAuthorizationRequest(requestUrl)
+        val key = wallet.resolveKey(keyId = null)
+            ?: error("No key available: wallet has no keyStores and no staticKey")
+        val validation = PresentationRequestValidator.validate(
+            resolvedRequest = resolvedAuthorizationRequest,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+            formatCapabilities = WalletPresentationFormatRegistry.capabilitiesFromKeyTypes(setOf(key.keyType)),
+        )
+        if (validation is PresentationRequestValidationResult.Invalid) {
+            error(
+                "Presentation request is invalid (${validation.error.code.code}): ${validation.error.message}"
+            )
+        }
+        return resolvedAuthorizationRequest.authorizationRequest
+    }
+
     internal suspend fun rememberPreviewedAuthorizationRequest(
         wallet: Wallet,
         preview: PreviewedPresentation,
@@ -1207,13 +1262,19 @@ object WalletPresentationHandler {
  * 2. `POST /present/build-vp-token` - builds the VP token (this request)
  * 3. `POST /present/send-response` - transmits the response to the verifier
  *
+ * [requestUrl] is re-resolved and revalidated server-side so DCQL / nonce / transaction
+ * data are never taken from a client-echoed [AuthorizationRequest].
+ *
  * Prefer [selectedCredentialOptions] (+ optional [selectedDisclosureOptions]) for consent UIs.
  * [selectedCredentialIds] remains for the legacy resolve → match → build path.
  */
 @Serializable
 data class BuildVpTokenRequest(
-    /** The resolved authorization request from preview / resolve-request. */
-    val authorizationRequest: AuthorizationRequest,
+    /**
+     * Original OpenID4VP request URL from preview / resolve-request.
+     * Re-resolved on every call; do not echo the preview [AuthorizationRequest].
+     */
+    override val requestUrl: Url,
     /**
      * User-selected credential options (queryId + credentialId), preferred for consent UIs.
      * When non-empty, takes precedence over [selectedCredentialIds].
@@ -1231,7 +1292,7 @@ data class BuildVpTokenRequest(
     val keyId: String? = null,
     /** DID to use as holder binding. Defaults to the wallet's default DID. */
     val did: String? = null,
-)
+) : VpRequestSource
 
 internal fun BuildVpTokenRequest.resolveSelectedCredentialOptions(): List<PresentationCredentialSelection> {
     if (selectedCredentialOptions.isNotEmpty()) return selectedCredentialOptions
@@ -1253,14 +1314,18 @@ data class BuildVpTokenResult(
 /**
  * Request to send the authorization response to the verifier.
  *
- * Final step of the manual presentation flow.
+ * Final step of the manual presentation flow. [requestUrl] is re-resolved and revalidated
+ * so response destination / mode / encryption come from the verifier, not the client.
  */
 @Serializable
 data class SendAuthorizationResponseRequest(
-    /** The resolved authorization request from step 1. */
-    val authorizationRequest: AuthorizationRequest,
-    /** The VP token from step 3. */
+    /**
+     * Original OpenID4VP request URL from preview.
+     * Re-resolved on every call; do not echo the preview [AuthorizationRequest].
+     */
+    override val requestUrl: Url,
+    /** The VP token from [buildVpToken]. */
     val vpToken: String,
-    /** The ID token from step 3, or null. */
+    /** The ID token from [buildVpToken], or null. */
     val idToken: String? = null,
-)
+) : VpRequestSource

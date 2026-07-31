@@ -275,6 +275,92 @@ class WalletPresentationHandlerRequirementsTest {
     }
 
     @Test
+    fun buildVpTokenReResolvesAndRejectsInvalidRequest() = runTest {
+        val wallet = Wallet(
+            id = "wallet-build-reresolve-invalid",
+            staticKey = JWKKey.generate(KeyType.Ed25519),
+        )
+        val authorizationRequest = AuthorizationRequest(
+            clientId = "redirect_uri:https://verifier.example/callback",
+            redirectUri = "https://verifier.example/callback",
+            responseMode = OpenID4VPResponseMode.FRAGMENT,
+            nonce = "nonce",
+            state = "state-123",
+            dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery("pid"))),
+            transactionData = listOf(
+                buildJsonObject {
+                    put("type", "unsupported")
+                    put("credential_ids", buildJsonArray { add(JsonPrimitive("pid")) })
+                }.toString().encodeToByteArray().encodeToBase64Url(),
+            ),
+        )
+        val requestUrl = authorizationRequest.toHttpUrl()
+        var resolveCalls = 0
+
+        val error = assertFailsWith<IllegalStateException> {
+            WalletPresentationHandler.buildVpToken(
+                wallet = wallet,
+                request = BuildVpTokenRequest(
+                    requestUrl = requestUrl,
+                    selectedCredentialOptions = listOf(
+                        PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1"),
+                    ),
+                ),
+                transactionDataTypeRegistry = TransactionDataTypeRegistry("payment"),
+                resolveAuthorizationRequest = {
+                    resolveCalls += 1
+                    ResolvedAuthorizationRequest.Plain(authorizationRequest)
+                },
+            )
+        }
+
+        assertEquals(1, resolveCalls)
+        assertTrue(error.message!!.contains("invalid_transaction_data"))
+    }
+
+    @Test
+    fun sendAuthorizationResponseReResolvesAndRejectsInvalidRequest() = runTest {
+        val wallet = Wallet(
+            id = "wallet-send-reresolve-invalid",
+            staticKey = JWKKey.generate(KeyType.Ed25519),
+        )
+        val authorizationRequest = AuthorizationRequest(
+            clientId = "redirect_uri:https://verifier.example/callback",
+            redirectUri = "https://verifier.example/callback",
+            responseMode = OpenID4VPResponseMode.FRAGMENT,
+            nonce = "nonce",
+            state = "state-123",
+            dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery("pid"))),
+            transactionData = listOf(
+                buildJsonObject {
+                    put("type", "unsupported")
+                    put("credential_ids", buildJsonArray { add(JsonPrimitive("pid")) })
+                }.toString().encodeToByteArray().encodeToBase64Url(),
+            ),
+        )
+        val requestUrl = authorizationRequest.toHttpUrl()
+        var resolveCalls = 0
+
+        val error = assertFailsWith<IllegalStateException> {
+            WalletPresentationHandler.sendAuthorizationResponse(
+                wallet = wallet,
+                request = SendAuthorizationResponseRequest(
+                    requestUrl = requestUrl,
+                    vpToken = """{"pid":"unused"}""",
+                ),
+                transactionDataTypeRegistry = TransactionDataTypeRegistry("payment"),
+                resolveAuthorizationRequest = {
+                    resolveCalls += 1
+                    ResolvedAuthorizationRequest.Plain(authorizationRequest)
+                },
+            )
+        }
+
+        assertEquals(1, resolveCalls)
+        assertTrue(error.message!!.contains("invalid_transaction_data"))
+    }
+
+    @Test
     fun unavailableTransactionCredentialCanBeReturnedAfterPreviewInteraction() = runTest {
         val wallet = Wallet(
             id = "wallet-unavailable-transaction-credential",

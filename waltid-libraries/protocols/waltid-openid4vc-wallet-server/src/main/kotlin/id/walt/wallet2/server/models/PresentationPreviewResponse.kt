@@ -13,9 +13,10 @@ import kotlinx.serialization.json.JsonObject
 /**
  * UI-facing result of resolving and validating an OpenID4VP request for consent review.
  *
- * Stateless: no preview handle is retained server-side. The caller holds [authorizationRequest]
- * and completes the flow with `credentials/present/build-vp-token` + `send-response`, or rejects
- * via `credentials/present/reject` with the original `requestUrl`.
+ * Stateless: no preview handle is retained server-side. [authorizationRequest] is for display /
+ * technical details only — do not echo it into `build-vp-token` or `send-response`. Complete the
+ * flow by passing the original `requestUrl` to those endpoints, or reject via
+ * `credentials/present/reject` with the same `requestUrl`.
  *
  * When [valid] is false, the detected [error] can be returned to the verifier via reject.
  */
