@@ -78,6 +78,7 @@ val modules = listOfNotNull(
         "waltid-openid4vc-wallet-mobile" whenEnabled enableIosBuild,
         "waltid-openid4vc-wallet-server",
         "waltid-mobile-test-utils" whenEnabled enableAndroidBuild,
+        "waltid-relying-party-certificate"
     ),
 
     * "$libraries:sdjwt".group(
