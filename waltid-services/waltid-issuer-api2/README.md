@@ -42,7 +42,7 @@ From the `waltid-identity` root:
 ./gradlew :waltid-services:waltid-issuer-api2:run
 ```
 
-By default the service listens on `0.0.0.0:7002`.
+By default the service listens on `0.0.0.0:7005`.
 
 ## Configuration
 
@@ -59,7 +59,7 @@ Configuration files live in `config/`:
 | `persistence.conf` | In-memory or Redis-backed repository configuration |
 | `authentication-service.conf` | Optional external OAuth authentication configuration |
 
-The default `issuer-service.conf` uses `http://localhost:7002` as `baseUrl`. Update this value when deploying behind a public host or reverse proxy so generated metadata and credential offers contain externally reachable URLs.
+The default `issuer-service.conf` uses `http://localhost:7005` as `baseUrl`. Update this value when deploying behind a public host or reverse proxy so generated metadata and credential offers contain externally reachable URLs.
 
 ## API Endpoints
 
@@ -94,7 +94,7 @@ The default `issuer-service.conf` uses `http://localhost:7002` as `baseUrl`. Upd
 Create offers by selecting a configured profile:
 
 ```bash
-curl -X POST http://localhost:7002/issuer2/credential-offers \
+curl -X POST http://localhost:7005/issuer2/credential-offers \
   -H "Content-Type: application/json" \
   -d '{
     "profileId": "UniversityDegree",
