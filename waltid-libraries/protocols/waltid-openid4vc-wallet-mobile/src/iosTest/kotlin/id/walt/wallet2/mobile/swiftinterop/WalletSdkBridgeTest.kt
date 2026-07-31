@@ -208,7 +208,7 @@ class WalletSdkBridgeTest {
                     verifierMetadataProvenance = provenance,
                     responseUri = null,
                     state = null,
-                    nonce = null,
+                    nonce = "nonce-1",
                     responseEncryption = MobileWalletResponseEncryption.NotRequired,
                 ),
                 credentialOptions = emptyList(),
