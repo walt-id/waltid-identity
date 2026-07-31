@@ -69,7 +69,10 @@ class MobileWalletTest {
             "{}".encodeToByteArray().encodeToBase64Url(),
             "signature".encodeToByteArray().encodeToBase64Url(),
         ).joinToString(".")
-        val authorizationRequest = AuthorizationRequest(clientId = "x509_san_dns:https://verifier.example")
+        val authorizationRequest = AuthorizationRequest(
+            clientId = "x509_san_dns:https://verifier.example",
+            nonce = "nonce-1",
+        )
 
         val info = authorizationRequest.toMobileRequestInfo(
             preferredLocales = emptyList(),
