@@ -342,6 +342,7 @@ class MobileWalletTest {
             MobileWalletPresentationRequestContext(
                 clientId = " ",
                 verifierMetadata = null,
+                verifierMetadataProvenance = MobileWalletVerifierMetadataProvenance.UnsignedRequest,
                 responseUri = null,
                 state = null,
                 nonce = null,
@@ -352,6 +353,7 @@ class MobileWalletTest {
         val context = MobileWalletPresentationRequestContext(
             clientId = "https://verifier.example",
             verifierMetadata = null,
+            verifierMetadataProvenance = MobileWalletVerifierMetadataProvenance.UnsignedRequest,
             responseUri = null,
             state = null,
             nonce = null,
