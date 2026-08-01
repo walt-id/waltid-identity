@@ -1,8 +1,13 @@
 package id.walt.rpcert.models
 
+import id.walt.dcql.models.CredentialFormat
+import id.walt.dcql.models.meta.CredentialQueryMeta
+import id.walt.dcql.models.meta.CredentialQueryMetaPolymorphicSerializer
+import id.walt.dcql.models.meta.NoMeta
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Wallet-Relying Party Registration Certificate (WRPRC), as specified in
@@ -77,16 +82,16 @@ data class WalletRelyingPartyRegistrationCertificateStatus(
 
 @Serializable
 data class RegistrationCertificateCredential(
-    val format: String,
-    val meta: Map<String, JsonElement>,
+    val format: CredentialFormat,
+    @Serializable(with = CredentialQueryMetaPolymorphicSerializer::class)
+    val meta: CredentialQueryMeta = NoMeta,
     val claim: List<Claim>? = null,
-) {
-}
+)
 
 @Serializable
 data class Claim(
-    val path: List<String>,
-    val values: List<String>? = null,
+    val path: List<JsonElement>,
+    val values: List<JsonPrimitive>? = null,
 )
 
 @Serializable
