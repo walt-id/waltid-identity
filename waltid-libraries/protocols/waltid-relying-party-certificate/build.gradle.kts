@@ -25,6 +25,14 @@ kotlin {
             implementation(project(":waltid-libraries:crypto:waltid-x509"))
             implementation(project(":waltid-libraries:credentials:waltid-dcql"))
         }
+
+        jvmTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(identityLibs.junit.jupiter.api)
+            implementation(identityLibs.junit.jupiter.engine)
+            implementation(identityLibs.kotlinx.coroutines.test)
+            implementation(identityLibs.kotlinx.io.bytestring)
+        }
     }
 }
 
