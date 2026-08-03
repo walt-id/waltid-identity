@@ -154,3 +154,14 @@ class WalletConformanceTestRunner(
             )
         }
     }
+
+    private suspend fun createPlan(
+        conformance: ConformanceInterface,
+        plan: Oid4vciWalletVariantPlan,
+    ): CreateTestPlanResponse {
+        val url = conformance.createTestPlanUrlWithConfig {
+            append("planName", plan.planName)
+            append("variant", plan.variantContext.testPlanCreationVariant().toString())
+        }
+        return conformance.createTestPlan(url, plan.configuration)
+    }
