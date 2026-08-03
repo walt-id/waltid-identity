@@ -106,3 +106,69 @@ data class WalletVariant(
         else -> replace("_", "")
     }
 }
+
+object WalletVariantMatrix {
+    /**
+     * The basic plan exposes all of these dimensions. This is 1,728 plan
+     * contexts, so callers should normally select a subset with filters.
+     */
+    fun basic(): List<WalletVariant> = buildList {
+        val formats = listOf("sd_jwt_vc", "mdoc")
+        val clientAuthTypes = listOf("private_key_jwt", "mtls", "client_attestation")
+        val senderConstraints = listOf("dpop", "mtls")
+        val authorizationRequestTypes = listOf("simple", "rar")
+        val requestMethods = listOf("unsigned", "signed_non_repudiation")
+        val credentialEncryptions = listOf("plain", "encrypted")
+        val issuanceModes = listOf("immediate", "deferred")
+
+        formats.forEach { format ->
+            clientAuthTypes.forEach { clientAuthType ->
+                senderConstraints.forEach { senderConstrain ->
+                    authorizationRequestTypes.forEach { authorizationRequestType ->
+                        requestMethods.forEach { requestMethod ->
+                            credentialEncryptions.forEach { credentialEncryption ->
+                                issuanceModes.forEach { issuanceMode ->
+                                    add(
+                                        WalletVariant(
+                                            fapiProfile = "vci",
+                                            credentialFormat = format,
+                                            grantType = "authorization_code",
+                                            authorizationCodeFlowVariant = "wallet_initiated",
+                                            clientAuthType = clientAuthType,
+                                            senderConstrain = senderConstrain,
+                                            authorizationRequestType = authorizationRequestType,
+                                            requestMethod = requestMethod,
+                                            credentialEncryption = credentialEncryption,
+                                            credentialIssuanceMode = issuanceMode,
+                                        )
+                                    )
+
+                                    listOf("issuer_initiated", "issuer_initiated_dc_api").forEach { flowVariant ->
+                                        listOf("authorization_code", "pre_authorization_code").forEach { grantType ->
+                                            listOf("by_value", "by_reference").forEach { offerVariant ->
+                                                add(
+                                                    WalletVariant(
+                                                        fapiProfile = "vci",
+                                                        credentialFormat = format,
+                                                        grantType = grantType,
+                                                        authorizationCodeFlowVariant = flowVariant,
+                                                        clientAuthType = clientAuthType,
+                                                        senderConstrain = senderConstrain,
+                                                        authorizationRequestType = authorizationRequestType,
+                                                        requestMethod = requestMethod,
+                                                        credentialEncryption = credentialEncryption,
+                                                        credentialIssuanceMode = issuanceMode,
+                                                        credentialOfferVariant = offerVariant,
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
