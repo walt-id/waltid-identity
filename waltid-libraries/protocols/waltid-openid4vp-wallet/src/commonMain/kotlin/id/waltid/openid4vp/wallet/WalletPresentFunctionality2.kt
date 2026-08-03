@@ -29,7 +29,7 @@ import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.walletRejectHandli
 import id.waltid.openid4vp.wallet.presentation.*
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
-import id.waltid.openid4vp.wallet.response.ResponseEncryptionHandler
+import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -61,7 +61,7 @@ object WalletPresentFunctionality2 {
         holderKey: Key,
         holderDid: String?,
         typeRegistry: TransactionDataTypeRegistry,
-        encryptionConfig: ResponseEncryptionHandler.EncryptionConfig?,
+        encryptionConfig: ResponseEncryption.Config?,
     ): String {
         validateMatchedCredentialSelection(authorizationRequest, matchedData)
         val vpTokenMapContents = mutableMapOf<String, JsonArray>()
@@ -421,7 +421,7 @@ object WalletPresentFunctionality2 {
         holderKey: Key,
         holderDid: String?,
         transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
-        encryptionConfig: ResponseEncryptionHandler.EncryptionConfig? = null,
+        encryptionConfig: ResponseEncryption.Config? = null,
     ): String {
         val selectedEncryptionConfig = encryptionConfig ?: selectEncryptionConfig(authorizationRequest)
         return generateVpTokenForRequest(
@@ -464,7 +464,7 @@ object WalletPresentFunctionality2 {
         authorizationRequest: AuthorizationRequest,
         vpToken: String,
         idToken: String? = null,
-        encryptionConfig: ResponseEncryptionHandler.EncryptionConfig? = null,
+        encryptionConfig: ResponseEncryption.Config? = null,
     ): Result<WalletPresentResult> = runCatching {
         // Infer response_mode from response_type if not explicitly set
         if (authorizationRequest.responseMode == null) {
@@ -550,7 +550,7 @@ object WalletPresentFunctionality2 {
                     idToken?.let { put("id_token", it) }
                     authorizationRequest.state?.let { put("state", JsonPrimitive(it)) }
                 }
-                val jweString = ResponseEncryptionHandler.encryptResponse(payloadJson, encryption)
+                val jweString = ResponseEncryption.encryptResponse(payloadJson, encryption)
                 val parameters = ParametersBuilder().apply { append("response", jweString) }.build()
                 postFormResponse(responseUri, parameters)
             }
@@ -563,8 +563,7 @@ object WalletPresentFunctionality2 {
 
     private suspend fun selectEncryptionConfig(
         authorizationRequest: AuthorizationRequest,
-    ): ResponseEncryptionHandler.EncryptionConfig? =
-        ResponseEncryptionHandler.extractEncryptionConfig(authorizationRequest).getOrThrow()
+    ): ResponseEncryption.Config? = ResponseEncryption.resolve(authorizationRequest)
 
     private suspend fun resolveAuthorizationRequestObject(
         presentationRequestUrl: Url,
