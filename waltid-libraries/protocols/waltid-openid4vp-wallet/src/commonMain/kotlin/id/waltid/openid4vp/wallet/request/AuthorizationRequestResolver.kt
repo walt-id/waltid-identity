@@ -82,8 +82,6 @@ object AuthorizationRequestResolver {
         val contentType: ContentType?,
         val body: String,
         val walletNonce: String? = null,
-        /** Final URL after redirects, when the transport can expose it. */
-        val resolvedRequestUri: String? = null,
     )
 
     /**
@@ -206,7 +204,6 @@ object AuthorizationRequestResolver {
             contentType = response.contentType(),
             body = response.bodyAsText(),
             walletNonce = walletNonce,
-            resolvedRequestUri = response.request.url.toString(),
         )
     }
 
@@ -353,14 +350,8 @@ object AuthorizationRequestResolver {
         log.trace { "Resolving AuthorizationRequest via request_uri" }
 
         val requestUriMethod = requestUriMethod?.let(::parseRequestUriMethod)
-        if (requestUriMethod == RequestUriHttpMethod.POST) {
-            requireHttpsRequestUri(requestUri)
-        }
         log.trace { "Fetching AuthorizationRequest from request_uri using method ${requestUriMethod?.method ?: "get"}" }
         val response = fetchRequestUri(requestUri, requestUriMethod)
-        if (requestUriMethod == RequestUriHttpMethod.POST) {
-            response.resolvedRequestUri?.let(::requireHttpsRequestUri)
-        }
         response.status.run { check(isSuccess()) { "AuthorizationRequest cannot be retrieved ($this) from $requestUri: ${response.body}" } }
 
         val contentType = requireNotNull(response.contentType) { "AuthorizationRequest response does not define a content type" }
@@ -504,14 +495,6 @@ object AuthorizationRequestResolver {
         RequestUriHttpMethod.GET.method -> RequestUriHttpMethod.GET
         RequestUriHttpMethod.POST.method -> RequestUriHttpMethod.POST
         else -> throw IllegalArgumentException("invalid_request_uri_method: $value is neither 'get' nor 'post'")
-    }
-
-    private fun requireHttpsRequestUri(requestUri: String) {
-        val url = runCatching { Url(requestUri) }
-            .getOrElse { error -> throw IllegalArgumentException("request_uri must be a valid HTTPS URL", error) }
-        require(url.protocol == URLProtocol.HTTPS) {
-            "request_uri_method=post requires an HTTPS request_uri"
-        }
     }
 
     private fun requireMatchingClientId(outerClientId: String?, innerClientId: String?) {

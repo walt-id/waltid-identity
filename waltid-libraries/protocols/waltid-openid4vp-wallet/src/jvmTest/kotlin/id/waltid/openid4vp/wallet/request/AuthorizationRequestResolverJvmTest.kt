@@ -430,57 +430,6 @@ class AuthorizationRequestResolverJvmTest {
     }
 
     @Test
-    fun `request uri post requires HTTPS before fetch and after redirects`() {
-        listOf(
-            "http://verifier.example/request.jwt",
-            "http://localhost/request.jwt",
-            "http://127.0.0.1/request.jwt",
-            "http://[::1]/request.jwt",
-        ).forEach { insecureRequestUri ->
-            val insecureRequest = URLBuilder("openid4vp://authorize").apply {
-                parameters.append("client_id", "verifier2")
-                parameters.append("request_uri", insecureRequestUri)
-                parameters.append("request_uri_method", "post")
-            }.build()
-            var fetchCalled = false
-            assertFailsWith<IllegalArgumentException>(insecureRequestUri) {
-                runBlocking {
-                    AuthorizationRequestResolver.resolve(
-                        insecureRequest,
-                        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
-                    ) { _, _ ->
-                        fetchCalled = true
-                        error("must not fetch")
-                    }
-                }
-            }
-            assertFalse(fetchCalled, insecureRequestUri)
-        }
-
-        val secureRequest = URLBuilder("openid4vp://authorize").apply {
-            parameters.append("client_id", "verifier2")
-            parameters.append("request_uri", "https://verifier.example/request.jwt")
-            parameters.append("request_uri_method", "post")
-        }.build()
-        val failure = assertFailsWith<IllegalArgumentException> {
-            runBlocking {
-                AuthorizationRequestResolver.resolve(
-                    secureRequest,
-                    AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
-                ) { _, _ ->
-                    AuthorizationRequestResolver.RequestUriFetchResponse(
-                        status = HttpStatusCode.OK,
-                        contentType = ContentType.parse("application/oauth-authz-req+jwt"),
-                        body = "not-reached",
-                        resolvedRequestUri = "http://verifier.example/request.jwt",
-                    )
-                }
-            }
-        }
-        assertTrue(failure.message.orEmpty().contains("HTTPS"))
-    }
-
-    @Test
     fun `wallet metadata uses OID4VP Final encryption parameter names`() {
         val metadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(WalletCapabilities())
         assertTrue(metadata.contains("authorization_encryption_alg_values_supported"))
