@@ -3,7 +3,7 @@ package id.walt.x509
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
-class X509ValidationMPTest {
+class X509ValidationTest {
 
     @Test
     fun validatesLeafWithProvidedTrustAnchor() {

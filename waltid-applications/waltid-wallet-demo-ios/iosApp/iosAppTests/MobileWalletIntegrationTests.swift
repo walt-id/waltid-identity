@@ -93,6 +93,53 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     // MARK: - Tests (mirror Android MobileWalletIntegrationTest.kt)
 
+    func testAppHostedWalletValidatesSignedRequestObjectCertificateChain() async throws {
+        let wallet = try await Wallet(
+            configuration: WalletConfiguration(
+                walletID: testWalletId,
+                requestObjectTrustAnchorPEMCertificates: [X509RequestObjectFixture.trustAnchorPEM]
+            )
+        )
+        _ = try await wallet.bootstrap()
+
+        let preview = try await wallet.previewPresentation(
+            request: X509RequestObjectFixture.authorizationRequestURL
+        )
+
+        guard case let .ready(readyPreview) = preview else {
+            return XCTFail("Expected a ready preview for the trusted signed Request Object")
+        }
+
+        XCTAssertEqual(readyPreview.request.clientID, X509RequestObjectFixture.clientID)
+        XCTAssertEqual(readyPreview.request.nonce, "app-hosted-x509-hash-test")
+        XCTAssertEqual(readyPreview.credentialOptions, [])
+    }
+
+    func testAppHostedWalletRejectsUntrustedSignedRequestObjectCertificateChain() async throws {
+        let wallet = try await makeWallet()
+
+        do {
+            _ = try await wallet.previewPresentation(
+                request: X509RequestObjectFixture.authorizationRequestURL
+            )
+            XCTFail("Expected the signed Request Object to be rejected with an unrelated trust anchor")
+        } catch {
+            XCTAssertTrue(
+                String(describing: error).contains("UntrustedCertificateChain"),
+                "Expected an untrusted certificate-chain error, got: \(error)"
+            )
+        }
+    }
+
+    func testWalletConfigurationAcceptsSystemRequestObjectTrustAnchorOptIn() async throws {
+        _ = try await Wallet(
+            configuration: WalletConfiguration(
+                walletID: testWalletId,
+                requestObjectEnableSystemTrustAnchors: true
+            )
+        )
+    }
+
     func testBootstrapCreatesKeyAndDid() async throws {
         let wallet = try await makeWallet()
 
@@ -209,18 +256,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
     }
 
     func testReceiveAndPresentEudiEhicSdJwtAgainstEudi() async throws {
-        try XCTSkipIf(
-            true,
-            "Pending native iOS PKIX/x509_hash Request Object authentication and EUDI trust-anchor refresh; tracked by https://github.com/walt-id/waltid-identity/pull/1940"
-        )
         try await receiveAndPresentEudiCredential(credentialID: Self.eudiEhicSdJwtCredentialID)
     }
 
     func testPreviewAndSubmitEudiEhicSdJwtAgainstEudi() async throws {
-        try XCTSkipIf(
-            true,
-            "Pending native iOS PKIX/x509_hash Request Object authentication and EUDI trust-anchor refresh; tracked by https://github.com/walt-id/waltid-identity/pull/1940"
-        )
         try await previewAndSubmitEudiCredential(credentialID: Self.eudiEhicSdJwtCredentialID)
     }
 

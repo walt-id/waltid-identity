@@ -77,6 +77,12 @@ kotlin {
             implementation(kotlin("test-js"))
 
         }
+
+        val jvmJsTest by creating {
+            dependsOn(commonTest.get())
+        }
+        jvmTest.get().dependsOn(jvmJsTest)
+        jsTest.get().dependsOn(jvmJsTest)
     }
 
     if (enableAndroidBuild) {
