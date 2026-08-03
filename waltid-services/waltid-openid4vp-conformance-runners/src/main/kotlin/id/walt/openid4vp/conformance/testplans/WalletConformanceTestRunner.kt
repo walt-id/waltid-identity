@@ -34,3 +34,68 @@ class WalletConformanceTestRunner(
     private val runtime: WalletConformanceRuntimeConfig = WalletConformanceRuntimeConfig.fromEnvironment(),
     private val selection: WalletVariantSelection = WalletVariantSelection.fromEnvironment(),
 ) {
+    suspend fun run(): List<TestPlanResult> {
+        val walletClient = HttpClient {
+            install(ContentNegotiation) { json() }
+            install(HttpTimeout) {
+                connectTimeoutMillis = 30_000
+                requestTimeoutMillis = 120_000
+            }
+            expectSuccess = false
+        }
+        val conformance = ConformanceInterface(runtime.conformanceHost, runtime.conformancePort)
+        val adapter = VciWalletConformanceAdapter(
+            walletApiUrl = runtime.walletApiUrl,
+            adapterPort = runtime.adapterPort,
+            publicBaseUrl = runtime.adapterPublicUrl,
+            clientId = runtime.clientId,
+            txCode = runtime.txCode,
+            clientAttestationIssuer = runtime.clientAttestationIssuer,
+            clientAttesterJwk = runtime.clientAttesterJwks.singleAttesterJwk(),
+        )
+
+        try {
+            checkWalletReachable(walletClient)
+            check(conformance.getServerVersion() != null) {
+                "OpenID conformance suite is unavailable at https://${runtime.conformanceHost}:${runtime.conformancePort}/api/server"
+            }
+            adapter.start(walletClient)
+
+            val allVariants = WalletVariantMatrix.all()
+            val selectedVariants = selection.select(allVariants)
+            require(selectedVariants.isNotEmpty()) {
+                "No OpenID4VCI wallet variants selected. Check OPENID4VCI_WALLET_CONFORMANCE_VARIANTS and filters."
+            }
+            println("Selected OpenID4VCI wallet variants: ${selectedVariants.size}/${allVariants.size}")
+
+            val results = mutableListOf<WalletVariantRunResult>()
+            for ((index, variant) in selectedVariants.withIndex()) {
+                println("Running wallet matrix variant ${index + 1}/${selectedVariants.size}: ${variant.id}")
+                results += runVariant(conformance, variant)
+            }
+            WalletVariantReportWriter.write(selection.reportDir, results)
+            println("Wrote wallet conformance matrix artifacts to ${selection.reportDir}")
+
+            if (selection.strictResults) {
+                val failures = results.filter { it.status != WalletVariantRunStatus.PASSED }
+                require(failures.isEmpty()) {
+                    "OpenID4VCI wallet matrix failed for ${failures.size} variants. See ${selection.reportDir}/summary.md"
+                }
+            }
+            return results.flatMap { result ->
+                result.modules.map { module ->
+                    TestPlanResult(
+                        testName = module.testModule,
+                        conformanceTestId = module.testId ?: result.variantId,
+                        conformanceStatus = module.status ?: result.status.name,
+                        conformanceResult = module.result,
+                        errorMessage = module.error ?: result.error,
+                    )
+                }
+            }
+        } finally {
+            adapter.close()
+            conformance.close()
+            walletClient.close()
+        }
+    }
