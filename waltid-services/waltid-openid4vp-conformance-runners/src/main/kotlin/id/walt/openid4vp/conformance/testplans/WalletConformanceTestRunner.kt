@@ -272,3 +272,60 @@ class WalletConformanceTestRunner(
         ?.trim('"')
         ?.takeIf { it.isNotBlank() && it != "null" }
 }
+
+data class WalletConformanceRuntimeConfig(
+    val walletApiUrl: String,
+    val adapterPort: Int,
+    val adapterPublicUrl: String,
+    val clientId: String,
+    val txCode: String,
+    val conformanceHost: String,
+    val conformancePort: Int,
+    val clientAttestationIssuer: String,
+    val clientAttesterJwks: JsonObject,
+    val clientAttestationTrustAnchorPem: String,
+    val keyAttestationTrustAnchorPem: String,
+    val clientCertificatePem: String,
+    val moduleTimeoutMinutes: Long,
+    val browserAutomation: WalletBrowserAutomationConfig,
+) {
+    companion object {
+        fun fromEnvironment(): WalletConformanceRuntimeConfig {
+            val clientAttesterJwks = Oid4vciWalletVariantPlan.loadJsonFromEnvironmentOrResource(
+                "OPENID4VCI_WALLET_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE",
+                "/keys/attester-key.json",
+            )
+            return WalletConformanceRuntimeConfig(
+                walletApiUrl = env("OPENID4VCI_WALLET_CONFORMANCE_WALLET_URL") ?: "http://127.0.0.1:7006",
+                adapterPort = env("OPENID4VCI_WALLET_CONFORMANCE_ADAPTER_PORT")?.toIntOrNull() ?: 7007,
+                adapterPublicUrl = (env("OPENID4VCI_WALLET_CONFORMANCE_ADAPTER_PUBLIC_URL")
+                    ?: "https://localhost.emobix.co.uk:9444").trimEnd('/'),
+                clientId = env("OPENID4VCI_WALLET_CONFORMANCE_CLIENT_ID") ?: "wallet-conformance-test",
+                txCode = env("OPENID4VCI_WALLET_CONFORMANCE_TX_CODE") ?: "123456",
+                conformanceHost = env("OPENID4VCI_WALLET_CONFORMANCE_HOST") ?: "localhost.emobix.co.uk",
+                conformancePort = env("OPENID4VCI_WALLET_CONFORMANCE_PORT")?.toIntOrNull() ?: 8443,
+                clientAttestationIssuer = env("OPENID4VCI_WALLET_CONFORMANCE_CLIENT_ATTESTATION_ISSUER")
+                    ?: "https://client-attestation.example.com",
+                clientAttesterJwks = clientAttesterJwks,
+                clientAttestationTrustAnchorPem = Oid4vciWalletVariantPlan.loadTextFromEnvironmentOrResource(
+                    "OPENID4VCI_WALLET_CONFORMANCE_CLIENT_ATTESTATION_TRUST_ANCHOR_PEM_FILE",
+                    "/certs/root-ca.pem",
+                ),
+                keyAttestationTrustAnchorPem = Oid4vciWalletVariantPlan.loadTextFromEnvironmentOrResource(
+                    "OPENID4VCI_WALLET_CONFORMANCE_KEY_ATTESTATION_TRUST_ANCHOR_PEM_FILE",
+                    "/certs/root-ca.pem",
+                ),
+                clientCertificatePem = Oid4vciWalletVariantPlan.loadTextFromEnvironmentOrResource(
+                    "OPENID4VCI_WALLET_CONFORMANCE_CLIENT_CERTIFICATE_PEM_FILE",
+                    "/certs/verifier.pem",
+                ),
+                moduleTimeoutMinutes = env("OPENID4VCI_WALLET_CONFORMANCE_MODULE_TIMEOUT_MINUTES")?.toLongOrNull()
+                    ?.coerceAtLeast(1)
+                    ?: 5L,
+                browserAutomation = WalletBrowserAutomationConfig.fromEnvironment(),
+            )
+        }
+
+        private fun env(name: String): String? = System.getenv(name)?.trim()?.takeIf { it.isNotEmpty() }
+    }
+}
