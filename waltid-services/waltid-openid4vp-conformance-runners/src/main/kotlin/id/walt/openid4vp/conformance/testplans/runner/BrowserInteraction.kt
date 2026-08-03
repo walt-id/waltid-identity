@@ -55,3 +55,17 @@ internal fun openBrowserInteraction(page: Page, interaction: BrowserInteraction)
         """.trimIndent()
     )
 }
+
+internal fun parseBrowserFormParameters(rawQuery: String?): List<Pair<String, String>> =
+    rawQuery
+        ?.takeIf { it.isNotBlank() }
+        ?.split("&")
+        ?.filter { it.isNotBlank() }
+        ?.map { part ->
+            val separator = part.indexOf('=')
+            val name = if (separator == -1) part else part.substring(0, separator)
+            val value = if (separator == -1) "" else part.substring(separator + 1)
+            URLDecoder.decode(name, StandardCharsets.UTF_8) to
+                URLDecoder.decode(value, StandardCharsets.UTF_8)
+        }
+        ?: emptyList()
