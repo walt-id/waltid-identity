@@ -87,6 +87,49 @@ class PlatformKeyStoreAuthorizationTest {
     }
 
     @Test
+    fun unprotectedAbsentPlatformKeyReturnsNullThroughStore() = runTest {
+        withQueries { queries ->
+            val key = TestKey("unprotected-key")
+            PlatformKeyStore(RecordingProvider(key), queries).addKey(
+                key,
+                MobileWalletKeyRecord(
+                    keyId = "unprotected-key",
+                    keyType = KeyType.secp256r1,
+                    keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+                    isPlatformBacked = true,
+                ),
+            )
+
+            val loaded = PlatformKeyStore(RecordingProvider(null), queries).getKey("unprotected-key")
+
+            assertEquals(null, loaded)
+        }
+    }
+
+    @Test
+    fun unexpectedPlatformLoadFailurePropagatesThroughStore() = runTest {
+        withQueries { queries ->
+            val key = TestKey("unexpected-key")
+            PlatformKeyStore(RecordingProvider(key), queries).addKey(
+                key,
+                MobileWalletKeyRecord(
+                    keyId = "unexpected-key",
+                    keyType = KeyType.secp256r1,
+                    keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+                    isPlatformBacked = true,
+                ),
+            )
+            val expected = IllegalStateException("unexpected platform failure")
+
+            val failure = assertFailsWith<IllegalStateException> {
+                PlatformKeyStore(RecordingProvider(null, loadFailure = expected), queries).getKey("unexpected-key")
+            }
+
+            assertSame(expected, failure)
+        }
+    }
+
+    @Test
     fun databaseRejectsInconsistentProtectedMetadata() = runTest {
         withQueries { queries ->
             assertFailsWith<Throwable> {
@@ -135,7 +178,10 @@ class PlatformKeyStoreAuthorizationTest {
         }
     }
 
-    private class RecordingProvider(private val key: Key?) : PlatformKeyProvider {
+    private class RecordingProvider(
+        private val key: Key?,
+        private val loadFailure: Throwable? = null,
+    ) : PlatformKeyProvider {
         var loadedPolicy: KeyUseAuthorizationPolicy? = null
 
         override suspend fun preflight(request: PlatformKeyRequest) = PlatformKeyPreflight(true)
@@ -152,6 +198,7 @@ class PlatformKeyStoreAuthorizationTest {
 
         override suspend fun load(record: MobileWalletKeyRecord): Key? {
             loadedPolicy = record.keyUseAuthorizationPolicy
+            loadFailure?.let { throw it }
             return key
         }
 

@@ -279,9 +279,9 @@ public class MobileWallet internal constructor(
 
         return try {
             validateGeneratedKey(request, key, record)
-            val didResult = registerDidByKey(didMethod, key)
             val keyId = keyStore.addKey(key, record)
             keyPersisted = true
+            val didResult = registerDidByKey(didMethod, key)
             didStore.addDid(
                 WalletDidEntry(
                     did = didResult.did,

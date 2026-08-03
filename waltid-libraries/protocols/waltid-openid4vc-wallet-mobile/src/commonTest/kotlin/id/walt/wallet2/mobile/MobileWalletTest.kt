@@ -167,12 +167,14 @@ class MobileWalletTest {
     fun bootstrapDidRegistrationFailureDeletesGeneratedKeyExactlyOnce() = runTest {
         val key = testKey()
         val provider = LifecycleProvider(key)
-        val keyStore = LifecycleKeyStore()
+        val keyStore = LifecycleKeyStore(onPersistedKeyDelete = { provider.delete(it) })
         val didStore = LifecycleDidStore()
         val wallet = lifecycleWallet(provider, keyStore, didStore)
 
         assertFailsWith<Throwable> { wallet.bootstrap(didMethod = "unsupported") }
 
+        assertEquals(1, keyStore.addCalls)
+        assertEquals(1, keyStore.removeCalls)
         assertEquals(1, provider.deleteCalls)
         assertTrue(keyStore.records.isEmpty())
         assertTrue(didStore.records.isEmpty())

@@ -88,7 +88,16 @@ public class AndroidPlatformKeyProvider private constructor(
             authorizationPrompt = authorizationPrompt,
             interactionContextProvider = interactionContextProvider,
         )
-        return if (record.isPlatformBacked) AndroidKey.Platform.load(options) else null
+        if (!record.isPlatformBacked) return null
+        return try {
+            AndroidKey.Platform.load(options)
+        } catch (failure: Throwable) {
+            if (record.keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.None && failure.isMissingPlatformKey()) {
+                null
+            } else {
+                throw failure
+            }
+        }
     }
 
     override suspend fun delete(record: MobileWalletKeyRecord) {
@@ -104,6 +113,9 @@ public class AndroidPlatformKeyProvider private constructor(
         return AndroidKey.Software.exportKeyMaterial(key)
     }
 }
+
+private fun Throwable.isMissingPlatformKey(): Boolean =
+    generateSequence(this) { it.cause }.any { it is NoSuchElementException }
 
 private fun FragmentActivity?.canHostBiometricPrompt(): Boolean =
     this != null && !isFinishing && !isDestroyed && !isChangingConfigurations

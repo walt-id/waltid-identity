@@ -7,6 +7,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.KeyUseAuthorizationException
 import id.walt.crypto.keys.KeyUseAuthorizationFailure
 import id.walt.crypto.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.stores.MobileWalletKeyRecord
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -15,6 +16,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
+import kotlin.uuid.Uuid
 
 class PlatformKeyProviderTestActivity : FragmentActivity()
 
@@ -92,6 +95,38 @@ class AndroidPlatformKeyProviderTest {
                 PlatformKeyRequest(KeyType.secp256r1, keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet)
             ).failure,
         )
+    }
+
+    @Test
+    fun unprotectedMissingPlatformKeyReturnsNull() = runTest {
+        val context = activityRule.scenario.withActivity().applicationContext
+        val loaded = AndroidPlatformKeyProvider(context, interactionContextProvider = { null }).load(
+            MobileWalletKeyRecord(
+                keyId = "missing-unprotected-${Uuid.random()}",
+                keyType = KeyType.secp256r1,
+                keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+                isPlatformBacked = true,
+            )
+        )
+
+        assertNull(loaded)
+    }
+
+    @Test
+    fun protectedMissingPlatformKeyReportsUnavailable() = runTest {
+        val context = activityRule.scenario.withActivity().applicationContext
+        val failure = assertFailsWith<KeyUseAuthorizationException> {
+            AndroidPlatformKeyProvider(context, interactionContextProvider = { null }).load(
+                MobileWalletKeyRecord(
+                    keyId = "missing-protected-${Uuid.random()}",
+                    keyType = KeyType.secp256r1,
+                    keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                    isPlatformBacked = true,
+                )
+            )
+        }
+
+        assertEquals(KeyUseAuthorizationFailure.ProtectedKeyUnavailable, failure.failure)
     }
 
     private fun <A : FragmentActivity> androidx.test.core.app.ActivityScenario<A>.withActivity(): A {

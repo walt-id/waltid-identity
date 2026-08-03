@@ -1,5 +1,6 @@
 package id.walt.wallet2.persistence.keys
 
+import at.asitplus.signum.supreme.CFCryptoOperationFailed
 import id.walt.crypto.IosKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
@@ -20,6 +21,7 @@ import platform.LocalAuthentication.LAContext
 import platform.LocalAuthentication.LAErrorBiometryNotAvailable
 import platform.LocalAuthentication.LAErrorBiometryNotEnrolled
 import platform.LocalAuthentication.LAPolicyDeviceOwnerAuthenticationWithBiometrics
+import platform.Security.errSecItemNotFound
 import kotlin.uuid.Uuid
 
 /** Keychain/Secure Enclave-backed mobile key provider. */
@@ -87,7 +89,16 @@ public class IosPlatformKeyProvider(
             keyUseAuthorizationPolicy = record.keyUseAuthorizationPolicy,
             authorizationPrompt = authorizationPrompt,
         )
-        return if (record.isPlatformBacked) IosKey.Platform.load(options) else null
+        if (!record.isPlatformBacked) return null
+        return try {
+            IosKey.Platform.load(options)
+        } catch (failure: Throwable) {
+            if (record.keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.None && failure.isMissingPlatformKey()) {
+                null
+            } else {
+                throw failure
+            }
+        }
     }
 
     override suspend fun delete(record: MobileWalletKeyRecord) {
@@ -122,6 +133,12 @@ public class IosPlatformKeyProvider(
 
     internal fun usesSecureElementFor(keyType: KeyType): Boolean =
         useSecureElement && keyType == KeyType.secp256r1
+}
+
+internal fun Throwable.isMissingPlatformKey(): Boolean {
+    val causes = generateSequence(this) { it.cause }.toList()
+    return causes.any { it is NoSuchElementException } ||
+        causes.filterIsInstance<CFCryptoOperationFailed>().any { it.osStatus == errSecItemNotFound }
 }
 
 internal expect fun isIosSimulatorTarget(): Boolean

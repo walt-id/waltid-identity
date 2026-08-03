@@ -1,10 +1,13 @@
 package id.walt.wallet2.persistence.keys
 
+import at.asitplus.signum.supreme.CFCryptoOperationFailed
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.KeyUseAuthorizationException
 import id.walt.crypto.keys.KeyUseAuthorizationFailure
 import id.walt.crypto.keys.KeyUseAuthorizationPolicy
 import kotlinx.coroutines.test.runTest
+import platform.Security.errSecItemNotFound
+import platform.Security.errSecNotAvailable
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -84,5 +87,13 @@ class IosPlatformKeyProviderTest {
 
         assertFalse(preflight.supported)
         assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, preflight.failure)
+    }
+
+    @Test
+    fun missingPlatformFailureRecognitionIsNarrow() {
+        assertTrue(NoSuchElementException().isMissingPlatformKey())
+        assertTrue(CFCryptoOperationFailed("missing", errSecItemNotFound).isMissingPlatformKey())
+        assertFalse(CFCryptoOperationFailed("unavailable", errSecNotAvailable).isMissingPlatformKey())
+        assertFalse(IllegalStateException().isMissingPlatformKey())
     }
 }
