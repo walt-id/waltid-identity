@@ -352,3 +352,29 @@ data class WalletVariantRunResult(
     val modules: List<WalletVariantModuleRunResult> = emptyList(),
     val error: String? = null,
 )
+
+object WalletVariantReportWriter {
+    private val json = kotlinx.serialization.json.Json { prettyPrint = true }
+
+    fun write(reportDir: String, results: List<WalletVariantRunResult>) {
+        val dir = Path.of(reportDir)
+        Files.createDirectories(dir)
+        Files.writeString(
+            dir.resolve("results.json"),
+            json.encodeToString(kotlinx.serialization.builtins.ListSerializer(WalletVariantRunResult.serializer()), results)
+        )
+        Files.writeString(dir.resolve("summary.md"), buildString {
+            appendLine("# OpenID4VCI Wallet Matrix Summary")
+            appendLine()
+            appendLine("| Variant | Status | Plan | Modules | Error |")
+            appendLine("|---------|--------|------|---------|-------|")
+            results.forEach { result ->
+                appendLine(
+                    "| `${result.variantId}` | `${result.status.name.lowercase()}` | " +
+                        "${result.planId.orEmpty()} | ${result.modules.size} | " +
+                        "${result.error.orEmpty().replace("\n", " ").replace("|", "\\|")} |"
+                )
+            }
+        })
+    }
+}
