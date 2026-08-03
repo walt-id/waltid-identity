@@ -21,3 +21,22 @@ class WalletVariantMatrixTest {
         assertTrue(variants.filter { it.authorizationCodeFlowVariant != "wallet_initiated" }
             .all { it.credentialOfferVariant in setOf("by_value", "by_reference") })
     }
+
+    @Test
+    fun addsTheSuiteDefinedHaipPlanContexts() {
+        val variants = WalletVariantMatrix.all()
+        val haipVariants = variants.filter { it.isHaip }
+
+        assertEquals(1_734, variants.size)
+        assertEquals(6, haipVariants.size)
+        assertTrue(haipVariants.all {
+            it.grantType == "authorization_code" &&
+                it.clientAuthType == "client_attestation" &&
+                it.senderConstrain == "dpop" &&
+                it.authorizationRequestType == "simple" &&
+                it.requestMethod == "unsigned" &&
+                it.credentialEncryption == "suite_matrix" &&
+                it.credentialIssuanceMode == "suite_matrix"
+        })
+    }
+}
