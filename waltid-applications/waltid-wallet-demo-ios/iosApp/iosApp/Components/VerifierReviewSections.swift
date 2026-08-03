@@ -2,16 +2,30 @@ import SwiftUI
 import WalletSDK
 
 struct VerifierReviewSections: View {
-    let request: PresentationRequestInfo
+    private enum Request {
+        case ready(PresentationRequestInfo)
+        case invalid(PresentationRequestContext)
+    }
+
+    private let request: Request
     @State private var technicalDetailsExpanded = false
 
+    init(request: PresentationRequestInfo) {
+        self.request = .ready(request)
+    }
+
+    init(request: PresentationRequestContext) {
+        self.request = .invalid(request)
+    }
+
     private var transactionDataGroups: [ClaimGroup] {
-        CredentialDisplayNormalizer.transactionDataGroups(for: request)
+        guard case let .ready(request) = request else { return [] }
+        return CredentialDisplayNormalizer.transactionDataGroups(for: request)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if let verifierMetadata = request.verifierMetadata,
+            if let verifierMetadata,
                verifierDisplayName != nil || !verifierDetails.isEmpty {
                 ReviewMetadataSection(
                     title: "Verifier",
@@ -73,14 +87,14 @@ struct VerifierReviewSections: View {
     }
 
     private var responseEncryptionStatus: String {
-        switch request.responseEncryption {
+        switch responseEncryption {
         case .notRequired: "Not requested"
         case .required: "Required"
         }
     }
 
     private var verifierDisplayName: String? {
-        guard let name = request.verifierMetadata?.display?.name?.trimmingCharacters(in: .whitespacesAndNewlines),
+        guard let name = verifierMetadata?.display?.name?.trimmingCharacters(in: .whitespacesAndNewlines),
               !name.isEmpty else {
             return nil
         }
@@ -88,7 +102,7 @@ struct VerifierReviewSections: View {
     }
 
     private var verifierDetails: [MetadataDetailItem] {
-        guard let metadata = request.verifierMetadata else { return [] }
+        guard let metadata = verifierMetadata else { return [] }
         return [
             MetadataDetailItem(label: "Client URI", value: metadata.clientURI, linkURI: metadata.clientURI),
             MetadataDetailItem(label: "Privacy policy", value: metadata.policyURI, linkURI: metadata.policyURI),
@@ -98,7 +112,7 @@ struct VerifierReviewSections: View {
 
     private var responseProtectionDetails: [MetadataDetailItem] {
         var items = [MetadataDetailItem(label: "Message-level encryption", value: responseEncryptionStatus)]
-        if case let .required(details) = request.responseEncryption {
+        if case let .required(details) = responseEncryption {
             items += [
                 MetadataDetailItem(label: "Key management algorithm", value: details.keyManagementAlgorithm),
                 MetadataDetailItem(label: "Content encryption algorithm", value: details.contentEncryptionAlgorithm),
@@ -111,10 +125,52 @@ struct VerifierReviewSections: View {
 
     private var technicalDetails: [MetadataDetailItem] {
         [
-            MetadataDetailItem(label: "Client ID", value: request.clientID),
-            MetadataDetailItem(label: "Response URI", value: request.responseURI?.absoluteString),
-            MetadataDetailItem(label: "State", value: request.state),
-            MetadataDetailItem(label: "Nonce", value: request.nonce),
+            MetadataDetailItem(label: "Client ID", value: clientID),
+            MetadataDetailItem(label: "Response URI", value: responseURI?.absoluteString),
+            MetadataDetailItem(label: "State", value: state),
+            MetadataDetailItem(label: "Nonce", value: nonce),
         ]
+    }
+
+    private var clientID: String {
+        switch request {
+        case let .ready(request): request.clientID
+        case let .invalid(request): request.clientID
+        }
+    }
+
+    private var verifierMetadata: VerifierMetadata? {
+        switch request {
+        case let .ready(request): request.verifierMetadata
+        case let .invalid(request): request.verifierMetadata
+        }
+    }
+
+    private var responseURI: URL? {
+        switch request {
+        case let .ready(request): request.responseURI
+        case let .invalid(request): request.responseURI
+        }
+    }
+
+    private var state: String? {
+        switch request {
+        case let .ready(request): request.state
+        case let .invalid(request): request.state
+        }
+    }
+
+    private var nonce: String? {
+        switch request {
+        case let .ready(request): request.nonce
+        case let .invalid(request): request.nonce
+        }
+    }
+
+    private var responseEncryption: PresentationResponseEncryption {
+        switch request {
+        case let .ready(request): request.responseEncryption
+        case let .invalid(request): request.responseEncryption
+        }
     }
 }
