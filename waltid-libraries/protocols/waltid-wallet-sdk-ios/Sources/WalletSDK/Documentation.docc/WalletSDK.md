@@ -70,7 +70,7 @@ Use ``WalletStores`` when an app owns credential, DID, or signing-key
 durability. Omitted credential and DID stores use the encrypted local database,
 while an omitted key store uses platform signing-key persistence and generation.
 Store overrides are independent except for signing keys: ``WalletKeys`` keeps
-the ``WalletKeyStore`` and its generator together so newly generated keys are
+the ``WalletKeyStore`` and its request-aware generator together so newly generated keys are
 persisted into the same app-owned key domain. This example assumes app-defined
 store types that implement the corresponding protocols.
 

@@ -114,10 +114,10 @@ let wallet = try await Wallet(
     )
 )
 
-let capability = try await wallet.keyUseAuthorizationCapability()
-guard capability.supported else {
+let preflight = try await wallet.keyUseAuthorizationPreflight()
+guard preflight.supported else {
     throw WalletError.keyUseAuthorization(
-        capability.failure ?? .unsupportedCombination,
+        preflight.failure ?? .unsupportedCombination,
         "Protected key creation is unavailable"
     )
 }
@@ -129,12 +129,12 @@ let keyMetadata = try await wallet.keys()
 The protected iOS combination is P-256 plus `.biometricCurrentSet` on a qualifying physical device.
 It requires Secure Enclave and biometric authorization for every private-key signing operation, does
 not permit device-passcode fallback, and makes the key unusable when biometric enrollment changes.
-The simulator reports the capability as unavailable; it is not evidence of Secure Enclave or biometric
+The simulator reports the preflight as unavailable; it is not evidence of Secure Enclave or biometric
 enforcement. Protected non-P-256 creation fails rather than falling back to an exported software key.
 
 The policy is immutable key metadata. Changing the configuration default affects only future key
-creation and does not protect, replace, or rotate existing keys. Use `keys()` to inspect requested and
-effective policy. Existing-key rotation, wallet/app unlock, action-scoped authorization, attestation,
+creation and does not protect, replace, or rotate existing keys. Use `keys()` to inspect the policy and
+platform-backed status. Existing-key rotation, wallet/app unlock, action-scoped authorization, attestation,
 and recovery are separate concerns.
 
 The operating system owns the prompt. These platform mechanisms alone do not establish WSCD, LoA
@@ -210,7 +210,7 @@ let wallet = try await Wallet(
 ```
 <!-- doc-snippet:end swift-custom-credential-store -->
 
-Apps that own more wallet durability can also provide DID and signing-key stores. Omitted credential and DID stores use the encrypted local database, while an omitted key store uses platform signing-key persistence and generation. Signing-key overrides are configured through `WalletKeys` so the app-owned `WalletKeyStore` and generator are supplied atomically. This example assumes `AppDidStore` and `AppKeyStore` implement the corresponding store protocols, and that `AppKeyStore` exposes app-owned key generation.
+Apps that own more wallet durability can also provide DID and signing-key stores. Omitted credential and DID stores use the encrypted local database, while an omitted key store uses platform signing-key persistence and generation. Signing-key overrides are configured through `WalletKeys` so the app-owned `WalletKeyStore` and request-aware generator are supplied atomically. This example assumes `AppDidStore` and `AppKeyStore` implement the corresponding store protocols, and that `AppKeyStore` exposes app-owned key generation.
 
 <!-- doc-snippet:start swift-full-store-overrides -->
 ```swift
@@ -223,8 +223,8 @@ let wallet = try await Wallet(
             stores: WalletStores(
                 credentials: AppCredentialStore(),
                 dids: AppDidStore(),
-                keys: WalletKeys(store: keyStore) { keyType in
-                    try await keyStore.generateKey(type: keyType)
+                keys: WalletKeys(store: keyStore) { request in
+                    try await keyStore.generateKey(type: request.keyType)
                 }
             )
         )
@@ -233,7 +233,7 @@ let wallet = try await Wallet(
 ```
 <!-- doc-snippet:end swift-full-store-overrides -->
 
-`StoredKey.serializedKeyJSON` is a walt.id serialized key payload and may contain private signing material. Treat it like a secret and store it only in app-owned secure storage. Custom serialized-key generators retain the legacy `.none` policy; they are not silently treated as supporting non-exportable protected keys.
+`StoredKey.serializedKeyJSON` is a walt.id serialized key payload and may contain private signing material. Treat it like a secret and store it only in app-owned secure storage. Custom generators receive the exact `WalletKeyRequest`; they must return matching immutable policy metadata and must reject protected requests they cannot enforce.
 
 Provided database keys and custom stores can be combined when an app owns both database-key recovery and wallet-record durability:
 

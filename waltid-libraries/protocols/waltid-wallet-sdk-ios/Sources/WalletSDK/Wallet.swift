@@ -74,11 +74,11 @@ public actor Wallet {
     ///   - keyUseAuthorizationPolicy: Optional policy override.
     /// - Returns: Platform capability and stable failure metadata.
     /// - Throws: ``WalletError`` when the capability cannot be evaluated.
-    public func keyUseAuthorizationCapability(
+    public func keyUseAuthorizationPreflight(
         keyType: WalletKeyType? = nil,
         keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy? = nil
-    ) async throws -> WalletKeyAuthorizationCapability {
-        try await bridge.keyUseAuthorizationCapability(
+    ) async throws -> WalletKeyAuthorizationPreflight {
+        try await bridge.keyUseAuthorizationPreflight(
             keyType: keyType ?? configuration.defaultKeyType,
             keyUseAuthorizationPolicy: keyUseAuthorizationPolicy
                 ?? configuration.defaultKeyUseAuthorizationPolicy

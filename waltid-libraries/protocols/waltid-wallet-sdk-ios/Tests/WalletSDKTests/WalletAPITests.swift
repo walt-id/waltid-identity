@@ -79,10 +79,10 @@ final class WalletAPITests: XCTestCase {
         let credentialStore = FakeCredentialStore()
         let didStore = FakeDidStore()
         let keyStore = FakeKeyStore()
-        let keys = WalletKeys(store: keyStore) { keyType in
+        let keys = WalletKeys(store: keyStore) { request in
             StoredKey(
-                keyID: "generated-\(keyType)",
-                keyType: keyType,
+                keyID: "generated-\(request.keyType)",
+                keyType: request.keyType,
                 algorithm: nil,
                 serializedKeyJSON: #"{"type":"jwk","jwk":{"kid":"generated"}}"#
             )
@@ -284,33 +284,23 @@ final class WalletAPITests: XCTestCase {
                 keyID: "protected-key",
                 keyType: .secp256r1,
                 algorithm: "ES256",
-                requestedKeyUseAuthorizationPolicy: .biometricCurrentSet,
-                effectiveKeyUseAuthorizationPolicy: .biometricCurrentSet,
-                isPlatformBacked: true,
-                effectiveHardwareBacking: .secureEnclave
+                keyUseAuthorizationPolicy: .biometricCurrentSet,
+                isPlatformBacked: true
             )
         ]
-        bridge.capabilityResult = .init(
-            platform: "iOS",
-            keyType: .secp256r1,
-            keyUseAuthorizationPolicy: .biometricCurrentSet,
+        bridge.preflightResult = .init(
             supported: true,
-            platformBackingAvailable: true,
-            secureHardwareRequired: true,
-            secureHardwareAvailable: true,
-            effectiveHardwareBacking: .secureEnclave
+            failure: nil
         )
         let wallet = Wallet(bridge: bridge)
 
         let keys = try await wallet.keys()
-        let capability = try await wallet.keyUseAuthorizationCapability(
+        let preflight = try await wallet.keyUseAuthorizationPreflight(
             keyUseAuthorizationPolicy: .biometricCurrentSet
         )
 
-        XCTAssertEqual(keys.single?.effectiveKeyUseAuthorizationPolicy, .biometricCurrentSet)
-        XCTAssertEqual(keys.single?.effectiveHardwareBacking, .secureEnclave)
-        XCTAssertTrue(capability.supported)
-        XCTAssertEqual(capability.effectiveHardwareBacking, .secureEnclave)
+        XCTAssertEqual(keys.single?.keyUseAuthorizationPolicy, .biometricCurrentSet)
+        XCTAssertTrue(preflight.supported)
     }
 
     func testResolveOfferForwardsOfferAndReturnsResolution() async throws {
@@ -831,14 +821,9 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     var error: WalletError?
     var bootstrapResult = WalletBootstrapResult(keyID: "key", did: "did:key:wallet")
     var keysResult: [WalletKeyInfo] = []
-    var capabilityResult = WalletKeyAuthorizationCapability(
-        platform: "iOS",
-        keyType: .secp256r1,
-        keyUseAuthorizationPolicy: .none,
+    var preflightResult = WalletKeyAuthorizationPreflight(
         supported: true,
-        platformBackingAvailable: true,
-        secureHardwareRequired: false,
-        secureHardwareAvailable: nil
+        failure: nil
     )
     var offerResolutionResult = testOfferResolution(transactionCodeRequired: false)
     var receiveResult: [String] = []
@@ -903,14 +888,14 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         return keysResult
     }
 
-    func keyUseAuthorizationCapability(
+    func keyUseAuthorizationPreflight(
         keyType: WalletKeyType,
         keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
-    ) async throws -> WalletKeyAuthorizationCapability {
+    ) async throws -> WalletKeyAuthorizationPreflight {
         if let error {
             throw error
         }
-        return capabilityResult
+        return preflightResult
     }
 
     func resolveOffer(offer: URL) async throws -> OfferResolution {

@@ -10,10 +10,10 @@ protocol WalletCoreBridge: Sendable {
         didMethod: String
     ) async throws -> WalletBootstrapResult
     func keys() async throws -> [WalletKeyInfo]
-    func keyUseAuthorizationCapability(
+    func keyUseAuthorizationPreflight(
         keyType: WalletKeyType,
         keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
-    ) async throws -> WalletKeyAuthorizationCapability
+    ) async throws -> WalletKeyAuthorizationPreflight
     func resolveOffer(offer: URL) async throws -> OfferResolution
     func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String]
     func receive(previewHandle: IssuancePreviewHandle, txCode: String?, clientID: String) async throws -> [String]
@@ -68,10 +68,10 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         throw unavailableError()
     }
 
-    func keyUseAuthorizationCapability(
+    func keyUseAuthorizationPreflight(
         keyType: WalletKeyType,
         keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
-    ) async throws -> WalletKeyAuthorizationCapability {
+    ) async throws -> WalletKeyAuthorizationPreflight {
         throw unavailableError()
     }
 

@@ -357,84 +357,31 @@ public enum KeyUseAuthorizationFailure: Equatable, Sendable {
     case biometricNotEnrolled
     /// The host did not supply the interaction context required for the prompt.
     case interactionContextUnavailable
-    /// The operating-system authorization attempt did not succeed.
-    case authorizationFailed
-    /// The protected key no longer satisfies its immutable authorization policy.
-    case protectedKeyInvalidated
-    /// The protected key is no longer present in platform storage.
-    case protectedKeyMissing
+    /// The operating-system authorization attempt did not complete.
+    case authorizationNotCompleted
+    /// The protected key is unavailable in platform storage.
+    case protectedKeyUnavailable
+    /// Stored key metadata is corrupt or internally inconsistent.
+    case invalidStoredKeyMetadata
 }
 
-/// Effective private-key backing reported by the platform.
-public enum WalletKeyHardwareBacking: Equatable, Sendable {
-    /// Exportable software key material.
-    case software
-    /// Platform-managed key storage without a more specific reliable classification.
-    case platform
-    /// Secure hardware without a more specific reliable classification.
-    case secureHardware
-    /// Android trusted execution environment.
-    case trustedEnvironment
-    /// Android StrongBox, confirmed from effective key information.
-    case strongBox
-    /// Apple Secure Enclave.
-    case secureEnclave
-    /// The platform could not classify effective backing reliably.
-    case unknown
-}
-
-/// Result of preflighting a key type and immutable authorization policy.
-public struct WalletKeyAuthorizationCapability: Equatable, Sendable {
-    /// Platform that evaluated the request.
-    public let platform: String
-    /// Requested key type.
-    public let keyType: WalletKeyType
-    /// Requested immutable key-use policy.
-    public let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+/// Result of preflighting an exact key-use authorization request.
+public struct WalletKeyAuthorizationPreflight: Equatable, Sendable {
     /// Whether the active device and provider can enforce the request.
     public let supported: Bool
-    /// Whether platform-managed key storage is available for the combination.
-    public let platformBackingAvailable: Bool
-    /// Whether the combination requires secure hardware.
-    public let secureHardwareRequired: Bool
-    /// Secure-hardware availability when it can be determined before creation.
-    public let secureHardwareAvailable: Bool?
-    /// Effective backing when reliable key information is already available.
-    public let effectiveHardwareBacking: WalletKeyHardwareBacking?
     /// Stable reason the request is unsupported, when applicable.
     public let failure: KeyUseAuthorizationFailure?
 
-    /// Creates a capability result.
+    /// Creates a preflight result.
     ///
     /// - Parameters:
-    ///   - platform: Platform that evaluated the request.
-    ///   - keyType: Requested key type.
-    ///   - keyUseAuthorizationPolicy: Requested immutable key-use policy.
-    ///   - supported: Whether the request can be enforced.
-    ///   - platformBackingAvailable: Whether platform-managed storage is available.
-    ///   - secureHardwareRequired: Whether secure hardware is required.
-    ///   - secureHardwareAvailable: Secure-hardware availability when known.
-    ///   - effectiveHardwareBacking: Reliable effective backing when known.
+    ///   - supported: Whether the exact request can be enforced.
     ///   - failure: Stable reason an unsupported request failed preflight.
     public init(
-        platform: String,
-        keyType: WalletKeyType,
-        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy,
         supported: Bool,
-        platformBackingAvailable: Bool,
-        secureHardwareRequired: Bool,
-        secureHardwareAvailable: Bool?,
-        effectiveHardwareBacking: WalletKeyHardwareBacking? = nil,
         failure: KeyUseAuthorizationFailure? = nil
     ) {
-        self.platform = platform
-        self.keyType = keyType
-        self.keyUseAuthorizationPolicy = keyUseAuthorizationPolicy
         self.supported = supported
-        self.platformBackingAvailable = platformBackingAvailable
-        self.secureHardwareRequired = secureHardwareRequired
-        self.secureHardwareAvailable = secureHardwareAvailable
-        self.effectiveHardwareBacking = effectiveHardwareBacking
         self.failure = failure
     }
 }
@@ -477,17 +424,11 @@ public struct WalletKeyInfo: Equatable, Identifiable, Sendable {
     /// Optional signing algorithm label, such as `EdDSA` or `ES256`.
     public let algorithm: String?
 
-    /// Authorization policy requested when the key was created.
-    public let requestedKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
-
-    /// Authorization policy effectively enforced by the stored key.
-    public let effectiveKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+    /// Immutable authorization policy enforced by the stored key.
+    public let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
 
     /// Whether private-key material is held by a platform key store.
     public let isPlatformBacked: Bool
-
-    /// Effective hardware backing when it can be determined reliably.
-    public let effectiveHardwareBacking: WalletKeyHardwareBacking?
 
     /// Stable identifier for SwiftUI and collection APIs.
     public var id: String { keyID }
@@ -498,26 +439,20 @@ public struct WalletKeyInfo: Equatable, Identifiable, Sendable {
     ///   - keyID: Stable wallet-local key identifier.
     ///   - keyType: Signing-key type.
     ///   - algorithm: Optional signing algorithm label.
-    ///   - requestedKeyUseAuthorizationPolicy: Policy requested when the key was created.
-    ///   - effectiveKeyUseAuthorizationPolicy: Policy enforced by the persisted key.
+    ///   - keyUseAuthorizationPolicy: Immutable policy enforced by the persisted key.
     ///   - isPlatformBacked: Whether private material remains in a platform key store.
-    ///   - effectiveHardwareBacking: Reliable effective backing when known.
     public init(
         keyID: String,
         keyType: WalletKeyType,
         algorithm: String? = nil,
-        requestedKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .none,
-        effectiveKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .none,
-        isPlatformBacked: Bool = false,
-        effectiveHardwareBacking: WalletKeyHardwareBacking? = nil
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .none,
+        isPlatformBacked: Bool = false
     ) {
         self.keyID = keyID
         self.keyType = keyType
         self.algorithm = algorithm
-        self.requestedKeyUseAuthorizationPolicy = requestedKeyUseAuthorizationPolicy
-        self.effectiveKeyUseAuthorizationPolicy = effectiveKeyUseAuthorizationPolicy
+        self.keyUseAuthorizationPolicy = keyUseAuthorizationPolicy
         self.isPlatformBacked = isPlatformBacked
-        self.effectiveHardwareBacking = effectiveHardwareBacking
     }
 }
 
@@ -537,6 +472,12 @@ public struct StoredKey: CustomDebugStringConvertible, CustomStringConvertible, 
 
     /// walt.id serialized key JSON payload.
     public let serializedKeyJSON: String
+
+    /// Immutable authorization policy enforced by this key.
+    public let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+
+    /// Whether private-key material is held by a platform key store.
+    public let isPlatformBacked: Bool
 
     /// Stable identifier for SwiftUI and collection APIs.
     public var id: String { keyID }
@@ -558,16 +499,22 @@ public struct StoredKey: CustomDebugStringConvertible, CustomStringConvertible, 
     ///   - keyType: Signing-key type.
     ///   - algorithm: Optional signing algorithm label.
     ///   - serializedKeyJSON: walt.id serialized key JSON payload.
+    ///   - keyUseAuthorizationPolicy: Immutable policy enforced by this key.
+    ///   - isPlatformBacked: Whether private-key material is held by a platform key store.
     public init(
         keyID: String,
         keyType: WalletKeyType,
         algorithm: String? = nil,
-        serializedKeyJSON: String
+        serializedKeyJSON: String,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .none,
+        isPlatformBacked: Bool = false
     ) {
         self.keyID = keyID
         self.keyType = keyType
         self.algorithm = algorithm
         self.serializedKeyJSON = serializedKeyJSON
+        self.keyUseAuthorizationPolicy = keyUseAuthorizationPolicy
+        self.isPlatformBacked = isPlatformBacked
     }
 }
 
@@ -597,13 +544,30 @@ public protocol WalletKeyStore: Sendable {
     func removeKey(id: String) async throws -> Bool
 }
 
+/// Exact custom signing-key generation request.
+public struct WalletKeyRequest: Sendable {
+    public let keyType: WalletKeyType
+    public let keyID: String?
+    public let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+
+    public init(
+        keyType: WalletKeyType,
+        keyID: String? = nil,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .none
+    ) {
+        self.keyType = keyType
+        self.keyID = keyID
+        self.keyUseAuthorizationPolicy = keyUseAuthorizationPolicy
+    }
+}
+
 /// Atomic custom signing-key persistence configuration.
 public struct WalletKeys: Sendable {
     /// App-owned signing-key store.
     public let store: any WalletKeyStore
 
     /// App-owned signing-key generator.
-    public let generate: @Sendable (WalletKeyType) async throws -> StoredKey
+    public let generate: @Sendable (WalletKeyRequest) async throws -> StoredKey
 
     /// Creates an atomic signing-key store and generator override.
     ///
@@ -612,7 +576,7 @@ public struct WalletKeys: Sendable {
     ///   - generate: App-owned signing-key generator.
     public init(
         store: any WalletKeyStore,
-        generate: @escaping @Sendable (WalletKeyType) async throws -> StoredKey
+        generate: @escaping @Sendable (WalletKeyRequest) async throws -> StoredKey
     ) {
         self.store = store
         self.generate = generate
