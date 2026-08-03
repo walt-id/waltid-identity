@@ -72,3 +72,19 @@ class Oid4vciWalletVariantPlan(
         put("maxWaitForNotificationSeconds", 20)
         put("publish", "no")
     }
+
+    override val isHaip: Boolean
+        get() = variantContext.isHaip
+
+    override val credentialFormat: String
+        get() = variantContext.credentialFormat
+
+    override val grantType: String
+        get() = variantContext.grantType
+
+    override val senderConstraint: String
+        get() = variantContext.senderConstrain
+
+    override val clientAuthType: String
+        get() = variantContext.clientAuthType
+
