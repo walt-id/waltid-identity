@@ -88,3 +88,29 @@ class Oid4vciWalletVariantPlan(
     override val clientAuthType: String
         get() = variantContext.clientAuthType
 
+    companion object {
+        private val serverJwks = jsonObject(
+            """{"keys":[{"kty":"EC","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E","use":"sig","alg":"ES256","kid":"issuer-key-1"}]}"""
+        )
+        private val clientJwks = jsonObject(
+            """{"keys":[{"kty":"EC","crv":"P-256","x":"d5KVpCdze-46QteHfgAswRurlSYUylJ1JntvcbaZ__Y","y":"uqvaPeOm7SGsdXr34frqkJGAz8tHmR0EmpsSbfqgwDA","use":"sig","alg":"ES256","kid":"wallet-static-key"}]}"""
+        )
+        private val credentialSigningJwk = jsonObject(
+            """{"kty":"EC","crv":"P-256","x":"HsIzLDaBvEhYF8u_Rs-UMk82ISNOMvipGCpyfCjA1nk","y":"c9oagfJlhCdS15GtMCW80liuR4LOAX21xSxA7Z0-efc","d":"c6XRnq85BooKJ3D7VAJGJ0NxZy9uROeCn5_a58eC8Bs","use":"sig","alg":"ES256","kid":"credential-key-1","x5c":["MIIBsDCCAVagAwIBAgIUW1zQSPkvzf4gXBvZXVO31XXQqYowCgYIKoZIzj0EAwIwNDEbMBkGA1UEAwwSVGVzdCBDcmVkZW50aWFsIENBMRUwEwYDVQQKDAxXYWx0LmlkIFRlc3QwHhcNMjYwNjMwMTA1MDQ1WhcNMjcwNjMwMTA1MDQ1WjA4MR8wHQYDVQQDDBZUZXN0IENyZWRlbnRpYWwgSXNzdWVyMRUwEwYDVQQKDAxXYWx0LmlkIFRlc3QwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQewjMsNoG8SFgXy79Gz5QyTzYhI04y+KkYKnJ8KMDWeXPaGoHyZYQnUteRrTAlvNJYrkeCzgF9tcUsQO2dPnn3o0IwQDAdBgNVHQ4EFgQUmHVulwcARfk/UwZlcZYf62xNJJUwHwYDVR0jBBgwFoAUOE24Bp12XncLtXO7LutemEtlilgwCgYIKoZIzj0EAwIDSAAwRQIgNLI1BNpbilApznhdYLrWeCE0m2/M2w1k0QYRrBjNyBUCIQDRm9ziS59vWRP1glgKkAmavHX+B2cDObrjIYmFR1KuIg==","MIIBvDCCAWOgAwIBAgIUFqjPwMAClt39/DebJo3PqCtEPv0wCgYIKoZIzj0EAwIwNDEbMBkGA1UEAwwSVGVzdCBDcmVkZW50aWFsIENBMRUwEwYDVQQKDAxXYWx0LmlkIFRlc3QwHhcNMjYwNjMwMTA1MDQ1WhcNMzYwNjI3MTA1MDQ1WjA0MRswGQYDVQQDDBJUZXN0IENyZWRlbnRpYWwgQ0ExFTATBgNVBAoMDFdhbHQuaWQgVGVzdDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABBI8zD1vGFC3ySjjiFI4WEgLRgLkwWkiSBMdu6VumEEHUx21wI++nWDXNhAF2JgOd3J0hkSuixrOcNTkhwpuFN6jUzBRMB0GA1UdDgQWBBQ4TbgGnXZedwu1c7su616YS2WKWDAfBgNVHSMEGDAWgBQ4TbgGnXZedwu1c7su616YS2WKWDAPBgNVHRMBAf8EBTADAQH/MAoGCCqGSM49BAMCA0cAMEQCIAg9X48chJZjEAutvzvaYxGHVdNx/PP23tUPEpzrhY7iAiBkyDPmXoRVPSFbfU+t9QDqayd1ZQyKkBQ9giJ+RmJwUQ=="]}"""
+        )
+
+        val credentialTrustAnchorPem: String = """
+            -----BEGIN CERTIFICATE-----
+            MIIBvDCCAWOgAwIBAgIUFqjPwMAClt39/DebJo3PqCtEPv0wCgYIKoZIzj0EAwIw
+            NDEbMBkGA1UEAwwSVGVzdCBDcmVkZW50aWFsIENBMRUwEwYDVQQKDAxXYWx0Lmlk
+            IFRlc3QwHhcNMjYwNjMwMTA1MDQ1WhcNMzYwNjI3MTA1MDQ1WjA0MRswGQYDVQQD
+            DBJUZXN0IENyZWRlbnRpYWwgQ0ExFTATBgNVBAoMDFdhbHQuaWQgVGVzdDBZMBMG
+            ByqGSM49AgEGCCqGSM49AwEHA0IABBI8zD1vGFC3ySjjiFI4WEgLRgLkwWkiSBMd
+            u6VumEEHUx21wI++nWDXNhAF2JgOd3J0hkSuixrOcNTkhwpuFN6jUzBRMB0GA1Ud
+            DgQWBBQ4TbgGnXZedwu1c7su616YS2WKWDAfBgNVHSMEGDAWgBQ4TbgGnXZedwu1
+            c7su616YS2WKWDAPBgNVHRMBAf8EBTADAQH/MAoGCCqGSM49BAMCA0cAMEQCIAg9
+            X48chJZjEAutvzvaYxGHVdNx/PP23tUPEpzrhY7iAiBkyDPmXoRVPSFbfU+t9QDq
+            ayd1ZQyKkBQ9giJ+RmJwUQ==
+            -----END CERTIFICATE-----
+        """.trimIndent()
+
