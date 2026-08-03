@@ -75,3 +75,9 @@ class WalletConformanceBrowserAutomation(
             browser.close()
         }
     }
+
+    private fun String.isConformanceCallback(): Boolean =
+        startsWith("https://$conformanceHost:$conformancePort/") && contains("/callback")
+}
+
+fun TestRunResult.walletBrowserInteractionsForAutomation(): List<BrowserInteraction> = pendingBrowserInteractions()
