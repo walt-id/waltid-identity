@@ -14,6 +14,8 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
+import id.walt.wallet2.data.WalletKeyInfo
+import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.PresentationCredentialOption
@@ -42,6 +44,7 @@ import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResul
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -97,6 +100,30 @@ public data class MobileWalletIssuancePreviewHandle(public val value: String) {
 
     /** Returns a redacted representation that does not reveal [value]. */
     public override fun toString(): String = "MobileWalletIssuancePreviewHandle(<redacted>)"
+}
+
+/**
+ * Read-only bridge from the mobile-specific key contract to the generic wallet handler contract.
+ *
+ * Mobile key creation and deletion deliberately stay on [MobileWalletKeyStore], where the
+ * immutable policy and platform-backing record are required. Generic wallet code only needs key
+ * lookup and metadata listing.
+ */
+internal class MobileWalletKeyStoreAdapter(
+    private val delegate: MobileWalletKeyStore,
+) : WalletKeyStore {
+    override suspend fun getKey(keyId: String): Key? = delegate.getKey(keyId)
+
+    override suspend fun listKeys(): Flow<WalletKeyInfo> = flow {
+        delegate.listKeyRecords().collect { record ->
+            emit(WalletKeyInfo(keyId = record.keyId, keyType = record.keyType.name))
+        }
+    }
+
+    override suspend fun addKey(key: Key): String =
+        error("Mobile keys must be persisted with MobileWalletKeyRecord")
+
+    override suspend fun removeKey(keyId: String): Boolean = delegate.removeKey(keyId)
 }
 
 /**
@@ -199,7 +226,7 @@ public class MobileWallet internal constructor(
 
     private val wallet = Wallet(
         id = walletId,
-        keyStores = listOf(keyStore),
+        keyStores = listOf(MobileWalletKeyStoreAdapter(keyStore)),
         didStore = didStore,
         credentialStores = listOf(credentialStore),
     )
@@ -248,11 +275,13 @@ public class MobileWallet internal constructor(
         val generated = keyProvider.generate(request)
         val key = generated.key
         val record = generated.record
-        validateGeneratedKey(request, key, record)
+        var keyPersisted = false
 
         return try {
+            validateGeneratedKey(request, key, record)
             val didResult = registerDidByKey(didMethod, key)
             val keyId = keyStore.addKey(key, record)
+            keyPersisted = true
             didStore.addDid(
                 WalletDidEntry(
                     did = didResult.did,
@@ -265,10 +294,13 @@ public class MobileWallet internal constructor(
                 did = didResult.did,
             )
         } catch (original: Throwable) {
-            runCatching { keyStore.removeKey(record.keyId) }
-                .exceptionOrNull()
-                ?.let(original::addSuppressed)
-            runCatching { keyProvider.delete(record) }
+            runCatching {
+                if (keyPersisted) {
+                    keyStore.removeKey(record.keyId)
+                } else {
+                    keyProvider.delete(record)
+                }
+            }
                 .exceptionOrNull()
                 ?.let(original::addSuppressed)
             throw original

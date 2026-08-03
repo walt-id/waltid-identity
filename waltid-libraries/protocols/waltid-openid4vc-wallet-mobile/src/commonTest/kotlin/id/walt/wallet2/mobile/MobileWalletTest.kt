@@ -5,6 +5,8 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyUseAuthorizationException
 import id.walt.crypto.keys.KeyUseAuthorizationFailure
 import id.walt.crypto.keys.KeyUseAuthorizationPolicy
@@ -13,7 +15,6 @@ import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
@@ -142,6 +143,103 @@ class MobileWalletTest {
         assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, failure.failure)
         assertEquals(0, generationCalls)
         assertEquals(0, keyStore.addKeyCalls)
+    }
+
+    @Test
+    fun bootstrapValidationFailureDeletesGeneratedKeyExactlyOnce() = runTest {
+        val key = testKey()
+        val provider = LifecycleProvider(key, recordPolicyOverride = KeyUseAuthorizationPolicy.None)
+        val keyStore = LifecycleKeyStore()
+        val didStore = LifecycleDidStore()
+        val wallet = lifecycleWallet(provider, keyStore, didStore)
+
+        val failure = assertFailsWith<KeyUseAuthorizationException> {
+            wallet.bootstrap(keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet)
+        }
+
+        assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, failure.failure)
+        assertEquals(1, provider.deleteCalls)
+        assertTrue(keyStore.records.isEmpty())
+        assertTrue(didStore.records.isEmpty())
+    }
+
+    @Test
+    fun bootstrapDidRegistrationFailureDeletesGeneratedKeyExactlyOnce() = runTest {
+        val key = testKey()
+        val provider = LifecycleProvider(key)
+        val keyStore = LifecycleKeyStore()
+        val didStore = LifecycleDidStore()
+        val wallet = lifecycleWallet(provider, keyStore, didStore)
+
+        assertFailsWith<Throwable> { wallet.bootstrap(didMethod = "unsupported") }
+
+        assertEquals(1, provider.deleteCalls)
+        assertTrue(keyStore.records.isEmpty())
+        assertTrue(didStore.records.isEmpty())
+    }
+
+    @Test
+    fun bootstrapKeyStoreFailureDeletesGeneratedKeyExactlyOnce() = runTest {
+        val key = testKey()
+        val provider = LifecycleProvider(key)
+        val keyStore = LifecycleKeyStore(addFailure = IllegalStateException("key store insertion"))
+        val didStore = LifecycleDidStore()
+        val wallet = lifecycleWallet(provider, keyStore, didStore)
+
+        assertFailsWith<IllegalStateException> { wallet.bootstrap() }
+
+        assertEquals(1, provider.deleteCalls)
+        assertEquals(1, keyStore.addCalls)
+        assertEquals(0, keyStore.removeCalls)
+        assertTrue(keyStore.records.isEmpty())
+        assertTrue(didStore.records.isEmpty())
+    }
+
+    @Test
+    fun bootstrapDidStoreFailureLetsStoreOwnPersistedKeyDeletion() = runTest {
+        val key = testKey()
+        val provider = LifecycleProvider(key)
+        val keyStore = LifecycleKeyStore(onPersistedKeyDelete = { provider.delete(it) })
+        val didStore = LifecycleDidStore(addFailure = IllegalStateException("did store insertion"))
+        val wallet = lifecycleWallet(provider, keyStore, didStore)
+
+        assertFailsWith<IllegalStateException> { wallet.bootstrap() }
+
+        assertEquals(1, keyStore.removeCalls)
+        assertEquals(1, provider.deleteCalls)
+        assertTrue(keyStore.records.isEmpty())
+        assertTrue(didStore.records.isEmpty())
+    }
+
+    @Test
+    fun bootstrapCleanupFailureIsSuppressedOnTheOriginalFailure() = runTest {
+        val key = testKey()
+        val cleanupFailure = IllegalStateException("cleanup")
+        val provider = LifecycleProvider(key, deleteFailure = cleanupFailure)
+        val keyStore = LifecycleKeyStore(addFailure = IllegalStateException("key store insertion"))
+        val wallet = lifecycleWallet(provider, keyStore, LifecycleDidStore())
+
+        val failure = assertFailsWith<IllegalStateException> { wallet.bootstrap() }
+
+        assertEquals("key store insertion", failure.message)
+        assertEquals(listOf(cleanupFailure), failure.suppressedExceptions)
+    }
+
+    @Test
+    fun successfulBootstrapDoesNotRunCompensation() = runTest {
+        val key = testKey()
+        val provider = LifecycleProvider(key)
+        val keyStore = LifecycleKeyStore(onPersistedKeyDelete = { provider.delete(it) })
+        val didStore = LifecycleDidStore()
+        val wallet = lifecycleWallet(provider, keyStore, didStore)
+
+        val result = wallet.bootstrap()
+
+        assertEquals(key.getKeyId(), result.keyId)
+        assertEquals(0, provider.deleteCalls)
+        assertEquals(0, keyStore.removeCalls)
+        assertEquals(1, keyStore.records.size)
+        assertEquals(1, didStore.records.size)
     }
 
     @Test
@@ -609,6 +707,22 @@ class MobileWalletTest {
         isPlatformBacked = true,
     )
 
+    private suspend fun testKey(): Key = KeyManager.resolveSerializedKey(
+        """{"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"lifecycle-key","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}"""
+    )
+
+    private fun lifecycleWallet(
+        provider: LifecycleProvider,
+        keyStore: LifecycleKeyStore,
+        didStore: LifecycleDidStore,
+    ) = MobileWallet(
+        walletId = "lifecycle-wallet",
+        keyStore = keyStore,
+        didStore = didStore,
+        credentialStore = RecordingCredentialStore(),
+        keyProvider = provider,
+    )
+
     private class TestProvider(
         private val preflight: PlatformKeyPreflight = PlatformKeyPreflight(true),
         private val onGenerate: () -> Unit = {},
@@ -626,7 +740,7 @@ class MobileWalletTest {
 
         override suspend fun load(record: MobileWalletKeyRecord): id.walt.crypto.keys.Key? = null
 
-        override suspend fun delete(record: MobileWalletKeyRecord): Boolean = true
+        override suspend fun delete(record: MobileWalletKeyRecord) = Unit
 
         override suspend fun loadSoftwareKey(
             keyId: String,
@@ -636,6 +750,81 @@ class MobileWalletTest {
 
         override suspend fun exportSoftwareKeyMaterial(key: id.walt.crypto.keys.Key): ByteArray =
             error("Test provider software export is not configured")
+    }
+
+    private class LifecycleProvider(
+        private val key: Key,
+        private val recordPolicyOverride: KeyUseAuthorizationPolicy? = null,
+        private val deleteFailure: Throwable? = null,
+    ) : PlatformKeyProvider {
+        var deleteCalls = 0
+
+        override suspend fun preflight(request: PlatformKeyRequest) = PlatformKeyPreflight(true)
+
+        override suspend fun generate(request: PlatformKeyRequest) = GeneratedPlatformKey(
+            key = key,
+            record = MobileWalletKeyRecord(
+                keyId = key.getKeyId(),
+                keyType = key.keyType,
+                keyUseAuthorizationPolicy = recordPolicyOverride ?: request.keyUseAuthorizationPolicy,
+                isPlatformBacked = true,
+            ),
+        )
+
+        override suspend fun load(record: MobileWalletKeyRecord): Key? = key
+
+        override suspend fun delete(record: MobileWalletKeyRecord) {
+            deleteCalls++
+            deleteFailure?.let { throw it }
+        }
+
+        override suspend fun loadSoftwareKey(keyId: String, keyType: KeyType, jwkMaterial: ByteArray): Key? = null
+
+        override suspend fun exportSoftwareKeyMaterial(key: Key): ByteArray = error("not used")
+    }
+
+    private class LifecycleKeyStore(
+        private val addFailure: Throwable? = null,
+        private val onPersistedKeyDelete: suspend (MobileWalletKeyRecord) -> Unit = {},
+    ) : MobileWalletKeyStore {
+        val records = linkedMapOf<String, MobileWalletKeyRecord>()
+        var addCalls = 0
+        var removeCalls = 0
+
+        override suspend fun getKey(keyId: String): Key? = null
+
+        override suspend fun listKeyRecords(): Flow<MobileWalletKeyRecord> = records.values.toList().asFlow()
+
+        override suspend fun addKey(key: Key, record: MobileWalletKeyRecord): String {
+            addCalls++
+            addFailure?.let { throw it }
+            records[record.keyId] = record
+            return record.keyId
+        }
+
+        override suspend fun removeKey(keyId: String): Boolean {
+            removeCalls++
+            val record = records.remove(keyId) ?: return false
+            onPersistedKeyDelete(record)
+            return true
+        }
+    }
+
+    private class LifecycleDidStore(
+        private val addFailure: Throwable? = null,
+    ) : WalletDidStore {
+        val records = linkedMapOf<String, WalletDidEntry>()
+
+        override suspend fun getDid(did: String): WalletDidEntry? = records[did]
+
+        override suspend fun listDids(): Flow<WalletDidEntry> = records.values.toList().asFlow()
+
+        override suspend fun addDid(entry: WalletDidEntry) {
+            addFailure?.let { throw it }
+            records[entry.did] = entry
+        }
+
+        override suspend fun removeDid(did: String): Boolean = records.remove(did) != null
     }
 
     private class RecordingDatabaseKeyProvider : DatabaseEncryptionKeyProvider {
@@ -651,17 +840,10 @@ class MobileWalletTest {
 
         override suspend fun getKey(keyId: String) = null
 
-        override suspend fun listKeys(): Flow<WalletKeyInfo> {
-            return listOf(WalletKeyInfo(record.keyId, record.keyType.name)).asFlow()
-        }
-
         override suspend fun listKeyRecords(): Flow<MobileWalletKeyRecord> {
             listKeyRecordsCalls++
             return listOf(record).asFlow()
         }
-
-        override suspend fun addKey(key: id.walt.crypto.keys.Key): String =
-            error("Preloaded test key store should not add keys")
 
         override suspend fun addKey(key: id.walt.crypto.keys.Key, record: MobileWalletKeyRecord): String =
             error("Preloaded test key store should not add keys")
@@ -677,14 +859,7 @@ class MobileWalletTest {
 
         override suspend fun getKey(keyId: String) = null
 
-        override suspend fun listKeys(): Flow<WalletKeyInfo> = emptyList<WalletKeyInfo>().asFlow()
-
         override suspend fun listKeyRecords(): Flow<MobileWalletKeyRecord> = emptyList<MobileWalletKeyRecord>().asFlow()
-
-        override suspend fun addKey(key: id.walt.crypto.keys.Key): String {
-            addKeyCalls++
-            return key.getKeyId()
-        }
 
         override suspend fun addKey(key: id.walt.crypto.keys.Key, record: MobileWalletKeyRecord): String {
             addKeyCalls++
