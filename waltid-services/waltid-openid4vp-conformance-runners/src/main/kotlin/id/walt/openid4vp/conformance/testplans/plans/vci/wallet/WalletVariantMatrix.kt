@@ -188,3 +188,22 @@ object WalletVariantMatrix {
     }
 
     fun all(): List<WalletVariant> = basic() + haip()
+
+    private fun haipVariant(
+        credentialFormat: String,
+        authorizationCodeFlowVariant: String,
+        credentialOfferVariant: String? = null,
+    ) = WalletVariant(
+        fapiProfile = "vci_haip",
+        credentialFormat = credentialFormat,
+        grantType = "authorization_code",
+        authorizationCodeFlowVariant = authorizationCodeFlowVariant,
+        clientAuthType = "client_attestation",
+        senderConstrain = "dpop",
+        authorizationRequestType = "simple",
+        requestMethod = "unsigned",
+        credentialEncryption = "suite_matrix",
+        credentialIssuanceMode = "suite_matrix",
+        credentialOfferVariant = credentialOfferVariant,
+    )
+}
