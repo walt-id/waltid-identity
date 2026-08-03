@@ -385,7 +385,7 @@ Validates credential issuer certificates against an ETSI Trust List (TSL/LoTE).
 {
   "policy": "etsi-trust-list",
   "trustLists": [
-    "https://www.signatur.rtr.at/currenttl.xml",
+    "https://www.signatur.rtr.at/vertrauensliste.xml",
     "https://ewc-consortium.github.io/ewc-trust-list/EWC-TL"
   ],
   "expectedEntityType": "WALLET_PROVIDER",
@@ -409,8 +409,9 @@ Validates credential issuer certificates against an ETSI Trust List (TSL/LoTE).
 | `expectedEntityType` | string | null | Filter: require specific entity type (`PID_PROVIDER`, `WALLET_PROVIDER`, `ATTESTATION_PROVIDER`, etc.) |
 | `expectedServiceType` | string | null | Filter: require specific service type |
 | `allowStaleSource` | boolean | false | If true, accept credentials from stale (but not expired) trust sources |
-| `requireAuthenticated` | boolean | false | If true, require trust source signature to be `VALIDATED` (XMLDSig verified) |
+| `requireAuthenticated` | boolean | false | Require a valid signature from an independently trusted signer |
 | `validateSignatures` | boolean | true | Validate XMLDSig signatures when loading inline trust lists |
+| `trustedSourceSignerCertificates` | string[] | `[]` | PEM or Base64-DER certificates authorized to sign a source |
 
 **Supported credential types:**
 - mDoc credentials with COSE signatures and x5c chain
@@ -434,14 +435,15 @@ Validates credential issuer certificates against an ETSI Trust List (TSL/LoTE).
     "status": "GRANTED"
   },
   "sourceFreshness": "FRESH",
-  "authenticity": "VALIDATED"
+  "authenticity": "AUTHENTICATED"
 }
 ```
 
 **Authenticity values:**
-- `VALIDATED` — Trust list XMLDSig signature verified successfully
+- `AUTHENTICATED` — Signature valid and signer independently trusted
+- `INTEGRITY_VERIFIED` — Signature valid; signer authorization not established
+- `UNVERIFIED` — Unsigned source or verification explicitly disabled
 - `FAILED` — Signature validation failed
-- `SKIPPED_DEMO` — Signature validation was disabled (testing/demo mode)
 
 ---
 

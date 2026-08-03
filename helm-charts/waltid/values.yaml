@@ -24,7 +24,7 @@ issuer:
 
 issuer2:
   api:
-    containerPort: 7002
+    containerPort: 7005
     image:
       repository: waltid/issuer-api2
       tag: latest
@@ -74,7 +74,7 @@ verifier:
 
 verifier2:
   api:
-    containerPort: 7003
+    containerPort: 7004
     image:
       repository: waltid/verifier-api2
       tag: latest
@@ -190,12 +190,21 @@ web-wallet:
 
 wallet-api2:
   api:
-    containerPort: 7005
+    containerPort: 7006
     image:
       repository: waltid/wallet-api2
       tag: latest
       imagePullPolicy: Always
   configMountPath: /waltid-wallet-api2/config
+  configFiles:
+    wallet-service.conf: |-
+      publicBaseUrl = "https://{{ .Values.ingress.host }}"
+      attestationConfig {
+        attesterUrl = "https://wallet-provider.eudiw.dev/wallet-instance-attestation/jwk"
+        requestBody {
+          jwk = "{{ `{{public_jwk}}` }}"
+        }
+      }
   persistence:
     enabled: true
     mountPath: /waltid-wallet-api2/data/

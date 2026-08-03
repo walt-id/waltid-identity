@@ -87,7 +87,7 @@ object ConformanceConfig {
     /**
      * Local issuer port for embedded test server.
      */
-    const val ISSUER_LOCAL_PORT = 7002
+    const val ISSUER_LOCAL_PORT = 7005
     
     /**
      * Issuer URL prefix placeholder.
