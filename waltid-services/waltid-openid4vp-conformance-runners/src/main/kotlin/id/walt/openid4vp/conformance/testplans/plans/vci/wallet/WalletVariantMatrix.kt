@@ -285,3 +285,40 @@ data class WalletVariantSelection(
             }
         }
 
+    companion object {
+        fun fromEnvironment(): WalletVariantSelection = WalletVariantSelection(
+            explicitVariantIds = csv("OPENID4VCI_WALLET_CONFORMANCE_VARIANTS"),
+            fapiProfiles = csv("OPENID4VCI_WALLET_CONFORMANCE_FILTER_FAPI_PROFILES"),
+            credentialFormats = csv("OPENID4VCI_WALLET_CONFORMANCE_FILTER_FORMATS"),
+            grantTypes = csv("OPENID4VCI_WALLET_CONFORMANCE_FILTER_GRANT_TYPES"),
+            authorizationCodeFlowVariants = csv("OPENID4VCI_WALLET_CONFORMANCE_FILTER_FLOW_VARIANTS"),
+            clientAuthTypes = csv("OPENID4VCI_WALLET_CONFORMANCE_FILTER_CLIENT_AUTH_TYPES"),
+            senderConstrains = csv("OPENID4VCI_WALLET_CONFORMANCE_FILTER_SENDER_CONSTRAINTS"),
+            authorizationRequestTypes = csv("OPENID4VCI_WALLET_CONFORMANCE_FILTER_AUTH_REQUEST_TYPES"),
+            requestMethods = csv("OPENID4VCI_WALLET_CONFORMANCE_FILTER_REQUEST_METHODS"),
+            credentialEncryptions = csv("OPENID4VCI_WALLET_CONFORMANCE_FILTER_CREDENTIAL_ENCRYPTION"),
+            credentialIssuanceModes = csv("OPENID4VCI_WALLET_CONFORMANCE_FILTER_ISSUANCE_MODES"),
+            credentialOfferVariants = csv("OPENID4VCI_WALLET_CONFORMANCE_FILTER_OFFER_VARIANTS"),
+            moduleGroups = csv("OPENID4VCI_WALLET_CONFORMANCE_MODULE_GROUPS").ifEmpty { setOf("all") },
+            explicitModules = csv("OPENID4VCI_WALLET_CONFORMANCE_MODULES"),
+            strictResults = optionalBool("OPENID4VCI_WALLET_CONFORMANCE_STRICT") ?: true,
+            reportDir = env("OPENID4VCI_WALLET_CONFORMANCE_REPORT_DIR") ?: "build/reports/openid4vci-wallet-matrix",
+        )
+
+        private fun csv(name: String): Set<String> = env(name)
+            ?.split(',')
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?.toSet()
+            ?: emptySet()
+
+        private fun optionalBool(name: String): Boolean? = env(name)?.let { value ->
+            when {
+                value.equals("true", true) || value == "1" || value.equals("yes", true) || value.equals("on", true) -> true
+                value.equals("false", true) || value == "0" || value.equals("no", true) || value.equals("off", true) -> false
+                else -> error("Unsupported $name value '$value'. Expected true or false.")
+            }
+        }
+
+        private fun env(name: String): String? = System.getenv(name)?.trim()?.takeIf { it.isNotEmpty() }
+    }
