@@ -15,8 +15,8 @@ kotlin {
             // JSON
             implementation(identityLibs.kotlinx.serialization.json)
 
-            // Logging
-            implementation(identityLibs.oshai.kotlinlogging)
+            // ByteString
+            implementation(identityLibs.kotlinx.io.bytestring)
 
             /*
              * walt.id:
@@ -24,6 +24,7 @@ kotlin {
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(project(":waltid-libraries:crypto:waltid-x509"))
             implementation(project(":waltid-libraries:credentials:waltid-dcql"))
+            implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
         }
 
         jvmTest.dependencies {
