@@ -1,7 +1,5 @@
 # -------- Stage 1: Build --------
-# The generated web assets are architecture-independent, so keep npm off QEMU
-# when Buildx creates the final multi-platform nginx images.
-FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
