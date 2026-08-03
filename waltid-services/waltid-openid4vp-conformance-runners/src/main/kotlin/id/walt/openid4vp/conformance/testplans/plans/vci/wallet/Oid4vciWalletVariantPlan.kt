@@ -41,3 +41,34 @@ class Oid4vciWalletVariantPlan(
                 put("keys", clientJwks["keys"]!!)
             }
         }
+        putJsonObject("credential") {
+            put("trust_anchor_pem", credentialTrustAnchorPem)
+            put("status_list_trust_anchor_pem", credentialTrustAnchorPem)
+            put("signing_jwk", credentialSigningJwk)
+        }
+        putJsonObject("client_attestation") {
+            put("issuer", clientAttestationIssuer)
+            put("trust_anchor", clientAttestationTrustAnchorPem)
+            put("attester_jwks", clientAttesterJwks)
+            put("key_attestation_jwks", clientAttesterJwks)
+            put("key_attestation_trust_anchor_pem", keyAttestationTrustAnchorPem)
+        }
+        putJsonObject("vci") {
+            if (variantContext.authorizationCodeFlowVariant != "wallet_initiated") {
+                put("credential_offer_endpoint", "$adapterPublicUrl/credential-offer")
+            }
+            // release-v5.1.x reads these legacy fields. Current suite releases
+            // read the top-level client_attestation object above.
+            if (variantContext.clientAuthType == "client_attestation") {
+                put("client_attestation_issuer", clientAttestationIssuer)
+                put("client_attestation_trust_anchor", clientAttestationTrustAnchorPem)
+            }
+            put(
+                "credential_configuration_id",
+                if (variantContext.credentialFormat == "mdoc") "eu.europa.ec.eudi.pid.mdoc.1" else "eu.europa.ec.eudi.pid.1"
+            )
+        }
+        put("waitTimeoutSeconds", 120)
+        put("maxWaitForNotificationSeconds", 20)
+        put("publish", "no")
+    }
