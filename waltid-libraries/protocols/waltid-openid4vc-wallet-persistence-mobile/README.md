@@ -29,7 +29,7 @@ Use this library when you need persistent wallet storage inside a mobile wallet 
 - **SQLDelight** — Kotlin Multiplatform database layer for Android and iOS
 - **Encrypted local databases** — SQLCipher-backed Android and iOS drivers
 - **Platform key stores** — Android KeyStore and iOS Keychain / Secure Enclave integration
-- **Immutable key-use metadata** — Requested/effective authorization policy and reliable effective hardware backing
+- **Immutable key-use metadata** — One persisted authorization policy and platform-backed status per key
 - **Credential persistence** — SQL-backed credential storage with metadata
 - **DID persistence** — SQL-backed DID document storage
 - **Shared schema** — Common mobile schema across supported platforms
@@ -72,7 +72,10 @@ val driver = DriverFactory(context).createEncryptedDriver(
 )
 val queries = WalletPersistenceDatabase(driver).walletPersistenceQueries
 
-val keyProvider = AndroidPlatformKeyProvider()
+val keyProvider = AndroidPlatformKeyProvider(
+    context = context,
+    interactionContextProvider = { currentFragmentActivity() },
+)
 val keyStore = PlatformKeyStore(keyProvider, queries)
 val credentialStore = SqlDelightCredentialStore(queries)
 val didStore = SqlDelightDidStore(queries)
@@ -80,11 +83,12 @@ val didStore = SqlDelightDidStore(queries)
 
 The higher-level `waltid-openid4vc-wallet-mobile` facade performs this wiring automatically. Use this module directly only when assembling custom platform persistence.
 
-`PlatformKeyProvider.capability(keyType, policy)` must be checked before protected key creation.
+`PlatformKeyProvider.preflight(PlatformKeyRequest(keyType, keyUseAuthorizationPolicy = policy))`
+must be checked before protected key creation.
 P-256 plus `BiometricCurrentSet` is the portable Android/iOS path; unsupported combinations fail
-without software fallback. `PlatformKeyStore` persists the requested and effective policy per key, and
-schema migration classifies pre-existing rows as `None`. A later configuration default is never inferred
-for an existing row.
+without software fallback. `PlatformKeyStore` persists one immutable policy per key, and corrupt or
+inconsistent protected metadata fails closed. There is no compatibility migration for the removed
+authorization metadata schema; reset local wallet data before opening an old database.
 
 ## Encryption and cleanup
 
@@ -98,7 +102,7 @@ The mobile facade opens encrypted databases by default and keeps managed databas
 
 | Interface | Implementation | Description |
 |-----------|----------------|-------------|
-| `WalletKeyStore` | `PlatformKeyStore` | Platform-backed key references and persisted software key material |
+| `MobileWalletKeyStore` | `PlatformKeyStore` | Platform-backed key references and persisted software key material |
 | `WalletCredentialStore` | `SqlDelightCredentialStore` | Stored credentials with metadata |
 | `WalletDidStore` | `SqlDelightDidStore` | DIDs and their documents |
 
@@ -106,7 +110,7 @@ The mobile facade opens encrypted databases by default and keeps managed databas
 
 The mobile schema includes the following tables:
 
-- `wallet2_keys` — Stored keys
+- `key_references` — Stored key references and immutable authorization policy
 - `wallet2_credentials` — Stored credentials
 - `wallet2_dids` — Stored DIDs
 

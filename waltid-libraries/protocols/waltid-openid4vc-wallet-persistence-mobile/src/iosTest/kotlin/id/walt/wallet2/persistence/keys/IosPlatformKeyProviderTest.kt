@@ -7,56 +7,52 @@ import id.walt.crypto.keys.KeyUseAuthorizationPolicy
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 
 class IosPlatformKeyProviderTest {
 
     @Test
-    fun supportsPlatformKeyTypes() {
-        assertEquals(
-            setOf(KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1, KeyType.RSA),
-            IosPlatformKeyProvider().supportedPlatformKeyTypes,
-        )
-    }
-
-    @Test
-    fun unprotectedCapabilityPreservesExistingAlgorithmSupport() = runTest {
+    fun unprotectedPreflightPreservesExistingAlgorithmSupport() = runTest {
         val provider = IosPlatformKeyProvider()
 
         KeyType.entries.forEach { keyType ->
-            val capability = provider.capability(keyType, KeyUseAuthorizationPolicy.None)
-            val expected = keyType in provider.supportedPlatformKeyTypes ||
-                keyType in setOf(KeyType.Ed25519, KeyType.secp256k1)
-            assertEquals(expected, capability.supported, "Unexpected None capability for $keyType")
-            assertEquals(KeyUseAuthorizationPolicy.None, capability.keyUseAuthorizationPolicy)
+            val preflight = provider.preflight(
+                PlatformKeyRequest(keyType = keyType, keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None)
+            )
+            val expected = keyType in PlatformKeyProvider.DEFAULT_SUPPORTED_PLATFORM_KEY_TYPES ||
+                keyType in PlatformKeyProvider.DEFAULT_SUPPORTED_SOFTWARE_KEY_TYPES
+            assertEquals(expected, preflight.supported, "Unexpected None preflight for $keyType")
         }
     }
 
     @Test
-    fun biometricCurrentSetIsPortableOnlyForP256AndRequiresPhysicalSecureEnclave() = runTest {
+    fun biometricCurrentSetIsRejectedOnSimulatorWithoutSoftwareFallback() = runTest {
         val provider = IosPlatformKeyProvider()
-        val portable = provider.capability(KeyType.secp256r1, KeyUseAuthorizationPolicy.BiometricCurrentSet)
-        val unsupported = provider.capability(KeyType.Ed25519, KeyUseAuthorizationPolicy.BiometricCurrentSet)
+        val preflight = provider.preflight(
+            PlatformKeyRequest(
+                keyType = KeyType.secp256r1,
+                keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+            )
+        )
+        val unsupported = provider.preflight(
+            PlatformKeyRequest(
+                keyType = KeyType.Ed25519,
+                keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+            )
+        )
 
-        assertEquals(PlatformKeyPlatform.iOS, portable.platform)
-        assertTrue(portable.platformBackingAvailable)
-        assertTrue(portable.secureHardwareRequired)
-        assertFalse(portable.secureHardwareAvailable == true, "The simulator must not report Secure Enclave availability")
-        assertEquals(KeyUseAuthorizationFailure.BiometricUnavailable, portable.failure)
-
+        assertFalse(preflight.supported)
+        assertEquals(KeyUseAuthorizationFailure.BiometricUnavailable, preflight.failure)
         assertFalse(unsupported.supported)
         assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, unsupported.failure)
     }
 
     @Test
-    fun unsupportedProtectedAlgorithmFailsBeforeSoftwareFallback() = runTest {
-        val provider = IosPlatformKeyProvider()
-
+    fun unsupportedProtectedAlgorithmFailsBeforeGeneration() = runTest {
         val failure = assertFailsWith<KeyUseAuthorizationException> {
-            provider.generateKey(
-                PlatformKeyGenerationRequest(
+            IosPlatformKeyProvider().generate(
+                PlatformKeyRequest(
                     keyType = KeyType.Ed25519,
                     keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
                 )

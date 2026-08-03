@@ -7,8 +7,9 @@ import id.walt.crypto.keys.KeyUseAuthorizationException
 import id.walt.crypto.keys.KeyUseAuthorizationFailure
 import id.walt.crypto.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto.keys.KeyUseAuthorizationPrompt
-import kotlinx.cinterop.ExperimentalForeignApi
+import id.walt.wallet2.persistence.stores.MobileWalletKeyRecord
 import kotlinx.cinterop.BetaInteropApi
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCObjectVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
@@ -21,141 +22,82 @@ import platform.LocalAuthentication.LAErrorBiometryNotEnrolled
 import platform.LocalAuthentication.LAPolicyDeviceOwnerAuthenticationWithBiometrics
 import kotlin.uuid.Uuid
 
-/**
- * [PlatformKeyProvider] implementation backed by iOS Keychain and Secure Enclave.
- *
- * @param useSecureElement When `true`, P-256 keys are created in Secure Enclave where available.
- */
+/** Keychain/Secure Enclave-backed mobile key provider. */
 public class IosPlatformKeyProvider(
-    private val useSecureElement: Boolean = true,
     private val authorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
 ) : PlatformKeyProvider {
-
-    /**
-     * iOS platform-backed key types supported by this provider.
-     */
-    override val supportedPlatformKeyTypes: Set<KeyType> =
-        PlatformKeyProvider.DEFAULT_SUPPORTED_PLATFORM_KEY_TYPES
-
-    /**
-     * Generates an iOS platform-backed key for supported types, otherwise a software key.
-     */
-    override suspend fun generateKey(keyType: KeyType, keyId: String?): Key {
-        return generateKey(PlatformKeyGenerationRequest(keyType = keyType, keyId = keyId))
+    @OptIn(ExperimentalForeignApi::class)
+    override suspend fun preflight(request: PlatformKeyRequest): PlatformKeyPreflight {
+        if (request.keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.None) {
+            val supported = request.keyType in PlatformKeyProvider.DEFAULT_SUPPORTED_PLATFORM_KEY_TYPES ||
+                request.keyType in PlatformKeyProvider.DEFAULT_SUPPORTED_SOFTWARE_KEY_TYPES
+            return PlatformKeyPreflight(supported, KeyUseAuthorizationFailure.UnsupportedCombination.takeUnless { supported })
+        }
+        val failure = when {
+            request.keyType != KeyType.secp256r1 -> KeyUseAuthorizationFailure.UnsupportedCombination
+            isSimulator() -> KeyUseAuthorizationFailure.BiometricUnavailable
+            else -> biometricAvailabilityFailure()
+        }
+        return PlatformKeyPreflight(failure == null, failure)
     }
 
-    override suspend fun generateKey(request: PlatformKeyGenerationRequest): Key {
-        val capability = capability(request.keyType, request.keyUseAuthorizationPolicy)
-        if (!capability.supported) {
+    override suspend fun generate(request: PlatformKeyRequest): GeneratedPlatformKey {
+        val preflight = preflight(request)
+        if (!preflight.supported) {
             throw KeyUseAuthorizationException(
-                failure = capability.failure ?: KeyUseAuthorizationFailure.UnsupportedCombination,
+                failure = preflight.failure ?: KeyUseAuthorizationFailure.UnsupportedCombination,
                 message = "iOS cannot enforce ${request.keyUseAuthorizationPolicy} for ${request.keyType}",
             )
         }
-
         val kid = request.keyId ?: Uuid.random().toString()
-        val options = IosKey.Options(
-            kid = kid,
-            keyType = request.keyType,
-            inSecureElement = useSecureElement && request.keyType == KeyType.secp256r1,
-            keyUseAuthorizationPolicy = request.keyUseAuthorizationPolicy,
-            authorizationPrompt = authorizationPrompt,
-        )
-        return if (isPlatformBacked(request.keyType)) {
-            IosKey.Platform.create(options)
-        } else {
-            IosKey.Software.create(options)
-        }
-    }
-
-    /**
-     * Loads an iOS key by identifier and expected key type.
-     */
-    override suspend fun loadKey(keyId: String, keyType: KeyType): Key? =
-        loadKey(keyId, keyType, KeyUseAuthorizationPolicy.None)
-
-    override suspend fun loadKey(
-        keyId: String,
-        keyType: KeyType,
-        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy,
-    ): Key? {
-        val options = IosKey.Options(
-            kid = keyId,
-            keyType = keyType,
-            inSecureElement = useSecureElement && keyType == KeyType.secp256r1,
-            keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
-            authorizationPrompt = authorizationPrompt,
-        )
-        return if (keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.None) {
-            runCatching { IosKey.Platform.load(options) }.getOrNull()
-        } else {
-            IosKey.Platform.load(options)
-        }
-    }
-
-    @OptIn(ExperimentalForeignApi::class)
-    override suspend fun capability(
-        keyType: KeyType,
-        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy,
-    ): PlatformKeyCapability {
-        if (keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.None) {
-            val supported = keyType in supportedPlatformKeyTypes ||
-                keyType in PlatformKeyProvider.DEFAULT_SUPPORTED_SOFTWARE_KEY_TYPES
-            return PlatformKeyCapability(
-                platform = PlatformKeyPlatform.iOS,
-                keyType = keyType,
-                keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
-                supported = supported,
-                platformBackingAvailable = isPlatformBacked(keyType),
-                secureHardwareRequired = false,
-                secureHardwareAvailable = null,
-                failure = KeyUseAuthorizationFailure.UnsupportedCombination.takeUnless { supported },
+        val platformBacked = request.keyType in PlatformKeyProvider.DEFAULT_SUPPORTED_PLATFORM_KEY_TYPES
+        val key = if (platformBacked) {
+            IosKey.Platform.create(
+                IosKey.Options(
+                    kid = kid,
+                    keyType = request.keyType,
+                    inSecureElement = request.keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                    keyUseAuthorizationPolicy = request.keyUseAuthorizationPolicy,
+                    authorizationPrompt = authorizationPrompt,
+                )
             )
+        } else {
+            IosKey.Software.create(IosKey.Options(kid = kid, keyType = request.keyType))
         }
-
-        val secureHardwareAvailable = !isSimulator()
-        val failure = when {
-            keyType != KeyType.secp256r1 || !useSecureElement ->
-                KeyUseAuthorizationFailure.UnsupportedCombination
-            !secureHardwareAvailable -> KeyUseAuthorizationFailure.BiometricUnavailable
-            else -> biometricAvailabilityFailure()
-        }
-
-        return PlatformKeyCapability(
-            platform = PlatformKeyPlatform.iOS,
-            keyType = keyType,
-            keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
-            supported = failure == null,
-            platformBackingAvailable = true,
-            secureHardwareRequired = true,
-            secureHardwareAvailable = secureHardwareAvailable,
-            failure = failure,
+        return GeneratedPlatformKey(
+            key = key,
+            record = MobileWalletKeyRecord(
+                keyId = kid,
+                keyType = request.keyType,
+                keyUseAuthorizationPolicy = request.keyUseAuthorizationPolicy,
+                isPlatformBacked = platformBacked,
+            ),
         )
     }
 
-    /**
-     * Loads an iOS software key from serialized JWK material.
-     */
+    override suspend fun load(record: MobileWalletKeyRecord): Key? {
+        val options = IosKey.Options(
+            kid = record.keyId,
+            keyType = record.keyType,
+            inSecureElement = record.keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.BiometricCurrentSet,
+            keyUseAuthorizationPolicy = record.keyUseAuthorizationPolicy,
+            authorizationPrompt = authorizationPrompt,
+        )
+        return if (record.isPlatformBacked) IosKey.Platform.load(options) else null
+    }
+
+    override suspend fun delete(record: MobileWalletKeyRecord): Boolean = runCatching {
+        if (record.isPlatformBacked) IosKey.Platform.delete(record.keyId)
+    }.isSuccess
+
     override suspend fun loadSoftwareKey(keyId: String, keyType: KeyType, jwkMaterial: ByteArray): Key? = runCatching {
         IosKey.Software.load(IosKey.Options(kid = keyId, keyType = keyType), jwkMaterial)
     }.getOrNull()
 
-    /**
-     * Exports serialized JWK material from an iOS software key.
-     */
     override suspend fun exportSoftwareKeyMaterial(key: Key): ByteArray {
-        require(key is IosKey.Software) { "Can only export material from Software keys" }
+        require(key is IosKey.Software) { "Can only export material from software keys" }
         return IosKey.Software.exportKeyMaterial(key)
     }
-
-    /**
-     * Deletes an iOS key by identifier and expected key type.
-     */
-    override suspend fun deleteKey(keyId: String, keyType: KeyType): Boolean = runCatching {
-        if (isPlatformBacked(keyType)) {
-            IosKey.Platform.delete(keyId)
-        }
-    }.isSuccess
 
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
     private fun biometricAvailabilityFailure(): KeyUseAuthorizationFailure? = memScoped {

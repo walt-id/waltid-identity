@@ -25,83 +25,71 @@ class AndroidPlatformKeyProviderTest {
     val activityRule = ActivityScenarioRule(PlatformKeyProviderTestActivity::class.java)
 
     @Test
-    fun nonePreservesExistingAlgorithmSupport() = runTest {
-        val provider = AndroidPlatformKeyProvider()
+    fun nonePreflightPreservesExistingAlgorithmSupport() = runTest {
+        val context = activityRule.scenario.withActivity().applicationContext
+        val provider = AndroidPlatformKeyProvider(context, interactionContextProvider = { null })
 
         KeyType.entries.forEach { keyType ->
-            val capability = provider.capability(keyType, KeyUseAuthorizationPolicy.None)
-            val expected = keyType in provider.supportedPlatformKeyTypes ||
-                keyType in setOf(KeyType.Ed25519, KeyType.secp256k1)
-            assertEquals(expected, capability.supported, "Unexpected None capability for $keyType")
+            val preflight = provider.preflight(PlatformKeyRequest(keyType, keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None))
+            val expected = keyType in PlatformKeyProvider.DEFAULT_SUPPORTED_PLATFORM_KEY_TYPES ||
+                keyType in PlatformKeyProvider.DEFAULT_SUPPORTED_SOFTWARE_KEY_TYPES
+            assertEquals(expected, preflight.supported, "Unexpected None preflight for $keyType")
         }
     }
 
     @Test
     fun protectedP256WithoutFragmentActivityFailsExplicitly() = runTest {
-        val capability = AndroidPlatformKeyProvider().capability(
-            KeyType.secp256r1,
-            KeyUseAuthorizationPolicy.BiometricCurrentSet,
+        val context = activityRule.scenario.withActivity().applicationContext
+        val preflight = AndroidPlatformKeyProvider(context, interactionContextProvider = { null }).preflight(
+            PlatformKeyRequest(KeyType.secp256r1, keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet)
         )
 
-        assertFalse(capability.supported)
-        assertEquals(KeyUseAuthorizationFailure.InteractionContextUnavailable, capability.failure)
+        assertFalse(preflight.supported)
+        assertEquals(KeyUseAuthorizationFailure.InteractionContextUnavailable, preflight.failure)
     }
 
     @Test
     fun unsupportedProtectedAlgorithmFailsBeforeSoftwareFallback() = runTest {
-        val provider = AndroidPlatformKeyProvider()
-        val capability = provider.capability(
-            KeyType.Ed25519,
-            KeyUseAuthorizationPolicy.BiometricCurrentSet,
+        val context = activityRule.scenario.withActivity().applicationContext
+        val provider = AndroidPlatformKeyProvider(context, interactionContextProvider = { null })
+        val preflight = provider.preflight(
+            PlatformKeyRequest(KeyType.Ed25519, keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet)
         )
 
-        assertFalse(capability.supported)
-        assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, capability.failure)
+        assertFalse(preflight.supported)
+        assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, preflight.failure)
 
         val failure = assertFailsWith<KeyUseAuthorizationException> {
-            provider.generateKey(
-                PlatformKeyGenerationRequest(
-                    keyType = KeyType.Ed25519,
-                    keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-                )
+            provider.generate(
+                PlatformKeyRequest(KeyType.Ed25519, keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet)
             )
         }
         assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, failure.failure)
     }
 
     @Test
-    fun currentActivityProviderSurvivesRecreationWithoutRetainingDestroyedActivity() = runTest {
+    fun currentActivityProviderResolvesActivityAfterRecreation() = runTest {
         var currentActivity = activityRule.scenario.withActivity()
         val applicationContext = currentActivity.applicationContext
-        val activityScopedProvider = AndroidPlatformKeyProvider(currentActivity)
-        val recreationAwareProvider = AndroidPlatformKeyProvider(
+        val provider = AndroidPlatformKeyProvider(
             context = applicationContext,
             interactionContextProvider = { currentActivity },
         )
 
         assertNotEquals(
             KeyUseAuthorizationFailure.InteractionContextUnavailable,
-            recreationAwareProvider.capability(
-                KeyType.secp256r1,
-                KeyUseAuthorizationPolicy.BiometricCurrentSet,
+            provider.preflight(
+                PlatformKeyRequest(KeyType.secp256r1, keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet)
             ).failure,
         )
 
         activityRule.scenario.recreate()
         currentActivity = activityRule.scenario.withActivity()
 
-        assertEquals(
-            KeyUseAuthorizationFailure.InteractionContextUnavailable,
-            activityScopedProvider.capability(
-                KeyType.secp256r1,
-                KeyUseAuthorizationPolicy.BiometricCurrentSet,
-            ).failure,
-        )
         assertNotEquals(
             KeyUseAuthorizationFailure.InteractionContextUnavailable,
-            recreationAwareProvider.capability(
-                KeyType.secp256r1,
-                KeyUseAuthorizationPolicy.BiometricCurrentSet,
+            provider.preflight(
+                PlatformKeyRequest(KeyType.secp256r1, keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet)
             ).failure,
         )
     }

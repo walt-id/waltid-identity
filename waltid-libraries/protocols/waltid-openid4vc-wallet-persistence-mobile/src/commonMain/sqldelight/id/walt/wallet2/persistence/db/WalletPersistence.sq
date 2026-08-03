@@ -4,9 +4,7 @@ CREATE TABLE key_references (
     created_at INTEGER NOT NULL,
     is_platform_backed INTEGER NOT NULL DEFAULT 1,
     key_material TEXT,
-    requested_authorization_policy TEXT NOT NULL DEFAULT 'None',
-    effective_authorization_policy TEXT NOT NULL DEFAULT 'None',
-    effective_hardware_backing TEXT
+    authorization_policy TEXT NOT NULL DEFAULT 'None'
 );
 
 selectAll:
@@ -16,17 +14,15 @@ selectByKeyId:
 SELECT * FROM key_references WHERE key_id = ?;
 
 insert:
-INSERT OR REPLACE INTO key_references (
+INSERT INTO key_references (
     key_id,
     key_type,
     created_at,
     is_platform_backed,
     key_material,
-    requested_authorization_policy,
-    effective_authorization_policy,
-    effective_hardware_backing
+    authorization_policy
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+VALUES (?, ?, ?, ?, ?, ?);
 
 deleteByKeyId:
 DELETE FROM key_references WHERE key_id = ?;
