@@ -245,3 +245,43 @@ data class WalletVariantSelection(
                 credentialOfferVariants.matches(variant.credentialOfferVariant)
         }
     }
+
+    /** Filter a module after the suite has added HAIP's internal variants. */
+    fun selectsModule(moduleName: String, moduleVariant: JsonObject, planVariant: WalletVariant): Boolean {
+        if (explicitModules.isNotEmpty() && moduleName !in explicitModules) return false
+        if (explicitModules.isEmpty() && !moduleGroups.matchesModule(moduleName)) return false
+
+        fun value(name: String): String? = moduleVariant[name]?.toString()?.trim('"')
+            ?: planVariant.toJsonObject()[name]?.toString()?.trim('"')
+
+        return fapiProfiles.matches(value("fapi_profile")) &&
+            credentialFormats.matches(value("credential_format")) &&
+            grantTypes.matches(value("vci_grant_type")) &&
+            authorizationCodeFlowVariants.matches(value("vci_authorization_code_flow_variant")) &&
+            clientAuthTypes.matches(value("client_auth_type")) &&
+            senderConstrains.matches(value("sender_constrain")) &&
+            authorizationRequestTypes.matches(value("authorization_request_type")) &&
+            requestMethods.matches(value("fapi_request_method")) &&
+            credentialEncryptions.matches(value("vci_credential_encryption")) &&
+            credentialIssuanceModes.matches(value("vci_credential_issuance_mode")) &&
+            credentialOfferVariants.matches(value("vci_credential_offer_variant"))
+    }
+
+    private fun WalletVariant.matchesPlanContextFilter(filter: Set<String>, value: String): Boolean =
+        filter.isEmpty() || value == "suite_matrix" || value in filter
+
+    private fun Set<String>.matches(value: String?): Boolean = isEmpty() || value in this
+
+    private fun Set<String>.matchesModule(moduleName: String): Boolean =
+        "all" in this || any { group ->
+            when (group) {
+                "issuance", "positive" -> moduleName == "oid4vci-1_0-wallet-test-credential-issuance"
+                "notification" -> moduleName == "oid4vci-1_0-wallet-test-credential-issuance-notification"
+                "scopes" -> moduleName.contains("scopes-without-authorization-details")
+                "client-attestation" -> moduleName == "oid4vci-1_0-wallet-test-client-attestation-challenge"
+                "batch" -> moduleName == "oid4vci-1_0-wallet-test-batch-credential-issuance"
+                "fapi" -> moduleName.startsWith("fapi2-")
+                else -> error("Unsupported OPENID4VCI_WALLET_CONFORMANCE_MODULE_GROUPS value '$group'.")
+            }
+        }
+
