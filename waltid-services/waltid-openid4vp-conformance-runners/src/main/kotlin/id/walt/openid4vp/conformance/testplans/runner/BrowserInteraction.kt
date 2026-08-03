@@ -32,3 +32,26 @@ internal fun TestRunResult.browserInteractionSummary(): String =
         "visitedUrlsWithMethod=${browser.visitedUrlsWithMethod.map { it.shortJson() }}, " +
         "visited=${browser.visited.map { it.shortJson() }}"
 
+internal fun openBrowserInteraction(page: Page, interaction: BrowserInteraction) {
+    if (!interaction.method.equals("POST", ignoreCase = true)) {
+        page.navigate(interaction.url)
+        return
+    }
+
+    val uri = URI.create(interaction.url)
+    val action = "${uri.scheme}://${uri.rawAuthority}${uri.rawPath.orEmpty()}"
+    val inputs = parseBrowserFormParameters(uri.rawQuery)
+        .joinToString("\n") { (name, value) ->
+            "<input type=\"hidden\" name=\"${name.htmlEscape()}\" value=\"${value.htmlEscape()}\">"
+        }
+
+    page.setContent(
+        """
+        <!doctype html>
+        <html><body>
+          <form method="post" action="${action.htmlEscape()}">$inputs</form>
+          <script>document.forms[0].submit();</script>
+        </body></html>
+        """.trimIndent()
+    )
+}
