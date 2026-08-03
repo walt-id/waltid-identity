@@ -99,3 +99,58 @@ class WalletConformanceTestRunner(
             walletClient.close()
         }
     }
+
+    private suspend fun runVariant(conformance: ConformanceInterface, variant: WalletVariant): WalletVariantRunResult {
+        unsupportedExecutionReason(variant)?.let { reason ->
+            return WalletVariantRunResult(
+                variantId = variant.id,
+                variant = variant.toJsonObject(),
+                status = WalletVariantRunStatus.BLOCKED,
+                error = reason,
+            )
+        }
+
+        return try {
+            val plan = Oid4vciWalletVariantPlan(
+                variantContext = variant,
+                adapterPublicUrl = runtime.adapterPublicUrl,
+                clientId = runtime.clientId,
+                clientAttestationIssuer = runtime.clientAttestationIssuer,
+                clientAttesterJwks = runtime.clientAttesterJwks,
+                clientAttestationTrustAnchorPem = runtime.clientAttestationTrustAnchorPem,
+                keyAttestationTrustAnchorPem = runtime.keyAttestationTrustAnchorPem,
+                clientCertificatePem = runtime.clientCertificatePem,
+            )
+            val planId = createPlan(conformance, plan)
+            val availableModules = planId.modules.filter { module ->
+                selection.selectsModule(module.testModule, module.variant, variant)
+            }
+            require(availableModules.isNotEmpty()) {
+                "No suite modules selected for ${variant.id}. Check module groups and module filters."
+            }
+            val browser = WalletConformanceBrowserAutomation(
+                config = runtime.browserAutomation,
+                adapterPublicUrl = runtime.adapterPublicUrl,
+                conformanceHost = runtime.conformanceHost,
+                conformancePort = runtime.conformancePort,
+            )
+            val moduleResults = mutableListOf<WalletVariantModuleRunResult>()
+            for (module in availableModules) {
+                moduleResults += runModule(conformance, planId.id, module, variant, browser)
+            }
+            WalletVariantRunResult(
+                variantId = variant.id,
+                variant = variant.toJsonObject(),
+                planId = planId.id,
+                status = if (moduleResults.all { it.accepted }) WalletVariantRunStatus.PASSED else WalletVariantRunStatus.FAILED,
+                modules = moduleResults,
+            )
+        } catch (error: Throwable) {
+            WalletVariantRunResult(
+                variantId = variant.id,
+                variant = variant.toJsonObject(),
+                status = WalletVariantRunStatus.FAILED,
+                error = "${error.javaClass.simpleName}: ${error.message}",
+            )
+        }
+    }
