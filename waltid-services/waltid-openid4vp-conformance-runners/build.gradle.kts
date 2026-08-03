@@ -182,19 +182,7 @@ fun registerWalletProfileTestTask(taskName: String, testFilter: String, descript
 }
 
 registerWalletProfileTestTask(
-    taskName = "vciWalletSdJwtVcDpopAuthorizationCode",
-    testFilter = "id.walt.openid4vp.conformance.VciWalletConformanceTests.vciWalletSdJwtVcDpopAuthorizationCode",
-    descriptionText = "Run the SD-JWT VC + DPoP + authorization_code VCI wallet conformance profile."
-)
-
-registerWalletProfileTestTask(
-    taskName = "vciWalletIsoMdocDpopAuthorizationCode",
-    testFilter = "id.walt.openid4vp.conformance.VciWalletConformanceTests.vciWalletIsoMdocDpopAuthorizationCode",
-    descriptionText = "Run the ISO mdoc + DPoP + authorization_code VCI wallet conformance profile."
-)
-
-registerWalletProfileTestTask(
-    taskName = "vciWalletSdJwtVcAuthorizationCodeHaipFullTarget",
-    testFilter = "id.walt.openid4vp.conformance.VciWalletConformanceTests.vciWalletSdJwtVcAuthorizationCodeHaipFullTarget",
-    descriptionText = "Run the HAIP full-target VCI wallet conformance profile."
+    taskName = "runVciWalletConformanceTests",
+    testFilter = "id.walt.openid4vp.conformance.VciWalletConformanceTests.runWalletConformanceTests",
+    descriptionText = "Run the OpenID4VCI wallet conformance matrix selected by OPENID4VCI_WALLET_CONFORMANCE_* variables."
 )
