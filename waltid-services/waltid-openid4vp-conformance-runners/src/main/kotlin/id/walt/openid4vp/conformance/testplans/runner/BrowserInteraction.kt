@@ -15,3 +15,20 @@ internal data class BrowserInteraction(
     val url: String,
     val method: String,
 )
+
+internal fun TestRunResult.browserInteractionsForAutomation(): List<BrowserInteraction> =
+    pendingBrowserInteractions().ifEmpty {
+        browser.visitedUrlsWithMethod.mapNotNull { it?.browserUrlWithMethod() } +
+            browser.visited.mapNotNull { it?.browserUrl() }
+    }
+
+internal fun TestRunResult.pendingBrowserInteractions(): List<BrowserInteraction> =
+    browser.urlsWithMethod.mapNotNull { it?.browserUrlWithMethod() }
+        .ifEmpty { browser.urls.mapNotNull { it?.browserUrl() } }
+
+internal fun TestRunResult.browserInteractionSummary(): String =
+    "urlsWithMethod=${browser.urlsWithMethod.map { it.shortJson() }}, " +
+        "urls=${browser.urls.map { it.shortJson() }}, " +
+        "visitedUrlsWithMethod=${browser.visitedUrlsWithMethod.map { it.shortJson() }}, " +
+        "visited=${browser.visited.map { it.shortJson() }}"
+
