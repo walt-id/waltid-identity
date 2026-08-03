@@ -7,7 +7,6 @@ package id.walt.wallet2.mobile
  * @property request Verifier, protocol, and transaction metadata extracted from the request.
  * @property credentialOptions Wallet-local credentials that can satisfy the presentation request.
  * @property credentialRequirements Required DCQL credential query combinations that must be satisfied before submission.
- * @property encryption Authenticated response-encryption requirements for the retained request.
  */
 public data class MobileWalletPresentationPreview(
     /** Opaque handle binding a later action to this reviewed presentation. */
@@ -15,37 +14,7 @@ public data class MobileWalletPresentationPreview(
     public val request: MobileWalletPresentationRequestInfo,
     public val credentialOptions: List<MobileWalletPresentationCredentialOption>,
     public val credentialRequirements: List<MobileWalletPresentationCredentialRequirement> = emptyList(),
-    public val encryption: MobileWalletEncryptionInfo = MobileWalletEncryptionInfo.NotRequired,
 )
-
-/** Authenticated encryption requirements for an OpenID4VP response (OID4VP 1.0 §8.3). */
-public sealed interface MobileWalletEncryptionInfo {
-    /** Whether response encryption is required. */
-    public val isRequired: Boolean
-    /** Negotiated JWE content-encryption algorithm, when required. */
-    public val contentEncryptionAlgorithm: String?
-    /** Negotiated JWE key-management algorithm, when required. */
-    public val keyManagementAlgorithm: String?
-    /** RFC 7638 thumbprint of the verifier encryption key, when required. */
-    public val verifierKeyThumbprint: String?
-
-    /** The verifier requested a cleartext response mode. */
-    public data object NotRequired : MobileWalletEncryptionInfo {
-        override val isRequired: Boolean = false
-        override val contentEncryptionAlgorithm: String? = null
-        override val keyManagementAlgorithm: String? = null
-        override val verifierKeyThumbprint: String? = null
-    }
-
-    /** The verifier requested an encrypted response with a fully negotiated JWE context. */
-    public data class Required(
-        override val contentEncryptionAlgorithm: String,
-        override val keyManagementAlgorithm: String,
-        override val verifierKeyThumbprint: String,
-    ) : MobileWalletEncryptionInfo {
-        override val isRequired: Boolean = true
-    }
-}
 
 /** Result of resolving and validating an OpenID4VP request for presentation preview. */
 public sealed interface MobileWalletPresentationPreviewResult {

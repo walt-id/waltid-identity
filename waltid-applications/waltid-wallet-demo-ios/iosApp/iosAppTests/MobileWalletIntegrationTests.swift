@@ -257,8 +257,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let previewResult = try await wallet.previewPresentation(request: presentationURL)
         let preview = try requireReadyPreview(previewResult)
         XCTAssertEqual(preview.request.responseMode, "direct_post.jwt")
-        guard case .required = preview.encryption else {
-            return XCTFail("Expected encrypted response metadata: \(preview.encryption)")
+        guard case .required = preview.request.responseEncryption else {
+            return XCTFail("Expected encrypted response metadata: \(preview.request.responseEncryption)")
         }
         XCTAssertFalse(preview.credentialOptions.isEmpty)
         XCTAssertTrue(preview.credentialOptions.allSatisfy { $0.format == "mso_mdoc" })

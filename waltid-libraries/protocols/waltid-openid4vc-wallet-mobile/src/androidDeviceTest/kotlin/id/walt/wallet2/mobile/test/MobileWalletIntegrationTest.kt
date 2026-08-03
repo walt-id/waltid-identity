@@ -14,7 +14,6 @@ import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
-import id.walt.wallet2.mobile.MobileWalletEncryptionInfo
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
@@ -165,7 +164,7 @@ class MobileWalletIntegrationTest {
         )
         val preview = client.previewPresentation(transaction.authorizationRequestUri).requireReadyPreview()
         assertEquals("direct_post.jwt", preview.request.responseMode)
-        assertIs<MobileWalletEncryptionInfo.Required>(preview.encryption)
+        assertIs<MobileWalletResponseEncryption.Required>(preview.request.responseEncryption)
         assertTrue(preview.credentialOptions.isNotEmpty())
         assertTrue(preview.credentialOptions.all { it.format == "mso_mdoc" })
 

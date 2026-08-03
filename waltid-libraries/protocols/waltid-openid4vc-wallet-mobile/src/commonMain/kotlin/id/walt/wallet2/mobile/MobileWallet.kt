@@ -415,17 +415,6 @@ public class MobileWallet internal constructor(
                         detailsJson = item.details.encodeJsonObject(),
                     )
                 }
-                val encryptionRequirements = WalletPresentationHandler
-                    .inspectEncryptionRequirements(result.authorizationRequest)
-                val encryption = if (encryptionRequirements.isEncryptionRequired) {
-                    MobileWalletEncryptionInfo.Required(
-                        contentEncryptionAlgorithm = requireNotNull(encryptionRequirements.encAlgorithm),
-                        keyManagementAlgorithm = requireNotNull(encryptionRequirements.algAlgorithm),
-                        verifierKeyThumbprint = requireNotNull(encryptionRequirements.verifierKeyThumbprint),
-                    )
-                } else {
-                    MobileWalletEncryptionInfo.NotRequired
-                }
                 MobileWalletPresentationPreviewResult.Ready(
                     MobileWalletPresentationPreview(
                         previewHandle = MobileWalletPresentationPreviewHandle(result.handle.value),
@@ -436,7 +425,6 @@ public class MobileWallet internal constructor(
                         ),
                         credentialOptions = result.credentialOptions.map { it.toMobileCredentialOption() },
                         credentialRequirements = result.credentialRequirements.map { it.toMobileCredentialRequirement() },
-                        encryption = encryption,
                     )
                 )
             }

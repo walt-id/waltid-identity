@@ -932,9 +932,6 @@ public struct PresentationPreview: Equatable, Sendable {
     /// Required DCQL credential query combinations that must be satisfied before submission.
     public let credentialRequirements: [PresentationCredentialRequirement]
 
-    /// Authenticated response-encryption requirements for the retained request.
-    public let encryption: PresentationEncryptionInfo
-
     /// Creates a presentation preview.
     ///
     /// - Parameters:
@@ -945,39 +942,17 @@ public struct PresentationPreview: Equatable, Sendable {
     ///     requested credential queries.
     ///   - credentialRequirements: Required DCQL credential query combinations
     ///     that must be satisfied before submission.
-    ///   - encryption: Authenticated response-encryption requirements for the
-    ///     retained request.
     public init(
         previewHandle: PresentationPreviewHandle,
         request: PresentationRequestInfo,
         credentialOptions: [PresentationCredentialOption],
-        credentialRequirements: [PresentationCredentialRequirement] = [],
-        encryption: PresentationEncryptionInfo = .notRequired
+        credentialRequirements: [PresentationCredentialRequirement] = []
     ) {
         self.previewHandle = previewHandle
         self.request = request
         self.credentialOptions = credentialOptions
         self.credentialRequirements = credentialRequirements
-        self.encryption = encryption
     }
-}
-
-/// Authenticated encryption requirements for an OpenID4VP response.
-public enum PresentationEncryptionInfo: Equatable, Sendable {
-    /// The authorization response does not require JWE encryption.
-    case notRequired
-
-    /// The authorization response must be encrypted for the verifier.
-    ///
-    /// - Parameters:
-    ///   - contentEncryptionAlgorithm: Negotiated JWE content-encryption algorithm.
-    ///   - keyManagementAlgorithm: Negotiated JWE key-management algorithm.
-    ///   - verifierKeyThumbprint: RFC 7638 thumbprint of the selected verifier key.
-    case required(
-        contentEncryptionAlgorithm: String,
-        keyManagementAlgorithm: String,
-        verifierKeyThumbprint: String
-    )
 }
 
 /// A required presentation credential-query combination.
