@@ -7,9 +7,14 @@ import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
-import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
+import id.walt.wallet2.persistence.keys.GeneratedPlatformKey
+import id.walt.wallet2.persistence.keys.PlatformKeyPreflight
+import id.walt.wallet2.persistence.keys.PlatformKeyProvider
+import id.walt.wallet2.persistence.keys.PlatformKeyRequest
+import id.walt.wallet2.persistence.stores.MobileWalletKeyRecord
+import id.walt.wallet2.persistence.stores.MobileWalletKeyStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlin.test.Test
@@ -84,7 +89,7 @@ class MobileWalletPersistenceSnippetsTest {
                     dids = appDidStore,
                     keys = MobileWalletKeys(
                         store = appKeyStore,
-                        generate = { keyType -> appKeyProvider.generateKey(keyType) }
+                        provider = appKeyProvider,
                     )
                 )
             )
@@ -128,18 +133,31 @@ private val appDidStore = object : WalletDidStore {
     override suspend fun removeDid(did: String): Boolean = false
 }
 
-private val appKeyStore = object : WalletKeyStore {
+private val appKeyStore = object : MobileWalletKeyStore {
     override suspend fun getKey(keyId: String): Key? = null
 
     override suspend fun listKeys(): Flow<WalletKeyInfo> = emptyFlow()
 
+    override suspend fun listKeyRecords(): Flow<MobileWalletKeyRecord> = emptyFlow()
+
     override suspend fun addKey(key: Key): String = key.getKeyId()
+
+    override suspend fun addKey(key: Key, record: MobileWalletKeyRecord): String = record.keyId
 
     override suspend fun removeKey(keyId: String): Boolean = false
 }
 
-private object appKeyProvider {
-    suspend fun generateKey(keyType: KeyType): Key {
-        error("Replace with app-owned key generation for $keyType")
-    }
+private object appKeyProvider : PlatformKeyProvider {
+    override suspend fun preflight(request: PlatformKeyRequest) = PlatformKeyPreflight(false)
+
+    override suspend fun generate(request: PlatformKeyRequest): GeneratedPlatformKey =
+        error("Replace with app-owned key generation for ${request.keyType}")
+
+    override suspend fun load(record: MobileWalletKeyRecord): Key? = null
+
+    override suspend fun delete(record: MobileWalletKeyRecord): Boolean = false
+
+    override suspend fun loadSoftwareKey(keyId: String, keyType: KeyType, jwkMaterial: ByteArray): Key? = null
+
+    override suspend fun exportSoftwareKeyMaterial(key: Key): ByteArray = error("not used")
 }

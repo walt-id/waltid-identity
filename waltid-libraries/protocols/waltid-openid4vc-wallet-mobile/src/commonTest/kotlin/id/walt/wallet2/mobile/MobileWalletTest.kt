@@ -14,13 +14,15 @@ import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
-import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
-import id.walt.wallet2.persistence.keys.PlatformKeyCapability
-import id.walt.wallet2.persistence.keys.PlatformKeyGenerationRequest
-import id.walt.wallet2.persistence.keys.PlatformKeyPlatform
+import id.walt.wallet2.persistence.keys.GeneratedPlatformKey
+import id.walt.wallet2.persistence.keys.PlatformKeyPreflight
+import id.walt.wallet2.persistence.keys.PlatformKeyProvider
+import id.walt.wallet2.persistence.keys.PlatformKeyRequest
+import id.walt.wallet2.persistence.stores.MobileWalletKeyRecord
+import id.walt.wallet2.persistence.stores.MobileWalletKeyStore
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -92,22 +94,13 @@ class MobileWalletTest {
             keyStore = keyStore,
             didStore = EmptyDidStore(),
             credentialStore = RecordingCredentialStore(),
-            keyGenerator = { _: PlatformKeyGenerationRequest ->
-                generationCalls++
-                error("Unsupported protected requests must not generate a key")
-            },
-            keyCapability = { keyType, policy ->
-                PlatformKeyCapability(
-                    platform = PlatformKeyPlatform.Custom,
-                    keyType = keyType,
-                    keyUseAuthorizationPolicy = policy,
+            keyProvider = TestProvider(
+                preflight = PlatformKeyPreflight(
                     supported = false,
-                    platformBackingAvailable = false,
-                    secureHardwareRequired = false,
-                    secureHardwareAvailable = null,
                     failure = KeyUseAuthorizationFailure.UnsupportedCombination,
-                )
-            },
+                ),
+                onGenerate = { generationCalls++ },
+            ),
         )
 
         val failure = assertFailsWith<KeyUseAuthorizationException> {
@@ -128,32 +121,24 @@ class MobileWalletTest {
             keyStore = keyStore,
             didStore = EmptyDidStore(),
             credentialStore = RecordingCredentialStore(),
-            keyGenerator = { _: PlatformKeyGenerationRequest ->
-                generationCalls++
-                error("Unsupported persistence must be rejected before key generation")
-            },
-            keyCapability = { keyType, policy ->
-                PlatformKeyCapability(
-                    platform = PlatformKeyPlatform.Custom,
-                    keyType = keyType,
-                    keyUseAuthorizationPolicy = policy,
-                    supported = true,
-                    platformBackingAvailable = true,
-                    secureHardwareRequired = false,
-                    secureHardwareAvailable = null,
-                )
-            },
+            keyProvider = TestProvider(
+                preflight = PlatformKeyPreflight(
+                    supported = false,
+                    failure = KeyUseAuthorizationFailure.UnsupportedCombination,
+                ),
+                onGenerate = { generationCalls++ },
+            ),
         )
 
-        val capability = wallet.keyUseAuthorizationCapability(
+        val preflight = wallet.keyUseAuthorizationPreflight(
             keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
         )
         val failure = assertFailsWith<KeyUseAuthorizationException> {
             wallet.bootstrap(keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet)
         }
 
-        assertFalse(capability.supported)
-        assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, capability.failure)
+        assertFalse(preflight.supported)
+        assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, preflight.failure)
         assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, failure.failure)
         assertEquals(0, generationCalls)
         assertEquals(0, keyStore.addKeyCalls)
@@ -161,11 +146,9 @@ class MobileWalletTest {
 
     @Test
     fun changingDefaultDoesNotReclassifyOrReplaceExistingKey() = runTest {
-        val existing = WalletKeyInfo(
+        val existing = MobileWalletKeyRecord(
             keyId = "existing-key",
-            keyType = KeyType.secp256r1.name,
-            requestedKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
-            effectiveKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+            keyType = KeyType.secp256r1,
             isPlatformBacked = true,
         )
         val wallet = MobileWallet(
@@ -173,12 +156,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(existing),
             didStore = PreloadedDidStore(WalletDidEntry("did:key:existing", JsonObject(emptyMap()))),
             credentialStore = RecordingCredentialStore(),
-            keyGenerator = { _: PlatformKeyGenerationRequest ->
-                error("An existing wallet must not generate replacement key material")
-            },
-            keyCapability = { _, _ ->
-                error("An existing wallet must not preflight a replacement key")
-            },
+            keyProvider = TestProvider(onPreflight = { error("An existing wallet must not preflight a replacement key") }),
             defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
         )
 
@@ -186,8 +164,7 @@ class MobileWalletTest {
         val persisted = wallet.keys().single()
 
         assertEquals("existing-key", bootstrap.keyId)
-        assertEquals(KeyUseAuthorizationPolicy.None, persisted.requestedKeyUseAuthorizationPolicy)
-        assertEquals(KeyUseAuthorizationPolicy.None, persisted.effectiveKeyUseAuthorizationPolicy)
+        assertEquals(KeyUseAuthorizationPolicy.None, persisted.keyUseAuthorizationPolicy)
     }
 
     @Test
@@ -209,13 +186,13 @@ class MobileWalletTest {
 
     @Test
     fun persistenceCanCombineProvidedDatabaseKeyWithIndependentStoreOverrides() {
-        val keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1"))
+        val keyStore = PreloadedKeyStore(record("custom-key"))
         val didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap())))
         val credentialStore = RecordingCredentialStore()
         val databaseKeyProvider = RecordingDatabaseKeyProvider()
         val keys = MobileWalletKeys(
             store = keyStore,
-            generate = { error("Existing custom-store wallets should not generate a new key") },
+            provider = TestProvider(onPreflight = { error("Existing custom-store wallets should not preflight") }),
         )
 
         val persistence = MobileWalletPersistence(
@@ -231,37 +208,37 @@ class MobileWalletTest {
         assertSame(credentialStore, persistence.stores.credentials)
         assertSame(didStore, persistence.stores.dids)
         assertSame(keyStore, persistence.stores.keys?.store)
-        assertSame(keys.generate, persistence.stores.keys?.generate)
+        assertSame(keys.provider, persistence.stores.keys?.provider)
     }
 
     @Test
     fun walletCanUseInjectedStoresAndAtomicKeyConfiguration() = runTest {
-        val keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1"))
+        val keyStore = PreloadedKeyStore(record("custom-key"))
         val didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap())))
         val credentialStore = RecordingCredentialStore()
         val keys = MobileWalletKeys(
             store = keyStore,
-            generate = { error("Existing custom-store wallets should not generate a new key") },
+            provider = TestProvider(onPreflight = { error("Existing custom-store wallets should not preflight") }),
         )
         val wallet = MobileWallet(
             walletId = "custom-wallet",
             keyStore = keys.store,
             didStore = didStore,
             credentialStore = credentialStore,
-            keyGenerator = keys.generate,
+            keyProvider = keys.provider,
         )
 
         val bootstrap = wallet.bootstrap()
 
         assertEquals("custom-key", bootstrap.keyId)
         assertEquals("did:key:custom", bootstrap.did)
-        assertEquals(1, keyStore.listKeysCalls)
+        assertEquals(1, keyStore.listKeyRecordsCalls)
         assertEquals(1, didStore.listDidsCalls)
     }
 
     @Test
     fun deleteWalletRemovesEntriesFromActiveStores() = runTest {
-        val keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1"))
+        val keyStore = PreloadedKeyStore(record("custom-key"))
         val didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap())))
         val credentialStore = RecordingCredentialStore()
         val wallet = MobileWallet(
@@ -269,7 +246,7 @@ class MobileWalletTest {
             keyStore = keyStore,
             didStore = didStore,
             credentialStore = credentialStore,
-            keyGenerator = { error("deleteWallet should not generate a key") },
+            keyProvider = TestProvider(),
         )
 
         wallet.deleteWallet()
@@ -456,10 +433,10 @@ class MobileWalletTest {
         )
         val wallet = MobileWallet(
             walletId = "custom-wallet",
-            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            keyStore = PreloadedKeyStore(record("custom-key")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            keyGenerator = { error("Injected credential listing should not generate a key") },
+            keyProvider = TestProvider(),
         )
 
         val credential = wallet.credentials().single()
@@ -484,10 +461,10 @@ class MobileWalletTest {
         )
         val wallet = MobileWallet(
             walletId = "custom-wallet",
-            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            keyStore = PreloadedKeyStore(record("custom-key")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            keyGenerator = { error("Injected credential listing should not generate a key") },
+            keyProvider = TestProvider(),
         )
 
         val displayData = displayJson.parseToJsonElement(wallet.credentials().single().credentialDataJson).jsonObject
@@ -626,6 +603,41 @@ class MobileWalletTest {
         isLenient = true
     }
 
+    private fun record(keyId: String) = MobileWalletKeyRecord(
+        keyId = keyId,
+        keyType = KeyType.secp256r1,
+        isPlatformBacked = true,
+    )
+
+    private class TestProvider(
+        private val preflight: PlatformKeyPreflight = PlatformKeyPreflight(true),
+        private val onGenerate: () -> Unit = {},
+        private val onPreflight: suspend () -> Unit = {},
+    ) : PlatformKeyProvider {
+        override suspend fun preflight(request: PlatformKeyRequest): PlatformKeyPreflight {
+            onPreflight()
+            return preflight
+        }
+
+        override suspend fun generate(request: PlatformKeyRequest): GeneratedPlatformKey {
+            onGenerate()
+            error("Test provider generation is not configured")
+        }
+
+        override suspend fun load(record: MobileWalletKeyRecord): id.walt.crypto.keys.Key? = null
+
+        override suspend fun delete(record: MobileWalletKeyRecord): Boolean = true
+
+        override suspend fun loadSoftwareKey(
+            keyId: String,
+            keyType: KeyType,
+            jwkMaterial: ByteArray,
+        ): id.walt.crypto.keys.Key? = null
+
+        override suspend fun exportSoftwareKeyMaterial(key: id.walt.crypto.keys.Key): ByteArray =
+            error("Test provider software export is not configured")
+    }
+
     private class RecordingDatabaseKeyProvider : DatabaseEncryptionKeyProvider {
         override suspend fun getOrCreateKey(walletId: String, databaseName: String): DatabaseEncryptionKey =
             DatabaseEncryptionKey("$walletId:$databaseName", ByteArray(32))
@@ -633,18 +645,25 @@ class MobileWalletTest {
         override suspend fun deleteKey(walletId: String, databaseName: String) = Unit
     }
 
-    private class PreloadedKeyStore(private val keyInfo: WalletKeyInfo) : WalletKeyStore {
-        var listKeysCalls = 0
+    private class PreloadedKeyStore(private val record: MobileWalletKeyRecord) : MobileWalletKeyStore {
+        var listKeyRecordsCalls = 0
         val removedKeyIds = mutableListOf<String>()
 
         override suspend fun getKey(keyId: String) = null
 
         override suspend fun listKeys(): Flow<WalletKeyInfo> {
-            listKeysCalls++
-            return listOf(keyInfo).asFlow()
+            return listOf(WalletKeyInfo(record.keyId, record.keyType.name)).asFlow()
+        }
+
+        override suspend fun listKeyRecords(): Flow<MobileWalletKeyRecord> {
+            listKeyRecordsCalls++
+            return listOf(record).asFlow()
         }
 
         override suspend fun addKey(key: id.walt.crypto.keys.Key): String =
+            error("Preloaded test key store should not add keys")
+
+        override suspend fun addKey(key: id.walt.crypto.keys.Key, record: MobileWalletKeyRecord): String =
             error("Preloaded test key store should not add keys")
 
         override suspend fun removeKey(keyId: String): Boolean {
@@ -653,16 +672,23 @@ class MobileWalletTest {
         }
     }
 
-    private class EmptyKeyStore : WalletKeyStore {
+    private class EmptyKeyStore : MobileWalletKeyStore {
         var addKeyCalls = 0
 
         override suspend fun getKey(keyId: String) = null
 
         override suspend fun listKeys(): Flow<WalletKeyInfo> = emptyList<WalletKeyInfo>().asFlow()
 
+        override suspend fun listKeyRecords(): Flow<MobileWalletKeyRecord> = emptyList<MobileWalletKeyRecord>().asFlow()
+
         override suspend fun addKey(key: id.walt.crypto.keys.Key): String {
             addKeyCalls++
             return key.getKeyId()
+        }
+
+        override suspend fun addKey(key: id.walt.crypto.keys.Key, record: MobileWalletKeyRecord): String {
+            addKeyCalls++
+            return record.keyId
         }
 
         override suspend fun removeKey(keyId: String): Boolean = false

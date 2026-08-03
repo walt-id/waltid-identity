@@ -50,9 +50,9 @@ val config = MobileWalletConfig(
     )
 )
 val wallet = MobileWalletFactory(activity).create(config)
-val capability = wallet.keyUseAuthorizationCapability()
+val preflight = wallet.keyUseAuthorizationPreflight()
 
-if (capability.supported) {
+if (preflight.supported) {
     wallet.bootstrap()
 }
 ```
@@ -68,14 +68,13 @@ instance, use `MobileWalletFactory(applicationContext) { activityTracker.current
 so protected operations resolve the current prompt host after configuration changes.
 
 This setting applies only when a key is created. It does not reclassify, replace, or rotate an existing
-key. Inspect `wallet.keys()` for each key's requested and effective policy and effective hardware
-backing when the platform can report it reliably. Changing the default affects future keys only.
+key. Inspect `wallet.keys()` for each key's immutable policy and whether its private material is
+platform-backed. Changing the default affects future keys only.
 
 The operating system owns the biometric prompt; the SDK adds no custom biometric UI and accepts no
-device-passcode fallback. Authentication is required for each signing operation. With the currently
-pinned Signum version, Android cancellation, lockout, and some prompt errors are intentionally exposed
-as the stable `AuthorizationFailed` outcome because they cannot be distinguished without parsing
-unstable messages. No failed authorization is retried with an unprotected key.
+device-passcode fallback. Authentication is required for each signing operation. Android cancellation,
+lockout, and other incomplete prompt outcomes are exposed as the stable `AuthorizationNotCompleted`
+result. No failed authorization is retried with an unprotected key.
 
 Key-use authorization is separate from wallet launch or app unlock. Platform biometrics and secure
 key storage alone do not establish WSCD, LoA High, ISO 18045, EUDI, or HAIP certification.
@@ -189,13 +188,11 @@ val config = MobileWalletConfig(
 ```
 <!-- doc-snippet:end kotlin-custom-credential-store -->
 
-KMP consumers can override all wallet stores. Key storage and key generation are configured together
-so platform-managed signing keys cannot be accidentally mixed with app-owned key persistence. The
-legacy `(KeyType) -> Key` generator supports `None` only; protected requests require an
-authorization-aware request generator and capability implementation and are never inferred from the
-legacy callback. A custom key store must also override `supportsKeyUseAuthorizationMetadata` and the
-metadata-aware `addKey` overload only after it preserves and enforces the requested policy; otherwise
-protected bootstrap fails before generating a key:
+KMP consumers can override all wallet stores. Mobile key storage and provider operations are configured
+together so platform-managed signing keys cannot be accidentally mixed with app-owned persistence.
+The provider receives the exact key request, preflights it, and returns the immutable policy and
+platform-backed status that the store persists. Protected bootstrap fails before generation when the
+provider cannot enforce the request:
 
 <!-- doc-snippet:start kotlin-full-store-overrides -->
 ```kotlin
@@ -207,7 +204,7 @@ val config = MobileWalletConfig(
             dids = appDidStore,
             keys = MobileWalletKeys(
                 store = appKeyStore,
-                generate = { keyType -> appKeyProvider.generateKey(keyType) }
+                provider = appKeyProvider,
             )
         )
     )

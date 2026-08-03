@@ -3,8 +3,6 @@
 package id.walt.wallet2.mobile
 
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.KeyUseAuthorizationAware
 import id.walt.crypto.keys.KeyUseAuthorizationException
 import id.walt.crypto.keys.KeyUseAuthorizationFailure
 import id.walt.crypto.keys.KeyUseAuthorizationPolicy
@@ -16,8 +14,6 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.data.WalletKeyStore
-import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.PresentationCredentialOption
@@ -34,9 +30,11 @@ import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
-import id.walt.wallet2.persistence.keys.PlatformKeyCapability
-import id.walt.wallet2.persistence.keys.PlatformKeyGenerationRequest
-import id.walt.wallet2.persistence.keys.PlatformKeyPlatform
+import id.walt.wallet2.persistence.keys.PlatformKeyPreflight
+import id.walt.wallet2.persistence.keys.PlatformKeyProvider
+import id.walt.wallet2.persistence.keys.PlatformKeyRequest
+import id.walt.wallet2.persistence.stores.MobileWalletKeyRecord
+import id.walt.wallet2.persistence.stores.MobileWalletKeyStore
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
@@ -169,11 +167,10 @@ public data class WalletAttestationConfig(
  */
 public class MobileWallet internal constructor(
     walletId: String,
-    private val keyStore: WalletKeyStore,
+    private val keyStore: MobileWalletKeyStore,
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
-    private val keyGenerator: suspend (PlatformKeyGenerationRequest) -> Key,
-    private val keyCapability: suspend (KeyType, KeyUseAuthorizationPolicy) -> PlatformKeyCapability,
+    private val keyProvider: PlatformKeyProvider,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     private val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
     attestationConfig: WalletAttestationConfig? = null,
@@ -182,52 +179,6 @@ public class MobileWallet internal constructor(
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {
-    /** Source-compatible constructor for existing unprotected custom key generators. */
-    internal constructor(
-        walletId: String,
-        keyStore: WalletKeyStore,
-        didStore: WalletDidStore,
-        credentialStore: WalletCredentialStore,
-        keyGenerator: suspend (KeyType) -> Key,
-        defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
-        attestationConfig: WalletAttestationConfig? = null,
-        transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
-        onEvent: suspend (MobileWalletEvent) -> Unit = {},
-        deleteLocalPersistence: suspend () -> Unit = {},
-    ) : this(
-        walletId = walletId,
-        keyStore = keyStore,
-        didStore = didStore,
-        credentialStore = credentialStore,
-        keyGenerator = { request ->
-            if (request.keyUseAuthorizationPolicy != KeyUseAuthorizationPolicy.None) {
-                throw KeyUseAuthorizationException(
-                    failure = KeyUseAuthorizationFailure.UnsupportedCombination,
-                    message = "The legacy key generator cannot enforce protected key-use authorization",
-                )
-            }
-            keyGenerator(request.keyType)
-        },
-        keyCapability = { keyType, policy ->
-            PlatformKeyCapability(
-                platform = PlatformKeyPlatform.Custom,
-                keyType = keyType,
-                keyUseAuthorizationPolicy = policy,
-                supported = policy == KeyUseAuthorizationPolicy.None,
-                platformBackingAvailable = false,
-                secureHardwareRequired = false,
-                secureHardwareAvailable = null,
-                failure = KeyUseAuthorizationFailure.UnsupportedCombination
-                    .takeIf { policy != KeyUseAuthorizationPolicy.None },
-            )
-        },
-        defaultKeyType = defaultKeyType,
-        attestationConfig = attestationConfig,
-        transactionDataProfiles = transactionDataProfiles,
-        onEvent = onEvent,
-        deleteLocalPersistence = deleteLocalPersistence,
-    )
-
     private val eventStream = MobileWalletEventStream()
 
     /**
@@ -271,7 +222,7 @@ public class MobileWallet internal constructor(
     ): MobileWalletBootstrapResult {
         val existingDids = didStore.listDids().toList()
         if (existingDids.isNotEmpty()) {
-            val existingKeys = keyStore.listKeys().toList()
+            val existingKeys = keyStore.listKeyRecords().toList()
             require(existingKeys.isNotEmpty()) {
                 "Wallet '${wallet.id}' has persisted DIDs but no persisted keys"
             }
@@ -283,82 +234,83 @@ public class MobileWallet internal constructor(
 
         val effectiveKeyType = keyType ?: defaultKeyType
         val effectiveAuthorizationPolicy = keyUseAuthorizationPolicy ?: defaultKeyUseAuthorizationPolicy
-        val capability = keyUseAuthorizationCapability(effectiveKeyType, effectiveAuthorizationPolicy)
-        if (!capability.supported) {
+        val request = PlatformKeyRequest(
+            keyType = effectiveKeyType.toKeyType(),
+            keyUseAuthorizationPolicy = effectiveAuthorizationPolicy,
+        )
+        val preflight = keyProvider.preflight(request)
+        if (!preflight.supported) {
             throw KeyUseAuthorizationException(
-                failure = capability.failure ?: KeyUseAuthorizationFailure.UnsupportedCombination,
-                message = "The active key generator cannot enforce $effectiveAuthorizationPolicy for $effectiveKeyType",
+                failure = preflight.failure ?: KeyUseAuthorizationFailure.UnsupportedCombination,
+                message = "The active key provider cannot enforce $effectiveAuthorizationPolicy for $effectiveKeyType",
             )
         }
-        val key = keyGenerator(
-            PlatformKeyGenerationRequest(
-                keyType = effectiveKeyType.toKeyType(),
-                keyUseAuthorizationPolicy = effectiveAuthorizationPolicy,
-            )
-        )
-        val authorizationAware = key as? KeyUseAuthorizationAware
-        if (
-            effectiveAuthorizationPolicy != KeyUseAuthorizationPolicy.None &&
-            (
-                authorizationAware == null ||
-                    authorizationAware.keyUseAuthorizationPolicy != effectiveAuthorizationPolicy ||
-                    !authorizationAware.isPlatformBacked
+        val generated = keyProvider.generate(request)
+        val key = generated.key
+        val record = generated.record
+        validateGeneratedKey(request, key, record)
+
+        return try {
+            val didResult = registerDidByKey(didMethod, key)
+            val keyId = keyStore.addKey(key, record)
+            didStore.addDid(
+                WalletDidEntry(
+                    did = didResult.did,
+                    document = didResult.didDocument.toJsonObject(),
                 )
-        ) {
-            runCatching { key.deleteKey() }
-            throw KeyUseAuthorizationException(
-                failure = KeyUseAuthorizationFailure.UnsupportedCombination,
-                message = "The generated key does not enforce the requested protected key-use authorization policy",
             )
-        }
-        val keyId = keyStore.addKey(
-            key,
-            WalletKeyInfo(
-                keyId = key.getKeyId(),
-                keyType = key.keyType.name,
-                requestedKeyUseAuthorizationPolicy = effectiveAuthorizationPolicy,
-                effectiveKeyUseAuthorizationPolicy =
-                    authorizationAware?.keyUseAuthorizationPolicy ?: effectiveAuthorizationPolicy,
-                isPlatformBacked = authorizationAware?.isPlatformBacked ?: capability.platformBackingAvailable,
-                effectiveHardwareBacking = authorizationAware?.effectiveHardwareBacking()
-                    ?: capability.effectiveHardwareBacking,
-            )
-        )
-        val didResult = registerDidByKey(didMethod, key)
 
-        didStore.addDid(
-            WalletDidEntry(
+            MobileWalletBootstrapResult(
+                keyId = keyId,
                 did = didResult.did,
-                document = didResult.didDocument.toJsonObject(),
             )
-        )
-
-        return MobileWalletBootstrapResult(
-            keyId = keyId,
-            did = didResult.did,
-        )
+        } catch (original: Throwable) {
+            runCatching { keyStore.removeKey(record.keyId) }
+                .exceptionOrNull()
+                ?.let(original::addSuppressed)
+            runCatching { keyProvider.delete(record) }
+                .exceptionOrNull()
+                ?.let(original::addSuppressed)
+            throw original
+        }
     }
 
     /** Returns non-secret metadata for persisted wallet signing keys. */
-    public suspend fun keys(): List<WalletKeyInfo> = keyStore.listKeys().toList()
+    public suspend fun keys(): List<MobileWalletKeyRecord> = keyStore.listKeyRecords().toList()
 
-    /** Preflights whether this wallet's active key generator can enforce [keyUseAuthorizationPolicy]. */
-    public suspend fun keyUseAuthorizationCapability(
+    /** Preflights whether this wallet's active key provider can enforce an exact request. */
+    public suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType = defaultKeyType,
         keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy,
-    ): PlatformKeyCapability {
-        val capability = keyCapability(keyType.toKeyType(), keyUseAuthorizationPolicy)
-        return if (
-            keyUseAuthorizationPolicy != KeyUseAuthorizationPolicy.None &&
-            capability.supported &&
-            !keyStore.supportsKeyUseAuthorizationMetadata
-        ) {
-            capability.copy(
-                supported = false,
-                failure = KeyUseAuthorizationFailure.UnsupportedCombination,
+    ): PlatformKeyPreflight = keyProvider.preflight(
+        PlatformKeyRequest(
+            keyType = keyType.toKeyType(),
+            keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
+        )
+    )
+
+    private suspend fun validateGeneratedKey(
+        request: PlatformKeyRequest,
+        key: Key,
+        record: MobileWalletKeyRecord,
+    ) {
+        if (record.keyId != key.getKeyId() || record.keyType != key.keyType) {
+            throw KeyUseAuthorizationException(
+                failure = KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
+                message = "The key provider returned inconsistent key metadata",
             )
-        } else {
-            capability
+        }
+        if (record.keyUseAuthorizationPolicy != request.keyUseAuthorizationPolicy) {
+            throw KeyUseAuthorizationException(
+                failure = KeyUseAuthorizationFailure.UnsupportedCombination,
+                message = "The generated key does not enforce the requested authorization policy",
+            )
+        }
+        if (request.keyUseAuthorizationPolicy != KeyUseAuthorizationPolicy.None && !record.isPlatformBacked) {
+            throw KeyUseAuthorizationException(
+                failure = KeyUseAuthorizationFailure.UnsupportedCombination,
+                message = "Protected keys must be platform-backed",
+            )
         }
     }
 
@@ -608,7 +560,7 @@ public class MobileWallet internal constructor(
     public suspend fun deleteWallet() {
         WalletIssuanceHandler.clearPreviews(wallet)
         WalletPresentationHandler.clearPreviews(wallet)
-        keyStore.listKeys().toList().forEach { key ->
+        keyStore.listKeyRecords().toList().forEach { key ->
             keyStore.removeKey(key.keyId)
         }
         credentialStore.listCredentials().toList().forEach { credential ->

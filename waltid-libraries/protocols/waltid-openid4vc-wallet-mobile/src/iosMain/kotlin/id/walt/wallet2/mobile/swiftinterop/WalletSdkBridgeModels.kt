@@ -4,7 +4,6 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyHardwareBacking
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -16,8 +15,6 @@ import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.data.WalletKeyInfo
-import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.handlers.PreviewSessionException
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
@@ -30,7 +27,12 @@ import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
-import id.walt.wallet2.persistence.keys.PlatformKeyCapability
+import id.walt.wallet2.persistence.keys.GeneratedPlatformKey
+import id.walt.wallet2.persistence.keys.PlatformKeyPreflight
+import id.walt.wallet2.persistence.keys.PlatformKeyProvider
+import id.walt.wallet2.persistence.keys.PlatformKeyRequest
+import id.walt.wallet2.persistence.stores.MobileWalletKeyRecord
+import id.walt.wallet2.persistence.stores.MobileWalletKeyStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
@@ -262,21 +264,16 @@ public interface WalletBridgeDidStore {
  * @property keyId Stable wallet-local key identifier.
  * @property keyType Wallet key type name.
  * @property algorithm Optional signing algorithm label supplied by Swift.
- * @property requestedKeyUseAuthorizationPolicy Policy requested when the key was created.
- * @property effectiveKeyUseAuthorizationPolicy Policy enforced by the restored key.
+ * @property keyUseAuthorizationPolicy Immutable policy enforced by the stored key.
  * @property isPlatformBacked Whether the private key is held by a platform key store.
- * @property effectiveHardwareBacking Effective hardware backing when reliably determined.
  */
 public data class WalletBridgeKeyInfo(
     public val keyId: String,
     public val keyType: String,
     public val algorithm: String? = null,
-    public val requestedKeyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy =
-        WalletBridgeKeyUseAuthorizationPolicy.None,
-    public val effectiveKeyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy =
+    public val keyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy =
         WalletBridgeKeyUseAuthorizationPolicy.None,
     public val isPlatformBacked: Boolean = false,
-    public val effectiveHardwareBacking: String? = null,
 )
 
 /**
@@ -292,6 +289,9 @@ public data class WalletBridgeStoredKey(
     public val keyType: String,
     public val algorithm: String? = null,
     public val serializedKeyJson: String,
+    public val keyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy =
+        WalletBridgeKeyUseAuthorizationPolicy.None,
+    public val isPlatformBacked: Boolean = false,
 ) {
     /**
      * Text representation that redacts serialized key material.
@@ -307,7 +307,7 @@ public data class WalletBridgeStoredKey(
  * app-owned key domain.
  *
  * @property store Swift-provided signing-key store.
- * @property generate Swift-provided signing-key generator.
+ * @property generate Swift-provided exact key generator.
  */
 public data class WalletBridgeKeys(
     public val store: WalletBridgeKeyStore,
@@ -348,33 +348,27 @@ public interface WalletBridgeKeyStore {
  */
 public interface WalletBridgeKeyGenerator {
     /**
-     * Generates a serialized signing key for [keyType].
+     * Generates a serialized signing key for the exact request.
      */
-    public suspend fun generateKey(keyType: MobileWalletKeyType): WalletBridgeStoredKey
+    public suspend fun generateKey(request: WalletBridgeKeyRequest): WalletBridgeStoredKey
 }
 
+/** Exact Swift custom-provider key request. */
+public data class WalletBridgeKeyRequest(
+    public val keyType: MobileWalletKeyType,
+    public val keyId: String? = null,
+    public val keyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy =
+        WalletBridgeKeyUseAuthorizationPolicy.None,
+)
+
 /**
- * Swift-facing platform key capability result.
+ * Swift-facing exact platform-key preflight result.
  *
- * @property platform Mobile platform that evaluated the request.
- * @property keyType Requested signing-key type.
- * @property keyUseAuthorizationPolicy Requested immutable key-use authorization policy.
  * @property supported Whether this exact request can be enforced without fallback.
- * @property platformBackingAvailable Whether platform-backed key storage is available.
- * @property secureHardwareRequired Whether the request requires secure hardware backing.
- * @property secureHardwareAvailable Whether required secure hardware availability is known on this device.
- * @property effectiveHardwareBacking Effective backing when it can be determined from platform key information.
  * @property failure Stable reason the request is unsupported, or `null` when supported.
  */
-public data class WalletBridgeKeyCapability(
-    public val platform: String,
-    public val keyType: MobileWalletKeyType,
-    public val keyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy,
+public data class WalletBridgeKeyPreflight(
     public val supported: Boolean,
-    public val platformBackingAvailable: Boolean,
-    public val secureHardwareRequired: Boolean,
-    public val secureHardwareAvailable: Boolean?,
-    public val effectiveHardwareBacking: String? = null,
     public val failure: WalletBridgeKeyUseAuthorizationFailure? = null,
 )
 
@@ -384,9 +378,9 @@ public enum class WalletBridgeKeyUseAuthorizationFailure {
     BiometricUnavailable,
     BiometricNotEnrolled,
     InteractionContextUnavailable,
-    AuthorizationFailed,
-    ProtectedKeyInvalidated,
-    ProtectedKeyMissing,
+    AuthorizationNotCompleted,
+    ProtectedKeyUnavailable,
+    InvalidStoredKeyMetadata,
 }
 
 private fun WalletBridgePersistence.toMobileWalletPersistence(
@@ -467,18 +461,23 @@ private class BridgeDidStore(
 
 private class BridgeKeyStore(
     private val bridgeStore: WalletBridgeKeyStore,
-) : WalletKeyStore {
+) : MobileWalletKeyStore {
     override suspend fun getKey(keyId: String): Key? =
         bridgeStore.getKey(keyId)?.toKey()
 
-    override suspend fun listKeys(): Flow<WalletKeyInfo> =
-        bridgeStore.listKeys().map { it.toWalletKeyInfo() }.asFlow()
+    override suspend fun listKeys(): Flow<id.walt.wallet2.data.WalletKeyInfo> =
+        bridgeStore.listKeys().map {
+            id.walt.wallet2.data.WalletKeyInfo(keyId = it.keyId, keyType = it.keyType, algorithm = it.algorithm)
+        }.asFlow()
+
+    override suspend fun listKeyRecords(): Flow<MobileWalletKeyRecord> =
+        bridgeStore.listKeys().map { it.toMobileWalletKeyRecord() }.asFlow()
 
     override suspend fun addKey(key: Key): String =
         bridgeStore.addKey(key.toBridgeStoredKey())
 
-    override suspend fun addKey(key: Key, keyInfo: WalletKeyInfo): String =
-        bridgeStore.addKey(key.toBridgeStoredKey(keyInfo))
+    override suspend fun addKey(key: Key, record: MobileWalletKeyRecord): String =
+        bridgeStore.addKey(key.toBridgeStoredKey(record))
 
     override suspend fun removeKey(keyId: String): Boolean =
         bridgeStore.removeKey(keyId)
@@ -486,18 +485,72 @@ private class BridgeKeyStore(
 
 private fun WalletBridgeKeys.toMobileWalletKeys() = MobileWalletKeys(
     store = BridgeKeyStore(store),
-    generate = { keyType -> generate.generateKey(keyType.toMobileWalletKeyType()).toKey() },
+    provider = BridgeKeyProvider(store, generate),
 )
 
-internal fun PlatformKeyCapability.toBridgeKeyCapability() = WalletBridgeKeyCapability(
-    platform = platform.name,
-    keyType = keyType.toMobileWalletKeyType(),
-    keyUseAuthorizationPolicy = keyUseAuthorizationPolicy.toBridgeKeyUseAuthorizationPolicy(),
+private class BridgeKeyProvider(
+    private val bridgeStore: WalletBridgeKeyStore,
+    private val generator: WalletBridgeKeyGenerator,
+) : PlatformKeyProvider {
+    override suspend fun preflight(request: PlatformKeyRequest): PlatformKeyPreflight {
+        val supported = request.keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.None
+        return PlatformKeyPreflight(
+            supported = supported,
+            failure = KeyUseAuthorizationFailure.UnsupportedCombination.takeUnless { supported },
+        )
+    }
+
+    override suspend fun generate(request: PlatformKeyRequest): GeneratedPlatformKey {
+        val preflight = preflight(request)
+        if (!preflight.supported) {
+            throw KeyUseAuthorizationException(
+                failure = preflight.failure ?: KeyUseAuthorizationFailure.UnsupportedCombination,
+                message = "The Swift custom key provider cannot enforce ${request.keyUseAuthorizationPolicy}",
+            )
+        }
+        val stored = generator.generateKey(
+            WalletBridgeKeyRequest(
+                keyType = request.keyType.toMobileWalletKeyType(),
+                keyId = request.keyId,
+                keyUseAuthorizationPolicy = request.keyUseAuthorizationPolicy.toBridgeKeyUseAuthorizationPolicy(),
+            )
+        )
+        val key = stored.toKey()
+        val keyId = key.getKeyId()
+        require(stored.keyId == keyId) { "Swift key generator returned inconsistent key identifier" }
+        return GeneratedPlatformKey(
+            key = key,
+            record = MobileWalletKeyRecord(
+                keyId = keyId,
+                keyType = key.keyType,
+                keyUseAuthorizationPolicy = request.keyUseAuthorizationPolicy,
+                isPlatformBacked = stored.isPlatformBacked,
+            ),
+        )
+    }
+
+    override suspend fun load(record: MobileWalletKeyRecord): Key? =
+        bridgeStore.getKey(record.keyId)?.toKey()
+
+    override suspend fun delete(record: MobileWalletKeyRecord): Boolean =
+        bridgeStore.removeKey(record.keyId)
+
+    override suspend fun loadSoftwareKey(keyId: String, keyType: KeyType, jwkMaterial: ByteArray): Key? =
+        runCatching { KeyManager.resolveSerializedKey(jwkMaterial.decodeToString()) }.getOrNull()
+
+    override suspend fun exportSoftwareKeyMaterial(key: Key): ByteArray =
+        KeySerialization.serializeKey(key).encodeToByteArray()
+}
+
+private fun WalletBridgeKeyInfo.toMobileWalletKeyRecord() = MobileWalletKeyRecord(
+    keyId = keyId,
+    keyType = KeyType.valueOf(keyType),
+    keyUseAuthorizationPolicy = keyUseAuthorizationPolicy.toKeyUseAuthorizationPolicy(),
+    isPlatformBacked = isPlatformBacked,
+)
+
+internal fun PlatformKeyPreflight.toBridgeKeyPreflight() = WalletBridgeKeyPreflight(
     supported = supported,
-    platformBackingAvailable = platformBackingAvailable,
-    secureHardwareRequired = secureHardwareRequired,
-    secureHardwareAvailable = secureHardwareAvailable,
-    effectiveHardwareBacking = effectiveHardwareBacking?.name,
     failure = failure?.toBridgeKeyUseAuthorizationFailure(),
 )
 
@@ -534,35 +587,25 @@ private fun WalletDidEntry.toBridgeStoredDid() = WalletBridgeStoredDid(
     documentJson = Json.encodeToString(JsonObject.serializer(), document),
 )
 
-private fun WalletBridgeKeyInfo.toWalletKeyInfo() = WalletKeyInfo(
+internal fun MobileWalletKeyRecord.toBridgeKeyInfo() = WalletBridgeKeyInfo(
     keyId = keyId,
-    keyType = keyType,
-    algorithm = algorithm,
-    // Swift custom stores exchange serialized JWK material and therefore retain the legacy policy.
-    requestedKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
-    effectiveKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
-    isPlatformBacked = false,
-    effectiveHardwareBacking = null,
-)
-
-internal fun WalletKeyInfo.toBridgeKeyInfo() = WalletBridgeKeyInfo(
-    keyId = keyId,
-    keyType = keyType,
-    algorithm = algorithm,
-    requestedKeyUseAuthorizationPolicy = requestedKeyUseAuthorizationPolicy.toBridgeKeyUseAuthorizationPolicy(),
-    effectiveKeyUseAuthorizationPolicy = effectiveKeyUseAuthorizationPolicy.toBridgeKeyUseAuthorizationPolicy(),
+    keyType = keyType.name,
+    keyUseAuthorizationPolicy = keyUseAuthorizationPolicy.toBridgeKeyUseAuthorizationPolicy(),
     isPlatformBacked = isPlatformBacked,
-    effectiveHardwareBacking = effectiveHardwareBacking?.name,
 )
 
 private suspend fun WalletBridgeStoredKey.toKey(): Key =
     KeyManager.resolveSerializedKey(serializedKeyJson)
 
-private suspend fun Key.toBridgeStoredKey(keyInfo: WalletKeyInfo? = null) = WalletBridgeStoredKey(
+private suspend fun Key.toBridgeStoredKey(record: MobileWalletKeyRecord? = null) = WalletBridgeStoredKey(
     keyId = getKeyId(),
     keyType = keyType.name,
-    algorithm = keyInfo?.algorithm,
+    algorithm = null,
     serializedKeyJson = KeySerialization.serializeKey(this),
+    keyUseAuthorizationPolicy = record?.keyUseAuthorizationPolicy
+        ?.toBridgeKeyUseAuthorizationPolicy()
+        ?: WalletBridgeKeyUseAuthorizationPolicy.None,
+    isPlatformBacked = record?.isPlatformBacked ?: false,
 )
 
 private fun KeyType.toMobileWalletKeyType(): MobileWalletKeyType = when (this) {

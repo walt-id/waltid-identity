@@ -1,21 +1,15 @@
 package id.walt.wallet2.mobile
 
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.KeyUseAuthorizationException
-import id.walt.crypto.keys.KeyUseAuthorizationFailure
 import id.walt.crypto.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto.keys.KeyUseAuthorizationPrompt
 import app.cash.sqldelight.db.SqlDriver
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.PlatformKeyProvider
-import id.walt.wallet2.persistence.keys.PlatformKeyCapability
-import id.walt.wallet2.persistence.keys.PlatformKeyGenerationRequest
+import id.walt.wallet2.persistence.stores.MobileWalletKeyStore
 import id.walt.wallet2.persistence.stores.PlatformKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
@@ -106,7 +100,7 @@ public sealed interface MobileWalletDatabaseKey {
  *
  * @property credentials Optional credential store override.
  * @property dids Optional DID document store override.
- * @property keys Optional atomic signing-key store and generation override.
+ * @property keys Optional atomic signing-key store and provider override.
  */
 public data class MobileWalletStores(
     public val credentials: WalletCredentialStore? = null,
@@ -115,40 +109,18 @@ public data class MobileWalletStores(
 )
 
 /**
- * Atomic override for wallet signing-key persistence and generation.
+ * Atomic override for wallet signing-key persistence and provider operations.
  *
  * Key storage and key generation are configured together because platform default signing keys
  * are coupled to their platform-protected key stores.
  *
- * @property store Store for wallet signing-key references.
- * @property generate Legacy generator used only for requests with [KeyUseAuthorizationPolicy.None].
- * @property generateForRequest Generator that explicitly receives key type, identifier, and authorization policy.
- * @property capability Optional preflight implementation for custom protected-key generators.
+ * @property store Store for wallet signing-key references and immutable policy metadata.
+ * @property provider Provider for exact preflight, generation, load, and delete operations.
  */
 public data class MobileWalletKeys(
-    public val store: WalletKeyStore,
-    public val generate: suspend (KeyType) -> Key,
-    public val generateForRequest: (suspend (PlatformKeyGenerationRequest) -> Key)? = null,
-    public val capability: (suspend (KeyType, KeyUseAuthorizationPolicy) -> PlatformKeyCapability)? = null,
-) {
-    internal suspend fun generate(request: PlatformKeyGenerationRequest): Key =
-        generateForRequest?.invoke(request) ?: if (
-            request.keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.None
-        ) {
-            generate(request.keyType)
-        } else {
-            throw KeyUseAuthorizationException(
-                failure = KeyUseAuthorizationFailure.UnsupportedCombination,
-                message = "The legacy custom key generator does not support protected key requests",
-            )
-        }
-
-    internal suspend fun capabilityFor(
-        keyType: KeyType,
-        policy: KeyUseAuthorizationPolicy,
-    ): PlatformKeyCapability = capability?.invoke(keyType, policy)
-        ?: PlatformKeyProvider.defaultCustomCapability(keyType, policy)
-}
+    public val store: MobileWalletKeyStore,
+    public val provider: PlatformKeyProvider,
+)
 
 /**
  * Platform factory that wires [MobileWallet] to Android or iOS storage and key infrastructure.
@@ -208,23 +180,16 @@ private fun createSqlDelightMobileWallet(
     val queries = db.walletPersistenceQueries
     val keyOverride = config.persistence.stores.keys
     val keyStore = keyOverride?.store ?: PlatformKeyStore(keyProvider, queries)
+    val activeKeyProvider = keyOverride?.provider ?: keyProvider
     val credentialStore = config.persistence.stores.credentials ?: SqlDelightCredentialStore(queries)
     val didStore = config.persistence.stores.dids ?: SqlDelightDidStore(queries)
-    val keyGenerator: suspend (PlatformKeyGenerationRequest) -> Key = keyOverride?.let { override ->
-        { request -> override.generate(request) }
-    } ?: keyProvider::generateKey
-    val keyCapability: suspend (KeyType, KeyUseAuthorizationPolicy) -> PlatformKeyCapability =
-        keyOverride?.let { override ->
-            { keyType, policy -> override.capabilityFor(keyType, policy) }
-        } ?: keyProvider::capability
 
     return MobileWallet(
         walletId = config.walletId,
         keyStore = keyStore,
         didStore = didStore,
         credentialStore = credentialStore,
-        keyGenerator = keyGenerator,
-        keyCapability = keyCapability,
+        keyProvider = activeKeyProvider,
         defaultKeyType = config.defaultKeyType,
         defaultKeyUseAuthorizationPolicy = config.defaultKeyUseAuthorizationPolicy,
         attestationConfig = config.attestationConfig,
@@ -234,17 +199,3 @@ private fun createSqlDelightMobileWallet(
         deleteLocalPersistence = deleteLocalPersistence,
     )
 }
-
-private fun PlatformKeyProvider.Companion.defaultCustomCapability(
-    keyType: KeyType,
-    policy: KeyUseAuthorizationPolicy,
-): PlatformKeyCapability = PlatformKeyCapability(
-    platform = id.walt.wallet2.persistence.keys.PlatformKeyPlatform.Custom,
-    keyType = keyType,
-    keyUseAuthorizationPolicy = policy,
-    supported = policy == KeyUseAuthorizationPolicy.None,
-    platformBackingAvailable = false,
-    secureHardwareRequired = false,
-    secureHardwareAvailable = null,
-    failure = if (policy == KeyUseAuthorizationPolicy.None) null else KeyUseAuthorizationFailure.UnsupportedCombination,
-)

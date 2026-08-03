@@ -1,7 +1,7 @@
 package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.crypto.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.data.WalletKeyInfo
+import id.walt.wallet2.persistence.stores.MobileWalletKeyRecord
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletCredential
@@ -69,17 +69,17 @@ public class WalletSdkBridge private constructor(
 
     /** Lists non-secret metadata for persisted signing keys. */
     public suspend fun keys(): WalletBridgeResult<List<WalletBridgeKeyInfo>> =
-        walletBridgeCall { operations.keys().map(WalletKeyInfo::toBridgeKeyInfo) }
+        walletBridgeCall { operations.keys().map(MobileWalletKeyRecord::toBridgeKeyInfo) }
 
     /** Preflights a key type and immutable key-use authorization policy. */
-    public suspend fun keyUseAuthorizationCapability(
+    public suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType,
         keyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy,
-    ): WalletBridgeResult<WalletBridgeKeyCapability> = walletBridgeCall {
-        operations.keyUseAuthorizationCapability(
+    ): WalletBridgeResult<WalletBridgeKeyPreflight> = walletBridgeCall {
+        operations.keyUseAuthorizationPreflight(
             keyType = keyType,
             keyUseAuthorizationPolicy = keyUseAuthorizationPolicy.toKeyUseAuthorizationPolicy(),
-        ).toBridgeKeyCapability()
+        ).toBridgeKeyPreflight()
     }
 
     /** Resolves a credential offer before issuance. */
@@ -224,12 +224,12 @@ internal interface WalletSdkBridgeOperations {
         keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy?,
     ): MobileWalletBootstrapResult
 
-    suspend fun keys(): List<WalletKeyInfo>
+    suspend fun keys(): List<MobileWalletKeyRecord>
 
-    suspend fun keyUseAuthorizationCapability(
+    suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType,
         keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy,
-    ): id.walt.wallet2.persistence.keys.PlatformKeyCapability
+    ): id.walt.wallet2.persistence.keys.PlatformKeyPreflight
 
     suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution
 
@@ -292,13 +292,13 @@ internal class MobileWalletSdkBridgeOperations(
             keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
         )
 
-    override suspend fun keys(): List<WalletKeyInfo> = wallet.keys()
+    override suspend fun keys(): List<MobileWalletKeyRecord> = wallet.keys()
 
-    override suspend fun keyUseAuthorizationCapability(
+    override suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType,
         keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy,
-    ): id.walt.wallet2.persistence.keys.PlatformKeyCapability =
-        wallet.keyUseAuthorizationCapability(keyType, keyUseAuthorizationPolicy)
+    ): id.walt.wallet2.persistence.keys.PlatformKeyPreflight =
+        wallet.keyUseAuthorizationPreflight(keyType, keyUseAuthorizationPolicy)
 
     override suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution =
         wallet.resolveOffer(offerUrl = offerUrl)

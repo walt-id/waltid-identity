@@ -3,13 +3,14 @@ package id.walt.wallet2.mobile.swiftinterop
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
 import id.walt.crypto.keys.KeyManager
-import id.walt.crypto.keys.KeyHardwareBacking
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.KeyUseAuthorizationFailure
 import id.walt.crypto.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletDidEntry
-import id.walt.wallet2.data.WalletKeyInfo
+import id.walt.wallet2.persistence.keys.PlatformKeyPreflight
+import id.walt.wallet2.persistence.keys.PlatformKeyRequest
+import id.walt.wallet2.persistence.stores.MobileWalletKeyRecord
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletEventPhase
 import id.walt.wallet2.mobile.MobileWalletEventStatus
@@ -41,8 +42,6 @@ import id.walt.wallet2.mobile.MobileWalletTransactionCodeInputMode
 import id.walt.wallet2.mobile.MobileWalletTransactionCodeRequirement
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
-import id.walt.wallet2.persistence.keys.PlatformKeyCapability
-import id.walt.wallet2.persistence.keys.PlatformKeyPlatform
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.mobile.toKeyType
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -155,8 +154,7 @@ class WalletSdkBridgeTest {
         val result = bridge.keys()
 
         assertIs<WalletBridgeResult.Success<List<WalletBridgeKeyInfo>>>(result)
-        assertEquals(WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet, result.value.single().effectiveKeyUseAuthorizationPolicy)
-        assertEquals("SecureEnclave", result.value.single().effectiveHardwareBacking)
+        assertEquals(WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet, result.value.single().keyUseAuthorizationPolicy)
         assertEquals(true, result.value.single().isPlatformBacked)
     }
 
@@ -165,12 +163,12 @@ class WalletSdkBridgeTest {
         val operations = FakeWalletSdkBridgeOperations()
         val bridge = WalletSdkBridge.forOperations(operations)
 
-        val result = bridge.keyUseAuthorizationCapability(
+        val result = bridge.keyUseAuthorizationPreflight(
             keyType = MobileWalletKeyType.secp256r1,
             keyUseAuthorizationPolicy = WalletBridgeKeyUseAuthorizationPolicy.BiometricCurrentSet,
         )
 
-        assertIs<WalletBridgeResult.Success<WalletBridgeKeyCapability>>(result)
+        assertIs<WalletBridgeResult.Success<WalletBridgeKeyPreflight>>(result)
         assertEquals(false, result.value.supported)
         assertEquals(WalletBridgeKeyUseAuthorizationFailure.BiometricNotEnrolled, result.value.failure)
         assertEquals(KeyType.secp256r1, operations.capabilityKeyType)
@@ -599,15 +597,15 @@ class WalletSdkBridgeTest {
         assertEquals(listOf("did:key:swift"), bridgeDidStore.removedDids)
 
         val keys = requireNotNull(persistence.stores.keys)
-        assertEquals(listOf(WalletKeyInfo(P256_KEY_ID, "secp256r1", "ES256")), keys.store.listKeys().toList())
+        assertEquals(listOf(MobileWalletKeyRecord(P256_KEY_ID, KeyType.secp256r1, isPlatformBacked = false)), keys.store.listKeyRecords().toList())
         assertEquals(P256_KEY_ID, keys.store.getKey(P256_KEY_ID)?.getKeyId())
         assertEquals(P256_KEY_ID, keys.store.addKey(generatedKey))
         assertEquals(generatedBridgeKey.keyId, bridgeKeyStore.addedKeys.single().keyId)
         assertEquals(true, keys.store.removeKey(P256_KEY_ID))
         assertEquals(listOf(P256_KEY_ID), bridgeKeyStore.removedKeyIds)
 
-        val generated = keys.generate(KeyType.Ed25519)
-        assertEquals(generatedBridgeKey.keyId, generated.getKeyId())
+        val generated = keys.provider.generate(PlatformKeyRequest(KeyType.Ed25519))
+        assertEquals(generatedBridgeKey.keyId, generated.key.getKeyId())
         assertEquals(listOf(MobileWalletKeyType.Ed25519), bridgeKeyGenerator.requestedTypes)
     }
 
@@ -751,33 +749,23 @@ class WalletSdkBridgeTest {
             )
         }
 
-        override suspend fun keys(): List<WalletKeyInfo> = listOf(
-            WalletKeyInfo(
+        override suspend fun keys(): List<MobileWalletKeyRecord> = listOf(
+            MobileWalletKeyRecord(
                 keyId = "key-1",
-                keyType = KeyType.secp256r1.name,
-                algorithm = "ES256",
-                requestedKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-                effectiveKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                keyType = KeyType.secp256r1,
+                keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
                 isPlatformBacked = true,
-                effectiveHardwareBacking = KeyHardwareBacking.SecureEnclave,
             )
         )
 
-        override suspend fun keyUseAuthorizationCapability(
+        override suspend fun keyUseAuthorizationPreflight(
             keyType: MobileWalletKeyType,
             keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy,
-        ): PlatformKeyCapability {
+        ): PlatformKeyPreflight {
             capabilityKeyType = keyType.toKeyType()
             capabilityPolicy = keyUseAuthorizationPolicy
-            return PlatformKeyCapability(
-                platform = PlatformKeyPlatform.iOS,
-                keyType = keyType.toKeyType(),
-                keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
+            return PlatformKeyPreflight(
                 supported = false,
-                platformBackingAvailable = true,
-                secureHardwareRequired = true,
-                secureHardwareAvailable = true,
-                effectiveHardwareBacking = KeyHardwareBacking.SecureEnclave,
                 failure = KeyUseAuthorizationFailure.BiometricNotEnrolled,
             )
         }
@@ -1019,8 +1007,8 @@ class WalletSdkBridgeTest {
     ) : WalletBridgeKeyGenerator {
         val requestedTypes = mutableListOf<MobileWalletKeyType>()
 
-        override suspend fun generateKey(keyType: MobileWalletKeyType): WalletBridgeStoredKey {
-            requestedTypes += keyType
+        override suspend fun generateKey(request: WalletBridgeKeyRequest): WalletBridgeStoredKey {
+            requestedTypes += request.keyType
             return key
         }
     }
