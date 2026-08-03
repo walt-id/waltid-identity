@@ -18,7 +18,6 @@ import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.PresentationCredentialRequirement
 import id.walt.wallet2.handlers.PresentationCredentialOption
-import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.UnsignedRequestObjectPolicy
 import id.walt.wallet2.handlers.PresentationCredentialSelection
 import id.walt.wallet2.handlers.PresentationDisclosureSelection

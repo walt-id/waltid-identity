@@ -24,6 +24,7 @@ import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestParameterCodec
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
+import id.waltid.openid4vp.wallet.request.UnsignedRequestObjectPolicy
 import id.waltid.openid4vp.wallet.request.WalletCapabilities
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.URLBuilder
@@ -37,8 +38,8 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalSerializationApi::class)
 class OpenId4VpPresentationService(
     private val credentialService: CredentialsService,
-    private val unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+    private val unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy =
+        UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
 ) {
     private val logger = KotlinLogging.logger { }
     private val json = Json {

@@ -20,6 +20,7 @@ import id.walt.webwallet.db.models.WalletKey
 import id.walt.webwallet.service.keys.KeysService
 import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import id.waltid.openid4vp.wallet.request.UnsignedRequestObjectPolicy
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.ktor.http.Url
 import io.mockk.mockk
@@ -113,7 +114,7 @@ class OpenId4VpPresentationServiceTest {
     fun `normalized request URL keeps direct OpenID4VP requests intact`() {
         val service = OpenId4VpPresentationService(
             credentialService = mockk(relaxed = true),
-            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         )
         val request = AuthorizationRequest(
             clientId = "redirect_uri:https://verifier.example/response",
@@ -136,7 +137,7 @@ class OpenId4VpPresentationServiceTest {
     fun `normalized request URL keeps raw scalar query parameters as strings`() {
         val service = OpenId4VpPresentationService(
             credentialService = mockk(relaxed = true),
-            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         )
         val request = AuthorizationRequest(
             clientId = "redirect_uri:https://verifier.example/response",
@@ -159,7 +160,7 @@ class OpenId4VpPresentationServiceTest {
     fun `buildWalletPresentationRequest keeps scalars plain and structured values JSON encoded`() {
         val service = OpenId4VpPresentationService(
             credentialService = mockk(relaxed = true),
-            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         )
         val authorizationRequest = AuthorizationRequest(
             clientId = "verifier2",
@@ -205,7 +206,7 @@ class OpenId4VpPresentationServiceTest {
     fun `normalized request URL preserves signed request objects from request parameter`() {
         val service = OpenId4VpPresentationService(
             credentialService = mockk(relaxed = true),
-            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         )
         val requestObject = unsecuredJwt(
             AuthorizationRequest(
@@ -318,7 +319,7 @@ class OpenId4VpPresentationServiceTest {
         withAuthorizationRequestServer { serverUrl, receivedRequest ->
             val service = OpenId4VpPresentationService(
                 credentialService = mockk(relaxed = true),
-                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
             )
 
             val resolvedRequest = runBlocking {
@@ -340,7 +341,7 @@ class OpenId4VpPresentationServiceTest {
         withAuthorizationRequestServer { serverUrl, receivedRequest ->
             val service = OpenId4VpPresentationService(
                 credentialService = mockk(relaxed = true),
-                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
             )
 
             val resolvedRequest = runBlocking {
@@ -398,7 +399,7 @@ class OpenId4VpPresentationServiceTest {
             withAuthorizationRequestServer { serverUrl, receivedRequest ->
                 val service = OpenId4VpPresentationService(
                     credentialService = mockk(relaxed = true),
-                    unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                    unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
                 )
 
                 runBlocking {
@@ -463,7 +464,7 @@ class OpenId4VpPresentationServiceTest {
             withAuthorizationRequestServer { serverUrl, receivedRequest ->
                 val service = OpenId4VpPresentationService(
                     credentialService = mockk(relaxed = true),
-                    unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                    unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
                 )
 
                 runBlocking {
@@ -509,7 +510,7 @@ class OpenId4VpPresentationServiceTest {
         ) { serverUrl, _ ->
             val service = OpenId4VpPresentationService(
                 credentialService = mockk(relaxed = true),
-                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
             )
 
             val resolvedRequest = runBlocking {
@@ -530,7 +531,7 @@ class OpenId4VpPresentationServiceTest {
         withAuthorizationRequestServer { serverUrl, _ ->
             val service = OpenId4VpPresentationService(
                 credentialService = mockk(relaxed = true),
-                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
             )
 
             val error = assertFailsWith<IllegalArgumentException> {
@@ -588,7 +589,7 @@ class OpenId4VpPresentationServiceTest {
         ) { serverUrl, _ ->
             val service = OpenId4VpPresentationService(
                 credentialService = mockk(relaxed = true),
-                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
             )
 
             val resolvedRequest = runBlocking {
