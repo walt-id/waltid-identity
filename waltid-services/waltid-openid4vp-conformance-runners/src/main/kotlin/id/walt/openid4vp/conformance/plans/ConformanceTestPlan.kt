@@ -105,7 +105,7 @@ interface WalletTestPlan : ConformanceTestPlan {
      * Wallet API base URL for programmatic operations.
      */
     val walletApiUrl: String
-        get() = "http://127.0.0.1:7005"
+        get() = "http://127.0.0.1:7006"
 
     /**
      * Whether this test expects the wallet to reject requests.
