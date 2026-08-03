@@ -33,13 +33,13 @@ class MobilePlatformKeySupportTest {
             result.signatureBytesOrThrow(protectedKeyUse = true)
         }
 
-        assertEquals(KeyUseAuthorizationFailure.AuthorizationFailed, failure.failure)
+        assertEquals(KeyUseAuthorizationFailure.AuthorizationNotCompleted, failure.failure)
     }
 
     @Test
     fun structuredSignumErrorsRemainStructured() {
         val expected = KeyUseAuthorizationException(
-            failure = KeyUseAuthorizationFailure.ProtectedKeyInvalidated,
+            failure = KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
             message = "invalidated",
         )
         val result = SignatureResult.Error(expected)
@@ -60,7 +60,7 @@ class MobilePlatformKeySupportTest {
             )
         )
 
-        assertEquals(KeyUseAuthorizationFailure.ProtectedKeyInvalidated, failure.failure)
+        assertEquals(KeyUseAuthorizationFailure.ProtectedKeyUnavailable, failure.failure)
     }
 
     @Test
@@ -71,7 +71,7 @@ class MobilePlatformKeySupportTest {
             )
         )
 
-        assertEquals(KeyUseAuthorizationFailure.ProtectedKeyMissing, failure.failure)
+        assertEquals(KeyUseAuthorizationFailure.ProtectedKeyUnavailable, failure.failure)
     }
 
     @Test

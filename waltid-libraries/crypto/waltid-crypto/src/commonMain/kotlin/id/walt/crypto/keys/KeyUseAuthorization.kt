@@ -37,9 +37,9 @@ public enum class KeyUseAuthorizationFailure {
     BiometricUnavailable,
     BiometricNotEnrolled,
     InteractionContextUnavailable,
-    AuthorizationFailed,
-    ProtectedKeyInvalidated,
-    ProtectedKeyMissing,
+    AuthorizationNotCompleted,
+    ProtectedKeyUnavailable,
+    InvalidStoredKeyMetadata,
 }
 
 /** Stable protected-key failure without platform exception-message parsing. */
@@ -48,22 +48,3 @@ public class KeyUseAuthorizationException(
     message: String,
     cause: Throwable? = null,
 ) : Exception(message, cause)
-
-/** Effective private-key backing determined from platform key information. */
-@Serializable
-public enum class KeyHardwareBacking {
-    Software,
-    Platform,
-    SecureHardware,
-    TrustedEnvironment,
-    StrongBox,
-    SecureEnclave,
-    Unknown,
-}
-
-/** Non-secret policy and backing metadata carried by mobile platform key implementations. */
-public interface KeyUseAuthorizationAware {
-    public val keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy
-    public val isPlatformBacked: Boolean
-    public suspend fun effectiveHardwareBacking(): KeyHardwareBacking
-}

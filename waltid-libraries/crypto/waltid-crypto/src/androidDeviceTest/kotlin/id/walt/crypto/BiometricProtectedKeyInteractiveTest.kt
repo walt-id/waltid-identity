@@ -82,7 +82,7 @@ class BiometricProtectedKeyInteractiveTest {
             key.signRaw("must not be signed".encodeToByteArray())
         }
 
-        assertEquals(KeyUseAuthorizationFailure.AuthorizationFailed, failure.failure)
+        assertEquals(KeyUseAuthorizationFailure.AuthorizationNotCompleted, failure.failure)
     }
 
     private fun <A : FragmentActivity> androidx.test.core.app.ActivityScenario<A>.withActivity(): A {

@@ -94,7 +94,7 @@ internal fun SignatureResult<*>.signatureBytesOrThrow(
     return when (this) {
         is SignatureResult.Success<*> -> signature.rawByteArray
         is SignatureResult.Failure -> throw KeyUseAuthorizationException(
-            failure = KeyUseAuthorizationFailure.AuthorizationFailed,
+            failure = KeyUseAuthorizationFailure.AuthorizationNotCompleted,
             message = "Key-use authorization failed",
             cause = problem,
         )

@@ -16,10 +16,8 @@ import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.providers.jdk.JDK
 import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyHardwareBacking
 import id.walt.crypto.keys.KeyMeta
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.KeyUseAuthorizationAware
 import id.walt.crypto.keys.KeyUseAuthorizationException
 import id.walt.crypto.keys.KeyUseAuthorizationFailure
 import id.walt.crypto.keys.KeyUseAuthorizationPolicy
@@ -48,7 +46,7 @@ sealed class AndroidKey : Key() {
     class Platform internal constructor(
         private val options: Options,
         override val hasPrivateKey: Boolean = true,
-    ) : AndroidKey(), KeyUseAuthorizationAware {
+    ) : AndroidKey() {
 
         companion object {
             suspend fun create(options: Options): Platform {
@@ -83,8 +81,6 @@ sealed class AndroidKey : Key() {
         }
 
         override val keyType get() = options.keyType
-        override val keyUseAuthorizationPolicy get() = options.keyUseAuthorizationPolicy
-        override val isPlatformBacked: Boolean = true
 
         private suspend fun signer(): AndroidKeystoreSigner = runCatching { options.loadSigner() }
             .getOrElse { throw options.mapPlatformFailure(it) }
@@ -156,23 +152,6 @@ sealed class AndroidKey : Key() {
         override suspend fun getPublicKey(): Key = Platform(options, hasPrivateKey = false)
         override suspend fun getPublicKeyRepresentation(): ByteArray = signer().publicKey.encodeToTlv().derEncoded
         override suspend fun getMeta(): KeyMeta = JwkKeyMeta(getKeyId())
-        @Suppress("DEPRECATION")
-        override suspend fun effectiveHardwareBacking(): KeyHardwareBacking {
-            val keyInfo = signer().keyInfo
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                when (keyInfo.securityLevel) {
-                    KeyProperties.SECURITY_LEVEL_SOFTWARE -> KeyHardwareBacking.Software
-                    KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT -> KeyHardwareBacking.TrustedEnvironment
-                    KeyProperties.SECURITY_LEVEL_STRONGBOX -> KeyHardwareBacking.StrongBox
-                    KeyProperties.SECURITY_LEVEL_UNKNOWN_SECURE -> KeyHardwareBacking.SecureHardware
-                    else -> KeyHardwareBacking.Unknown
-                }
-            } else if (keyInfo.isInsideSecureHardware) {
-                KeyHardwareBacking.SecureHardware
-            } else {
-                KeyHardwareBacking.Software
-            }
-        }
         override suspend fun deleteKey(): Boolean = runCatching {
             AndroidKeyStoreProvider.deleteSigningKey(options.kid).getOrThrow()
         }.isSuccess
@@ -281,7 +260,7 @@ private suspend fun AndroidKey.Options.loadSigner(): AndroidKeystoreSigner {
             !biometricOnly
         ) {
             throw KeyUseAuthorizationException(
-                failure = KeyUseAuthorizationFailure.ProtectedKeyInvalidated,
+                failure = KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
                 message = "The stored key does not enforce biometric current-set authorization for every use",
             )
         }
@@ -306,12 +285,12 @@ private fun AndroidKey.Options.mapPlatformFailure(throwable: Throwable): Throwab
     val causes = generateSequence(throwable as Throwable?) { it.cause }.toList()
     return when {
         causes.any { it is KeyPermanentlyInvalidatedException } -> KeyUseAuthorizationException(
-            failure = KeyUseAuthorizationFailure.ProtectedKeyInvalidated,
+            failure = KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
             message = "The protected key was invalidated",
             cause = throwable,
         )
         causes.any { it is NoSuchElementException } -> KeyUseAuthorizationException(
-            failure = KeyUseAuthorizationFailure.ProtectedKeyMissing,
+            failure = KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
             message = "The protected key is missing",
             cause = throwable,
         )

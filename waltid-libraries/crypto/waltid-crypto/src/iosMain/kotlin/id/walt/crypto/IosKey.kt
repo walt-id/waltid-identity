@@ -10,10 +10,8 @@ import at.asitplus.signum.supreme.os.IosKeychainProvider
 import dev.whyoleg.cryptography.CryptographyProvider
 import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyHardwareBacking
 import id.walt.crypto.keys.KeyMeta
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.KeyUseAuthorizationAware
 import id.walt.crypto.keys.KeyUseAuthorizationException
 import id.walt.crypto.keys.KeyUseAuthorizationFailure
 import id.walt.crypto.keys.KeyUseAuthorizationPolicy
@@ -47,7 +45,7 @@ sealed class IosKey : Key() {
     class Platform internal constructor(
         private val options: Options,
         override val hasPrivateKey: Boolean = true,
-    ) : IosKey(), KeyUseAuthorizationAware {
+    ) : IosKey() {
 
         companion object {
             suspend fun create(options: Options): Platform {
@@ -76,8 +74,6 @@ sealed class IosKey : Key() {
         }
 
         override val keyType get() = options.keyType
-        override val keyUseAuthorizationPolicy get() = options.keyUseAuthorizationPolicy
-        override val isPlatformBacked: Boolean = true
 
         private suspend fun signer(): IosSigner = runCatching { options.loadSigner() }
             .getOrElse { throw options.mapPlatformFailure(it) }
@@ -135,8 +131,6 @@ sealed class IosKey : Key() {
         override suspend fun getPublicKey(): Key = Platform(options, hasPrivateKey = false)
         override suspend fun getPublicKeyRepresentation(): ByteArray = signer().publicKey.encodeToTlv().derEncoded
         override suspend fun getMeta(): KeyMeta = JwkKeyMeta(getKeyId())
-        override suspend fun effectiveHardwareBacking(): KeyHardwareBacking =
-            if (options.inSecureElement) KeyHardwareBacking.SecureEnclave else KeyHardwareBacking.Platform
         override suspend fun deleteKey(): Boolean = runCatching {
             IosKeychainProvider.deleteSigningKey(options.kid).getOrThrow()
         }.isSuccess
@@ -227,7 +221,7 @@ private suspend fun IosKey.Options.loadSigner(): IosSigner {
         (!signer.needsAuthentication || !signer.needsAuthenticationForEveryUse)
     ) {
         throw KeyUseAuthorizationException(
-            failure = KeyUseAuthorizationFailure.ProtectedKeyInvalidated,
+            failure = KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
             message = "The stored key does not enforce biometric authorization for every use",
         )
     }
@@ -250,7 +244,7 @@ internal fun IosKey.Options.mapPlatformFailure(throwable: Throwable): Throwable 
     val causes = generateSequence(throwable as Throwable?) { it.cause }.toList()
     return when {
         causes.any { it is NoSuchElementException } -> KeyUseAuthorizationException(
-            failure = KeyUseAuthorizationFailure.ProtectedKeyMissing,
+            failure = KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
             message = "The protected key is missing",
             cause = throwable,
         )
@@ -259,7 +253,7 @@ internal fun IosKey.Options.mapPlatformFailure(throwable: Throwable): Throwable 
         // OS makes the protected private key inaccessible as an absent Keychain item.
         causes.filterIsInstance<CFCryptoOperationFailed>().any { it.osStatus == errSecItemNotFound } ->
             KeyUseAuthorizationException(
-                failure = KeyUseAuthorizationFailure.ProtectedKeyInvalidated,
+                failure = KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
                 message = "The protected key is no longer usable under its biometric current-set policy",
                 cause = throwable,
             )
