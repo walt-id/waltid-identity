@@ -76,7 +76,7 @@ import id.walt.openid4vci.CredentialFormat as VciCredentialFormat
  *  2. GET /wallet list works (was broken by Flow<String> serialization)
  *  3. GET /wallet/{id} reports correct store counts
  *  4. Key generation with multiple algorithms (Ed25519, secp256r1)
- *  5. DID creation with multiple methods (did:key, did:jwk)
+ *  5. DID creation with multiple methods (did:key, did:jwk, did:web with options)
  *  6. Isolated OID4VCI receive steps (resolve-offer → request-token → sign-proof → fetch)
  *  7. Multiple credential types stored and listed
  *  8. Credential deletion
@@ -257,13 +257,33 @@ class Wallet2ExtendedIntegrationTest {
             }
             assertTrue(didJwk.did.startsWith("did:jwk:"), "Expected did:jwk:, got ${didJwk.did}")
 
-            // -- List DIDs - both should appear --
-            testAndReturn("List DIDs shows both created DIDs") {
+            // -- Create did:web with domain/path options --
+            val didWeb = testAndReturn("Create did:web with domain and path options") {
+                http.post("/wallet/$walletId/dids/create") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        id.walt.wallet2.server.handlers.CreateDidRequest(
+                            method = "web",
+                            keyId = ed25519Key.keyId,
+                            options = mapOf(
+                                "domain" to JsonPrimitive("example.com"),
+                                "path" to JsonPrimitive("/users/alice"),
+                            ),
+                        )
+                    )
+                }.also { assertEquals(HttpStatusCode.Created, it.status) }
+                    .body<WalletDidEntry>()
+            }
+            assertEquals("did:web:example.com:users:alice", didWeb.did)
+
+            // -- List DIDs - all three should appear --
+            testAndReturn("List DIDs shows all created DIDs") {
                 val dids = http.get("/wallet/$walletId/dids")
                     .body<List<WalletDidEntry>>()
-                assertEquals(2, dids.size, "Expected 2 DIDs, got ${dids.size}")
+                assertEquals(3, dids.size, "Expected 3 DIDs, got ${dids.size}")
                 assertTrue(dids.any { it.did.startsWith("did:key:") })
                 assertTrue(dids.any { it.did.startsWith("did:jwk:") })
+                assertTrue(dids.any { it.did == "did:web:example.com:users:alice" })
             }
 
             // -- Delete a key --

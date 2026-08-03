@@ -42,7 +42,7 @@ private val log = KotlinLogging.logger { }
  *
  * @property trustRegistryUrl Optional base URL of the waltid-trust-registry-service
  *   (e.g., `http://localhost:8080` or `https://trust.example.com`).
- *   The policy will call `POST {trustRegistryUrl}/trust-registry/resolve/certificate`.
+ *   The policy will call `POST {trustRegistryUrl}/trust-registry/resolve/certificate-chain`.
  *
  * @property trustLists Optional list of trust list sources to load inline.
  *   Each entry can be either:
@@ -59,10 +59,12 @@ private val log = KotlinLogging.logger { }
  *   will still be considered trusted with a warning. Default: `false`.
  *
  * @property requireAuthenticated If `true`, the trust source must have
- *   `authenticityState = VALIDATED`. Default: `false` (SKIPPED_DEMO also accepted).
+ *   `authenticityState = AUTHENTICATED`. Default: `false`.
  *
- * @property validateSignatures If `true`, XMLDSig signatures are validated when
- *   loading trust lists in inline mode. Default: `true`.
+ * @property validateSignatures If `true`, XMLDSig or supported signed-source envelopes
+ *   are validated when loading trust lists in inline mode. Default: `true`.
+ * @property trustedSourceSignerCertificates PEM or Base64-DER certificates trusted to
+ *   sign compact-JWS LoTE sources in inline mode.
  *
  * ## Usage Examples
  *
@@ -107,7 +109,8 @@ data class ETSITrustListPolicy(
     val expectedServiceType: String? = null,
     val allowStaleSource: Boolean = false,
     val requireAuthenticated: Boolean = false,
-    val validateSignatures: Boolean = true
+    val validateSignatures: Boolean = true,
+    val trustedSourceSignerCertificates: List<String> = emptyList()
 ) : CredentialVerificationPolicy2() {
 
     override val id = "etsi-trust-list"
@@ -185,39 +188,8 @@ data class ETSITrustListPolicy(
     // ---------------------------------------------------------------------------
 
     private suspend fun resolveViaRemoteService(certificateChain: List<String>): Result<JsonElement> {
-        // Query trust registry with each certificate in the chain, starting from leaf
-        // But ONLY accept trust if we can validate the chain from leaf to trusted cert
-        for ((index, certPem) in certificateChain.withIndex()) {
-            log.debug { "Checking certificate at index $index via remote service" }
-            
-            val decision = queryTrustRegistry(certPem, trustRegistryUrl!!)
-            
-            if (decision.decision == "TRUSTED" || 
-                (decision.decision == "STALE_SOURCE" && allowStaleSource)) {
-                
-                // Security check: if the trusted certificate is not the leaf (index 0),
-                // we must verify the chain from leaf to this trusted certificate
-                if (index > 0) {
-                    val chainValidation = validateCertificateChainToIndex(certificateChain, index)
-                    if (!chainValidation.first) {
-                        log.warn { "Certificate chain validation failed: ${chainValidation.second}" }
-                        // Continue checking other certificates in the chain
-                        continue
-                    }
-                    log.debug { "Certificate chain validated from leaf to trusted cert at index $index" }
-                }
-                
-                log.debug { "Found trusted certificate at chain index $index" }
-                return evaluateDecision(decision)
-            }
-            
-            log.debug { "Certificate at index $index not trusted (decision: ${decision.decision})" }
-        }
-        
-        return Result.failure(ETSITrustListPolicyException(
-            "Certificate chain not trusted: no certificate in the chain (length: ${certificateChain.size}) " +
-            "was found in the ETSI trust list, or chain validation failed"
-        ))
+        val decision = queryTrustRegistry(certificateChain, trustRegistryUrl!!)
+        return evaluateDecision(decision)
     }
 
     // ---------------------------------------------------------------------------
@@ -233,7 +205,8 @@ data class ETSITrustListPolicy(
             expectedServiceType = expectedServiceType,
             allowStaleSource = allowStaleSource,
             requireAuthenticated = requireAuthenticated,
-            validateSignatures = validateSignatures
+            validateSignatures = validateSignatures,
+            trustedSourceSignerCertificates = trustedSourceSignerCertificates
         )
     }
 
@@ -245,41 +218,12 @@ data class ETSITrustListPolicy(
         certificateChain: List<String>,
         resolver: TrustRegistryServiceResolver
     ): Result<JsonElement> {
-        for ((index, certPem) in certificateChain.withIndex()) {
-            log.debug { "Checking certificate at index $index via injected resolver" }
-
-            val decision = resolver.resolveCertificate(
-                certificatePem = certPem,
-                expectedEntityType = expectedEntityType,
-                expectedServiceType = expectedServiceType
-            )
-
-            if (decision.decision == "TRUSTED" ||
-                (decision.decision == "STALE_SOURCE" && allowStaleSource)) {
-
-                // Security check: if the trusted certificate is not the leaf (index 0),
-                // we must verify the chain from leaf to this trusted certificate
-                if (index > 0) {
-                    val chainValidation = validateCertificateChainToIndex(certificateChain, index)
-                    if (!chainValidation.first) {
-                        log.warn { "Certificate chain validation failed: ${chainValidation.second}" }
-                        // Continue checking other certificates in the chain
-                        continue
-                    }
-                    log.debug { "Certificate chain validated from leaf to trusted cert at index $index" }
-                }
-
-                log.debug { "Found trusted certificate at chain index $index" }
-                return evaluateDecision(decision)
-            }
-
-            log.debug { "Certificate at index $index not trusted (decision: ${decision.decision})" }
-        }
-
-        return Result.failure(ETSITrustListPolicyException(
-            "Certificate chain not trusted: no certificate in the chain (length: ${certificateChain.size}) " +
-            "was found in the injected trust registry, or chain validation failed"
-        ))
+        val decision = resolver.resolveCertificateChain(
+            certificateChainPem = certificateChain,
+            expectedEntityType = expectedEntityType,
+            expectedServiceType = expectedServiceType
+        )
+        return evaluateDecision(decision)
     }
 
     // ---------------------------------------------------------------------------
@@ -349,15 +293,15 @@ data class ETSITrustListPolicy(
     // Remote Service Query
     // ---------------------------------------------------------------------------
 
-    private suspend fun queryTrustRegistry(certificatePem: String, baseUrl: String): TrustDecisionResponse {
-        val url = "${baseUrl.trimEnd('/')}/trust-registry/resolve/certificate"
+    private suspend fun queryTrustRegistry(certificateChain: List<String>, baseUrl: String): TrustDecisionResponse {
+        val url = "${baseUrl.trimEnd('/')}/trust-registry/resolve/certificate-chain"
 
         log.debug { "Querying trust registry at: $url" }
 
         val response = sharedHttpClient.post(url) {
             contentType(ContentType.Application.Json)
-            setBody(TrustResolveRequest(
-                certificatePemOrDer = certificatePem,
+            setBody(TrustResolveChainRequest(
+                certificateChainPemOrDer = certificateChain,
                 expectedEntityType = expectedEntityType,
                 expectedServiceType = expectedServiceType
             ))
@@ -376,8 +320,20 @@ data class ETSITrustListPolicy(
     // Decision Evaluation
     // ---------------------------------------------------------------------------
 
-    private fun evaluateDecision(decision: TrustDecisionResponse): Result<JsonElement> {
-        log.debug { "Trust decision: ${decision.decision}, freshness: ${decision.sourceFreshness}, authenticity: ${decision.authenticity}" }
+    internal fun evaluateDecision(decision: TrustDecisionResponse): Result<JsonElement> {
+        val authenticity = decision.sourceAssurance?.authenticityState
+            ?: decision.authenticity
+            ?: "UNKNOWN"
+        log.debug { "Trust decision: ${decision.decision}, freshness: ${decision.sourceFreshness}, authenticity: $authenticity" }
+
+        if (authenticity == "FAILED") {
+            return Result.failure(ETSITrustListPolicyException("Trust source authenticity validation failed"))
+        }
+        if (requireAuthenticated && authenticity != "AUTHENTICATED") {
+            return Result.failure(ETSITrustListPolicyException(
+                "Trust source is not authenticated (got: $authenticity)"
+            ))
+        }
         
         return when (decision.decision) {
             "TRUSTED" -> {
@@ -388,10 +344,6 @@ data class ETSITrustListPolicy(
                 } else if (decision.sourceFreshness == "EXPIRED") {
                     Result.failure(ETSITrustListPolicyException(
                         "Trust source has expired"
-                    ))
-                } else if (requireAuthenticated && decision.authenticity != "VALIDATED") {
-                    Result.failure(ETSITrustListPolicyException(
-                        "Trust source authenticity not validated (got: ${decision.authenticity})"
                     ))
                 } else {
                     Result.success(buildSuccessResult(decision))
@@ -463,7 +415,11 @@ data class ETSITrustListPolicy(
                 })
             }
             put("sourceFreshness", JsonPrimitive(decision.sourceFreshness))
-            put("authenticity", JsonPrimitive(decision.authenticity))
+            put("authenticity", JsonPrimitive(
+                decision.sourceAssurance?.authenticityState
+                    ?: decision.authenticity
+                    ?: "UNKNOWN"
+            ))
             if (decision.warnings.isNotEmpty() || warning != null) {
                 put("warnings", buildJsonArray {
                     warning?.let { add(JsonPrimitive(it)) }
@@ -496,15 +452,35 @@ data class ETSITrustListPolicy(
     )
 
     @Serializable
+    data class TrustResolveChainRequest(
+        val certificateChainPemOrDer: List<String>,
+        val instant: String? = null,
+        val expectedEntityType: String? = null,
+        val expectedServiceType: String? = null
+    )
+
+    @Serializable
     data class TrustDecisionResponse(
         val decision: String,
         val sourceFreshness: String = "UNKNOWN",
-        val authenticity: String = "UNKNOWN",
+        /** Legacy flat field returned by older trust-registry services. */
+        val authenticity: String? = null,
+        val sourceAssurance: SourceAssuranceDto? = null,
         val matchedSource: MatchedSourceDto? = null,
         val matchedEntity: MatchedEntityDto? = null,
         val matchedService: MatchedServiceDto? = null,
         val evidence: List<TrustEvidenceDto> = emptyList(),
         val warnings: List<String> = emptyList()
+    )
+
+    @Serializable
+    data class SourceAssuranceDto(
+        val signatureStatus: String = "NOT_CHECKED",
+        val signerTrust: String = "NOT_EVALUATED",
+        val authenticityState: String = "UNKNOWN",
+        val acceptancePolicy: String = "REQUIRE_AUTHENTICATED",
+        val accepted: Boolean = false,
+        val details: String? = null
     )
 
     @Serializable
@@ -569,12 +545,12 @@ data class ETSITrustListPolicy(
  * Callers of the verification pipeline (e.g. an enterprise verifier) supply an
  * implementation per request through [PolicyExecutionContext] under the
  * [PolicyServiceKey.TRUST_REGISTRY_RESOLVER] key; [ETSITrustListPolicy] looks it up
- * and invokes [resolveCertificate] when neither `trustRegistryUrl` nor `trustLists`
+ * and invokes [resolveCertificateChain] when neither `trustRegistryUrl` nor `trustLists`
  * is configured on the policy itself.
  */
 interface TrustRegistryServiceResolver {
-    suspend fun resolveCertificate(
-        certificatePem: String,
+    suspend fun resolveCertificateChain(
+        certificateChainPem: List<String>,
         expectedEntityType: String?,
         expectedServiceType: String?
     ): ETSITrustListPolicy.TrustDecisionResponse
@@ -600,7 +576,8 @@ expect object ETSITrustListInlineResolver {
         expectedServiceType: String?,
         allowStaleSource: Boolean,
         requireAuthenticated: Boolean,
-        validateSignatures: Boolean
+        validateSignatures: Boolean,
+        trustedSourceSignerCertificates: List<String>
     ): Result<JsonElement>
 }
 

@@ -1,6 +1,8 @@
 package id.walt.trust.signature
 
 import id.walt.trust.model.AuthenticityState
+import id.walt.trust.model.SignatureStatus
+import id.walt.trust.model.SignerTrust
 import id.walt.trust.parser.SecureXmlParser
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.w3c.dom.Document
@@ -22,6 +24,8 @@ private val logger = KotlinLogging.logger {}
  */
 data class SignatureValidationResult(
     val state: AuthenticityState,
+    val signatureStatus: SignatureStatus,
+    val signerTrust: SignerTrust,
     val signerCertificate: X509Certificate? = null,
     val signatureValid: Boolean = false,
     val referencesValid: Boolean = false,
@@ -82,6 +86,8 @@ object XmlDsigValidator {
             logger.error(e) { "Signature validation failed with exception" }
             SignatureValidationResult(
                 state = AuthenticityState.FAILED,
+                signatureStatus = SignatureStatus.INVALID,
+                signerTrust = SignerTrust.NOT_EVALUATED,
                 details = "Validation error: ${e.message}"
             )
         }
@@ -95,7 +101,9 @@ object XmlDsigValidator {
         val signatureNodes = doc.getElementsByTagNameNS(XMLDSIG_NS, "Signature")
         if (signatureNodes.length == 0) {
             return SignatureValidationResult(
-                state = AuthenticityState.FAILED,
+                state = AuthenticityState.UNVERIFIED,
+                signatureStatus = SignatureStatus.NOT_PRESENT,
+                signerTrust = SignerTrust.NOT_APPLICABLE,
                 details = "No Signature element found in document"
             )
         }
@@ -103,6 +111,8 @@ object XmlDsigValidator {
         if (signatureNodes.length > 1) {
             return SignatureValidationResult(
                 state = AuthenticityState.FAILED,
+                signatureStatus = SignatureStatus.INVALID,
+                signerTrust = SignerTrust.NOT_EVALUATED,
                 details = "Multiple Signature elements found (${signatureNodes.length}); document must contain exactly one"
             )
         }
@@ -146,6 +156,18 @@ object XmlDsigValidator {
         }
 
         // Certificate validation (if required)
+        if (config.requireTrustedCertificate && signerCert == null) {
+            return SignatureValidationResult(
+                state = AuthenticityState.FAILED,
+                signatureStatus = if (coreValid) SignatureStatus.VALID else SignatureStatus.INVALID,
+                signerTrust = SignerTrust.UNTRUSTED,
+                signatureValid = signatureValueValid,
+                referencesValid = allRefsValid,
+                details = "Signature does not contain an X.509 signer certificate",
+                warnings = warnings
+            )
+        }
+
         if (config.requireTrustedCertificate && signerCert != null) {
             val certValidation = validateCertificateChain(
                 signerCert,
@@ -155,6 +177,8 @@ object XmlDsigValidator {
             if (!certValidation.first) {
                 return SignatureValidationResult(
                     state = AuthenticityState.FAILED,
+                    signatureStatus = if (coreValid) SignatureStatus.VALID else SignatureStatus.INVALID,
+                    signerTrust = SignerTrust.UNTRUSTED,
                     signerCertificate = signerCert,
                     signatureValid = signatureValueValid,
                     referencesValid = allRefsValid,
@@ -176,7 +200,13 @@ object XmlDsigValidator {
 
         return if (coreValid) {
             SignatureValidationResult(
-                state = AuthenticityState.VALIDATED,
+                state = if (config.requireTrustedCertificate) {
+                    AuthenticityState.AUTHENTICATED
+                } else {
+                    AuthenticityState.INTEGRITY_VERIFIED
+                },
+                signatureStatus = SignatureStatus.VALID,
+                signerTrust = if (config.requireTrustedCertificate) SignerTrust.TRUSTED else SignerTrust.NOT_EVALUATED,
                 signerCertificate = signerCert,
                 signatureValid = signatureValueValid,
                 referencesValid = allRefsValid,
@@ -186,6 +216,8 @@ object XmlDsigValidator {
         } else {
             SignatureValidationResult(
                 state = AuthenticityState.FAILED,
+                signatureStatus = SignatureStatus.INVALID,
+                signerTrust = if (config.requireTrustedCertificate) SignerTrust.UNTRUSTED else SignerTrust.NOT_EVALUATED,
                 signerCertificate = signerCert,
                 signatureValid = signatureValueValid,
                 referencesValid = allRefsValid,

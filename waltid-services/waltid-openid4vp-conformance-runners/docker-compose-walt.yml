@@ -14,6 +14,13 @@ services:
       context: ./nginx
     ports:
      - "8443:8443"
+     - "9443:9443"
+    extra_hosts:
+     - "host.docker.internal:host-gateway"
+    networks:
+      default:
+        aliases:
+         - localhost.emobix.co.uk
     depends_on:
      - server
     logging:
