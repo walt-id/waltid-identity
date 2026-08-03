@@ -69,3 +69,35 @@ internal fun parseBrowserFormParameters(rawQuery: String?): List<Pair<String, St
                 URLDecoder.decode(value, StandardCharsets.UTF_8)
         }
         ?: emptyList()
+
+private fun JsonElement.browserUrlWithMethod(): BrowserInteraction? {
+    val obj = this as? JsonObject ?: return browserUrl()
+    val url = obj.stringValue("url")
+        ?: obj.stringValue("originalUrl")
+        ?: obj.stringValue("fullUrl")
+        ?: return null
+    return BrowserInteraction(url = url, method = (obj.stringValue("method") ?: "GET").uppercase())
+}
+
+private fun JsonElement.browserUrl(): BrowserInteraction? = runCatching {
+    jsonPrimitive.contentOrNull?.takeIf { it.isNotBlank() }?.let { BrowserInteraction(it, "GET") }
+}.getOrNull()
+
+private fun JsonObject.stringValue(name: String): String? =
+    get(name)?.let { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }?.takeIf { it.isNotBlank() }
+
+private fun JsonElement?.shortJson(): String =
+    this?.toString()?.let { if (it.length > 500) it.take(500) + "..." else it } ?: "null"
+
+private fun String.htmlEscape(): String = buildString {
+    this@htmlEscape.forEach { char ->
+        when (char) {
+            '&' -> append("&amp;")
+            '<' -> append("&lt;")
+            '>' -> append("&gt;")
+            '\"' -> append("&quot;")
+            '\'' -> append("&#39;")
+            else -> append(char)
+        }
+    }
+}
