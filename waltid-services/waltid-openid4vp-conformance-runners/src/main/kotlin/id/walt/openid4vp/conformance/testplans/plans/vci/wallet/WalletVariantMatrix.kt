@@ -322,3 +322,33 @@ data class WalletVariantSelection(
 
         private fun env(name: String): String? = System.getenv(name)?.trim()?.takeIf { it.isNotEmpty() }
     }
+}
+
+@Serializable
+enum class WalletVariantRunStatus {
+    BLOCKED,
+    FAILED,
+    PASSED,
+}
+
+@Serializable
+data class WalletVariantModuleRunResult(
+    val testModule: String,
+    val testId: String? = null,
+    val logUrl: String? = null,
+    val status: String? = null,
+    val result: String? = null,
+    val accepted: Boolean = false,
+    val error: String? = null,
+    val variant: JsonObject = JsonObject(emptyMap()),
+)
+
+@Serializable
+data class WalletVariantRunResult(
+    val variantId: String,
+    val variant: JsonObject,
+    val status: WalletVariantRunStatus,
+    val planId: String? = null,
+    val modules: List<WalletVariantModuleRunResult> = emptyList(),
+    val error: String? = null,
+)
