@@ -242,3 +242,33 @@ class WalletConformanceTestRunner(
         )
     }
 
+    private suspend fun checkWalletReachable(client: HttpClient) {
+        val response = client.get("${runtime.walletApiUrl}/wallet")
+        check(response.status.value in 200..299) {
+            "Wallet API2 is unavailable at ${runtime.walletApiUrl}/wallet: ${response.status}; ${response.bodyAsText().take(500)}"
+        }
+    }
+
+    private fun unsupportedExecutionReason(variant: WalletVariant): String? = when (variant.authorizationCodeFlowVariant) {
+        "wallet_initiated" ->
+            "Wallet2 has no API for starting a wallet-initiated OpenID4VCI authorization-code flow without a credential offer."
+        "issuer_initiated_dc_api" ->
+            "Wallet2 has no Digital Credentials API request handler for issuer_initiated_dc_api conformance flows."
+        else -> null
+    }
+
+    private fun mergeVariant(planVariant: WalletVariant, moduleVariant: JsonObject): JsonObject = buildJsonObject {
+        planVariant.toJsonObject().forEach { (key, value) -> put(key, value) }
+        moduleVariant.forEach { (key, value) -> put(key, value) }
+    }
+
+    private fun JsonObject.singleAttesterJwk(): JsonObject {
+        val keys = this["keys"] as? kotlinx.serialization.json.JsonArray
+        return keys?.singleOrNull() as? JsonObject ?: this
+    }
+
+    private fun JsonElement?.compactError(): String? = this
+        ?.toString()
+        ?.trim('"')
+        ?.takeIf { it.isNotBlank() && it != "null" }
+}
