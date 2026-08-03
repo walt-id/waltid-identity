@@ -172,3 +172,19 @@ object WalletVariantMatrix {
             }
         }
     }
+
+    /**
+     * HAIP fixes client-attestation, DPoP, simple/unsigned authorization-code
+     * behaviour inside the upstream plan. It exposes only format, initiation
+     * mode, and issuer-initiated offer delivery as plan selectors.
+     */
+    fun haip(): List<WalletVariant> = buildList {
+        listOf("sd_jwt_vc", "mdoc").forEach { format ->
+            add(haipVariant(format, "wallet_initiated"))
+            listOf("by_value", "by_reference").forEach { offerVariant ->
+                add(haipVariant(format, "issuer_initiated", offerVariant))
+            }
+        }
+    }
+
+    fun all(): List<WalletVariant> = basic() + haip()
