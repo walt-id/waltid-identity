@@ -2,10 +2,9 @@ package id.walt.openid4vp.conformance
 
 import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.testplans.IssuerConformanceTestRunner
-import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import org.junit.jupiter.api.Assumptions.assumeTrue
-import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -33,6 +32,10 @@ class IssuerConformanceTests {
         private const val sdJwtCredentialConfigurationIdEnv = "OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID"
         private const val mdocCredentialConfigurationIdProperty = "openid4vci.conformance.mdoc-credential-configuration-id"
         private const val mdocCredentialConfigurationIdEnv = "OPENID4VCI_CONFORMANCE_MDOC_CREDENTIAL_CONFIGURATION_ID"
+        private const val haipSdJwtCredentialConfigurationIdProperty = "openid4vci.conformance.haip-sd-jwt-credential-configuration-id"
+        private const val haipSdJwtCredentialConfigurationIdEnv = "OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID"
+        private const val haipMdocCredentialConfigurationIdProperty = "openid4vci.conformance.haip-mdoc-credential-configuration-id"
+        private const val haipMdocCredentialConfigurationIdEnv = "OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID"
         private const val clientAttestationIssuerProperty = "openid4vci.conformance.client-attestation-issuer"
         private const val clientAttestationIssuerEnv = "OPENID4VCI_CONFORMANCE_CLIENT_ATTESTATION_ISSUER"
         private const val clientAttesterJwksFileProperty = "openid4vci.conformance.client-attester-jwks-file"
@@ -41,6 +44,8 @@ class IssuerConformanceTests {
         private const val authorizationServerEnv = "OPENID4VCI_CONFORMANCE_AUTHORIZATION_SERVER"
         private const val credentialProofTypeHintProperty = "openid4vci.conformance.credential-proof-type-hint"
         private const val credentialProofTypeHintEnv = "OPENID4VCI_CONFORMANCE_CREDENTIAL_PROOF_TYPE_HINT"
+        private const val timeoutMinutesProperty = "openid4vci.conformance.timeout-minutes"
+        private const val timeoutMinutesEnv = "OPENID4VCI_CONFORMANCE_TIMEOUT_MINUTES"
 
         private fun propertyOrEnv(property: String, env: String): String? =
             System.getProperty(property) ?: System.getenv(env)
@@ -112,6 +117,12 @@ class IssuerConformanceTests {
         val mdocCredentialConfigurationId: String? =
             propertyOrEnv(mdocCredentialConfigurationIdProperty, mdocCredentialConfigurationIdEnv)
 
+        val haipSdJwtCredentialConfigurationId: String? =
+            propertyOrEnv(haipSdJwtCredentialConfigurationIdProperty, haipSdJwtCredentialConfigurationIdEnv)
+
+        val haipMdocCredentialConfigurationId: String? =
+            propertyOrEnv(haipMdocCredentialConfigurationIdProperty, haipMdocCredentialConfigurationIdEnv)
+
         val clientAttestationIssuer: String =
             propertyOrEnv(clientAttestationIssuerProperty, clientAttestationIssuerEnv)
                 ?: "https://client-attestation.example.com"
@@ -124,36 +135,30 @@ class IssuerConformanceTests {
         val credentialProofTypeHint: String? =
             propertyOrEnv(credentialProofTypeHintProperty, credentialProofTypeHintEnv)
 
-        val conformanceServerVersionResult = runBlocking {
-            runCatching {
-                ConformanceInterface(ConformanceConfig.CONFORMANCE_HOST, ConformanceConfig.CONFORMANCE_PORT).getServerVersion()
-            }.onFailure {
-                println("Error getting server version: $it")
-            }
-        }
-
-        @JvmStatic
-        val isConformanceAvailable = conformanceServerVersionResult.isSuccess
-
-        @JvmStatic
-        val isIssuerConfigured = credentialIssuerUrl != null
+        val timeoutMinutes: Long =
+            propertyOrEnv(timeoutMinutesProperty, timeoutMinutesEnv)?.toLongOrNull() ?: 240L
     }
 
     @Test
-    fun runIssuerConformanceTests() = runTest(timeout = 10.minutes) {
-        assumeTrue(isConformanceAvailable, "OpenID conformance suite is not reachable")
-        assumeTrue(isIssuerConfigured, "No credential issuer URL / enterprise issuer target configured")
+    fun runIssuerConformanceTests() {
+        assumeTrue(credentialIssuerUrl != null, "No credential issuer URL / enterprise issuer target configured")
 
-        IssuerConformanceTestRunner(
-            credentialIssuerUrl = requireNotNull(credentialIssuerUrl),
-            conformanceHost = ConformanceConfig.CONFORMANCE_HOST,
-            conformancePort = ConformanceConfig.CONFORMANCE_PORT,
-            sdJwtCredentialConfigurationId = sdJwtCredentialConfigurationId,
-            mdocCredentialConfigurationId = mdocCredentialConfigurationId,
-            clientAttestationIssuer = clientAttestationIssuer,
-            clientAttesterJwks = clientAttesterJwks,
-            authorizationServer = authorizationServer,
-            credentialProofTypeHint = credentialProofTypeHint,
-        ).run()
+        runBlocking {
+            withTimeout(timeoutMinutes.minutes) {
+                IssuerConformanceTestRunner(
+                    credentialIssuerUrl = requireNotNull(credentialIssuerUrl),
+                    conformanceHost = ConformanceConfig.CONFORMANCE_HOST,
+                    conformancePort = ConformanceConfig.CONFORMANCE_PORT,
+                    sdJwtCredentialConfigurationId = sdJwtCredentialConfigurationId,
+                    mdocCredentialConfigurationId = mdocCredentialConfigurationId,
+                    haipSdJwtCredentialConfigurationId = haipSdJwtCredentialConfigurationId,
+                    haipMdocCredentialConfigurationId = haipMdocCredentialConfigurationId,
+                    clientAttestationIssuer = clientAttestationIssuer,
+                    clientAttesterJwks = clientAttesterJwks,
+                    authorizationServer = authorizationServer,
+                    credentialProofTypeHint = credentialProofTypeHint,
+                ).run()
+            }
+        }
     }
 }

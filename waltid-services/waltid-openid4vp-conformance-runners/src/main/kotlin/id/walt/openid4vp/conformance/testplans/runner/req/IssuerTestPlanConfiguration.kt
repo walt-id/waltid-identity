@@ -3,10 +3,17 @@ package id.walt.openid4vp.conformance.testplans.runner.req
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+
+@Serializable
+enum class CredentialOfferAuthMethod {
+    PRE_AUTHORIZED,
+    AUTHORIZED,
+}
 
 /**
  * Configuration for OpenID4VCI Issuer test plans.
- * 
+ *
  * Used to configure the conformance suite to test an Issuer implementation.
  * The conformance suite acts as a wallet testing the issuer.
  */
@@ -17,17 +24,12 @@ data class IssuerTestPlanConfiguration(
      * Should include planName and variant.
      */
     val testPlanCreationUrl: ParametersBuilder.() -> Unit,
-    
+
     /**
      * JSON configuration for the test plan.
      * Includes issuer URL, client credentials, etc.
      */
     val testPlanCreationConfiguration: JsonObject,
-
-    /**
-     * Variant JSON string shared by all test modules in this plan.
-     */
-    val moduleVariant: String = "",
 
     /**
      * The URL of the issuer being tested.
@@ -41,26 +43,29 @@ data class IssuerTestPlanConfiguration(
     val skippableModules: Set<String> = emptySet(),
 
     /**
-     * Whether this test plan requires a pre-authorized credential offer.
+     * Authentication method for issuer-initiated credential offers, or null when
+     * the wallet starts without an offer.
      */
-    val requiresPreAuthorizedOffer: Boolean = false,
+    val credentialOfferAuthMethod: CredentialOfferAuthMethod? = null,
 
     /**
      * Profile ID to use when creating credential offers.
      */
-    val credentialProfileId: String = ""
-) {
+    val credentialProfileId: String = "",
+
     /**
-     * Create a new configuration with a credential offer URI added.
+     * Static transaction code to give to the conformance suite and issuer2 for pre-authorized tests.
      */
-    fun withCredentialOffer(credentialOfferUri: String): JsonObject {
+    val staticTxCode: String? = null,
+) {
+    /** Create the suite configuration with the configured static tx_code. */
+    fun withStaticTxCode(): JsonObject {
+        val txCode = staticTxCode?.takeIf { it.isNotBlank() } ?: return testPlanCreationConfiguration
         val mutableConfig = testPlanCreationConfiguration.toMutableMap()
-        
-        // Add credential_offer_uri to the vci configuration
         val vciConfig = (mutableConfig["vci"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
-        vciConfig["credential_offer_uri"] = kotlinx.serialization.json.JsonPrimitive(credentialOfferUri)
+        vciConfig["static_tx_code"] = JsonPrimitive(txCode)
         mutableConfig["vci"] = kotlinx.serialization.json.JsonObject(vciConfig)
-        
+
         return kotlinx.serialization.json.JsonObject(mutableConfig)
     }
 }

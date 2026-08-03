@@ -2,219 +2,228 @@ package id.walt.trust.parser.lote
 
 import id.walt.trust.model.*
 import id.walt.trust.utils.HashUtils.computeCertificateSha256
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
+import id.walt.trust.utils.HashUtils.normalizeCertificateDerBase64
+import io.github.optimumcode.json.schema.JsonSchema
+import io.github.optimumcode.json.schema.ValidationError
+import kotlinx.serialization.json.*
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Instant
 
 /**
- * Parses TS 119 602-style LoTE JSON sources into normalized trust model objects.
+ * Parses the normative scheme-explicit JSON binding from ETSI TS 119 602
+ * V1.1.1, Annex A.1.
  *
- * Input format matches the synthetic sample at:
- * waltid-architecture/enterprise/trust-lists/samples/sample-lote-wallet-providers.synthetic.json
- *
- * Note: this parser handles the MVP JSON shape. It is intentionally lenient —
- * unknown fields are ignored. The format is provisional pending TS 119 605 stabilisation.
+ * Input is validated against the ETSI-published JSON Schema before any data is normalized.
  */
 object LoteJsonParser {
 
-    // ---------------------------------------------------------------------------
-    // Raw JSON shape (internal deserialization models)
-    // ---------------------------------------------------------------------------
+    private val json = Json
+    private val schema by lazy { JsonSchema.fromJsonElement(EtsiLoteJsonSchema.schema) }
 
-    @Serializable
-    private data class RawLoteDocument(
-        val listMetadata: RawListMetadata,
-        val trustedEntities: List<RawTrustedEntity>
-    )
+    fun isNormative(json: String): Boolean = runCatching {
+        Json.parseToJsonElement(json).jsonObject.containsKey("LoTE")
+    }.getOrDefault(false)
 
-    @Serializable
-    private data class RawListMetadata(
-        val listId: String,
-        val listType: String? = null,
-        val territory: String? = null,
-        val issueDate: String? = null,
-        val nextUpdate: String? = null,
-        val sequenceNumber: String? = null
-    )
+    fun parse(
+        json: String,
+        sourceId: String,
+        sourceUrl: String? = null,
+        assurance: SourceAssurance = SourceAssurance(
+            signatureStatus = SignatureStatus.NOT_PRESENT,
+            signerTrust = SignerTrust.NOT_APPLICABLE,
+            authenticityState = AuthenticityState.UNVERIFIED,
+            details = "Unsigned ETSI TS 119 602 JSON"
+        ),
+        validationMetadata: Map<String, String> = emptyMap()
+    ): ParsedLoteSource {
+        val document = Json.parseToJsonElement(json)
+        val errors = mutableListOf<ValidationError>()
+        require(schema.validate(document, errors::add)) {
+            errors.joinToString(
+                prefix = "ETSI TS 119 602 JSON Schema validation failed: ",
+                separator = "; ",
+                limit = 10
+            ) { it.toString() }
+        }
 
-    @Serializable
-    private data class RawTrustedEntity(
-        val entityId: String,
-        val entityType: String,
-        val legalName: String,
-        val tradeName: String? = null,
-        val registrationNumber: String? = null,
-        val country: String? = null,
-        val services: List<RawService> = emptyList()
-    )
-
-    @Serializable
-    private data class RawService(
-        val serviceId: String,
-        val serviceType: String,
-        val status: String,
-        val statusStart: String? = null,
-        val identities: List<RawIdentity> = emptyList()
-    )
-
-    @Serializable
-    private data class RawIdentity(
-        val matchType: String,
-        val value: String
-    )
-
-    // ---------------------------------------------------------------------------
-    // Parse entry point
-    // ---------------------------------------------------------------------------
-
-    fun parse(json: String, sourceId: String, sourceUrl: String? = null): ParsedLoteSource {
-        val doc = Json { ignoreUnknownKeys = true }.decodeFromString<RawLoteDocument>(json)
-        val meta = doc.listMetadata
+        val lote = document.jsonObject.requiredObject("LoTE")
+        val scheme = lote.requiredObject("ListAndSchemeInformation")
+        val loteType = scheme.string("LoTEType")
+        val territory = scheme.string("SchemeTerritory")
+        val displayName = scheme.multiLangValue("SchemeName")
+            ?: scheme.multiLangValue("SchemeOperatorName")
+            ?: sourceId
 
         val source = TrustSource(
             sourceId = sourceId,
             sourceFamily = SourceFamily.LOTE,
-            displayName = meta.listId,
+            format = TrustListFormat.ETSI_TS_119_602_JSON,
+            displayName = displayName,
             sourceUrl = sourceUrl,
-            territory = meta.territory,
-            issueDate = meta.issueDate?.let { runCatching { Instant.parse(it) }.getOrNull() },
-            nextUpdate = meta.nextUpdate?.let { runCatching { Instant.parse(it) }.getOrNull() },
-            sequenceNumber = meta.sequenceNumber,
-            authenticityState = AuthenticityState.SKIPPED_DEMO,
+            territory = territory,
+            issueDate = scheme.string("ListIssueDateTime")?.parseInstant(),
+            nextUpdate = scheme.string("NextUpdate")?.parseInstant(),
+            sequenceNumber = scheme.primitive("LoTESequenceNumber")?.content,
+            assurance = assurance,
             freshnessState = FreshnessState.UNKNOWN,
             metadata = buildMap {
-                meta.listType?.let { put("listType", it) }
+                put("syntax", "ETSI_TS_119_602_V1_1_1_JSON")
+                put("schemaCommit", EtsiLoteJsonSchema.SOURCE_COMMIT)
+                scheme.primitive("LoTEVersionIdentifier")?.content?.let { put("loteVersionIdentifier", it) }
+                loteType?.let { put("loteType", it) }
+                putAll(validationMetadata)
             }
         )
 
         val entities = mutableListOf<TrustedEntity>()
         val services = mutableListOf<TrustedService>()
         val identities = mutableListOf<ServiceIdentity>()
+        val rawEntities = lote.array("TrustedEntitiesList") ?: JsonArray(emptyList())
 
-        doc.trustedEntities.forEach { rawEntity ->
-            val entityType = mapEntityType(rawEntity.entityType)
+        rawEntities.forEachIndexed { entityIndex, entityElement ->
+            val entityObject = entityElement.jsonObject
+            val info = entityObject.requiredObject("TrustedEntityInformation")
+            val informationUris = info.multiLangUris("TEInformationURI")
+            val entityId = informationUris.firstOrNull { "/ListOfTrustedEntities/" in it }
+                ?: informationUris.firstOrNull()
+                ?: "$sourceId::entity-$entityIndex"
+            val legalName = info.multiLangValue("TEName") ?: entityId
+            val country = info.objectOrNull("TEAddress")
+                ?.array("TEPostalAddress")
+                ?.firstOrNull()
+                ?.jsonObject
+                ?.string("Country")
 
             entities += TrustedEntity(
-                entityId = rawEntity.entityId,
+                entityId = entityId,
                 sourceId = sourceId,
-                entityType = entityType,
-                legalName = rawEntity.legalName,
-                tradeName = rawEntity.tradeName,
-                registrationNumber = rawEntity.registrationNumber,
-                country = rawEntity.country
+                entityType = mapEntityType(loteType),
+                legalName = legalName,
+                tradeName = info.multiLangValue("TETradeName"),
+                country = country,
+                metadata = buildMap {
+                    put("entityIndex", entityIndex.toString())
+                    if (informationUris.isNotEmpty()) put("informationUris", informationUris.joinToString(" "))
+                }
             )
 
-            rawEntity.services.forEach { rawService ->
-                val serviceId = "${rawEntity.entityId}::${rawService.serviceId}"
+            val rawServices = entityObject.array("TrustedEntityServices") ?: JsonArray(emptyList())
+            rawServices.forEachIndexed { serviceIndex, serviceElement ->
+                val serviceInfo = serviceElement.jsonObject.requiredObject("ServiceInformation")
+                val serviceId = "$entityId::service-$serviceIndex"
+                val serviceType = serviceInfo.string("ServiceTypeIdentifier") ?: "urn:etsi:ts:119602:service:unspecified"
+                val rawStatus = serviceInfo.string("ServiceStatus")
 
                 services += TrustedService(
                     serviceId = serviceId,
                     sourceId = sourceId,
-                    entityId = rawEntity.entityId,
-                    serviceType = rawService.serviceType,
-                    status = mapStatus(rawService.status),
-                    statusStart = rawService.statusStart?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                    entityId = entityId,
+                    serviceType = serviceType,
+                    status = mapStatus(rawStatus),
+                    statusStart = serviceInfo.string("StatusStartingTime")?.parseInstant(),
+                    metadata = buildMap {
+                        serviceInfo.multiLangValue("ServiceName")?.let { put("serviceName", it) }
+                        rawStatus?.let { put("rawStatusUri", it) }
+                    }
                 )
 
-                rawService.identities.forEachIndexed { idx, rawId ->
-                    val identityId = "$serviceId::id-$idx"
-                    identities += buildServiceIdentity(
-                        identityId = identityId,
-                        sourceId = sourceId,
-                        entityId = rawEntity.entityId,
-                        serviceId = serviceId,
-                        matchType = rawId.matchType,
-                        value = rawId.value
-                    )
-                }
+                val digitalIdentity = serviceInfo.requiredObject("ServiceDigitalIdentity")
+                identities += parseIdentities(digitalIdentity, sourceId, entityId, serviceId)
             }
         }
 
         return ParsedLoteSource(source, entities, services, identities)
     }
 
-    // ---------------------------------------------------------------------------
-    // Helpers
-    // ---------------------------------------------------------------------------
-
-    private fun buildServiceIdentity(
-        identityId: String,
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun parseIdentities(
+        digitalIdentity: JsonObject,
         sourceId: String,
         entityId: String,
-        serviceId: String,
-        matchType: String,
-        value: String
-    ): ServiceIdentity {
-        return when (matchType.uppercase()) {
-            "CERTIFICATE_SHA256" -> ServiceIdentity(
-                identityId = identityId,
+        serviceId: String
+    ): List<ServiceIdentity> = buildList {
+        var index = 0
+        digitalIdentity.array("X509Certificates")?.forEach { value ->
+            val encoded = value.jsonObject.requiredString("val")
+            add(ServiceIdentity(
+                identityId = "$serviceId::id-${index++}",
                 sourceId = sourceId,
                 entityId = entityId,
                 serviceId = serviceId,
-                certificateSha256Hex = value.removePrefix("sha256:")
-            )
-
-            "CERTIFICATE_PEM", "CERTIFICATE_DER" -> {
-                // Compute SHA-256 from PEM or DER certificate
-                val sha256 = computeCertificateSha256(value)
-                ServiceIdentity(
-                    identityId = identityId,
-                    sourceId = sourceId,
-                    entityId = entityId,
-                    serviceId = serviceId,
-                    certificateSha256Hex = sha256,
-                    metadata = if (sha256 == null) mapOf("rawMatchType" to matchType, "rawValue" to value) else emptyMap()
-                )
-            }
-
-            "SUBJECT_DN" -> ServiceIdentity(
-                identityId = identityId,
-                sourceId = sourceId,
-                entityId = entityId,
-                serviceId = serviceId,
-                subjectDn = value
-            )
-
-            "SKI" -> ServiceIdentity(
-                identityId = identityId,
-                sourceId = sourceId,
-                entityId = entityId,
-                serviceId = serviceId,
-                subjectKeyIdentifierHex = value
-            )
-
-            else -> ServiceIdentity(
-                identityId = identityId,
-                sourceId = sourceId,
-                entityId = entityId,
-                serviceId = serviceId,
-                metadata = mapOf("rawMatchType" to matchType, "rawValue" to value)
-            )
+                certificateDerBase64 = normalizeCertificateDerBase64(encoded),
+                certificateSha256Hex = computeCertificateSha256(encoded),
+                metadata = value.jsonObject.string("encoding")?.let { mapOf("encoding" to it) } ?: emptyMap()
+            ))
+        }
+        digitalIdentity.array("X509SubjectNames")?.forEach { value ->
+            add(ServiceIdentity(
+                identityId = "$serviceId::id-${index++}", sourceId = sourceId,
+                entityId = entityId, serviceId = serviceId,
+                subjectDn = value.jsonPrimitive.content
+            ))
+        }
+        digitalIdentity.array("X509SKIs")?.forEach { value ->
+            val ski = value.jsonPrimitive.content
+            val skiHex = runCatching {
+                Base64.decode(ski).joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
+            }.getOrElse { ski }
+            add(ServiceIdentity(
+                identityId = "$serviceId::id-${index++}", sourceId = sourceId,
+                entityId = entityId, serviceId = serviceId,
+                subjectKeyIdentifierHex = skiHex
+            ))
+        }
+        digitalIdentity.array("PublicKeyValues")?.forEach { value ->
+            add(ServiceIdentity(
+                identityId = "$serviceId::id-${index++}", sourceId = sourceId,
+                entityId = entityId, serviceId = serviceId,
+                metadata = mapOf("publicKeyJwk" to json.encodeToString(JsonElement.serializer(), value))
+            ))
+        }
+        digitalIdentity.array("OtherIds")?.forEach { value ->
+            add(ServiceIdentity(
+                identityId = "$serviceId::id-${index++}", sourceId = sourceId,
+                entityId = entityId, serviceId = serviceId,
+                metadata = mapOf("otherId" to value.jsonPrimitive.content)
+            ))
         }
     }
 
-    private fun mapEntityType(raw: String): TrustedEntityType = when (raw.uppercase()) {
-        "WALLET_PROVIDER" -> TrustedEntityType.WALLET_PROVIDER
-        "PID_PROVIDER" -> TrustedEntityType.PID_PROVIDER
-        "ATTESTATION_PROVIDER" -> TrustedEntityType.ATTESTATION_PROVIDER
-        "ACCESS_CERTIFICATE_PROVIDER" -> TrustedEntityType.ACCESS_CERTIFICATE_PROVIDER
-        "TRUST_SERVICE_PROVIDER" -> TrustedEntityType.TRUST_SERVICE_PROVIDER
-        "RELYING_PARTY_PROVIDER" -> TrustedEntityType.RELYING_PARTY_PROVIDER
+    private fun mapEntityType(loteType: String?): TrustedEntityType = when {
+        loteType == null -> TrustedEntityType.OTHER
+        "EUPIDProvidersList" in loteType -> TrustedEntityType.PID_PROVIDER
+        "EUWalletProvidersList" in loteType -> TrustedEntityType.WALLET_PROVIDER
+        "EUWRPACProvidersList" in loteType -> TrustedEntityType.ACCESS_CERTIFICATE_PROVIDER
+        "EUWRPRCProvidersList" in loteType -> TrustedEntityType.RELYING_PARTY_PROVIDER
+        "EUPubEAAProvidersList" in loteType -> TrustedEntityType.ATTESTATION_PROVIDER
         else -> TrustedEntityType.OTHER
     }
 
-    private fun mapStatus(raw: String): TrustStatus = when (raw.uppercase()) {
-        "GRANTED" -> TrustStatus.GRANTED
-        "RECOGNIZED" -> TrustStatus.RECOGNIZED
-        "ACCREDITED" -> TrustStatus.ACCREDITED
-        "SUPERVISED" -> TrustStatus.SUPERVISED
-        "DEPRECATED" -> TrustStatus.DEPRECATED
-        "SUSPENDED" -> TrustStatus.SUSPENDED
-        "REVOKED" -> TrustStatus.REVOKED
-        "WITHDRAWN" -> TrustStatus.WITHDRAWN
-        "EXPIRED" -> TrustStatus.EXPIRED
+    private fun mapStatus(raw: String?): TrustStatus = when (raw?.substringAfterLast('/')?.lowercase()) {
+        "granted", "recognized", "accredited", "supervised", "inaccord" -> TrustStatus.GRANTED
+        "deprecated" -> TrustStatus.DEPRECATED
+        "suspended" -> TrustStatus.SUSPENDED
+        "revoked" -> TrustStatus.REVOKED
+        "withdrawn", "notinaccord" -> TrustStatus.WITHDRAWN
+        "expired" -> TrustStatus.EXPIRED
         else -> TrustStatus.UNKNOWN
     }
+
+    private fun String.parseInstant(): Instant? = runCatching { Instant.parse(this) }.getOrNull()
+    private fun JsonObject.primitive(name: String): JsonPrimitive? = get(name) as? JsonPrimitive
+    private fun JsonObject.string(name: String): String? = primitive(name)?.contentOrNull
+    private fun JsonObject.requiredString(name: String): String = requireNotNull(string(name)) { "Missing $name" }
+    private fun JsonObject.objectOrNull(name: String): JsonObject? = get(name) as? JsonObject
+    private fun JsonObject.requiredObject(name: String): JsonObject = requireNotNull(objectOrNull(name)) { "Missing $name" }
+    private fun JsonObject.array(name: String): JsonArray? = get(name) as? JsonArray
+    private fun JsonObject.multiLangValue(name: String): String? {
+        val values = array(name)?.mapNotNull { it as? JsonObject } ?: return null
+        return values.firstOrNull { it.string("lang") == "en" }?.string("value")
+            ?: values.firstNotNullOfOrNull { it.string("value") }
+    }
+    private fun JsonObject.multiLangUris(name: String): List<String> =
+        array(name)?.mapNotNull { (it as? JsonObject)?.string("uriValue") } ?: emptyList()
 }
 
 data class ParsedLoteSource(

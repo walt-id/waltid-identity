@@ -1,6 +1,7 @@
 package id.walt.trust.parser
 
 import id.walt.trust.model.AuthenticityState
+import id.walt.trust.model.SignatureStatus
 import id.walt.trust.parser.tsl.TslParseConfig
 import id.walt.trust.parser.tsl.TslSignatureValidationException
 import id.walt.trust.parser.tsl.TslXmlParser
@@ -37,14 +38,14 @@ class TslSignatureValidationTest {
         println("  Source ID: ${result.source.sourceId}")
         println("  Territory: ${result.source.territory}")
         println("  Sequence Number: ${result.source.sequenceNumber}")
-        println("  Authenticity: ${result.source.authenticityState}")
+        println("  Authenticity: ${result.source.assurance.authenticityState}")
         println("  Entities: ${result.entities.size}")
         println("  Services: ${result.services.size}")
         println("  Signer: ${result.signerCertificate?.subjectX500Principal}")
 
         // EU LoTL should validate successfully
         assertEquals(
-            AuthenticityState.VALIDATED, result.source.authenticityState,
+            AuthenticityState.INTEGRITY_VERIFIED, result.source.assurance.authenticityState,
             "EU LoTL should have valid signature"
         )
         assertNotNull(result.signatureValidation, "Should have signature validation result")
@@ -74,12 +75,12 @@ class TslSignatureValidationTest {
         println("German TSL Parse Result:")
         println("  Source ID: ${result.source.sourceId}")
         println("  Territory: ${result.source.territory}")
-        println("  Authenticity: ${result.source.authenticityState}")
+        println("  Authenticity: ${result.source.assurance.authenticityState}")
         println("  Entities: ${result.entities.size}")
         println("  Services: ${result.services.size}")
 
         assertEquals(
-            AuthenticityState.VALIDATED, result.source.authenticityState,
+            AuthenticityState.INTEGRITY_VERIFIED, result.source.assurance.authenticityState,
             "German TSL should have valid signature"
         )
         assertEquals("DE", result.source.territory, "Should identify as German TSL")
@@ -94,7 +95,7 @@ class TslSignatureValidationTest {
         val result = TslXmlParser.parse(xml, "test-no-sig", config = config)
 
         assertEquals(
-            AuthenticityState.SKIPPED_DEMO, result.source.authenticityState,
+            AuthenticityState.UNVERIFIED, result.source.assurance.authenticityState,
             "Should skip signature validation when disabled"
         )
         assertNull(result.signatureValidation, "Should not have signature validation result")
@@ -120,7 +121,8 @@ class TslSignatureValidationTest {
 
         println("Expected exception: ${exception.message}")
         assertNotNull(exception.validationResult, "Should include validation result")
-        assertEquals(AuthenticityState.FAILED, exception.validationResult?.state)
+        assertEquals(AuthenticityState.UNVERIFIED, exception.validationResult?.state)
+        assertEquals(SignatureStatus.NOT_PRESENT, exception.validationResult?.signatureStatus)
     }
 
     @Test
@@ -137,7 +139,7 @@ class TslSignatureValidationTest {
 
         // Should parse but mark as failed
         assertEquals(
-            AuthenticityState.FAILED, result.source.authenticityState,
+            AuthenticityState.FAILED, result.source.assurance.authenticityState,
             "Should mark as FAILED when signature validation fails in lenient mode"
         )
 
@@ -170,7 +172,7 @@ class TslSignatureValidationTest {
         val result = TslXmlParser.parse(tamperedXml, "tampered", config = config)
 
         assertEquals(
-            AuthenticityState.FAILED, result.source.authenticityState,
+            AuthenticityState.FAILED, result.source.assurance.authenticityState,
             "Tampered content should fail signature validation"
         )
 
