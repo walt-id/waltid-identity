@@ -118,7 +118,7 @@ class AuthorizationRequestResolverJvmTest {
             runBlocking {
                 AuthorizationRequestResolver.resolve(
                     requestUrl = requestUrl,
-                    unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+                    unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
                 ) { _, _ ->
                     error("request_uri fetch should not be called for inline request objects")
                 }
@@ -145,7 +145,7 @@ class AuthorizationRequestResolverJvmTest {
         val resolved = runBlocking {
             AuthorizationRequestResolver.resolve(
                 requestUrl = requestUrl,
-                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
             ) { _, _ ->
                 error("request_uri fetch should not be called for inline request objects")
             }
@@ -229,7 +229,7 @@ class AuthorizationRequestResolverJvmTest {
             runBlocking {
                 AuthorizationRequestResolver.resolve(
                     requestUrl = requestUrl,
-                    unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                    unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
                 ) { _, method ->
                     assertEquals("post", method?.method)
                     AuthorizationRequestResolver.RequestUriFetchResponse(
@@ -269,7 +269,7 @@ class AuthorizationRequestResolverJvmTest {
                 runBlocking {
                     AuthorizationRequestResolver.resolve(
                         requestUrl,
-                        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                        UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
                     ) { _, _ -> response }
                 }
             }
@@ -283,7 +283,7 @@ class AuthorizationRequestResolverJvmTest {
         val acceptedWithLegacyPolicy = runBlocking {
             AuthorizationRequestResolver.resolve(
                 requestUrl,
-                AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
                 enforceFinalRequestObject = false,
             ) { _, _ ->
                 AuthorizationRequestResolver.RequestUriFetchResponse(
@@ -299,7 +299,7 @@ class AuthorizationRequestResolverJvmTest {
             runBlocking {
                 AuthorizationRequestResolver.resolve(
                     requestUrl,
-                    AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+                    UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
                 ) { _, _ ->
                     AuthorizationRequestResolver.RequestUriFetchResponse(
                         HttpStatusCode.OK,
@@ -338,7 +338,7 @@ class AuthorizationRequestResolverJvmTest {
                 runBlocking {
                     AuthorizationRequestResolver.resolve(
                         requestUrl,
-                        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                        UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
                     ) { _, _ -> error("invalid request must fail before fetching") }
                 }
             }
@@ -363,7 +363,7 @@ class AuthorizationRequestResolverJvmTest {
                 runBlocking {
                     AuthorizationRequestResolver.resolve(
                         requestUrl,
-                        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                        UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
                     ) { _, _ -> error("plain request must not fetch") }
                 }
             }
@@ -383,7 +383,7 @@ class AuthorizationRequestResolverJvmTest {
             runBlocking {
                 AuthorizationRequestResolver.resolve(
                     requestUrl,
-                    AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                    UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
                 ) { _, _ -> error("plain request must not fetch") }
             }
         }
@@ -403,7 +403,7 @@ class AuthorizationRequestResolverJvmTest {
         val resolved = runBlocking {
             AuthorizationRequestResolver.resolve(
                 requestUrl,
-                AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+                UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
             ) { _, _ -> error("plain request must not fetch") }
         }
         assertEquals(deliveryUri, resolved.authorizationRequest.responseUri)
@@ -415,7 +415,7 @@ class AuthorizationRequestResolverJvmTest {
             runBlocking {
                 AuthorizationRequestResolver.resolve(
                     mismatch,
-                    AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+                    UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
                 ) { _, _ -> error("plain request must not fetch") }
             }
         }
@@ -433,7 +433,7 @@ class AuthorizationRequestResolverJvmTest {
             runBlocking {
                 AuthorizationRequestResolver.resolve(
                     requestUrl,
-                    AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                    UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
                 ) { _, _ -> error("plain request must not fetch") }
             }
         }
@@ -483,7 +483,7 @@ class AuthorizationRequestResolverJvmTest {
         }.build()
         AuthorizationRequestResolver.resolve(
             requestUrl,
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
         ) { _, _ -> error("request_uri fetch should not be called") }
     }
 

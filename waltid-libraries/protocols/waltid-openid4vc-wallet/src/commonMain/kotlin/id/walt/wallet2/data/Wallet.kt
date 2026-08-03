@@ -3,7 +3,7 @@ package id.walt.wallet2.data
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import id.walt.openid4vp.clientidprefix.X509TrustPolicy
-import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import id.waltid.openid4vp.wallet.request.UnsignedRequestObjectPolicy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.toList
@@ -66,8 +66,8 @@ data class Wallet(
      * Defaults to REQUIRE_SIGNED for production-grade security.
      * Use ALLOW_UNSIGNED only for testing or legacy interoperability.
      */
-    val unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+    val unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy =
+        UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
 
     /** Expected Request Object audience for the wallet's configured discovery mode. */
     val requestObjectAudience: String = "https://self-issued.me/v2",

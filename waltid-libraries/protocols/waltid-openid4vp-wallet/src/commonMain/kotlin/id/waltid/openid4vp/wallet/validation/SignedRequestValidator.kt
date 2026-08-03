@@ -10,6 +10,7 @@ import id.walt.openid4vp.clientidprefix.RequestContext
 import id.walt.openid4vp.clientidprefix.X509TrustPolicy
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.waltid.openid4vp.wallet.request.UnsignedRequestObjectPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
@@ -78,16 +79,6 @@ object SignedRequestValidator {
             val message: String,
             val code: FailureCode = FailureCode.VALIDATION,
         ) : ValidationResult()
-    }
-
-    /**
-     * Policy for handling unsigned (alg=none) authorization requests.
-     */
-    enum class UnsignedRequestObjectPolicy {
-        /** Allow unsigned requests (NOT recommended for production). */
-        ALLOW_UNSIGNED,
-        /** Require all requests to be signed. */
-        REQUIRE_SIGNED,
     }
 
     /**

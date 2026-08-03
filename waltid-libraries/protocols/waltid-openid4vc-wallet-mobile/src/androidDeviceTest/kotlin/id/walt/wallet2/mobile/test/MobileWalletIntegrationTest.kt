@@ -18,6 +18,7 @@ import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import id.waltid.openid4vp.wallet.request.UnsignedRequestObjectPolicy
 import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
 import id.walt.wallet2.mobile.MobileWalletPresentationPreview
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
@@ -438,8 +439,8 @@ class MobileWalletIntegrationTest {
         transactionDataProfiles: List<MobileWalletTransactionDataProfile> = DEMO_TRANSACTION_DATA_PROFILES,
         requestObjectX509Trust: WalletX509TrustConfig? = null,
         // Demo sessions use direct redirect_uri-bound requests; keep Request Objects fail-closed.
-        unsignedRequestPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+        unsignedRequestPolicy: UnsignedRequestObjectPolicy =
+            UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
     ) = MobileWalletConfig(
         walletId = "android-demo-$prefix-${UUID.randomUUID()}",
         requestObjectX509Trust = requestObjectX509Trust,

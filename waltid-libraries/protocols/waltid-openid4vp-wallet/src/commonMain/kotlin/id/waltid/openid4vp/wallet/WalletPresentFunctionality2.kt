@@ -29,6 +29,7 @@ import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.walletRejectHandli
 import id.waltid.openid4vp.wallet.presentation.*
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
+import id.waltid.openid4vp.wallet.request.UnsignedRequestObjectPolicy
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.statement.*
@@ -328,15 +329,15 @@ object WalletPresentFunctionality2 {
      * @param presentationRequestUrl The openid4vp:// or https:// URL containing or
      *   referencing the authorization request.
      * @param unsignedRequestObjectPolicy Whether to accept unsigned (alg=none) JWTs.
-     *   Defaults to [AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED].
+     *   Defaults to [UnsignedRequestObjectPolicy.REQUIRE_SIGNED].
      * @param legacyFallbackCallback Optional legacy fallback for pre-registered client IDs.
      * @return The resolved and verified [AuthorizationRequest].
      * @throws IllegalArgumentException if the request cannot be resolved or verified.
      */
     suspend fun resolveAuthorizationRequest(
         presentationRequestUrl: Url,
-        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+        unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy =
+            UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
         expectedRequestObjectAudience: String = "https://self-issued.me/v2",
         x509TrustPolicy: X509TrustPolicy? = null,
@@ -567,7 +568,7 @@ object WalletPresentFunctionality2 {
 
     private suspend fun resolveAuthorizationRequestObject(
         presentationRequestUrl: Url,
-        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy,
+        unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
         expectedRequestObjectAudience: String,
         x509TrustPolicy: X509TrustPolicy?,
     ): ResolvedAuthorizationRequest =
@@ -631,8 +632,8 @@ object WalletPresentFunctionality2 {
          */
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
 
-        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+        unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy =
+            UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
 
         expectedRequestObjectAudience: String = "https://self-issued.me/v2",
         x509TrustPolicy: X509TrustPolicy? = null,

@@ -84,21 +84,6 @@ object AuthorizationRequestResolver {
         val walletNonce: String? = null,
     )
 
-    /**
-     * Policy for handling unsigned (alg=none) authorization requests.
-     * Maps to [SignedRequestValidator.UnsignedRequestObjectPolicy] for internal use.
-     */
-    enum class UnsignedRequestObjectPolicy {
-        ALLOW_UNSIGNED,
-        REQUIRE_SIGNED,
-        ;
-
-        internal fun toValidatorPolicy(): SignedRequestValidator.UnsignedRequestObjectPolicy = when (this) {
-            ALLOW_UNSIGNED -> SignedRequestValidator.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED
-            REQUIRE_SIGNED -> SignedRequestValidator.UnsignedRequestObjectPolicy.REQUIRE_SIGNED
-        }
-    }
-
     class UnsignedAuthorizationRequestNotAllowedException :
         IllegalArgumentException("Unsigned AuthorizationRequest object (alg=none) is not allowed")
 
@@ -428,7 +413,7 @@ object AuthorizationRequestResolver {
             expectedWalletNonce = expectedWalletNonce,
             expectedAudience = expectedRequestObjectAudience,
             x509TrustPolicy = x509TrustPolicy,
-            unsignedPolicy = unsignedRequestObjectPolicy.toValidatorPolicy(),
+            unsignedPolicy = unsignedRequestObjectPolicy,
         )
 
         return when (validationResult) {

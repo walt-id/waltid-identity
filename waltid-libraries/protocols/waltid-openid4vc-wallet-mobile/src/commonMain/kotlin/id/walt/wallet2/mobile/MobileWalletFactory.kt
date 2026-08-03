@@ -13,7 +13,7 @@ import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.PlatformKeyProvider
 import id.walt.wallet2.persistence.stores.PlatformKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
-import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import id.waltid.openid4vp.wallet.request.UnsignedRequestObjectPolicy
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 
@@ -41,8 +41,8 @@ public data class MobileWalletConfig(
     public val persistence: MobileWalletPersistence = MobileWalletPersistence(),
     public val requestObjectX509Trust: WalletX509TrustConfig? = null,
     public val requestObjectAudience: String = "https://self-issued.me/v2",
-    public val unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+    public val unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy =
+        UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
