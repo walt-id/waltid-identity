@@ -160,7 +160,7 @@ fun playwrightInstallArgs(): List<String> = buildList {
 
 tasks.register<JavaExec>("installPlaywrightBrowsers") {
     group = "verification"
-    description = "Install the Playwright browser used by issuer conformance authorization-code tests."
+    description = "Install the Playwright browser used by OpenID conformance authorization-code tests."
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("com.microsoft.playwright.CLI")
     args(playwrightInstallArgs())
