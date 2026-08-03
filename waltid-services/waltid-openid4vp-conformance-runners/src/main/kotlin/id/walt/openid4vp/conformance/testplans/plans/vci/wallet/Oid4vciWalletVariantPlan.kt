@@ -114,3 +114,30 @@ class Oid4vciWalletVariantPlan(
             -----END CERTIFICATE-----
         """.trimIndent()
 
+        fun loadTextFromEnvironmentOrResource(environmentName: String, resource: String): String {
+            val configuredPath = System.getenv(environmentName)?.trim()?.takeIf { it.isNotEmpty() }
+            if (configuredPath != null) {
+                return Files.readString(Path.of(configuredPath))
+            }
+            return requireNotNull(Oid4vciWalletVariantPlan::class.java.getResourceAsStream(resource)) {
+                "Missing conformance resource $resource"
+            }.bufferedReader().use { it.readText() }
+        }
+
+        /** Accept a JWKS directly or normalize one JWK into the JWKS shape required by the suite. */
+        fun loadJsonFromEnvironmentOrResource(environmentName: String, resource: String): JsonObject {
+            val value = Json.parseToJsonElement(loadTextFromEnvironmentOrResource(environmentName, resource)) as? JsonObject
+                ?: error("$environmentName / $resource must contain a JSON object")
+
+            return if ("keys" in value) {
+                value
+            } else {
+                buildJsonObject {
+                    put("keys", buildJsonArray { add(value) })
+                }
+            }
+        }
+
+        private fun jsonObject(value: String): JsonObject = Json.parseToJsonElement(value) as JsonObject
+    }
+}
