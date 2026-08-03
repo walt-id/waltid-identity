@@ -165,3 +165,80 @@ class WalletConformanceTestRunner(
         }
         return conformance.createTestPlan(url, plan.configuration)
     }
+
+    private suspend fun runModule(
+        conformance: ConformanceInterface,
+        planId: String,
+        module: CreateTestPlanResponse.Module,
+        planVariant: WalletVariant,
+        browser: WalletConformanceBrowserAutomation,
+    ): WalletVariantModuleRunResult {
+        val testUrl = conformance.buildCreateTestUrl(planId, module.testModule, module.variant)
+        val testId = conformance.createTest(testUrl).id
+        val logUrl = "https://${runtime.conformanceHost}:${runtime.conformancePort}/log-detail.html?log=$testId"
+        println("  ${module.testModule}: $logUrl")
+
+        val attemptedUrls = mutableSetOf<String>()
+        repeat(runtime.moduleTimeoutMinutes.toInt() * 120) {
+            delay(500)
+            val info = conformance.getTestRunInfo(testId)
+            // Fetch this before returning a terminal state. Some wallet modules publish
+            // their browser URL and then fail quickly; the full run contains the actual
+            // failure detail that /api/info intentionally omits.
+            val testRun = conformance.getTestRun(testId)
+
+            if (info.status == "WAITING" && runtime.browserAutomation.enabled) {
+                val interactions = testRun.walletBrowserInteractionsForAutomation()
+                    .filter { it.url !in attemptedUrls }
+                interactions.forEach { interaction ->
+                    attemptedUrls += interaction.url
+                    try {
+                        browser.complete(interaction)
+                    } catch (error: Throwable) {
+                        // The suite otherwise waits forever for protocol requests that a
+                        // failed local wallet adapter can no longer make.
+                        runCatching {
+                            conformance.cancelTest(testId)
+                        }.onFailure {
+                            println("Warning: could not cancel failed wallet test $testId: ${it.message}")
+                        }
+                        throw error
+                    } finally {
+                        // Preserve the same browser-URL audit state as the suite UI.
+                        runCatching {
+                            conformance.markBrowserUrlVisited(testId, interaction.url)
+                        }.onFailure {
+                            println("Warning: could not mark wallet browser URL as visited: ${it.message}")
+                        }
+                    }
+                }
+            }
+
+            if (info.status in setOf("FINISHED", "INTERRUPTED")) {
+                val accepted = info.status == "FINISHED" && info.result in setOf("PASSED", "SKIPPED")
+                return WalletVariantModuleRunResult(
+                    testModule = module.testModule,
+                    testId = testId,
+                    logUrl = logUrl,
+                    status = info.status,
+                    result = info.result,
+                    accepted = accepted,
+                    error = if (accepted) null else testRun.error.compactError()
+                        ?: info.summary
+                        ?: "Conformance result: ${info.result ?: info.status}",
+                    variant = mergeVariant(planVariant, module.variant),
+                )
+            }
+        }
+
+        return WalletVariantModuleRunResult(
+            testModule = module.testModule,
+            testId = testId,
+            logUrl = logUrl,
+            status = "TIMEOUT",
+            result = "TIMEOUT",
+            error = "Module did not complete within ${runtime.moduleTimeoutMinutes} minutes",
+            variant = mergeVariant(planVariant, module.variant),
+        )
+    }
+
