@@ -12,7 +12,6 @@ import id.walt.crypto.keys.KeyUseAuthorizationFailure
 import id.walt.crypto.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.persistence.stores.MobileWalletKeyRecord
-import java.lang.ref.WeakReference
 import kotlin.uuid.Uuid
 
 /** Android Keystore-backed mobile key provider. */
@@ -31,6 +30,7 @@ public class AndroidPlatformKeyProvider private constructor(
     private val interactionContext: FragmentActivity?
         get() = interactionContextProvider().takeIf { it.canHostBiometricPrompt() }
 
+    /** Checks Android support for the exact request without creating a key. */
     override suspend fun preflight(request: PlatformKeyRequest): PlatformKeyPreflight {
         if (request.keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.None) {
             val supported = request.keyType in PlatformKeyProvider.DEFAULT_SUPPORTED_PLATFORM_KEY_TYPES ||
@@ -49,6 +49,7 @@ public class AndroidPlatformKeyProvider private constructor(
         return PlatformKeyPreflight(failure == null, failure)
     }
 
+    /** Generates an Android Keystore or software key according to the exact request. */
     override suspend fun generate(request: PlatformKeyRequest): GeneratedPlatformKey {
         val preflight = preflight(request)
         if (!preflight.supported) {
@@ -78,6 +79,7 @@ public class AndroidPlatformKeyProvider private constructor(
         )
     }
 
+    /** Loads the Android Keystore key described by [record]. */
     override suspend fun load(record: MobileWalletKeyRecord): Key? {
         val options = AndroidKey.Options(
             kid = record.keyId,
@@ -89,9 +91,9 @@ public class AndroidPlatformKeyProvider private constructor(
         return if (record.isPlatformBacked) AndroidKey.Platform.load(options) else null
     }
 
-    override suspend fun delete(record: MobileWalletKeyRecord): Boolean = runCatching {
+    override suspend fun delete(record: MobileWalletKeyRecord) {
         if (record.isPlatformBacked) AndroidKey.Platform.delete(record.keyId)
-    }.isSuccess
+    }
 
     override suspend fun loadSoftwareKey(keyId: String, keyType: KeyType, jwkMaterial: ByteArray): Key? = runCatching {
         AndroidKey.Software.load(AndroidKey.Options(kid = keyId, keyType = keyType), jwkMaterial)

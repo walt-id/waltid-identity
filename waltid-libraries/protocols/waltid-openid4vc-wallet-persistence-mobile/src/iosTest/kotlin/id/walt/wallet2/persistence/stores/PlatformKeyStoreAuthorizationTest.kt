@@ -87,24 +87,38 @@ class PlatformKeyStoreAuthorizationTest {
     }
 
     @Test
-    fun corruptProtectedMetadataFailsClosedBeforeProviderLoad() = runTest {
+    fun databaseRejectsInconsistentProtectedMetadata() = runTest {
         withQueries { queries ->
-            queries.insert(
-                key_id = "protected-key",
-                key_type = KeyType.secp256r1.name,
-                created_at = 0L,
-                is_platform_backed = 0L,
-                key_material = "must-not-be-read",
-                authorization_policy = KeyUseAuthorizationPolicy.BiometricCurrentSet.name,
-            )
+            assertFailsWith<Throwable> {
+                queries.insert(
+                    key_id = "protected-key",
+                    key_type = KeyType.secp256r1.name,
+                    created_at = 0L,
+                    is_platform_backed = 0L,
+                    key_material = "must-not-be-read",
+                    authorization_policy = KeyUseAuthorizationPolicy.BiometricCurrentSet.name,
+                )
+            }
+        }
+    }
 
-            val provider = RecordingProvider(null)
+    @Test
+    fun invalidProtectedRecordFailsClosedBeforeSoftwareExport() = runTest {
+        withQueries { queries ->
+            val key = TestKey("protected-key")
             val failure = assertFailsWith<KeyUseAuthorizationException> {
-                PlatformKeyStore(provider, queries).getKey("protected-key")
+                PlatformKeyStore(RecordingProvider(key), queries).addKey(
+                    key,
+                    MobileWalletKeyRecord(
+                        keyId = "protected-key",
+                        keyType = KeyType.secp256r1,
+                        keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                        isPlatformBacked = false,
+                    ),
+                )
             }
 
             assertEquals(KeyUseAuthorizationFailure.InvalidStoredKeyMetadata, failure.failure)
-            assertEquals(null, provider.loadedPolicy)
         }
     }
 
@@ -141,7 +155,7 @@ class PlatformKeyStoreAuthorizationTest {
             return key
         }
 
-        override suspend fun delete(record: MobileWalletKeyRecord): Boolean = true
+        override suspend fun delete(record: MobileWalletKeyRecord) = Unit
 
         override suspend fun loadSoftwareKey(keyId: String, keyType: KeyType, jwkMaterial: ByteArray): Key? = null
 

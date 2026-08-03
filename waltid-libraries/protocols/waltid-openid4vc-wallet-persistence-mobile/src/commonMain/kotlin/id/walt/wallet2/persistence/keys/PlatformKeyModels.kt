@@ -18,13 +18,23 @@ public data class PlatformKeyRequest(
     public val keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
 )
 
-/** Result of checking whether a provider can enforce an exact request. */
+/**
+ * Result of checking whether a provider can enforce an exact request.
+ *
+ * @property supported Whether the exact request can be enforced without fallback.
+ * @property failure Stable reason the request is unsupported, or `null` when supported.
+ */
 public data class PlatformKeyPreflight(
     public val supported: Boolean,
     public val failure: KeyUseAuthorizationFailure? = null,
 )
 
-/** The authoritative result of a successful platform-key generation. */
+/**
+ * The authoritative result of a successful platform-key generation.
+ *
+ * @property key Generated signing key.
+ * @property record Immutable metadata that must be persisted with [key].
+ */
 public data class GeneratedPlatformKey(
     public val key: id.walt.crypto.keys.Key,
     public val record: id.walt.wallet2.persistence.stores.MobileWalletKeyRecord,

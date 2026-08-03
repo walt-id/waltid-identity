@@ -6,7 +6,6 @@ import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.GeneratedPlatformKey
@@ -136,11 +135,7 @@ private val appDidStore = object : WalletDidStore {
 private val appKeyStore = object : MobileWalletKeyStore {
     override suspend fun getKey(keyId: String): Key? = null
 
-    override suspend fun listKeys(): Flow<WalletKeyInfo> = emptyFlow()
-
     override suspend fun listKeyRecords(): Flow<MobileWalletKeyRecord> = emptyFlow()
-
-    override suspend fun addKey(key: Key): String = key.getKeyId()
 
     override suspend fun addKey(key: Key, record: MobileWalletKeyRecord): String = record.keyId
 
@@ -155,7 +150,7 @@ private object appKeyProvider : PlatformKeyProvider {
 
     override suspend fun load(record: MobileWalletKeyRecord): Key? = null
 
-    override suspend fun delete(record: MobileWalletKeyRecord): Boolean = false
+    override suspend fun delete(record: MobileWalletKeyRecord) = Unit
 
     override suspend fun loadSoftwareKey(keyId: String, keyType: KeyType, jwkMaterial: ByteArray): Key? = null
 

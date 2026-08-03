@@ -5,7 +5,6 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.KeyUseAuthorizationException
 import id.walt.crypto.keys.KeyUseAuthorizationFailure
 import id.walt.crypto.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import id.walt.wallet2.persistence.keys.PlatformKeyProvider
 import kotlinx.coroutines.flow.Flow
@@ -18,55 +17,60 @@ public class PlatformKeyStore(
     private val queries: WalletPersistenceQueries,
 ) : MobileWalletKeyStore {
 
+    /** Loads and validates the key record before returning key material. */
     override suspend fun getKey(keyId: String): Key? {
         val row = queries.selectByKeyId(keyId).executeAsOneOrNull() ?: return null
-        val record = row.toRecord()
+        val record = row.toValidatedRecord()
         val key = if (record.isPlatformBacked) {
             keyProvider.load(record)
         } else {
-            row.key_material?.let { keyProvider.loadSoftwareKey(record.keyId, record.keyType, it.encodeToByteArray()) }
+            keyProvider.loadSoftwareKey(
+                record.keyId,
+                record.keyType,
+                requireNotNull(row.key_material).encodeToByteArray(),
+            ) ?: invalidMetadata("Software key '${record.keyId}' could not be loaded from its stored material")
         }
-        return key ?: if (record.keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.None) {
-            null
-        } else {
+        if (key == null && record.keyUseAuthorizationPolicy != KeyUseAuthorizationPolicy.None) {
             throw KeyUseAuthorizationException(
                 failure = KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
                 message = "The protected key '$keyId' is unavailable",
             )
         }
-    }
-
-    override suspend fun listKeys(): Flow<WalletKeyInfo> = flow {
-        listKeyRecords().collect { record ->
-            emit(WalletKeyInfo(keyId = record.keyId, keyType = record.keyType.name))
+        if (key == null) return null
+        val loadedKeyId = runCatching { key.getKeyId() }.getOrElse {
+            invalidMetadata("Loaded key '${record.keyId}' did not expose a usable identifier", it)
         }
+        if (loadedKeyId != record.keyId || key.keyType != record.keyType) {
+            invalidMetadata("Loaded key '${record.keyId}' does not match its stored metadata")
+        }
+        return key
     }
 
+    /** Streams validated immutable key records from the local database. */
     override suspend fun listKeyRecords(): Flow<MobileWalletKeyRecord> = flow {
         queries.selectAll().executeAsList().forEach { row ->
-            emit(row.toRecord())
+            emit(row.toValidatedRecord())
         }
     }
 
-    override suspend fun addKey(key: Key): String = addKey(
-        key,
-        MobileWalletKeyRecord(
-            keyId = key.getKeyId(),
-            keyType = key.keyType,
-            isPlatformBacked = true,
-        ),
-    )
-
+    /** Persists a complete key record atomically; incomplete metadata is rejected fail-closed. */
     override suspend fun addKey(key: Key, record: MobileWalletKeyRecord): String {
-        require(record.keyId == key.getKeyId()) { "Key record identifier does not match the key" }
-        require(record.keyType == key.keyType) { "Key record type does not match the key" }
+        val actualKeyId = key.getKeyId()
+        if (record.keyId.isBlank() || record.keyId != actualKeyId) {
+            invalidMetadata("Key record identifier does not match the key")
+        }
+        if (record.keyType != key.keyType) {
+            invalidMetadata("Key record type does not match the key")
+        }
         if (record.keyUseAuthorizationPolicy != KeyUseAuthorizationPolicy.None) {
-            require(record.isPlatformBacked) { "Protected keys must be platform-backed" }
+            if (!record.isPlatformBacked) invalidMetadata("Protected keys must be platform-backed")
         }
         val keyMaterial: String? = if (record.isPlatformBacked) {
             null
         } else {
-            keyProvider.exportSoftwareKeyMaterial(key).decodeToString()
+            keyProvider.exportSoftwareKeyMaterial(key).decodeToString().also {
+                if (it.isBlank()) invalidMetadata("Software key '${record.keyId}' has empty serialized material")
+            }
         }
         queries.insert(
             key_id = record.keyId,
@@ -87,36 +91,43 @@ public class PlatformKeyStore(
     }
 
     private suspend fun recordFor(keyId: String): MobileWalletKeyRecord? =
-        queries.selectByKeyId(keyId).executeAsOneOrNull()?.toRecord()
+        queries.selectByKeyId(keyId).executeAsOneOrNull()?.toValidatedRecord()
 
-    private fun id.walt.wallet2.persistence.db.Key_references.toRecord(): MobileWalletKeyRecord {
+    private fun id.walt.wallet2.persistence.db.Key_references.toValidatedRecord(): MobileWalletKeyRecord {
+        if (key_id.isBlank()) invalidMetadata("Stored key identifier is blank")
+        if (is_platform_backed != 0L && is_platform_backed != 1L) {
+            invalidMetadata("Stored platform-backing flag for key '$key_id' is invalid")
+        }
         val policy = runCatching { KeyUseAuthorizationPolicy.valueOf(authorization_policy) }
             .getOrElse {
-                throw KeyUseAuthorizationException(
-                    failure = KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
-                    message = "Stored authorization policy for key '$key_id' is invalid",
-                    cause = it,
-                )
+                invalidMetadata("Stored authorization policy for key '$key_id' is invalid", it)
             }
         val keyType = runCatching { KeyType.valueOf(key_type) }
             .getOrElse {
-                throw KeyUseAuthorizationException(
-                    failure = KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
-                    message = "Stored key type for key '$key_id' is invalid",
-                    cause = it,
-                )
+                invalidMetadata("Stored key type for key '$key_id' is invalid", it)
             }
-        if (policy != KeyUseAuthorizationPolicy.None && (is_platform_backed != 1L || key_material != null)) {
-            throw KeyUseAuthorizationException(
-                failure = KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
-                message = "Protected key '$key_id' has inconsistent stored metadata",
-            )
+        val platformBacked = is_platform_backed == 1L
+        if (platformBacked && key_material != null) {
+            invalidMetadata("Platform-backed key '$key_id' must not contain software material")
+        }
+        if (!platformBacked && key_material.isNullOrBlank()) {
+            invalidMetadata("Software key '$key_id' must contain serialized material")
+        }
+        if (policy != KeyUseAuthorizationPolicy.None && (!platformBacked || key_material != null)) {
+            invalidMetadata("Protected key '$key_id' has inconsistent stored metadata")
         }
         return MobileWalletKeyRecord(
             keyId = key_id,
             keyType = keyType,
             keyUseAuthorizationPolicy = policy,
-            isPlatformBacked = is_platform_backed == 1L,
+            isPlatformBacked = platformBacked,
         )
     }
+
+    private fun invalidMetadata(message: String, cause: Throwable? = null): Nothing =
+        throw KeyUseAuthorizationException(
+            failure = KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
+            message = message,
+            cause = cause,
+        )
 }

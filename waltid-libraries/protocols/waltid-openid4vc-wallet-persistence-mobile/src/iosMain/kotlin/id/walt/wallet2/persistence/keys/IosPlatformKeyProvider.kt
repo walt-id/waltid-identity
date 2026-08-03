@@ -24,9 +24,11 @@ import kotlin.uuid.Uuid
 
 /** Keychain/Secure Enclave-backed mobile key provider. */
 public class IosPlatformKeyProvider(
+    private val useSecureElement: Boolean = true,
     private val authorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
 ) : PlatformKeyProvider {
     @OptIn(ExperimentalForeignApi::class)
+    /** Checks iOS support for the exact request without creating a key. */
     override suspend fun preflight(request: PlatformKeyRequest): PlatformKeyPreflight {
         if (request.keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.None) {
             val supported = request.keyType in PlatformKeyProvider.DEFAULT_SUPPORTED_PLATFORM_KEY_TYPES ||
@@ -34,13 +36,14 @@ public class IosPlatformKeyProvider(
             return PlatformKeyPreflight(supported, KeyUseAuthorizationFailure.UnsupportedCombination.takeUnless { supported })
         }
         val failure = when {
-            request.keyType != KeyType.secp256r1 -> KeyUseAuthorizationFailure.UnsupportedCombination
+            request.keyType != KeyType.secp256r1 || !useSecureElement -> KeyUseAuthorizationFailure.UnsupportedCombination
             isSimulator() -> KeyUseAuthorizationFailure.BiometricUnavailable
             else -> biometricAvailabilityFailure()
         }
         return PlatformKeyPreflight(failure == null, failure)
     }
 
+    /** Generates an iOS Keychain/Secure Enclave or software key for the exact request. */
     override suspend fun generate(request: PlatformKeyRequest): GeneratedPlatformKey {
         val preflight = preflight(request)
         if (!preflight.supported) {
@@ -56,7 +59,7 @@ public class IosPlatformKeyProvider(
                 IosKey.Options(
                     kid = kid,
                     keyType = request.keyType,
-                    inSecureElement = request.keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                    inSecureElement = usesSecureElementFor(request.keyType),
                     keyUseAuthorizationPolicy = request.keyUseAuthorizationPolicy,
                     authorizationPrompt = authorizationPrompt,
                 )
@@ -75,20 +78,21 @@ public class IosPlatformKeyProvider(
         )
     }
 
+    /** Loads the platform key described by [record]. */
     override suspend fun load(record: MobileWalletKeyRecord): Key? {
         val options = IosKey.Options(
             kid = record.keyId,
             keyType = record.keyType,
-            inSecureElement = record.keyUseAuthorizationPolicy == KeyUseAuthorizationPolicy.BiometricCurrentSet,
+            inSecureElement = usesSecureElementFor(record.keyType),
             keyUseAuthorizationPolicy = record.keyUseAuthorizationPolicy,
             authorizationPrompt = authorizationPrompt,
         )
         return if (record.isPlatformBacked) IosKey.Platform.load(options) else null
     }
 
-    override suspend fun delete(record: MobileWalletKeyRecord): Boolean = runCatching {
+    override suspend fun delete(record: MobileWalletKeyRecord) {
         if (record.isPlatformBacked) IosKey.Platform.delete(record.keyId)
-    }.isSuccess
+    }
 
     override suspend fun loadSoftwareKey(keyId: String, keyType: KeyType, jwkMaterial: ByteArray): Key? = runCatching {
         IosKey.Software.load(IosKey.Options(kid = keyId, keyType = keyType), jwkMaterial)
@@ -115,6 +119,9 @@ public class IosPlatformKeyProvider(
     }
 
     private fun isSimulator(): Boolean = isIosSimulatorTarget()
+
+    internal fun usesSecureElementFor(keyType: KeyType): Boolean =
+        useSecureElement && keyType == KeyType.secp256r1
 }
 
 internal expect fun isIosSimulatorTarget(): Boolean

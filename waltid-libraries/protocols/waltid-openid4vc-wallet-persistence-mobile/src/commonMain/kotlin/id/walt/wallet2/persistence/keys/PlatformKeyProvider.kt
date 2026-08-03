@@ -9,13 +9,20 @@ import id.walt.wallet2.persistence.stores.MobileWalletKeyRecord
  * Platform abstraction for creating, loading, and deleting mobile wallet signing keys.
  */
 public interface PlatformKeyProvider {
+    /** Checks whether this exact request can be enforced without fallback. */
     public suspend fun preflight(request: PlatformKeyRequest): PlatformKeyPreflight
 
+    /** Generates a key and its authoritative immutable record for [request]. */
     public suspend fun generate(request: PlatformKeyRequest): GeneratedPlatformKey
 
+    /** Loads the key described by [record], returning `null` only when it is absent. */
     public suspend fun load(record: MobileWalletKeyRecord): Key?
 
-    public suspend fun delete(record: MobileWalletKeyRecord): Boolean
+    /**
+     * Deletes the platform key for [record]. Missing keys are treated as success; other platform
+     * failures must throw so compensation cannot silently report success.
+     */
+    public suspend fun delete(record: MobileWalletKeyRecord)
 
     /**
      * Loads a serialized software key for platforms that need a non-platform-backed fallback.

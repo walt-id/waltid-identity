@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class IosPlatformKeyProviderTest {
 
@@ -60,5 +61,28 @@ class IosPlatformKeyProviderTest {
         }
 
         assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, failure.failure)
+    }
+
+    @Test
+    fun secureEnclavePreferenceIsIndependentFromAuthorizationPolicy() {
+        val secureProvider = IosPlatformKeyProvider(useSecureElement = true)
+        val keychainProvider = IosPlatformKeyProvider(useSecureElement = false)
+
+        assertTrue(secureProvider.usesSecureElementFor(KeyType.secp256r1))
+        assertFalse(secureProvider.usesSecureElementFor(KeyType.secp384r1))
+        assertFalse(keychainProvider.usesSecureElementFor(KeyType.secp256r1))
+    }
+
+    @Test
+    fun protectedP256RequiresSecureEnclavePreference() = runTest {
+        val preflight = IosPlatformKeyProvider(useSecureElement = false).preflight(
+            PlatformKeyRequest(
+                keyType = KeyType.secp256r1,
+                keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+            )
+        )
+
+        assertFalse(preflight.supported)
+        assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, preflight.failure)
     }
 }
