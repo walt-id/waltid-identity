@@ -85,8 +85,8 @@ let wallet = try await Wallet(
             stores: WalletStores(
                 credentials: AppCredentialStore(),
                 dids: AppDidStore(),
-                keys: WalletKeys(store: keyStore) { keyType in
-                    try await keyStore.generateKey(type: keyType)
+                keys: WalletKeys(store: keyStore) { request in
+                    try await keyStore.generateKey(type: request.keyType)
                 }
             )
         )

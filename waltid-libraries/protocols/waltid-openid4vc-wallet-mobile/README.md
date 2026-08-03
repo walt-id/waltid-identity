@@ -63,9 +63,10 @@ Android Keystore key restricted to strong biometrics; the factory must receive a
 current Face ID or Touch ID enrollment set and therefore requires a qualifying physical device.
 Protected non-P-256 requests fail without software fallback.
 
-`MobileWalletFactory(activity)` weakly references that activity. If the wallet outlives one activity
-instance, use `MobileWalletFactory(applicationContext) { activityTracker.currentFragmentActivity }`
-so protected operations resolve the current prompt host after configuration changes.
+The context-only `MobileWalletFactory(applicationContext)` constructor supports non-interactive
+(`None`) key use only. If the wallet can create or use protected keys, use
+`MobileWalletFactory(applicationContext) { activityTracker.currentFragmentActivity }` so protected
+operations resolve the current prompt host after configuration changes.
 
 This setting applies only when a key is created. It does not reclassify, replace, or rotate an existing
 key. Inspect `wallet.keys()` for each key's immutable policy and whether its private material is

@@ -546,10 +546,21 @@ public protocol WalletKeyStore: Sendable {
 
 /// Exact custom signing-key generation request.
 public struct WalletKeyRequest: Sendable {
+    /// Key algorithm requested from the configured generator.
     public let keyType: WalletKeyType
+
+    /// Optional wallet-local identifier to assign to the generated key.
     public let keyID: String?
+
+    /// Authorization policy that must hold when the key is used.
     public let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
 
+    /// Creates a custom signing-key generation request.
+    ///
+    /// - Parameters:
+    ///   - keyType: Key algorithm requested from the configured generator.
+    ///   - keyID: Optional wallet-local identifier to assign to the generated key.
+    ///   - keyUseAuthorizationPolicy: Authorization policy that must hold when the key is used.
     public init(
         keyType: WalletKeyType,
         keyID: String? = nil,

@@ -283,6 +283,8 @@ public data class WalletBridgeKeyInfo(
  * @property keyType Wallet key type name.
  * @property algorithm Optional signing algorithm label supplied by Swift.
  * @property serializedKeyJson walt.id serialized key JSON payload.
+ * @property keyUseAuthorizationPolicy Immutable policy enforced by the stored key.
+ * @property isPlatformBacked Whether the private key is held by a platform key store.
  */
 public data class WalletBridgeStoredKey(
     public val keyId: String,
@@ -353,7 +355,13 @@ public interface WalletBridgeKeyGenerator {
     public suspend fun generateKey(request: WalletBridgeKeyRequest): WalletBridgeStoredKey
 }
 
-/** Exact Swift custom-provider key request. */
+/**
+ * Exact Swift custom-provider key request.
+ *
+ * @property keyType Requested signing-key type.
+ * @property keyId Optional key identifier requested by the caller.
+ * @property keyUseAuthorizationPolicy Immutable policy the generator must enforce.
+ */
 public data class WalletBridgeKeyRequest(
     public val keyType: MobileWalletKeyType,
     public val keyId: String? = null,
@@ -465,16 +473,8 @@ private class BridgeKeyStore(
     override suspend fun getKey(keyId: String): Key? =
         bridgeStore.getKey(keyId)?.toKey()
 
-    override suspend fun listKeys(): Flow<id.walt.wallet2.data.WalletKeyInfo> =
-        bridgeStore.listKeys().map {
-            id.walt.wallet2.data.WalletKeyInfo(keyId = it.keyId, keyType = it.keyType, algorithm = it.algorithm)
-        }.asFlow()
-
     override suspend fun listKeyRecords(): Flow<MobileWalletKeyRecord> =
         bridgeStore.listKeys().map { it.toMobileWalletKeyRecord() }.asFlow()
-
-    override suspend fun addKey(key: Key): String =
-        bridgeStore.addKey(key.toBridgeStoredKey())
 
     override suspend fun addKey(key: Key, record: MobileWalletKeyRecord): String =
         bridgeStore.addKey(key.toBridgeStoredKey(record))
@@ -532,8 +532,9 @@ private class BridgeKeyProvider(
     override suspend fun load(record: MobileWalletKeyRecord): Key? =
         bridgeStore.getKey(record.keyId)?.toKey()
 
-    override suspend fun delete(record: MobileWalletKeyRecord): Boolean =
+    override suspend fun delete(record: MobileWalletKeyRecord) {
         bridgeStore.removeKey(record.keyId)
+    }
 
     override suspend fun loadSoftwareKey(keyId: String, keyType: KeyType, jwkMaterial: ByteArray): Key? =
         runCatching { KeyManager.resolveSerializedKey(jwkMaterial.decodeToString()) }.getOrNull()

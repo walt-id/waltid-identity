@@ -5,23 +5,22 @@ import androidx.fragment.app.FragmentActivity
 import id.walt.wallet2.persistence.encryption.AndroidDatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.AndroidPlatformKeyProvider
 import id.walt.wallet2.persistence.stores.DriverFactory
-import java.lang.ref.WeakReference
 
 /**
  * Android [MobileWallet] factory backed by Android KeyStore and an app-private SQLDelight database.
  *
- * The single-context constructor weakly references an interactive [FragmentActivity]. Apps that retain
- * a wallet across activity recreation should use the provider-based constructor.
+ * The single-context constructor is for non-interactive (`None`) key use. Protected signing requires
+ * the provider-based constructor so the current [FragmentActivity] can be resolved after recreation.
  */
 public actual class MobileWalletFactory private constructor(
     private val applicationContext: Context,
     private val interactionContextProvider: () -> FragmentActivity?,
     @Suppress("UNUSED_PARAMETER") marker: Unit,
 ) {
-    /** Creates an activity-scoped factory while retaining only the application context strongly. */
+    /** Creates a context-only factory. Protected signing requires the provider-based constructor. */
     public constructor(context: Context) : this(
         applicationContext = context.applicationContext,
-        interactionContextProvider = weakInteractionContextProvider(context as? FragmentActivity),
+        interactionContextProvider = { null },
         marker = Unit,
     )
 
@@ -54,12 +53,5 @@ public actual class MobileWalletFactory private constructor(
             openEncryptedDriver = driverFactory::createEncryptedDriver,
             deleteDatabase = driverFactory::deleteDatabase,
         )
-    }
-
-    private companion object {
-        fun weakInteractionContextProvider(activity: FragmentActivity?): () -> FragmentActivity? {
-            val reference = activity?.let(::WeakReference)
-            return { reference?.get() }
-        }
     }
 }

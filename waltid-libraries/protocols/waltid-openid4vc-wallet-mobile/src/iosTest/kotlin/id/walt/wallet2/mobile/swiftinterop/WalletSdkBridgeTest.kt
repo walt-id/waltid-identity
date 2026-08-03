@@ -599,7 +599,14 @@ class WalletSdkBridgeTest {
         val keys = requireNotNull(persistence.stores.keys)
         assertEquals(listOf(MobileWalletKeyRecord(P256_KEY_ID, KeyType.secp256r1, isPlatformBacked = false)), keys.store.listKeyRecords().toList())
         assertEquals(P256_KEY_ID, keys.store.getKey(P256_KEY_ID)?.getKeyId())
-        assertEquals(P256_KEY_ID, keys.store.addKey(generatedKey))
+        assertEquals(P256_KEY_ID, keys.store.addKey(
+            generatedKey,
+            MobileWalletKeyRecord(
+                keyId = generatedKey.getKeyId(),
+                keyType = generatedKey.keyType,
+                isPlatformBacked = false,
+            ),
+        ))
         assertEquals(generatedBridgeKey.keyId, bridgeKeyStore.addedKeys.single().keyId)
         assertEquals(true, keys.store.removeKey(P256_KEY_ID))
         assertEquals(listOf(P256_KEY_ID), bridgeKeyStore.removedKeyIds)
