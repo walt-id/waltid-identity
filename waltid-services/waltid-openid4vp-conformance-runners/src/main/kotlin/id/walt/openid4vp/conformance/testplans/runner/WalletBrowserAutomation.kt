@@ -47,3 +47,31 @@ class WalletConformanceBrowserAutomation(
             openBrowserInteraction(page, interaction)
 
             val deadline = System.currentTimeMillis() + Duration.ofSeconds(config.timeoutSeconds).toMillis()
+            var actionClicked = false
+            while (System.currentTimeMillis() < deadline) {
+                val currentUrl = page.url().orEmpty()
+                if (currentUrl.startsWith(adapterPublicUrl) && currentUrl.contains("/callback")) return
+                if (currentUrl.isConformanceCallback()) return
+
+                if (!actionClicked) {
+                    val submit = page.locator("button[type='submit'], input[type='submit']")
+                    if (submit.count() > 0 && submit.first().isVisible) {
+                        submit.first().click()
+                        actionClicked = true
+                    }
+                }
+
+                if (currentUrl.startsWith(adapterPublicUrl) && page.content().contains("Credential issuance completed")) {
+                    return
+                }
+                if (currentUrl.startsWith(adapterPublicUrl) && page.content().contains("Wallet failed")) {
+                    error("Wallet adapter failed to complete the interaction: ${page.content().take(1_000)}")
+                }
+                page.waitForTimeout(250.0)
+            }
+
+            error("Timed out waiting for the wallet browser interaction to complete; last URL=${page.url()}")
+        } finally {
+            browser.close()
+        }
+    }
