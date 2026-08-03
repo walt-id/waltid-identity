@@ -207,3 +207,41 @@ object WalletVariantMatrix {
         credentialOfferVariant = credentialOfferVariant,
     )
 }
+
+data class WalletVariantSelection(
+    val explicitVariantIds: Set<String> = emptySet(),
+    val fapiProfiles: Set<String> = emptySet(),
+    val credentialFormats: Set<String> = emptySet(),
+    val grantTypes: Set<String> = emptySet(),
+    val authorizationCodeFlowVariants: Set<String> = emptySet(),
+    val clientAuthTypes: Set<String> = emptySet(),
+    val senderConstrains: Set<String> = emptySet(),
+    val authorizationRequestTypes: Set<String> = emptySet(),
+    val requestMethods: Set<String> = emptySet(),
+    val credentialEncryptions: Set<String> = emptySet(),
+    val credentialIssuanceModes: Set<String> = emptySet(),
+    val credentialOfferVariants: Set<String> = emptySet(),
+    val moduleGroups: Set<String> = setOf("all"),
+    val explicitModules: Set<String> = emptySet(),
+    val strictResults: Boolean = true,
+    val reportDir: String = "build/reports/openid4vci-wallet-matrix",
+) {
+    fun select(variants: List<WalletVariant>): List<WalletVariant> {
+        if (explicitVariantIds.isNotEmpty()) {
+            return variants.filter { it.id in explicitVariantIds }
+        }
+
+        return variants.filter { variant ->
+            fapiProfiles.matches(variant.fapiProfile) &&
+                credentialFormats.matches(variant.credentialFormat) &&
+                grantTypes.matches(variant.grantType) &&
+                authorizationCodeFlowVariants.matches(variant.authorizationCodeFlowVariant) &&
+                clientAuthTypes.matches(variant.clientAuthType) &&
+                senderConstrains.matches(variant.senderConstrain) &&
+                authorizationRequestTypes.matches(variant.authorizationRequestType) &&
+                requestMethods.matches(variant.requestMethod) &&
+                variant.matchesPlanContextFilter(credentialEncryptions, variant.credentialEncryption) &&
+                variant.matchesPlanContextFilter(credentialIssuanceModes, variant.credentialIssuanceMode) &&
+                credentialOfferVariants.matches(variant.credentialOfferVariant)
+        }
+    }
