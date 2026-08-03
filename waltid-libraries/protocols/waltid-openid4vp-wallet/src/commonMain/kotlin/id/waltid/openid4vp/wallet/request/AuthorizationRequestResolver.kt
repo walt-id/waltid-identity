@@ -354,6 +354,18 @@ object AuthorizationRequestResolver {
         val response = fetchRequestUri(requestUri, requestUriMethod)
         response.status.run { check(isSuccess()) { "AuthorizationRequest cannot be retrieved ($this) from $requestUri: ${response.body}" } }
 
+        // OID4VP request_uri_method=post carries a nonce-bound Request Object. The
+        // strict wallet2 path requires that object to be a signed JWT; the legacy
+        // wallet API keeps its existing compatibility behavior explicitly via
+        // enforceFinalRequestObject=false.
+        val requestObjectPolicy = if (
+            requestUriMethod == RequestUriHttpMethod.POST && enforceFinalRequestObject
+        ) {
+            UnsignedRequestObjectPolicy.REQUIRE_SIGNED
+        } else {
+            unsignedRequestObjectPolicy
+        }
+
         val contentType = requireNotNull(response.contentType) { "AuthorizationRequest response does not define a content type" }
         log.trace { "Resolved AuthorizationRequest response with content type $contentType" }
 
@@ -362,7 +374,7 @@ object AuthorizationRequestResolver {
                 requestObject = response.body,
                 outerClientId = outerClientId,
                 enforceFinalRequestObject = enforceFinalRequestObject,
-                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+                unsignedRequestObjectPolicy = requestObjectPolicy,
                 expectedWalletNonce = response.walletNonce,
                 expectedRequestObjectAudience = expectedRequestObjectAudience,
                 x509TrustPolicy = x509TrustPolicy,
@@ -370,7 +382,7 @@ object AuthorizationRequestResolver {
             contentType.match(ContentType.Application.Json) -> {
                 // JSON content type from request_uri indicates an unsigned request.
                 // Apply the unsigned request policy: reject if REQUIRE_SIGNED, allow otherwise.
-                when (unsignedRequestObjectPolicy) {
+                when (requestObjectPolicy) {
                     UnsignedRequestObjectPolicy.REQUIRE_SIGNED -> {
                         throw IllegalArgumentException(
                             "Unsigned authorization request not allowed: received application/json " +
@@ -428,7 +440,7 @@ object AuthorizationRequestResolver {
                 )
             }
             is SignedRequestValidator.ValidationResult.Failure -> {
-                if (validationResult.message.contains("alg=none")) {
+                if (validationResult.code == SignedRequestValidator.ValidationResult.FailureCode.UNSIGNED_REQUEST_OBJECT) {
                     throw UnsignedAuthorizationRequestNotAllowedException()
                 }
                 val error = validationResult.error

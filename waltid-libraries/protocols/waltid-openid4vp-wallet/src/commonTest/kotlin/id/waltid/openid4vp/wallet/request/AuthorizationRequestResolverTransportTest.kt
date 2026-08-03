@@ -45,7 +45,7 @@ class AuthorizationRequestResolverTransportTest {
 
         val response = AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
             webResolveAuthReq = fetcher,
-            requestUri = "https://verifier.example/request.jwt",
+            requestUri = "http://127.0.0.1/request.jwt",
             requestUriMethod = RequestUriHttpMethod.POST,
         )
 

@@ -68,9 +68,15 @@ object SignedRequestValidator {
             val clientMetadata: ClientMetadata?
         ) : ValidationResult()
 
+        enum class FailureCode {
+            VALIDATION,
+            UNSIGNED_REQUEST_OBJECT,
+        }
+
         data class Failure(
             val error: ClientIdError?,
-            val message: String
+            val message: String,
+            val code: FailureCode = FailureCode.VALIDATION,
         ) : ValidationResult()
     }
 
@@ -201,7 +207,8 @@ object SignedRequestValidator {
             if (unsignedPolicy == UnsignedRequestObjectPolicy.REQUIRE_SIGNED || authenticatedPrefixRequiresSignature) {
                 return ValidationResult.Failure(
                     error = null,
-                    message = "Authorization request JWT uses alg=none — unsigned requests are not accepted for client_id '$clientId'"
+                    message = "Authorization request JWT uses alg=none — unsigned requests are not accepted for client_id '$clientId'",
+                    code = ValidationResult.FailureCode.UNSIGNED_REQUEST_OBJECT,
                 )
             }
             return ValidationResult.Success(authRequest, null)
