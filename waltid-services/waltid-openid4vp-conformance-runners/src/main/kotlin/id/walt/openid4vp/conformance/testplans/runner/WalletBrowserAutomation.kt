@@ -29,3 +29,21 @@ data class WalletBrowserAutomationConfig(
                 ?: System.getenv(environment)?.trim()?.takeIf { it.isNotEmpty() }
     }
 }
+
+/** Drives only the front-channel URLs emitted by the conformance suite. */
+class WalletConformanceBrowserAutomation(
+    private val config: WalletBrowserAutomationConfig,
+    private val adapterPublicUrl: String,
+    private val conformanceHost: String,
+    private val conformancePort: Int,
+) {
+    fun complete(interaction: BrowserInteraction) {
+        val browser = ConformanceBrowser.open()
+        try {
+            val page = browser.page
+            page.setDefaultTimeout(30_000.0)
+            page.setDefaultNavigationTimeout(30_000.0)
+            println("Opening wallet browser interaction via ${interaction.method}: ${interaction.url}")
+            openBrowserInteraction(page, interaction)
+
+            val deadline = System.currentTimeMillis() + Duration.ofSeconds(config.timeoutSeconds).toMillis()
