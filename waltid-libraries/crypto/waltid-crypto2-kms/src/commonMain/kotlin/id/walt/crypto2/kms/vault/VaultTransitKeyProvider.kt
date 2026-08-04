@@ -127,6 +127,62 @@ class VaultTransitKeyProvider(
         return key(stored, providerData)
     }
 
+    /**
+     * Builds a descriptor for a key that already exists in Vault, resolving its current version and
+     * public key from Vault itself.
+     *
+     * Vault Transit embeds the key version in every signature and rotates keys in place, so the
+     * version cannot be assumed: a rotated key is at v2 or higher, and signing with a stale version
+     * produces signatures Vault rejects or that do not verify against the current public key. For the
+     * same reason the public key is read from the resolved version rather than taken from the caller,
+     * whose cached copy may predate a rotation.
+     */
+    suspend fun storedKeyForExisting(
+        id: KeyId,
+        spec: KeySpec,
+        usages: Set<KeyUsage>,
+        options: VaultTransitOptions,
+        remoteName: String,
+        metadata: Map<String, String> = emptyMap(),
+    ): StoredKey.Managed {
+        require(usages.isNotEmpty()) { "Vault key usages cannot be empty" }
+        val allowedUsages = if (spec is KeySpec.Rsa) {
+            setOf(KeyUsage.SIGN, KeyUsage.VERIFY, KeyUsage.ENCRYPT, KeyUsage.DECRYPT)
+        } else {
+            setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
+        }
+        require(usages.all(allowedUsages::contains)) {
+            "Vault key usages are not supported by the requested key specification"
+        }
+        require(remoteName.isNotBlank()) { "Vault key name cannot be blank" }
+        val expectedType = spec.toVaultKeyType()
+        val keyData = authorizedData(
+            options = options,
+            method = HttpMethod.Get,
+            endpoint = options.transitEndpoint("keys", remoteName),
+        )
+        require(keyData.requiredString("type") == expectedType) {
+            "Vault key type does not match the requested key specification"
+        }
+        val version = keyData.requiredInt("latest_version")
+        val publicKey = keyData.requiredObject("keys")
+            .requiredObject(version.toString())
+            .requiredString("public_key")
+            .toPublicKey(spec)
+        publicKey.toPublicJwk(spec)
+        return StoredKey.Managed(
+            version = StoredKey.CURRENT_VERSION,
+            id = id,
+            spec = spec,
+            usages = usages,
+            provider = this.id,
+            providerSchemaVersion = PROVIDER_SCHEMA_VERSION,
+            providerData = VaultStoredKeyData(options.copy(keyName = null), remoteName, version).encode(),
+            publicKey = publicKey,
+            metadata = metadata,
+        )
+    }
+
     private fun key(stored: StoredKey.Managed, providerData: VaultStoredKeyData): ManagedKey =
         VaultTransitKey(stored, providerData)
 
@@ -399,6 +455,14 @@ class VaultTransitKeyProvider(
     companion object {
         val ID = ProviderId("vault-transit-rest")
 
+        /**
+         * Builds a descriptor for an existing key from a caller-supplied version and public key,
+         * without contacting Vault.
+         *
+         * Prefer the instance overload, which resolves both from Vault. This one pins whatever the
+         * caller passes, so [keyVersion] must be the key's current version - Vault Transit embeds the
+         * version in signatures, and a stale value silently breaks signing after any rotation.
+         */
         suspend fun storedKeyForExisting(
             id: KeyId,
             spec: KeySpec,
