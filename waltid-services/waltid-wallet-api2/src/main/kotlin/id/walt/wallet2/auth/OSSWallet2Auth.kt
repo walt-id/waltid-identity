@@ -7,6 +7,7 @@ import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.jose.preferredJwsAlgorithm
 import id.walt.crypto2.jose.supportsJwsAlgorithm
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
@@ -155,19 +156,25 @@ data class AccountInfoResponse(
  *
  * Reads [OSSWallet2AuthConfig] from the config manager:
  * - [OSSWallet2AuthConfig.signingStoredKey]: preferred crypto2 key used to sign and verify JWT
- *   session tokens.
+ *   session tokens. Sufficient on its own, and the only way to configure a managed key.
  * - [OSSWallet2AuthConfig.signingKey]: legacy sidecar and in-memory migration source.
  * - [OSSWallet2AuthConfig.tokenExpiry]: JWT `exp` lifetime as a [Duration].
+ *
+ * [cryptoRuntime] resolves the configured StoredKey. The default carries software providers only;
+ * pass a runtime holding the matching [id.walt.crypto2.providers.ManagedKeyProvider] to run auth off
+ * a KMS/HSM key.
  *
  * Returns the loaded [OSSWallet2AuthConfig] so the caller can pass
  * [OSSWallet2AuthConfig.tokenExpiry] to [registerWallet2AuthRoutes].
  *
  * Called from Main.kt when the auth optional feature is enabled.
  */
-suspend fun Application.configureWallet2Auth(): OSSWallet2AuthConfig {
+suspend fun Application.configureWallet2Auth(
+    cryptoRuntime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
+): OSSWallet2AuthConfig {
     val config = ConfigManager.getConfig<OSSWallet2AuthConfig>()
 
-    val signingKey = resolveWallet2AuthSigningKey(config)
+    val signingKey = resolveWallet2AuthSigningKey(config, cryptoRuntime)
 
     KtorAuthnzManager.accountStore = OSSWallet2AccountStore
     KtorAuthnzManager.tokenHandler = JwtTokenHandler.crypto2(
@@ -183,26 +190,37 @@ suspend fun Application.configureWallet2Auth(): OSSWallet2AuthConfig {
     return config
 }
 
-internal suspend fun resolveWallet2AuthSigningKey(config: OSSWallet2AuthConfig): Wallet2AuthSigningKey {
-    val legacyKey = config.signingKey.key
+/**
+ * Resolves the auth signing key through [cryptoRuntime].
+ *
+ * A standalone [OSSWallet2AuthConfig.signingStoredKey] is sufficient and is the only way to configure
+ * a managed (KMS/HSM) key - pass a runtime carrying the matching provider for those. The legacy
+ * [OSSWallet2AuthConfig.signingKey], when present, is migrated in memory and cross-checked against
+ * the StoredKey; it also fixes the JWS algorithm, which is otherwise taken from the StoredKey.
+ */
+internal suspend fun resolveWallet2AuthSigningKey(
+    config: OSSWallet2AuthConfig,
+    cryptoRuntime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
+): Wallet2AuthSigningKey {
+    val legacyKey = config.signingKey?.key
     val storedKey = config.signingStoredKey?.let(StoredKeyCodec::decodeFromString)
         ?: V1KeyMigration().migrate(
-            recordId = KeyId(legacyKey.getKeyId()),
+            recordId = KeyId(requireNotNull(legacyKey).getKeyId()),
             serialized = KeySerialization.serializeKeyToJson(legacyKey).jsonObject,
             usages = walletAuthKeyUsages,
         )
     require(storedKey.usages == walletAuthKeyUsages) {
         "Wallet auth signing StoredKey usages must be exactly $walletAuthKeyUsages"
     }
-    val key = CryptoRuntime(defaultSoftwareKeyProviders()).restore(storedKey)
-    val algorithm = JwsAlgorithm.parse(legacyKey.keyType.jwsAlg)
+    val key = cryptoRuntime.restore(storedKey)
     require(key.usages == walletAuthKeyUsages) {
         "Wallet auth signing StoredKey usages must be exactly $walletAuthKeyUsages"
     }
     require(key.capabilities.signer != null && key.capabilities.verifier != null) {
         "Wallet auth signing StoredKey must support signing and verification"
     }
-    validateWallet2AuthSidecar(legacyKey, key, algorithm)
+    val algorithm = legacyKey?.let { JwsAlgorithm.parse(it.keyType.jwsAlg) } ?: key.preferredJwsAlgorithm()
+    legacyKey?.let { validateWallet2AuthSidecar(it, key, algorithm) }
     return Wallet2AuthSigningKey(key, algorithm)
 }
 
