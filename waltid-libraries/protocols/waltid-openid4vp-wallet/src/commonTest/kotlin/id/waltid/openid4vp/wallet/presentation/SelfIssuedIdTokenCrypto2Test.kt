@@ -25,6 +25,38 @@ import id.walt.crypto2.keys.Key as Crypto2Key
 
 class SelfIssuedIdTokenCrypto2Test {
     @Test
+    fun `default ID token algorithm signs with the default P-256 holder key`() = runTest {
+        // The verifier default must be usable by the default mobile holder key, which is P-256 and
+        // can only sign ES256. RS256 (the OpenID Connect registration default) would fail here.
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+        val key = runtime.generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("default-holder-key"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        val token = SelfIssuedIdTokenBuilder.build(
+            authorizationRequest = AuthorizationRequest(
+                clientId = "verifier",
+                nonce = "nonce",
+                clientMetadata = ClientMetadata(
+                    subjectSyntaxTypesSupported = listOf("urn:ietf:params:oauth:jwk-thumbprint"),
+                    // No idTokenSignedResponseAlg: exercise the shared default.
+                ),
+            ),
+            holderKey = key,
+            holderDid = null,
+        )
+
+        assertEquals(JwsAlgorithm.ES256, CompactJws.decodeUnverified(token).algorithm)
+        assertEquals(
+            JwsAlgorithm.ES256,
+            JwsAlgorithm.parse(ClientMetadata.DEFAULT_ID_TOKEN_SIGNED_RESPONSE_ALG),
+        )
+    }
+
+    @Test
     fun `SPKI-exporting managed key builds JWK thumbprint subject`() = runTest {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val generated = runtime.generateSoftwareKey(
