@@ -65,7 +65,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -348,10 +347,7 @@ class WalletIssuanceSessionService(
                 expectedState = authorization.public.state,
                 expectedRedirectUri = active.request.redirectUri.toString(),
                 expectedIssuer = active.resolved.authorizationServerMetadata.issuer,
-                requireIssuer = active.resolved.authorizationServerMetadata.customParameters
-                    ?.get(AUTHORIZATION_RESPONSE_ISS_PARAMETER_SUPPORTED)
-                    ?.jsonPrimitive
-                    ?.booleanOrNull == true,
+                requireIssuer = active.resolved.authorizationServerMetadata.authorizationResponseIssParameterSupported == true,
             )
         } catch (error: AuthorizationResponseParser.AuthorizationErrorException) {
             return if (error.authError.error == "access_denied") {
@@ -1511,8 +1507,6 @@ class WalletIssuanceSessionService(
         const val DPOP_HEADER = "DPoP"
         const val DPOP_NONCE_HEADER = "DPoP-Nonce"
         const val USE_DPOP_NONCE = "use_dpop_nonce"
-        const val AUTHORIZATION_RESPONSE_ISS_PARAMETER_SUPPORTED =
-            "authorization_response_iss_parameter_supported"
         const val ACTIVE_RECORD_PREFIX = "active:"
         const val DEFERRED_RECORD_PREFIX = "deferred:"
 
