@@ -38,8 +38,14 @@ data class DecentralizedIdentifier(val did: String, override val rawValue: Strin
             val keys = DidService.resolveToKeys(clientId.did).getOrThrow()
 
             // 2. Find the specific key used for signing.
-            val verificationKey = keys.find { it.getKeyId() == kid }
-                ?: throw IllegalArgumentException("Key ID '$kid' from JWS not found in DID document.")
+            // JAR kid may be a DID URL (did:key:<mb>#<mb> / did:…#vm-id) while resolved
+            // Key.getKeyId() is often a JWK thumbprint — accept both forms.
+            val verificationKey = keys.find { key ->
+                val keyId = key.getKeyId()
+                keyId == kid || kid.endsWith("#$keyId") || kid.endsWith("/$keyId")
+            } ?: keys.singleOrNull()?.takeIf {
+                kid == clientId.did || kid.startsWith("${clientId.did}#")
+            } ?: throw IllegalArgumentException("Key ID '$kid' from JWS not found in DID document.")
 
             // 3. Verify the JWS signature with that key.
             verificationKey.verifyJws(jws).getOrThrow()
