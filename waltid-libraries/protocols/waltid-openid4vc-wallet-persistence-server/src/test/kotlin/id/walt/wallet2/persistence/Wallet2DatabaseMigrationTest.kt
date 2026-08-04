@@ -3,6 +3,13 @@ package id.walt.wallet2.persistence
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -48,7 +55,20 @@ class Wallet2DatabaseMigrationTest {
             }
 
             val db = initWallet2Database(config(jdbcUrl))
-            assertNotNull(ExposedKeyStore("legacy", db).getCrypto2Key(keyId))
+            val store = ExposedKeyStore("legacy", db)
+            assertNotNull(store.getCrypto2Key(keyId))
+
+            // An upgraded pre-crypto2 table must also accept a crypto2-only key, which has no legacy
+            // representation at all - i.e. serialized_key must no longer be NOT NULL.
+            val crypto2Key = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+                GenerateSoftwareKeyRequest(
+                    id = KeyId("crypto2-after-upgrade"),
+                    spec = KeySpec.Ec(EcCurve.P256),
+                    usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                )
+            )
+            assertEquals("crypto2-after-upgrade", store.addCrypto2Key(crypto2Key))
+            assertNotNull(store.getCrypto2Key("crypto2-after-upgrade", setOf(KeyUsage.SIGN)))
         }
     }
 
