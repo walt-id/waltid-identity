@@ -120,6 +120,12 @@ data class OpenId4VPConfig(
     val responseType: OpenID4VPResponseType = OpenID4VPResponseType.VP_TOKEN,
     val scope: String? = null,
     @SerialName("id_token_type") val idTokenType: String? = null,
+    /**
+     * JWS algorithm the Wallet must use for the Self-Issued ID Token.
+     * Defaults to [id.walt.verifier.openid.models.authorization.ClientMetadata.DEFAULT_ID_TOKEN_SIGNED_RESPONSE_ALG]
+     * and must be one the holder key can actually produce - the Wallet enforces the requested algorithm.
+     */
+    @SerialName("id_token_signed_response_alg") val idTokenSignedResponseAlg: String? = null,
 ) {
     init {
         if (responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN) {
@@ -129,6 +135,13 @@ data class OpenId4VPConfig(
             require(idTokenType == "subject_signed") {
                 "id_token_type must be subject_signed for response_type=vp_token id_token"
             }
+        } else {
+            require(idTokenSignedResponseAlg == null) {
+                "id_token_signed_response_alg only applies to response_type=vp_token id_token"
+            }
+        }
+        require(idTokenSignedResponseAlg?.isNotBlank() != false) {
+            "id_token_signed_response_alg must not be blank"
         }
     }
 }
