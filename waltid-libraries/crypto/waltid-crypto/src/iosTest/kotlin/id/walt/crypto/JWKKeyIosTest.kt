@@ -7,6 +7,8 @@ import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -139,5 +141,80 @@ class JWKKeyIosTest {
         val serialized = KeySerialization.serializeKey(key)
 
         assertTrue(serialized.contains("\"jwk\""), "serialized key should use JWK polymorphic type")
+    }
+
+    @Test
+    fun rejectsPkcs8PrivatePemImport() = runTest {
+        assertPrivatePemImportUnsupported("PRIVATE KEY")
+    }
+
+    @Test
+    fun rejectsPkcs1RsaPrivatePemImport() = runTest {
+        assertPrivatePemImportUnsupported("RSA PRIVATE KEY")
+    }
+
+    @Test
+    fun rejectsSec1EcPrivatePemImport() = runTest {
+        assertPrivatePemImportUnsupported("EC PRIVATE KEY")
+    }
+
+    @Test
+    fun importsPublicKeyPem() = runTest {
+        val key = JWKKey.importPEM(publicKeyPem).getOrThrow()
+
+        assertEquals(KeyType.secp256r1, key.keyType)
+        assertFalse(key.hasPrivateKey)
+    }
+
+    @Test
+    fun importsCertificatePemAsPublicKey() = runTest {
+        val key = JWKKey.importPEM(certificatePem).getOrThrow()
+
+        assertEquals(KeyType.secp256r1, key.keyType)
+        assertFalse(key.hasPrivateKey)
+    }
+
+    private suspend fun assertPrivatePemImportUnsupported(header: String) {
+        val exception = assertFailsWith<UnsupportedOperationException> {
+            JWKKey.importPEM(privatePem(header)).getOrThrow()
+        }
+
+        assertEquals("Importing private PEM keys is not supported on iOS", exception.message)
+    }
+
+    private fun privatePem(header: String): String = """
+        -----BEGIN $header-----
+        cGVuZGluZw==
+        -----END $header-----
+    """.trimIndent()
+
+    companion object {
+        private val publicKeyPem = """
+            -----BEGIN PUBLIC KEY-----
+            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEuo896Ho570UP24xyyNt7dE3U6qHl
+            DNJth0Hc/u/uJ2H0+7gRyILHJOH15UTFrQWcmIlnnzNAplM+d8pelYwK2g==
+            -----END PUBLIC KEY-----
+        """.trimIndent()
+
+        private val certificatePem = """
+            -----BEGIN CERTIFICATE-----
+            MIIC8TCCApigAwIBAgIKXkW8UsGZRHyHyDAKBggqhkjOPQQDAjB1MQswCQYDVQQG
+            EwJBVTEtMCsGA1UEAwwkQXVzdHJvYWRzIFByZS1wcm9kdWN0aW9uIERUUyBSb290
+            IENBMTcwNQYDVQQKDC5BdXN0cm9hZHMgUHJlLXByb2R1Y3Rpb24gRGlnaXRhbCBU
+            cnVzdCBTZXJ2aWNlMB4XDTI0MDkwMjAzMjQ0MVoXDTQ0MDkwMjAzMjQ0MVowdTEL
+            MAkGA1UEBhMCQVUxLTArBgNVBAMMJEF1c3Ryb2FkcyBQcmUtcHJvZHVjdGlvbiBE
+            VFMgUm9vdCBDQTE3MDUGA1UECgwuQXVzdHJvYWRzIFByZS1wcm9kdWN0aW9uIERp
+            Z2l0YWwgVHJ1c3QgU2VydmljZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABMJt
+            zT2r7UHttv6jSGEso6dVKF9QwsEyXcb4EUzciXonsLIorpUiG5tuuIUoD0fRbGNV
+            KD4yA3KJs6R8pe/94c6jggEOMIIBCjASBgNVHRMBAf8ECDAGAQH/AgEAMA4GA1Ud
+            DwEB/wQEAwIBBjAdBgNVHQ4EFgQUjQCqUhB6NiazWEI4a0qWZ7mXlRYwgcQGA1Ud
+            HwSBvDCBuTCBtqCBs6CBsIaBrWh0dHBzOi8vYXVzdHJvYWRzLWR0cy1wcmUtcHJk
+            LnZpaS5hdTAxLm1hdHRyLmdsb2JhbC92MS9lY29zeXN0ZW1zLzljOTVmNjY2LWNk
+            Y2UtNGU4YS1iY2Q3LWRkNzQ0ZjQ3ODhmNC92aWNhbHMvcHVibGljL2NlcnRpZmlj
+            YXRlcy9jYS9kOTRkZTEyNi1lOTgyLTRmOTUtYTUzNS1iZDA3NjcwOWU2NmYvY3Js
+            MAoGCCqGSM49BAMCA0cAMEQCIGxwNRWAq0B4DU/OlHjal0gULknk3JD4w1+Mtrpb
+            yPxFAiAaQMxnrcRJopU6SRrNTq1x29UlFJdaE7XHvdXu1sXnDA==
+            -----END CERTIFICATE-----
+        """.trimIndent()
     }
 }

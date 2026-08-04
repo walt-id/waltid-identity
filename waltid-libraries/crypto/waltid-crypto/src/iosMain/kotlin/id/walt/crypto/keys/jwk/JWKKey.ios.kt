@@ -2,8 +2,6 @@ package id.walt.crypto.keys.jwk
 
 import at.asitplus.signum.indispensable.CryptoPublicKey
 import at.asitplus.signum.indispensable.ECCurve
-import at.asitplus.signum.indispensable.asn1.*
-import at.asitplus.signum.indispensable.asn1.encoding.parse
 import at.asitplus.signum.indispensable.josef.JsonWebKey
 import at.asitplus.signum.indispensable.josef.JweAlgorithm
 import at.asitplus.signum.indispensable.josef.JweEncrypted.Companion.deserialize
@@ -251,17 +249,14 @@ actual class JWKKey actual constructor(
             val match = pemRegex.matchEntire(pem)
             requireNotNull(match) { "Invalid PEM format" }
             val headerType = match.groupValues[1].trim()
-            val base64 = match.groupValues[2].replace("\\s".toRegex(), "")
             val footerType = match.groupValues[3].trim()
             require(headerType == footerType) { "PEM header and footer do not match" }
             when (headerType) {
                 "CERTIFICATE" -> X509Certificate.decodeFromPem(pem).getOrThrow()
                     .decodedPublicKey.getOrThrow()
 
-                "RSA PRIVATE KEY" -> publicKeyFromPkcs1RsaPrivateKey(Base64.decode(base64))
-
-                "PRIVATE KEY" -> publicKeyFromPkcs8RsaPrivateKey(Base64.decode(base64))
-                    ?: throw IllegalArgumentException("Not a RSA private key")
+                "PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY" ->
+                    throw UnsupportedOperationException("Importing private PEM keys is not supported on iOS")
 
                 else -> CryptoPublicKey.decodeFromPem(pem).getOrThrow()
             }.let { cryptoPubKey ->
@@ -270,52 +265,6 @@ actual class JWKKey actual constructor(
             }
         }
 
-        fun publicKeyFromPkcs8RsaPrivateKey(pkcs8Bytes: ByteArray): CryptoPublicKey? {
-            // Unpack the outer PKCS#8 Sequence container
-            val pkcs8Sequence = Asn1Element.parse(pkcs8Bytes) as Asn1Sequence
-
-            // Structure indices for PrivateKeyInfo:
-            // index 0 -> Version
-            // index 1 -> AlgorithmIdentifier
-            // index 2 -> PrivateKey (housed inside an Asn1OctetString wrapper)
-            val algIdentifier =
-                ObjectIdentifier.decodeFromTlv(pkcs8Sequence.children[1].asSequence().children[0].asPrimitive())
-            if (!algIdentifier.toString().startsWith("1.2.840.113549.1.1.")) {
-                //Not an RSA private key
-                return null
-            }
-            val privateKeyOctetString = pkcs8Sequence.children[2] as Asn1OctetString
-
-            // 2. Extract the nested raw PKCS#1 byte payload from the octet string
-            return publicKeyFromPkcs1RsaPrivateKey(privateKeyOctetString.content)
-        }
-
-        fun publicKeyFromPkcs1RsaPrivateKey(pkcs1Bytes: ByteArray): CryptoPublicKey {
-            // Parse the extracted PKCS#1 payload structure
-            val pkcs1Sequence = Asn1Element.parse(pkcs1Bytes) as Asn1Sequence
-
-            // Representation of RSA private key with information for the CRT algorithm.
-            // RSAPrivateKey ::= SEQUENCE {
-            // [0] version           Version,
-            // [1] modulus           INTEGER,  -- n
-            // [2] publicExponent    INTEGER,  -- e
-            // [3] privateExponent   INTEGER,  -- d
-            // [4] prime1            INTEGER,  -- p
-            // [5] prime2            INTEGER,  -- q
-            // [6] exponent1         INTEGER,  -- d mod (p-1)
-            // [7] exponent2         INTEGER,  -- d mod (q-1)
-            // [8] coefficient       INTEGER,  -- (inverse of q) mod p
-            // [9] otherPrimeInfos   OtherPrimeInfos OPTIONAL
-            //}
-            val modulusInteger = Asn1Integer.decodeFromTlv(pkcs1Sequence.children[1].asPrimitive())
-            val publicExponentInteger = Asn1Integer.decodeFromTlv(pkcs1Sequence.children[2].asPrimitive())
-
-            // 4. Instantiate and return Signum's platform-agnostic RSA public key structural map
-            return CryptoPublicKey.RSA(
-                n = modulusInteger,
-                e = publicExponentInteger
-            )
-        }
     }
 
     override fun hashCode(): Int {
