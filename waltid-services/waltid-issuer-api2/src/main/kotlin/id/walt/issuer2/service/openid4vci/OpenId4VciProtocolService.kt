@@ -120,7 +120,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
     suspend fun processAuthorizeRequest(parameters: Map<String, List<String>>): AuthorizationResponseHttp {
         val authorizationRequest = when (val result = oauth2Provider.createAuthorizationRequest(parameters)) {
-            is AuthorizationRequestResult.Success -> result.request
+            is AuthorizationRequestResult.Success -> result.request.withIssuer(metadataService.issuerBaseUrl())
             is AuthorizationRequestResult.Failure -> return oauth2Provider.writeAuthorizationError(result.error)
         }
         val resolvedParameters = authorizationRequest.requestForm
@@ -202,7 +202,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         val authorizationRequest = when (
             val result = oauth2Provider.createAuthorizationRequest(authorizationRequestParameters)
         ) {
-            is AuthorizationRequestResult.Success -> result.request
+            is AuthorizationRequestResult.Success -> result.request.withIssuer(metadataService.issuerBaseUrl())
             is AuthorizationRequestResult.Failure -> return oauth2Provider.writeAuthorizationError(result.error)
         }
 

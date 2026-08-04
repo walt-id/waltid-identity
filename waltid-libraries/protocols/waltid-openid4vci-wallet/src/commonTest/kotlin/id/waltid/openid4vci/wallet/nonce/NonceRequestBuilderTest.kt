@@ -24,7 +24,7 @@ class NonceRequestBuilderTest {
         val builder = NonceRequestBuilder(client { request ->
             assertEquals(NONCE_ENDPOINT, request.url.toString())
             respond(
-                content = """{"c_nonce":"proof-nonce","c_nonce_expires_in":300}""",
+                content = """{"c_nonce":"proof-nonce"}""",
                 status = HttpStatusCode.OK,
                 headers = headersOf(HttpHeaders.ContentType, "application/json"),
             )
