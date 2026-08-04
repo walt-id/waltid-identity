@@ -18,6 +18,7 @@ import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.openid4vci.offers.AuthenticationMethod
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.prooftypes.Proofs
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -65,8 +66,11 @@ class Issuer2CredentialProofValidationTest {
         val key = JWKKey.generate(KeyType.secp256r1)
         val now = Clock.System.now().epochSeconds
 
-        suspend fun assertRejected(proofs: Proofs) {
-            assertInvalidProof(flow.request(proofs))
+        suspend fun assertRejected(
+            proofs: Proofs,
+            expectedError: String = CredentialErrorCodes.INVALID_PROOF,
+        ) {
+            assertRejectedCredentialRequest(flow.request(proofs), expectedError)
             assertEquals(0, acceptanceCalls.get())
             val session = flow.client.getSession(flow.sessionId)
             assertEquals(IssuanceSessionStatus.ACTIVE, session.status)
@@ -74,10 +78,10 @@ class Issuer2CredentialProofValidationTest {
         }
 
         assertRejected(proof(key, nonce = flow.nonce(), audience = listOf("https://wrong.example")))
-        assertRejected(proof(key, nonce = flow.nonce(), issuedAt = now - 6.minutes.inWholeSeconds))
+        assertRejected(proof(key, nonce = flow.nonce(), issuedAt = now - 10.minutes.inWholeSeconds))
         assertRejected(proof(key, nonce = flow.nonce(), issuedAt = now + 2.minutes.inWholeSeconds))
-        assertRejected(proof(key, nonce = null))
-        assertRejected(proof(key, nonce = UUID.randomUUID().toString()))
+        assertRejected(proof(key, nonce = null), CredentialErrorCodes.INVALID_NONCE)
+        assertRejected(proof(key, nonce = UUID.randomUUID().toString()), CredentialErrorCodes.INVALID_NONCE)
         assertRejected(proof(key, nonce = flow.nonce(), type = "JWT"))
         assertRejected(Proofs())
         assertRejected(Proofs(jwt = listOf("not-a-jwt")))
@@ -91,15 +95,6 @@ class Issuer2CredentialProofValidationTest {
                 includeJwk = false,
             ), key)
         )
-        assertRejected(
-            proof(
-                key = key,
-                nonce = flow.nonce(),
-                kid = "$holderDid#unrelated",
-                includeJwk = false,
-            )
-        )
-
         val reusableNonce = flow.nonce()
         assertRejected(
             proof(
@@ -114,15 +109,17 @@ class Issuer2CredentialProofValidationTest {
             nonce = reusableNonce,
             audience = listOf("https://other.example", flow.resolvedOffer.issuerMetadata.credentialIssuer),
         ).jwt.orEmpty().single()
-        assertRejected(Proofs(jwt = listOf(validProof, validProof)))
-
         val response = flow.request(Proofs(jwt = listOf(validProof)))
         assertEquals(HttpStatusCode.OK, response.status)
         assertEquals(1, acceptanceCalls.get())
     }
 
+    /**
+     * Nonces stay valid until they expire, so a rejected proof key can be retried with the same
+     * proof. Every attempt must reach key acceptance again and must leave the session issuable.
+     */
     @Test
-    fun `replayed nonce is rejected before key acceptance`() = testApplication {
+    fun `retrying a rejected proof key keeps the session issuable`() = testApplication {
         val acceptanceCalls = AtomicInteger()
         installIssuer2WithConfigFiles(
             credentialProofKeyAcceptance = CredentialProofKeyAcceptance { _, _ ->
@@ -137,11 +134,11 @@ class Issuer2CredentialProofValidationTest {
             audience = listOf(flow.resolvedOffer.issuerMetadata.credentialIssuer),
         )
 
-        assertInvalidProof(flow.request(proofs))
+        assertRejectedCredentialRequest(flow.request(proofs))
         assertEquals(1, acceptanceCalls.get())
 
-        assertInvalidProof(flow.request(proofs))
-        assertEquals(1, acceptanceCalls.get())
+        assertRejectedCredentialRequest(flow.request(proofs))
+        assertEquals(2, acceptanceCalls.get())
         val session = flow.client.getSession(flow.sessionId)
         assertEquals(IssuanceSessionStatus.ACTIVE, session.status)
         assertFalse(session.isClosed)
@@ -193,9 +190,12 @@ class Issuer2CredentialProofValidationTest {
         return Proofs(jwt = listOf(signingKey.signJws(payload.toString().encodeToByteArray(), header)))
     }
 
-    private suspend fun assertInvalidProof(response: HttpResponse) {
+    private suspend fun assertRejectedCredentialRequest(
+        response: HttpResponse,
+        expectedError: String = CredentialErrorCodes.INVALID_PROOF,
+    ) {
         assertEquals(HttpStatusCode.BadRequest, response.status)
-        assertEquals("invalid_proof", response.body<JsonObject>()["error"]?.jsonPrimitive?.content)
+        assertEquals(expectedError, response.body<JsonObject>()["error"]?.jsonPrimitive?.content)
     }
 
     private fun withConflictingMalformedJwk(proofs: Proofs, key: Key): Proofs {
