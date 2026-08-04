@@ -130,6 +130,19 @@ data class ClientMetadata(
     data class Jwks(val keys: List<JsonObject>)
 
     companion object {
+        /**
+         * Default `id_token_signed_response_alg` when the Verifier does not request a specific one.
+         *
+         * SIOPv2 defines ES256 as the Self-Issued OP default (`id_token_signing_alg_values_supported`),
+         * not RS256 as OpenID Connect Dynamic Client Registration does. Holder keys are P-256 in the
+         * default mobile setup and cannot sign RS256 at all, so RS256 would make the default
+         * `vp_token id_token` flow fail before signing.
+         *
+         * Shared by the Verifier (request construction and id_token validation) and the Wallet
+         * (id_token signing) so all three sides agree on one value.
+         */
+        const val DEFAULT_ID_TOKEN_SIGNED_RESPONSE_ALG: String = "ES256"
+
         private val jsonParser = Json { ignoreUnknownKeys = true }
         fun fromJson(jsonString: JsonElement): Result<ClientMetadata> {
             return runCatching {
