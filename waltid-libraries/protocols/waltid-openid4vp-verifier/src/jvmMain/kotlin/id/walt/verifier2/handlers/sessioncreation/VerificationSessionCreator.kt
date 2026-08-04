@@ -305,7 +305,10 @@ object VerificationSessionCreator {
                 metadata.copy(
                     subjectSyntaxTypesSupported = metadata.subjectSyntaxTypesSupported
                         ?: listOf("did", "urn:ietf:params:oauth:jwk-thumbprint"),
-                    idTokenSignedResponseAlg = metadata.idTokenSignedResponseAlg ?: "RS256",
+                    // The per-flow openid block wins over service-wide client metadata, both over the SIOPv2 default.
+                    idTokenSignedResponseAlg = openIdConfig?.idTokenSignedResponseAlg
+                        ?: metadata.idTokenSignedResponseAlg
+                        ?: ClientMetadata.DEFAULT_ID_TOKEN_SIGNED_RESPONSE_ALG,
                 )
             } else metadata
         }
