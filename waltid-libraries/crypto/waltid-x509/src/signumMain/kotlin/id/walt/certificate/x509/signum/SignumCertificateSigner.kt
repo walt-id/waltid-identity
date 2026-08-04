@@ -1,6 +1,9 @@
 package id.walt.certificate.x509.signum
 
+import at.asitplus.signum.indispensable.asn1.Asn1Element
 import at.asitplus.signum.indispensable.asn1.Asn1Time
+import at.asitplus.signum.indispensable.asn1.encoding.parse
+import at.asitplus.signum.indispensable.pki.RelativeDistinguishedName
 import at.asitplus.signum.indispensable.pki.TbsCertificate
 import at.asitplus.signum.indispensable.toX509SignatureAlgorithm
 import id.walt.certificate.x509.SignumPublicKeyInfoUtil.toSignumPublicKey
@@ -15,6 +18,8 @@ import id.walt.certificate.x509.signum.SignumSignatureAlgorithmUtil.toSignatureA
 import id.walt.certificate.x509.signum.dn.toSignumDn
 import id.walt.certificate.x509.signum.extension.SignumExtensionFactory
 import id.walt.crypto.keys.Key
+import kotlinx.io.bytestring.isNotEmpty
+import at.asitplus.signum.indispensable.pki.RelativeDistinguishedName as SigRdn
 import at.asitplus.signum.indispensable.pki.X509Certificate as SigX509Certificate
 
 class SignumCertificateSigner : X509CertificateSigner {
@@ -24,23 +29,30 @@ class SignumCertificateSigner : X509CertificateSigner {
         builder: X509CertificateDataBuilder
     ): X509Certificate {
         require(builder.version == 3) { "Only version 3 certificates are supported by Signum" }
-        // 1. Evaluate public key material
+        val subjectDn: List<RelativeDistinguishedName> =
+            DistinguishedName.ofString(builder.subjectDn).toSignumDn()
+
+        var issuerDn: List<RelativeDistinguishedName> = subjectDn
+
+        // Evaluate public key material
         val authorityPublicKeyInfo = issuerKey.toSignumPublicKey()
         val subjectPublicKeyInfo =
             (builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder).let {
                 if (it.selfSigned) {
+                    issuerDn = subjectDn
                     authorityPublicKeyInfo
                 } else {
-                    requireNotNull(it.key) {"Subject key must be provided for non-self-signed certificates."}
+                    require(builder.issuerDnRaw.isNotEmpty()) { "Issuer DN must be set for non-self-signed certificates." }
+                    issuerDn = Asn1Element.parse(builder.issuerDnRaw.toByteArray())
+                        .asSequence().children.map {
+                            SigRdn.decodeFromTlv(it.asSet())
+                        }
+                    requireNotNull(it.key) { "Subject key must be provided for non-self-signed certificates." }
                     it.key.toSignumPublicKey()
                 }
             }
 
-        // 2. Define the Identity (Subject & Issuer are identical for self-signed)
-        val subjectDn = DistinguishedName.ofString(builder.subjectDn)
-        val issuerDn = DistinguishedName.ofString(builder.issuerDn)
-
-        // 3. Configure Validity Timestamps using Asn1Time wrapper
+        // Configure Validity Timestamps using Asn1Time wrapper
         val notBefore = Asn1Time(builder.validity.notBefore)
         val notAfter = Asn1Time(builder.validity.notAfter)
 
@@ -69,10 +81,10 @@ class SignumCertificateSigner : X509CertificateSigner {
             version = builder.version - 1,
             serialNumber = builder.serialNumberRaw.toByteArray(),
             signatureAlgorithm = signumSigAlgorithmDescription,
-            issuerName = issuerDn.toSignumDn(),
+            issuerName = issuerDn,
             validFrom = notBefore,
             validUntil = notAfter,
-            subjectName = subjectDn.toSignumDn(),
+            subjectName = subjectDn,
             publicKey = subjectPublicKeyInfo,
             issuerUniqueID = null,
             subjectUniqueID = null,

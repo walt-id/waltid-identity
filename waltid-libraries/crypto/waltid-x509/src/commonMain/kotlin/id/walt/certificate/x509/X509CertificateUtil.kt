@@ -36,8 +36,8 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
     ): X509Certificate {
         val builder = X509CertificateDataBuilder(
             serialNumberGenerator = services.serialNumberGenerator,
-            issuerDn = "OU=CA,DC=test,O=Walt.id",
-            subjectDn = "DC=client,O=Walt.id",
+            issuerDnRaw = ByteString(),
+            subjectDn = "OU=CA,DC=test,O=Walt.id",
         )
         block.invoke(builder)
         builder.extensionAuthorityKeyIdentifier()
@@ -51,7 +51,7 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
     ): X509Certificate {
         val builder = X509CertificateDataBuilder(
             serialNumberGenerator = services.serialNumberGenerator,
-            issuerDn = issuerCert.data.subjectDn,
+            issuerDnRaw = issuerCert.data.subjectDnRaw,
             subjectDn = "OU=issuer, DC=test, O=Walt.id"
         )
         block.invoke(builder)
@@ -75,7 +75,7 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         return validateCertificateChain(certificates, additionalTrust)
     }
 
-    suspend fun validateCsrSignature(csr : Pkcs10CertificateSigningRequest): Boolean =
+    suspend fun validateCsrSignature(csr: Pkcs10CertificateSigningRequest): Boolean =
         services.signatureValidator.validateCsrSignature(csr)
 
     suspend fun validateCertificateChain(

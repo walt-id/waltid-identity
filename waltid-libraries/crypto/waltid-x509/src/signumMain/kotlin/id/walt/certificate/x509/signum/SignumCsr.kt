@@ -6,6 +6,7 @@ import at.asitplus.signum.indispensable.asn1.extensionRequest
 import id.walt.certificate.x509.Pkcs10CertificateSigningRequest
 import id.walt.certificate.x509.extension.Extension
 import id.walt.certificate.x509.signum.dn.toDistinguishedName
+import id.walt.certificate.x509.signum.dn.toRaw
 import id.walt.certificate.x509.signum.extension.SignumExtensionFactory
 import kotlinx.io.bytestring.ByteString
 import at.asitplus.signum.indispensable.pki.Pkcs10CertificationRequest as SignumCertificateRequest
@@ -26,6 +27,9 @@ class SignumCsr(val csr: SignumCertificateRequest) : Pkcs10CertificateSigningReq
     inner class SignumRequestedCertificate : Pkcs10CertificateSigningRequest.RequestedCertificateData {
         override val subjectDn: String =
             csr.tbsCsr.subjectName.toDistinguishedName().toString()
+
+        override val subjectDnRaw: ByteString
+            get() = csr.tbsCsr.subjectName.toRaw()
 
         override val subjectPublicKeyInfo: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo
             get() = SignumPublicKeyInfo.ofCryptoPublicKey(csr.tbsCsr.publicKey)

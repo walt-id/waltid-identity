@@ -21,12 +21,18 @@ class MockX509Certificate(private val subjectDn: String) : X509Certificate {
         override val issuerDn: String
             get() = "issuerDN"
 
+        override val issuerDnRaw: ByteString
+            get() = TODO("Not yet implemented")
+
         override val validity: X509Certificate.Validity = X509Certificate.Validity(
             Clock.System.now(),
             Clock.System.now() + 3600.days
         )
 
         override val subjectDn: String = this@MockX509Certificate.subjectDn
+
+        override val subjectDnRaw: ByteString
+            get() = TODO("Not yet implemented")
 
         override val subjectPublicKeyInfo: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo
             get() = TODO("Not yet implemented")

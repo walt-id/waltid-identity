@@ -24,6 +24,7 @@ interface Pkcs10CertificateSigningRequest {
 
     interface RequestedCertificateData : ExtensionContainer {
         val subjectDn: String
+        val subjectDnRaw: ByteString
         val subjectPublicKeyInfo: SubjectPublicKeyInfo
     }
 

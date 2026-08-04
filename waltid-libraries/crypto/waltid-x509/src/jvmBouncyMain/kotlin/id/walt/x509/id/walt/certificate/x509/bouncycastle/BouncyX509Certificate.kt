@@ -19,6 +19,8 @@ import kotlin.time.toKotlinInstant
 
         override val subjectDn: String = certificate.subject.toString()
 
+        override val subjectDnRaw: ByteString = ByteString(certificate.subject.encoded)
+
         override val subjectPublicKeyInfo: X509Certificate.SubjectPublicKeyInfo =
             object : X509Certificate.SubjectPublicKeyInfo {
                 override val algorithmName: String
@@ -33,6 +35,8 @@ import kotlin.time.toKotlinInstant
             }
 
         override val issuerDn: String = certificate.issuer.toString()
+
+        override val issuerDnRaw: ByteString = ByteString(certificate.issuer.encoded)
 
         override val validity: X509Certificate.Validity = X509Certificate.Validity(
             notBefore = certificate.notBefore.toInstant().toKotlinInstant(),

@@ -27,9 +27,7 @@ class X509CertificateSigningTest {
         val key = JWKKey.importPEM(caIssuerPrivateKey).getOrThrow()
 
         val certificate = X509CertificateUtil.createSelfSignedCertificate(key) {
-            issuerDn = "OU=waltid"
             subjectDn = "OU=waltid"
-
 
             extensionBasicConstraints {
                 cA = true
@@ -91,7 +89,6 @@ class X509CertificateSigningTest {
         val key = JWKKey.importPEM(TestKeys.ecP256KeyPem).getOrThrow()
         val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
             subjectDn = "CN=Example CA, C=US"
-            issuerDn = "CN=Example CA, C=US"
             extensionBasicConstraints {
                 cA = true
             }
@@ -126,7 +123,6 @@ class X509CertificateSigningTest {
         println("Keys imported")
 
         val caCert = X509CertificateUtil.createSelfSignedCertificate(caKey) {
-            issuerDn = "OU=waltid"
             subjectDn = "OU=waltid"
         }
 

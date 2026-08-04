@@ -37,6 +37,7 @@ interface X509Certificate {
             get() = serialNumberRaw.toHexString()
 
         val issuerDn: String
+        val issuerDnRaw: ByteString
 
         val validity: Validity
 

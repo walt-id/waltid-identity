@@ -4,9 +4,11 @@ import at.asitplus.signum.indispensable.asn1.Asn1BitString
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.extension.Extension
 import id.walt.certificate.x509.signum.dn.toDistinguishedName
+import id.walt.certificate.x509.signum.dn.toRaw
 import id.walt.certificate.x509.signum.extension.SignumExtensionFactory
 import kotlinx.io.bytestring.ByteString
 import at.asitplus.signum.indispensable.pki.X509Certificate as SignumCertificate
+
 
 class SignumX509Certificate(
     private val certificate: SignumCertificate
@@ -30,17 +32,19 @@ class SignumX509Certificate(
 
         override val issuerDn: String = certificate.tbsCertificate.issuerName.toDistinguishedName().toString()
 
+        override val issuerDnRaw: ByteString
+            get() = certificate.tbsCertificate.issuerName.toRaw()
+
         override val validity: X509Certificate.Validity
             get() = X509Certificate.Validity(
                 notBefore = certificate.tbsCertificate.validFrom.instant,
                 notAfter = certificate.tbsCertificate.validUntil.instant
             )
 
-        override val subjectDn: String
-            get() {
-                val subject = certificate.tbsCertificate.subjectName
-                return subject.toDistinguishedName().toString()
-            }
+        override val subjectDn: String = certificate.tbsCertificate.subjectName.toDistinguishedName().toString()
+
+        override val subjectDnRaw: ByteString
+            get() = certificate.tbsCertificate.subjectName.toRaw()
 
         override val subjectPublicKeyInfo: X509Certificate.SubjectPublicKeyInfo
             get() = SignumPublicKeyInfo.ofCryptoPublicKey(

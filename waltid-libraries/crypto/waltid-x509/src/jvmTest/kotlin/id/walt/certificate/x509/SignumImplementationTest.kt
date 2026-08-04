@@ -276,7 +276,6 @@ class SignumImplementationTest {
         val intermediateKey = JWKKey.importPEM(intermediateIssuerKeyPem).getOrThrow()
 
         val caCert = signumCertUtil.createSelfSignedCertificate(caKey) {
-            issuerDn = "OU=waltid"
             subjectDn = "OU=waltid"
         }
 

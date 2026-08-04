@@ -16,6 +16,9 @@ class BouncyPkcs10CertificateSigningRequest(val csr: PKCS10CertificationRequest)
             override val subjectDn: String
                 get() = csr.subject.toString()
 
+            override val subjectDnRaw: ByteString
+                get() = ByteString(csr.subject.encoded)
+
             override val subjectPublicKeyInfo: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo =
                 object : Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo {
                     override val algorithmName: String

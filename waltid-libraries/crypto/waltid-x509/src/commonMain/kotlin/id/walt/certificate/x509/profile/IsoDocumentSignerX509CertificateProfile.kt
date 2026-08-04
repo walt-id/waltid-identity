@@ -2,7 +2,6 @@ package id.walt.certificate.x509.profile
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
-import id.walt.certificate.x509.dn.DistinguishedName
 import id.walt.certificate.x509.extension.BasicConstraintsExtension
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension.Companion.extensionCrlDistributionPoints
@@ -20,21 +19,21 @@ import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
-import kotlinx.io.bytestring.ByteString
+import id.walt.crypto.keys.Key
 import kotlin.time.Duration.Companion.days
 
 
 /**
- * Profile for certificates in accordance to requirements for Issuing Authority Root Ca Certificates
+ * Profile for certificates which are used to sign the mobile security object in the device retrieval mdoc response.
  * described in
  * ISO/IEC 18014-5 Second Edition
  *
  * Annex B
- * Section 1.2 IACA root certificate
+ * Section 1.4 Document signer certificate
  */
-object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509CertificateValidator {
+object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509CertificateValidator {
 
-    const val ID = "iso-iaca-root"
+    const val ID = "iso-document-signer"
 
     val allowedSignatureAlgorithmsOid = listOf(
         "1.2.840.10045.4.3.2", // ECDSA-with SHA256
@@ -57,70 +56,44 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
     )
 
     /**
-     * Maximum of 20 years after “notBefore” date.
-     * NOTE The 20-year validity period results from the possibility of
-     * using the IACA root certificate for issuing an IDL according to
-     * ISO/IEC 18013-3, which allows the use of DS certificates with
-     * validity periods up to 15 years. If the IACA root certificate is only
-     * used to issue mDLs, a maximum validity period of 9 years is
-     * sufficient.
+     * Maximum of 457 days after “notBefore” date
      */
-    val maxValidityTime = 365.days * 20 // 20 years
+    val maxValidityTime = 457.days
 
     override val id: String = ID
 
-    fun X509CertificateDataBuilder.profileIaCaRootCertificate(
-        issuerDnCountryCode: String,
-        issuerDnStateOrProvinceName: String? = null,
-        issuerDnOrganizationName: String? = null,
-        issuerDnCommonName: String? = null,
-        issuerDnSerialNumber: String? = null,
-        issuerEmailAddress: String? = null,
-        issuerUri: String? = null
+    fun X509CertificateDataBuilder.profileDocumentSignerCertificate(
+        issuerCertificate: X509Certificate,
+        subjectKey: Key,
+        subjectDnCountryCode: String,
+        subjectDnStateOrProvinceName: String? = null,
+        subjectDnLocalityName: String? = null,
+        subjectDnOrganizationName: String? = null,
+        subjectDnCommonName: String,
+        subjectDnSerialNumber: String? = null,
     ) {
-        require(issuerDnCountryCode.length == 2) { "Require two letter country code but is '${issuerDnCountryCode}'" }
-        val issuerDn = listOfNotNull(
-            issuerDnSerialNumber?.ifBlank { null }?.let {
-                if (issuerDnCommonName?.ifBlank { null } != null) {
-                    // append it to commonName
-                    null
-                } else {
-                    "SERIALNUMBER=${it}"
-                }
-            },
-            issuerDnCommonName?.ifBlank { null }
-                ?.let { cn -> "CN=${cn}${issuerDnSerialNumber?.let { "+SERIALNUMBER=${it.trim()}" } ?: ""}" },
-            issuerDnOrganizationName?.ifBlank { null }?.let { "O=${it.trim()}" },
-            issuerDnStateOrProvinceName?.ifBlank { null }?.let { "ST=${it.trim()}" },
-            issuerDnCountryCode.let { "C=${it.uppercase().trim()}" },
+        require(issuerDn.isNotBlank()) { "issuerDn must not be blank" }
+        require(subjectDnCountryCode.length == 2) { "Require two letter country code but is '${subjectDnCountryCode}'" }
+        require(subjectDnCommonName.isNotBlank()) { "common name must not be blank" }
+        val subjectDn = listOfNotNull(
+            subjectDnCommonName.let { cn -> "CN=${cn}${subjectDnSerialNumber?.let { "+SERIALNUMBER=${it.trim()}" } ?: ""}" },
+            subjectDnOrganizationName?.ifBlank { null }?.let { "O=${it.trim()}" },
+            subjectDnLocalityName?.ifBlank { null }?.let { "L=${it.trim()}" },
+            subjectDnStateOrProvinceName?.ifBlank { null }?.let { "ST=${it.trim()}" },
+            subjectDnCountryCode.let { "C=${it.uppercase().trim()}" },
         )
             .joinToString(",")
-        profileIaCaRootCertificate(issuerDn, issuerEmailAddress, issuerUri)
+        profileDocumentSignerCertificate(issuerCertificate, subjectKey, subjectDn)
     }
 
-    fun X509CertificateDataBuilder.profileIaCaRootCertificate(
-        issuerDn: String,
-        issuerEmailAddress: String?,
-        issuerUri: String?
+    fun X509CertificateDataBuilder.profileDocumentSignerCertificate(
+        issuerCertificate: X509Certificate,
+        subjectKey: Key,
+        subjectDn: String
     ) {
-        this.subjectDn = issuerDn
-        subjectPublicKeySelfSigned()
-        extensionBasicConstraints {
-            critical = true
-            cA = true
-            pathLenConstraint = 0
-        }
-        extensionKeyUsage {
-            critical = true
-            addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign)
-            addKeyUsage(KeyUsageExtension.KeyUsage.cRLSign)
-        }
-        extensionSubjectKeyIdentifier()
-        require(issuerEmailAddress?.isNotBlank() == true || issuerUri?.isNotBlank() == true) { "Issuer email address or issuer uri is required" }
-        extensionIssuerAltName {
-            issuerEmailAddress?.also { addEmail(it) }
-            issuerUri?.also { addUri(it) }
-        }
+        this.issuerDnRaw = issuerCertificate.data.subjectDnRaw
+        this.subjectDn = subjectDn
+        subjectPublicKey(subjectKey)
     }
 
     override suspend fun validate(
@@ -130,7 +103,6 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
         validateVersion(context, x509Certificate)
         validateSerialNumber(context, x509Certificate)
         validateSignatureAlgorithm(context, x509Certificate)
-        validateIssuerDn(context, x509Certificate)
         validateValidityTime(context, x509Certificate, maxValidityTime)
         validateSubjectDn(context, x509Certificate)
         validateSubjectPublicKeyInfo(context, x509Certificate)
@@ -140,6 +112,7 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
         validateExtensionBasicConstraints(context, x509Certificate)
         validateExtensionCrlDistributionPoints(context, x509Certificate)
     }
+
 
     /**
      * countryName is mandatory. The value shall be in upper case and
@@ -168,71 +141,20 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
 
     private val countryCodeRegx = Regex("""\bc\s*=\s*"?([A-Z]{2})"?\b""", RegexOption.IGNORE_CASE)
 
-    fun validateIssuerDn(
-        context: ValidationContext,
-        x509Certificate: X509Certificate
-    ) {
-        // check presents of country code
-        val issuerDn = x509Certificate.data.issuerDn
-        val foundCountyCode = countryCodeRegx.find(issuerDn)
-        if (foundCountyCode != null) {
-            val countryCode = foundCountyCode.groups[1]?.value
-            if (countryCode == null || countryCode.length != 2 || countryCode != countryCode.uppercase()) {
-                context.addLogEntry(
-                    ValidationResult.Severity.ERROR,
-                    "issuerDn",
-                    "Expected country name to be ISO 3166-1 alpha-2 code  with capital letters but found '${countryCode}'"
-                )
-            }
-        } else {
-            context.addLogEntry(
-                ValidationResult.Severity.ERROR,
-                "issuerDn",
-                "Issuer DN doesn't contain a valid country name, expected country name to be ISO 3166-1 alpha-2 code in issuer DN '${issuerDn}'"
-            )
-        }
-    }
-
     /**
-     * countryName is mandatory. The value shall be in upper case and
-     * contain the ISO 3166-1 alpha-2 code of the issuing country, exactly
-     * the same value as in the issuing country data element. The
-     * countryName shall be PrintableString.
-     *
-     * stateOrProvinceName is optional. If this element is present in
-     * the IACA root certificate, this element shall be present and hold the
-     * same value. The value shall exactly match the value of the data
-     * element “issuing_jurisdiction”, if that element is present on the
-     * mDL.
-     *
-     * organizationName is optional. Its value is at the discretion of
-     * the IACA.
-     *
-     * commonName shall be present. Its value is at the discretion of the
-     * IACA.
-     *
-     * localityName is optional. Its value is at the discretion of the
-     * IACA.
-     *
-     * serialNumber is optional. If present, it shall be a
-     * PrintableString.
-     *
-     * Attributes that have a DirectoryString and for which the
-     * encoding is not listed above syntax shall be either
-     * PrintableString or UTF8String.
+     * Same exact binary value as Issuer.
      */
     fun validateSubjectDn(
         context: ValidationContext,
         x509Certificate: X509Certificate
     ) {
-        val dn = DistinguishedName.ofString(x509Certificate.data.subjectDn)
-        val dnByType = dn.rdnList
-            .flatMap { it }
-            .map { it.type.names.associateWith { it } }
-
-            //{ it.flatMap { it.type.names.associateWith { it } } }
-           // .groupingBy { it.type }
-        //if (dn)
+        if (x509Certificate.data.subjectDn != x509Certificate.data.issuerDn) {
+            context.addLogEntry(
+                ValidationResult.Severity.ERROR,
+                "subjectDn",
+                "Subject DN '${x509Certificate.data.subjectDn}' must be same as issuer DN ''${x509Certificate.data.issuerDn}'"
+            )
+        }
     }
 
     /**

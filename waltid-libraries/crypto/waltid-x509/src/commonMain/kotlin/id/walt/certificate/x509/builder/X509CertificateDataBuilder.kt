@@ -14,7 +14,7 @@ open class X509CertificateDataBuilder(
     private val serialNumberGenerator: X509CertificateSerialNumberGenerator,
     override val version: Int = 3,
     override var serialNumberRaw: ByteString = serialNumberGenerator.next(),
-    override var issuerDn: String,
+    override var issuerDnRaw: ByteString,
     override var subjectDn: String,
     override var validity: X509Certificate.Validity = X509Certificate.Validity(
         notBefore = Clock.System.now(),
@@ -22,6 +22,12 @@ open class X509CertificateDataBuilder(
     ),
     override var subjectPublicKeyInfo: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder()
 ) : X509Certificate.CertificateData, MutableExtensionContainer {
+
+    override val issuerDn: String
+        get() = error("Not allowed, raw value must be provided")
+
+    override val subjectDnRaw: ByteString
+        get() = error("Not available in builder")
 
     override val extensions: MutableMap<String, Extension> = mutableMapOf()
 

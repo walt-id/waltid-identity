@@ -12,6 +12,7 @@ import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension
 import id.walt.crypto.keys.Key
 import id.walt.x509.id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory
+import kotlinx.io.bytestring.isNotEmpty
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier
@@ -43,21 +44,27 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
         builder: X509CertificateDataBuilder
     ): X509Certificate {
         val serial = BigInteger(builder.serialNumberRaw.toByteArray())
-        val issuer = X500Name(builder.issuerDn)
+        var issuer: X500Name? = null
         val notBefore = Date(builder.validity.notBefore.toEpochMilliseconds())
         val notAfter = Date(builder.validity.notAfter.toEpochMilliseconds())
         val subject = X500Name(builder.subjectDn)
 
         val issuerPublicKeyInfo = BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(issuerKey)
         val subjectPublicKeyInfo =
-            (builder.subjectPublicKeyInfo as WaltIdKeySubjectPublicKeyInfoBuilder).let { builder ->
-                if (builder.selfSigned) {
+            (builder.subjectPublicKeyInfo as WaltIdKeySubjectPublicKeyInfoBuilder).let { subjectKeyBuilder ->
+                if (subjectKeyBuilder.selfSigned) {
+                    issuer = subject
                     issuerPublicKeyInfo
                 } else {
-                    checkNotNull(builder.key) { "Certificate subject public key missing" }
-                    BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(builder.key)
+                    val issuerDnRaw = builder.issuerDnRaw
+                    require(issuerDnRaw.isNotEmpty()) { "Issuer DN must be set for non-self-signed certificates" }
+                    issuer = X500Name.getInstance(issuerDnRaw.toByteArray())
+
+                    checkNotNull(subjectKeyBuilder.key) { "Certificate subject public key missing" }
+                    BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(subjectKeyBuilder.key)
                 }
             }
+        check(issuer != null)
         val bouncyBuilder = X509v3CertificateBuilder(
             issuer,
             serial,
