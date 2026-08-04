@@ -1,5 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.plans.vci.issuer
 
+import id.walt.openid4vp.conformance.report.ConformanceCiFlags
+import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.runner.req.CredentialOfferAuthMethod
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -198,7 +200,7 @@ data class IssuerVariantSelection(
     val credentialEncryptions: Set<String> = emptySet(),
     val discoveryOnly: Boolean = false,
     val strictResults: Boolean = true,
-    val reportDir: String = "build/reports/openid4vci-issuer-matrix",
+    val reportDir: String = "${ConformanceReportWriter.DEFAULT_REPORT_ROOT}/${ConformanceReportWriter.Role.VCI_ISSUER.directoryName}",
 ) {
     fun select(variants: List<IssuerVariant>): List<IssuerVariant> {
         if (explicitVariantIds.isNotEmpty()) {
@@ -234,13 +236,26 @@ data class IssuerVariantSelection(
             credentialEncryptions = csv("OPENID4VCI_CONFORMANCE_FILTER_CREDENTIAL_ENCRYPTION"),
             discoveryOnly = bool("OPENID4VCI_CONFORMANCE_DISCOVERY_ONLY") ||
                 env("OPENID4VCI_CONFORMANCE_MATRIX")?.equals("discovery", ignoreCase = true) == true,
-            strictResults = if (bool("OPENID4VCI_CONFORMANCE_CERTIFICATION_MODE")) {
-                true
-            } else {
-                optionalBool("OPENID4VCI_CONFORMANCE_STRICT") ?: true
-            },
-            reportDir = env("OPENID4VCI_CONFORMANCE_REPORT_DIR") ?: "build/reports/openid4vci-issuer-matrix",
+            strictResults = resolveStrictResults(),
+            reportDir = env("OPENID4VCI_CONFORMANCE_REPORT_DIR")
+                ?: "${ConformanceReportWriter.DEFAULT_REPORT_ROOT}/${ConformanceReportWriter.Role.VCI_ISSUER.directoryName}",
         )
+
+        /**
+         * Strictness resolution:
+         * 1. Certification mode always strict
+         * 2. Explicit OPENID4VCI_CONFORMANCE_STRICT wins for local runs
+         * 3. If CONFORMANCE_ALLOW_FAILURE is present (including empty CI injection), invert soft-fail
+         * 4. Otherwise default strict (preserve local issuer exploration defaults)
+         */
+        private fun resolveStrictResults(): Boolean {
+            if (bool("OPENID4VCI_CONFORMANCE_CERTIFICATION_MODE")) return true
+            optionalBool("OPENID4VCI_CONFORMANCE_STRICT")?.let { return it }
+            if (System.getenv(ConformanceCiFlags.ALLOW_FAILURE_ENV) != null) {
+                return ConformanceCiFlags.strictResults()
+            }
+            return true
+        }
 
         private fun csv(name: String): Set<String> = env(name)
             ?.split(',')
@@ -340,6 +355,8 @@ object IssuerVariantReportWriter {
 
     private fun buildSummary(results: List<IssuerVariantRunResult>): String = buildString {
         appendLine("# OpenID4VCI Issuer Matrix Summary")
+        appendLine()
+        appendLine("- Soft-fail (`CONFORMANCE_ALLOW_FAILURE`): `${if (ConformanceCiFlags.allowFailure()) "enabled" else "disabled"}`")
         appendLine()
         appendLine("| Status | Count |")
         appendLine("|--------|-------|")
