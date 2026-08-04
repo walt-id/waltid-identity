@@ -41,14 +41,22 @@ data class DecentralizedIdentifier(val did: String, override val rawValue: Strin
                 ?: throw IllegalStateException("Missing 'kid' header in JWS for key selection.")
 
             if (decoded.algorithm == JwsAlgorithm.ES256K) {
-                val verificationKey = DidService.resolveToKeys(clientId.did).getOrThrow()
-                    .find { it.getKeyId() == kid }
-                    ?: throw IllegalArgumentException("Key ID '$kid' from JWS not found in DID document.")
+                val keys = DidService.resolveToKeys(clientId.did).getOrThrow()
+                val verificationKey = keys.find { key ->
+                    val keyId = key.getKeyId()
+                    keyId == kid || kid.endsWith("#$keyId") || kid.endsWith("/$keyId")
+                } ?: keys.singleOrNull()?.takeIf {
+                    kid == clientId.did || kid.startsWith("${clientId.did}#")
+                } ?: throw IllegalArgumentException("Key ID '$kid' from JWS not found in DID document.")
                 verificationKey.verifyJws(jws).getOrThrow()
             } else {
-                val verificationKey = DidService.resolveToCrypto2Keys(clientId.did).getOrThrow()
-                    .find { it.id.value == kid }
-                    ?: throw IllegalArgumentException("Key ID '$kid' from JWS not found in DID document.")
+                val keys = DidService.resolveToCrypto2Keys(clientId.did).getOrThrow()
+                val verificationKey = keys.find { key ->
+                    val keyId = key.id.value
+                    keyId == kid || kid.endsWith("#$keyId") || kid.endsWith("/$keyId")
+                } ?: keys.singleOrNull()?.takeIf {
+                    kid == clientId.did || kid.startsWith("${clientId.did}#")
+                } ?: throw IllegalArgumentException("Key ID '$kid' from JWS not found in DID document.")
                 ClientIdCrypto2.verify(jws, verificationKey)
             }
 
