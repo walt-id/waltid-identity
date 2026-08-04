@@ -422,14 +422,7 @@ public class MobileWallet internal constructor(
         )
         val authorizationRequest = result.resolvedRequest.authorizationRequest
         val profilesByType = transactionDataProfiles.associateBy { it.type }
-        val encryptionRequirements = WalletPresentationHandler.inspectEncryptionRequirements(authorizationRequest)
-        val encryption = if (encryptionRequirements.isEncryptionRequired) {
-            MobileWalletEncryptionInfo.Required(
-                contentEncryptionAlgorithm = requireNotNull(encryptionRequirements.encAlgorithm),
-                keyManagementAlgorithm = requireNotNull(encryptionRequirements.algAlgorithm),
-                verifierKeyThumbprint = requireNotNull(encryptionRequirements.verifierKeyThumbprint),
-            )
-        } else MobileWalletEncryptionInfo.NotRequired
+        val encryption = ResponseEncryption.resolve(authorizationRequest)?.metadata().toMobileResponseEncryption()
 
         return MobileWalletDigitalCredentialPreview(
             requestId = result.requestId,

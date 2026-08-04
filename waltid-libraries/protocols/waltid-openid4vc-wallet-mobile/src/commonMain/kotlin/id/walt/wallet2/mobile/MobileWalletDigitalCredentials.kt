@@ -182,7 +182,7 @@ public data class MobileWalletDigitalCredentialPreview(
     public val request: MobileWalletPresentationRequestInfo,
     public val credentialOptions: List<MobileWalletPresentationCredentialOption>,
     public val credentialRequirements: List<MobileWalletPresentationCredentialRequirement>,
-    public val encryption: MobileWalletEncryptionInfo,
+    public val encryption: MobileWalletResponseEncryption,
     public val readerTrust: MobileWalletReaderTrust,
 )
 

@@ -5,7 +5,8 @@ import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
-import id.waltid.openid4vp.wallet.response.ResponseEncryptionHandler
+import id.waltid.openid4vp.wallet.request.UnsignedRequestObjectPolicy
+import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.ktor.http.URLBuilder
 import io.ktor.http.URLProtocol
 import io.ktor.http.Url
@@ -117,7 +118,7 @@ public object DcApiWallet {
         request: ResolvedDcApiRequest,
         vpToken: String,
         idToken: String? = null,
-        encryptionConfig: ResponseEncryptionHandler.EncryptionConfig? = null,
+        encryptionConfig: ResponseEncryption.Config? = null,
     ): DcApiCredentialResponse {
         val authorizationRequest = request.authorizationRequest
         val payload = buildJsonObject {
@@ -128,12 +129,10 @@ public object DcApiWallet {
             OpenID4VPResponseMode.DC_API -> payload
             OpenID4VPResponseMode.DC_API_JWT -> {
                 val encryption = requireNotNull(
-                    encryptionConfig ?: ResponseEncryptionHandler
-                        .extractEncryptionConfig(authorizationRequest)
-                        .getOrThrow()
+                    encryptionConfig ?: ResponseEncryption.resolve(authorizationRequest)
                 ) { "response_mode=dc_api.jwt requires response encryption metadata" }
                 buildJsonObject {
-                    put("response", JsonPrimitive(ResponseEncryptionHandler.encryptResponse(payload, encryption)))
+                    put("response", JsonPrimitive(ResponseEncryption.encryptResponse(payload, encryption)))
                 }
             }
 
@@ -256,7 +255,7 @@ public object DcApiWallet {
         }.build()
         return AuthorizationRequestResolver.resolve(
             requestUrl = requestUrl,
-            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
             expectedRequestObjectAudience = expectedRequestObjectAudience,
             x509TrustPolicy = x509TrustPolicy,
             fetchRequestUri = { _, _ -> error("request_uri is not a DC API request transport") },
