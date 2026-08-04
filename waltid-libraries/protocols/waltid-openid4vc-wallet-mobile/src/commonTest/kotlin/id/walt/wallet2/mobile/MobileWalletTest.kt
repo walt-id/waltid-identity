@@ -710,7 +710,7 @@ class MobileWalletTest {
     }
 
     @Test
-    fun capabilityAndMigrationModelsFailClosedByDefault() = runTest {
+    fun capabilityModelsFailClosedByDefault() = runTest {
         assertFalse(UnavailableMobileWalletCredentialRegistry.capabilities.platformAvailable)
         assertFalse(UnavailableMobileWalletCredentialRegistry.capabilities.registrationAvailable)
         assertIs<MobileWalletReaderTrust.Unverified>(
