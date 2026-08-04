@@ -354,7 +354,6 @@ class Wallet2IssuerVerifier2IntegrationTest {
                     call.response.header(HttpHeaders.CacheControl, "no-store")
                     call.respond(buildJsonObject {
                         put("c_nonce", nonce.nonce)
-                        put("c_nonce_expires_in", nonce.expiresInSeconds)
                     })
                 }
                 post("/token") {

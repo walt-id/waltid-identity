@@ -65,10 +65,7 @@ class JwtCredentialNonceService private constructor(
                 SOURCE_ENDPOINT_CLAIM to binding.nonceEndpoint,
             ),
         )
-        return IssuedCredentialNonce(
-            nonce = nonce,
-            expiresInSeconds = nonceLifetime.inWholeSeconds,
-        )
+        return IssuedCredentialNonce(nonce = nonce)
     }
 
     override suspend fun validate(

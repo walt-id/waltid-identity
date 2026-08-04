@@ -131,7 +131,6 @@ class Issuer2PARRouteTest {
         assertEquals("no-store", response.headers[HttpHeaders.CacheControl])
         val payload = response.body<JsonObject>()
         val nonce = assertNotNull(payload["c_nonce"]?.jsonPrimitive?.contentOrNull)
-        assertEquals("300", payload["c_nonce_expires_in"]?.jsonPrimitive?.content)
         assertTrue(KeyManager.resolveSerializedKey(serviceConfig.ciTokenKey).getPublicKey().verifyJws(nonce).isSuccess)
     }
 

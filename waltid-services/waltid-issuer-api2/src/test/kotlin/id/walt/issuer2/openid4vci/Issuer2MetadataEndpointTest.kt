@@ -45,6 +45,7 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -116,7 +117,14 @@ class Issuer2MetadataEndpointTest {
         assertEquals("$ISSUER_BASE_URL/jwks", authorizationServerMetadata.jwksUri)
         assertEquals("$ISSUER_BASE_URL/par", authorizationServerMetadata.pushedAuthorizationRequestEndpoint)
         assertEquals(false, authorizationServerMetadata.requirePushedAuthorizationRequests)
-        assertNull(authorizationServerMetadata.codeChallengeMethodsSupported)
+        assertEquals(true, authorizationServerMetadata.authorizationResponseIssParameterSupported)
+        assertEquals(
+            true,
+            authorizationServerMetadataJson["authorization_response_iss_parameter_supported"]
+                ?.jsonPrimitive
+                ?.booleanOrNull,
+        )
+        assertEquals(listOf("S256"), authorizationServerMetadata.codeChallengeMethodsSupported)
         assertEquals(setOf("attest_jwt_client_auth"), authorizationServerMetadata.tokenEndpointAuthMethodsSupported)
         assertNull(authorizationServerMetadata.tokenEndpointAuthSigningAlgValuesSupported)
         assertEquals(
@@ -137,7 +145,12 @@ class Issuer2MetadataEndpointTest {
             ),
             authorizationServerMetadata.grantTypesSupported,
         )
-        assertFalse("code_challenge_methods_supported" in authorizationServerMetadataJson)
+        assertEquals(
+            listOf("S256"),
+            authorizationServerMetadataJson["code_challenge_methods_supported"]
+                ?.jsonArray
+                ?.map { it.jsonPrimitive.content },
+        )
 
         assertEquals(ISSUER_BASE_URL, jwtVcIssuerMetadata.issuer)
         assertEquals("$ISSUER_BASE_URL/jwks", jwtVcIssuerMetadata.jwksUri)
