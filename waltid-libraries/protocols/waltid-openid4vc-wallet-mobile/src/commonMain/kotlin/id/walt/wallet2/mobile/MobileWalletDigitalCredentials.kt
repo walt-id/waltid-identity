@@ -164,6 +164,36 @@ public data class MobileWalletDigitalCredentialRequest(
 )
 
 /**
+ * Verifier and transaction metadata extracted from an OpenID4VP request received through a
+ * Digital Credentials API.
+ *
+ * Unlike [MobileWalletPresentationRequestInfo], [clientId] is nullable: the OpenID4VP DC API
+ * requires unsigned requests to omit and ignore `client_id`. The authenticated platform origin
+ * is exposed separately by [MobileWalletDigitalCredentialPreview.verifiedOrigin] and is the
+ * authoritative requester identity for those requests.
+ *
+ * @property clientId Authenticated signed-request client identifier, or null for unsigned requests.
+ * @property verifierMetadata Typed verifier metadata supplied by the request, when available.
+ * @property nonce Required OpenID4VP nonce value supplied by the verifier.
+ * @property responseMode Serialized OpenID4VP DC API response mode, when provided.
+ * @property transactionData Decoded transaction data items requested by the verifier.
+ */
+public data class MobileWalletDigitalCredentialRequestInfo(
+    public val clientId: String?,
+    public val verifierMetadata: MobileWalletVerifierMetadata?,
+    public val nonce: String,
+    public val responseMode: String?,
+    public val transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
+) {
+    init {
+        require(clientId == null || clientId.isNotBlank()) {
+            "A Digital Credentials request client ID must not be blank."
+        }
+        require(nonce.isNotBlank()) { "A Digital Credentials request nonce must not be blank." }
+    }
+}
+
+/**
  * Consent preview retained by the SDK until [MobileWallet.submitDigitalCredentialPresentation].
  *
  * @property requestId Opaque identifier binding the later submission to this preview.
@@ -179,7 +209,7 @@ public data class MobileWalletDigitalCredentialPreview(
     public val requestId: String,
     public val protocol: String,
     public val verifiedOrigin: String,
-    public val request: MobileWalletPresentationRequestInfo,
+    public val request: MobileWalletDigitalCredentialRequestInfo,
     public val credentialOptions: List<MobileWalletPresentationCredentialOption>,
     public val credentialRequirements: List<MobileWalletPresentationCredentialRequirement>,
     public val encryption: MobileWalletResponseEncryption,

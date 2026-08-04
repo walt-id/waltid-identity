@@ -71,9 +71,6 @@ public data class WalletBridgeConfiguration(
 )
 
 internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfig {
-    require(!requestObjectEnableSystemTrustAnchors) {
-        "iOS system trust anchors are not supported for OID4VP Request Object validation"
-    }
     require((appGroupIdentifier == null) == (keychainAccessGroup == null)) {
         "App Group and Keychain access group must be configured together"
     }

@@ -253,7 +253,7 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
             .ifEmpty { option.credentialId }
 
     private fun reportFailure(error: Throwable) {
-        Log.e(TAG, "Digital credential presentation failed (${error::class.simpleName})")
+        Log.e(TAG, "Digital credential presentation failed (${error::class.simpleName})", error)
         AndroidDigitalCredentialProvider.setFailure(resultIntent)
         finishProviderResult()
     }

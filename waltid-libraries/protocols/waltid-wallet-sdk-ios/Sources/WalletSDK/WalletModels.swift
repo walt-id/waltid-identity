@@ -17,7 +17,7 @@ public struct WalletConfiguration: Sendable {
     /// Wallet-controlled PEM trust anchors for signed OID4VP Request Objects.
     public var requestObjectTrustAnchorPEMCertificates: [String]
 
-    /// Whether platform trust anchors are also accepted for Request Objects.
+    /// Whether iOS system trust anchors are also accepted for Request Object certificate validation.
     public var requestObjectEnableSystemTrustAnchors: Bool
 
     /// Expected audience of signed OID4VP Request Objects.

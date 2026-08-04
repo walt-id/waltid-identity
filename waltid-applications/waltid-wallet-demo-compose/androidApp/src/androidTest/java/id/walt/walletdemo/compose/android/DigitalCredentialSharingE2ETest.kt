@@ -80,12 +80,18 @@ class DigitalCredentialSharingE2ETest {
 
         val candidate = device.wait(Until.findObject(By.text("org.iso.18013.5.1.mDL")), UI_ELEMENT_TIMEOUT)
         assertNotNull("Credential Manager did not surface the mDL candidate", candidate)
-        val continueButton = device.wait(Until.findObject(By.text("Agree and continue")), UI_ELEMENT_TIMEOUT)
-            ?: device.wait(Until.findObject(By.text("Continue")), UI_ELEMENT_TIMEOUT)
+        val continueButton = device.wait(
+            Until.findObject(By.res("continue_button")),
+            UI_ELEMENT_TIMEOUT,
+        ) ?: device.wait(Until.findObject(By.text("Continue")), UI_ELEMENT_TIMEOUT)
         assertNotNull("Credential Manager did not offer consent", continueButton)
         continueButton!!.click()
 
-        val shareButton = device.wait(Until.findObject(By.text("SHARE")), UI_ELEMENT_TIMEOUT)
+        val shareButton = device.wait(
+            Until.findObject(By.res("android:id/button1")),
+            UI_ELEMENT_TIMEOUT,
+        ) ?: device.wait(Until.findObject(By.text("Share")), UI_ELEMENT_TIMEOUT)
+            ?: device.wait(Until.findObject(By.text("SHARE")), UI_ELEMENT_TIMEOUT)
         assertNotNull("Wallet provider consent did not open", shareButton)
         shareButton!!.click()
 

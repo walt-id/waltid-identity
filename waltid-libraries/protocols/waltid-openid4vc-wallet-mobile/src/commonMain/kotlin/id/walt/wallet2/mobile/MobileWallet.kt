@@ -395,7 +395,10 @@ public class MobileWallet internal constructor(
 
     /**
      * Resolves an OS-mediated OpenID4VP request and returns consent metadata without releasing a credential.
-     * The caller-provided origin must already have been asserted by the platform adapter.
+     * The caller-provided origin must already have been asserted by the platform adapter. For an
+     * unsigned request, the returned [MobileWalletDigitalCredentialPreview.verifiedOrigin] is the
+     * authenticated requester identity and [MobileWalletDigitalCredentialRequestInfo.clientId]
+     * remains null because the untrusted request-supplied `client_id` is ignored.
      */
     public suspend fun previewDigitalCredentialPresentation(
         request: MobileWalletDigitalCredentialRequest,
@@ -428,9 +431,8 @@ public class MobileWallet internal constructor(
             requestId = result.requestId,
             protocol = request.protocol,
             verifiedOrigin = result.resolvedRequest.origin,
-            request = authorizationRequest.toMobileRequestInfo(
+            request = authorizationRequest.toMobileDigitalCredentialRequestInfo(
                 preferredLocales = preferredLocales,
-                responseEncryption = ResponseEncryption.resolve(authorizationRequest)?.metadata(),
                 transactionData = result.transactionData.map { item ->
                     val profile = profilesByType[item.type]
                     MobileWalletTransactionDataItem(
@@ -845,6 +847,22 @@ private fun AuthorizationRequest.toMobileRequestInfo(
         },
     )
 }
+
+private fun AuthorizationRequest.toMobileDigitalCredentialRequestInfo(
+    preferredLocales: List<String>,
+    transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
+): MobileWalletDigitalCredentialRequestInfo =
+    MobileWalletDigitalCredentialRequestInfo(
+        clientId = clientId,
+        verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
+        nonce = requireNotNull(nonce) {
+            "A validated Digital Credentials request must contain nonce."
+        },
+        responseMode = responseMode?.let { mode ->
+            Json.encodeToString(OpenID4VPResponseMode.serializer(), mode).trim('"')
+        },
+        transactionData = transactionData,
+    )
 
 private fun AuthorizationRequest.toMobileRequestContext(
     preferredLocales: List<String>,
