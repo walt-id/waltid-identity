@@ -19,6 +19,7 @@ import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.policies2.vp.policies.*
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
@@ -29,6 +30,7 @@ import kotlinx.serialization.json.*
 import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -63,8 +65,69 @@ class VerificationSessionCreatorTransactionDataPolicyTest {
         assertEquals(OpenID4VPResponseType.VP_TOKEN_ID_TOKEN, session.authorizationRequest.responseType)
         assertEquals("openid", session.authorizationRequest.scope)
         assertEquals("subject_signed", session.authorizationRequest.idTokenType)
-        assertEquals("RS256", session.authorizationRequest.clientMetadata?.idTokenSignedResponseAlg)
+        assertEquals("ES256", session.authorizationRequest.clientMetadata?.idTokenSignedResponseAlg)
         assertTrue(session.authorizationRequest.clientMetadata?.subjectSyntaxTypesSupported?.isNotEmpty() == true)
+    }
+
+    @Test
+    fun `SIOP id_token algorithm is configurable per flow`() = runTest {
+        val session = VerificationSessionCreator.createVerificationSession(
+            setup = CrossDeviceFlowSetup(
+                core = GeneralFlowConfig(
+                    dcqlQuery = DcqlQuery(
+                        credentials = listOf(
+                            CredentialQuery("pid", CredentialFormat.DC_SD_JWT, meta = NoMeta)
+                        )
+                    ),
+                ),
+                openid = OpenId4VPConfig(
+                    responseType = OpenID4VPResponseType.VP_TOKEN_ID_TOKEN,
+                    scope = "openid",
+                    idTokenType = "subject_signed",
+                    idTokenSignedResponseAlg = "ES384",
+                ),
+            ),
+            clientId = "verifier",
+            clientMetadata = ClientMetadata(idTokenSignedResponseAlg = "RS256"),
+            urlPrefix = "https://verifier.example/verification-session",
+            urlHost = "openid4vp://authorize",
+        )
+
+        // The per-flow openid block wins over service-wide client metadata.
+        assertEquals("ES384", session.authorizationRequest.clientMetadata?.idTokenSignedResponseAlg)
+    }
+
+    @Test
+    fun `SIOP id_token algorithm falls back to client metadata`() = runTest {
+        val session = VerificationSessionCreator.createVerificationSession(
+            setup = CrossDeviceFlowSetup(
+                core = GeneralFlowConfig(
+                    dcqlQuery = DcqlQuery(
+                        credentials = listOf(
+                            CredentialQuery("pid", CredentialFormat.DC_SD_JWT, meta = NoMeta)
+                        )
+                    ),
+                ),
+                openid = OpenId4VPConfig(
+                    responseType = OpenID4VPResponseType.VP_TOKEN_ID_TOKEN,
+                    scope = "openid",
+                    idTokenType = "subject_signed",
+                ),
+            ),
+            clientId = "verifier",
+            clientMetadata = ClientMetadata(idTokenSignedResponseAlg = "RS256"),
+            urlPrefix = "https://verifier.example/verification-session",
+            urlHost = "openid4vp://authorize",
+        )
+
+        assertEquals("RS256", session.authorizationRequest.clientMetadata?.idTokenSignedResponseAlg)
+    }
+
+    @Test
+    fun `id_token algorithm is rejected outside the SIOP response type`() {
+        assertFails {
+            OpenId4VPConfig(idTokenSignedResponseAlg = "ES256")
+        }
     }
 
     @Test
