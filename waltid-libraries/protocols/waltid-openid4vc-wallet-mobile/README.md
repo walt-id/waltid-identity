@@ -29,31 +29,37 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 ## Capabilities
 
 - Bootstrap a mobile wallet with platform-backed keys and DID material.
-- Receive credentials using OpenID4VCI.
+- Start and continue OpenID4VCI issuance sessions.
 - List credentials stored in mobile persistence.
 - Present credentials using OpenID4VP.
 - Support mobile issuance flows using OAuth 2.0 client attestation.
 
 ## Receiving credentials
 
-Resolve an offer before issuance so the application can collect a separately
-delivered transaction code when the issuer requires one:
+Start an issuance session to resolve the offer and retain the exact reviewed
+session state while the application collects a separately delivered transaction
+code when the issuer requires one:
 
 ```kotlin
-val resolution = wallet.resolveOffer(offerUrl)
-val transactionCode = resolution.transactionCode?.let { requirement ->
+val session = wallet.startIssuance(MobileWalletIssuanceRequest(offerUrl = offerUrl))
+val transactionCode = session.offer.transactionCode?.let { requirement ->
     collectTransactionCode(
-        inputMode = requirement.inputMode,
+        inputMode = requirement.inputMode ?: "numeric",
         expectedLength = requirement.length,
-        description = requirement.description,
+        description = requirement.descriptionText,
     )
 }
-val credentialIds = wallet.receive(resolution.previewHandle, txCode = transactionCode)
+val outcome = wallet.continuePreAuthorizedIssuance(session.id, transactionCode)
+val credentialIds = (outcome as? WalletIssuanceOutcome.Stored)?.credentialIds
+    ?: error("Issuance did not store credentials: $outcome")
 ```
 
-The resolution also contains localized, typed issuer and credential-configuration
-metadata for review UI. Set `MobileWalletConfig.preferredLocales` to the app's
-ordered BCP 47 language preferences; platform demos pass their platform locale preferences.
+The session contains typed issuer, credential-configuration, and transaction-code
+metadata for review UI. Authorization-code sessions expose a browser request in
+`session.authorization`; after the callback, continue with
+`continueAuthorizationIssuance`. Set `MobileWalletConfig.preferredLocales` to the
+app's ordered BCP 47 language preferences; platform demos pass their platform
+locale preferences.
 
 ## Presenting credentials
 

@@ -5,9 +5,7 @@ import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletKeyType
-import id.walt.wallet2.mobile.MobileWalletIssuancePreviewHandle
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
-import id.walt.wallet2.mobile.MobileWalletOfferResolution
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
@@ -65,48 +63,6 @@ public class WalletSdkBridge private constructor(
                 didMethod = didMethod,
             )
         }
-
-    /** Resolves a credential offer before issuance. */
-    public suspend fun resolveOffer(
-        offerUrl: String,
-    ): WalletBridgeResult<MobileWalletOfferResolution> =
-        walletBridgeCall { operations.resolveOffer(offerUrl = offerUrl) }
-
-    /**
-     * Receives credentials from an OpenID4VCI credential offer.
-     */
-    public suspend fun receive(
-        offerUrl: String,
-        txCode: String? = null,
-        clientId: String = "wallet-client",
-    ): WalletBridgeResult<List<String>> =
-        walletBridgeCall {
-            operations.receive(
-                offerUrl = offerUrl,
-                txCode = txCode,
-                clientId = clientId,
-            )
-        }
-
-    /** Receives credentials from one reviewed issuance preview. */
-    public suspend fun receivePreviewed(
-        previewHandle: MobileWalletIssuancePreviewHandle,
-        txCode: String? = null,
-        clientId: String = "wallet-client",
-    ): WalletBridgeResult<List<String>> =
-        walletBridgeCall {
-            operations.receivePreviewed(
-                previewHandle = previewHandle,
-                txCode = txCode,
-                clientId = clientId,
-            )
-        }
-
-    /** Discards one reviewed issuance preview locally. */
-    public suspend fun discardIssuancePreview(
-        previewHandle: MobileWalletIssuancePreviewHandle,
-    ): WalletBridgeResult<Unit> =
-        walletBridgeCall { operations.discardIssuancePreview(previewHandle) }
 
     /** Resolves an offer and starts its bound OpenID4VCI issuance session. */
     public suspend fun startIssuance(
@@ -239,22 +195,6 @@ internal interface WalletSdkBridgeOperations {
         didMethod: String,
     ): MobileWalletBootstrapResult
 
-    suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution
-
-    suspend fun receive(
-        offerUrl: String,
-        txCode: String?,
-        clientId: String,
-    ): List<String>
-
-    suspend fun receivePreviewed(
-        previewHandle: MobileWalletIssuancePreviewHandle,
-        txCode: String?,
-        clientId: String,
-    ): List<String>
-
-    suspend fun discardIssuancePreview(previewHandle: MobileWalletIssuancePreviewHandle)
-
     suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceSession
 
     suspend fun continuePreAuthorizedIssuance(
@@ -313,33 +253,6 @@ internal class MobileWalletSdkBridgeOperations(
             keyType = keyType,
             didMethod = didMethod,
         )
-
-    override suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution =
-        wallet.resolveOffer(offerUrl = offerUrl)
-
-    override suspend fun receive(
-        offerUrl: String,
-        txCode: String?,
-        clientId: String,
-    ): List<String> =
-        wallet.receive(
-            offerUrl = offerUrl,
-            txCode = txCode,
-            clientId = clientId,
-        )
-
-    override suspend fun receivePreviewed(
-        previewHandle: MobileWalletIssuancePreviewHandle,
-        txCode: String?,
-        clientId: String,
-    ): List<String> = wallet.receive(
-        previewHandle = previewHandle,
-        txCode = txCode,
-        clientId = clientId,
-    )
-
-    override suspend fun discardIssuancePreview(previewHandle: MobileWalletIssuancePreviewHandle) =
-        wallet.discardIssuancePreview(previewHandle)
 
     override suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceSession =
         wallet.startIssuance(request)
