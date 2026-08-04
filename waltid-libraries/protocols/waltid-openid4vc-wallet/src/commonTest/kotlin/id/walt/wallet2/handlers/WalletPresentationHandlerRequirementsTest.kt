@@ -369,7 +369,7 @@ class WalletPresentationHandlerRequirementsTest {
         val preview = WalletPresentationHandler.previewPresentation(
             wallet = wallet,
             request = PreviewPresentationRequest(requestUrl),
-            keyMaterial = assertNotNull(wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))),
+            executionKey = assertNotNull(wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))).let { { it } },
             onEvent = {},
             transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
             resolveAuthorizationRequest = { resolvedUrl ->
