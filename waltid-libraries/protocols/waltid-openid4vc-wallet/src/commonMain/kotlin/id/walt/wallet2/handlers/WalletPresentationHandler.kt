@@ -4,11 +4,7 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto.keys.DirectSerializedKey
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
@@ -274,6 +270,11 @@ object WalletPresentationHandler {
         data class Ready(
             override val requestUrl: Url,
             override val resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
+            /**
+             * The concrete signing key selected while previewing. Submission re-resolves exactly this
+             * key so that the request was validated against the key that actually signs the response.
+             */
+            val keyId: String,
         ) : PreviewedPresentation
 
         data class Invalid(
@@ -405,19 +406,31 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
-    ): PreviewPresentationResult = previewPresentation(
-        wallet = wallet,
-        request = request,
-        onEvent = onEvent,
-        transactionDataTypeRegistry = transactionDataTypeRegistry,
-        resolveAuthorizationRequest = { requestUrl ->
-            resolveAuthorizationRequest(wallet, requestUrl, clientIdTrustConfiguration)
-        },
-    )
+    ): PreviewPresentationResult {
+        // The execution key is selected here, once, and retained in the preview: advertised wallet
+        // metadata, request validation and the eventual signature must all refer to the same key.
+        val keyMaterial = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
+            ?: error("No key available: wallet has no keyStores and no staticKey")
+        return previewPresentation(
+            wallet = wallet,
+            request = request,
+            keyMaterial = keyMaterial,
+            onEvent = onEvent,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+            resolveAuthorizationRequest = { requestUrl ->
+                resolveAuthorizationRequest(
+                    keyMaterial.presentationCapabilities(),
+                    requestUrl,
+                    clientIdTrustConfiguration,
+                )
+            },
+        )
+    }
 
     internal suspend fun previewPresentation(
         wallet: Wallet,
         request: PreviewPresentationRequest,
+        keyMaterial: WalletKeyStoreEntry,
         onEvent: suspend (WalletSessionEvent) -> Unit,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest,
@@ -428,7 +441,7 @@ object WalletPresentationHandler {
         val validation = PresentationRequestValidator.validate(
             resolvedRequest = resolvedAuthorizationRequest,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
-            formatCapabilities = wallet.presentationRuntimeCapabilities(),
+            formatCapabilities = keyMaterial.presentationCapabilities(),
         )
         if (validation is PresentationRequestValidationResult.Invalid) {
             val handle = rememberPreviewedAuthorizationRequest(
@@ -499,6 +512,7 @@ object WalletPresentationHandler {
             preview = PreviewedPresentation.Ready(
                 requestUrl = request.requestUrl,
                 resolvedAuthorizationRequest = resolvedAuthorizationRequest,
+                keyId = keyMaterial.keyId,
             ),
         )
         return PreviewPresentationResult.Ready(
@@ -523,11 +537,12 @@ object WalletPresentationHandler {
                 "Cannot submit an invalid presentation request; reject it or dismiss it locally"
             }
         }
-        val resolvedAuthorizationRequest = (preview as? PreviewedPresentation.Ready)
-            ?.resolvedAuthorizationRequest
+        val ready = preview as? PreviewedPresentation.Ready
             ?: error("Unexpected presentation preview state")
-        val keyMaterial = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
-            ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
+        val resolvedAuthorizationRequest = ready.resolvedAuthorizationRequest
+        // Sign with exactly the key the request was validated against during preview.
+        val keyMaterial = wallet.resolveKeyMaterial(ready.keyId, setOf(KeyUsage.SIGN))
+            ?: error("Key '${ready.keyId}' selected while previewing is no longer available")
         val did = request.did ?: wallet.defaultDid()
         val selectedQueryIds = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.queryId }
         validateSelectedTransactionDataCredentials(
@@ -992,14 +1007,12 @@ object WalletPresentationHandler {
         )
 
     private suspend fun resolveAuthorizationRequest(
-        wallet: Wallet,
+        capabilities: WalletPresentationFormatRegistry.RuntimeCapabilities,
         requestUrl: Url,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
     ): ResolvedAuthorizationRequest {
         val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
-        val vpFormatsSupported = WalletPresentationFormatRegistry.buildVpFormatsSupported(
-            wallet.presentationRuntimeCapabilities()
-        )
+        val vpFormatsSupported = WalletPresentationFormatRegistry.buildVpFormatsSupported(capabilities)
         return AuthorizationRequestResolver.resolve(
             requestUrl = requestUrl,
             unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
@@ -1191,35 +1204,19 @@ object WalletPresentationHandler {
     }
 }
 
-internal suspend fun Wallet.presentationRuntimeCapabilities(): WalletPresentationFormatRegistry.RuntimeCapabilities {
-    val crypto2Keys = mutableListOf<Crypto2Key>()
-    val fallbackKeyTypes = mutableSetOf<KeyType>()
-    val storedKeyIds = mutableSetOf<String>()
-    keyStores.forEach { keyStore ->
-        keyStore.listKeys().toList().forEach { keyInfo ->
-            storedKeyIds += keyInfo.keyId
-            val crypto2Key = keyStore.getCrypto2Key(keyInfo.keyId)
-            if (crypto2Key != null) {
-                crypto2Keys += crypto2Key
-            } else {
-                keyStore.getKey(keyInfo.keyId)
-                    ?.takeIf(Key::isMigratableSigningKey)
-                    ?.let { fallbackKeyTypes += it.keyType }
-            }
-        }
-    }
-    attachedStaticCrypto2Key()
-        ?.takeUnless { it.id.value in storedKeyIds }
-        ?.let(crypto2Keys::add)
-        ?: staticKey
-            ?.takeUnless { it.getKeyId() in storedKeyIds }
-            ?.takeIf(Key::isMigratableSigningKey)
-            ?.let { fallbackKeyTypes += it.keyType }
-    return WalletPresentationFormatRegistry.capabilitiesFromKeys(crypto2Keys, fallbackKeyTypes)
-}
-
-private fun Key.isMigratableSigningKey(): Boolean =
-    this is JWKKey && keyType != KeyType.secp256k1 && hasPrivateKey
+/**
+ * Presentation capabilities of exactly this key material.
+ *
+ * Deliberately scoped to one key rather than to the union of every signing key in the wallet:
+ * submission signs with a single key, so anything advertised to or accepted from a Verifier beyond
+ * that key's capabilities could be accepted while previewing and then fail while signing.
+ * Mirrors the capability computation in `WalletPresentFunctionality2.walletPresentHandlingWithKey`.
+ */
+internal fun WalletKeyStoreEntry.presentationCapabilities(): WalletPresentationFormatRegistry.RuntimeCapabilities =
+    WalletPresentationFormatRegistry.capabilitiesFromKeys(
+        keys = listOfNotNull(crypto2Key),
+        fallbackKeyTypes = setOfNotNull(legacyKey?.keyType?.takeIf { crypto2Key == null }),
+    )
 
 // ---------------------------------------------------------------------------
 // Isolated-step request / response types for the manual presentation flow
