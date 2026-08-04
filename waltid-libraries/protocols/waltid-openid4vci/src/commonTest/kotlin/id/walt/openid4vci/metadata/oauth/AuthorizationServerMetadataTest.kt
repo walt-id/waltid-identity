@@ -87,6 +87,7 @@ class AuthorizationServerMetadataTest {
         )
         assertEquals(setOf("ES256"), metadata.dpopSigningAlgValuesSupported)
         assertEquals(true, metadata.preAuthorizedGrantAnonymousAccessSupported)
+        assertEquals(true, metadata.authorizationResponseIssParameterSupported)
         assertEquals(null, metadata.codeChallengeMethodsSupported)
         assertEquals("https://issuer.example/par", metadata.pushedAuthorizationRequestEndpoint)
         assertEquals(false, metadata.requirePushedAuthorizationRequests)
@@ -120,6 +121,7 @@ class AuthorizationServerMetadataTest {
             pushedAuthorizationRequestEndpointPath = "/oauth2/par",
             requirePushedAuthorizationRequests = true,
             statusListAggregationEndpointPath = "/oauth2/status-list-aggregation",
+            authorizationResponseIssParameterSupported = true,
         )
 
         assertEquals("https://issuer.example", metadata.issuer)
@@ -142,6 +144,7 @@ class AuthorizationServerMetadataTest {
         )
         assertEquals(true, metadata.requirePushedAuthorizationRequests)
         assertEquals(true, metadata.preAuthorizedGrantAnonymousAccessSupported)
+        assertEquals(true, metadata.authorizationResponseIssParameterSupported)
     }
 
     @Test

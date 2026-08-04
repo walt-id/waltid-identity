@@ -34,6 +34,8 @@ class Issuer2MetadataServiceTest {
 
         assertEquals("http://localhost/openid4vci/par", metadata.pushedAuthorizationRequestEndpoint)
         assertEquals(false, metadata.requirePushedAuthorizationRequests)
+        assertEquals(true, metadata.authorizationResponseIssParameterSupported)
+        assertEquals(listOf("S256"), metadata.codeChallengeMethodsSupported)
     }
 
     @Test
