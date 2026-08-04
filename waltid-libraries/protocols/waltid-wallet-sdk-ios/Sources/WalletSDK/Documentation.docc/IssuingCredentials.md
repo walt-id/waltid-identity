@@ -20,21 +20,32 @@ let session = try await wallet.startIssuance(
         redirectURI: URL(string: "wallet.example:/callback")!
     )
 )
-let transactionCode: String?
-if let requirement = session.offer.transactionCode {
-    transactionCode = await collectTransactionCode(
-        inputMode: requirement.inputMode,
-        expectedLength: requirement.length,
-        description: requirement.description
+let outcome: IssuanceOutcome
+switch session.offer.grant {
+case .preAuthorizedCode:
+    let transactionCode: String?
+    if let requirement = session.offer.transactionCode {
+        transactionCode = await collectTransactionCode(
+            inputMode: requirement.inputMode,
+            expectedLength: requirement.length,
+            description: requirement.descriptionText
+        )
+    } else {
+        transactionCode = nil
+    }
+    outcome = try await wallet.continuePreAuthorizedIssuance(
+        sessionID: session.id,
+        transactionCode: transactionCode
     )
-} else {
-    transactionCode = nil
+case .authorizationCode:
+    let authorization = try await wallet.beginAuthorizationIssuance(sessionID: session.id)
+    await openBrowser(authorization.url)
+    let callbackURI = await receiveAuthorizationCallback()
+    outcome = try await wallet.continueAuthorizationIssuance(
+        sessionID: session.id,
+        callbackURI: callbackURI
+    )
 }
-
-let outcome = try await wallet.continuePreAuthorizedIssuance(
-    sessionID: session.id,
-    transactionCode: transactionCode
-)
 
 guard case let .stored(_, credentialIDs) = outcome else {
     // Handle deferred, cancelled, or failed issuance as appropriate for the app.
@@ -54,6 +65,6 @@ let issuedCredentials = credentials.filter { credentialIDs.contains($0.id) }
 > progress updates for issuer communication, credential storage, or completion.
 
 If the user closes the review without accepting it, call
-``Wallet/cancelIssuance(sessionID:)``. For authorization-code issuance, open
-the session's authorization URL and pass the callback URI to
-``Wallet/continueAuthorizationIssuance(sessionID:callbackURI:)``.
+``Wallet/cancelIssuance(sessionID:)``. Authorization-code issuance creates its
+browser URL only after ``Wallet/beginAuthorizationIssuance(sessionID:)`` is
+called following acceptance.

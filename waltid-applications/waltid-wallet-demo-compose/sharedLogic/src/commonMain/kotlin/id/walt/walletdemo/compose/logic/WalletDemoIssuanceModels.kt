@@ -6,7 +6,10 @@ data class WalletDemoIssuanceSession(
     val id: String,
     val grant: WalletDemoIssuanceGrant,
     val preview: WalletDemoOfferPreview,
-    val authorizationUrl: String? = null,
+)
+
+data class WalletDemoIssuanceAuthorization(
+    val url: String,
 )
 
 data class WalletDemoDeferredCredential(

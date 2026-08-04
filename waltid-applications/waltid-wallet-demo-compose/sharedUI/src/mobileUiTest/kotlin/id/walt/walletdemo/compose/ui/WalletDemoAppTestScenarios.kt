@@ -1094,13 +1094,11 @@ private class FakeDemoWallet(
             },
             requiresIssuerAuthentication = issuanceGrant == WalletDemoIssuanceGrant.AuthorizationCode,
             ),
-            authorizationUrl = if (issuanceGrant == WalletDemoIssuanceGrant.AuthorizationCode) {
-                "https://issuer.example/authorize"
-            } else {
-                null
-            },
         )
     }
+
+    override suspend fun beginAuthorizationIssuance(sessionId: String): WalletDemoIssuanceAuthorization =
+        WalletDemoIssuanceAuthorization("https://issuer.example/authorize")
 
     override suspend fun continuePreAuthorizedIssuance(
         sessionId: String,

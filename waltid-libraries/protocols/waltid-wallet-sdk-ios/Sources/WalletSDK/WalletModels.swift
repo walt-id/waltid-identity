@@ -871,6 +871,9 @@ public struct IssuanceAuthorization: Equatable, Sendable {
     /// Indicates whether the request was submitted through PAR.
     public let pushedAuthorizationRequestUsed: Bool
 
+    /// Absolute expiry of the PAR request URI, when PAR was used.
+    public let requestURIExpiresAt: Date?
+
     /// Creates browser authorization continuation data.
     ///
     /// - Parameters:
@@ -879,18 +882,21 @@ public struct IssuanceAuthorization: Equatable, Sendable {
     ///   - redirectURI: Exact redirect URI expected for the callback.
     ///   - pkce: PKCE material bound to the request.
     ///   - pushedAuthorizationRequestUsed: Whether PAR was used.
+    ///   - requestURIExpiresAt: Absolute expiry of the PAR request URI, when present.
     public init(
         url: URL,
         state: String,
         redirectURI: URL,
         pkce: IssuancePKCEState,
-        pushedAuthorizationRequestUsed: Bool
+        pushedAuthorizationRequestUsed: Bool,
+        requestURIExpiresAt: Date? = nil
     ) {
         self.url = url
         self.state = state
         self.redirectURI = redirectURI
         self.pkce = pkce
         self.pushedAuthorizationRequestUsed = pushedAuthorizationRequestUsed
+        self.requestURIExpiresAt = requestURIExpiresAt
     }
 
 }
@@ -903,19 +909,14 @@ public struct IssuanceSession: Equatable, Sendable {
     /// Typed offer preview for application review UI.
     public let offer: IssuanceOfferPreview
 
-    /// Browser authorization data for authorization-code issuance.
-    public let authorization: IssuanceAuthorization?
-
     /// Creates an issuance session.
     ///
     /// - Parameters:
     ///   - id: Opaque session identifier.
     ///   - offer: Typed offer preview.
-    ///   - authorization: Browser authorization data when required.
-    public init(id: String, offer: IssuanceOfferPreview, authorization: IssuanceAuthorization?) {
+    public init(id: String, offer: IssuanceOfferPreview) {
         self.id = id
         self.offer = offer
-        self.authorization = authorization
     }
 
 }

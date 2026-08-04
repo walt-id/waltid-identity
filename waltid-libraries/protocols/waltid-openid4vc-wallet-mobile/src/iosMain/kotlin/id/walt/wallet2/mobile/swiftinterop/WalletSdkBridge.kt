@@ -13,6 +13,7 @@ import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.handlers.WalletIssuanceSession
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -69,6 +70,12 @@ public class WalletSdkBridge private constructor(
         request: MobileWalletIssuanceRequest,
     ): WalletBridgeResult<WalletIssuanceSession> =
         walletBridgeCall { operations.startIssuance(request) }
+
+    /** Starts the authorization-code browser request for an accepted issuance session. */
+    public suspend fun beginAuthorizationIssuance(
+        sessionId: String,
+    ): WalletBridgeResult<WalletIssuanceAuthorization> =
+        walletBridgeCall { operations.beginAuthorizationIssuance(sessionId) }
 
     /** Continues one reviewed pre-authorized issuance session. */
     public suspend fun continuePreAuthorizedIssuance(
@@ -197,6 +204,8 @@ internal interface WalletSdkBridgeOperations {
 
     suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceSession
 
+    suspend fun beginAuthorizationIssuance(sessionId: String): WalletIssuanceAuthorization
+
     suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
         transactionCode: String?,
@@ -256,6 +265,9 @@ internal class MobileWalletSdkBridgeOperations(
 
     override suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceSession =
         wallet.startIssuance(request)
+
+    override suspend fun beginAuthorizationIssuance(sessionId: String): WalletIssuanceAuthorization =
+        wallet.beginAuthorizationIssuance(sessionId)
 
     override suspend fun continuePreAuthorizedIssuance(
         sessionId: String,

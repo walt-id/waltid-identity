@@ -4,6 +4,7 @@ interface DemoWallet {
     suspend fun bootstrap(): WalletDemoBootstrapResult
     suspend fun listCredentials(): List<WalletDemoCredential>
     suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?): WalletDemoIssuanceSession
+    suspend fun beginAuthorizationIssuance(sessionId: String): WalletDemoIssuanceAuthorization
     suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
         transactionCode: String?,

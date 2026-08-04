@@ -72,6 +72,9 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /** Grant selected for a resolved issuance session. */
@@ -133,6 +136,7 @@ data class WalletIssuanceAuthorization(
     val redirectUri: String,
     val pkce: WalletIssuancePkceState,
     val pushedAuthorizationRequestUsed: Boolean,
+    val requestUriExpiresAtEpochMilliseconds: Long? = null,
 )
 
 /** Public handle returned by [WalletIssuanceSessionService.start]. */
@@ -140,7 +144,6 @@ data class WalletIssuanceAuthorization(
 data class WalletIssuanceSession(
     val id: String,
     val offer: WalletIssuanceOfferPreview,
-    val authorization: WalletIssuanceAuthorization?,
 )
 
 /** Input used to start either supported grant from one offer. */
@@ -167,6 +170,13 @@ data class WalletIssuanceSessionRequest(
 data class WalletIssuanceAuthorizationCallback(
     val sessionId: String,
     val callbackUri: String,
+)
+
+/** Wallet-local retention policy for uncompleted issuance sessions. */
+@Serializable
+data class WalletIssuanceSessionPolicy(
+    val reviewTtl: Duration = 10.minutes,
+    val authorizationCallbackTtl: Duration = 10.minutes,
 )
 
 /** Public reference for a credential that must be polled later. */
@@ -237,14 +247,22 @@ class WalletIssuanceSessionService(
     private val onEvent: suspend (WalletSessionEvent) -> Unit = {},
     private val sessionStore: WalletIssuanceSessionStore? = null,
     httpClient: HttpClient? = null,
+    private val sessionPolicy: WalletIssuanceSessionPolicy = WalletIssuanceSessionPolicy(),
+    private val now: () -> Instant = { Clock.System.now() },
 ) {
+    init {
+        require(sessionPolicy.reviewTtl > Duration.ZERO) { "reviewTtl must be positive" }
+        require(sessionPolicy.authorizationCallbackTtl > Duration.ZERO) {
+            "authorizationCallbackTtl must be positive"
+        }
+    }
     private val httpClient = httpClient ?: WebDataFetcher(WebDataFetcherId.WALLET2_ISSUANCE_HANDLER).httpClient
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
     private val mutex = Mutex()
     private val sessions = LinkedHashMap<String, ActiveSession>()
     private val deferred = LinkedHashMap<String, DeferredRecord>()
 
-    /** Resolves and binds an offer, returning a browser request only for authorization-code grants. */
+    /** Resolves and binds an offer without initiating any authorization-server side effects. */
     suspend fun start(request: WalletIssuanceSessionRequest): WalletIssuanceSession {
         val key = wallet.resolveKey(request.key, request.keyId)
             ?: error("No holder key is available for credential issuance")
@@ -252,15 +270,9 @@ class WalletIssuanceSessionService(
         val grant = resolved.offer.getGrantType()
             ?: error("Credential offer does not contain a supported grant")
         val sessionId = Uuid.random().toString()
-        val authorizationState = if (grant is GrantType.AuthorizationCode) {
-            buildAuthorization(resolved, request, key)
-        } else {
-            null
-        }
         val publicSession = WalletIssuanceSession(
             id = sessionId,
             offer = resolved.toPreview(grant),
-            authorization = authorizationState?.public,
         )
         val selectedKeyId = request.keyId ?: if (request.key == null) {
             wallet.defaultKeyId ?: wallet.listAllKeys().firstOrNull()?.keyId
@@ -274,8 +286,10 @@ class WalletIssuanceSessionService(
             key = key,
             keyId = selectedKeyId,
             did = request.did ?: wallet.defaultDid(),
-            authorization = authorizationState,
-            state = if (grant is GrantType.AuthorizationCode) SessionState.AWAITING_CALLBACK else SessionState.READY,
+            authorization = null,
+            state = SessionState.AWAITING_ACCEPTANCE,
+            expiresAtEpochMilliseconds = nowEpochMilliseconds() +
+                sessionPolicy.reviewTtl.inWholeMilliseconds,
         )
         val evicted = mutex.withLock {
             val removed = if (sessions.size >= MAX_ACTIVE_SESSIONS) sessions.remove(sessions.keys.first()) else null
@@ -309,10 +323,56 @@ class WalletIssuanceSessionService(
         return publicSession
     }
 
+    /**
+     * Starts the authorization-code browser request for an accepted session.
+     *
+     * PAR, state, PKCE and client-attestation material are created only at this boundary.
+     */
+    suspend fun beginAuthorization(sessionId: String): WalletIssuanceAuthorization {
+        val active = loadActive(sessionId) ?: throw IllegalStateException("Issuance session is unknown")
+        check(active.public.offer.grant == WalletIssuanceGrant.AUTHORIZATION_CODE) {
+            "Issuance session does not use the authorization-code grant"
+        }
+        val claimed = mutex.withLock {
+            if (sessions[sessionId] !== active || active.state != SessionState.AWAITING_ACCEPTANCE) {
+                false
+            } else {
+                active.state = SessionState.PROCESSING
+                active.expiresAtEpochMilliseconds = PROCESSING_EXPIRY
+                true
+            }
+        }
+        if (!claimed) throw IllegalStateException("Issuance session is not awaiting acceptance")
+        try {
+            persistActive(active)
+            val authorization = buildAuthorization(active.resolved, active.request, active.key)
+            mutex.withLock {
+                check(sessions[sessionId] === active && active.state == SessionState.PROCESSING) {
+                    "Issuance session changed while authorization was being built"
+                }
+                active.authorization = authorization
+                active.state = SessionState.AWAITING_CALLBACK
+                active.expiresAtEpochMilliseconds = nowEpochMilliseconds() +
+                    sessionPolicy.authorizationCallbackTtl.inWholeMilliseconds
+            }
+            persistActive(active)
+            return authorization.public
+        } catch (error: CancellationException) {
+            invalidateActiveSessionBestEffort(sessionId)
+            throw error
+        } catch (error: IllegalArgumentException) {
+            removeSession(sessionId)
+            throw error
+        } catch (error: Exception) {
+            restoreSession(active, SessionState.AWAITING_ACCEPTANCE)
+            throw error
+        }
+    }
+
     /** Continues a pre-authorized session with the separately delivered transaction code. */
     suspend fun continuePreAuthorized(sessionId: String, transactionCode: String? = null): WalletIssuanceOutcome {
         val active = try {
-            beginTransition(sessionId, SessionState.READY)
+            beginTransition(sessionId, SessionState.AWAITING_ACCEPTANCE)
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {
@@ -322,7 +382,7 @@ class WalletIssuanceSessionService(
             ?: return failAndRemove(sessionId, WalletIssuanceErrorCode.INVALID_SESSION)
         val requirement = grant.txCode
         if (requirement != null && transactionCode.isNullOrBlank()) {
-            restoreSession(active, SessionState.READY)
+            restoreSession(active, SessionState.AWAITING_ACCEPTANCE)
             return failed(sessionId, WalletIssuanceErrorCode.INVALID_INPUT)
         }
         return complete(active, retryTokenRejection = requirement != null) {
@@ -503,7 +563,7 @@ class WalletIssuanceSessionService(
                 storedIds.isEmpty() &&
                 error.oauthError == "invalid_grant"
             ) {
-                restoreSession(active, SessionState.READY)
+                restoreSession(active, SessionState.AWAITING_ACCEPTANCE)
             } else {
                 removeSession(active.public.id)
             }
@@ -690,12 +750,8 @@ class WalletIssuanceSessionService(
     }
 
     private fun ActiveSession.dpopAlgorithms(): Set<String>? {
-        val metadata = resolved.authorizationServerMetadata
-        val grant = resolved.offer.getGrantType() ?: return null
-        val grantIsAdvertised = metadata.grantTypesSupported?.contains(grant.value)
-            ?: (grant is GrantType.AuthorizationCode)
-        return metadata.dpopSigningAlgValuesSupported
-            ?.takeIf { grantIsAdvertised && it.isNotEmpty() }
+        return resolved.authorizationServerMetadata.dpopSigningAlgValuesSupported
+            ?.takeIf { it.isNotEmpty() }
     }
 
     private fun ActiveSession.dpopFactory(): DPoPProofFactory? =
@@ -729,6 +785,9 @@ class WalletIssuanceSessionService(
         require(metadata.requirePushedAuthorizationRequests != true || parEndpoint != null) {
             "Authorization server requires PAR but does not advertise an endpoint"
         }
+        val dpopJkt = dpopAlgorithmsForAuthorization(metadata, key)?.let {
+            key.getPublicKey().getThumbprint()
+        }
 
         if (parEndpoint != null) {
             val pushed = builder.buildPushedAuthorizationRequestStateForCredentialConfigurations(
@@ -737,6 +796,7 @@ class WalletIssuanceSessionService(
                 usePKCE = true,
                 metadata = metadata,
                 redirectUri = request.redirectUri.toString(),
+                dpopJkt = dpopJkt,
             )
             val attestation = attestationHeaders(metadata, request.clientId, key)
             val response = httpClient.post(parEndpoint) {
@@ -749,8 +809,10 @@ class WalletIssuanceSessionService(
                     header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, headers.popJwt)
                 }
             }
-            require(response.status.isSuccess()) { "Pushed authorization request failed" }
-            val par = response.body<PushedAuthorizationResponse>()
+            require(response.status == HttpStatusCode.Created) {
+                "Pushed authorization request must return HTTP 201"
+            }
+            val par = json.decodeFromString<PushedAuthorizationResponse>(response.bodyAsText())
             val browserUrl = URLBuilder(endpoint).apply {
                 parameters.append("client_id", request.clientId)
                 parameters.append("request_uri", par.requestUri)
@@ -766,6 +828,8 @@ class WalletIssuanceSessionService(
                         codeChallengeMethod = pkce.codeChallengeMethod.value,
                     ),
                     pushedAuthorizationRequestUsed = true,
+                    requestUriExpiresAtEpochMilliseconds = nowEpochMilliseconds() +
+                        par.expiresIn * 1000L,
                 ),
                 pkce = pkce,
             )
@@ -778,6 +842,7 @@ class WalletIssuanceSessionService(
             usePKCE = true,
             metadata = metadata,
             redirectUri = request.redirectUri.toString(),
+            dpopJkt = dpopJkt,
         )
         val pkce = requireNotNull(direct.pkceData)
         return AuthorizationState(
@@ -790,10 +855,17 @@ class WalletIssuanceSessionService(
                     codeChallengeMethod = pkce.codeChallengeMethod.value,
                 ),
                 pushedAuthorizationRequestUsed = false,
+                requestUriExpiresAtEpochMilliseconds = null,
             ),
             pkce = pkce,
         )
     }
+
+    private fun dpopAlgorithmsForAuthorization(
+        metadata: AuthorizationServerMetadata,
+        key: Key,
+    ): Set<String>? = metadata.dpopSigningAlgValuesSupported
+        ?.takeIf { it.isNotEmpty() && key.keyType.jwsAlg in it }
 
     private suspend fun resolve(request: WalletIssuanceSessionRequest): ResolvedOffer {
         val offer = if (request.offerJson != null) {
@@ -1090,6 +1162,7 @@ class WalletIssuanceSessionService(
         val marked = mutex.withLock {
             if (sessions[sessionId] !== active || active.state != expected) return@withLock false
             active.state = SessionState.PROCESSING
+            active.expiresAtEpochMilliseconds = PROCESSING_EXPIRY
             true
         }
         if (!marked) return null
@@ -1106,7 +1179,13 @@ class WalletIssuanceSessionService(
     }
 
     private suspend fun loadActive(sessionId: String): ActiveSession? {
-        mutex.withLock { sessions[sessionId] }?.let { return it }
+        mutex.withLock { sessions[sessionId] }?.let { cached ->
+            if (cached.expiresAtEpochMilliseconds <= nowEpochMilliseconds()) {
+                invalidateActiveSessionBestEffort(sessionId)
+                return null
+            }
+            return cached
+        }
         val store = sessionStore ?: return null
         val record = store.get(activeRecordId(sessionId)) ?: return null
         require(record.kind == WalletIssuanceSessionRecordKind.ACTIVE_SESSION && record.sessionId == sessionId) {
@@ -1114,6 +1193,10 @@ class WalletIssuanceSessionService(
         }
         val persisted = json.decodeFromString<PersistedActiveSession>(record.payload)
         require(persisted.public.id == sessionId) { "Stored issuance session identifier is invalid" }
+        if (persisted.expiresAtEpochMilliseconds <= nowEpochMilliseconds()) {
+            invalidateActiveSessionBestEffort(sessionId)
+            return null
+        }
         if (persisted.state == SessionState.PROCESSING) {
             invalidateActiveSessionBestEffort(sessionId)
             return null
@@ -1136,10 +1219,19 @@ class WalletIssuanceSessionService(
             tokenRequestHeaders = persisted.request.tokenRequestHeaders,
         )
         val key = resolvePersistedKey(persisted.request.keyId, persisted.selectedPublicJwk)
-        require((persisted.public.authorization != null) == (persisted.codeVerifier != null)) {
+        require((persisted.authorization != null) == (persisted.codeVerifier != null)) {
             "Stored issuance session PKCE binding is invalid"
         }
-        val authorization = persisted.public.authorization?.let { public ->
+        when (persisted.state) {
+            SessionState.AWAITING_ACCEPTANCE -> require(persisted.authorization == null) {
+                "Stored review session already contains authorization state"
+            }
+            SessionState.AWAITING_CALLBACK -> require(persisted.authorization != null) {
+                "Stored callback session is missing authorization state"
+            }
+            SessionState.PROCESSING -> Unit
+        }
+        val authorization = persisted.authorization?.let { public ->
             val codeVerifier = requireNotNull(persisted.codeVerifier)
             val method = requireNotNull(PKCEManager.CodeChallengeMethod.fromString(public.pkce.codeChallengeMethod)) {
                 "Stored issuance session contains an unsupported PKCE method"
@@ -1165,6 +1257,7 @@ class WalletIssuanceSessionService(
             did = persisted.request.did,
             authorization = authorization,
             state = persisted.state,
+            expiresAtEpochMilliseconds = persisted.expiresAtEpochMilliseconds,
         )
         return mutex.withLock {
             sessions[sessionId] ?: active.also { sessions[sessionId] = it }
@@ -1188,10 +1281,12 @@ class WalletIssuanceSessionService(
             resolved.offeredCredentials.map { it.credentialConfigurationId } ==
                 public.offer.credentials.map { it.configurationId }
         ) { "Stored offered credential binding is invalid" }
-        val authorizationExpected = public.offer.grant == WalletIssuanceGrant.AUTHORIZATION_CODE
-        require((public.authorization != null) == authorizationExpected) {
-            "Stored issuance grant binding is invalid"
+        val resolvedGrant = when (resolved.offer.getGrantType()) {
+            is GrantType.AuthorizationCode -> WalletIssuanceGrant.AUTHORIZATION_CODE
+            is GrantType.PreAuthorizedCode -> WalletIssuanceGrant.PRE_AUTHORIZED_CODE
+            else -> error("Stored issuance grant is unsupported")
         }
+        require(public.offer.grant == resolvedGrant) { "Stored issuance grant binding is invalid" }
     }
 
     private suspend fun resolvePersistedKey(keyId: String?, selectedPublicJwk: String): Key {
@@ -1220,8 +1315,10 @@ class WalletIssuanceSessionService(
             issuerMetadata = json.encodeToString(active.resolved.issuerMetadata),
             authorizationServerMetadata = json.encodeToString(active.resolved.authorizationServerMetadata),
             selectedPublicJwk = active.key.getPublicKey().exportJWKObject().toString(),
+            authorization = active.authorization?.public,
             codeVerifier = active.authorization?.pkce?.codeVerifier,
             state = active.state,
+            expiresAtEpochMilliseconds = active.expiresAtEpochMilliseconds,
         )
         store.put(
             WalletIssuanceSessionRecord(
@@ -1240,7 +1337,19 @@ class WalletIssuanceSessionService(
 
     private suspend fun prunePersistedActiveSessions() {
         val store = sessionStore ?: return
-        val stale = store.list()
+        val records = store.list()
+        val now = nowEpochMilliseconds()
+        val expired = records.filter {
+            it.kind == WalletIssuanceSessionRecordKind.ACTIVE_SESSION &&
+                runCatching { json.decodeFromString<PersistedActiveSession>(it.payload).expiresAtEpochMilliseconds <= now }
+                    .getOrDefault(false)
+        }
+        expired.forEach { record ->
+            store.remove(record.id)
+            mutex.withLock { sessions.remove(record.sessionId) }
+        }
+        val stale = records
+            .filterNot { expired.any { removed -> removed.id == it.id } }
             .filter { it.kind == WalletIssuanceSessionRecordKind.ACTIVE_SESSION }
             .sortedByDescending { it.updatedAtEpochMilliseconds }
             .drop(MAX_ACTIVE_SESSIONS)
@@ -1275,7 +1384,7 @@ class WalletIssuanceSessionService(
                         sessionId = record.sessionId,
                         kind = WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL,
                         payload = json.encodeToString(payload),
-                        updatedAtEpochMilliseconds = Clock.System.now().toEpochMilliseconds(),
+                        updatedAtEpochMilliseconds = nowEpochMilliseconds(),
                     )
                 )
             }
@@ -1352,6 +1461,13 @@ class WalletIssuanceSessionService(
         mutex.withLock {
             if (sessions[active.public.id] === active && active.state == SessionState.PROCESSING) {
                 active.state = state
+                if (state == SessionState.AWAITING_ACCEPTANCE) active.authorization = null
+                active.expiresAtEpochMilliseconds = nowEpochMilliseconds() +
+                    when (state) {
+                        SessionState.AWAITING_ACCEPTANCE -> sessionPolicy.reviewTtl.inWholeMilliseconds
+                        SessionState.AWAITING_CALLBACK -> sessionPolicy.authorizationCallbackTtl.inWholeMilliseconds
+                        SessionState.PROCESSING -> PROCESSING_EXPIRY
+                    }
                 restored = true
             }
         }
@@ -1411,6 +1527,8 @@ class WalletIssuanceSessionService(
         WalletIssuanceErrorCode.PROTOCOL -> "The issuance response did not satisfy OpenID4VCI 1.0 requirements."
     }
 
+    private fun nowEpochMilliseconds(): Long = now().toEpochMilliseconds()
+
     private data class ResolvedOffer(
         val offer: CredentialOffer,
         val issuerMetadata: CredentialIssuerMetadata,
@@ -1430,8 +1548,9 @@ class WalletIssuanceSessionService(
         val key: Key,
         val keyId: String?,
         val did: String?,
-        val authorization: AuthorizationState?,
+        var authorization: AuthorizationState?,
         var state: SessionState,
+        var expiresAtEpochMilliseconds: Long,
     ) {
         val persistable: Boolean get() = request.key == null
     }
@@ -1475,8 +1594,10 @@ class WalletIssuanceSessionService(
         val issuerMetadata: String,
         val authorizationServerMetadata: String,
         val selectedPublicJwk: String,
+        val authorization: WalletIssuanceAuthorization? = null,
         val codeVerifier: String? = null,
         val state: SessionState,
+        val expiresAtEpochMilliseconds: Long,
     )
 
     @Serializable
@@ -1500,10 +1621,11 @@ class WalletIssuanceSessionService(
     ) : Exception(code.name, cause)
 
     @Serializable
-    private enum class SessionState { READY, AWAITING_CALLBACK, PROCESSING }
+    private enum class SessionState { AWAITING_ACCEPTANCE, AWAITING_CALLBACK, PROCESSING }
 
     private companion object {
         const val MAX_ACTIVE_SESSIONS = 32
+        const val PROCESSING_EXPIRY = Long.MAX_VALUE
         const val DPOP_HEADER = "DPoP"
         const val DPOP_NONCE_HEADER = "DPoP-Nonce"
         const val USE_DPOP_NONCE = "use_dpop_nonce"

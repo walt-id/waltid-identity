@@ -26,6 +26,7 @@ import id.walt.wallet2.handlers.PreviewPresentationResult
 import id.walt.wallet2.handlers.RejectPresentationRequest
 import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceAuthorizationCallback
+import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceSession
 import id.walt.wallet2.handlers.WalletIssuanceSessionRequest
@@ -251,9 +252,8 @@ public class MobileWallet internal constructor(
     /**
      * Resolves an offer and starts a bound OpenID4VCI 1.0 issuance session.
      *
-     * Authorization-code offers return a typed browser request containing the authorization URL,
-     * callback binding, state, and PKCE data. Pre-authorized offers return the same typed offer
-     * preview without a browser request and are continued with [continuePreAuthorizedIssuance].
+     * This operation only resolves and previews the offer. For authorization-code offers,
+     * [beginAuthorizationIssuance] creates the browser request after the user accepts the offer.
      */
     public suspend fun startIssuance(
         request: MobileWalletIssuanceRequest,
@@ -266,6 +266,16 @@ public class MobileWallet internal constructor(
             redirectUri = request.redirectUri.trim(),
         )
     )
+
+    /**
+     * Starts the authorization-code browser request for an accepted issuance session.
+     *
+     * State, PKCE, PAR, client attestation, and the callback continuation are created only by
+     * this explicit acceptance transition.
+     */
+    public suspend fun beginAuthorizationIssuance(
+        sessionId: String,
+    ): WalletIssuanceAuthorization = issuanceSessions.beginAuthorization(sessionId)
 
     /** Continues a pre-authorized session after review and optional transaction-code collection. */
     public suspend fun continuePreAuthorizedIssuance(

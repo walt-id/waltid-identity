@@ -1641,13 +1641,11 @@ private class FakeDemoWallet(
             id = "issuance-session",
             grant = issuanceGrant,
             preview = offerResolution,
-            authorizationUrl = if (issuanceGrant == WalletDemoIssuanceGrant.AuthorizationCode) {
-                "openid://authorization"
-            } else {
-                null
-            },
         )
     }
+
+    override suspend fun beginAuthorizationIssuance(sessionId: String): WalletDemoIssuanceAuthorization =
+        WalletDemoIssuanceAuthorization("openid://authorization")
 
     override suspend fun continuePreAuthorizedIssuance(
         sessionId: String,

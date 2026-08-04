@@ -453,10 +453,8 @@ class WalletViewModel: ObservableObject {
                         request: request
                     )
                 case .authorizationCode:
-                    guard let authorizationURL = session.authorization?.url else {
-                        throw WalletError.internalFailure("Issuance session is missing its authorization request")
-                    }
-                    authorizationRequestURL = authorizationURL
+                    let authorization = try await walletClient.beginAuthorizationIssuance(sessionID: session.id)
+                    authorizationRequestURL = authorization.url
                     setSuccess(WalletStatusText.reviewCredentialOffer, tab: .receive)
                 }
             } catch is CancellationError {

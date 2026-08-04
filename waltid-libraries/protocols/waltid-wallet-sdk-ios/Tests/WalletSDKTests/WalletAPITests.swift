@@ -267,6 +267,7 @@ final class WalletAPITests: XCTestCase {
         )
 
         let session = try await wallet.startIssuance(request)
+        let authorization = try await wallet.beginAuthorizationIssuance(sessionID: session.id)
         let preAuthorizedOutcome = try await wallet.continuePreAuthorizedIssuance(
             sessionID: session.id,
             transactionCode: "1234"
@@ -280,11 +281,13 @@ final class WalletAPITests: XCTestCase {
         let deferredOutcome = try await wallet.resumeDeferredIssuance(deferredCredentialID: "deferred-1")
 
         XCTAssertEqual(session, bridge.issuanceSessionResult)
+        XCTAssertEqual(authorization.url.absoluteString, "https://issuer.example/authorize")
         XCTAssertEqual(preAuthorizedOutcome, bridge.issuanceOutcomeResult)
         XCTAssertEqual(authorizationOutcome, bridge.issuanceOutcomeResult)
         XCTAssertEqual(cancellationOutcome, bridge.issuanceOutcomeResult)
         XCTAssertEqual(deferredOutcome, bridge.issuanceOutcomeResult)
         XCTAssertEqual(bridge.issuanceRequests, [request])
+        XCTAssertEqual(bridge.authorizationStartSessionIDs, [session.id])
         XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.count, 1)
         XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.first?.0, session.id)
         XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.first?.1, "1234")
@@ -770,8 +773,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
             issuer: .init(identifier: "https://issuer.example", name: nil, locale: nil, logoURI: nil, logoAltText: nil),
             credentials: [],
             transactionCode: nil
-        ),
-        authorization: nil
+        )
     )
     var issuanceOutcomeResult = IssuanceOutcome.stored(sessionID: "issuance-session-1", credentialIDs: [])
     var credentialsResult: [Credential] = []
@@ -791,6 +793,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     var rejectResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
     private(set) var bootstrapCalls: [BootstrapCall] = []
     private(set) var issuanceRequests: [IssuanceRequest] = []
+    private(set) var authorizationStartSessionIDs: [String] = []
     private(set) var preAuthorizedIssuanceCalls: [(String, String?)] = []
     private(set) var authorizationIssuanceCalls: [(String, URL)] = []
     private(set) var cancelledIssuanceSessionIDs: [String] = []
@@ -826,6 +829,18 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         }
         issuanceRequests.append(request)
         return issuanceSessionResult
+    }
+
+    func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization {
+        if let error { throw error }
+        authorizationStartSessionIDs.append(sessionID)
+        return IssuanceAuthorization(
+            url: URL(string: "https://issuer.example/authorize")!,
+            state: "test-state",
+            redirectURI: URL(string: "openid://")!,
+            pkce: .init(codeChallenge: "test-challenge", codeChallengeMethod: "S256"),
+            pushedAuthorizationRequestUsed: false
+        )
     }
 
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome {

@@ -55,11 +55,12 @@ val credentialIds = (outcome as? WalletIssuanceOutcome.Stored)?.credentialIds
 ```
 
 The session contains typed issuer, credential-configuration, and transaction-code
-metadata for review UI. Authorization-code sessions expose a browser request in
-`session.authorization`; after the callback, continue with
-`continueAuthorizationIssuance`. Set `MobileWalletConfig.preferredLocales` to the
-app's ordered BCP 47 language preferences; platform demos pass their platform
-locale preferences.
+metadata for review UI. For an authorization-code offer, call
+`beginAuthorizationIssuance(session.id)` after the user accepts the reviewed
+offer, open the returned browser URL, and then continue with
+`continueAuthorizationIssuance`. Set `MobileWalletConfig.preferredLocales` to
+the app's ordered BCP 47 language preferences; platform demos pass their
+platform locale preferences.
 
 ## Presenting credentials
 

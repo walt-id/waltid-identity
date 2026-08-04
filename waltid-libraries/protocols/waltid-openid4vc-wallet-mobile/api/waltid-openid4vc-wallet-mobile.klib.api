@@ -583,6 +583,7 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge { // id.walt.wal
     final val events // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.events|{}events[0]
         final fun <get-events>(): kotlinx.coroutines.flow/Flow<id.walt.wallet2.mobile/MobileWalletEvent> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.events.<get-events>|<get-events>(){}[0]
 
+    final suspend fun beginAuthorizationIssuance(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.handlers/WalletIssuanceAuthorization> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.beginAuthorizationIssuance|beginAuthorizationIssuance(kotlin.String){}[0]
     final suspend fun bootstrap(id.walt.wallet2.mobile/MobileWalletKeyType? = ..., kotlin/String = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile/MobileWalletBootstrapResult> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.bootstrap|bootstrap(id.walt.wallet2.mobile.MobileWalletKeyType?;kotlin.String){}[0]
     final suspend fun cancelIssuance(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.handlers/WalletIssuanceOutcome> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.cancelIssuance|cancelIssuance(kotlin.String){}[0]
     final suspend fun continueAuthorizationIssuance(kotlin/String, kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.handlers/WalletIssuanceOutcome> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.continueAuthorizationIssuance|continueAuthorizationIssuance(kotlin.String;kotlin.String){}[0]
@@ -608,6 +609,7 @@ final class id.walt.wallet2.mobile/MobileWallet { // id.walt.wallet2.mobile/Mobi
     final val events // id.walt.wallet2.mobile/MobileWallet.events|{}events[0]
         final fun <get-events>(): kotlinx.coroutines.flow/Flow<id.walt.wallet2.mobile/MobileWalletEvent> // id.walt.wallet2.mobile/MobileWallet.events.<get-events>|<get-events>(){}[0]
 
+    final suspend fun beginAuthorizationIssuance(kotlin/String): id.walt.wallet2.handlers/WalletIssuanceAuthorization // id.walt.wallet2.mobile/MobileWallet.beginAuthorizationIssuance|beginAuthorizationIssuance(kotlin.String){}[0]
     final suspend fun bootstrap(id.walt.wallet2.mobile/MobileWalletKeyType? = ..., kotlin/String = ...): id.walt.wallet2.mobile/MobileWalletBootstrapResult // id.walt.wallet2.mobile/MobileWallet.bootstrap|bootstrap(id.walt.wallet2.mobile.MobileWalletKeyType?;kotlin.String){}[0]
     final suspend fun cancelIssuance(kotlin/String): id.walt.wallet2.handlers/WalletIssuanceOutcome // id.walt.wallet2.mobile/MobileWallet.cancelIssuance|cancelIssuance(kotlin.String){}[0]
     final suspend fun continueAuthorizationIssuance(kotlin/String, kotlin/String): id.walt.wallet2.handlers/WalletIssuanceOutcome // id.walt.wallet2.mobile/MobileWallet.continueAuthorizationIssuance|continueAuthorizationIssuance(kotlin.String;kotlin.String){}[0]

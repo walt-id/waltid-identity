@@ -85,6 +85,7 @@ class AuthorizationRequestBuilder(
         usePKCE: Boolean = true,
         metadata: AuthorizationServerMetadata? = null,
         redirectUri: String? = null,
+        dpopJkt: String? = null,
     ): AuthorizationRequest = buildAuthorizationRequestForCredentialConfigurations(
         authorizationEndpoint = authorizationEndpoint,
         credentialConfigurationIds = listOf(credentialConfigurationId),
@@ -93,6 +94,7 @@ class AuthorizationRequestBuilder(
         usePKCE = usePKCE,
         metadata = metadata,
         redirectUri = redirectUri,
+        dpopJkt = dpopJkt,
     )
 
     /** Builds one authorization request containing all offered credential configurations. */
@@ -104,6 +106,7 @@ class AuthorizationRequestBuilder(
         usePKCE: Boolean = true,
         metadata: AuthorizationServerMetadata? = null,
         redirectUri: String? = null,
+        dpopJkt: String? = null,
     ): AuthorizationRequest {
         require(authorizationEndpoint.isNotBlank()) { "Authorization endpoint cannot be blank" }
         require(credentialConfigurationIds.isNotEmpty() && credentialConfigurationIds.all { it.isNotBlank() }) {
@@ -158,6 +161,8 @@ class AuthorizationRequestBuilder(
                 append("code_challenge", it.codeChallenge)
                 append("code_challenge_method", it.codeChallengeMethod.value)
             }
+
+            dpopJkt?.let { append("dpop_jkt", it) }
         }
 
         val authorizationUrl = urlBuilder.buildString()
@@ -187,6 +192,7 @@ class AuthorizationRequestBuilder(
         scope: String? = null,
         usePKCE: Boolean = true,
         metadata: AuthorizationServerMetadata? = null,
+        dpopJkt: String? = null,
     ): Pair<Map<String, String>, PKCEManager.PKCEData?> {
         val request = buildPushedAuthorizationRequestState(
             credentialConfigurationId = credentialConfigurationId,
@@ -194,6 +200,7 @@ class AuthorizationRequestBuilder(
             scope = scope,
             usePKCE = usePKCE,
             metadata = metadata,
+            dpopJkt = dpopJkt,
         )
         return request.parameters to request.pkceData
     }
@@ -206,6 +213,7 @@ class AuthorizationRequestBuilder(
         usePKCE: Boolean = true,
         metadata: AuthorizationServerMetadata? = null,
         redirectUri: String? = null,
+        dpopJkt: String? = null,
     ): PushedAuthorizationRequest = buildPushedAuthorizationRequestStateForCredentialConfigurations(
         credentialConfigurationIds = listOf(credentialConfigurationId),
         issuerState = issuerState,
@@ -213,6 +221,7 @@ class AuthorizationRequestBuilder(
         usePKCE = usePKCE,
         metadata = metadata,
         redirectUri = redirectUri,
+        dpopJkt = dpopJkt,
     )
 
     /** Builds one PAR body containing all offered credential configurations. */
@@ -223,6 +232,7 @@ class AuthorizationRequestBuilder(
         usePKCE: Boolean = true,
         metadata: AuthorizationServerMetadata? = null,
         redirectUri: String? = null,
+        dpopJkt: String? = null,
     ): PushedAuthorizationRequest {
         require(credentialConfigurationIds.isNotEmpty() && credentialConfigurationIds.all { it.isNotBlank() }) {
             "At least one non-blank credential configuration ID is required"
@@ -254,6 +264,8 @@ class AuthorizationRequestBuilder(
             parameters["code_challenge"] = it.codeChallenge
             parameters["code_challenge_method"] = it.codeChallengeMethod.value
         }
+
+        dpopJkt?.let { parameters["dpop_jkt"] = it }
 
         log.debug { "Built PAR request parameters for credential: ${credentialConfigurationIds.first()}" }
         return PushedAuthorizationRequest(

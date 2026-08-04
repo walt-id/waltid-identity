@@ -45,6 +45,8 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 
 class WalletIssuanceSessionServiceTest {
     private val json = Json { ignoreUnknownKeys = true }
@@ -70,20 +72,23 @@ class WalletIssuanceSessionServiceTest {
 
         val first = service.start(authRequest())
         val second = service.start(authRequest())
+        val firstAuthorization = service.beginAuthorization(first.id)
+        service.beginAuthorization(second.id)
         val crossBound = service.continueAuthorization(
             WalletIssuanceAuthorizationCallback(
                 sessionId = second.id,
-                callbackUri = callback(first, code = "cross-bound"),
+                callbackUri = callback(firstAuthorization, code = "cross-bound"),
             )
         )
         assertEquals(WalletIssuanceErrorCode.INVALID_CALLBACK, assertIs<WalletIssuanceOutcome.Failed>(crossBound).error.code)
         assertEquals(0, tokenCalls)
 
         val wrongRedirect = service.start(authRequest())
+        val wrongRedirectAuthorization = service.beginAuthorization(wrongRedirect.id)
         val wrongRedirectResult = service.continueAuthorization(
             WalletIssuanceAuthorizationCallback(
                 sessionId = wrongRedirect.id,
-                callbackUri = "other.wallet:/callback?code=code&state=${wrongRedirect.authorization!!.state}",
+                callbackUri = "other.wallet:/callback?code=code&state=${wrongRedirectAuthorization.state}",
             )
         )
         assertEquals(
@@ -93,15 +98,16 @@ class WalletIssuanceSessionServiceTest {
         assertEquals(0, tokenCalls)
 
         val accepted = service.start(authRequest())
+        val acceptedAuthorization = service.beginAuthorization(accepted.id)
         val result = service.continueAuthorization(
-            WalletIssuanceAuthorizationCallback(accepted.id, callback(accepted, "accepted-code"))
+            WalletIssuanceAuthorizationCallback(accepted.id, callback(acceptedAuthorization, "accepted-code"))
         )
         val deferred = assertIs<WalletIssuanceOutcome.Deferred>(result)
         assertEquals("test-credential", deferred.credentials.single().credentialConfigurationId)
         assertEquals(1, tokenCalls)
 
         val replay = service.continueAuthorization(
-            WalletIssuanceAuthorizationCallback(accepted.id, callback(accepted, "replayed-code"))
+            WalletIssuanceAuthorizationCallback(accepted.id, callback(acceptedAuthorization, "replayed-code"))
         )
         assertEquals(WalletIssuanceErrorCode.INVALID_SESSION, assertIs<WalletIssuanceOutcome.Failed>(replay).error.code)
         assertEquals(1, tokenCalls)
@@ -118,11 +124,12 @@ class WalletIssuanceSessionServiceTest {
         }
 
         val denied = service.start(authRequest())
+        val deniedAuthorization = service.beginAuthorization(denied.id)
         assertIs<WalletIssuanceOutcome.Cancelled>(
             service.continueAuthorization(
                 WalletIssuanceAuthorizationCallback(
                     denied.id,
-                    "wallet.example:/callback?error=access_denied&state=${denied.authorization!!.state}",
+                    "wallet.example:/callback?error=access_denied&state=${deniedAuthorization.state}",
                 )
             )
         )
@@ -150,34 +157,37 @@ class WalletIssuanceSessionServiceTest {
         }
 
         val missing = service.start(authRequest())
+        val missingAuthorization = service.beginAuthorization(missing.id)
         assertEquals(
             WalletIssuanceErrorCode.INVALID_CALLBACK,
             assertIs<WalletIssuanceOutcome.Failed>(
                 service.continueAuthorization(
-                    WalletIssuanceAuthorizationCallback(missing.id, callback(missing, "missing-iss"))
+                    WalletIssuanceAuthorizationCallback(missing.id, callback(missingAuthorization, "missing-iss"))
                 )
             ).error.code,
         )
 
         val mismatched = service.start(authRequest())
+        val mismatchedAuthorization = service.beginAuthorization(mismatched.id)
         assertEquals(
             WalletIssuanceErrorCode.INVALID_CALLBACK,
             assertIs<WalletIssuanceOutcome.Failed>(
                 service.continueAuthorization(
                     WalletIssuanceAuthorizationCallback(
                         mismatched.id,
-                        "${callback(mismatched, "wrong-iss")}&iss=https%3A%2F%2Fother.example",
+                        "${callback(mismatchedAuthorization, "wrong-iss")}&iss=https%3A%2F%2Fother.example",
                     )
                 )
             ).error.code,
         )
 
         val accepted = service.start(authRequest())
+        val acceptedAuthorization = service.beginAuthorization(accepted.id)
         assertIs<WalletIssuanceOutcome.Deferred>(
             service.continueAuthorization(
                 WalletIssuanceAuthorizationCallback(
                     accepted.id,
-                    "${callback(accepted, "accepted")}&iss=https%3A%2F%2Fissuer.example",
+                    "${callback(acceptedAuthorization, "accepted")}&iss=https%3A%2F%2Fissuer.example",
                 )
             )
         )
@@ -309,11 +319,12 @@ class WalletIssuanceSessionServiceTest {
         val wallet = Wallet("durable", staticKey = key)
         val startedBy = WalletIssuanceSessionService(wallet, sessionStore = records, httpClient = client)
         val session = startedBy.start(authRequest())
+        val authorization = startedBy.beginAuthorization(session.id)
         assertTrue("codeVerifier" !in Json.encodeToString(session))
 
         val resumedBy = WalletIssuanceSessionService(wallet, sessionStore = records, httpClient = client)
         val outcome = resumedBy.continueAuthorization(
-            WalletIssuanceAuthorizationCallback(session.id, callback(session, "after-recreation"))
+            WalletIssuanceAuthorizationCallback(session.id, callback(authorization, "after-recreation"))
         )
 
         assertIs<WalletIssuanceOutcome.Deferred>(outcome)
@@ -370,7 +381,7 @@ class WalletIssuanceSessionServiceTest {
         val session = WalletIssuanceSessionService(wallet, sessionStore = records, httpClient = client)
             .start(preAuthorizedRequest())
         val active = records.records.values.single()
-        val processingPayload = active.payload.replace("\"state\":\"READY\"", "\"state\":\"PROCESSING\"")
+        val processingPayload = active.payload.replace("\"state\":\"AWAITING_ACCEPTANCE\"", "\"state\":\"PROCESSING\"")
         assertTrue(processingPayload != active.payload)
         records.records[active.id] = active.copy(payload = processingPayload)
 
@@ -409,6 +420,7 @@ class WalletIssuanceSessionServiceTest {
             httpClient = client,
         )
         val authorization = service.start(authRequest())
+        val authorizationRequest = service.beginAuthorization(authorization.id)
         val preAuthorized = service.start(preAuthorizedRequest())
         val deferred = assertIs<WalletIssuanceOutcome.Deferred>(
             service.continuePreAuthorized(preAuthorized.id)
@@ -430,7 +442,7 @@ class WalletIssuanceSessionServiceTest {
                 service.continueAuthorization(
                     WalletIssuanceAuthorizationCallback(
                         authorization.id,
-                        callback(authorization, "after-clear"),
+                        callback(authorizationRequest, "after-clear"),
                     )
                 )
             ).error.code,
@@ -776,7 +788,7 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
-    fun dpopIsNotAppliedToAnUnadvertisedGrant() = runTest {
+    fun dpopIsAppliedWithoutSelectedGrantAdvertisement() = runTest {
         val key = JWKKey.generate(KeyType.secp256r1)
         val client = client { request ->
             when (request.url.toString()) {
@@ -789,7 +801,7 @@ class WalletIssuanceSessionServiceTest {
                     )
                 )
                 TOKEN_ENDPOINT -> {
-                    assertEquals(null, request.headers["DPoP"])
+                    assertNotNull(request.headers["DPoP"])
                     jsonResponse("""{"access_token":"access-token","token_type":"Bearer"}""")
                 }
                 CREDENTIAL_ENDPOINT -> {
@@ -807,6 +819,41 @@ class WalletIssuanceSessionServiceTest {
 
         val session = service.start(preAuthorizedRequest())
         assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
+    }
+
+    @Test
+    fun dpopIsAppliedToAuthorizationCodeWithoutGrantAdvertisement() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(
+                    """{"issuer":"$ISSUER","authorization_endpoint":"$AUTHORIZATION_ENDPOINT","token_endpoint":"$TOKEN_ENDPOINT","response_types_supported":["code"],"dpop_signing_alg_values_supported":["ES256"]}"""
+                )
+                TOKEN_ENDPOINT -> {
+                    assertNotNull(request.headers["DPoP"])
+                    jsonResponse("""{"access_token":"access-token","token_type":"Bearer"}""")
+                }
+                CREDENTIAL_ENDPOINT -> {
+                    assertEquals("Bearer access-token", request.headers[HttpHeaders.Authorization])
+                    assertEquals(null, request.headers["DPoP"])
+                    jsonResponse(
+                        """{"transaction_id":"transaction-1","interval":7}""",
+                        HttpStatusCode.Accepted,
+                    )
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(Wallet("test", staticKey = key), httpClient = client)
+
+        val session = service.start(authRequest())
+        val authorization = service.beginAuthorization(session.id)
+        assertIs<WalletIssuanceOutcome.Deferred>(
+            service.continueAuthorization(
+                WalletIssuanceAuthorizationCallback(session.id, callback(authorization, "authorization-code"))
+            )
+        )
     }
 
     @Test
@@ -873,24 +920,80 @@ class WalletIssuanceSessionServiceTest {
                       "pushed_authorization_request_endpoint":"$PAR_ENDPOINT",
                       "require_pushed_authorization_requests":true,
                       "response_types_supported":["code"],
-                      "grant_types_supported":["authorization_code"]
+                      "grant_types_supported":["authorization_code"],
+                      "dpop_signing_alg_values_supported":["ES256"]
                     }
                     """.trimIndent()
                 )
                 PAR_ENDPOINT -> {
                     parCalls += 1
                     assertTrue(request.bodyText().contains("code_challenge="))
-                    jsonResponse("""{"request_uri":"urn:example:par:1","expires_in":60}""")
+                    assertTrue(request.bodyText().contains("dpop_jkt="))
+                    jsonResponse("""{"request_uri":"urn:example:par:1","expires_in":60}""", HttpStatusCode.Created)
                 }
                 else -> respondError(HttpStatusCode.NotFound)
             }
         }
 
         val session = service.start(authRequest())
+        assertEquals(0, parCalls)
+        val authorization = service.beginAuthorization(session.id)
 
         assertEquals(1, parCalls)
-        assertTrue(session.authorization!!.pushedAuthorizationRequestUsed)
-        assertEquals("urn:example:par:1", Url(session.authorization.url).parameters["request_uri"])
+        assertTrue(authorization.pushedAuthorizationRequestUsed)
+        assertEquals("urn:example:par:1", Url(authorization.url).parameters["request_uri"])
+        assertNotNull(authorization.requestUriExpiresAtEpochMilliseconds)
+    }
+
+    @Test
+    fun parRequiresCreatedResponseAndPositiveExpiry() = runTest {
+        var parBody = """{"request_uri":"urn:example:par:invalid-status","expires_in":60}"""
+        var parStatus = HttpStatusCode.OK
+        val service = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(
+                    """{"issuer":"$ISSUER","authorization_endpoint":"$AUTHORIZATION_ENDPOINT","token_endpoint":"$TOKEN_ENDPOINT","pushed_authorization_request_endpoint":"$PAR_ENDPOINT","response_types_supported":["code"]}"""
+                )
+                PAR_ENDPOINT -> jsonResponse(parBody, parStatus)
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val session = service.start(authRequest())
+        assertFailsWith<Exception> { service.beginAuthorization(session.id) }
+
+        parBody = """{"request_uri":"urn:example:par:invalid-expiry","expires_in":0}"""
+        parStatus = HttpStatusCode.Created
+        val second = service.start(authRequest())
+        assertFailsWith<Exception> { service.beginAuthorization(second.id) }
+    }
+
+    @Test
+    fun expiredReviewSessionIsRemovedBeforeAcceptance() = runTest {
+        var current = Clock.System.now()
+        val records = RecordingSessionStore()
+        val service = WalletIssuanceSessionService(
+            wallet = Wallet("expiry", staticKey = JWKKey.generate(KeyType.secp256r1)),
+            sessionStore = records,
+            httpClient = client { request ->
+                when (request.url.toString()) {
+                    ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                    AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                    else -> respondError(HttpStatusCode.NotFound)
+                }
+            },
+            sessionPolicy = WalletIssuanceSessionPolicy(reviewTtl = 1.seconds, authorizationCallbackTtl = 1.seconds),
+            now = { current },
+        )
+        val session = service.start(preAuthorizedRequest())
+        current += 2.seconds
+
+        val outcome = service.continuePreAuthorized(session.id)
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_SESSION,
+            assertIs<WalletIssuanceOutcome.Failed>(outcome).error.code,
+        )
+        assertTrue(records.records.isEmpty())
     }
 
     @Test
@@ -968,8 +1071,8 @@ class WalletIssuanceSessionServiceTest {
             ).jsonObject,
         )
 
-    private fun callback(session: WalletIssuanceSession, code: String) =
-        "$REDIRECT_URI?code=$code&state=${session.authorization!!.state}"
+    private fun callback(authorization: WalletIssuanceAuthorization, code: String) =
+        "$REDIRECT_URI?code=$code&state=${authorization.state}"
 
     private fun issuerMetadata(
         proofRequired: Boolean,

@@ -64,15 +64,19 @@ actor MockWalletClient: WalletClient {
                     ? .init(inputMode: "numeric", length: 6, descriptionText: "Enter the six-digit code")
                     : nil
             ),
-            authorization: issuanceGrant == .authorizationCode
-                ? .init(
-                    url: URL(string: "https://issuer.example/authorize")!,
-                    state: "mock-state",
-                    redirectURI: request.redirectURI,
-                    pkce: .init(codeChallenge: "mock-challenge", codeChallengeMethod: "S256"),
-                    pushedAuthorizationRequestUsed: false
-                )
-                : nil
+        )
+    }
+
+    func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization {
+        guard issuanceGrant == .authorizationCode else {
+            throw WalletError.internalFailure("Mock issuance session is not authorization-code based")
+        }
+        return IssuanceAuthorization(
+            url: URL(string: "https://issuer.example/authorize")!,
+            state: "mock-state",
+            redirectURI: URL(string: "openid://")!,
+            pkce: .init(codeChallenge: "mock-challenge", codeChallengeMethod: "S256"),
+            pushedAuthorizationRequestUsed: false
         )
     }
 

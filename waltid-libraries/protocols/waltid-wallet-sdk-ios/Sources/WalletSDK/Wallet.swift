@@ -61,10 +61,23 @@ public actor Wallet {
     /// Starts a typed pre-authorized or authorization-code issuance session.
     ///
     /// - Parameter request: Offer, callback, client, and holder-binding configuration.
-    /// - Returns: A validated session with a typed offer preview and optional browser authorization data.
-    /// - Throws: ``WalletError`` when offer resolution, metadata validation, PAR, or key selection fails.
+    /// - Returns: A validated session with a typed offer preview.
+    /// - Throws: ``WalletError`` when offer resolution, metadata validation, or key selection fails.
     public func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
         try await bridge.startIssuance(request: request)
+    }
+
+    /// Starts the authorization-code browser request for an accepted issuance session.
+    ///
+    /// Offer resolution and local review do not create authorization-server state. Call this
+    /// method only after the user accepts an authorization-code offer, then open the returned URL
+    /// in the browser and deliver the callback to ``continueAuthorizationIssuance(sessionID:callbackURI:)``.
+    ///
+    /// - Parameter sessionID: Opaque identifier returned by ``startIssuance(_:)``.
+    /// - Returns: Browser authorization data, including the callback binding and PKCE state.
+    /// - Throws: ``WalletError`` when authorization initiation cannot be completed.
+    public func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization {
+        try await bridge.beginAuthorizationIssuance(sessionID: sessionID)
     }
 
     /// Continues a reviewed pre-authorized issuance session.

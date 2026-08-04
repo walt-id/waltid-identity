@@ -92,6 +92,23 @@ class AuthorizationRequestBuilderTest {
     }
 
     @Test
+    fun dpopJktIsIncludedInDirectAndPushedAuthorizationRequests() {
+        val thumbprint = "thumbprint-value"
+        val direct = builder.buildAuthorizationRequest(
+            authorizationEndpoint = endpoint,
+            credentialConfigurationId = "test_config",
+            dpopJkt = thumbprint,
+        )
+        assertEquals(thumbprint, Url(direct.url).parameters["dpop_jkt"])
+
+        val pushed = builder.buildPushedAuthorizationRequest(
+            credentialConfigurationId = "test_config",
+            dpopJkt = thumbprint,
+        )
+        assertEquals(thumbprint, pushed.first["dpop_jkt"])
+    }
+
+    @Test
     fun authorizationDetailsContainEveryOfferedCredentialConfiguration() {
         val request = builder.buildAuthorizationRequestForCredentialConfigurations(
             authorizationEndpoint = endpoint,

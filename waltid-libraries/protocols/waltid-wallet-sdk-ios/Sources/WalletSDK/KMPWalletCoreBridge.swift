@@ -75,6 +75,16 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return try value.toSwiftIssuanceSession()
     }
 
+    func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization {
+        let result = try await bridge.beginAuthorizationIssuance(sessionId: sessionID)
+        let value = try Self.successValue(
+            result,
+            as: Waltid_openid4vc_walletWalletIssuanceAuthorization.self,
+            operation: "begin authorization issuance"
+        )
+        return try value.toSwiftIssuanceAuthorization()
+    }
+
     func continuePreAuthorizedIssuance(
         sessionID: String,
         transactionCode: String?
@@ -260,8 +270,7 @@ private extension Waltid_openid4vc_walletWalletIssuanceSession {
     func toSwiftIssuanceSession() throws -> IssuanceSession {
         IssuanceSession(
             id: id,
-            offer: try offer.toSwiftIssuanceOfferPreview(),
-            authorization: try authorization?.toSwiftIssuanceAuthorization()
+            offer: try offer.toSwiftIssuanceOfferPreview()
         )
     }
 }
@@ -325,7 +334,10 @@ private extension Waltid_openid4vc_walletWalletIssuanceAuthorization {
                 codeChallenge: pkce.codeChallenge,
                 codeChallengeMethod: pkce.codeChallengeMethod
             ),
-            pushedAuthorizationRequestUsed: pushedAuthorizationRequestUsed
+            pushedAuthorizationRequestUsed: pushedAuthorizationRequestUsed,
+            requestURIExpiresAt: requestUriExpiresAtEpochMilliseconds.map {
+                Date(timeIntervalSince1970: TimeInterval($0.int64Value) / 1000.0)
+            }
         )
     }
 }

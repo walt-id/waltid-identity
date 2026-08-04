@@ -34,6 +34,7 @@ import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.mobile.toKeyType
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -656,6 +657,9 @@ class WalletSdkBridgeTest {
         }
 
         override suspend fun startIssuance(request: MobileWalletIssuanceRequest) =
+            error("Not used by this test fake")
+
+        override suspend fun beginAuthorizationIssuance(sessionId: String): WalletIssuanceAuthorization =
             error("Not used by this test fake")
 
         override suspend fun continuePreAuthorizedIssuance(

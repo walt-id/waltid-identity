@@ -90,9 +90,13 @@ internal class MobileDemoWallet(
                 transactionCode = session.offer.transactionCode?.toDemoRequirement(),
                 requiresIssuerAuthentication = session.offer.grant == WalletIssuanceGrant.AUTHORIZATION_CODE,
             ),
-            authorizationUrl = session.authorization?.url,
         )
     }
+
+    override suspend fun beginAuthorizationIssuance(sessionId: String): WalletDemoIssuanceAuthorization =
+        mobileWallet.beginAuthorizationIssuance(sessionId).let {
+            WalletDemoIssuanceAuthorization(url = it.url)
+        }
 
     override suspend fun continuePreAuthorizedIssuance(
         sessionId: String,

@@ -6,6 +6,7 @@ protocol WalletCoreBridge: Sendable {
 
     func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession
+    func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
@@ -53,6 +54,10 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     }
 
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
+        throw unavailableError()
+    }
+
+    func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization {
         throw unavailableError()
     }
 

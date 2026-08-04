@@ -23,6 +23,9 @@ internal class LazyDemoWallet(
     override suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?) =
         wallet().startIssuance(offerUrl, redirectUri, did)
 
+    override suspend fun beginAuthorizationIssuance(sessionId: String) =
+        wallet().beginAuthorizationIssuance(sessionId)
+
     override suspend fun continuePreAuthorizedIssuance(sessionId: String, transactionCode: String?) =
         wallet().continuePreAuthorizedIssuance(sessionId, transactionCode)
 

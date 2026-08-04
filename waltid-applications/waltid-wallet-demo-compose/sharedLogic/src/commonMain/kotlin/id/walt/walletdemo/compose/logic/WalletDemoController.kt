@@ -339,8 +339,11 @@ class WalletDemoController(
                     WalletDemoIssuanceGrant.PreAuthorizedCode -> completeIssuanceOutcome(
                         ready, request, wallet.continuePreAuthorizedIssuance(session.id, txCode),
                     )
-                    WalletDemoIssuanceGrant.AuthorizationCode -> updateIfCurrent(request, WalletOperationState.Receiving) {
-                        it.copy(authorizationRequestUrl = session.authorizationUrl, operation = WalletOperationState.OfferPreview)
+                    WalletDemoIssuanceGrant.AuthorizationCode -> {
+                        val authorization = wallet.beginAuthorizationIssuance(session.id)
+                        updateIfCurrent(request, WalletOperationState.Receiving) {
+                            it.copy(authorizationRequestUrl = authorization.url, operation = WalletOperationState.OfferPreview)
+                        }
                     }
                 }
             } catch (cancellation: CancellationException) {

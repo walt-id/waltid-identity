@@ -292,16 +292,17 @@ private actor TransactionCodeWalletClient: WalletClient {
                 issuer: IssuanceIssuerPreview(identifier: "https://issuer.example", name: "Example Issuer", locale: nil, logoURI: nil, logoAltText: nil),
                 credentials: [IssuanceCredentialPreview(configurationID: "ExampleCredential", format: "vc+sd-jwt", name: "Example credential", descriptionText: nil, logoURI: nil)],
                 transactionCode: transactionCode
-            ),
-            authorization: issuanceGrant == .authorizationCode
-                ? IssuanceAuthorization(
-                    url: URL(string: "https://issuer.example/authorize")!,
-                    state: "test-state",
-                    redirectURI: request.redirectURI,
-                    pkce: .init(codeChallenge: "test-challenge", codeChallengeMethod: "S256"),
-                    pushedAuthorizationRequestUsed: false
-                )
-                : nil
+            )
+        )
+    }
+
+    func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization {
+        IssuanceAuthorization(
+            url: URL(string: "https://issuer.example/authorize")!,
+            state: "test-state",
+            redirectURI: URL(string: "openid://")!,
+            pkce: .init(codeChallenge: "test-challenge", codeChallengeMethod: "S256"),
+            pushedAuthorizationRequestUsed: false
         )
     }
 
