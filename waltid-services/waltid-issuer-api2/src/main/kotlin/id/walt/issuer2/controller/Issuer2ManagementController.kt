@@ -9,10 +9,12 @@ import id.walt.ktornotifications.SseNotifier
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.sse.sse
 import kotlinx.serialization.json.Json
@@ -27,12 +29,18 @@ class Issuer2ManagementController(
             val profileExamples = Issuer2ManagementRoutesDocs.selectProfileExamples(profileService.listProfiles())
 
             get("profiles", Issuer2ManagementRoutesDocs.listProfiles(profileExamples)) {
-                call.respond(profileService.listProfiles())
+                call.respondText(
+                    text = Json.encodeToString(profileService.listProfiles()),
+                    contentType = ContentType.Application.Json,
+                )
             }
 
             get("profiles/{profileId}", Issuer2ManagementRoutesDocs.getProfile(profileExamples)) {
                 val profileId = requireNotNull(call.parameters["profileId"]) { "Missing profileId" }
-                call.respond(profileService.getProfile(profileId))
+                call.respondText(
+                    text = Json.encodeToString(profileService.getProfile(profileId)),
+                    contentType = ContentType.Application.Json,
+                )
             }
 
             post("credential-offers", Issuer2ManagementRoutesDocs.createCredentialOffer()) {
