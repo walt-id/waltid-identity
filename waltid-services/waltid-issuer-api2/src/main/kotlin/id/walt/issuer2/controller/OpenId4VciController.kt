@@ -154,7 +154,6 @@ class OpenId4VciController(
                 call.response.headers.append(HttpHeaders.CacheControl, "no-store")
                 call.respond(buildJsonObject {
                     put("c_nonce", issuedNonce.nonce)
-                    put("c_nonce_expires_in", issuedNonce.expiresInSeconds)
                 })
             }
 
