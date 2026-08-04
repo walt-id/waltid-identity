@@ -67,6 +67,7 @@ kotlin {
                     dependencies {
                         api(identityLibs.androidx.fragment)
                         implementation(identityLibs.androidx.biometric)
+                        implementation(identityLibs.androidx.lifecycle.runtime.ktx)
                         implementation(identityLibs.kotlinx.coroutines.android)
                         implementation(identityLibs.cryptography.provider.jdk)
                     }

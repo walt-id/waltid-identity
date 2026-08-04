@@ -1,6 +1,7 @@
 package id.walt.wallet2.persistence.keys
 
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import id.walt.crypto.keys.KeyType
@@ -49,6 +50,59 @@ class AndroidPlatformKeyProviderTest {
 
         assertFalse(preflight.supported)
         assertEquals(KeyUseAuthorizationFailure.InteractionContextUnavailable, preflight.failure)
+    }
+
+    @Test
+    fun protectedPreflightRequiresResumedFragmentActivity() = runTest {
+        val scenario = activityRule.scenario
+        val activity = scenario.withActivity()
+        val provider = AndroidPlatformKeyProvider(
+            context = activity.applicationContext,
+            interactionContextProvider = { activity },
+        )
+        val request = PlatformKeyRequest(
+            KeyType.secp256r1,
+            keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+        )
+
+        scenario.moveToState(Lifecycle.State.CREATED)
+        assertEquals(
+            KeyUseAuthorizationFailure.InteractionContextUnavailable,
+            provider.preflight(request).failure,
+        )
+
+        scenario.moveToState(Lifecycle.State.STARTED)
+        assertEquals(
+            KeyUseAuthorizationFailure.InteractionContextUnavailable,
+            provider.preflight(request).failure,
+        )
+
+        scenario.moveToState(Lifecycle.State.RESUMED)
+        assertNotEquals(
+            KeyUseAuthorizationFailure.InteractionContextUnavailable,
+            provider.preflight(request).failure,
+        )
+    }
+
+    @Test
+    fun protectedPreflightRejectsDestroyedFragmentActivity() = runTest {
+        val scenario = activityRule.scenario
+        val activity = scenario.withActivity()
+        val provider = AndroidPlatformKeyProvider(
+            context = activity.applicationContext,
+            interactionContextProvider = { activity },
+        )
+        val request = PlatformKeyRequest(
+            KeyType.secp256r1,
+            keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+        )
+
+        scenario.close()
+
+        assertEquals(
+            KeyUseAuthorizationFailure.InteractionContextUnavailable,
+            provider.preflight(request).failure,
+        )
     }
 
     @Test

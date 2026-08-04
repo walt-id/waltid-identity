@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
 import id.walt.crypto.AndroidKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
@@ -118,4 +119,8 @@ private fun Throwable.isMissingPlatformKey(): Boolean =
     generateSequence(this) { it.cause }.any { it is NoSuchElementException }
 
 private fun FragmentActivity?.canHostBiometricPrompt(): Boolean =
-    this != null && !isFinishing && !isDestroyed && !isChangingConfigurations
+    this != null &&
+        !isFinishing &&
+        !isDestroyed &&
+        !isChangingConfigurations &&
+        lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)

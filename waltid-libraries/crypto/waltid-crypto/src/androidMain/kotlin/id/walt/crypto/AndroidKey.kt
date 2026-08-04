@@ -5,6 +5,7 @@ import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
 import at.asitplus.signum.indispensable.josef.io.joseCompliantSerializer
 import at.asitplus.signum.indispensable.josef.toJsonWebKey
 import at.asitplus.signum.supreme.SignatureResult
@@ -234,7 +235,11 @@ private fun at.asitplus.signum.supreme.os.AndroidSigningKeyConfiguration.configu
 }
 
 private fun FragmentActivity?.canHostBiometricPrompt(): Boolean =
-    this != null && !isFinishing && !isDestroyed && !isChangingConfigurations
+    this != null &&
+        !isFinishing &&
+        !isDestroyed &&
+        !isChangingConfigurations &&
+        lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
 
 private suspend fun AndroidKey.Options.loadSigner(): AndroidKeystoreSigner {
     val signer = AndroidKeyStoreProvider.getSignerForKey(kid) {
