@@ -31,6 +31,7 @@ import id.walt.openid4vci.proofs.CredentialNonceBinding
 import id.walt.openid4vci.proofs.CredentialNonceService
 import id.walt.openid4vci.proofs.CredentialNonceValidationContext
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
+import id.walt.openid4vci.proofs.CredentialProofValidationException
 import id.walt.openid4vci.proofs.CredentialProofVerifier
 import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.openid4vci.proofs.IssuedCredentialNonce
@@ -415,12 +416,18 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
         // The provider validates proofs authoritatively while building the credential response. Sessions
         // pinned to an expected holder key, and deployments hooking into proof-key acceptance, need that
-        // key before the session is claimed, so resolve it up front for those cases only.
+        // key before the session is claimed, so resolve it up front for those cases only. Nonces stay
+        // valid until they expire, so validating them here as well never consumes anything.
         val proofPublicKeyJwk = if (requiresCredentialProofKey(observedSession)) {
             try {
                 resolveCredentialProofPublicKeyJwk(requestWithSession, configuration, nonceBinding)
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: CredentialProofValidationException) {
+                return oauth2Provider.writeCredentialError(
+                    requestWithSession,
+                    CredentialError(e.errorCode, e.message),
+                )
             } catch (e: Exception) {
                 return oauth2Provider.writeCredentialError(
                     requestWithSession,
@@ -802,10 +809,11 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 session.expectedCredentialProofKeyJwk != null
 
     /**
-     * Resolves the holder key of the request's credential proof without consuming a nonce.
+     * Resolves the holder key of the request's credential proof.
      *
-     * The credential response creation validates proofs authoritatively, including the nonce. This
-     * only exposes the holder key to session pinning and to the proof-key hooks beforehand.
+     * The credential response creation validates proofs authoritatively as well. This only exposes the
+     * holder key to session pinning and to the proof-key hooks before the session is claimed, so that
+     * neither runs for a request that cannot be issued.
      */
     private suspend fun resolveCredentialProofPublicKeyJwk(
         request: CredentialRequest,
@@ -819,6 +827,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 credentialIssuer = nonceBinding.credentialIssuer,
                 clientId = request.accessTokenClientId,
                 anonymousPreAuthorizedAccess = request.anonymousPreAuthorizedAccess,
+                nonceValidation = CredentialNonceValidationContext(
+                    service = credentialNonceService,
+                    binding = nonceBinding,
+                ),
             ),
         ).firstOrNull() ?: throw IllegalArgumentException("Credential request has no credential proof")
         return verifiedProof.holderKey.getPublicKey().exportJWKObject()
