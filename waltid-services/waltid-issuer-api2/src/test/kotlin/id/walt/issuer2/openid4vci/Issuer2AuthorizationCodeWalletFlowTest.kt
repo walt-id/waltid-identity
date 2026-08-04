@@ -6,6 +6,7 @@ import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.testsupport.Issuer2BrowserTestServer
 import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
 import id.walt.issuer2.testsupport.Issuer2WalletFlowDriver
+import id.walt.issuer2.testsupport.KTOR_TEST_APPLICATION_BASE_URL
 import id.walt.issuer2.testsupport.apiClient
 import id.walt.issuer2.testsupport.assertBearerAccessToken
 import id.walt.issuer2.testsupport.assertIsoMdlCredentialPayload
@@ -447,6 +448,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
         val redirect = Url(assertNotNull(authorizationResponse.headers[HttpHeaders.Location]))
         assertEquals("invalid_request", redirect.parameters["error"])
         assertEquals("unknown-scope-state", redirect.parameters["state"])
+        assertEquals("$KTOR_TEST_APPLICATION_BASE_URL/openid4vci", redirect.parameters["iss"])
         assertTrue(
             assertNotNull(redirect.parameters["error_description"]).contains("No credential configuration"),
         )
