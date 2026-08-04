@@ -9,6 +9,7 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJwe
 import id.walt.crypto2.jose.JweContentEncryption
 import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.dcql.DcqlCredential
@@ -427,13 +428,12 @@ object Verifier2VPDirectPostHandler {
             try {
                 val allowedAlgorithms = session.authorizationRequest.clientMetadata
                     ?.idTokenSignedResponseAlg
-                    ?.let(JwsAlgorithm::parse)
-                    ?: JwsAlgorithm.RS256
+                    ?: ClientMetadata.DEFAULT_ID_TOKEN_SIGNED_RESPONSE_ALG
                 SelfIssuedIdTokenValidator.validate(
                     idToken = idToken,
                     expectedNonce = session.authorizationRequest.nonce!!,
                     expectedAudience = session.authorizationRequest.clientId!!,
-                    allowedAlgorithms = setOf(allowedAlgorithms),
+                    allowedAlgorithms = setOf(JwsAlgorithm.parse(allowedAlgorithms)),
                 )
             } catch (cause: CancellationException) {
                 throw cause
