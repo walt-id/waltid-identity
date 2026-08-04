@@ -8,7 +8,6 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.keys.toPublicJwk
-import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.prooftypes.Proofs
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.utils.io.core.*
@@ -47,17 +46,15 @@ class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilde
      * @param key The cryptographic key to use for signing
      * @param audience The credential issuer URL
      * @param nonce The optional c_nonce obtained from the issuer's Nonce Endpoint
-     * @param keyId Optional key identifier (DID) for kid header
-     * @param includeJwk Whether to include the public key as JWK in the header
+     * @param binding How the proof header identifies [key]
      * @return Proofs object containing the JWT proof
      */
     @Deprecated("Use the Crypto2Key overload")
-    suspend fun buildJwtProof(
+    override suspend fun buildProof(
         key: Key,
         audience: String,
         nonce: String?,
-        keyId: String? = null,
-        includeJwk: Boolean = false,
+        binding: ProofKeyBinding,
     ): Proofs {
         ProofBuilderUtils.validateProofParameters(audience, nonce)
 
@@ -75,14 +72,14 @@ class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilde
             put("typ", "openid4vci-proof+jwt")
             put("alg", key.keyType.jwsAlg)
 
-            when {
-                keyId != null -> {
-                    // DID-based binding: use kid
-                    put("kid", keyId)
-                    log.debug { "Using DID-based binding with kid: $keyId" }
+            when (binding) {
+                is ProofKeyBinding.KeyId -> {
+                    // Externally resolvable binding (e.g. DID verification method): use kid
+                    put("kid", binding.keyId)
+                    log.debug { "Using kid-based binding with kid: ${binding.keyId}" }
                 }
 
-                includeJwk -> {
+                ProofKeyBinding.Jwk -> {
                     // JWK-based binding: include public key
                     try {
                         val publicKeyJwk = key.getPublicKey().exportJWK()
@@ -94,8 +91,7 @@ class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilde
                     }
                 }
 
-                else -> {
-                    // Default: use key's thumbprint as kid
+                ProofKeyBinding.JwkThumbprint -> {
                     val thumbprint = key.getThumbprint()
                     put("kid", thumbprint)
                     log.debug { "Using key thumbprint as kid: $thumbprint" }
@@ -120,13 +116,12 @@ class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilde
         )
     }
 
-    suspend fun buildJwtProof(
+    override suspend fun buildProof(
         key: Crypto2Key,
         algorithm: JwsAlgorithm,
         audience: String,
         nonce: String?,
-        keyId: String? = null,
-        includeJwk: Boolean = false,
+        binding: ProofKeyBinding,
     ): Proofs {
         ProofBuilderUtils.validateProofParameters(audience, nonce)
         val payload = buildJsonObject {
@@ -134,20 +129,12 @@ class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilde
             put("iat", ProofBuilderUtils.currentTimestampSeconds())
             nonce?.let { put("nonce", it) }
         }
-        val bindingJwk = if (keyId == null) {
-            val exported = key.capabilities.publicKeyExporter?.exportPublicKey()
-                ?: throw IllegalArgumentException("Proof signing key does not support public-key export")
-            exported.toPublicJwk(key.spec)
-        } else null
-        val thumbprint = if (keyId == null && !includeJwk) {
-            Jwk.sha256Thumbprint(requireNotNull(bindingJwk))
-        } else null
         val header = buildJsonObject {
             put("typ", "openid4vci-proof+jwt")
-            when {
-                keyId != null -> put("kid", keyId)
-                includeJwk -> put("jwk", requireNotNull(bindingJwk).toJsonObject())
-                else -> put("kid", requireNotNull(thumbprint))
+            when (binding) {
+                is ProofKeyBinding.KeyId -> put("kid", binding.keyId)
+                ProofKeyBinding.Jwk -> put("jwk", key.exportPublicJwk().toJsonObject())
+                ProofKeyBinding.JwkThumbprint -> put("kid", Jwk.sha256Thumbprint(key.exportPublicJwk()))
             }
         }
         return Proofs(
@@ -161,48 +148,12 @@ class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilde
             )
         )
     }
+}
 
-    @Deprecated("Use the Crypto2Key overload")
-    override suspend fun buildProof(
-        key: Key,
-        audience: String,
-        nonce: String?,
-    ): Proofs {
-        // Default: try to use DID if available, otherwise use JWK
-        val keyId = key.getKeyId()
-        val useDid = keyId.startsWith("did:")
-
-        return if (useDid) {
-            buildJwtProof(key, audience, nonce, keyId = keyId, includeJwk = false)
-        } else {
-            buildJwtProof(key, audience, nonce, keyId = null, includeJwk = true)
-        }
-    }
-
-    override suspend fun buildProof(
-        key: Crypto2Key,
-        algorithm: JwsAlgorithm,
-        audience: String,
-        nonce: String,
-    ): Proofs {
-        val keyId = key.id.value
-        return if (keyId.startsWith("did:")) {
-            buildJwtProof(key, algorithm, audience, nonce, keyId = keyId)
-        } else {
-            buildJwtProof(key, algorithm, audience, nonce, includeJwk = true)
-        }
-    }
-
-    /**
-     * Determines the appropriate binding method based on key and configuration
-     */
-    @Deprecated("Binding is selected directly by the Crypto2Key proof overload")
-    fun determineBindingMethod(key: Key, keyId: String?): CryptographicBindingMethod {
-        return when {
-            keyId?.startsWith("did:") == true -> CryptographicBindingMethod.fromValue("did")
-            else -> CryptographicBindingMethod.Jwk
-        }
-    }
+private suspend fun Crypto2Key.exportPublicJwk(): EncodedKey.Jwk {
+    val exported = capabilities.publicKeyExporter?.exportPublicKey()
+        ?: throw IllegalArgumentException("Proof signing key does not support public-key export")
+    return exported.toPublicJwk(spec)
 }
 
 private fun EncodedKey.Jwk.toJsonObject(): JsonObject =
