@@ -402,6 +402,76 @@ class VaultTransitKeyProviderTest {
         )
     }
 
+    @Test
+    fun `attaching an existing key resolves the rotated version and its public key from Vault`() = runTest {
+        // Vault Transit rotates in place and embeds the version in signatures, so attaching must not
+        // assume v1: this key is at latest_version 3.
+        val spec = KeySpec.Ec(EcCurve.P256)
+        val remoteSpki = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("vault-v3"),
+                spec = spec,
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        ).capabilities.publicKeyExporter!!.exportPublicKey().toSpkiDer(spec)
+        var keyLookups = 0
+        val provider = VaultTransitKeyProvider(
+            client = mockClient { request ->
+                assertEquals(HttpMethod.Get, request.method)
+                assertEquals("https://vault.example/v1/transit/keys/rotated-key", request.url.toString())
+                assertEquals("tenant-a", request.headers["X-Vault-Namespace"])
+                keyLookups += 1
+                respondJson(keyResponse(publicKeySpki = remoteSpki.data.toByteArray()))
+            },
+            credentialResolver = VaultCredentialResolver { VaultCredential.Token("vault-token") },
+        )
+
+        val stored = provider.storedKeyForExisting(
+            id = KeyId("existing-vault-key"),
+            spec = spec,
+            usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            options = options,
+            remoteName = "rotated-key",
+        )
+        val providerData = stored.providerData.toByteArray().decodeToString()
+
+        assertEquals(1, keyLookups)
+        assertTrue("\"keyVersion\":3" in providerData, providerData)
+        assertTrue("\"remoteName\":\"rotated-key\"" in providerData, providerData)
+        // The public key comes from the resolved version, not from a caller-supplied cached copy.
+        assertEquals(
+            remoteSpki.data.toByteArray().toList(),
+            (stored.publicKey as EncodedKey.SpkiDer).data.toByteArray().toList(),
+        )
+        // Credentials are never persisted into the descriptor.
+        assertFalse("vault-token" in providerData)
+
+        // The descriptor round-trips and restores without contacting Vault again.
+        assertNotNull(
+            runtime(mockClient { error("Restore must not call Vault") })
+                .restore(StoredKeyCodec.decodeFromByteArray(StoredKeyCodec.encodeToByteArray(stored)))
+                .capabilities.signer
+        )
+    }
+
+    @Test
+    fun `attaching an existing key rejects a Vault key of the wrong type`() = runTest {
+        val provider = VaultTransitKeyProvider(
+            client = mockClient { respondJson(keyResponse(type = "ed25519")) },
+            credentialResolver = VaultCredentialResolver { VaultCredential.Token("vault-token") },
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            provider.storedKeyForExisting(
+                id = KeyId("mismatch"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                options = options,
+                remoteName = "rotated-key",
+            )
+        }
+    }
+
     private fun runtime(
         client: HttpClient,
         resolver: VaultCredentialResolver = VaultCredentialResolver { VaultCredential.Token("vault-token") },
@@ -421,13 +491,13 @@ class VaultTransitKeyProviderTest {
         headers = headersOf(HttpHeaders.ContentType, "application/json"),
     )
 
-    private fun keyResponse(type: String = "ecdsa-p256"): String = """
+    private fun keyResponse(type: String = "ecdsa-p256", publicKeySpki: ByteArray = TEST_SPKI): String = """
         {
           "data": {
             "type": "$type",
             "latest_version": 3,
             "keys": {
-              "3": {"public_key": "-----BEGIN PUBLIC KEY-----\n${Base64.encode(TEST_SPKI)}\n-----END PUBLIC KEY-----"}
+              "3": {"public_key": "-----BEGIN PUBLIC KEY-----\n${Base64.encode(publicKeySpki)}\n-----END PUBLIC KEY-----"}
             }
           }
         }
