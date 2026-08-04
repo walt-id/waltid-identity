@@ -13,7 +13,6 @@ import kotlinx.io.bytestring.ByteString
 import kotlin.io.encoding.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import at.asitplus.signum.indispensable.pki.X509Certificate as SignumCertificate
 
@@ -36,44 +35,18 @@ actual object SignatureValidationUtil {
         val allCertificates = certBlocks.map { base64Str ->
             val derBytes = Base64.decode(base64Str) // Use a KMP-friendly Base64 decoder
             SignumCertificate.decodeFromDer(derBytes)
-        }.groupingBy { it.tbsCertificate.issuerName }
-            .reduce { key, acc, element ->
-                assertNull(acc, "Duplicate issuer name found: $key")
-                element
-            }
+        }
 
-        val certificateToVerify = allCertificates.values.toMutableList()
-        var currentParent = rootCert
-
-        while (certificateToVerify.isNotEmpty()) {
-            val certificatesForIssuer =
-                certificateToVerify.filter { it.tbsCertificate.issuerName == currentParent.tbsCertificate.subjectName }
-
-            val rootCertsInChain =
-                certificatesForIssuer.filter { it.tbsCertificate.subjectName == it.tbsCertificate.issuerName }
-
-            assertTrue(rootCertsInChain.size <= 1, "Root Cert may only be one time in chain.")
-            rootCertsInChain.firstOrNull()?.let { rootCertInChain ->
+        assertEquals(1, allCertificates.size, "Only a root or a single child certificate is supported.")
+        val certificateToVerify = allCertificates.single()
+        if (certificateToVerify.tbsCertificate.subjectName == certificateToVerify.tbsCertificate.issuerName) {
                 assertEquals(
                     ByteString(rootCert.tbsCertificate.serialNumber),
-                    ByteString(rootCertInChain.tbsCertificate.serialNumber),
+                    ByteString(certificateToVerify.tbsCertificate.serialNumber),
                     "Root cert serial number must match."
                 )
-                verifyCertSignature(rootCert, rootCertInChain)
-            }
-            certificatesForIssuer.filter { it.tbsCertificate.subjectName != it.tbsCertificate.issuerName }
-                .also { certList ->
-                    assertEquals(
-                        1,
-                        certList.size,
-                        "Exact one cert per issuer '${rootCert.tbsCertificate.subjectName}' but found ${certList.size}."
-                    )
-                    val currentCert = certList.first()
-                    verifyCertSignature(currentParent, currentCert)
-                    currentParent = currentCert
-                }
-            certificateToVerify.removeAll(certificatesForIssuer)
         }
+        verifyCertSignature(rootCert, certificateToVerify)
     }
 
     actual fun verifyCsrPem(csrPem: String) {
