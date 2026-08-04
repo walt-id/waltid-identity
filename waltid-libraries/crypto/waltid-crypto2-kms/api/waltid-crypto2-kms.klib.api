@@ -286,6 +286,7 @@ final class id.walt.crypto2.kms.vault/VaultTransitKeyProvider : id.walt.crypto2.
 
     final suspend fun generate(id.walt.crypto2.providers/GenerateManagedKeyRequest): id.walt.crypto2.keys/ManagedKey // id.walt.crypto2.kms.vault/VaultTransitKeyProvider.generate|generate(id.walt.crypto2.providers.GenerateManagedKeyRequest){}[0]
     final suspend fun restore(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.keys/ManagedKey // id.walt.crypto2.kms.vault/VaultTransitKeyProvider.restore|restore(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+    final suspend fun storedKeyForExisting(id.walt.crypto2.keys/KeyId, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.kms.vault/VaultTransitOptions, kotlin/String, kotlin.collections/Map<kotlin/String, kotlin/String> = ...): id.walt.crypto2.keys/StoredKey.Managed // id.walt.crypto2.kms.vault/VaultTransitKeyProvider.storedKeyForExisting|storedKeyForExisting(id.walt.crypto2.keys.KeyId;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.kms.vault.VaultTransitOptions;kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
 
     final object Companion { // id.walt.crypto2.kms.vault/VaultTransitKeyProvider.Companion|null[0]
         final val ID // id.walt.crypto2.kms.vault/VaultTransitKeyProvider.Companion.ID|{}ID[0]
