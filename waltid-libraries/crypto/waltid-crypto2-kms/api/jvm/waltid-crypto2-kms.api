@@ -285,6 +285,8 @@ public final class id/walt/crypto2/kms/vault/VaultTransitKeyProvider : id/walt/c
 	public fun generate (Lid/walt/crypto2/providers/GenerateManagedKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getId-v1VkqW4 ()Ljava/lang/String;
 	public fun restore (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun storedKeyForExisting-FO05kzI (Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/kms/vault/VaultTransitOptions;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun storedKeyForExisting-FO05kzI$default (Lid/walt/crypto2/kms/vault/VaultTransitKeyProvider;Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/kms/vault/VaultTransitOptions;Ljava/lang/String;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class id/walt/crypto2/kms/vault/VaultTransitKeyProvider$Companion {
