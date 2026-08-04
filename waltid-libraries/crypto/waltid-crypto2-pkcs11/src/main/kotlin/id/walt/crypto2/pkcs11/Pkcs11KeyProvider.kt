@@ -390,7 +390,7 @@ private fun KeySpec.keyPairGeneratorName(): String = when (this) {
 private fun KeySpec.signatureAlgorithms(session: Pkcs11Session): Set<SignatureAlgorithm> = when (this) {
     is KeySpec.Ec -> {
         val digest = curve.ecdsaDigest() ?: return emptySet()
-        if (!session.supportsEcdsa(digest)) emptySet()
+        if (!session.supportsEcdsa) emptySet()
         else EcdsaSignatureEncoding.entries.mapTo(mutableSetOf()) { SignatureAlgorithm.Ecdsa(digest, it) }
     }
 
@@ -411,10 +411,10 @@ private fun KeySpec.signatureAlgorithms(session: Pkcs11Session): Set<SignatureAl
  * ECDSA is offered when the token implements raw `CKM_ECDSA`, which is the mechanism every PKCS#11 token provides and
  * the only one used here. The combined `CKM_ECDSA_SHA*` mechanisms are deliberately ignored even when SunPKCS11
  * registers them: SoftHSMv2 registers `SHA256withECDSA` and signing with it fails, so treating registration as proof
- * of support would advertise an algorithm that does not work. The digest is computed on this side either way.
+ * of support would advertise an algorithm that does not work. The digest is computed on this side either way, which is
+ * also why support does not depend on the digest.
  */
-@Suppress("UNUSED_PARAMETER")
-private fun Pkcs11Session.supportsEcdsa(digest: DigestAlgorithm): Boolean = supportsSignature("NONEwithECDSA")
+private val Pkcs11Session.supportsEcdsa: Boolean get() = supportsSignature("NONEwithECDSA")
 
 private fun EcCurve.ecdsaDigest(): DigestAlgorithm? = when (this) {
     EcCurve.P256 -> DigestAlgorithm.SHA_256
@@ -484,10 +484,6 @@ private fun SignatureAlgorithm.verifyInSoftware(
 private fun Pkcs11Session.privateKey(alias: String): PrivateKey =
     keyStore.getKey(alias, null) as? PrivateKey
         ?: throw IllegalArgumentException("PKCS11 alias has no private key: $alias")
-
-private fun Pkcs11Session.publicKey(alias: String): PublicKey =
-    keyStore.getCertificate(alias)?.publicKey
-        ?: throw IllegalArgumentException("PKCS11 alias has no public key: $alias")
 
 /** Derives the key specification from a token-resident public key, for the attach-existing-key path. */
 private fun PublicKey.toKeySpec(): KeySpec = when (this) {

@@ -121,11 +121,6 @@ certificate, so a token public-key object serves no purpose, and `P11KeyStore.de
 only the private key and the certificate - a persistent one would be orphaned on the token by every
 generate/delete cycle.
 
-Public keys are generated as **session** objects. SunPKCS11 reads the public key from the
-certificate, so a token public-key object serves no purpose, and `P11KeyStore.deleteEntry` destroys
-only the private key and the certificate - a persistent one would be orphaned on the token by every
-generate/delete cycle.
-
 ## Deliberately unsupported
 
 RSA encryption and RSA key wrapping. SunPKCS11 registers only `RSA/ECB/PKCS1Padding` and

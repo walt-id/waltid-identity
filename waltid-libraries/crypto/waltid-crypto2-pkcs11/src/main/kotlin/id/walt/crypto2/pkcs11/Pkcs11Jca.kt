@@ -108,11 +108,21 @@ internal object Pkcs11Sessions {
         require(Files.isRegularFile(Path.of(options.libraryPath))) {
             "PKCS11 library does not exist: ${options.libraryPath}"
         }
+        val sunPkcs11 = requireNotNull(Security.getProvider("SunPKCS11")) { "SunPKCS11 provider is unavailable" }
         val config = Files.createTempFile("waltid-pkcs11-", ".cfg")
         val provider = try {
             Files.writeString(config, options.sunPkcs11Configuration(hardened))
-            requireNotNull(Security.getProvider("SunPKCS11")) { "SunPKCS11 provider is unavailable" }
-                .configure(config.toString())
+            sunPkcs11.configure(config.toString())
+        } catch (cause: ProviderException) {
+            // Provider.configure() is where C_Initialize runs and the slot is resolved, so this is what fails when the
+            // token is not reachable at all - not when a key operation is wrong. Left untranslated it surfaced as a
+            // bare `CKR_SLOT_ID_INVALID` or SunPKCS11's `slotListIndex is 0 but token only has 0 slots`, which reads
+            // like a numbering mistake even when the real cause is that the vendor client cannot see the token from
+            // this process. That has cost real debugging time, so say what it actually means.
+            //
+            // Deliberately only ProviderException, which is what SunPKCS11 raises for initialisation and slot
+            // failures. A malformed configuration or an IO error is a different problem and must keep its own message.
+            throw IllegalStateException(options.tokenUnreachableMessage(), cause)
         } finally {
             Files.deleteIfExists(config)
         }
@@ -125,8 +135,7 @@ internal object Pkcs11Sessions {
             // context for the lifetime of the process ("Esys_Load: Function called in the wrong order"), and it
             // cannot be repaired in-process. Say so, rather than surfacing "load failed".
             throw IllegalStateException(
-                "Could not open a PKCS11 session on ${options.libraryPath} " +
-                        "(slot ${options.slotId ?: "index ${options.slotListIndex}"}). If an earlier operation on this " +
+                "Could not open a PKCS11 session on ${options.tokenDescription()}. If an earlier operation on this " +
                         "token failed, some libraries - tpm2-pkcs11 in particular - are left unusable for the lifetime " +
                         "of the process and the service has to be restarted.",
                 cause,
@@ -195,6 +204,28 @@ internal fun Throwable.indicatesTokenFailure(): Boolean =
     generateSequence(this) { it.cause }.any { cause ->
         cause is ProviderException || cause::class.qualifiedName?.endsWith("PKCS11Exception") == true
     }
+
+/** How this token is addressed, for error messages. Shared so both failure paths name the token the same way. */
+internal fun Pkcs11Options.tokenDescription(): String =
+    "$libraryPath (${slotId?.let { "slot $it" } ?: "slot-list index $slotListIndex"})"
+
+/**
+ * Why initialising a token failed, in terms an operator can act on.
+ *
+ * `Provider.configure()` covers `C_Initialize` and slot resolution, so its failures are almost never about the key
+ * being requested. The vendor's own wording actively misleads here: an unreachable token reports
+ * `CKR_SLOT_ID_INVALID`, and an empty slot list reports `slotListIndex is 0 but token only has 0 slots`. Both read as
+ * a wrong slot number, when the usual cause is that the vendor client cannot see the token from *this process* - a
+ * missing or mis-scoped configuration environment variable, or configuration holding paths relative to a working
+ * directory the service does not run in.
+ */
+internal fun Pkcs11Options.tokenUnreachableMessage(): String =
+    "Could not initialise the PKCS11 token ${tokenDescription()}. The library loaded, so this is not a wrong " +
+            "library path. Either the slot does not exist, or the vendor client cannot see the token from this " +
+            "process - check that the library's configuration environment variable is set for the service process " +
+            "itself, and that any paths inside that configuration are absolute rather than relative to the client " +
+            "install directory. Verify with a vendor tool run as the service user from an unrelated working " +
+            "directory before changing the slot."
 
 internal data class Pkcs11Session(
     val provider: Provider,
