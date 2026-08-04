@@ -31,6 +31,8 @@ data class RequestBodyErrorInfo(
 
 private val FAILED_TO_CONVERT_REGEX =
     Regex("""Failed to convert request body to (?:class\s+)?([^\s,]+)""")
+private val EXPECTED_TYPE_REGEX =
+    Regex("""expected type:\s*([A-Za-z0-9_.$]+)""", RegexOption.IGNORE_CASE)
 private val UNKNOWN_KEY_REGEX =
     Regex("""Encountered(?: an)? unknown key ['"]([^'"]+)['"]""", RegexOption.IGNORE_CASE)
 private val POLYMORPHIC_SCOPE_REGEX =
@@ -167,9 +169,7 @@ private fun extractExpectedType(cause: Throwable): String? {
             ?.takeIf { it.isNotBlank() }
             ?.let { return it }
 
-        Regex("""expected type:\s*([A-Za-z0-9_.$]+)""", RegexOption.IGNORE_CASE)
-            .find(message)
-            ?.groupValues?.get(1)
+        EXPECTED_TYPE_REGEX.find(message)?.groupValues?.get(1)
             ?.substringAfterLast('.')
             ?.let { return it }
 
