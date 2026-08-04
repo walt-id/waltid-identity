@@ -24,6 +24,7 @@ import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
+import id.waltid.openid4vci.wallet.proof.ProofKeyBinding
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -370,12 +371,11 @@ class Issuer2WalletFlowDriver(
             null
         }
 
-        return JwtProofBuilder().buildJwtProof(
+        return JwtProofBuilder().buildProof(
             key = proofKey,
             audience = issuerMetadata.credentialIssuer,
             nonce = requireNotNull(nonceResponse["c_nonce"]?.jsonPrimitive?.contentOrNull),
-            keyId = holderDid?.let { "$it#0" },
-            includeJwk = !useDidInProof,
+            binding = holderDid?.let { ProofKeyBinding.KeyId("$it#0") } ?: ProofKeyBinding.Jwk,
         )
     }
 
