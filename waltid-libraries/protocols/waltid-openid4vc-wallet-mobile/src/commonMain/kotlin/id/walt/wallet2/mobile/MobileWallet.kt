@@ -24,12 +24,8 @@ import id.walt.wallet2.handlers.PresentationPreviewHandle
 import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.handlers.PreviewPresentationResult
 import id.walt.wallet2.handlers.RejectPresentationRequest
-import id.walt.wallet2.handlers.ReceiveCredentialRequest
-import id.walt.wallet2.handlers.ReceiveCredentialFromPreviewRequest
-import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceAuthorizationCallback
-import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceSession
 import id.walt.wallet2.handlers.WalletIssuanceSessionRequest
@@ -43,8 +39,6 @@ import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -88,20 +82,6 @@ public data class MobileWalletCredential(
     public val credentialDataJson: String,
     public val metadataJson: String? = null,
 )
-
-/**
- * Opaque issuance preview handle. It is valid only for the wallet that created it.
- *
- * @property value Opaque identifier returned by [MobileWallet.resolveOffer].
- */
-public data class MobileWalletIssuancePreviewHandle(public val value: String) {
-    init {
-        require(value.isNotBlank()) { "Issuance preview handle must not be blank" }
-    }
-
-    /** Returns a redacted representation that does not reveal [value]. */
-    public override fun toString(): String = "MobileWalletIssuancePreviewHandle(<redacted>)"
-}
 
 /**
  * Result of answering an OpenID4VP presentation request.
@@ -184,8 +164,6 @@ public class MobileWallet internal constructor(
     private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {
     private val eventStream = MobileWalletEventStream()
-    private val legacyIssuanceMutex = Mutex()
-    private val legacyIssuanceSessions = mutableMapOf<String, LegacyIssuanceSession>()
 
     /**
      * Buffered stream of recent issuance and presentation events emitted by this wallet.
@@ -271,21 +249,6 @@ public class MobileWallet internal constructor(
         }
 
     /**
-     * Resolves a credential offer and reports any transaction code the app must collect.
-     *
-     * Apps use [MobileWalletOfferResolution.previewHandle] with the reviewed [receive] overload.
-     * The handle retains this exact resolution while the app collects any required code.
-     *
-     * @param offerUrl Credential offer URL, including `openid-credential-offer://` URLs.
-     * @return Issuer, offered credential, and transaction-code metadata for app-side review.
-     */
-    public suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution =
-        WalletIssuanceHandler.previewOffer(
-            wallet = wallet,
-            request = ResolveOfferRequest(offerUrl = Url(offerUrl.trim())),
-        ).toMobileOfferResolution(preferredLocales)
-
-    /**
      * Resolves an offer and starts a bound OpenID4VCI 1.0 issuance session.
      *
      * Authorization-code offers return a typed browser request containing the authorization URL,
@@ -341,55 +304,6 @@ public class MobileWallet internal constructor(
     ): WalletIssuanceOutcome =
         issuanceSessions.resumeDeferred(deferredCredentialId)
 
-    /**
-     * Receives credentials from an OpenID4VCI credential offer.
-     *
-     * This immediate path resolves the offer as part of the call. Review UIs should use
-     * [resolveOffer] followed by the handle-based [receive] overload.
-     *
-     * @param offerUrl Credential offer URL, including `openid-credential-offer://` URLs.
-     * @param txCode Optional transaction code for pre-authorized offers.
-     * @param clientId Client identifier sent to the issuer.
-     * @return Wallet-local identifiers of the stored credentials.
-     */
-    public suspend fun receive(
-        offerUrl: String,
-        txCode: String? = null,
-        clientId: String = LEGACY_ISSUANCE_CLIENT_ID,
-    ): List<String> {
-        val normalizedOffer = offerUrl.trim()
-        var cached = legacyIssuanceMutex.withLock { legacyIssuanceSessions.remove(normalizedOffer) }
-        if (cached != null && cached.clientId != clientId) {
-            issuanceSessions.cancel(cached.session.id)
-            cached = null
-        }
-        val session = cached?.session ?: issuanceSessions.start(
-            newIssuanceRequest(
-                offerUrl = normalizedOffer,
-                clientId = clientId,
-                redirectUri = LEGACY_ISSUANCE_REDIRECT_URI,
-            )
-        )
-        if (session.authorization != null) {
-            issuanceSessions.cancel(session.id)
-            error("Authorization-code offers require startIssuance and continueAuthorizationIssuance")
-        }
-        return when (
-            val outcome = issuanceSessions.continuePreAuthorized(
-                sessionId = session.id,
-                transactionCode = txCode?.ifBlank { null },
-            )
-        ) {
-            is WalletIssuanceOutcome.Stored -> outcome.credentialIds
-            is WalletIssuanceOutcome.Deferred -> {
-                issuanceSessions.cancel(outcome.sessionId)
-                error("Deferred issuance requires the issuance-session API")
-            }
-            is WalletIssuanceOutcome.Cancelled -> error("Credential issuance was cancelled")
-            is WalletIssuanceOutcome.Failed -> error(outcome.error.message)
-        }
-    }
-
     private suspend fun newIssuanceRequest(
         offerUrl: String,
         clientId: String,
@@ -406,31 +320,6 @@ public class MobileWallet internal constructor(
             did = selectedDid,
             clientId = clientId,
             redirectUri = Url(redirectUri),
-        )
-    }
-
-    /** Receives credentials using exactly one reviewed offer preview. */
-    public suspend fun receive(
-        previewHandle: MobileWalletIssuancePreviewHandle,
-        txCode: String? = null,
-        clientId: String = LEGACY_ISSUANCE_CLIENT_ID,
-    ): List<String> =
-        WalletIssuanceHandler.receiveCredential(
-            wallet = wallet,
-            request = ReceiveCredentialFromPreviewRequest(
-                previewHandle = id.walt.wallet2.handlers.IssuancePreviewHandle(previewHandle.value),
-                txCode = txCode?.ifBlank { null },
-                clientId = clientId,
-            ),
-            attestationAssembler = attestationAssembler,
-            onEvent = ::emitSessionEvent,
-        ).credentialIds
-
-    /** Discards a reviewed issuance preview after local dismissal. */
-    public suspend fun discardIssuancePreview(previewHandle: MobileWalletIssuancePreviewHandle) {
-        WalletIssuanceHandler.discardPreview(
-            wallet = wallet,
-            handle = id.walt.wallet2.handlers.IssuancePreviewHandle(previewHandle.value),
         )
     }
 
@@ -604,10 +493,8 @@ public class MobileWallet internal constructor(
      * the configured database key.
      */
     public suspend fun deleteWallet() {
-        WalletIssuanceHandler.clearPreviews(wallet)
         WalletPresentationHandler.clearPreviews(wallet)
         issuanceSessions.clearSessions()
-        legacyIssuanceMutex.withLock { legacyIssuanceSessions.clear() }
         keyStore.listKeys().toList().forEach { key ->
             keyStore.removeKey(key.keyId)
         }
@@ -661,15 +548,6 @@ public class MobileWallet internal constructor(
             else -> toString()
         }
 
-    private data class LegacyIssuanceSession(
-        val session: WalletIssuanceSession,
-        val clientId: String,
-    )
-
-    private companion object {
-        const val LEGACY_ISSUANCE_CLIENT_ID = "wallet-client"
-        const val LEGACY_ISSUANCE_REDIRECT_URI = "openid://"
-    }
 }
 
 internal fun WalletPresentResult.toMobilePresentationResult(): MobileWalletPresentationResult =

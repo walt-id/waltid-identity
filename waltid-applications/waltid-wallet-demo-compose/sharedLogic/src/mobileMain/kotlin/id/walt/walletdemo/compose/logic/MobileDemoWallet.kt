@@ -1,9 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
 import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.MobileWalletCredentialClaimMetadata
 import id.walt.wallet2.mobile.MobileWalletMetadataDisplay
-import id.walt.wallet2.mobile.MobileWalletOfferedCredentialMetadata
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationPreview
@@ -12,8 +10,6 @@ import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationRequestInfo
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletResponseEncryption
-import id.walt.wallet2.mobile.MobileWalletTransactionCodeInputMode
-import id.walt.wallet2.mobile.MobileWalletTransactionCodeRequirement
 import id.walt.wallet2.mobile.MobileWalletTransactionDataItem
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
 import id.walt.wallet2.handlers.WalletIssuanceGrant
@@ -304,33 +300,6 @@ private fun MobileWalletMetadataDisplay.toDemoMetadataDisplay(): WalletDemoMetad
         name = name,
         logoUri = logoUri,
         logoAltText = logoAltText,
-        description = description,
-    )
-
-private fun MobileWalletOfferedCredentialMetadata.toDemoMetadata(): WalletDemoOfferedCredentialMetadata =
-    WalletDemoOfferedCredentialMetadata(
-        configurationId = configurationId,
-        format = format,
-        vct = vct,
-        doctype = doctype,
-        display = display?.toDemoMetadataDisplay(),
-        claims = claims.map(MobileWalletCredentialClaimMetadata::toDemoMetadata),
-    )
-
-private fun MobileWalletCredentialClaimMetadata.toDemoMetadata(): WalletDemoCredentialClaimMetadata =
-    WalletDemoCredentialClaimMetadata(
-        path = path,
-        mandatory = mandatory,
-        displayName = displayName,
-    )
-
-private fun MobileWalletTransactionCodeRequirement.toDemoRequirement(): WalletDemoTransactionCodeRequirement =
-    WalletDemoTransactionCodeRequirement(
-        inputMode = when (inputMode) {
-            MobileWalletTransactionCodeInputMode.Numeric -> WalletDemoTransactionCodeInputMode.Numeric
-            MobileWalletTransactionCodeInputMode.Text -> WalletDemoTransactionCodeInputMode.Text
-        },
-        length = length,
         description = description,
     )
 
