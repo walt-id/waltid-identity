@@ -208,6 +208,47 @@ class WalletPresentFunctionality2Test {
     }
 
     @Test
+    fun signedRequestCarryingLegacyParameterIsNeverDivertedToFallback() = runTest {
+        // The strict resolver must run first: appending a legacy parameter to a signed request must
+        // not let an attacker downgrade it to the legacy Presentation Exchange path.
+        val trustedKey = JWKKey.generate(KeyType.Ed25519)
+        val attackerKey = JWKKey.generate(KeyType.Ed25519)
+        val requestObject = attackerKey.signJws(
+            buildJsonObject {
+                put("client_id", "verifier")
+                put("nonce", "nonce")
+            }.toString().encodeToByteArray(),
+            mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
+        )
+        var fallbackInvocations = 0
+        val downgradeUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier")
+            parameters.append("request", requestObject)
+            parameters.append("presentation_definition", "{}")
+        }.build()
+
+        assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
+            WalletPresentFunctionality2.resolveAuthorizationRequest(
+                presentationRequestUrl = downgradeUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+                legacyFallbackCallback = {
+                    fallbackInvocations++
+                    Result.success(JsonPrimitive("legacy"))
+                },
+                clientIdTrustConfiguration = ClientIdTrustConfiguration(
+                    preRegisteredClients = mapOf(
+                        "verifier" to ClientMetadata(
+                            jwks = ClientMetadata.Jwks(listOf(trustedKey.getPublicKey().exportJWKObject())),
+                        )
+                    ),
+                ),
+            )
+        }
+
+        assertEquals(0, fallbackInvocations)
+    }
+
+    @Test
     fun explicitPresentationDefinitionUsesLegacyFallback() = runTest {
         var fallbackInvocations = 0
         val requestUrl = URLBuilder("openid4vp://authorize").apply {
