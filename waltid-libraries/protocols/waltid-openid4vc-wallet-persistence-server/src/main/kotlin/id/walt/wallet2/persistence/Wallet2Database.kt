@@ -6,6 +6,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.jdbc.Database
+import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.io.File
@@ -104,9 +105,40 @@ private fun createOrMigrateSchema(db: Database, jdbcUrl: String) {
                 exec("SELECT pg_advisory_xact_lock($SCHEMA_MIGRATION_LOCK_ID)")
             }
             SchemaUtils.createMissingTablesAndColumns(*Wallet2Tables.ALL)
+            relaxLegacyKeyColumn(jdbcUrl)
         }
     }
     log.info { "wallet2 schema ready" }
+}
+
+/**
+ * Drops the NOT NULL constraint on `wallet2_keys.serialized_key`.
+ *
+ * The crypto2 [id.walt.crypto2.keys.StoredKey] descriptor is the canonical record and crypto2-only
+ * keys (in particular managed KMS/HSM keys) have no legacy representation, so the legacy column has
+ * to be nullable. Databases created before that change still carry the constraint, and
+ * [SchemaUtils.createMissingTablesAndColumns] only adds missing columns - it does not relax existing
+ * ones, and SQLite has no ALTER for it, hence the explicit table rebuild.
+ */
+private fun JdbcTransaction.relaxLegacyKeyColumn(jdbcUrl: String) {
+    val alreadyNullable = connection.metadata { columns(Wallet2Tables.Keys) }[Wallet2Tables.Keys]
+        ?.firstOrNull { it.name.equals("serialized_key", ignoreCase = true) }
+        ?.nullable
+        ?: return
+    if (alreadyNullable) return
+
+    log.info { "Relaxing wallet2_keys.serialized_key so crypto2-only keys can be stored" }
+    if (jdbcUrl.startsWith("jdbc:sqlite:")) {
+        exec("ALTER TABLE wallet2_keys RENAME TO $LEGACY_KEYS_TABLE")
+        SchemaUtils.create(Wallet2Tables.Keys)
+        exec(
+            "INSERT INTO wallet2_keys(store_id, key_id, key_type, serialized_key, crypto2_stored_key) " +
+                    "SELECT store_id, key_id, key_type, serialized_key, crypto2_stored_key FROM $LEGACY_KEYS_TABLE"
+        )
+        exec("DROP TABLE $LEGACY_KEYS_TABLE")
+    } else {
+        exec("ALTER TABLE wallet2_keys ALTER COLUMN serialized_key DROP NOT NULL")
+    }
 }
 
 /** Runs [block], retrying while it fails with a transient concurrent-schema-change error. */
@@ -146,6 +178,7 @@ private fun Throwable.isRetryableSchemaRace(): Boolean {
     return false
 }
 
+private const val LEGACY_KEYS_TABLE = "wallet2_keys_pre_crypto2"
 private const val SCHEMA_MIGRATION_ATTEMPTS = 5
 private const val SCHEMA_MIGRATION_RETRY_MILLIS = 100L
 private const val SCHEMA_MIGRATION_LOCK_ID = 0x57414c5432L
