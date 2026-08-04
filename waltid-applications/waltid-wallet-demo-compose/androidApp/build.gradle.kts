@@ -68,9 +68,9 @@ dependencies {
     implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedLogic"))
     implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedUI"))
     implementation(identityLibs.androidx.activity.compose)
-    // MainActivity is a FragmentActivity so protected AndroidX BiometricPrompt flows
-    // can resolve the current interaction host without retaining an application context.
-    implementation(identityLibs.androidx.biometric)
+    // MainActivity is a FragmentActivity so protected prompt flows can resolve the
+    // current interaction host without retaining an application context.
+    implementation(identityLibs.androidx.fragment)
 
     androidTestImplementation(identityLibs.androidx.test.ext.junit)
     androidTestImplementation(identityLibs.androidx.test.runner)

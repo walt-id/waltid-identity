@@ -64,6 +64,9 @@ Android Keystore key restricted to strong biometrics; the provider must return t
 `FragmentActivity`, while the factory keeps only the application context for persistence. iOS uses a
 P-256 Secure Enclave key bound to the current Face ID or Touch ID enrollment set and therefore
 requires a qualifying physical device.
+
+An iOS host app that enables this policy must add `NSFaceIDUsageDescription` to
+its own `Info.plist` with an appropriate user-facing reason string.
 Protected non-P-256 requests fail without software fallback.
 
 The context-only `MobileWalletFactory(applicationContext)` constructor supports non-interactive

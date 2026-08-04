@@ -132,6 +132,9 @@ not permit device-passcode fallback, and makes the key unusable when biometric e
 The simulator reports the preflight as unavailable; it is not evidence of Secure Enclave or biometric
 enforcement. Protected non-P-256 creation fails rather than falling back to an exported software key.
 
+Host apps that enable this policy must add `NSFaceIDUsageDescription` to their own `Info.plist` with
+an appropriate user-facing reason string; the SDK does not provide or override that entry.
+
 The policy is immutable key metadata. Changing the configuration default affects only future key
 creation and does not protect, replace, or rotate existing keys. Use `keys()` to inspect the policy and
 platform-backed status. Existing-key rotation, wallet/app unlock, action-scoped authorization, attestation,

@@ -60,6 +60,7 @@ kotlin {
         }
         if (enableAndroidBuild) {
             androidMain.dependencies {
+                api(identityLibs.androidx.fragment)
                 implementation(identityLibs.androidx.biometric)
                 implementation(identityLibs.sqldelight.android.driver)
                 implementation(identityLibs.sqlcipher.android)

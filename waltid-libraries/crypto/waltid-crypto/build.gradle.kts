@@ -65,6 +65,7 @@ kotlin {
                 named("androidMain") {
                     dependsOn(mobileMain)
                     dependencies {
+                        api(identityLibs.androidx.fragment)
                         implementation(identityLibs.androidx.biometric)
                         implementation(identityLibs.kotlinx.coroutines.android)
                         implementation(identityLibs.cryptography.provider.jdk)
