@@ -1,30 +1,32 @@
 package id.walt.certificate.x509.profile
 
 import id.walt.certificate.TestData.intermediateIssuerKeyPem
+import id.walt.certificate.TestKeys.opensslHexFormat
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
 import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension.Companion.extensionIssuerAltName
 import id.walt.certificate.x509.extension.KeyUsageExtension
 import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
+import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.model.GeneralName
 import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile.profileIaCaRootCertificate
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.X509SingleCertificateValidator
-import id.walt.crypto.keys.JvmJWKKeyCreator
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.x509.iso.IsoSharedTestHarnessValidResources
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.bytestring.toHexString
 import kotlin.test.*
 
 class IsoIaCaRootX509CertificateProfileTest {
 
     @Test
-    fun shouldCreateIaCaRootCertificate(): Unit = runTest {
+    fun shouldCreateIaCaRootCertificate() = runTest {
+        val key = JWKKey.importPEM(intermediateIssuerKeyPem).getOrThrow()
         val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
             profileIaCaRootCertificate(
                 issuerDnCountryCode = "at",
@@ -46,7 +48,8 @@ class IsoIaCaRootX509CertificateProfileTest {
     }
 
     @Test
-    fun shouldFindIllegalIssuerDnCountryCodeInIaCaRootCertificate(): Unit = runTest {
+    fun shouldFindIllegalIssuerDnCountryCodeInIaCaRootCertificate() = runTest {
+        val key = JWKKey.importPEM(intermediateIssuerKeyPem).getOrThrow()
         val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
             profileIaCaRootCertificate(
                 issuerDn = "cn=Walt ID,C=Austria",
@@ -151,12 +154,68 @@ class IsoIaCaRootX509CertificateProfileTest {
         }
     }
 
+    @Test
+    fun shouldValidateCertificateFromLoadedPem() {
+        val pem = """
+            -----BEGIN CERTIFICATE-----
+            MIIC/TCCAqSgAwIBAgIUBAlgS9FXMuQksnLjqOTIVlYurbwwCgYIKoZIzj0EAwIw
+            gbAxCzAJBgNVBAYTAkdSMVowWAYDVQQDDFHOlyDOus6xzrvPhc+EzrXPgc+Mz4TO
+            tc+BzrcgzrHPgc+Hzq4gz4DOuc+Dz4TOv8+Azr/Or863z4POt8+CIM+Dz4TOv869
+            IM66z4zPg868zr8xFTATBgNVBAgMDM6Rz4TPhM65zrrOrjEuMCwGA1UECgwlzqXP
+            gM6/z4XPgc6zzrXOr86/IM6czrXPhM6xz4bOv8+Bz47OvTAeFw0yNTA1MjgxMjIz
+            MDFaFw00MDA1MjQxMjIzMDFaMIGwMQswCQYDVQQGEwJHUjFaMFgGA1UEAwxRzpcg
+            zrrOsc67z4XPhM61z4HPjM+EzrXPgc63IM6xz4HPh86uIM+AzrnPg8+Ezr/PgM6/
+            zq/Ot8+DzrfPgiDPg8+Ezr/OvSDOus+Mz4POvM6/MRUwEwYDVQQIDAzOkc+Ez4TO
+            uc66zq4xLjAsBgNVBAoMJc6lz4DOv8+Fz4HOs861zq/OvyDOnM61z4TOsc+Gzr/P
+            gc+Ozr0wWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASrTGLbW652GQLVAzKR9ivI
+            31twPHjzSIktJpEjTkJaBjYQ/tPcaq1IBNvqkrfIOYpnj4CjzzVaWKB5rEy9n+Iq
+            o4GZMIGWMB0GA1UdDgQWBBSYrxEhOTqG8/lCsR8IV8pI0hVaODASBgNVHRMBAf8E
+            CDAGAQH/AgEAMCMGA1UdEgQcMBqGGGh0dHBzOi8vaWFjYS5leGFtcGxlLmNvbTAO
+            BgNVHQ8BAf8EBAMCAQYwLAYDVR0fBCUwIzAhoB+gHYYbaHR0cHM6Ly9jcmwuZ292
+            LmdyL2lhY2EuY3JsMAoGCCqGSM49BAMCA0cAMEQCIFPWHi68eADZxb8fid1vWBKt
+            pb5ucDMPXAP6IZxcvLMqAiB8vwu0dPhMJ20Bl0LWfM1h/jZa27o9Vm6YmjtNdMna
+            SA==
+            -----END CERTIFICATE-----
+            """.trimIndent()
+        val issuingAuthority = "C=GR,CN=Η καλυτερότερη αρχή πιστοποίησης στον κόσμο,ST=Αττική,O=Υπουργείο Μεταφορών"
+        val subjectHex =
+            "98:AF:11:21:39:3A:86:F3:F9:42:B1:1F:08:57:CA:48:D2:15:5A:38"
+
+        val cert = X509CertificateUtil.parseCertificatePem(pem)
+        assertIaCaCertificateData(issuingAuthority, null, cert)
+        assertNotNull(cert.data.extensionSubjectKeyIdentifier) { skid ->
+            assertEquals(subjectHex, skid.keyIdentifier.toHexString(opensslHexFormat))
+        }
+    }
+
+    @Test
+    fun shouldValidateCertificateFromLoadedPem2() {
+        val pem = """
+                    -----BEGIN CERTIFICATE-----
+                    MIIBtDCCAVqgAwIBAgIUTEBApuzyNump/cYzKXVdgubtZIwwCgYIKoZIzj0EAwIw
+                    JDELMAkGA1UEBhMCVVMxFTATBgNVBAMMDEV4YW1wbGUgSUFDQTAeFw0yNTA1Mjgx
+                    MjIzMDFaFw00MDA1MjQxMjIzMDFaMCQxCzAJBgNVBAYTAlVTMRUwEwYDVQQDDAxF
+                    eGFtcGxlIElBQ0EwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASrTGLbW652GQLV
+                    AzKR9ivI31twPHjzSIktJpEjTkJaBjYQ/tPcaq1IBNvqkrfIOYpnj4CjzzVaWKB5
+                    rEy9n+Iqo2owaDAdBgNVHQ4EFgQUmK8RITk6hvP5QrEfCFfKSNIVWjgwEgYDVR0T
+                    AQH/BAgwBgEB/wIBADAjBgNVHRIEHDAahhhodHRwczovL2lhY2EuZXhhbXBsZS5j
+                    b20wDgYDVR0PAQH/BAQDAgEGMAoGCCqGSM49BAMCA0gAMEUCIQCN8SX5ojwspuyL
+                    W/XZBSTYpFj3bqpAOWthCLoxW29pNAIgSYLq8sE43y2Bf1pDvKu5cYjtkJ8hel53
+                    z4eL4VJvD1A=
+                    -----END CERTIFICATE-----
+                """.trimIndent()
+        val issuingAuthority = "C=US,CN=Example IACA"
+        val subjectHex = "98:AF:11:21:39:3A:86:F3:F9:42:B1:1F:08:57:CA:48:D2:15:5A:38"
+
+        val cert = X509CertificateUtil.parseCertificatePem(pem)
+        assertIaCaCertificateData(issuingAuthority, null, cert)
+        assertNotNull(cert.data.extensionSubjectKeyIdentifier) { skid ->
+            assertEquals(subjectHex, skid.keyIdentifier.toHexString(opensslHexFormat))
+        }
+    }
+
 
     companion object {
-        val key = runBlocking {
-            JvmJWKKeyCreator.importPEM(intermediateIssuerKeyPem).getOrThrow()
-        }
-
         val validator = X509SingleCertificateValidator(listOf(IsoIaCaRootX509CertificateProfile))
 
         fun assertIaCaCertificateData(
@@ -183,6 +242,5 @@ class IsoIaCaRootX509CertificateProfileTest {
                 assertTrue(ku.keyPurposeIdList.contains(KeyUsageExtension.KeyUsage.keyCertSign))
             }
         }
-
     }
 }

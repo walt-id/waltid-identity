@@ -1,7 +1,6 @@
 package id.walt.x509.iso.iaca.builder
 
 import id.walt.crypto.keys.Key
-import id.walt.x509.iso.blockingBridge
 import id.walt.x509.iso.iaca.certificate.IACACertificateBundle
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.validate.IACAValidator
@@ -44,20 +43,6 @@ class IACACertificateBuilder {
             signingKey = signingKey,
         )
     }
-
-    /**
-     * Blocking variant of [build].
-     */
-    fun buildBlocking(
-        profileData: IACACertificateProfileData,
-        signingKey: Key,
-    ): IACACertificateBundle = blockingBridge {
-        build(
-            profileData = profileData,
-            signingKey = signingKey,
-        )
-    }
-
 }
 
 /**
