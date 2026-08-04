@@ -13,6 +13,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.data.resolveKeyMaterial
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -50,37 +51,34 @@ class WalletCrypto2OnlyKeyStoreTest {
     }
 
     @Test
-    fun `capability discovery includes legacy fallback and prefers actual crypto2 material`() = runTest {
-        val staticKey = JWKKey.generate(KeyType.Ed25519)
+    fun `capabilities are scoped to the single key that will sign`() = runTest {
+        val ed25519StaticKey = JWKKey.generate(KeyType.Ed25519)
         val crypto2Store = InMemoryKeyStore()
-        val crypto2Key = crypto2Key("crypto2-capability")
-        crypto2Store.addCrypto2Key(crypto2Key)
+        val p256Key = crypto2Key("crypto2-capability")
+        crypto2Store.addCrypto2Key(p256Key)
 
-        val combined = Wallet(
+        val wallet = Wallet(
             id = "combined",
             keyStores = listOf(crypto2Store),
-            staticKey = staticKey,
-        ).presentationRuntimeCapabilities()
+            staticKey = ed25519StaticKey,
+        )
+        val keyMaterial = assertNotNull(wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)))
 
-        assertEquals(listOf("ES256", "Ed25519"), combined.supportedJwsAlgorithms)
+        // The store key is the one that will sign, so only its algorithm is advertised and accepted -
+        // not the union with the Ed25519 static key, which submission would never use.
+        assertEquals(p256Key.id.value, keyMaterial.keyId)
+        assertEquals(listOf("ES256"), keyMaterial.presentationCapabilities().supportedJwsAlgorithms)
+    }
 
-        val sameIdStore = InMemoryKeyStore()
-        sameIdStore.addKey(staticKey)
-        sameIdStore.addCrypto2Key(
-            runtime.generateSoftwareKey(
-                GenerateSoftwareKeyRequest(
-                    id = KeyId(staticKey.getKeyId()),
-                    spec = KeySpec.Ec(EcCurve.P256),
-                    usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-                )
-            )
+    @Test
+    fun `legacy-only key material falls back to its v1 key type`() = runTest {
+        val legacyKey = JWKKey.generate(KeyType.Ed25519)
+        val keyMaterial = assertNotNull(
+            Wallet(id = "legacy", staticKey = legacyKey).resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
         )
 
-        assertEquals(
-            listOf("ES256"),
-            Wallet(id = "preferred", keyStores = listOf(sameIdStore))
-                .presentationRuntimeCapabilities().supportedJwsAlgorithms,
-        )
+        assertNull(keyMaterial.crypto2Key)
+        assertEquals(listOf("Ed25519"), keyMaterial.presentationCapabilities().supportedJwsAlgorithms)
     }
 
     private suspend fun crypto2Key(id: String) = runtime.generateSoftwareKey(
