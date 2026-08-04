@@ -19,7 +19,6 @@ import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
 import id.walt.issuer2.service.openid4vci.CredentialProofKeyCommitment
-import id.walt.issuer2.service.openid4vci.CredentialNonceService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 
 class Issuer2Module @JvmOverloads constructor(
@@ -35,7 +34,6 @@ class Issuer2Module @JvmOverloads constructor(
     private val parRepository = ConfiguredPARRepository()
     private val refreshTokenRepository = ConfiguredRefreshTokenRepository()
     private val notificationService = IssuanceNotificationService()
-    private val credentialNonceService = CredentialNonceService()
 
     private val openId4VciModule = OpenId4VciModule.create(
         config = serviceConfig,
@@ -79,7 +77,7 @@ class Issuer2Module @JvmOverloads constructor(
         notificationService = notificationService,
         credentialProofKeyAcceptance = credentialProofKeyAcceptance,
         credentialProofKeyCommitment = credentialProofKeyCommitment,
-        credentialNonceService = credentialNonceService,
+        credentialNonceService = openId4VciModule.credentialNonceService,
     )
 
     val managementController = Issuer2ManagementController(

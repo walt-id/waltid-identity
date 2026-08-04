@@ -42,7 +42,10 @@ import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -371,6 +374,17 @@ class BuildProviderConfigurationTest {
         assertEquals(400, response.status)
         assertEquals(null, response.redirectUri)
         assertEquals("Missing response_type", response.body)
+    }
+
+    @Test
+    fun `OAuth errors serialize descriptions using the protocol field name`() {
+        val error = Json.encodeToJsonElement(
+            OAuthError("invalid_request", "Missing response_type"),
+        ).jsonObject
+
+        assertEquals("invalid_request", error["error"]?.jsonPrimitive?.content)
+        assertEquals("Missing response_type", error["error_description"]?.jsonPrimitive?.content)
+        assertTrue("description" !in error)
     }
 
     @Test

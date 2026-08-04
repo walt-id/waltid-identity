@@ -14,6 +14,7 @@ import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -30,6 +31,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
@@ -38,11 +40,33 @@ import kotlin.test.assertTrue
 class MobileWalletTest {
 
     @Test
+    fun presentationErrorCodesMatchOAuthAndOpenId4VpValues() {
+        assertEquals(
+            listOf(
+                "access_denied",
+                "invalid_request",
+                "invalid_client",
+                "invalid_scope",
+                "unauthorized_client",
+                "unsupported_response_type",
+                "server_error",
+                "temporarily_unavailable",
+                "vp_formats_not_supported",
+                "invalid_request_uri_method",
+                "invalid_transaction_data",
+                "wallet_unavailable",
+            ),
+            MobileWalletPresentationErrorCode.entries.map { it.errorCode },
+        )
+    }
+
+    @Test
     fun mobileWalletConfigUsesStableDefaults() {
         val config = MobileWalletConfig()
 
         assertEquals("default", config.walletId)
         assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
+        assertEquals(emptyList(), config.preferredLocales)
         assertEquals(null, config.attestationConfig)
         assertEquals(MobileWalletPersistence(), config.persistence)
         assertEquals(emptyList(), config.transactionDataProfiles)
@@ -152,33 +176,148 @@ class MobileWalletTest {
     }
 
     @Test
-    fun walletSessionEventsMapToMobileWalletEventsInCommonCode() {
-        val progress = WalletSessionEvent.issuance_offer_resolved.toMobileWalletEvent()
-        val completed = WalletSessionEvent.presentation_completed.toMobileWalletEvent()
-        val failed = WalletSessionEvent.issuance_failed.toMobileWalletEvent()
+    fun walletSessionEventsMapExhaustivelyToMobileWalletEvents() {
+        assertEquals(WalletSessionEvent.entries.size, MobileWalletEvent.entries.size)
+        WalletSessionEvent.entries.forEach { event ->
+            assertEquals(event.name, event.toMobileWalletEvent().name)
+        }
 
-        assertEquals(MobileWalletEventPhase.issuance, progress.phase)
-        assertEquals(MobileWalletEventStatus.progress, progress.status)
-        assertEquals("issuance_offer_resolved", progress.name)
+        assertEquals(MobileWalletEventPhase.issuance, MobileWalletEvent.issuance_offer_resolved.phase)
+        assertEquals(MobileWalletEventStatus.progress, MobileWalletEvent.issuance_offer_resolved.status)
+        assertEquals(MobileWalletEventPhase.presentation, MobileWalletEvent.presentation_completed.phase)
+        assertEquals(MobileWalletEventStatus.completed, MobileWalletEvent.presentation_completed.status)
+        assertEquals(MobileWalletEventStatus.failed, MobileWalletEvent.issuance_failed.status)
+    }
 
-        assertEquals(MobileWalletEventPhase.presentation, completed.phase)
-        assertEquals(MobileWalletEventStatus.completed, completed.status)
-        assertEquals("presentation_completed", completed.name)
+    @Test
+    fun presentationCredentialRequirementsRejectEmptyCombinations() {
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationCredentialRequirement(emptyList())
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationCredentialRequirement(listOf(emptyList()))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationCredentialRequirement(listOf(listOf(" ")))
+        }
+    }
 
-        assertEquals(MobileWalletEventPhase.issuance, failed.phase)
-        assertEquals(MobileWalletEventStatus.failed, failed.status)
-        assertEquals("issuance_failed", failed.name)
+    @Test
+    fun presentationOutputModelsRejectMissingCredentialQueryIds() {
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationCredentialOption(
+                queryId = " ",
+                credentialId = "credential-1",
+                format = "vc+sd-jwt",
+                issuer = null,
+                subject = null,
+                label = null,
+                credentialDataJson = "{}",
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            presentationTransactionData(credentialQueryIds = emptyList())
+        }
+        assertFailsWith<IllegalArgumentException> {
+            presentationTransactionData(credentialQueryIds = listOf(" "))
+        }
+    }
+
+    @Test
+    fun presentationRequestInfoRequiresClientIdAndNonce() {
+        assertFailsWith<IllegalArgumentException> {
+            presentationRequestInfo(clientId = " ")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            presentationRequestInfo(nonce = " ")
+        }
+    }
+
+    @Test
+    fun presentationRequestContextRequiresClientIdButAllowsMissingNonce() {
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationRequestContext(
+                clientId = " ",
+                verifierMetadata = null,
+                responseUri = null,
+                state = null,
+                nonce = null,
+                responseEncryption = MobileWalletResponseEncryption.NotRequired,
+            )
+        }
+
+        val context = MobileWalletPresentationRequestContext(
+            clientId = "https://verifier.example",
+            verifierMetadata = null,
+            responseUri = null,
+            state = null,
+            nonce = null,
+            responseEncryption = MobileWalletResponseEncryption.NotRequired,
+        )
+        assertEquals("https://verifier.example", context.clientId)
+        assertEquals(null, context.nonce)
+    }
+
+    @Test
+    fun presentationDisclosuresRejectImpossibleSelectableStates() {
+        assertFailsWith<IllegalArgumentException> {
+            presentationDisclosure(selectivelyDisclosable = false, required = false, selectable = true)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            presentationDisclosure(selectivelyDisclosable = true, required = true, selectable = true)
+        }
     }
 
     @Test
     fun presentationResultCarriesVerifierResponseAsJsonString() {
-        val result = MobileWalletPresentationResult(
-            success = true,
-            redirectTo = "wallet://return",
+        val result = MobileWalletPresentationResult.Transmitted.Succeeded(
             verifierResponseJson = """{"accepted":true}""",
+            redirectUrl = "wallet://return",
         )
 
         assertEquals("""{"accepted":true}""", result.verifierResponseJson)
+        assertEquals("wallet://return", result.redirectUrl)
+    }
+
+    @Test
+    fun presentationResultPreservesFrontChannelResponseArtifacts() {
+        val responseUrl = WalletPresentResult(getUrl = "https://verifier.example/callback?error=access_denied")
+            .toMobilePresentationResult()
+        val formPost = WalletPresentResult(formPostHtml = "<form></form>").toMobilePresentationResult()
+
+        assertEquals(
+            MobileWalletPresentationResult.Prepared.OpenUrl(
+                "https://verifier.example/callback?error=access_denied"
+            ),
+            responseUrl,
+        )
+        assertEquals(MobileWalletPresentationResult.Prepared.SubmitForm("<form></form>"), formPost)
+    }
+
+    @Test
+    fun presentationResultHonorsExplicitFailedTransmission() {
+        val result = WalletPresentResult(
+            transmissionSuccess = false,
+            verifierResponse = buildJsonObject { put("error", "server_error") },
+        ).toMobilePresentationResult()
+
+        assertEquals(
+            MobileWalletPresentationResult.Transmitted.Failed("""{"error":"server_error"}"""),
+            result,
+        )
+    }
+
+    @Test
+    fun presentationResultRejectsIncompatibleCoreArtifacts() {
+        assertFailsWith<IllegalArgumentException> {
+            WalletPresentResult(
+                getUrl = "https://verifier.example/callback",
+                formPostHtml = "<form></form>",
+            ).toMobilePresentationResult()
+        }
+        assertFailsWith<IllegalArgumentException> {
+            WalletPresentResult(transmissionSuccess = true).toMobilePresentationResult()
+        }
     }
 
     @Test
@@ -246,12 +385,24 @@ class MobileWalletTest {
     @Test
     fun presentationPreviewUsesSwiftFriendlyCredentialAndClaimDtos() {
         val preview = MobileWalletPresentationPreview(
+            previewHandle = MobileWalletPresentationPreviewHandle("preview-1"),
             request = MobileWalletPresentationRequestInfo(
                 clientId = "https://verifier.example",
-                verifierName = "Example Verifier",
+                verifierMetadata = MobileWalletVerifierMetadata(
+                    display = MobileWalletMetadataDisplay(
+                        name = "Example Verifier",
+                        locale = "en",
+                        logoUri = null,
+                        logoAltText = null,
+                    ),
+                    clientUri = "https://verifier.example",
+                    policyUri = null,
+                    termsOfServiceUri = null,
+                ),
                 responseUri = "https://verifier.example/direct-post",
                 state = "state-1",
                 nonce = "nonce-1",
+                responseEncryption = MobileWalletResponseEncryption.NotRequired,
             ),
             credentialOptions = listOf(
                 MobileWalletPresentationCredentialOption(
@@ -299,7 +450,7 @@ class MobileWalletTest {
         runCurrent()
 
         repeat(100) { index ->
-            val emitted = stream.tryEmit(progressEvent("issuance_progress_$index"))
+            val emitted = stream.tryEmit(MobileWalletEvent.issuance_offer_resolved)
 
             assertTrue(emitted, "Progress event $index should not suspend or fail when the buffer is full")
         }
@@ -307,10 +458,51 @@ class MobileWalletTest {
         collector.cancel()
     }
 
-    private fun progressEvent(name: String) = MobileWalletEvent(
-        name = name,
-        phase = MobileWalletEventPhase.issuance,
-        status = MobileWalletEventStatus.progress,
+    private fun presentationRequestInfo(
+        clientId: String = "https://verifier.example",
+        nonce: String = "nonce-1",
+    ) = MobileWalletPresentationRequestInfo(
+        clientId = clientId,
+        verifierMetadata = MobileWalletVerifierMetadata(
+            display = MobileWalletMetadataDisplay(
+                name = "Example Verifier",
+                locale = "en",
+                logoUri = null,
+                logoAltText = null,
+            ),
+            clientUri = null,
+            policyUri = null,
+            termsOfServiceUri = null,
+        ),
+        responseUri = "https://verifier.example/direct-post",
+        state = null,
+        nonce = nonce,
+        responseEncryption = MobileWalletResponseEncryption.NotRequired,
+    )
+
+    private fun presentationTransactionData(
+        credentialQueryIds: List<String>,
+    ) = MobileWalletTransactionDataItem(
+        type = "example",
+        displayName = "Example",
+        credentialQueryIds = credentialQueryIds,
+        supportedFields = emptyList(),
+        rawJson = "{}",
+        detailsJson = "{}",
+    )
+
+    private fun presentationDisclosure(
+        selectivelyDisclosable: Boolean,
+        required: Boolean,
+        selectable: Boolean,
+    ) = MobileWalletPresentationDisclosure(
+        path = "$.claim",
+        name = "claim",
+        valueJson = "true",
+        displayValue = "true",
+        selectivelyDisclosable = selectivelyDisclosable,
+        required = required,
+        selectable = selectable,
     )
 
     private val displayJson = kotlinx.serialization.json.Json {

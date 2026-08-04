@@ -4,6 +4,8 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.WaltConfig
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
+import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.issuer2.config.AuthenticationServiceConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
@@ -17,16 +19,25 @@ import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
+import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.metadata.issuer.SigningAlgId
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
+import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
+import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import id.walt.sdjwt.metadata.issuer.JWTVCIssuerMetadata
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
+import io.ktor.http.getSplitValues
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
@@ -47,6 +58,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class Issuer2MetadataEndpointTest {
 
@@ -141,6 +153,54 @@ class Issuer2MetadataEndpointTest {
     }
 
     @Test
+    fun shouldServeSignedCredentialIssuerMetadataForBothRegisteredMediaTypes() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val metadataPath = "/.well-known/openid-credential-issuer/openid4vci"
+        val unsignedMetadata = client.get(metadataPath) {
+            header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+        }.body<JsonObject>()
+        val signingKey = KeyManager
+            .resolveSerializedKey(ConfigManager.getConfig<Issuer2ServiceConfig>().ciTokenKey)
+            .getPublicKey()
+
+        listOf(
+            CredentialIssuerMetadataJwt.MEDIA_TYPE,
+            CredentialIssuerMetadataJwt.TYPED_MEDIA_TYPE,
+        ).forEach { mediaType ->
+            val response = client.get(metadataPath) {
+                header(HttpHeaders.Accept, mediaType)
+            }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(
+                ContentType.parse(mediaType),
+                response.contentType()?.withoutParameters(),
+            )
+            assertTrue(HttpHeaders.Accept in response.headers.getSplitValues(HttpHeaders.Vary).orEmpty())
+
+            val compactJws = response.bodyAsText()
+            val decoded = compactJws.decodeJws()
+            assertEquals(signingKey.keyType.jwsAlg, decoded.header[JwtHeaderParams.ALGORITHM]?.jsonPrimitive?.content)
+            assertEquals(CredentialIssuerMetadataJwt.TYPE, decoded.header[JwtHeaderParams.TYPE]?.jsonPrimitive?.content)
+            assertEquals(signingKey.getKeyId(), decoded.header[JwtHeaderParams.KEY_ID]?.jsonPrimitive?.content)
+            val publicJwk = assertNotNull(decoded.header[JwtHeaderParams.JSON_WEB_KEY]?.jsonObject)
+            assertEquals(signingKey.getKeyId(), publicJwk["kid"]?.jsonPrimitive?.content)
+            assertEquals(signingKey.keyType.jwsAlg, publicJwk["alg"]?.jsonPrimitive?.content)
+            assertEquals("sig", publicJwk["use"]?.jsonPrimitive?.content)
+            assertFalse("d" in publicJwk)
+            assertEquals(ISSUER_BASE_URL, decoded.payload[JwtPayloadClaims.ISSUER]?.jsonPrimitive?.content)
+            assertEquals(ISSUER_BASE_URL, decoded.payload[JwtPayloadClaims.SUBJECT]?.jsonPrimitive?.content)
+            assertNotNull(decoded.payload[JwtPayloadClaims.ISSUED_AT]?.jsonPrimitive?.content?.toLongOrNull())
+            assertFalse(JwtPayloadClaims.EXPIRATION in decoded.payload)
+            unsignedMetadata.forEach { (name, value) ->
+                assertEquals(value, decoded.payload[name], "Signed payload must preserve metadata parameter $name")
+            }
+            assertTrue(signingKey.verifyJws(compactJws).isSuccess)
+        }
+    }
+
+    @Test
     fun shouldServeJwtVcIssuerMetadataFromSpecWellKnownPathOnly() = testApplication {
         installIssuer2WithConfigFiles()
         val client = apiClient()
@@ -232,7 +292,10 @@ class Issuer2MetadataEndpointTest {
             assertEquals(JWT_PROOF_BINDING_METHODS, configuration.cryptographicBindingMethodsSupported)
             assertEquals(credentialConfigurationId, configuration.scope)
             assertEquals("$ISSUER_BASE_URL/$credentialConfigurationId", configuration.vct)
-            assertNotNull(configuration.proofTypesSupported?.get("jwt"))
+            assertEquals(
+                JWT_PROOF_SIGNING_ALGORITHMS,
+                assertNotNull(configuration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+            )
         }
     }
 
@@ -256,7 +319,10 @@ class Issuer2MetadataEndpointTest {
             setOf("VerifiableCredential", "OpenBadgeCredential"),
             openBadgeConfiguration.credentialDefinition?.type?.toSet(),
         )
-        assertNotNull(openBadgeConfiguration.proofTypesSupported?.get("jwt"))
+        assertEquals(
+            JWT_PROOF_SIGNING_ALGORITHMS,
+            assertNotNull(openBadgeConfiguration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+        )
     }
 
     private fun assertMdocConfiguration(
@@ -278,6 +344,10 @@ class Issuer2MetadataEndpointTest {
             )
             assertEquals(doctype, mdocConfiguration.doctype)
             assertEquals(credentialConfigurationId, mdocConfiguration.scope)
+            assertEquals(
+                JWT_PROOF_SIGNING_ALGORITHMS,
+                assertNotNull(mdocConfiguration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+            )
         }
     }
 
@@ -296,7 +366,10 @@ class Issuer2MetadataEndpointTest {
         assertEquals(JWT_PROOF_BINDING_METHODS, sdJwtConfiguration.cryptographicBindingMethodsSupported)
         assertEquals(SD_JWT_INTERNAL_CONFIG_ID, sdJwtConfiguration.scope)
         assertEquals(INTERNAL_SD_JWT_VCT, sdJwtConfiguration.vct)
-        assertNotNull(sdJwtConfiguration.proofTypesSupported?.get("jwt"))
+        assertEquals(
+            JWT_PROOF_SIGNING_ALGORITHMS,
+            assertNotNull(sdJwtConfiguration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+        )
     }
 
     private fun ApplicationTestBuilder.installIssuer2WithConfigFiles() {
@@ -343,7 +416,7 @@ class Issuer2MetadataEndpointTest {
             ?: error("Could not locate waltid-issuer-api2 config directory")
 
     private companion object {
-        const val ISSUER_AUTHORITY_BASE_URL = "http://localhost:7002"
+        const val ISSUER_AUTHORITY_BASE_URL = "http://localhost:7005"
         const val OPENID4VCI_PREFIX = "/openid4vci"
         const val ISSUER_BASE_URL = "$ISSUER_AUTHORITY_BASE_URL/openid4vci"
         const val AUTHORIZATION_SERVER_METADATA_PATH = "/.well-known/oauth-authorization-server/openid4vci"
@@ -379,6 +452,8 @@ class Issuer2MetadataEndpointTest {
             CryptographicBindingMethod.DidJwk,
             CryptographicBindingMethod.DidEbsi,
         )
+
+        val JWT_PROOF_SIGNING_ALGORITHMS = setOf("ES256", "EdDSA")
 
         val configFiles: List<Pair<String, KClass<out WaltConfig>>> = listOf(
             "issuer-service" to Issuer2ServiceConfig::class,

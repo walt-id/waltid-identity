@@ -46,6 +46,7 @@ object OpenApiModule {
 
     // Module
     fun Application.enable() {
+        val basePath = rootPath.trim('/').takeIf { it.isNotEmpty() }
         install(OpenApi) {
 
             schemas {
@@ -126,19 +127,21 @@ object OpenApiModule {
         }
 
         routing {
+            val specPath = basePath?.let { "/$it/api.json" } ?: "/api.json"
+            val swaggerPath = basePath?.let { "/$it/swagger" } ?: "/swagger"
             route("api.json") {
                 openApi()
             }
 
             route("swagger") {
-                swaggerUI("/api.json") {
+                swaggerUI(specPath) {
                     filter = true
                     // onlineSpecValidator()
                 }
             }
 
             route("redoc") {
-                redoc("/api.json")
+                redoc(specPath)
             }
 
             get("/", {
@@ -147,7 +150,7 @@ object OpenApiModule {
                 hidden = true
                 summary = "Redirect to swagger interface for API documentation"
             }) {
-                call.respondRedirect("swagger")
+                call.respondRedirect(swaggerPath)
             }
         }
     }

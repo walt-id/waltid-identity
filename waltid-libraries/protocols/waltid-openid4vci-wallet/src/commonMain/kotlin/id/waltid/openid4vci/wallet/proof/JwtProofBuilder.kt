@@ -35,11 +35,11 @@ class JwtProofBuilder : ProofOfPossessionBuilder {
      * - iss: client_id or key identifier
      * - aud: credential issuer URL
      * - iat: current timestamp
-     * - nonce: c_nonce from issuer
+     * - nonce: c_nonce from issuer, when one was obtained
      * 
      * @param key The cryptographic key to use for signing
      * @param audience The credential issuer URL
-     * @param nonce The c_nonce from the issuer
+     * @param nonce The optional c_nonce obtained from the issuer's Nonce Endpoint
      * @param keyId Optional key identifier (DID) for kid header
      * @param includeJwk Whether to include the public key as JWK in the header
      * @return Proofs object containing the JWT proof
@@ -47,7 +47,7 @@ class JwtProofBuilder : ProofOfPossessionBuilder {
     suspend fun buildJwtProof(
         key: Key,
         audience: String,
-        nonce: String,
+        nonce: String?,
         keyId: String? = null,
         includeJwk: Boolean = false,
     ): Proofs {
@@ -59,7 +59,7 @@ class JwtProofBuilder : ProofOfPossessionBuilder {
         val payload = buildJsonObject {
             put("aud", audience)
             put("iat", ProofBuilderUtils.currentTimestampSeconds())
-            put("nonce", nonce)
+            nonce?.let { put("nonce", it) }
         }
 
         // Build JWT header with typ
@@ -115,7 +115,7 @@ class JwtProofBuilder : ProofOfPossessionBuilder {
     override suspend fun buildProof(
         key: Key,
         audience: String,
-        nonce: String,
+        nonce: String?,
     ): Proofs {
         // Default: try to use DID if available, otherwise use JWK
         val keyId = key.getKeyId()

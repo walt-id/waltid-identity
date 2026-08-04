@@ -3,15 +3,81 @@ package id.walt.wallet2.mobile
 /**
  * Preview of an OpenID4VP presentation request before the wallet submits a VP token.
  *
+ * @property previewHandle Opaque handle required for submit, reject, or local dismissal.
  * @property request Verifier, protocol, and transaction metadata extracted from the request.
  * @property credentialOptions Wallet-local credentials that can satisfy the presentation request.
  * @property credentialRequirements Required DCQL credential query combinations that must be satisfied before submission.
  */
 public data class MobileWalletPresentationPreview(
+    val previewHandle: MobileWalletPresentationPreviewHandle,
     val request: MobileWalletPresentationRequestInfo,
     val credentialOptions: List<MobileWalletPresentationCredentialOption>,
     val credentialRequirements: List<MobileWalletPresentationCredentialRequirement> = emptyList(),
 )
+
+/** Result of resolving and validating an OpenID4VP request for presentation preview. */
+public sealed interface MobileWalletPresentationPreviewResult {
+    /** The request is valid and can be reviewed, submitted, or declined. */
+    public data class Ready(
+        /** Presentation request metadata and matching wallet credentials available for review. */
+        public val preview: MobileWalletPresentationPreview,
+    ) : MobileWalletPresentationPreviewResult
+
+    /** The request cannot be fulfilled, but the detected protocol error can be returned after user interaction. */
+    public data class Invalid(
+        /** Opaque handle required to reject or discard this reviewed request. */
+        public val previewHandle: MobileWalletPresentationPreviewHandle,
+        /** Validated response destination and request context to show before returning the error. */
+        public val request: MobileWalletPresentationRequestContext,
+        /** Standard OpenID4VP error detected by the wallet. */
+        public val errorCode: MobileWalletPresentationErrorCode,
+        /** Local diagnostic intended for wallet UI; it is not sent to the verifier automatically. */
+        public val message: String,
+    ) : MobileWalletPresentationPreviewResult
+}
+
+/**
+ * Opaque presentation preview handle. It is valid only for the wallet that created it.
+ *
+ * @property value Opaque identifier returned by [MobileWallet.previewPresentation].
+ */
+public data class MobileWalletPresentationPreviewHandle(val value: String) {
+    init {
+        require(value.isNotBlank()) { "Presentation preview handle must not be blank" }
+    }
+
+    /** Returns a redacted representation that does not reveal [value]. */
+    public override fun toString(): String = "MobileWalletPresentationPreviewHandle(<redacted>)"
+}
+
+/**
+ * Partial request context retained when an OpenID4VP request is invalid.
+ *
+ * A reportable invalid request has a validated, non-blank [clientId]. Its [nonce] remains nullable
+ * because a missing nonce can itself be the validation error. A ready preview instead exposes a
+ * validated, non-null nonce through [MobileWalletPresentationRequestInfo].
+ *
+ * @property clientId Required OpenID4VP `client_id` value identifying the verifier.
+ * @property verifierMetadata Typed verifier metadata supplied by the OpenID4VP client, when available.
+ * @property responseUri Verifier response URI to which the wallet would submit the presentation or error, when provided.
+ * @property state OpenID4VP state value supplied by the verifier, when provided.
+ * @property nonce OpenID4VP nonce value supplied by the verifier, when provided. May be null if the missing nonce is the validation error.
+ * @property responseEncryption Response-encryption state selected for this request.
+ */
+public data class MobileWalletPresentationRequestContext(
+    val clientId: String,
+    val verifierMetadata: MobileWalletVerifierMetadata?,
+    val responseUri: String?,
+    val state: String?,
+    val nonce: String?,
+    val responseEncryption: MobileWalletResponseEncryption,
+) {
+    init {
+        require(clientId.isNotBlank()) {
+            "A reportable presentation request client ID must not be blank."
+        }
+    }
+}
 
 /**
  * A required presentation credential-query combination.
@@ -23,26 +89,45 @@ public data class MobileWalletPresentationPreview(
  */
 public data class MobileWalletPresentationCredentialRequirement(
     val options: List<List<String>>,
-)
+) {
+    init {
+        require(options.isNotEmpty()) {
+            "A presentation credential requirement must contain at least one option."
+        }
+        require(options.all { it.isNotEmpty() }) {
+            "Each presentation credential requirement option must contain at least one query ID."
+        }
+        require(options.flatten().all(String::isNotBlank)) {
+            "Presentation credential requirement query IDs must not be blank."
+        }
+    }
+}
 
 /**
  * Verifier and transaction metadata extracted from a presentation request.
  *
- * @property clientId Raw OpenID4VP `client_id` value, when available.
- * @property verifierName Human-readable verifier name derived from request metadata or the client identifier.
+ * @property clientId Required OpenID4VP `client_id` value.
+ * @property verifierMetadata Typed verifier metadata supplied by the OpenID4VP client, when available.
  * @property responseUri Verifier response URI to which the wallet will submit the presentation, when provided.
  * @property state OpenID4VP state value supplied by the verifier, when provided.
- * @property nonce OpenID4VP nonce value supplied by the verifier, when provided.
+ * @property nonce Required OpenID4VP nonce value supplied by the verifier.
+ * @property responseEncryption Response-encryption state selected for this request.
  * @property transactionData Decoded transaction data items requested by the verifier.
  */
 public data class MobileWalletPresentationRequestInfo(
-    val clientId: String?,
-    val verifierName: String?,
+    val clientId: String,
+    val verifierMetadata: MobileWalletVerifierMetadata?,
     val responseUri: String?,
     val state: String?,
-    val nonce: String?,
+    val nonce: String,
+    val responseEncryption: MobileWalletResponseEncryption,
     val transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
-)
+) {
+    init {
+        require(clientId.isNotBlank()) { "A presentation request client ID must not be blank." }
+        require(nonce.isNotBlank()) { "A presentation request nonce must not be blank." }
+    }
+}
 
 /**
  * A wallet credential that satisfies one DCQL credential query in the presentation request.
@@ -67,7 +152,13 @@ public data class MobileWalletPresentationCredentialOption(
     val label: String?,
     val credentialDataJson: String,
     val disclosures: List<MobileWalletPresentationDisclosure> = emptyList(),
-)
+) {
+    init {
+        require(queryId.isNotBlank()) {
+            "A presentation credential option query ID must not be blank."
+        }
+    }
+}
 
 /**
  * User-selected presentation credential option.
@@ -116,7 +207,13 @@ public data class MobileWalletPresentationDisclosure(
     val selectivelyDisclosable: Boolean,
     val required: Boolean = !selectivelyDisclosable,
     val selectable: Boolean = selectivelyDisclosable && !required,
-)
+) {
+    init {
+        require(!selectable || (selectivelyDisclosable && !required)) {
+            "A selectable disclosure must be selectively disclosable and optional."
+        }
+    }
+}
 
 /**
  * Decoded transaction_data item attached to a presentation request.
@@ -135,4 +232,38 @@ public data class MobileWalletTransactionDataItem(
     val supportedFields: List<String>,
     val rawJson: String,
     val detailsJson: String,
-)
+) {
+    init {
+        require(credentialQueryIds.isNotEmpty()) {
+            "Transaction data must reference at least one credential query ID."
+        }
+        require(credentialQueryIds.all(String::isNotBlank)) {
+            "Transaction data credential query IDs must not be blank."
+        }
+    }
+}
+/**
+ * OAuth 2.0 and OpenID4VP 1.0 authorization error codes supported by the wallet.
+ *
+ * Apps should use [accessDenied] when the user declines, the wallet has no requested credential,
+ * or user authentication fails. The remaining values describe protocol or availability failures
+ * and should not be presented as end-user choices.
+ *
+ * @property errorCode Error code returned to the verifier.
+ */
+public enum class MobileWalletPresentationErrorCode(
+    public val errorCode: String,
+) {
+    accessDenied("access_denied"),
+    invalidRequest("invalid_request"),
+    invalidClient("invalid_client"),
+    invalidScope("invalid_scope"),
+    unauthorizedClient("unauthorized_client"),
+    unsupportedResponseType("unsupported_response_type"),
+    serverError("server_error"),
+    temporarilyUnavailable("temporarily_unavailable"),
+    vpFormatsNotSupported("vp_formats_not_supported"),
+    invalidRequestUriMethod("invalid_request_uri_method"),
+    invalidTransactionData("invalid_transaction_data"),
+    walletUnavailable("wallet_unavailable"),
+}

@@ -3,6 +3,7 @@ package id.walt.wallet2.server.handlers
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.did.dids.DidService
+import id.walt.openid4vci.errors.CredentialError
 import id.walt.wallet2.data.*
 import id.walt.wallet2.handlers.*
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlin.uuid.Uuid
 
@@ -85,7 +87,15 @@ data class ImportKeyRequest(
 @Serializable
 data class CreateDidRequest(
     val method: String,
-    val keyId: String? = null
+    val keyId: String? = null,
+    /**
+     * Method-specific registrar arguments forwarded to [DidService.registerDefaultDidMethodByKey].
+     *
+     * Examples:
+     * - did:web — `domain` (required), `path` (optional)
+     * - did:key — `useJwkJcsPub` (optional boolean)
+     */
+    val options: Map<String, JsonPrimitive> = emptyMap(),
 )
 
 @Serializable
@@ -381,7 +391,7 @@ object Wallet2RouteHandler {
                         ?: return@post call.respond(HttpStatusCode.BadRequest, "Wallet has no DID store")
                     val key = (req.keyId?.let { wallet.findKey(it) } ?: wallet.defaultKey())
                         ?: return@post call.respond(HttpStatusCode.BadRequest, "No key available for DID creation")
-                    val did = DidService.registerByKey(req.method, key)
+                    val did = DidService.registerDefaultDidMethodByKey(req.method, key, req.options)
                     val entry = WalletDidEntry(
                         did = did.did,
                         document = runCatching {
@@ -585,6 +595,17 @@ object Wallet2RouteHandler {
                         )
                     }
 
+                    post("/request-nonce", {
+                        summary = "Isolated: obtain a fresh credential proof nonce"
+                        request { pathParameter<String>("walletId"); body<RequestNonceRequest>() }
+                        response { HttpStatusCode.OK to { body<RequestNonceResult>() } }
+                    }) {
+                        val req = call.receive<RequestNonceRequest>()
+                        call.respond(
+                            WalletIssuanceHandler.requestNonce(request = req)
+                        )
+                    }
+
                     post("/sign-proof", {
                         summary = "Isolated: sign a proof-of-possession JWT"
                         request { pathParameter<String>("walletId"); body<SignProofRequest>() }
@@ -598,13 +619,23 @@ object Wallet2RouteHandler {
                     post("/fetch-credential", {
                         summary = "Isolated: fetch a credential from the issuer's credential endpoint"
                         description = "When storeInWallet is true the fetched credential(s) are automatically " +
-                                "stored in the wallet, removing the need to call the import endpoint afterwards."
+                                "stored in the wallet, removing the need to call the import endpoint afterwards. " +
+                                "If the issuer returns invalid_nonce, request a fresh nonce, sign a new proof, " +
+                                "and repeat this isolated fetch step."
                         request { pathParameter<String>("walletId"); body<FetchCredentialRequest>() }
-                        response { HttpStatusCode.OK to { body<FetchCredentialResult>() } }
+                        response {
+                            HttpStatusCode.OK to { body<FetchCredentialResult>() }
+                            HttpStatusCode.BadRequest to { body<CredentialError>() }
+                        }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<FetchCredentialRequest>()
-                        call.respond(WalletIssuanceHandler.fetchCredential(wallet, req))
+                        try {
+                            call.respond(WalletIssuanceHandler.fetchCredential(wallet, req))
+                        } catch (error: CredentialEndpointException) {
+                            if (!error.isInvalidNonce) throw error
+                            call.respond(HttpStatusCode.BadRequest, requireNotNull(error.credentialError))
+                        }
                     }
 
                     // Auth-code grant isolated steps

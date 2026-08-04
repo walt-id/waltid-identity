@@ -10,7 +10,6 @@ class JweCredentialRequestDecryptor(
     override suspend fun decrypt(compactJwe: String): JsonObject {
         val parts = JweUtils.parseJWE(compactJwe, privateJwk)
         requireSupportedHeader(parts.header, "credential request")
-        println("we are in")
         return parts.payload
     }
 }

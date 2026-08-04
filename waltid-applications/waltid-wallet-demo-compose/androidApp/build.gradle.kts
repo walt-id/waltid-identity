@@ -8,6 +8,14 @@ plugins {
 val javaVersion = identityLibs.versions.java.library.get().toInt()
 val publicDemoTransactionDataProfilesUrl = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
 
+val appVersionName: String = (findProperty("appVersionName") as String?)?.takeIf { it.isNotBlank() } ?: "0.1.0"
+val appVersionCode: Int = run {
+    val core = appVersionName.trimStart('v', 'V').substringBefore('-').substringBefore('+')
+    val parts = core.split('.')
+    fun slot(i: Int) = (parts.getOrNull(i)?.toIntOrNull() ?: 0).coerceIn(0, 999)
+    (slot(0) * 1_000_000L + slot(1) * 1_000L + slot(2)).coerceIn(1L, 2_100_000_000L).toInt()
+}
+
 android {
     namespace = "id.walt.walletdemo.compose.android"
     compileSdk = 37
@@ -16,8 +24,8 @@ android {
         applicationId = "id.walt.walletdemo.compose"
         minSdk = 30
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "ATTESTATION_BASE_URL", "\"${findProperty("attestation.baseUrl") ?: ""}\"")

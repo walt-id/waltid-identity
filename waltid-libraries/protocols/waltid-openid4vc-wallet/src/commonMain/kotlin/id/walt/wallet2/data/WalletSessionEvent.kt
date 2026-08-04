@@ -35,6 +35,8 @@ enum class WalletSessionEvent {
     presentation_credentials_selected,
     /** Presentation(s) have been signed / constructed. */
     presentation_signed,
+    /** Presentation response is prepared and still requires host-app delivery. */
+    presentation_response_prepared,
     /** Presentation has been submitted to the verifier. */
     presentation_submitted,
     /** Presentation flow completed successfully. */

@@ -199,11 +199,20 @@ object EudiTestBackend {
         }
     }
 
-    private fun buildDcqlQuery(credentialId: String): JsonElement {
+    internal fun buildDcqlQuery(credentialId: String): JsonElement {
         val format: String
         val meta: JsonObject
 
         when {
+            credentialId.contains("ehic") &&
+                (credentialId.contains("sd_jwt") || credentialId.contains("jwt_vc")) -> {
+                format = "dc+sd-jwt"
+                meta = buildJsonObject {
+                    putJsonArray("vct_values") {
+                        add("urn:eudi:ehic:1")
+                    }
+                }
+            }
             credentialId.contains("sd_jwt") || credentialId.contains("jwt_vc") -> {
                 format = "dc+sd-jwt"
                 meta = buildJsonObject {

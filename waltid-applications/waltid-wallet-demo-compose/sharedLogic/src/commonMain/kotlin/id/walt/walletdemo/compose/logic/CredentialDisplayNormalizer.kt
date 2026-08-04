@@ -33,12 +33,14 @@ object CredentialDisplayNormalizer {
                 summary = summary,
                 groups = emptyList(),
             )
+        val displayData = if (summary.format == MdocFormat) parsed.withoutNullObjectMembers() else parsed
 
-        val groupedItems = parsed.entries
+        val groupedItems = displayData.entries
             .flatMap { (key, value) ->
                 val path = ClaimPath.topLevel(key)
                 value.toClaimRows(path = path, label = CredentialDisplayVocabulary.humanizedClaimLabel(key))
-                    .map { row -> CredentialDisplayVocabulary.groupKind(row.path) to row }
+                    .map { row -> row.withMdocDisplaySemantics(summary.format) }
+                    .map { row -> CredentialDisplayVocabulary.groupKind(row.path, summary.format) to row }
             }
             .groupBy(keySelector = { it.first }, valueTransform = { it.second })
             .entries
@@ -47,8 +49,11 @@ object CredentialDisplayNormalizer {
                 ClaimGroup(
                     title = group.title,
                     items = rows
-                        .sortedWith { left, right -> CredentialDisplayVocabulary.compareClaimPaths(left.path, right.path) }
+                        .sortedWith { left, right ->
+                            CredentialDisplayVocabulary.compareClaimPaths(left.path, right.path, summary.format)
+                        }
                         .map { it.item },
+                    initiallyExpanded = group.initiallyExpanded,
                 )
             }
 
@@ -194,6 +199,56 @@ object CredentialDisplayNormalizer {
         return flattenObjectForClaimRows(path = path, item = item)
     }
 
+    private fun ClaimRow.withMdocDisplaySemantics(format: String): ClaimRow {
+        val semantics = MdocClaimDisplaySemantics.describe(format = format, path = path.components)
+            ?: return this
+        val displayValue = when (semantics.valueKind) {
+            MdocClaimValueKind.Boolean -> if (item.value is DisplayValue.BooleanValue) {
+                item.value
+            } else {
+                DisplayValue.Text("Unsupported value")
+            }
+            MdocClaimValueKind.Binary -> item.value.toBinaryAvailability()
+            MdocClaimValueKind.Other -> item.value
+        }
+        return copy(
+            item = item.copy(
+                label = semantics.label,
+                value = displayValue,
+            )
+        )
+    }
+
+    private fun DisplayValue.toBinaryAvailability(): DisplayValue.Text {
+        val byteCount = when (this) {
+            is DisplayValue.Image -> byteCount
+            is DisplayValue.ListValue -> values
+                .takeIf { it.isNotEmpty() && it.all { value -> value is DisplayValue.NumberValue } }
+                ?.size
+            else -> null
+        }
+        return DisplayValue.Text(
+            byteCount?.let { "Available, ${it.toReadableByteCount()}" } ?: "Available"
+        )
+    }
+
+    private fun Int.toReadableByteCount(): String =
+        if (this == 1) "1 byte" else "$this bytes"
+
+    private fun JsonObject.withoutNullObjectMembers(): JsonObject =
+        JsonObject(
+            entries.mapNotNull { (key, value) ->
+                if (value is JsonNull) null else key to value.withoutNullObjectMembers()
+            }.toMap()
+        )
+
+    private fun JsonElement.withoutNullObjectMembers(): JsonElement =
+        when (this) {
+            is JsonObject -> withoutNullObjectMembers()
+            is JsonArray -> JsonArray(map { element -> element.withoutNullObjectMembers() })
+            else -> this
+        }
+
     private fun JsonElement.flattenObjectForClaimRows(path: ClaimPath, item: ClaimItem): List<ClaimRow> =
         when {
             item.value !is DisplayValue.ObjectValue -> listOf(ClaimRow(path = path, item = item))
@@ -281,6 +336,7 @@ object CredentialDisplayNormalizer {
     private const val minimumCredibleEpochSeconds = 100_000_000L
     private const val epochMillisecondsThreshold = 10_000_000_000L
     private const val imageWrapperClaimName = "elementValue"
+    private const val MdocFormat = "mso_mdoc"
 }
 
 private data class ClaimRow(

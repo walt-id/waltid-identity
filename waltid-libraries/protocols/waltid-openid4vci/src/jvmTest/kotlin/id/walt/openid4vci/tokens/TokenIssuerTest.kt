@@ -3,10 +3,13 @@ package id.walt.openid4vci.tokens
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.openid4vci.tokens.access.AccessTokenContext
+import id.walt.openid4vci.tokens.access.AccessTokenAuthorization
+import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
+import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
 import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenVerifier
 import id.walt.openid4vci.tokens.jwt.JwtSigningKeyResolver
+import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import java.lang.ThreadLocal
@@ -28,6 +31,7 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.createTestConfig
+import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
@@ -225,6 +229,7 @@ class TokenIssuerTest {
                 subject = "alice",
                 issuer = "https://issuer.example",
                 audience = "https://audience.example",
+                additional = mapOf(JwtPayloadClaims.CLIENT_ID to "wallet-client"),
             )
         )
 
@@ -233,13 +238,18 @@ class TokenIssuerTest {
                 "credential_configuration_id" to listOf("test-credential")
             ),
             session = null,
-            accessTokenContext = AccessTokenContext(
-                token = token,
+            accessTokenContext = CredentialAccessTokenContext(
+                authorization = AccessTokenAuthorization(
+                    scheme = AccessTokenAuthorizationScheme.BEARER,
+                    token = token,
+                ),
                 expectedIssuer = "https://issuer.example",
             )
         )
 
-        assertTrue(result is CredentialRequestResult.Success)
+        val success = result as CredentialRequestResult.Success
+        assertEquals("wallet-client", success.request.accessTokenClientId)
+        assertTrue(!success.request.anonymousPreAuthorizedAccess)
     }
 
     @Test
@@ -267,13 +277,17 @@ class TokenIssuerTest {
                 "credential_configuration_id" to listOf("test-credential")
             ),
             session = null,
-            accessTokenContext = AccessTokenContext(
-                token = token,
+            accessTokenContext = CredentialAccessTokenContext(
+                authorization = AccessTokenAuthorization(
+                    scheme = AccessTokenAuthorizationScheme.BEARER,
+                    token = token,
+                ),
                 expectedIssuer = "https://wrong-issuer.example",
             )
         )
 
-        assertTrue(result is CredentialRequestResult.Failure)
+        assertTrue(result is CredentialRequestResult.OAuthFailure)
+        assertEquals(OAuthErrorCodes.INVALID_TOKEN, result.error.error)
     }
 
     private fun resolveCurrentKey(currentKey: ThreadLocal<Key?>): Key =

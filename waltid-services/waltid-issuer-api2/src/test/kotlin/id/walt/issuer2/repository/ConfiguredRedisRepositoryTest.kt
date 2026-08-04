@@ -152,8 +152,6 @@ class ConfiguredRedisRepositoryTest {
         grantedAudience = setOf("issuer2"),
         session = DefaultSession(subject = "subject"),
         expiresAt = Clock.System.now().plus(5.minutes),
-        credentialNonce = "nonce",
-        credentialNonceExpiresAt = Clock.System.now().plus(5.minutes),
         issuanceSessionId = "redis-session-$suffix",
     )
 

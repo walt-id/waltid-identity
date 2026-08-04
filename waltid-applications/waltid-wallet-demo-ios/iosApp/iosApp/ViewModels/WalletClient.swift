@@ -5,15 +5,18 @@ protocol WalletClient {
     func bootstrap() async throws -> WalletBootstrapResult
     func credentials() async throws -> [Credential]
     func resolveOffer(offer: URL) async throws -> OfferResolution
-    func receive(offer: URL, txCode: String?) async throws -> [String]
+    func receive(previewHandle: IssuancePreviewHandle, txCode: String?) async throws -> [String]
+    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws
     func present(request: URL, did: String?) async throws -> PresentationResult
-    func previewPresentation(request: URL) async throws -> PresentationPreview
+    func previewPresentation(request: URL) async throws -> PresentationPreviewResult
     func submitPresentation(
-        request: URL,
+        previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
     ) async throws -> PresentationResult
+    func rejectPresentation(previewHandle: PresentationPreviewHandle) async throws -> PresentationResult
+    func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws
 }
 
 final class SDKWalletClient: WalletClient {
@@ -36,30 +39,42 @@ final class SDKWalletClient: WalletClient {
         try await wallet().resolveOffer(offer: offer)
     }
 
-    func receive(offer: URL, txCode: String?) async throws -> [String] {
-        try await wallet().receive(offer: offer, txCode: txCode)
+    func receive(previewHandle: IssuancePreviewHandle, txCode: String?) async throws -> [String] {
+        try await wallet().receive(previewHandle: previewHandle, txCode: txCode)
+    }
+
+    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
+        try await wallet().discardIssuancePreview(previewHandle)
     }
 
     func present(request: URL, did: String?) async throws -> PresentationResult {
         try await wallet().present(request: request, did: did)
     }
 
-    func previewPresentation(request: URL) async throws -> PresentationPreview {
+    func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         try await wallet().previewPresentation(request: request)
     }
 
     func submitPresentation(
-        request: URL,
+        previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
     ) async throws -> PresentationResult {
         try await wallet().submitPresentation(
-            request: request,
+            previewHandle: previewHandle,
             selectedCredentialOptions: selectedCredentialOptions,
             selectedDisclosureOptions: selectedDisclosureOptions,
             did: did
         )
+    }
+
+    func rejectPresentation(previewHandle: PresentationPreviewHandle) async throws -> PresentationResult {
+        try await wallet().rejectPresentation(previewHandle: previewHandle)
+    }
+
+    func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
+        try await wallet().discardPresentationPreview(previewHandle)
     }
 
     private func wallet() async throws -> Wallet {

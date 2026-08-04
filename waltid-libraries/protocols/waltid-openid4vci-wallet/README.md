@@ -85,6 +85,7 @@ import id.waltid.openid4vci.wallet.*
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.waltid.openid4vci.wallet.offer.*
 import id.waltid.openid4vci.wallet.metadata.*
+import id.waltid.openid4vci.wallet.nonce.NonceRequestBuilder
 import id.waltid.openid4vci.wallet.token.*
 import id.waltid.openid4vci.wallet.proof.*
 import io.ktor.client.*
@@ -126,16 +127,21 @@ if (preAuthGrant != null) {
         txCode = null // or user-provided PIN
     )
 
-    // 7. Generate proof of possession
+    // 7. Obtain a fresh proof nonce when the issuer advertises a Nonce Endpoint
+    val nonce = issuerMetadata.nonceEndpoint?.let { nonceEndpoint ->
+        NonceRequestBuilder(httpClient).requestNonce(nonceEndpoint).cNonce
+    }
+
+    // 8. Generate proof of possession, omitting the nonce claim when none was obtained
     val key = KeyManager.loadKey("my-key-id")
     val proofBuilder = JwtProofBuilder()
     val proof = proofBuilder.buildProof(
         key = key,
         audience = offer.credentialIssuer,
-        nonce = tokenResponse.c_nonce!!
+        nonce = nonce
     )
 
-    // 8. Request credential (Implementation coming soon)
+    // 9. Request credential (Implementation coming soon)
     // ...
 }
 ```
@@ -145,6 +151,7 @@ if (preAuthGrant != null) {
 - `oauth/` - OAuth 2.0 client components (PKCE, State management)
 - `offer/` - Credential offer parsing and resolution
 - `metadata/` - Issuer and authorization server metadata discovery
+- `nonce/` - OpenID4VCI 1.0 Nonce Endpoint requests
 - `authorization/` - Authorization request building and response parsing
 - `token/` - Token exchange logic for both grant types
 - `proof/` - Proof of possession building (JWT-based)

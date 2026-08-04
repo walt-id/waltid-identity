@@ -50,7 +50,7 @@ internal fun ClaimValueRow(item: ClaimItem, modifier: Modifier = Modifier) {
 private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modifier = Modifier) {
     when (value) {
         is DisplayValue.BooleanValue -> Text(
-            value.value.toString(),
+            if (value.value) "Yes" else "No",
             modifier = modifier,
             style = MaterialTheme.typography.bodyMedium,
         )

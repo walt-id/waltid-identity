@@ -1,5 +1,7 @@
 package id.walt.wallet2.mobile.swiftinterop
 
+import id.walt.wallet2.handlers.PreviewSessionException
+import id.walt.wallet2.handlers.PreviewSessionFailureReason
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import kotlinx.coroutines.CancellationException
 import kotlin.test.Test
@@ -13,6 +15,9 @@ class WalletSdkBridgeModelsTest {
         val invalid = WalletBridgeError.fromThrowable(IllegalArgumentException("bad offer"))
         val cancelled = WalletBridgeError.fromThrowable(CancellationException("cancelled"))
         val unknown = WalletBridgeError.fromThrowable(IllegalStateException("boom"))
+        val stalePreview = WalletBridgeError.fromThrowable(
+            PreviewSessionException(PreviewSessionFailureReason.EXPIRED, "Preview expired")
+        )
 
         assertEquals(WalletBridgeErrorCategory.invalidInput, invalid.category)
         assertEquals("bad offer", invalid.message)
@@ -23,6 +28,8 @@ class WalletSdkBridgeModelsTest {
 
         assertEquals(WalletBridgeErrorCategory.internalFailure, unknown.category)
         assertEquals("boom", unknown.message)
+        assertEquals(WalletBridgeErrorCategory.invalidInput, stalePreview.category)
+        assertEquals("Preview expired", stalePreview.message)
     }
 
     @Test

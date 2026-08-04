@@ -12,11 +12,12 @@ struct PresentationReviewView: View {
     let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
     let onCredentialSelected: (String) -> Void
     let onSubmit: () -> Void
+    let onReject: () -> Void
     let onCancel: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            VerifierDetailsView(request: preview.request)
+            VerifierReviewSections(request: preview.request)
 
             Text("Select credentials to share")
                 .font(.subheadline.weight(.semibold))
@@ -67,6 +68,7 @@ struct PresentationReviewView: View {
                     selectionComplete: selectionComplete,
                     isLoading: isLoading,
                     onSubmit: onSubmit,
+                    onReject: onReject,
                     onCancel: onCancel
                 )
             }
@@ -129,7 +131,6 @@ private struct PresentationDisclosureListView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color(.secondarySystemBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-                .accessibilityIdentifier(WalletAccessibilityID.presentationDisclosure(selection.id))
             }
         }
     }
@@ -164,6 +165,7 @@ private struct PresentationReviewActionsView: View {
     let selectionComplete: Bool
     let isLoading: Bool
     let onSubmit: () -> Void
+    let onReject: () -> Void
     let onCancel: () -> Void
 
     var body: some View {
@@ -178,6 +180,11 @@ private struct PresentationReviewActionsView: View {
                 .buttonStyle(.bordered)
                 .disabled(isLoading)
                 .accessibilityIdentifier(WalletAccessibilityID.presentationCancelButton)
+
+            Button("Reject", action: onReject)
+                .buttonStyle(.bordered)
+                .disabled(isLoading)
+                .accessibilityIdentifier(WalletAccessibilityID.presentationRejectButton)
         }
     }
 }

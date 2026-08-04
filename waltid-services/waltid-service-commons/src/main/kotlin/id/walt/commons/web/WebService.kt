@@ -15,6 +15,7 @@ import io.klogging.logger
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
+import io.ktor.server.routing.*
 import java.net.BindException
 
 data class WebService(
@@ -23,6 +24,11 @@ data class WebService(
     private val log = logger("WebService")
 
     val webServiceModule: suspend Application.() -> Unit = {
+        System.getenv("SWAGGER_SERVER_BASE_PATH")?.trim()?.trim('/')?.takeIf { it.isNotEmpty() }
+            ?.let { rootPath = "/$it" }
+
+        install(IgnoreTrailingSlash)
+
         KtorStatusChecker.run { init() };
 
         { FeatureFlagInformationModule.run { enable() } } whenFeature CommonsFeatureCatalog.featureFlagInformationEndpointFeature

@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 
 class CredentialResponseEncryptionParametersTest {
@@ -69,7 +70,20 @@ class CredentialResponseEncryptionParametersTest {
     }
 
     @Test
-    fun `request rejects missing key id`() {
+    fun `request accepts a JWK without a key id`() {
+        val request = CredentialResponseEncryptionParameters.fromJsonObject(
+            buildJsonObject {
+                put("jwk", JsonObject(validWalletJwk().filterKeys { it != "kid" }))
+                put("enc", JsonPrimitive("A128GCM"))
+            }
+        )
+
+        assertEquals("ECDH-ES", request.alg)
+        assertEquals("A128GCM", request.enc)
+    }
+
+    @Test
+    fun `request rejects a blank key id when present`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialResponseEncryptionParameters.fromJsonObject(
                 buildJsonObject {
@@ -83,6 +97,13 @@ class CredentialResponseEncryptionParametersTest {
                 }
             )
         }
+    }
+
+    @Test
+    fun `credential request encryption metadata key still requires a key id`() {
+        val jwkWithoutKid = JsonObject(validWalletJwk().filterKeys { it != "kid" })
+
+        assertFalse(CredentialEncryptionProfile.isSupportedCredentialRequestEncryptionJwk(jwkWithoutKid))
     }
 
     @Test
@@ -120,16 +141,16 @@ class CredentialResponseEncryptionParametersTest {
     }
 
     @Test
-    fun `request rejects compression`() {
-        assertFailsWith<IllegalArgumentException> {
-            CredentialResponseEncryptionParameters.fromJsonObject(
-                buildJsonObject {
-                    put("jwk", validWalletJwk())
-                    put("enc", JsonPrimitive("A128GCM"))
-                    put("zip", JsonPrimitive("DEF"))
-                }
-            )
-        }
+    fun `request preserves compression parameter in the data model`() {
+        val request = CredentialResponseEncryptionParameters.fromJsonObject(
+            buildJsonObject {
+                put("jwk", validWalletJwk())
+                put("enc", JsonPrimitive("A128GCM"))
+                put("zip", JsonPrimitive("DEF"))
+            }
+        )
+
+        assertEquals("DEF", request.zip)
     }
 
     private fun validWalletJwk(vararg replacements: Pair<String, JsonPrimitive>): JsonObject {

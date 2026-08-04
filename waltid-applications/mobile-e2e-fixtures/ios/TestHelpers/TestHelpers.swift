@@ -10,6 +10,16 @@ public func jsonString(_ object: Any) throws -> String {
 public func buildDcqlQuery(credentialID: String) -> [String: Any] {
     let normalized = credentialID.lowercased()
 
+    if normalized.contains("ehic") && (normalized.contains("sd_jwt") || normalized.contains("jwt_vc")) {
+        return [
+            "credentials": [[
+                "id": "query_0",
+                "format": "dc+sd-jwt",
+                "meta": ["vct_values": ["urn:eudi:ehic:1"]],
+            ]],
+        ]
+    }
+
     if normalized.contains("sd_jwt") || normalized.contains("jwt_vc") {
         return [
             "credentials": [[

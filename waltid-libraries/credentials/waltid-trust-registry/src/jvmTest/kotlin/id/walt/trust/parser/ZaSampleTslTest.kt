@@ -44,7 +44,7 @@ class ZaSampleTslTest {
         println("Next Update: ${result.source.nextUpdate}")
         println("Sequence: ${result.source.sequenceNumber}")
         println("Freshness: ${result.source.freshnessState}")
-        println("Authenticity: ${result.source.authenticityState}")
+        println("Authenticity: ${result.source.assurance.authenticityState}")
         println("Metadata: ${result.source.metadata}")
         println()
 
@@ -75,7 +75,7 @@ class ZaSampleTslTest {
 
         // Assertions
         assertEquals("ZA", result.source.territory)
-        assertEquals(AuthenticityState.SKIPPED_DEMO, result.source.authenticityState, "Without validation, should be SKIPPED_DEMO")
+        assertEquals(AuthenticityState.UNVERIFIED, result.source.assurance.authenticityState)
         assertTrue(result.entities.isNotEmpty(), "Should have entities")
 
         // Check for expected TSPs
