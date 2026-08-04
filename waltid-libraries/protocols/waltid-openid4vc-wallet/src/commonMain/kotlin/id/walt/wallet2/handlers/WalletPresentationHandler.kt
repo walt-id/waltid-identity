@@ -407,19 +407,20 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
     ): PreviewPresentationResult {
-        // The execution key is selected here, once, and retained in the preview: advertised wallet
-        // metadata, request validation and the eventual signature must all refer to the same key.
-        val keyMaterial = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
-            ?: error("No key available: wallet has no keyStores and no staticKey")
+        // Selected once up front so advertised wallet metadata, request validation and the retained
+        // preview all refer to the same key, but only *required* where a key is genuinely needed: a
+        // request that fails resolution or client-ID trust validation must report that failure rather
+        // than a wallet-local missing-key condition.
+        val executionKey = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)).requiredOnUse()
         return previewPresentation(
             wallet = wallet,
             request = request,
-            keyMaterial = keyMaterial,
+            executionKey = executionKey,
             onEvent = onEvent,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             resolveAuthorizationRequest = { requestUrl ->
                 resolveAuthorizationRequest(
-                    keyMaterial.presentationCapabilities(),
+                    { executionKey().presentationCapabilities() },
                     requestUrl,
                     clientIdTrustConfiguration,
                 )
@@ -430,7 +431,7 @@ object WalletPresentationHandler {
     internal suspend fun previewPresentation(
         wallet: Wallet,
         request: PreviewPresentationRequest,
-        keyMaterial: WalletKeyStoreEntry,
+        executionKey: () -> WalletKeyStoreEntry,
         onEvent: suspend (WalletSessionEvent) -> Unit,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest,
@@ -441,7 +442,7 @@ object WalletPresentationHandler {
         val validation = PresentationRequestValidator.validate(
             resolvedRequest = resolvedAuthorizationRequest,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
-            formatCapabilities = keyMaterial.presentationCapabilities(),
+            formatCapabilities = { executionKey().presentationCapabilities() },
         )
         if (validation is PresentationRequestValidationResult.Invalid) {
             val handle = rememberPreviewedAuthorizationRequest(
@@ -512,7 +513,7 @@ object WalletPresentationHandler {
             preview = PreviewedPresentation.Ready(
                 requestUrl = request.requestUrl,
                 resolvedAuthorizationRequest = resolvedAuthorizationRequest,
-                keyId = keyMaterial.keyId,
+                keyId = executionKey().keyId,
             ),
         )
         return PreviewPresentationResult.Ready(
@@ -1006,13 +1007,16 @@ object WalletPresentationHandler {
             credentialId = credential.id,
         )
 
+    /**
+     * @param capabilities resolved lazily: wallet metadata is only advertised when a `request_uri` is
+     *   actually fetched, so a request carrying its object inline needs no signing key to be resolved.
+     */
     private suspend fun resolveAuthorizationRequest(
-        capabilities: WalletPresentationFormatRegistry.RuntimeCapabilities,
+        capabilities: () -> WalletPresentationFormatRegistry.RuntimeCapabilities,
         requestUrl: Url,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
     ): ResolvedAuthorizationRequest {
         val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
-        val vpFormatsSupported = WalletPresentationFormatRegistry.buildVpFormatsSupported(capabilities)
         return AuthorizationRequestResolver.resolve(
             requestUrl = requestUrl,
             unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
@@ -1023,7 +1027,7 @@ object WalletPresentationHandler {
                     requestUri = requestUri,
                     requestUriMethod = requestUriMethod,
                     requestUriPostWalletMetadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
-                        vpFormatsSupported,
+                        WalletPresentationFormatRegistry.buildVpFormatsSupported(capabilities()),
                         clientIdTrustConfiguration,
                     ),
                 )
@@ -1212,6 +1216,17 @@ object WalletPresentationHandler {
  * that key's capabilities could be accepted while previewing and then fail while signing.
  * Mirrors the capability computation in `WalletPresentFunctionality2.walletPresentHandlingWithKey`.
  */
+/**
+ * Defers the "a key is required" failure to the point where the key is actually used.
+ *
+ * The key is still selected once, before anything else, so every consumer sees the same key. But a
+ * request that is rejected without ever needing a key - an untrusted client identifier, a malformed
+ * request - must surface that rejection, not a wallet-local missing-key error.
+ */
+internal fun WalletKeyStoreEntry?.requiredOnUse(): () -> WalletKeyStoreEntry = {
+    this ?: error("No key available: wallet has no keyStores and no staticKey")
+}
+
 internal fun WalletKeyStoreEntry.presentationCapabilities(): WalletPresentationFormatRegistry.RuntimeCapabilities =
     WalletPresentationFormatRegistry.capabilitiesFromKeys(
         keys = listOfNotNull(crypto2Key),
