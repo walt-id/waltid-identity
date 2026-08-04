@@ -10,6 +10,7 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.supportsJwsAlgorithm
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.did.dids.DidService
 import id.waltid.openid4vp.wallet.WalletCrypto2KeyAdapter
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -109,7 +110,9 @@ object SelfIssuedIdTokenBuilder {
 
         val now = Clock.System.now()
         val exp = now + 5.minutes
-        val signingAlgorithm = JwsAlgorithm.parse(clientMetadata.idTokenSignedResponseAlg ?: "RS256")
+        val signingAlgorithm = JwsAlgorithm.parse(
+            clientMetadata.idTokenSignedResponseAlg ?: ClientMetadata.DEFAULT_ID_TOKEN_SIGNED_RESPONSE_ALG
+        )
         if (crypto2Key != null) {
             require(crypto2Key.spec.supportsJwsAlgorithm(signingAlgorithm) &&
                 crypto2Key.capabilities.supportsSignatureAlgorithm(signingAlgorithm.toSignatureAlgorithm())) {
