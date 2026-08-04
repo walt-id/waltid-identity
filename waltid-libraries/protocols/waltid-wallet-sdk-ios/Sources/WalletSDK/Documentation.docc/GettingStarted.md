@@ -37,8 +37,8 @@ before bootstrap, especially because Secure Enclave biometric enforcement is
 unavailable in the simulator. This immutable policy applies only to new keys;
 changing the default does not protect or rotate existing keys. Use
 ``Wallet/keys()`` to inspect each persisted key's immutable policy and platform-backed status.
-Host apps that enable this policy must add ``NSFaceIDUsageDescription`` to their
-own ``Info.plist`` with an appropriate user-facing reason string. The SDK does
+Host apps that enable this policy must add `NSFaceIDUsageDescription` to their
+own `Info.plist` with an appropriate user-facing reason string. The SDK does
 not provide or override that entry.
 
 > Important: Key-use authorization is not wallet/app unlock. Platform
