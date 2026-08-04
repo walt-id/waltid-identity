@@ -158,11 +158,25 @@ enabledFeatures = [
 ]
 
 # config/auth.conf
-signingKey = { type = "jwk", jwk = { kty = "EC", crv = "P-256", x = "...", y = "...", d = "..." } }
+signingStoredKey = """{"kind":"software","version":1,"id":"...","spec":{...},"usages":["SIGN","VERIFY"],"material":{...}}"""
 tokenExpiry = "PT24H"
 ```
 
-`signingStoredKey` can additionally contain the encoded crypto2 `StoredKey` sidecar and takes precedence over `signingKey`. Startup validates that both forms represent the same signing and verification key. If it is omitted, the legacy JWK is migrated only in memory and `auth.conf` is not rewritten. Malformed or mismatched StoredKey values fail startup without legacy fallback.
+`signingStoredKey` is an encoded crypto2 `StoredKey` and is a complete configuration on its own. It is
+the only way to run auth off a managed (KMS/HSM) key: pass a `CryptoRuntime` carrying the matching
+`ManagedKeyProvider` to `configureWallet2Auth`, since the default runtime only has software providers.
+The JWS algorithm is derived from the `StoredKey`.
+
+The legacy alternative is a waltid-crypto JWK:
+
+```hocon
+signingKey = { type = "jwk", jwk = { kty = "EC", crv = "P-256", x = "...", y = "...", d = "..." } }
+```
+
+It is migrated to crypto2 in memory at startup and `auth.conf` is never rewritten. Setting both is the
+migration configuration: they must describe the same signing and verification key, `signingStoredKey`
+takes precedence, and malformed or mismatched values fail startup without legacy fallback. At least one
+of the two is required.
 
 ---
 
