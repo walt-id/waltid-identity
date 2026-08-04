@@ -4,6 +4,7 @@ import com.microsoft.playwright.Browser
 import com.microsoft.playwright.BrowserContext
 import com.microsoft.playwright.BrowserType
 import com.microsoft.playwright.Locator
+import com.microsoft.playwright.Page
 import com.microsoft.playwright.Playwright
 import java.net.URI
 import java.nio.file.Files
@@ -50,7 +51,7 @@ data class IssuerBrowserAutomationConfig(
     }
 }
 
-class IssuerConformanceBrowserAutomation(
+internal class IssuerConformanceBrowserAutomation(
     private val config: IssuerBrowserAutomationConfig,
     private val conformanceHost: String,
     private val conformancePort: Int,

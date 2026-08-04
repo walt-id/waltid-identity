@@ -13,10 +13,11 @@ The runner is intentionally separate from issuer conformance testing:
 
 ## Prerequisites
 
-For any `client_attestation` context, configure the Wallet API2 instance with
-the local, test-only attestation endpoint below before starting it. The runner
-starts this endpoint on port `7007`, signs attestations with its bundled test
-key, and the suite trusts its corresponding test certificate chain.
+Client-attestation contexts use the conformance-only Wallet API2 configuration at
+`config/conformance-wallet-service.conf` in this runner directory.
+It points Wallet API2 to the local, test-only attestation endpoint below. The
+runner starts this endpoint on port `7007`, signs attestations with its bundled
+test key, and the suite trusts its corresponding test certificate chain.
 
 ```hocon
 attestationConfig {
@@ -27,8 +28,10 @@ attestationConfig {
 }
 ```
 
-This replaces the default external attester only for local conformance runs.
-Do not use the test endpoint or its bundled key material in a deployment.
+The default `wallet-service.conf` continues to use the external attester. The
+launcher selects this configuration with
+`-Dconfig.file.wallet-service=/absolute/path/to/conformance-wallet-service.conf`.
+Do not use the loopback endpoint or bundled key material in a deployment.
 
 The local wrapper starts the suite, MongoDB, and Nginx through
 `docker-compose-walt.yml`. It requires `docker`, `curl`, `openssl`, and
@@ -46,9 +49,9 @@ From this runner directory, start Wallet API2 with the conformance launcher:
 ```
 
 It prepares the local suite, reuses its certificate for repeat runs, and starts
-Wallet API2 with the generated truststore. Leave that terminal running. In a
-second terminal, return to this runner directory and execute the selected
-conformance command. For the baseline run:
+Wallet API2 with the generated truststore and conformance-specific configuration.
+Leave that terminal running. In a second terminal, return to this runner
+directory and execute the selected conformance command. For the baseline run:
 
 ```bash
 # Terminal 2
@@ -62,8 +65,9 @@ OPENID4VCI_WALLET_CONFORMANCE_PREPARE_TLS_ONLY=true \
 ./run-wallet-conformance-local.sh
 
 CONFORMANCE_RUNNER_DIR="$(pwd)"
+CONFORMANCE_WALLET_CONFIG="$CONFORMANCE_RUNNER_DIR/config/conformance-wallet-service.conf"
 cd ../..
-JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=$CONFORMANCE_RUNNER_DIR/build/conformance/conformance-truststore.jks -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=JKS" \
+JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=$CONFORMANCE_RUNNER_DIR/build/conformance/conformance-truststore.jks -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=JKS -Dconfig.file.wallet-service=$CONFORMANCE_WALLET_CONFIG" \
 ./gradlew :waltid-services:waltid-wallet-api2:run
 ```
 

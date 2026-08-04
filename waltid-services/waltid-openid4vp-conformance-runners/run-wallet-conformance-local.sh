@@ -6,7 +6,7 @@ IDENTITY_ROOT="$(cd "$RUNNER_DIR/../.." && pwd)"
 COMPOSE_FILE="${CONFORMANCE_COMPOSE_FILE:-$RUNNER_DIR/docker-compose-walt.yml}"
 BASE_TRUSTSTORE="$RUNNER_DIR/conformance-truststore.jks"
 TRUSTSTORE="$RUNNER_DIR/build/conformance/conformance-truststore.jks"
-RESULT_XML="$RUNNER_DIR/build/test-results/test/TEST-id.walt.openid4vp.conformance.VciWalletConformanceTests.xml"
+RESULT_XML="$RUNNER_DIR/build/test-results/runVciWalletConformanceTests/TEST-id.walt.openid4vp.conformance.VciWalletConformanceTests.xml"
 
 CONFORMANCE_HOST="${OPENID4VCI_WALLET_CONFORMANCE_HOST:-localhost.emobix.co.uk}"
 CONFORMANCE_PORT="${OPENID4VCI_WALLET_CONFORMANCE_PORT:-8443}"
@@ -197,8 +197,7 @@ set +e
   "-Dplaywright.browser=$PLAYWRIGHT_BROWSER" \
   "-Dplaywright.headless=$PLAYWRIGHT_HEADLESS" \
   :waltid-services:waltid-openid4vp-conformance-runners:cleanTest \
-  :waltid-services:waltid-openid4vp-conformance-runners:test \
-  --tests "id.walt.openid4vp.conformance.VciWalletConformanceTests.runWalletConformanceTests" \
+  :waltid-services:waltid-openid4vp-conformance-runners:runVciWalletConformanceTests \
   --rerun-tasks \
   --no-build-cache
 GRADLE_EXIT=$?

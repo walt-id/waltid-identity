@@ -166,6 +166,12 @@ tasks.register<JavaExec>("installPlaywrightBrowsers") {
     args(playwrightInstallArgs())
 }
 
+tasks.named<Test>("test") {
+    filter {
+        excludeTestsMatching("id.walt.openid4vp.conformance.VciWalletConformanceTests.*")
+    }
+}
+
 fun registerWalletProfileTestTask(taskName: String, testFilter: String, descriptionText: String) {
     tasks.register<Test>(taskName) {
         group = "verification"
@@ -175,6 +181,7 @@ fun registerWalletProfileTestTask(taskName: String, testFilter: String, descript
         classpath = tasks.test.get().classpath
 
         useJUnitPlatform()
+        systemProperty("openid4vci.conformance.wallet.enabled", "true")
         filter {
             includeTestsMatching(testFilter)
         }

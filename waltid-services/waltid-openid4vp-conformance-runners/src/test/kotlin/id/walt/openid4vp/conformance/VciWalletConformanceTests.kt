@@ -5,6 +5,7 @@ import id.walt.openid4vp.conformance.testplans.WalletConformanceTestRunner
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty
 import kotlin.time.Duration.Companion.minutes
 
 /**
@@ -17,6 +18,10 @@ import kotlin.time.Duration.Companion.minutes
 class VciWalletConformanceTests {
 
     @Test
+    @EnabledIfSystemProperty(
+        named = "openid4vci.conformance.wallet.enabled",
+        matches = "true",
+    )
     fun runWalletConformanceTests() {
         runBlocking {
             val runtime = WalletConformanceRuntimeConfig.fromEnvironment()

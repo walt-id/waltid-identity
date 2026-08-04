@@ -31,7 +31,7 @@ data class WalletBrowserAutomationConfig(
 }
 
 /** Drives only the front-channel URLs emitted by the conformance suite. */
-class WalletConformanceBrowserAutomation(
+internal class WalletConformanceBrowserAutomation(
     private val config: WalletBrowserAutomationConfig,
     private val adapterPublicUrl: String,
     private val conformanceHost: String,
@@ -80,4 +80,4 @@ class WalletConformanceBrowserAutomation(
         startsWith("https://$conformanceHost:$conformancePort/") && contains("/callback")
 }
 
-fun TestRunResult.walletBrowserInteractionsForAutomation(): List<BrowserInteraction> = pendingBrowserInteractions()
+internal fun TestRunResult.walletBrowserInteractionsForAutomation(): List<BrowserInteraction> = pendingBrowserInteractions()
