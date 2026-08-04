@@ -41,6 +41,7 @@ import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
+import id.waltid.openid4vci.wallet.proof.ProofKeyBinding
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -1368,6 +1369,13 @@ object WalletIssuanceHandler {
         onEvent(WalletSessionEvent.issuance_completed)
     }
 
+    /**
+     * Builds a JWT proof through the proof-builder contracts - no proof assembly happens here.
+     *
+     * [nonce] is null whenever the Credential Issuer advertises no Nonce Endpoint; the builder then
+     * omits the `nonce` claim. The legacy branch is only reached for keys that cannot be represented
+     * in crypto2 (remote v1 KMS keys, secp256k1) and goes away with the legacy key API.
+     */
     private suspend fun buildJwtProof(
         proofBuilder: JwtProofBuilder,
         keyMaterial: WalletKeyStoreEntry,
@@ -1376,17 +1384,18 @@ object WalletIssuanceHandler {
         did: String?,
         acceptedAlgorithms: Set<String>? = null,
     ): Proofs {
-        val proofKeyId = did?.let { DidService.resolveAuthenticationMethodId(it, keyMaterial.keyId) }
+        val binding = did
+            ?.let { ProofKeyBinding.KeyId(DidService.resolveAuthenticationMethodId(it, keyMaterial.keyId)) }
+            ?: ProofKeyBinding.Jwk
         val effectiveCrypto2Key = keyMaterial.crypto2Key
             ?: keyMaterial.legacyKey?.let { migrateLocalJwk(it) }?.let { crypto2Runtime.restore(it) }
         return effectiveCrypto2Key?.let {
-            proofBuilder.buildJwtProof(
+            proofBuilder.buildProof(
                 key = it,
                 algorithm = it.selectJwsAlgorithm(acceptedAlgorithms),
                 audience = audience,
                 nonce = nonce,
-                keyId = proofKeyId,
-                includeJwk = did == null,
+                binding = binding,
             )
         } ?: run {
             val legacyKey = requireNotNull(keyMaterial.legacyKey) {
@@ -1397,12 +1406,11 @@ object WalletIssuanceHandler {
                     "Issuer does not support proof algorithm ${legacyKey.keyType.jwsAlg}"
                 }
             }
-            proofBuilder.buildJwtProof(
+            proofBuilder.buildProof(
                 key = legacyKey,
                 audience = audience,
                 nonce = nonce,
-                keyId = proofKeyId,
-                includeJwk = did == null,
+                binding = binding,
             )
         }
     }
