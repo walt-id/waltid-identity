@@ -863,10 +863,12 @@ object WalletPresentFunctionality2 {
         val validation = PresentationRequestValidator.validate(
             resolvedRequest = resolvedRequest,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
-            formatCapabilities = WalletPresentationFormatRegistry.capabilitiesFromKeys(
-                keys = listOfNotNull(holderCrypto2Key),
-                fallbackKeyTypes = setOfNotNull(holderKey?.keyType.takeIf { holderCrypto2Key == null }),
-            ),
+            formatCapabilities = {
+                WalletPresentationFormatRegistry.capabilitiesFromKeys(
+                    keys = listOfNotNull(holderCrypto2Key),
+                    fallbackKeyTypes = setOfNotNull(holderKey?.keyType.takeIf { holderCrypto2Key == null }),
+                )
+            },
         )
         if (validation is PresentationRequestValidationResult.Invalid) {
             return walletRejectHandling(authorizationRequest, validation.error.code)
