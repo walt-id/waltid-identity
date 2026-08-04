@@ -41,6 +41,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.filter
@@ -361,7 +362,8 @@ object WalletPresentFunctionality2 {
      * @param unsignedRequestObjectPolicy Whether to accept unsigned (alg=none) JWTs.
      *   Defaults to [AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED].
      * @param legacyFallbackCallback Optional fallback for requests carrying explicit legacy
-     *   `presentation_definition` or `presentation_definition_uri` parameters.
+     *   `presentation_definition` or `presentation_definition_uri` parameters. Only consulted after
+     *   strict resolution has failed.
      * @return The resolved and verified [AuthorizationRequest].
      * @throws IllegalArgumentException if the request cannot be resolved or verified.
      */
@@ -382,26 +384,12 @@ object WalletPresentFunctionality2 {
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy,
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
-    ): AuthorizationRequest {
-        legacyFallbackResult(presentationRequestUrl, legacyFallbackCallback)
-            ?.let { throw LegacyFallbackException(it.verifierResponse ?: JsonNull) }
-        return AuthorizationRequestResolver.resolve(
-            requestUrl = presentationRequestUrl,
-            unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
-            trustConfiguration = clientIdTrustConfiguration,
-            fetchRequestUri = { requestUri, requestUriMethod ->
-                AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
-                    webResolveAuthReq = webResolveAuthReq,
-                    requestUri = requestUri,
-                    requestUriMethod = requestUriMethod,
-                    // Optional wallet metadata is omitted until the caller explicitly profiles
-                    // its values. Some Final-compliant verifier endpoints reject unsupported
-                    // capability members, while wallet_nonce remains mandatory for this flow.
-                    sendWalletMetadata = false,
-                )
-            },
-        ).authorizationRequest.also(::validateAuthorizationRequest)
-    }
+    ): AuthorizationRequest = resolveAndValidateAuthorizationRequest(
+        presentationRequestUrl = presentationRequestUrl,
+        unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+        clientIdTrustConfiguration = clientIdTrustConfiguration,
+        legacyFallbackCallback = legacyFallbackCallback,
+    ).authorizationRequest
 
     private fun validateAuthorizationRequest(request: AuthorizationRequest) {
         require(!request.clientId.isNullOrBlank()) { "Authorization Request client_id is required" }
@@ -424,8 +412,10 @@ object WalletPresentFunctionality2 {
     }
 
     /**
-     * Internal marker exception thrown by [resolveAuthorizationRequest] when the
-     * legacy fallback path is taken. Caught by [walletPresentHandling] only.
+     * Internal marker exception thrown by [resolveAndValidateAuthorizationRequest] when the legacy
+     * fallback path produced a result. [walletPresentHandling] catches it and turns it into a
+     * successful [WalletPresentResult]; the standalone [resolveAuthorizationRequest] step lets it
+     * propagate, because it has no result type to carry a legacy verifier response in.
      */
     internal class LegacyFallbackException(val result: JsonElement) : Exception()
 
@@ -671,31 +661,76 @@ object WalletPresentFunctionality2 {
             },
         )
 
+    /**
+     * Resolves the request with the strict OpenID4VP 1.0 resolver and validates it.
+     *
+     * The strict resolver - including client identifier authentication - is always the primary path.
+     * A configured legacy fallback is consulted only after resolution or validation has failed, by
+     * throwing [LegacyFallbackException]; see [legacyFallbackResult].
+     */
+    private suspend fun resolveAndValidateAuthorizationRequest(
+        presentationRequestUrl: Url,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)?,
+    ): ResolvedAuthorizationRequest = try {
+        resolveAuthorizationRequestObject(
+            presentationRequestUrl,
+            unsignedRequestObjectPolicy,
+            clientIdTrustConfiguration,
+        ).also { validateAuthorizationRequest(it.authorizationRequest) }
+    } catch (cause: CancellationException) {
+        throw cause
+    } catch (cause: Exception) {
+        legacyFallbackResult(presentationRequestUrl, legacyFallbackCallback)
+            ?.let { throw LegacyFallbackException(it.verifierResponse ?: JsonNull) }
+        throw cause
+    }
+
+    /**
+     * Legacy DIF Presentation Exchange fallback.
+     *
+     * Reached only after [AuthorizationRequestResolver.resolve] and [validateAuthorizationRequest]
+     * have already failed, so a well-formed OpenID4VP 1.0 request is never diverted here, and client
+     * identifier trust validation always runs first. [isLegacyPresentationDefinitionRequest]
+     * additionally rejects anything carrying a request object, so an attacker cannot downgrade a
+     * signed request by appending a legacy parameter to its URL.
+     */
     private suspend fun legacyFallbackResult(
         presentationRequestUrl: Url,
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)?,
     ): WalletPresentResult? {
-        if (!presentationRequestUrl.isLegacyPresentationDefinitionRequest() || legacyFallbackCallback == null) {
+        if (legacyFallbackCallback == null || !presentationRequestUrl.isLegacyPresentationDefinitionRequest()) {
             return null
         }
 
-        val fallbackResponse = runCatching { legacyFallbackCallback(presentationRequestUrl) }
-            .getOrNull()
-            ?.getOrNull()
+        val fallbackResponse = try {
+            legacyFallbackCallback(presentationRequestUrl).getOrNull()
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: Exception) {
+            null
+        } ?: return null
 
-        if (fallbackResponse != null) {
-            return WalletPresentResult(
-                transmissionSuccess = true,
-                verifierResponse = fallbackResponse,
-            )
-        }
-        return null
+        return WalletPresentResult(
+            transmissionSuccess = true,
+            verifierResponse = fallbackResponse,
+        )
     }
 
+    /**
+     * Whether the request explicitly and unambiguously identifies itself as pre-1.0 DIF Presentation
+     * Exchange. A request object is disqualifying: those are resolved and authenticated by
+     * [AuthorizationRequestResolver] and must never be retried on the legacy path.
+     */
     private fun Url.isLegacyPresentationDefinitionRequest(): Boolean =
-        protocol.name == "mdoc-openid4vp" ||
-            parameters.contains("presentation_definition") ||
-            parameters.contains("presentation_definition_uri")
+        !parameters.contains("request") &&
+            !parameters.contains("request_uri") &&
+            (
+                protocol.name == "mdoc-openid4vp" ||
+                    parameters.contains("presentation_definition") ||
+                    parameters.contains("presentation_definition_uri")
+                )
 
     @Deprecated("Use the Crypto2Key overload")
     suspend fun walletPresentHandling(
@@ -807,17 +842,20 @@ object WalletPresentFunctionality2 {
         log.trace { "- Start of Wallet Present Handling -" }
         log.trace { "Wallet presentation will use key $holderKey, and did $holderDid" }
 
-        // Step 1: Resolve AuthorizationRequest.
-        if (resolvedAuthorizationRequest == null) {
-            legacyFallbackResult(presentationRequestUrl, legacyFallbackCallback)
-                ?.let { return Result.success(it) }
-        }
-        val resolvedRequest = resolvedAuthorizationRequest
-            ?: resolveAuthorizationRequestObject(
+        // Step 1: Resolve AuthorizationRequest. The strict resolver is always the primary path; the
+        // legacy fallback is only reached from inside it, after resolution has failed.
+        val resolvedRequest = resolvedAuthorizationRequest ?: try {
+            resolveAndValidateAuthorizationRequest(
                 presentationRequestUrl,
                 unsignedRequestObjectPolicy,
                 clientIdTrustConfiguration,
+                legacyFallbackCallback,
             )
+        } catch (fallback: LegacyFallbackException) {
+            return Result.success(
+                WalletPresentResult(transmissionSuccess = true, verifierResponse = fallback.result)
+            )
+        }
         val authorizationRequest = resolvedRequest.authorizationRequest.also(::validateAuthorizationRequest)
 
         log.trace { "Wallet will try to present to AuthorizationRequest: $authorizationRequest" }
