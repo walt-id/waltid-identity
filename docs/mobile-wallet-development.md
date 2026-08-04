@@ -44,6 +44,27 @@ enableIosBuild=true
 
 Enable only the platform builds your machine can support. Android requires an Android SDK; native iOS requires macOS and Xcode. The Web/Wasm flag only enables the mock Compose preview module.
 
+### Demo key authorization profiles
+
+The Android and iOS demo app entry points default to biometric authorization for newly created
+P-256 signing keys. This is intended for physical-device demonstrations with an enrolled strong
+biometric. The shared wallet fixtures and automated tests remain non-interactive.
+
+Use the non-interactive profile for simulator, emulator, and CI runs:
+
+```bash
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedDebugAndroidTest \
+  -PwalletBiometricEnabled=false
+```
+
+For iOS, set `WALLET_BIOMETRIC_ENABLED=false` in the test launch environment. iOS simulator
+preflight deliberately rejects protected P-256 keys; Android emulators may support strong
+biometrics, but unattended tests must not depend on prompt interaction.
+
+The policy is immutable per signing key. Changing the demo setting affects only a newly created
+wallet key, so reset local wallet data or choose a fresh wallet ID when switching from `none` to
+biometric authorization.
+
 ## Common checks
 
 Android:

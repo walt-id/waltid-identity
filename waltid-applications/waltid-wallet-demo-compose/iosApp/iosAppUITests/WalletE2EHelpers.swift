@@ -11,6 +11,7 @@ final class WalletE2EUI {
     }
 
     func launch(environment: [String: String] = [:]) {
+        app.launchEnvironment["WALLET_BIOMETRIC_ENABLED"] = "false"
         for (key, value) in environment {
             app.launchEnvironment[key] = value
         }
@@ -26,6 +27,7 @@ final class WalletE2EUI {
         environment: [String: String],
         walletReadyTimeout: TimeInterval = 60
     ) {
+        app.launchEnvironment["WALLET_BIOMETRIC_ENABLED"] = "false"
         for (key, value) in environment {
             app.launchEnvironment[key] = value
         }

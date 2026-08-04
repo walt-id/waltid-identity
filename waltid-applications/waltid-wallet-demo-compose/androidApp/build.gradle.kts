@@ -7,6 +7,10 @@ plugins {
 
 val javaVersion = identityLibs.versions.java.library.get().toInt()
 val publicDemoTransactionDataProfilesUrl = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
+val walletBiometricEnabled = when ((findProperty("walletBiometricEnabled") as String?)?.trim()?.lowercase()) {
+    "0", "false", "no", "off" -> false
+    else -> true
+}
 
 val appVersionName: String = (findProperty("appVersionName") as String?)?.takeIf { it.isNotBlank() } ?: "0.1.0"
 val appVersionCode: Int = run {
@@ -33,6 +37,7 @@ android {
         buildConfigField("String", "ATTESTATION_BEARER_TOKEN", "\"${findProperty("attestation.bearerToken") ?: ""}\"")
         buildConfigField("String", "ATTESTATION_HOST_HEADER", "\"${findProperty("attestation.hostHeader") ?: ""}\"")
         buildConfigField("String", "TRANSACTION_DATA_PROFILES_URL", "\"${findProperty("transactionDataProfiles.url") ?: publicDemoTransactionDataProfilesUrl}\"")
+        buildConfigField("boolean", "WALLET_BIOMETRIC_ENABLED", walletBiometricEnabled.toString())
     }
 
     buildFeatures {
@@ -63,6 +68,9 @@ dependencies {
     implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedLogic"))
     implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedUI"))
     implementation(identityLibs.androidx.activity.compose)
+    // MainActivity is a FragmentActivity so protected AndroidX BiometricPrompt flows
+    // can resolve the current interaction host without retaining an application context.
+    implementation(identityLibs.androidx.biometric)
 
     androidTestImplementation(identityLibs.androidx.test.ext.junit)
     androidTestImplementation(identityLibs.androidx.test.runner)

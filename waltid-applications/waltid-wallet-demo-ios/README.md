@@ -30,6 +30,13 @@ The demo uses the default managed encrypted local persistence. Wallet database f
 
 The UI stays focused on the production default. Non-default persistence options, including provided database keys and custom credential stores, are documented and covered by SDK and demo integration tests.
 
+## Key authorization profiles
+
+The demo app defaults to biometric authorization for newly created P-256 signing keys on a physical
+device with an enrolled biometric. For simulator and automated-test runs, set
+`WALLET_BIOMETRIC_ENABLED=false` in the launch environment. Existing keys keep their immutable
+policy; reset local wallet data or use a new wallet ID when switching profiles.
+
 ## Public demo backend defaults
 
 Clean demo installs use the public walt.id demo profile endpoint for OpenID4VP transaction-data support:

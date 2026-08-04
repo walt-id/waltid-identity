@@ -1,5 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.crypto.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
 import platform.Foundation.NSLocale
@@ -18,6 +20,15 @@ fun createIosDemoWallet(
                     attestationConfig = config.toWalletAttestationConfig(),
                     transactionDataProfiles = transactionDataProfiles.profiles,
                     preferredLocales = NSLocale.preferredLanguages.mapNotNull { it as? String },
+                    defaultKeyUseAuthorizationPolicy = if (config.biometricEnabled) {
+                        KeyUseAuthorizationPolicy.BiometricCurrentSet
+                    } else {
+                        KeyUseAuthorizationPolicy.None
+                    },
+                    keyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(
+                        message = "Authorize wallet signing",
+                        cancelText = "Cancel",
+                    ),
                 )
             ),
             warning = transactionDataProfiles.warning,

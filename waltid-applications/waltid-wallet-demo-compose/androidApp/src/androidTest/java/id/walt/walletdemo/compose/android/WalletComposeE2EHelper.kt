@@ -66,7 +66,10 @@ internal object WalletComposeE2EHelper {
 
     private fun launch(context: Context) {
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            ?.apply { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) }
+            ?.apply {
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                putExtra(WALLET_BIOMETRIC_ENABLED_EXTRA, false)
+            }
             ?: error("Cannot resolve launch intent for ${context.packageName}")
         context.startActivity(launchIntent)
     }
@@ -105,6 +108,7 @@ internal object WalletComposeE2EHelper {
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
                     Intent.FLAG_ACTIVITY_SINGLE_TOP
             )
+            putExtra(WALLET_BIOMETRIC_ENABLED_EXTRA, false)
         }
         context.startActivity(intent)
     }

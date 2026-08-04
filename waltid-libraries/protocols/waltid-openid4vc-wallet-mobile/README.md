@@ -49,7 +49,9 @@ val config = MobileWalletConfig(
         cancelText = "Cancel"
     )
 )
-val wallet = MobileWalletFactory(activity).create(config)
+val wallet = MobileWalletFactory(applicationContext) {
+    activityTracker.currentFragmentActivity
+}.create(config)
 val preflight = wallet.keyUseAuthorizationPreflight()
 
 if (preflight.supported) {
@@ -58,9 +60,10 @@ if (preflight.supported) {
 ```
 
 The protected portable combination is P-256 plus `BiometricCurrentSet`. Android uses an auth-per-use
-Android Keystore key restricted to strong biometrics; the factory must receive an interactive
-`FragmentActivity`, not an application context. iOS uses a P-256 Secure Enclave key bound to the
-current Face ID or Touch ID enrollment set and therefore requires a qualifying physical device.
+Android Keystore key restricted to strong biometrics; the provider must return the current interactive
+`FragmentActivity`, while the factory keeps only the application context for persistence. iOS uses a
+P-256 Secure Enclave key bound to the current Face ID or Touch ID enrollment set and therefore
+requires a qualifying physical device.
 Protected non-P-256 requests fail without software fallback.
 
 The context-only `MobileWalletFactory(applicationContext)` constructor supports non-interactive

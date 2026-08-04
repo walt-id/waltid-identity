@@ -34,6 +34,22 @@ The demo unlock PIN is stored separately as a salted PBKDF2-SHA256 verifier in a
 
 The UI stays focused on the production default. Non-default persistence options, including provided database keys and custom stores, are documented and tested at the SDK layer.
 
+## Key authorization profiles
+
+The installed Android and iOS demo apps default to biometric authorization for newly created
+P-256 signing keys. Use a physical device with an enrolled strong biometric for this profile.
+
+Automated tests and simulator/emulator runs must opt into the non-interactive profile:
+
+```bash
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug \
+  -PwalletBiometricEnabled=false
+```
+
+For iOS, set `WALLET_BIOMETRIC_ENABLED=false` in the launch environment or `UserDefaults`.
+Switching this setting does not retrofit an existing wallet key. Reset local wallet data or use a
+new wallet ID before expecting biometric prompts.
+
 ## Public demo backend defaults
 
 Clean demo installs use the public walt.id demo profile endpoint for OpenID4VP transaction-data support:

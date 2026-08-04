@@ -7,6 +7,11 @@ data class DemoWalletConfig(
     val attestationBearerToken: String = DemoPublicBackendDefaults.attestationBearerToken,
     val attestationHostHeader: String = DemoPublicBackendDefaults.attestationHostHeader,
     val transactionDataProfilesUrl: String = DemoPublicBackendDefaults.transactionDataProfilesUrl,
+    /**
+     * Whether newly created wallet signing keys require the enrolled biometric.
+     * Existing keys keep their immutable policy and must be recreated explicitly.
+     */
+    val biometricEnabled: Boolean = false,
 )
 
 object DemoPublicBackendDefaults {

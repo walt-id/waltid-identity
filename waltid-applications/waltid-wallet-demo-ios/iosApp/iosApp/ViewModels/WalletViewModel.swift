@@ -175,6 +175,7 @@ class WalletViewModel: ObservableObject {
         attestationBearerToken: String? = nil,
         attestationHostHeader: String? = nil,
         transactionDataProfilesUrl: String? = nil,
+        biometricEnabled: Bool = false,
         walletClient: (any WalletClient)? = nil
     ) {
         let transactionDataProfiles: TransactionDataProfilesConfiguration
@@ -183,8 +184,16 @@ class WalletViewModel: ObservableObject {
         } else {
             transactionDataProfiles = TransactionDataProfilesConfiguration(profiles: [])
         }
+        let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = biometricEnabled
+            ? .biometricCurrentSet
+            : .none
+        let keyUseAuthorizationPrompt = biometricEnabled
+            ? WalletKeyUseAuthorizationPrompt(message: "Authorize wallet signing", cancelText: "Cancel")
+            : WalletKeyUseAuthorizationPrompt()
         let configuration = WalletConfiguration(
             walletID: walletID,
+            defaultKeyUseAuthorizationPolicy: keyUseAuthorizationPolicy,
+            keyUseAuthorizationPrompt: keyUseAuthorizationPrompt,
             attestation: Self.attestationConfiguration(
                 baseUrl: attestationBaseUrl,
                 attesterPath: attestationAttesterPath,

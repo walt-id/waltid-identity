@@ -11,10 +11,12 @@ struct WalletDemoApp: App {
         }
         #endif
         let walletID = env["E2E_WALLET_ID"] ?? defaults.string(forKey: "E2E_WALLET_ID") ?? "default"
+        let biometricEnabled = walletBiometricEnabled(environment: env, defaults: defaults)
         if env["E2E_MOCK_WALLET"] == "1" {
             let delayMilliseconds = UInt64(env["E2E_MOCK_WALLET_DELAY_MS"] ?? "") ?? 0
             return WalletViewModel(
                 walletID: walletID,
+                biometricEnabled: biometricEnabled,
                 walletClient: MockWalletClient(
                     operationDelayMilliseconds: delayMilliseconds,
                     verifierStyle: Self.mockVerifierStyle(environment: env),
@@ -34,12 +36,14 @@ struct WalletDemoApp: App {
                 attestationAttesterPath: env["ATTESTATION_ATTESTER_PATH"] ?? defaults.string(forKey: "ATTESTATION_ATTESTER_PATH") ?? DemoBackendDefaults.attestationAttesterPath,
                 attestationBearerToken: env["ATTESTATION_BEARER_TOKEN"] ?? defaults.string(forKey: "ATTESTATION_BEARER_TOKEN") ?? DemoBackendDefaults.attestationBearerToken,
                 attestationHostHeader: env["ATTESTATION_HOST_HEADER"] ?? defaults.string(forKey: "ATTESTATION_HOST_HEADER") ?? DemoBackendDefaults.attestationHostHeader,
-                transactionDataProfilesUrl: transactionDataProfilesUrl
+                transactionDataProfilesUrl: transactionDataProfilesUrl,
+                biometricEnabled: biometricEnabled
             )
         }
         return WalletViewModel(
             walletID: walletID,
-            transactionDataProfilesUrl: transactionDataProfilesUrl
+            transactionDataProfilesUrl: transactionDataProfilesUrl,
+            biometricEnabled: biometricEnabled
         )
     }()
 
@@ -58,6 +62,17 @@ struct WalletDemoApp: App {
             return .did
         }
         return .named
+    }
+}
+
+private func walletBiometricEnabled(environment: [String: String], defaults: UserDefaults) -> Bool {
+    let rawValue = environment["WALLET_BIOMETRIC_ENABLED"] ?? defaults.string(forKey: "WALLET_BIOMETRIC_ENABLED")
+    guard let rawValue else { return true }
+
+    switch rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+    case "0", "false", "no", "off": return false
+    case "1", "true", "yes", "on": return true
+    default: return true
     }
 }
 
