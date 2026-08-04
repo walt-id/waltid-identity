@@ -73,14 +73,40 @@ object VerificationSessionCreator {
     ): List<Policy> =
         if (!shouldInclude || any { it.id == policy.id }) this else this + policy
 
+    /**
+     * Builds the JAR `kid` header for signed authorization requests.
+     *
+     * For `decentralized_identifier:did:key:…`, the verification method id is
+     * `did:key:<multibase>#<multibase>` (DID Key method). Using the raw KMS key id
+     * (e.g. an Azure Key Vault URL) produces a DID URL wallets reject.
+     *
+     * For other DIDs, prefer a stable public-key identifier and avoid absolute URLs
+     * (Azure embeds vault URLs as JWK `kid`) so the fragment remains a valid DID URL.
+     */
     private suspend fun getKid(clientId: String?, key: Key): String {
         val prefix = "decentralized_identifier:"
-        val keyId = key.getKeyId()
+        val did = clientId
+            ?.takeIf { it.startsWith(prefix) }
+            ?.substringAfter(prefix)
+            ?.takeIf { it.isNotBlank() }
+            ?: return fragmentKeyId(key)
 
-        return clientId
-            ?.takeIf { it.startsWith(prefix) && it.substringAfter(prefix).isNotBlank() }
-            ?.let { "${it.substringAfter(prefix)}#$keyId" }
-            ?: keyId
+        if (did.startsWith("did:key:")) {
+            val identifier = did.removePrefix("did:key:")
+            return "$did#$identifier"
+        }
+
+        return "$did#${fragmentKeyId(key)}"
+    }
+
+    private suspend fun fragmentKeyId(key: Key): String {
+        val publicKey = key.getPublicKey()
+        val keyId = publicKey.getKeyId()
+        return if (keyId.startsWith("http://") || keyId.startsWith("https://")) {
+            publicKey.getThumbprint()
+        } else {
+            keyId
+        }
     }
 
     suspend fun createVerificationSession(
@@ -448,10 +474,13 @@ object VerificationSessionCreator {
             else -> null
         }
 
+        val setupForSession =
+            if (isSignedRequest && key != null) setup.withCoreKeyIfMissing(key) else setup
+
         @Suppress("SENSELESS_COMPARISON") // TODO
         val newSession = Verification2Session(
             id = sessionId,
-            setup = setup,
+            setup = setupForSession,
             data = customData?.let { Json.encodeToJsonElement(it) },
 
             creationDate = now,
