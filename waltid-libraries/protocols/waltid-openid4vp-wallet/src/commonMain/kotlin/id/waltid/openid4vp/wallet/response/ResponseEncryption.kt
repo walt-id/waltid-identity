@@ -97,7 +97,8 @@ object ResponseEncryption {
         }
 
         // 2. Select Verifier's Public Key
-        // We prefer a key explicitly marked for encryption ('use': 'enc'), otherwise fall back to the first available key.
+        // Accept keys explicitly marked for encryption or without a use value; deterministic
+        // thumbprint/kid ordering selects one when more than one key is eligible.
         val keys = metadata.jwks?.keys.orEmpty()
         require(keys.isNotEmpty()) { "client_metadata.jwks must contain at least one response-encryption key" }
         val keyIds = keys.mapIndexed { index, jwk ->
