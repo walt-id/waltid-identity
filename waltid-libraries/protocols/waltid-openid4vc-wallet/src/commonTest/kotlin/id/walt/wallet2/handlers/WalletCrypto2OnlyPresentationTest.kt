@@ -70,7 +70,8 @@ class WalletCrypto2OnlyPresentationTest {
             )
         )
         val authorizationRequest = AuthorizationRequest(
-            clientId = "verifier",
+            clientId = "redirect_uri:https://verifier.example/callback",
+            redirectUri = "https://verifier.example/callback",
             nonce = "nonce",
             responseType = OpenID4VPResponseType.VP_TOKEN,
             dcqlQuery = query,
@@ -95,7 +96,8 @@ class WalletCrypto2OnlyPresentationTest {
 
         val verified = CompactJws.verify(presentationJwt, key, JwsAlgorithm.ED25519)
         assertEquals(
-            "verifier", Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject["aud"]
+            "redirect_uri:https://verifier.example/callback",
+            Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject["aud"]
                 ?.jsonPrimitive?.content
         )
     }
