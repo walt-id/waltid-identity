@@ -9,6 +9,7 @@ struct ContentView: UIViewControllerRepresentable {
     let attestationBearerToken: String
     let attestationHostHeader: String
     let transactionDataProfilesUrl: String
+    let biometricEnabled: Bool
 
     func makeUIViewController(context: Context) -> UIViewController {
         sharedUI.WalletDemoIosKt.walletDemoViewController(
@@ -17,7 +18,8 @@ struct ContentView: UIViewControllerRepresentable {
             attestationAttesterPath: attestationAttesterPath,
             attestationBearerToken: attestationBearerToken,
             attestationHostHeader: attestationHostHeader,
-            transactionDataProfilesUrl: transactionDataProfilesUrl
+            transactionDataProfilesUrl: transactionDataProfilesUrl,
+            biometricEnabled: biometricEnabled
         )
     }
 
@@ -32,6 +34,7 @@ struct ContentView: UIViewControllerRepresentable {
         attestationAttesterPath: "",
         attestationBearerToken: "",
         attestationHostHeader: "",
-        transactionDataProfilesUrl: ""
+        transactionDataProfilesUrl: "",
+        biometricEnabled: false
     )
 }
