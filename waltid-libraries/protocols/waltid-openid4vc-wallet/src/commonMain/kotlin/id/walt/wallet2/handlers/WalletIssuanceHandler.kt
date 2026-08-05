@@ -659,7 +659,7 @@ object WalletIssuanceHandler {
         request: ReceiveCredentialRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = WalletIssuanceHandler.httpClient
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     ): ReceiveCredentialResult {
         val ids = mutableListOf<String>()
@@ -1337,7 +1337,7 @@ object WalletIssuanceHandler {
         val proofBuilder = JwtProofBuilder()
         // The proof must use an algorithm the issuer advertises for this configuration.
         val jwtProofAlgorithms = supportedJwtProofAlgorithms(
-            issuerMetadata.credentialConfigurationsSupported[credentialConfigurationId]?.proofTypesSupported
+            issuerMetadata.metadata.credentialConfigurationsSupported[credentialConfigurationId]?.proofTypesSupported
         )
         val credentialResponse = requestCredentialWithNonceRetry(
             request = FetchCredentialRequest(
