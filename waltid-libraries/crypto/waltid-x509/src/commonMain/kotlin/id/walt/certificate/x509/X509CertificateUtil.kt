@@ -3,8 +3,10 @@ package id.walt.certificate.x509
 import id.walt.certificate.x509.builder.Pkcs10CertificateSigningRequestBuilder
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.X509CertificateChainValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateValidator
 import id.walt.crypto.keys.Key
 import kotlinx.io.bytestring.ByteString
 
@@ -80,6 +82,12 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
 
     suspend fun validateCertificateChain(
         certificateChain: Collection<X509Certificate>,
+        trustedRootCert: X509Certificate
+    ): ValidationResult =
+        validateCertificateChain(certificateChain, InMemoryTrustStore(listOf(trustedRootCert)))
+
+    suspend fun validateCertificateChain(
+        certificateChain: Collection<X509Certificate>,
         additionalTrust: X509CertificateTrustStore? = null
     ): ValidationResult =
         services.certificateChainValidator.validate(certificateChain, additionalTrust)
@@ -116,6 +124,15 @@ class X509CertificateUtilBuilder internal constructor(val from: X509CertificateU
 
     private var servicesChanged: Boolean = false
     private var trustChanged: Boolean = false
+
+    fun addValidators(vararg validators: X509CertificateValidator) {
+        val originValidatorIdMap = certificateChainValidator.validators
+            .associateBy { it.id }
+        val additionalValidatorIdMap = validators.associateBy { it.id }
+        val newValidators = originValidatorIdMap + additionalValidatorIdMap
+        certificateChainValidator =
+            X509CertificateChainValidator(newValidators.values, certificateChainValidator.trustStore)
+    }
 
     fun setServices(
         csrParser: Pkcs10CertificateSigningRequestParser,

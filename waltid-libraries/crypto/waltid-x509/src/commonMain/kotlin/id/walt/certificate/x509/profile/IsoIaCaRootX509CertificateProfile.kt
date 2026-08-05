@@ -21,7 +21,7 @@ import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
-import kotlinx.io.bytestring.ByteString
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 
 
@@ -71,7 +71,7 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
      * used to issue mDLs, a maximum validity period of 9 years is
      * sufficient.
      */
-    private val maxValidityTime = 365.days * 20 // 20 years
+    val maxValidityTime = 365.days * 20 // 20 years
 
     override val id: String = ID
 
@@ -111,6 +111,11 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
     ) {
         this.subjectDn = issuerDn
         subjectPublicKeySelfSigned()
+        val now = Clock.System.now()
+        validity = X509Certificate.Validity(
+            notBefore = now,
+            notAfter = now + maxValidityTime
+        )
         extensionBasicConstraints {
             critical = true
             cA = true
@@ -237,8 +242,8 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
             .flatMap { it }
             .map { it.type.names.associateWith { it } }
 
-            //{ it.flatMap { it.type.names.associateWith { it } } }
-           // .groupingBy { it.type }
+        //{ it.flatMap { it.type.names.associateWith { it } } }
+        // .groupingBy { it.type }
         //if (dn)
     }
 

@@ -26,7 +26,10 @@ interface X509SigningAlgorithmInfo {
         const val KEY_ALG_NAME_RSA = "rsaEncryption"
 
         fun ofKey(key: Key): X509SigningAlgorithmInfo =
-            signingAlgorithmInfoMap.get(key.keyType) ?: error("Unknown key type: $key.keyType")
+            ofKeyType(key.keyType)
+
+        fun ofKeyType(keyType: KeyType): X509SigningAlgorithmInfo =
+            signingAlgorithmInfoMap.get(keyType) ?: error("Unknown key type: $keyType")
 
         fun algorithmNameByOid(oid: String): String =
             oidToNameMap[oid] ?: oid

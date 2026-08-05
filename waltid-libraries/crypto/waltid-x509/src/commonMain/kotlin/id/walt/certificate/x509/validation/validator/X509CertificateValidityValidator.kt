@@ -6,7 +6,9 @@ import id.walt.certificate.x509.validation.ValidationResult
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 
-class X509CertificateValidityValidator : X509CertificateValidator {
+class X509CertificateValidityValidator(
+    private val allowValidityInFuture: Boolean = false
+) : X509CertificateValidator {
 
     override val id: String = ID
 
@@ -15,13 +17,16 @@ class X509CertificateValidityValidator : X509CertificateValidator {
         x509Certificate: X509Certificate
     ) {
         val certificateValidity = x509Certificate.data.validity
-
         if ((certificateValidity.notBefore - certificateValidity.notAfter).isPositive()) {
             context.addLogEntry(ValidationResult.Severity.ERROR, "Illegal certificate validity")
         } else {
             val now = Clock.System.now()
             if ((now - certificateValidity.notBefore).isNegative()) {
-                context.addLogEntry(ValidationResult.Severity.ERROR, "Certificate is not yet valid")
+                if (allowValidityInFuture) {
+                    context.addLogEntry(ValidationResult.Severity.WARNING, "Certificate is not yet valid")
+                } else {
+                    context.addLogEntry(ValidationResult.Severity.ERROR, "Certificate is not yet valid")
+                }
             } else if ((now - certificateValidity.notAfter).isPositive()) {
                 context.addLogEntry(ValidationResult.Severity.ERROR, "Certificate is expired")
             } else {

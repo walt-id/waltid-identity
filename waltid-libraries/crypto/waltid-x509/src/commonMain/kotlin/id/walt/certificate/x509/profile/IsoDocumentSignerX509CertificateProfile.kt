@@ -3,16 +3,12 @@ package id.walt.certificate.x509.profile
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.dn.DistinguishedName
-import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension
+import id.walt.certificate.x509.extension.*
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension.Companion.extensionCrlDistributionPoints
-import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension
 import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension.Companion.extensionExtendedKeyUsage
-import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension
 import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension.Companion.extensionIssuerAltName
-import id.walt.certificate.x509.extension.KeyUsageExtension
 import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
-import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.model.GeneralName
 import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateExtensionsAreNotCritical
@@ -72,7 +68,7 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
     /**
      * Maximum of 457 days after “notBefore” date
      */
-    private val maxValidityTime = 457.days
+    val maxValidityTime = 457.days
 
     override val id: String = ID
 

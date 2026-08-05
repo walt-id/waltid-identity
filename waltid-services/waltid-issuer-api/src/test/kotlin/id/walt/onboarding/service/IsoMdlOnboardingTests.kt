@@ -1,16 +1,16 @@
 package id.walt.onboarding.service
 
-import id.walt.crypto.keys.KeyManager
-import id.walt.crypto.keys.KeySerialization
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.certificate.x509.X509Certificate
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.X509SigningAlgorithmInfo
+import id.walt.certificate.x509.profile.IsoDocumentSignerX509CertificateProfile
+import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile
+import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile.profileIaCaRootCertificate
+import id.walt.certificate.x509.validation.ValidationResult
+import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
+import id.walt.crypto.keys.*
 import id.walt.issuer.services.onboarding.OnboardingService
 import id.walt.issuer.services.onboarding.models.*
-import id.walt.x509.CertificateDer
-import id.walt.x509.iso.documentsigner.parser.DocumentSignerCertificateParser
-import id.walt.x509.iso.documentsigner.validate.DocumentSignerValidator
-import id.walt.x509.iso.iaca.parser.IACACertificateParser
-import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.jsonObject
@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
-import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
@@ -27,24 +27,51 @@ class IsoMdlOnboardingTests {
 
     companion object {
 
-        private const val KEY_GEN_BACKEND = "jwk"
+        private val rootCaUtil = X509CertificateUtil {
+            addValidators(IsoIaCaRootX509CertificateProfile)
+        }
 
-        private val signingKey = runBlocking {
-            assertNotNull(
-                JWKKey.importJWK(
-                    """
-                {
-                    "kty": "EC",
-                    "d": "u-UvsghdzpSXv5HmG5ngvm4Dv8yyRYw9fKA6mdp1KWs",
-                    "crv": "P-256",
-                    "kid": "R_E_QZ-Ea6etoAdWfUHSjjexRYz447ffnnfIO9kxn_Y",
-                    "x": "n_b1GmZTSEhioK3z8MGqcb7nxXqyjFaLR-OfKOnspwU",
-                    "y": "nGRVvuHTtEAZ1HjgdLaLZnYxrkiRV_e4V2Wz0qVWa-M"
-                }
-            """.trimIndent()
-                ).getOrNull()
+        private val documentSignerUtil = X509CertificateUtil {
+            addValidators(
+                IsoDocumentSignerX509CertificateProfile,
+                X509CertificateValidityValidator(allowValidityInFuture = true)
             )
         }
+
+        private const val KEY_GEN_BACKEND = "jwk"
+
+        private val rootCaKey: Key by lazy {
+            runBlocking {
+                KeyManager.createKey(
+                    KeyGenerationRequest(
+                        keyType = KeyType.secp256r1,
+                    )
+                )
+            }
+        }
+
+        private val rootCa: X509Certificate by lazy {
+            runBlocking {
+                rootCaUtil.createSelfSignedCertificate(rootCaKey) {
+                    profileIaCaRootCertificate(
+                        issuerDnCountryCode = validIACACertReqData.country,
+                        issuerDnStateOrProvinceName = validIACACertReqData.stateOrProvinceName,
+                        issuerDnOrganizationName = validIACACertReqData.organizationName,
+                        issuerDnCommonName = validIACACertReqData.commonName,
+                        issuerEmailAddress = validIACACertReqData.issuerAlternativeNameConf.email,
+                        issuerUri = validIACACertReqData.issuerAlternativeNameConf.uri
+                    )
+                }
+            }
+        }
+
+        private val validIACASigner: IACASignerData by lazy {
+            IACASignerData(
+                iacaKey = KeySerialization.serializeKeyToJson(rootCaKey).jsonObject,
+                iacaPem = rootCa.encodedPem
+            )
+        }
+
 
         private val validIACACertReqData = IACACertificateRequestData(
             country = "US",
@@ -55,22 +82,6 @@ class IsoMdlOnboardingTests {
             crlDistributionPointUri = "https://ca.example.com/crl",
         )
 
-        private val validIACACertData = IACACertificateData(
-            country = "US",
-            commonName = "Example IACA",
-            notBefore = Instant.parse("2025-05-28T12:23:01Z"),
-            notAfter = Instant.parse("2040-05-24T12:23:01Z"),
-            issuerAlternativeNameConf = IssuerAlternativeNameConfiguration(uri = "https://ca.example.com"),
-            crlDistributionPointUri = "https://ca.example.com/crl",
-        )
-
-        private val validIACASigner = IACASignerData(
-            certificateData = validIACACertData,
-            iacaKey = runBlocking {
-                KeySerialization.serializeKeyToJson(signingKey).jsonObject
-            },
-        )
-
         private val iacaOnboardingRequest = IACAOnboardingRequest(
             certificateData = validIACACertReqData,
         )
@@ -79,72 +90,50 @@ class IsoMdlOnboardingTests {
             country = "US",
             commonName = "Example DS",
             crlDistributionPointUri = "https://ca.example.com/crl",
+            issuerEmailAddress = "office@walt.id"
         )
-
     }
-
-
-    private fun pemToCertificateDer(pem: String) = CertificateDer(
-        bytes = JWKKey.convertDERorPEMtoByteArray(
-            derOrPem = pem,
-        )
-    )
 
     @Test
     fun `onboard IACA root generates valid certificate`() = runTest {
-
         val response = OnboardingService.onboardIACA(iacaOnboardingRequest)
-
-        val iacaDecodedCertificate = IACACertificateParser().parse(
-            certificate = pemToCertificateDer(response.certificatePEM),
-        )
-
-        assertDoesNotThrow {
-            IACAValidator().validate(
-                decodedCert = iacaDecodedCertificate,
-            )
-        }
-
+        val iaCaRootCert = X509CertificateUtil.parseCertificatePem(response.certificatePEM)
+        val validationResult = rootCaUtil.validateCertificateChain(listOf(iaCaRootCert), iaCaRootCert)
+        assertTrue(validationResult.valid)
+        assertTrue(validationResult.log.any { it.validatorId == IsoIaCaRootX509CertificateProfile.ID })
     }
 
     @Test
     fun `onboard Document Signer generates valid certificate`() = runTest {
-
         val now = Clock.System.now()
-
         val iacaResponse = OnboardingService.onboardIACA(iacaOnboardingRequest)
-
-        val iacaDecodedCert = IACACertificateParser().parse(
-            certificate = pemToCertificateDer(iacaResponse.certificatePEM),
-        )
+        val iacaDecodedCert = rootCaUtil.parseCertificatePem(iacaResponse.certificatePEM)
 
         val dsRequest = DocumentSignerOnboardingRequest(
             iacaSigner = IACASignerData(
-                certificateData = validIACACertData,
-                iacaKey = iacaResponse.iacaKey
+                iacaKey = iacaResponse.iacaKey,
+                iacaPem = iacaResponse.certificatePEM,
             ),
             certificateData = DocumentSignerCertificateRequestData(
                 country = "US",
                 commonName = "Example DS",
                 crlDistributionPointUri = "https://ca.example.com/crl",
                 notBefore = now.plus(1.days),
+                issuerEmailAddress = "office@walt.id"
             )
         )
-
 
         val response = OnboardingService.onboardDocumentSigner(dsRequest)
+        val dsDecodedCert = documentSignerUtil.parseCertificatePem(response.certificatePEM)
+        val validationResult = documentSignerUtil.validateCertificateChain(listOf(dsDecodedCert), iacaDecodedCert)
 
-        val dsDecodedCert = DocumentSignerCertificateParser().parse(
-            certificate = pemToCertificateDer(response.certificatePEM),
-        )
-
-        assertDoesNotThrow {
-            DocumentSignerValidator().validate(
-                dsDecodedCert = dsDecodedCert,
-                iacaDecodedCert = iacaDecodedCert,
-            )
+        if (!validationResult.valid) {
+            validationResult.log
+                .filter { it.severity == ValidationResult.Severity.ERROR }
+                .forEach { println(it) }
         }
-
+        assertTrue(validationResult.valid)
+        assertTrue(validationResult.log.any { it.validatorId == IsoDocumentSignerX509CertificateProfile.ID })
     }
 
     @Test
@@ -194,7 +183,6 @@ class IsoMdlOnboardingTests {
 
     @Test
     fun `onboard IACA works with all supported key types`() = runTest {
-        val iacaCertificateParser = IACACertificateParser()
         listOf(
             IACAOnboardingRequest( //ensure by default a valid key is generated
                 certificateData = validIACACertReqData,
@@ -236,16 +224,19 @@ class IsoMdlOnboardingTests {
                 expected = request.ecKeyGenRequestParams.keyType,
                 actual = generatedKey.keyType,
             )
+            val iacaDecodedCertificate = rootCaUtil.parseCertificatePem(response.certificatePEM)
+            val validationResult =
+                rootCaUtil.validateCertificateChain(listOf(iacaDecodedCertificate), iacaDecodedCertificate)
+            assertTrue(validationResult.valid)
+            assertTrue(validationResult.log.any { it.validatorId == IsoIaCaRootX509CertificateProfile.ID })
 
-            val iacaDecodedCertificate = iacaCertificateParser.parse(
-                certificate = pemToCertificateDer(response.certificatePEM),
-            )
+            val publicKeyInfo = iacaDecodedCertificate.data.subjectPublicKeyInfo
+            val requestedPublicKeyInfo = X509SigningAlgorithmInfo.ofKeyType(request.ecKeyGenRequestParams.keyType)
 
             assertEquals(
-                expected = request.ecKeyGenRequestParams.keyType,
-                actual = iacaDecodedCertificate.publicKey.keyType,
+                expected = requestedPublicKeyInfo.keyAlgorithmOid,
+                actual = publicKeyInfo.algorithmOid,
             )
-
         }
     }
 
@@ -304,8 +295,6 @@ class IsoMdlOnboardingTests {
 
     @Test
     fun `onboard Document Signer works with all supported key types`() = runTest {
-
-        val dsCertificateParser = DocumentSignerCertificateParser()
         listOf(
             DocumentSignerOnboardingRequest(
                 //ensure by default a valid key is generated
@@ -354,16 +343,14 @@ class IsoMdlOnboardingTests {
                 actual = generatedKey.keyType,
             )
 
-            val dsDecodedCertificate = dsCertificateParser.parse(
-                certificate = pemToCertificateDer(response.certificatePEM),
-            )
+            val documentSignerCert = X509CertificateUtil.parseCertificatePem(response.certificatePEM)
+            val publicKeyInfo = documentSignerCert.data.subjectPublicKeyInfo
+            val requestedPublicKeyInfo = X509SigningAlgorithmInfo.ofKeyType(request.ecKeyGenRequestParams.keyType)
 
             assertEquals(
-                expected = request.ecKeyGenRequestParams.keyType,
-                actual = dsDecodedCertificate.publicKey.keyType,
+                expected = requestedPublicKeyInfo.keyAlgorithmOid,
+                actual = publicKeyInfo.algorithmOid,
             )
-
         }
-
     }
 }

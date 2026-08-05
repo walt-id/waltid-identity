@@ -6,7 +6,7 @@ import id.walt.certificate.x509.truststore.CompositeTrustStore
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
 
 class X509CertificateChainValidator(
-    val validators: List<X509CertificateValidator>,
+    val validators: Collection<X509CertificateValidator>,
     val trustStore: X509CertificateTrustStore
 ) {
 
