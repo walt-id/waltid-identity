@@ -115,14 +115,13 @@ final class MobileWalletIntegrationTests: XCTestCase {
         )
         _ = try await wallet.bootstrap()
 
-        do {
-            _ = try await wallet.previewPresentation(request: X509RequestObjectFixture.authorizationRequestURL)
-            XCTFail("Expected the fixture's required credential query to have no local match")
-        } catch {
-            let description = String(describing: error)
-            XCTAssertTrue(description.contains("No matches found for required credential queries"), description)
-            XCTAssertFalse(description.contains("UntrustedCertificateChain"), description)
+        let result = try await wallet.previewPresentation(request: X509RequestObjectFixture.authorizationRequestURL)
+        guard case let .ready(preview) = result else {
+            XCTFail("The pinned X.509 Request Object should authenticate and produce a preview: \(result)")
+            return
         }
+        XCTAssertTrue(preview.credentialOptions.isEmpty)
+        XCTAssertTrue(preview.credentialRequirements.isEmpty)
     }
 
     func testAppHostedWalletRejectsUntrustedSignedRequestObjectCertificateChain() async throws {
@@ -141,10 +140,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         } catch {
             let description = String(describing: error)
             XCTAssertFalse(description.contains("No matches found for required credential queries"), description)
-            XCTAssertTrue(
-                description.contains("UntrustedCertificateChain") || description.contains("InvalidSignature"),
-                description
-            )
+            XCTAssertTrue(description.contains("InvalidSignature"), description)
         }
     }
 
