@@ -21,9 +21,9 @@ import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialOption
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreview
+import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.logic.toRequestedDisclosureGroup
-import id.walt.walletdemo.compose.logic.toVerifierDetails
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
@@ -38,6 +38,7 @@ internal fun PresentationReviewSection(
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
     onCredentialClick: (String) -> Unit,
     onSubmit: () -> Unit,
+    onReject: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -47,7 +48,7 @@ internal fun PresentationReviewSection(
             .testTag(WalletUiTestTags.PresentationReview),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        VerifierDetailsCard(preview.toVerifierDetails())
+        VerifierReviewSections(preview)
 
         Text(
             "Select credentials to share",
@@ -57,6 +58,7 @@ internal fun PresentationReviewSection(
 
         preview.credentialOptions.forEach { option ->
             val details = option.toCredentialDetails()
+            val credentialDisplay = details.toCardDisplayData()
             val requestedDisclosureItems = option.toRequestedDisclosureGroup()?.items.orEmpty()
             Column(
                 modifier = Modifier
@@ -77,7 +79,7 @@ internal fun PresentationReviewSection(
                         )
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(option.label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(option.issuer, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(credentialDisplay.issuer, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             option.subject?.let {
                                 Text("Subject: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
@@ -111,6 +113,7 @@ internal fun PresentationReviewSection(
                 enabled = enabled,
                 selectionComplete = selectionComplete,
                 onSubmit = onSubmit,
+                onReject = onReject,
                 onCancel = onCancel,
             )
         }
@@ -189,6 +192,7 @@ private fun ReviewActionsRow(
     enabled: Boolean,
     selectionComplete: Boolean,
     onSubmit: () -> Unit,
+    onReject: () -> Unit,
     onCancel: () -> Unit,
 ) {
     Row(
@@ -201,6 +205,13 @@ private fun ReviewActionsRow(
             modifier = Modifier.testTag(WalletUiTestTags.PresentationSubmitButton),
         ) {
             Text("Share")
+        }
+        TextButton(
+            onClick = onReject,
+            enabled = enabled,
+            modifier = Modifier.testTag(WalletUiTestTags.PresentationRejectButton),
+        ) {
+            Text("Reject")
         }
         TextButton(
             onClick = onCancel,

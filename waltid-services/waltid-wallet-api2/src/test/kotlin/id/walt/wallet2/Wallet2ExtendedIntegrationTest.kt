@@ -76,7 +76,7 @@ import id.walt.openid4vci.CredentialFormat as VciCredentialFormat
  *  2. GET /wallet list works (was broken by Flow<String> serialization)
  *  3. GET /wallet/{id} reports correct store counts
  *  4. Key generation with multiple algorithms (Ed25519, secp256r1)
- *  5. DID creation with multiple methods (did:key, did:jwk)
+ *  5. DID creation with multiple methods (did:key, did:jwk, did:web with options)
  *  6. Isolated OID4VCI receive steps (resolve-offer → request-token → sign-proof → fetch)
  *  7. Multiple credential types stored and listed
  *  8. Credential deletion
@@ -257,13 +257,33 @@ class Wallet2ExtendedIntegrationTest {
             }
             assertTrue(didJwk.did.startsWith("did:jwk:"), "Expected did:jwk:, got ${didJwk.did}")
 
-            // -- List DIDs - both should appear --
-            testAndReturn("List DIDs shows both created DIDs") {
+            // -- Create did:web with domain/path options --
+            val didWeb = testAndReturn("Create did:web with domain and path options") {
+                http.post("/wallet/$walletId/dids/create") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        id.walt.wallet2.server.handlers.CreateDidRequest(
+                            method = "web",
+                            keyId = ed25519Key.keyId,
+                            options = mapOf(
+                                "domain" to JsonPrimitive("example.com"),
+                                "path" to JsonPrimitive("/users/alice"),
+                            ),
+                        )
+                    )
+                }.also { assertEquals(HttpStatusCode.Created, it.status) }
+                    .body<WalletDidEntry>()
+            }
+            assertEquals("did:web:example.com:users:alice", didWeb.did)
+
+            // -- List DIDs - all three should appear --
+            testAndReturn("List DIDs shows all created DIDs") {
                 val dids = http.get("/wallet/$walletId/dids")
                     .body<List<WalletDidEntry>>()
-                assertEquals(2, dids.size, "Expected 2 DIDs, got ${dids.size}")
+                assertEquals(3, dids.size, "Expected 3 DIDs, got ${dids.size}")
                 assertTrue(dids.any { it.did.startsWith("did:key:") })
                 assertTrue(dids.any { it.did.startsWith("did:jwk:") })
+                assertTrue(dids.any { it.did == "did:web:example.com:users:alice" })
             }
 
             // -- Delete a key --
@@ -338,6 +358,7 @@ class Wallet2ExtendedIntegrationTest {
                 credentialEndpointHandlers = CredentialEndpointHandlers()
             )
         )
+        val proofSupport = TestIssuerProofSupport(issuerBase, accessTokenKey)
         val session = DefaultSession(subject = "holder-isolated")
         runBlocking {
             preAuthRepo.save(
@@ -345,8 +366,6 @@ class Wallet2ExtendedIntegrationTest {
                     code = preAuthCode, clientId = null, txCode = null, txCodeValue = null,
                     grantedScopes = emptySet(), grantedAudience = emptySet(), session = session,
                     expiresAt = Clock.System.now() + 10.minutes,
-                    credentialNonce = "isolated-nonce",
-                    credentialNonceExpiresAt = Clock.System.now() + 10.minutes
                 )
             )
         }
@@ -387,6 +406,13 @@ class Wallet2ExtendedIntegrationTest {
                     )
                 }
                 get("/credential-offer") { call.respond(offer) }
+                post("/nonce") {
+                    val nonce = proofSupport.issueNonce()
+                    call.response.header(HttpHeaders.CacheControl, "no-store")
+                    call.respond(buildJsonObject {
+                        put("c_nonce", nonce.nonce)
+                    })
+                }
                 post("/token") {
                     val params = call.receiveParameters()
                     val code = params["pre-authorized_code"] ?: return@post call.respond(
@@ -406,11 +432,10 @@ class Wallet2ExtendedIntegrationTest {
                     if (tokenResponse !is AccessTokenResponseResult.Success) return@post call.respond(
                         HttpStatusCode.InternalServerError, buildJsonObject { put("error", "server_error") }
                     )
+                    val nonce = proofSupport.issueNonce()
                     call.respond(buildJsonObject {
                         put("access_token", tokenResponse.response.accessToken)
                         put("token_type", "Bearer")
-                        put("c_nonce", "isolated-nonce")
-                        put("c_nonce_expires_in", 300)
                     })
                 }
                 post("/credential") {
@@ -430,8 +455,9 @@ class Wallet2ExtendedIntegrationTest {
                     if (credentialRequest !is CredentialRequestResult.Success) return@post call.respond(
                         HttpStatusCode.BadRequest, buildJsonObject { put("error", "invalid_proof") }
                     )
+                    val request = credentialRequest.request.withIssuer(issuerBase)
                     val credentialResponse = provider.createCredentialResponse(
-                        request = credentialRequest.request.withIssuer(issuerBase),
+                        request = request,
                         configuration = configuration,
                         issuerKey = issuerKey,
                         issuerId = issuerBase,
@@ -439,13 +465,16 @@ class Wallet2ExtendedIntegrationTest {
                             put("given_name", "Alice"); put("family_name", "Wonder")
                             put("issuing_country", "DE")
                         },
-                        selectiveDisclosure = null
+                        selectiveDisclosure = null,
+                        proofValidationContext = proofSupport.validationContext(request)
                     )
-                    if (credentialResponse !is CredentialResponseResult.Success) return@post call.respond(
-                        HttpStatusCode.InternalServerError, buildJsonObject { put("error", "server_error") }
-                    )
+                    if (credentialResponse !is CredentialResponseResult.Success) {
+                        val failure = credentialResponse as CredentialResponseResult.Failure
+                        val httpResp = provider.writeCredentialError(request, failure.error)
+                        return@post call.respond(HttpStatusCode.fromValue(httpResp.status), httpResp.payload)
+                    }
                     val httpResp = provider.writeCredentialResponse(
-                        credentialRequest.request.withIssuer(issuerBase), credentialResponse.response
+                        request, credentialResponse.response
                     )
                     call.respond(HttpStatusCode.fromValue(httpResp.status), httpResp.payload)
                 }
@@ -506,14 +535,23 @@ class Wallet2ExtendedIntegrationTest {
                 }
                 assertNotNull(tokenResult.accessToken)
 
-                // -- Isolated step 3: Sign proof of possession --
+                // -- Isolated step 3: Obtain a fresh proof nonce --
+                val nonceResult = testAndReturn("Isolated: request-nonce") {
+                    http.post("/wallet/$walletId/credentials/receive/request-nonce") {
+                        contentType(ContentType.Application.Json)
+                        setBody(RequestNonceRequest(Url(resolveResult.credentialIssuer)))
+                    }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+                        .body<RequestNonceResult>()
+                }
+
+                // -- Isolated step 4: Sign proof of possession --
                 val signResult = testAndReturn("Isolated: sign-proof") {
                     http.post("/wallet/$walletId/credentials/receive/sign-proof") {
                         contentType(ContentType.Application.Json)
                         setBody(
                             SignProofRequest(
                                 issuerUrl = Url(issuerBase),
-                                nonce = tokenResult.cNonce ?: "isolated-nonce",
+                                nonce = nonceResult.nonce,
                                 keyId = keyInfo.keyId
                             )
                         )
@@ -522,7 +560,7 @@ class Wallet2ExtendedIntegrationTest {
                 }
                 assertNotNull(signResult.proofJwt)
 
-                // -- Isolated step 4: Fetch credential --
+                // -- Isolated step 5: Fetch credential --
                 val fetchResult = testAndReturn("Isolated: fetch-credential") {
                     http.post("/wallet/$walletId/credentials/receive/fetch-credential") {
                         contentType(ContentType.Application.Json)
@@ -574,8 +612,6 @@ class Wallet2ExtendedIntegrationTest {
                             code = fullFlowCode, clientId = null, txCode = null, txCodeValue = null,
                             grantedScopes = emptySet(), grantedAudience = emptySet(), session = session,
                             expiresAt = Clock.System.now() + 10.minutes,
-                            credentialNonce = "full-nonce",
-                            credentialNonceExpiresAt = Clock.System.now() + 10.minutes
                         )
                     )
                 }

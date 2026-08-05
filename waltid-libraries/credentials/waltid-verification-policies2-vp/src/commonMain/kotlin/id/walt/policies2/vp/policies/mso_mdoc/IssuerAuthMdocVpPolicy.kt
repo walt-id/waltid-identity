@@ -2,15 +2,18 @@
 
 package id.walt.policies2.vp.policies
 
-import id.walt.cose.toCoseVerifier
 import id.walt.crypto.keys.jwk.JWKKey.Companion.convertDerCertificateToPemCertificate
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.keys.toPublicJwk
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
+import id.walt.mdoc.verification.verifyIssuerAuthentication
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.io.encoding.Base64
+import kotlin.time.Clock
 
 private const val policyId = "mso_mdoc/issuer_auth"
 
@@ -32,32 +35,28 @@ class IssuerAuthMdocVpPolicy : MdocVPPolicy() {
     ): Result<Unit> = coroutineScope {
         log.trace { "--- Verifying issuer authentication ---" }
 
-        // Use getParsedIssuerAuth() which checks unprotected header first, then falls back to
-        // the protected header per ISO 18013-5 §9.1.2.4 ("readers SHOULD support protected header").
-        val parsedIssuerAuth = document.issuerSigned.getParsedIssuerAuth()
+        val verification = verifyIssuerAuthentication(
+            document,
+            verificationContext?.verificationTime ?: Clock.System.now(),
+        )
+        val encodedChain = verification.certificateChain.map { Base64.Default.encode(it.bytes.toByteArray()) }
+        addResult("certificate_chain", encodedChain)
 
-        addResult("certificate_chain", parsedIssuerAuth.x5c)
-
-        val issuerKey = parsedIssuerAuth.signerKey
+        val issuerKey = verification.signerKey
         log.trace { "Signer key to be used: $issuerKey" }
-        addOptionalJsonResult("signer_jwk") { issuerKey.exportJWKObject() }
+        addOptionalJsonResult("signer_jwk") {
+            val publicKey = requireNotNull(issuerKey.capabilities.publicKeyExporter).exportPublicKey()
+            Jwk.parse(publicKey.toPublicJwk(issuerKey.spec))
+        }
 
-        val firstCertDer = parsedIssuerAuth.x5c.first().decodeFromBase64()
+        val firstCertDer = verification.certificateChain.first().bytes.toByteArray()
         addOptionalResult("signer_pem") { convertDerCertificateToPemCertificate(firstCertDer) }
-
-        log.trace { "Verifying issuer auth signature with signer key..." }
-        val issuerAuth = document.issuerSigned.issuerAuth
-        if (!issuerAuth.verify(issuerKey.toCoseVerifier())) {
-            throw IllegalArgumentException("IssuerAuth COSE_Sign1 signature is invalid.")
+        addResult("cose_algorithm", verification.coseAlgorithm)
+        // Trust anchors are enforced separately by VICAL or trusted-list policies.
+        if (verification.certificateChain.size > 1) {
+            addResult("chain_length", verification.certificateChain.size.toString())
         }
-
-        // Verify the certificate chain when more than one cert is present.
-        if (parsedIssuerAuth.x5c.size > 1) {
-            val chainBytes = parsedIssuerAuth.x5c.map { it.decodeFromBase64() }
-            X5CChainValidator.verifyChain(chainBytes)
-            addResult("chain_length", parsedIssuerAuth.x5c.size.toString())
-            addResult("chain_verified", true.toString())
-        }
+        addResult("chain_constraints_verified", true.toString())
 
         success()
     }

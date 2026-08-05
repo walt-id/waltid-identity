@@ -21,6 +21,7 @@ data class DefaultAccessTokenRequest(
     override val session: Session? = null,
     override val issClaim: String? = null,
     override val authenticatedClient: AuthenticatedClient? = null,
+    override val dpopJwkThumbprint: String? = null,
 ) : AccessTokenRequest {
     override fun markGrantTypeHandled(grantType: String): AccessTokenRequest =
         copy(handledGrantTypes = handledGrantTypes + grantType)
@@ -48,6 +49,9 @@ data class DefaultAccessTokenRequest(
 
     override fun withAuthenticatedClient(authenticatedClient: AuthenticatedClient?): AccessTokenRequest =
         copy(authenticatedClient = authenticatedClient)
+
+    override fun withDpopJwkThumbprint(dpopJwkThumbprint: String?): AccessTokenRequest =
+        copy(dpopJwkThumbprint = dpopJwkThumbprint)
 
     fun hasHandledGrantType(grantType: String): Boolean = handledGrantTypes.contains(grantType)
 }

@@ -3,11 +3,14 @@ package id.walt.openid4vci.core
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolver
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
+import id.walt.openid4vci.dpop.DPoPProofVerifier
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.par.PushedAuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
+import id.walt.openid4vci.proofs.CredentialProofVerifier
+import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.PARRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
@@ -19,7 +22,7 @@ import id.walt.openid4vci.tokens.refresh.RefreshTokenIssuer
 import id.walt.openid4vci.tokens.refresh.RefreshTokenVerifier
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
 import id.walt.openid4vci.responses.credential.encryption.CredentialResponseEncryptor
-import id.walt.openid4vci.responses.credential.encryption.JweCredentialResponseEncryptor
+import id.walt.openid4vci.responses.credential.encryption.Crypto2JweCredentialResponseEncryptor
 import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.CredentialRequestValidator
@@ -60,6 +63,7 @@ data class OAuth2ProviderConfig(
     val tokenEndpointHandlers: TokenEndpointHandlers,
     val accessTokenIssuer: AccessTokenIssuer,
     val accessTokenVerifier: AccessTokenVerifier? = null,
+    val dpopProofVerifier: DPoPProofVerifier? = null,
     val refreshTokenIssuer: RefreshTokenIssuer,
     val refreshTokenVerifier: RefreshTokenVerifier,
     val refreshTokenRepository: RefreshTokenRepository,
@@ -69,8 +73,9 @@ data class OAuth2ProviderConfig(
 
     val credentialRequestValidator: CredentialRequestValidator,
     val credentialRequestDecryptor: CredentialRequestDecryptor? = null,
+    val credentialProofVerifier: CredentialProofVerifier? = DefaultCredentialProofVerifier(),
     val credentialEndpointHandlers: CredentialEndpointHandlers,
-    val credentialResponseEncryptor: CredentialResponseEncryptor = JweCredentialResponseEncryptor,
+    val credentialResponseEncryptor: CredentialResponseEncryptor = Crypto2JweCredentialResponseEncryptor,
 )
 
 data class PushedAuthorizationConfig(

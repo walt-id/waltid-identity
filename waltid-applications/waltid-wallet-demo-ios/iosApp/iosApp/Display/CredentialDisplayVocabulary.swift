@@ -175,8 +175,14 @@ enum CredentialDisplayVocabulary {
         "termsOfUse"
     ].map(NormalizedClaimKey.init))
 
-    static func groupKind(for components: [String]) -> ClaimGroupKind {
+    static func groupKind(for components: [String], format: String? = nil) -> ClaimGroupKind {
         let path = ClaimPath(components: components)
+        if let semantics = MdocClaimDisplaySemantics.describe(format: format, path: components) {
+            switch semantics.group {
+            case .ageAttestations: return .ageAttestations
+            case .travelDocumentData: return .travelDocumentData
+            }
+        }
         if isW3CMetadataClaimPath(path) {
             return .technical
         }
@@ -223,7 +229,12 @@ enum CredentialDisplayVocabulary {
         roles(for: ClaimPath(components: components))
     }
 
-    static func claimPathCompare(_ lhs: [String], _ rhs: [String]) -> ComparisonResult {
+    static func claimPathCompare(_ lhs: [String], _ rhs: [String], format: String? = nil) -> ComparisonResult {
+        let lhsSemanticOrder = MdocClaimDisplaySemantics.sortOrder(format: format, path: lhs)
+        let rhsSemanticOrder = MdocClaimDisplaySemantics.sortOrder(format: format, path: rhs)
+        if lhsSemanticOrder < rhsSemanticOrder { return .orderedAscending }
+        if lhsSemanticOrder > rhsSemanticOrder { return .orderedDescending }
+
         let lhsSegments = displayOrderSegments(for: lhs)
         let rhsSegments = displayOrderSegments(for: rhs)
         for index in 0..<min(lhsSegments.count, rhsSegments.count) {
@@ -328,6 +339,138 @@ enum CredentialDisplayVocabulary {
     }
 
     private static let unknownClaimDisplayOrder = 10_000
+}
+
+enum MdocClaimDisplayGroup: String, Hashable {
+    case ageAttestations = "Age attestations"
+    case travelDocumentData = "Travel document data"
+
+    var order: Int {
+        switch self {
+        case .ageAttestations: return 1
+        case .travelDocumentData: return 2
+        }
+    }
+}
+
+enum MdocClaimValueKind {
+    case bool
+    case binary
+    case other
+}
+
+struct MdocClaimDisplaySemantics {
+    let group: MdocClaimDisplayGroup
+    let label: String
+    let sortOrder: Int
+    let valueKind: MdocClaimValueKind
+
+    static func describe(format: String?, path: [String]) -> MdocClaimDisplaySemantics? {
+        guard format == mdocFormat else { return nil }
+
+        if path.contains(where: ageAttestationNamespaces.contains),
+           let age = path.reversed().compactMap(ageThreshold).first {
+            return MdocClaimDisplaySemantics(
+                group: .ageAttestations,
+                label: "\(age) or older",
+                sortOrder: age,
+                valueKind: .bool
+            )
+        }
+
+        guard path.contains(dataGroupNamespace) else { return nil }
+        guard let element = path.reversed().first(where: isTravelDocumentElement) else { return nil }
+        if element == "version" || element == "dtc_version" {
+            return MdocClaimDisplaySemantics(
+                group: .travelDocumentData,
+                label: "Specification version",
+                sortOrder: 0,
+                valueKind: .other
+            )
+        }
+        if element == "sod" || element == "dtc_sod" {
+            return MdocClaimDisplaySemantics(
+                group: .travelDocumentData,
+                label: "Document security object (SOD)",
+                sortOrder: 1,
+                valueKind: .binary
+            )
+        }
+        if element == "dg_content_info" {
+            return MdocClaimDisplaySemantics(
+                group: .travelDocumentData,
+                label: "Document content information",
+                sortOrder: 18,
+                valueKind: .binary
+            )
+        }
+
+        guard let number = dataGroupNumber(element) else { return nil }
+        return MdocClaimDisplaySemantics(
+            group: .travelDocumentData,
+            label: "DG\(number): \(dataGroupNames[number] ?? "Data group")",
+            sortOrder: number + 1,
+            valueKind: .binary
+        )
+    }
+
+    static func sortOrder(format: String?, path: [String]) -> Int {
+        describe(format: format, path: path)?.sortOrder ?? .max
+    }
+
+    private static func ageThreshold(_ component: String) -> Int? {
+        let prefix = "age_over_"
+        guard component.hasPrefix(prefix) else { return nil }
+        let value = component.dropFirst(prefix.count)
+        guard value.count == 2, value.allSatisfy(\.isNumber), let age = Int(value), (1...99).contains(age) else {
+            return nil
+        }
+        return age
+    }
+
+    private static func isTravelDocumentElement(_ component: String) -> Bool {
+        component == "version" ||
+            component == "dtc_version" ||
+            component == "sod" ||
+            component == "dtc_sod" ||
+            component == "dg_content_info" ||
+            dataGroupNumber(component) != nil
+    }
+
+    private static func dataGroupNumber(_ component: String) -> Int? {
+        let value: Substring
+        if component.hasPrefix("dtc_dg") {
+            value = component.dropFirst("dtc_dg".count)
+        } else if component.hasPrefix("dg") {
+            value = component.dropFirst(2)
+        } else {
+            return nil
+        }
+        guard let number = Int(value), value == String(number), (1...16).contains(number) else { return nil }
+        return number
+    }
+
+    private static let mdocFormat = "mso_mdoc"
+    private static let ageAttestationNamespaces = Set(["org.iso.18013.5.1", "org.iso.23220.1"])
+    private static let dataGroupNamespace = "org.iso.23220.dtc.1"
+    private static let dataGroupNames = [
+        1: "Machine-readable zone",
+        2: "Facial image",
+        3: "Fingerprints",
+        4: "Iris images",
+        5: "Displayed portrait",
+        6: "Reserved",
+        7: "Signature or usual mark",
+        8: "Data features",
+        9: "Structure features",
+        10: "Substance features",
+        11: "Additional personal details",
+        12: "Additional document details",
+        13: "Optional details",
+        14: "Security options",
+        15: "Active authentication public key",
+        16: "Persons to notify"
+    ]
 }
 
 private enum ClaimLabelFormatter {

@@ -4,6 +4,7 @@ import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.vc.policies.status.StatusPolicyImplementation.verifyWithAttributes
 import id.walt.policies2.vc.policies.status.Values
 import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyAttribute
+import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -28,5 +29,9 @@ class RevocationPolicy : CredentialVerificationPolicy2() {
         credential: DigitalCredential,
         context: PolicyExecutionContext
     ): Result<JsonElement> =
-        verifyWithAttributes(credential, attribute)
+        verifyWithAttributes(
+            credential,
+            attribute,
+            context.getService<StatusListSignerAuthorizer>(PolicyServiceKey.STATUS_LIST_SIGNER_AUTHORIZER),
+        )
 }

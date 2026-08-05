@@ -4,6 +4,8 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
@@ -13,28 +15,33 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier.openid.transactiondata.decodeList
-import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.WalletKeyStoreEntry
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.data.resolveKeyMaterial
 import id.walt.wallet2.handlers.WalletPresentationHandler.matchCredentials
 import id.walt.wallet2.handlers.WalletPresentationHandler.matchCredentialsFromStore
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
+import id.waltid.openid4vp.wallet.PresentationRequestError
+import id.waltid.openid4vp.wallet.PresentationRequestValidationResult
+import id.waltid.openid4vp.wallet.PresentationRequestValidator
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
+import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
+import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.jvm.JvmInline
 
 private val log = KotlinLogging.logger {}
 
@@ -72,6 +79,23 @@ data class PresentCredentialRequest(
     val did: String? = null,
     val runPolicies: Boolean? = null
 ) : VpRequestSource
+
+internal fun WalletPresentResult.presentationOutcomeEvent(): WalletSessionEvent = when {
+    transmissionSuccess == true -> WalletSessionEvent.presentation_completed
+    transmissionSuccess == false -> WalletSessionEvent.presentation_failed
+    getUrl != null || formPostHtml != null -> WalletSessionEvent.presentation_response_prepared
+    else -> WalletSessionEvent.presentation_failed
+}
+
+private suspend fun Result<WalletPresentResult>.emitPresentationOutcome(
+    onEvent: suspend (WalletSessionEvent) -> Unit,
+): WalletPresentResult {
+    exceptionOrNull()?.let { error ->
+        onEvent(WalletSessionEvent.presentation_failed)
+        throw error
+    }
+    return getOrThrow().also { result -> onEvent(result.presentationOutcomeEvent()) }
+}
 
 @Serializable
 data class PresentCredentialIsolatedRequest(
@@ -130,12 +154,36 @@ data class PreviewPresentationRequest(
     val requestUrl: Url
 )
 
-data class PreviewPresentationResult(
-    val authorizationRequest: AuthorizationRequest,
-    val credentialOptions: List<PresentationCredentialOption>,
-    val credentialRequirements: List<PresentationCredentialRequirement>,
-    val transactionData: List<PresentationTransactionDataItem>,
-)
+/** Opaque identifier binding a presentation action to one reviewed request resolution. */
+@Serializable
+@JvmInline
+value class PresentationPreviewHandle(val value: String) {
+    init {
+        require(value.isNotBlank()) { "Presentation preview handle must not be blank" }
+    }
+
+    override fun toString(): String = "PresentationPreviewHandle(<redacted>)"
+}
+
+sealed interface PreviewPresentationResult {
+    val handle: PresentationPreviewHandle
+
+    data class Ready(
+        override val handle: PresentationPreviewHandle,
+        val authorizationRequest: AuthorizationRequest,
+        /** Response-encryption selection derived from this authenticated request, or `null` for a plain response. */
+        val responseEncryption: ResponseEncryption.Metadata?,
+        val credentialOptions: List<PresentationCredentialOption>,
+        val credentialRequirements: List<PresentationCredentialRequirement>,
+        val transactionData: List<PresentationTransactionDataItem>,
+    ) : PreviewPresentationResult
+
+    data class Invalid(
+        override val handle: PresentationPreviewHandle,
+        val authorizationRequest: AuthorizationRequest,
+        val error: PresentationRequestError,
+    ) : PreviewPresentationResult
+}
 
 data class PresentationCredentialRequirement(
     val options: List<List<String>>,
@@ -184,15 +232,19 @@ data class PresentationDisclosureSelection(
 
 @Serializable
 data class SubmitPresentationRequest(
-    val requestUrl: Url,
+    val previewHandle: PresentationPreviewHandle,
     val selectedCredentialOptions: List<PresentationCredentialSelection>,
     val selectedDisclosureOptions: List<PresentationDisclosureSelection>? = null,
     val did: String? = null,
     val runPolicies: Boolean? = null,
 )
 
-class MissingPresentationPreviewException :
-    IllegalStateException("Presentation request preview expired or was not found; preview the request again before submitting.")
+@Serializable
+data class RejectPresentationRequest(
+    val previewHandle: PresentationPreviewHandle,
+    val errorCode: String? = null,
+    val errorDescription: String? = null,
+)
 
 // ---------------------------------------------------------------------------
 // Handler
@@ -211,9 +263,29 @@ class MissingPresentationPreviewException :
  * supported here by design.
  */
 object WalletPresentationHandler {
-    private const val MAX_PREVIEWED_AUTHORIZATION_REQUESTS = 16
-    private val previewedAuthorizationRequests = LinkedHashMap<PresentationPreviewCacheKey, ResolvedAuthorizationRequest>()
-    private val previewedAuthorizationRequestsMutex = Mutex()
+    internal sealed interface PreviewedPresentation {
+        val requestUrl: Url
+        val resolvedAuthorizationRequest: ResolvedAuthorizationRequest
+
+        data class Ready(
+            override val requestUrl: Url,
+            override val resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
+            /**
+             * The concrete signing key selected while previewing. Submission re-resolves exactly this
+             * key so that the request was validated against the key that actually signs the response.
+             */
+            val keyId: String,
+        ) : PreviewedPresentation
+
+        data class Invalid(
+            override val requestUrl: Url,
+            override val resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
+            val error: PresentationRequestError,
+        ) : PreviewedPresentation
+    }
+
+    private val previewedAuthorizationRequests =
+        PreviewSessionStore<PreviewedPresentation>(sessionName = "Presentation")
 
     /**
      * Full presentation flow: resolve VP request → DCQL-match credentials
@@ -224,17 +296,30 @@ object WalletPresentationHandler {
         request: PresentCredentialRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
+    ): WalletPresentResult = presentCredentialWithTrust(
+        wallet,
+        request,
+        onEvent,
+        transactionDataTypeRegistry,
+        ClientIdTrustConfiguration(),
+    )
+
+    suspend fun presentCredentialWithTrust(
+        wallet: Wallet,
+        request: PresentCredentialRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
     ): WalletPresentResult {
-        val key = wallet.resolveKey(keyId = request.keyId)
+        val keyMaterial = wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
-        val keyId = key.getKeyId()
-        log.trace { "presentCredential: keyId=$keyId, did=$did, requestUrl=${request.requestUrl}" }
+        log.trace { "presentCredential: keyId=${keyMaterial.keyId}, did=$did, requestUrl=${request.requestUrl}" }
 
         onEvent(WalletSessionEvent.presentation_request_parsed)
 
-        val result = WalletPresentFunctionality2.walletPresentHandling(
-            holderKey = key,
+        val result = presentWithKeyMaterial(
+            keyMaterial = keyMaterial,
             holderDid = did,
             presentationRequestUrl = request.requestUrl,
             selectCredentialsForQuery = { query ->
@@ -245,20 +330,12 @@ object WalletPresentationHandler {
                         onEvent(WalletSessionEvent.presentation_credentials_selected)
                     }
             },
-            holderPoliciesToRun = null,
             runPolicies = request.runPolicies,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
         )
 
-        if (result.isSuccess) {
-            onEvent(WalletSessionEvent.presentation_completed)
-            log.info { "Presentation completed successfully" }
-        } else {
-            onEvent(WalletSessionEvent.presentation_failed)
-            log.warn { "Presentation failed: ${result.exceptionOrNull()?.message}" }
-        }
-
-        return result.getOrThrow()
+        return result.emitPresentationOutcome(onEvent)
     }
 
     /**
@@ -269,8 +346,22 @@ object WalletPresentationHandler {
         request: PresentCredentialIsolatedRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
+    ): WalletPresentResult = presentCredentialIsolatedWithTrust(
+        wallet,
+        request,
+        onEvent,
+        transactionDataTypeRegistry,
+        ClientIdTrustConfiguration(),
+    )
+
+    suspend fun presentCredentialIsolatedWithTrust(
+        wallet: Wallet,
+        request: PresentCredentialIsolatedRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
     ): WalletPresentResult {
-        val key = wallet.resolveKey(keyId = request.keyId)
+        val keyMaterial = wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available for isolated presentation")
         val did = request.did ?: wallet.defaultDid()
 
@@ -280,26 +371,20 @@ object WalletPresentationHandler {
             stored.credential.toRawDcqlCredential(idx.toString())
         }
 
-        val result = WalletPresentFunctionality2.walletPresentHandling(
-            holderKey = key,
+        val result = presentWithKeyMaterial(
+            keyMaterial = keyMaterial,
             holderDid = did,
             presentationRequestUrl = request.requestUrl,
             selectCredentialsForQuery = { query ->
                 DcqlMatcher.match(query, rawCredentials).getOrThrow()
                     .also { onEvent(WalletSessionEvent.presentation_credentials_selected) }
             },
-            holderPoliciesToRun = null,
             runPolicies = null,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
         )
 
-        if (result.isSuccess) {
-            onEvent(WalletSessionEvent.presentation_completed)
-        } else {
-            onEvent(WalletSessionEvent.presentation_failed)
-        }
-
-        return result.getOrThrow()
+        return result.emitPresentationOutcome(onEvent)
     }
 
     suspend fun previewPresentation(
@@ -307,17 +392,73 @@ object WalletPresentationHandler {
         request: PreviewPresentationRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
+    ): PreviewPresentationResult = previewPresentationWithTrust(
+        wallet,
+        request,
+        onEvent,
+        transactionDataTypeRegistry,
+        ClientIdTrustConfiguration(),
+    )
+
+    suspend fun previewPresentationWithTrust(
+        wallet: Wallet,
+        request: PreviewPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+    ): PreviewPresentationResult {
+        // Selected once up front so advertised wallet metadata, request validation and the retained
+        // preview all refer to the same key, but only *required* where a key is genuinely needed: a
+        // request that fails resolution or client-ID trust validation must report that failure rather
+        // than a wallet-local missing-key condition.
+        val executionKey = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)).requiredOnUse()
+        return previewPresentation(
+            wallet = wallet,
+            request = request,
+            executionKey = executionKey,
+            onEvent = onEvent,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+            resolveAuthorizationRequest = { requestUrl ->
+                resolveAuthorizationRequest(
+                    { executionKey().presentationCapabilities() },
+                    requestUrl,
+                    clientIdTrustConfiguration,
+                )
+            },
+        )
+    }
+
+    internal suspend fun previewPresentation(
+        wallet: Wallet,
+        request: PreviewPresentationRequest,
+        executionKey: () -> WalletKeyStoreEntry,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest,
     ): PreviewPresentationResult {
         onEvent(WalletSessionEvent.presentation_request_parsed)
         val resolvedAuthorizationRequest = resolveAuthorizationRequest(request.requestUrl)
         val authorizationRequest = resolvedAuthorizationRequest.authorizationRequest
-        val query = authorizationRequest.dcqlQuery ?: error("Missing dcql_query for AuthorizationRequest")
-        val transactionDataItems = validateRequestTransactionData(
-            transactionData = authorizationRequest.transactionData,
-            typeRegistry = transactionDataTypeRegistry,
-            credentialQueriesById = query.credentials.associateBy { it.id },
+        val validation = PresentationRequestValidator.validate(
+            resolvedRequest = resolvedAuthorizationRequest,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+            formatCapabilities = { executionKey().presentationCapabilities() },
         )
-        val transactionData = transactionDataItems.map { decoded ->
+        if (validation is PresentationRequestValidationResult.Invalid) {
+            val handle = rememberPreviewedAuthorizationRequest(
+                wallet = wallet,
+                preview = PreviewedPresentation.Invalid(
+                    requestUrl = request.requestUrl,
+                    resolvedAuthorizationRequest = resolvedAuthorizationRequest,
+                    error = validation.error,
+                ),
+            )
+            return PreviewPresentationResult.Invalid(handle, authorizationRequest, validation.error)
+        }
+
+        val valid = validation as PresentationRequestValidationResult.Valid
+        val query = requireNotNull(authorizationRequest.dcqlQuery)
+        val transactionData = valid.transactionData.map { decoded ->
             PresentationTransactionDataItem(
                 type = decoded.transactionData.type,
                 credentialQueryIds = decoded.transactionData.credentialIds,
@@ -325,32 +466,62 @@ object WalletPresentationHandler {
                 details = decoded.details,
             )
         }
-        rememberPreviewedAuthorizationRequest(wallet, request.requestUrl, resolvedAuthorizationRequest)
+        val responseEncryption = ResponseEncryption.resolveCrypto2(authorizationRequest)?.metadata()
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
         val matched = selectFromStores(wallet, query, useWalletCredentialIds = true)
+        val availableCredentialQueryIds = matched.filterValues { it.isNotEmpty() }.keys
+        val availabilityError = PresentationRequestValidator.validateTransactionDataCredentialAvailability(
+            transactionData = valid.transactionData,
+            availableCredentialQueryIds = availableCredentialQueryIds,
+        ) ?: PresentationRequestValidator.validateCredentialAvailability(
+            query = query,
+            availableCredentialQueryIds = availableCredentialQueryIds,
+        )
+        if (availabilityError != null) {
+            PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedAuthorizationRequest)
+            val handle = rememberPreviewedAuthorizationRequest(
+                wallet = wallet,
+                preview = PreviewedPresentation.Invalid(
+                    requestUrl = request.requestUrl,
+                    resolvedAuthorizationRequest = resolvedAuthorizationRequest,
+                    error = availabilityError,
+                ),
+            )
+            return PreviewPresentationResult.Invalid(handle, authorizationRequest, availabilityError)
+        }
         onEvent(WalletSessionEvent.presentation_credentials_selected)
-
-        return PreviewPresentationResult(
+        val credentialOptions = matched.flatMap { (queryId, results) ->
+            results.map { result ->
+                val raw = result.credential as RawDcqlCredential
+                val stored = storedById[raw.id] ?: error("Credential '${raw.id}' disappeared while building presentation preview")
+                val credential = stored.credential
+                PresentationCredentialOption(
+                    queryId = queryId,
+                    credentialId = stored.id,
+                    multiple = result.originalQuery.multiple,
+                    format = credential.format,
+                    issuer = credential.issuer,
+                    subject = credential.subject,
+                    label = stored.label,
+                    credentialData = credential.credentialData,
+                    disclosures = result.toPresentationDisclosures(),
+                )
+            }
+        }
+        val handle = rememberPreviewedAuthorizationRequest(
+            wallet = wallet,
+            preview = PreviewedPresentation.Ready(
+                requestUrl = request.requestUrl,
+                resolvedAuthorizationRequest = resolvedAuthorizationRequest,
+                keyId = executionKey().keyId,
+            ),
+        )
+        return PreviewPresentationResult.Ready(
+            handle = handle,
             authorizationRequest = authorizationRequest,
+            responseEncryption = responseEncryption,
             credentialRequirements = query.requiredCredentialRequirements(),
-            credentialOptions = matched.flatMap { (queryId, results) ->
-                results.map { result ->
-                    val raw = result.credential as RawDcqlCredential
-                    val stored = storedById[raw.id] ?: error("Credential '${raw.id}' disappeared while building presentation preview")
-                    val credential = stored.credential
-                    PresentationCredentialOption(
-                        queryId = queryId,
-                        credentialId = stored.id,
-                        multiple = result.originalQuery.multiple,
-                        format = credential.format,
-                        issuer = credential.issuer,
-                        subject = credential.subject,
-                        label = stored.label,
-                        credentialData = credential.credentialData,
-                        disclosures = result.toPresentationDisclosures(),
-                    )
-                }
-            },
+            credentialOptions = credentialOptions,
             transactionData = transactionData,
         )
     }
@@ -362,9 +533,17 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ): WalletPresentResult {
         request.selectedCredentialOptions.requireValidPresentationCredentialSelection()
-        val resolvedAuthorizationRequest = consumePreviewedAuthorizationRequest(wallet, request.requestUrl)
-        val key = wallet.resolveKey(keyId = null)
-            ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
+        val preview = consumePreviewedAuthorizationRequest(wallet, request.previewHandle) { cached ->
+            require(cached is PreviewedPresentation.Ready) {
+                "Cannot submit an invalid presentation request; reject it or dismiss it locally"
+            }
+        }
+        val ready = preview as? PreviewedPresentation.Ready
+            ?: error("Unexpected presentation preview state")
+        val resolvedAuthorizationRequest = ready.resolvedAuthorizationRequest
+        // Sign with exactly the key the request was validated against during preview.
+        val keyMaterial = wallet.resolveKeyMaterial(ready.keyId, setOf(KeyUsage.SIGN))
+            ?: error("Key '${ready.keyId}' selected while previewing is no longer available")
         val did = request.did ?: wallet.defaultDid()
         val selectedQueryIds = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.queryId }
         validateSelectedTransactionDataCredentials(
@@ -374,10 +553,10 @@ object WalletPresentationHandler {
 
         onEvent(WalletSessionEvent.presentation_request_parsed)
 
-        val result = WalletPresentFunctionality2.walletPresentHandling(
-            holderKey = key,
+        val result = presentWithKeyMaterial(
+            keyMaterial = keyMaterial,
             holderDid = did,
-            presentationRequestUrl = request.requestUrl,
+            presentationRequestUrl = preview.requestUrl,
             resolvedAuthorizationRequest = resolvedAuthorizationRequest,
             selectCredentialsForQuery = { query ->
                 val requirements = query.requiredCredentialRequirements()
@@ -402,19 +581,79 @@ object WalletPresentationHandler {
                     onEvent(WalletSessionEvent.presentation_credentials_selected)
                 }
             },
-            holderPoliciesToRun = null,
             runPolicies = request.runPolicies,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
         )
 
-        if (result.isSuccess) {
-            onEvent(WalletSessionEvent.presentation_completed)
-        } else {
-            onEvent(WalletSessionEvent.presentation_failed)
-        }
-
-        return result.getOrThrow()
+        return result.emitPresentationOutcome(onEvent)
     }
+
+    /**
+     * Rejects exactly one reviewed presentation and atomically consumes its preview handle.
+     */
+    suspend fun rejectPresentation(
+        wallet: Wallet,
+        request: RejectPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+    ): WalletPresentResult {
+        val preview = consumePreviewedAuthorizationRequest(wallet, request.previewHandle) { cached ->
+            val detectedCode = (cached as? PreviewedPresentation.Invalid)?.error?.code?.code
+            require(detectedCode == null || request.errorCode == null || request.errorCode == detectedCode) {
+                "The error code for an invalid presentation request is determined by the wallet"
+            }
+        }
+        val authorizationRequest = preview.resolvedAuthorizationRequest.authorizationRequest
+        val detectedError = (preview as? PreviewedPresentation.Invalid)?.error
+        val errorCode = detectedError?.code?.code ?: request.errorCode
+            ?: WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED.code
+        PresentationRequestValidator.requireErrorResponseCanBeSent(preview.resolvedAuthorizationRequest)
+        onEvent(WalletSessionEvent.presentation_request_parsed)
+
+        val result = WalletPresentFunctionality2.walletRejectHandling(
+            authorizationRequest = authorizationRequest,
+            error = errorCode,
+            errorDescription = request.errorDescription.takeIf { detectedError == null },
+        )
+
+        return result.emitPresentationOutcome(onEvent)
+    }
+
+    private suspend fun presentWithKeyMaterial(
+        keyMaterial: WalletKeyStoreEntry,
+        holderDid: String?,
+        presentationRequestUrl: Url,
+        selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+        runPolicies: Boolean?,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+    ): Result<WalletPresentResult> = keyMaterial.crypto2Key?.let { crypto2Key ->
+        WalletPresentFunctionality2.walletPresentHandling(
+            holderKey = crypto2Key,
+            holderDid = holderDid,
+            presentationRequestUrl = presentationRequestUrl,
+            selectCredentialsForQuery = selectCredentialsForQuery,
+            holderPoliciesToRun = null,
+            runPolicies = runPolicies,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+            resolvedAuthorizationRequest = resolvedAuthorizationRequest,
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
+        )
+    } ?: WalletPresentFunctionality2.walletPresentHandling(
+        holderKey = requireNotNull(keyMaterial.legacyKey) {
+            "Key '${keyMaterial.keyId}' has no usable signing representation"
+        },
+        holderDid = holderDid,
+        presentationRequestUrl = presentationRequestUrl,
+        selectCredentialsForQuery = selectCredentialsForQuery,
+        holderPoliciesToRun = null,
+        runPolicies = runPolicies,
+        transactionDataTypeRegistry = transactionDataTypeRegistry,
+        resolvedAuthorizationRequest = resolvedAuthorizationRequest,
+        holderCrypto2Key = null,
+        clientIdTrustConfiguration = clientIdTrustConfiguration,
+    )
+
     // ---------------------------------------------------------------------------
     // Isolated step handlers
     // ---------------------------------------------------------------------------
@@ -514,7 +753,8 @@ object WalletPresentationHandler {
      *   and optional key/DID overrides.
      */
     suspend fun buildVpToken(wallet: Wallet, request: BuildVpTokenRequest): BuildVpTokenResult {
-        val key = wallet.resolveKey(request.key, request.keyId)
+        val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
+            ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: throw IllegalArgumentException("Wallet has no key available for VP token building")
         val did = request.did ?: wallet.defaultDid()
 
@@ -549,13 +789,33 @@ object WalletPresentationHandler {
             matches
         }
 
-        val vpToken = WalletPresentFunctionality2.buildVpToken(
-            authorizationRequest = request.authorizationRequest,
-            matchedCredentials = matchedCredentials,
-            holderKey = key,
-            holderDid = did,
-        )
-        val idToken = WalletPresentFunctionality2.buildIdToken(request.authorizationRequest, key, did)
+        val crypto2Key = keyMaterial.crypto2Key
+        val vpToken = if (crypto2Key != null) {
+            WalletPresentFunctionality2.buildVpToken(
+                authorizationRequest = request.authorizationRequest,
+                matchedCredentials = matchedCredentials,
+                holderKey = crypto2Key,
+                holderDid = did,
+            )
+        } else {
+            WalletPresentFunctionality2.buildVpToken(
+                authorizationRequest = request.authorizationRequest,
+                matchedCredentials = matchedCredentials,
+                holderKey = requireNotNull(keyMaterial.legacyKey) {
+                    "Key '${keyMaterial.keyId}' has no usable signing representation"
+                },
+                holderDid = did,
+            )
+        }
+        val idToken = if (crypto2Key != null) {
+            WalletPresentFunctionality2.buildIdToken(request.authorizationRequest, crypto2Key, did)
+        } else {
+            WalletPresentFunctionality2.buildIdToken(
+                request.authorizationRequest,
+                requireNotNull(keyMaterial.legacyKey),
+                did,
+            )
+        }
         return BuildVpTokenResult(vpToken = vpToken, idToken = idToken)
     }
 
@@ -597,7 +857,7 @@ object WalletPresentationHandler {
         }
 
         log.debug { "DCQL matching against $idx stored credential(s), queries=${query.credentials.map { it.id }}" }
-        val matched = DcqlMatcher.match(query, rawCredentials).getOrThrow()
+        val matched = DcqlMatcher.match(query.copy(credentialSets = null), rawCredentials).getOrThrow()
         log.trace { "DCQL match result: matchedQueryIds=${matched.keys}, matchCounts=${matched.mapValues { it.value.size }}" }
         return matched
     }
@@ -747,47 +1007,63 @@ object WalletPresentationHandler {
             credentialId = credential.id,
         )
 
-    private data class PresentationPreviewCacheKey(
-        val walletId: String,
-        val requestUrl: String,
-    )
-
-    private suspend fun resolveAuthorizationRequest(requestUrl: Url): ResolvedAuthorizationRequest {
+    /**
+     * @param capabilities resolved lazily: wallet metadata is only advertised when a `request_uri` is
+     *   actually fetched, so a request carrying its object inline needs no signing key to be resolved.
+     */
+    private suspend fun resolveAuthorizationRequest(
+        capabilities: () -> WalletPresentationFormatRegistry.RuntimeCapabilities,
+        requestUrl: Url,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+    ): ResolvedAuthorizationRequest {
         val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
         return AuthorizationRequestResolver.resolve(
             requestUrl = requestUrl,
             unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            trustConfiguration = clientIdTrustConfiguration,
             fetchRequestUri = { requestUri, requestUriMethod ->
                 AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
                     webResolveAuthReq = fetcher,
                     requestUri = requestUri,
                     requestUriMethod = requestUriMethod,
+                    requestUriPostWalletMetadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                        WalletPresentationFormatRegistry.buildVpFormatsSupported(capabilities()),
+                        clientIdTrustConfiguration,
+                    ),
                 )
             },
         )
     }
 
-    private suspend fun rememberPreviewedAuthorizationRequest(
+    internal suspend fun rememberPreviewedAuthorizationRequest(
         wallet: Wallet,
-        requestUrl: Url,
-        resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
-    ) = previewedAuthorizationRequestsMutex.withLock {
-        if (previewedAuthorizationRequests.size >= MAX_PREVIEWED_AUTHORIZATION_REQUESTS) {
-            previewedAuthorizationRequests.remove(previewedAuthorizationRequests.keys.first())
-        }
-        previewedAuthorizationRequests[presentationPreviewCacheKey(wallet, requestUrl)] = resolvedAuthorizationRequest
+        preview: PreviewedPresentation,
+    ): PresentationPreviewHandle = PresentationPreviewHandle(
+        previewedAuthorizationRequests.create(
+            walletId = wallet.id,
+            value = preview,
+        )
+    )
+
+    internal suspend fun consumePreviewedAuthorizationRequest(
+        wallet: Wallet,
+        handle: PresentationPreviewHandle,
+        validate: (PreviewedPresentation) -> Unit = {},
+    ): PreviewedPresentation = previewedAuthorizationRequests.consume(
+        walletId = wallet.id,
+        id = handle.value,
+        validate = validate,
+    )
+
+    /** Explicitly discards a reviewed presentation without contacting the verifier. */
+    suspend fun discardPreview(wallet: Wallet, handle: PresentationPreviewHandle) {
+        previewedAuthorizationRequests.discard(walletId = wallet.id, id = handle.value)
     }
 
-    private suspend fun consumePreviewedAuthorizationRequest(
-        wallet: Wallet,
-        requestUrl: Url,
-    ): ResolvedAuthorizationRequest =
-        previewedAuthorizationRequestsMutex.withLock {
-            previewedAuthorizationRequests.remove(presentationPreviewCacheKey(wallet, requestUrl))
-        } ?: throw MissingPresentationPreviewException()
-
-    private fun presentationPreviewCacheKey(wallet: Wallet, requestUrl: Url): PresentationPreviewCacheKey =
-        PresentationPreviewCacheKey(walletId = wallet.id, requestUrl = requestUrl.toString())
+    /** Clears every presentation preview and tombstone owned by [wallet] during wallet deletion. */
+    suspend fun clearPreviews(wallet: Wallet) {
+        previewedAuthorizationRequests.clearWallet(wallet.id)
+    }
 
     internal fun DcqlMatcher.DcqlMatchResult.toPresentationDisclosures(): List<PresentationDisclosure> {
         val plan = originalQuery.claimSelectionPlan()
@@ -931,6 +1207,31 @@ object WalletPresentationHandler {
         )
     }
 }
+
+/**
+ * Presentation capabilities of exactly this key material.
+ *
+ * Deliberately scoped to one key rather than to the union of every signing key in the wallet:
+ * submission signs with a single key, so anything advertised to or accepted from a Verifier beyond
+ * that key's capabilities could be accepted while previewing and then fail while signing.
+ * Mirrors the capability computation in `WalletPresentFunctionality2.walletPresentHandlingWithKey`.
+ */
+/**
+ * Defers the "a key is required" failure to the point where the key is actually used.
+ *
+ * The key is still selected once, before anything else, so every consumer sees the same key. But a
+ * request that is rejected without ever needing a key - an untrusted client identifier, a malformed
+ * request - must surface that rejection, not a wallet-local missing-key error.
+ */
+internal fun WalletKeyStoreEntry?.requiredOnUse(): () -> WalletKeyStoreEntry = {
+    this ?: error("No key available: wallet has no keyStores and no staticKey")
+}
+
+internal fun WalletKeyStoreEntry.presentationCapabilities(): WalletPresentationFormatRegistry.RuntimeCapabilities =
+    WalletPresentationFormatRegistry.capabilitiesFromKeys(
+        keys = listOfNotNull(crypto2Key),
+        fallbackKeyTypes = setOfNotNull(legacyKey?.keyType?.takeIf { crypto2Key == null }),
+    )
 
 // ---------------------------------------------------------------------------
 // Isolated-step request / response types for the manual presentation flow

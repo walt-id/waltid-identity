@@ -1,4 +1,3 @@
-
 package id.walt.openid4vci.handlers.granttypes.authorizationcode
 
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url

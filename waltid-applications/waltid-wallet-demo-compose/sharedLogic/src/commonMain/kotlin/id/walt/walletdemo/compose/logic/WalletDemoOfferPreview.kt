@@ -1,7 +1,10 @@
 package id.walt.walletdemo.compose.logic
 
 data class WalletDemoOfferPreview(
-    val credentialIssuer: String,
-    val offeredCredentials: List<String>,
-    val transactionCodeRequired: Boolean,
+    val previewHandle: WalletDemoIssuancePreviewHandle,
+    val issuer: WalletDemoIssuerMetadata,
+    val offeredCredentials: List<WalletDemoOfferedCredentialMetadata>,
+    val transactionCode: WalletDemoTransactionCodeRequirement?,
 )
+
+data class WalletDemoIssuancePreviewHandle(val value: String)

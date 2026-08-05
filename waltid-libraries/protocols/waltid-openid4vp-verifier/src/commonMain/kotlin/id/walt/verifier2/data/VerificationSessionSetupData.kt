@@ -13,6 +13,7 @@ import id.walt.dcql.models.meta.NoMeta
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.VerifierInfoItem
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier2.data.Verification2Session.DefinedVerificationPolicies
 import id.walt.verifier2.utils.UrlUtils
 import io.ktor.http.Url
@@ -87,6 +88,27 @@ sealed interface VerificationSessionSetup {
     val core: GeneralFlowConfig
 }
 
+internal fun VerificationSessionSetup.publicView(): VerificationSessionSetup = when (this) {
+    is CrossDeviceFlowSetup -> copy(core = core.publicView())
+    is SameDeviceFlowSetup -> copy(core = core.publicView())
+    is DcApiAnnexDFlowSetup -> copy(core = core.publicView())
+    is DcApiAnnexCFlowSetup -> copy(coreFlow = coreFlow.publicView())
+}
+
+private fun GeneralFlowConfig.publicView(): GeneralFlowConfig = copy(
+    notifications = notifications?.publicView(),
+    policies = policies.publicView(),
+    key = null,
+)
+
+internal fun KtorSessionNotifications.publicView(): KtorSessionNotifications = copy(
+    webhook = webhook?.copy(
+        basicAuthUser = null,
+        basicAuthPass = null,
+        bearerToken = null,
+    )
+)
+
 /** Flows that use URLs*/
 sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
     val urlConfig: UrlConfig
@@ -94,8 +116,35 @@ sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
 
 @Serializable
 data class OpenId4VPConfig(
-    val transactionData: List<JsonObject>? = null
-)
+    val transactionData: List<JsonObject>? = null,
+    val responseType: OpenID4VPResponseType = OpenID4VPResponseType.VP_TOKEN,
+    val scope: String? = null,
+    @SerialName("id_token_type") val idTokenType: String? = null,
+    /**
+     * JWS algorithm the Wallet must use for the Self-Issued ID Token.
+     * Defaults to [id.walt.verifier.openid.models.authorization.ClientMetadata.DEFAULT_ID_TOKEN_SIGNED_RESPONSE_ALG]
+     * and must be one the holder key can actually produce - the Wallet enforces the requested algorithm.
+     */
+    @SerialName("id_token_signed_response_alg") val idTokenSignedResponseAlg: String? = null,
+) {
+    init {
+        if (responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN) {
+            require(scope?.split(' ')?.contains("openid") == true) {
+                "scope must contain openid for response_type=vp_token id_token"
+            }
+            require(idTokenType == "subject_signed") {
+                "id_token_type must be subject_signed for response_type=vp_token id_token"
+            }
+        } else {
+            require(idTokenSignedResponseAlg == null) {
+                "id_token_signed_response_alg only applies to response_type=vp_token id_token"
+            }
+        }
+        require(idTokenSignedResponseAlg?.isNotBlank() != false) {
+            "id_token_signed_response_alg must not be blank"
+        }
+    }
+}
 
 /** Allow exposing certain OpenID4VP specific options */
 sealed interface OpenID4VP1FlowSetup : VerificationSessionSetup {
@@ -147,6 +196,12 @@ data class CrossDeviceFlowSetup(
         val EXAMPLE_EUDI_PID: VerificationSessionSetup = BASE_EXAMPLE.copy(
             core = BASE_EXAMPLE.core.copy(
                 dcqlQuery = DcqlQuery.DcqlQueryExamples.EXAMPLE_EUDI_PID
+            )
+        )
+
+        val EXAMPLE_SDJWT_OR_ISO_PID: VerificationSessionSetup = BASE_EXAMPLE.copy(
+            core = BASE_EXAMPLE.core.copy(
+                dcqlQuery = DcqlQuery.DcqlQueryExamples.EXAMPLE_SDJWT_OR_ISO_PID
             )
         )
     }

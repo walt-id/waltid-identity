@@ -59,7 +59,10 @@ kotlin {
 
             // Cryptography and DID
             api(project(":waltid-libraries:crypto:waltid-crypto"))
+            api(project(":waltid-libraries:crypto:waltid-crypto2"))
+            implementation(project(":waltid-libraries:crypto:waltid-jose"))
             api(project(":waltid-libraries:waltid-did"))
+            implementation(identityLibs.whyoleg.cryptography.random)
         }
 
         jvmMain.dependencies {
@@ -72,6 +75,7 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
+            implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
         }
 
         jvmTest.dependencies {

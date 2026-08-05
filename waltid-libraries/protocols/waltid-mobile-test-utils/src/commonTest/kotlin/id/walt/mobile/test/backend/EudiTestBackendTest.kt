@@ -3,12 +3,28 @@ package id.walt.mobile.test.backend
 import io.ktor.http.encodeURLParameter
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class EudiTestBackendTest {
+    @Test
+    fun buildsEhicSdJwtVerifierQuery() {
+        val query = EudiTestBackend.buildDcqlQuery("eu.europa.ec.eudi.ehic_sd_jwt_vc").jsonObject
+        val credentialQuery = query.getValue("credentials").jsonArray.single().jsonObject
+
+        assertEquals("dc+sd-jwt", credentialQuery.getValue("format").jsonPrimitive.content)
+        assertEquals(
+            listOf("urn:eudi:ehic:1"),
+            credentialQuery.getValue("meta").jsonObject.getValue("vct_values").jsonArray
+                .map { it.jsonPrimitive.content },
+        )
+    }
+
     @Test
     fun preservesStandardOfferAndReturnsTransactionCodeSeparately() {
         val offerJson = """

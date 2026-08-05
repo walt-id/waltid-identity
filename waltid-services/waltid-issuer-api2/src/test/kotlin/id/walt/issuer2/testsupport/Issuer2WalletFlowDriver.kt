@@ -3,9 +3,12 @@ package id.walt.issuer2.testsupport
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.issuer2.models.CredentialOfferCreateResponse
+import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
+import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
@@ -21,6 +24,7 @@ import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
+import id.waltid.openid4vci.wallet.proof.ProofKeyBinding
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -34,7 +38,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLBuilder
 import io.ktor.http.contentType
-import io.ktor.http.parseQueryString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -50,7 +53,7 @@ class Issuer2WalletFlowDriver(
     ),
     private val attestationAssembler: ClientAttestationAssembler? = null,
 ) {
-    private var walletInstanceKey: Key? = null
+    private var walletInstanceKey: Crypto2Key? = null
 
     suspend fun resolve(createdOffer: CredentialOfferCreateResponse): ResolvedCredentialOffer {
         val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(createdOffer.credentialOffer)
@@ -117,8 +120,8 @@ class Issuer2WalletFlowDriver(
             issuerState = issuerState,
             requestMode = requestMode,
         )
-        val internalAuthorizationRequest = redirectUri.substringAfter("/external_login/")
-        assertEquals(issuerState, parseQueryString(internalAuthorizationRequest)["issuer_state"])
+        val internalAuthorizationRequest = decodeExternalLoginAuthorizationRequest(redirectUri)
+        assertEquals(issuerState, internalAuthorizationRequest["issuer_state"]?.singleOrNull())
         assertAuthorizationRequestMode(internalAuthorizationRequest, scenario, requestMode)
         return redirectUri
     }
@@ -134,8 +137,8 @@ class Issuer2WalletFlowDriver(
             issuerState = null,
             requestMode = requestMode,
         )
-        val internalAuthorizationRequest = redirectUri.substringAfter("/external_login/")
-        assertEquals(null, parseQueryString(internalAuthorizationRequest)["issuer_state"])
+        val internalAuthorizationRequest = decodeExternalLoginAuthorizationRequest(redirectUri)
+        assertEquals(null, internalAuthorizationRequest["issuer_state"]?.singleOrNull())
         assertAuthorizationRequestMode(internalAuthorizationRequest, scenario, requestMode)
         return redirectUri
     }
@@ -160,8 +163,8 @@ class Issuer2WalletFlowDriver(
             issuerState = issuerState,
             requestMode = requireNotNull(variant.authorizationRequestMode),
         )
-        val internalAuthorizationRequest = redirectUri.substringAfter("/external_login/")
-        assertEquals(issuerState, parseQueryString(internalAuthorizationRequest)["issuer_state"])
+        val internalAuthorizationRequest = decodeExternalLoginAuthorizationRequest(redirectUri)
+        assertEquals(issuerState, internalAuthorizationRequest["issuer_state"]?.singleOrNull())
         assertAuthorizationRequestMode(internalAuthorizationRequest, scenario, variant.authorizationRequestMode)
         return redirectUri
     }
@@ -181,8 +184,8 @@ class Issuer2WalletFlowDriver(
             requestMode = requestMode,
         )
         val redirectUri = sendAuthorizationRequest(authorizationUrl)
-        val internalAuthorizationRequest = redirectUri.substringAfter("/external_login/")
-        assertEquals(null, parseQueryString(internalAuthorizationRequest)["issuer_state"])
+        val internalAuthorizationRequest = decodeExternalLoginAuthorizationRequest(redirectUri)
+        assertEquals(null, internalAuthorizationRequest["issuer_state"]?.singleOrNull())
         assertAuthorizationRequestMode(internalAuthorizationRequest, scenario, requestMode)
         return redirectUri
     }
@@ -237,9 +240,13 @@ class Issuer2WalletFlowDriver(
         resolvedOffer: ResolvedCredentialOffer,
         accessToken: String,
         credentialConfigurationId: String = resolvedOffer.offer.credentialConfigurationIds.single(),
-        includeDidInProof: Boolean = true,
+        includeDidInProof: Boolean? = null,
     ): JsonObject {
-        val proofs = buildJwtProofs(resolvedOffer.issuerMetadata, includeDidInProof = includeDidInProof)
+        val proofs = buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = credentialConfigurationId,
+            includeDidInProof = includeDidInProof,
+        )
         val response = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(accessToken)
             contentType(ContentType.Application.Json)
@@ -292,8 +299,8 @@ class Issuer2WalletFlowDriver(
         )
     }
 
-    private suspend fun getWalletInstanceKey(): Key =
-        walletInstanceKey ?: JWKKey.generate(KeyType.secp256r1).also {
+    private suspend fun getWalletInstanceKey(): Crypto2Key =
+        walletInstanceKey ?: generateIssuer2WalletInstanceKey().also {
             walletInstanceKey = it
         }
 
@@ -327,14 +334,13 @@ class Issuer2WalletFlowDriver(
         }
 
     private fun assertAuthorizationRequestMode(
-        internalAuthorizationRequest: String,
+        parameters: Map<String, List<String>>,
         scenario: Issuer2CredentialScenario,
         requestMode: Issuer2AuthorizationRequestMode,
     ) {
-        val parameters = parseQueryString(internalAuthorizationRequest)
         when (requestMode) {
             Issuer2AuthorizationRequestMode.SCOPE -> {
-                assertEquals(scenario.authorizationScope, parameters["scope"])
+                assertEquals(listOf(scenario.authorizationScope), parameters["scope"])
                 assertEquals(null, parameters["authorization_details"])
             }
 
@@ -345,13 +351,19 @@ class Issuer2WalletFlowDriver(
         }
     }
 
+    private fun decodeExternalLoginAuthorizationRequest(redirectUri: String): Map<String, List<String>> =
+        redirectUri.substringAfter("/external_login/").decodeExternalLoginAuthorizationParameters()
+
     suspend fun buildJwtProofs(
         issuerMetadata: CredentialIssuerMetadata,
-        includeDidInProof: Boolean = true,
+        credentialConfigurationId: String,
+        includeDidInProof: Boolean? = null,
     ): Proofs {
         val nonceResponse = client.post(requireNotNull(issuerMetadata.nonceEndpoint)).body<JsonObject>()
         val proofKey = JWKKey.generate(KeyType.secp256r1)
-        val holderDid = if (includeDidInProof) {
+        val useDidInProof = includeDidInProof
+            ?: issuerMetadata.useDidJwkProof(credentialConfigurationId)
+        val holderDid = if (useDidInProof) {
             DidJwkRegistrar()
                 .registerByKey(proofKey, DidJwkCreateOptions(KeyType.secp256r1))
                 .did
@@ -359,13 +371,27 @@ class Issuer2WalletFlowDriver(
             null
         }
 
-        return JwtProofBuilder().buildJwtProof(
+        return JwtProofBuilder().buildProof(
             key = proofKey,
             audience = issuerMetadata.credentialIssuer,
             nonce = requireNotNull(nonceResponse["c_nonce"]?.jsonPrimitive?.contentOrNull),
-            keyId = holderDid?.let { "$it#0" },
-            includeJwk = !includeDidInProof,
+            binding = holderDid?.let { ProofKeyBinding.KeyId("$it#0") } ?: ProofKeyBinding.Jwk,
         )
+    }
+
+    private fun CredentialIssuerMetadata.useDidJwkProof(credentialConfigurationId: String): Boolean {
+        val configuration = requireNotNull(getCredentialConfiguration(credentialConfigurationId)) {
+            "Credential configuration $credentialConfigurationId is missing from issuer metadata"
+        }
+        val bindingMethods = configuration.cryptographicBindingMethodsSupported
+            ?: return true
+        return when {
+            CryptographicBindingMethod.DidJwk in bindingMethods -> true
+            CryptographicBindingMethod.Jwk in bindingMethods || CryptographicBindingMethod.CoseKey in bindingMethods -> false
+            else -> error(
+                "Credential configuration $credentialConfigurationId does not support did:jwk, jwk, or cose_key holder binding",
+            )
+        }
     }
 }
 

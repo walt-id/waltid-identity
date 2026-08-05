@@ -57,6 +57,7 @@ object JwtPayloadClaims {
     const val TYPE = "typ"
     const val AUTHORIZED_PARTY = "azp"
     const val SESSION_ID = "sid"
+    const val PRE_AUTHORIZED_CODE = "pre_authorized_code"
 }
 
 /**
@@ -66,6 +67,7 @@ object JwtHeaderParams {
     const val TYPE = "typ"
     const val ALGORITHM = "alg"
     const val KEY_ID = "kid"
+    const val JSON_WEB_KEY = "jwk"
 }
 
 /**
@@ -73,4 +75,5 @@ object JwtHeaderParams {
  */
 object JwtConfirmationClaims {
     const val JWK = "jwk"
+    const val JWK_THUMBPRINT = "jkt"
 }

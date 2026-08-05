@@ -25,12 +25,11 @@
 		A1000008AAAA000100000008 /* WalletColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000008AAAA000000000008 /* WalletColors.swift */; };
 		A1000424AAAA000100000024 /* EmptyCredentialsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000424AAAA000000000024 /* EmptyCredentialsView.swift */; };
 		A1000425AAAA000100000025 /* UrlEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000425AAAA000000000025 /* UrlEditor.swift */; };
-		A1000426AAAA000100000026 /* VerifierDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000426AAAA000000000026 /* VerifierDetailsView.swift */; };
+		A1000426AAAA000100000026 /* VerifierReviewSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000426AAAA000000000026 /* VerifierReviewSections.swift */; };
 		A1000427AAAA000100000027 /* PresentationReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000427AAAA000000000027 /* PresentationReviewView.swift */; };
 		A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000430AAAA000000000030 /* OfferReviewView.swift */; };
+		A1000431AAAA000100000031 /* ReviewMetadataComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000431AAAA000000000031 /* ReviewMetadataComponents.swift */; };
 		A1000428AAAA000100000028 /* ClaimPathExpression.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000428AAAA000000000028 /* ClaimPathExpression.swift */; };
-		A1000429AAAA000100000029 /* VerifierClientIdentifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000429AAAA000000000029 /* VerifierClientIdentifier.swift */; };
-		A100042AAAAA00010000002A /* VerifierDisplayName.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100042AAAAA00000000002A /* VerifierDisplayName.swift */; };
 		A1000301AAAA000100000001 /* ClaimGroupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000301AAAA000000000001 /* ClaimGroupView.swift */; };
 		A1000302AAAA000100000002 /* ClaimValueRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000302AAAA000000000002 /* ClaimValueRow.swift */; };
 		A1000303AAAA000100000003 /* CredentialDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000303AAAA000000000003 /* CredentialDetailsView.swift */; };
@@ -91,12 +90,11 @@
 		A1000008AAAA000000000008 /* WalletColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletColors.swift; sourceTree = "<group>"; };
 		A1000424AAAA000000000024 /* EmptyCredentialsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyCredentialsView.swift; sourceTree = "<group>"; };
 		A1000425AAAA000000000025 /* UrlEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UrlEditor.swift; sourceTree = "<group>"; };
-		A1000426AAAA000000000026 /* VerifierDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifierDetailsView.swift; sourceTree = "<group>"; };
+		A1000426AAAA000000000026 /* VerifierReviewSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifierReviewSections.swift; sourceTree = "<group>"; };
 		A1000427AAAA000000000027 /* PresentationReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationReviewView.swift; sourceTree = "<group>"; };
 		A1000430AAAA000000000030 /* OfferReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfferReviewView.swift; sourceTree = "<group>"; };
+		A1000431AAAA000000000031 /* ReviewMetadataComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewMetadataComponents.swift; sourceTree = "<group>"; };
 		A1000428AAAA000000000028 /* ClaimPathExpression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaimPathExpression.swift; sourceTree = "<group>"; };
-		A1000429AAAA000000000029 /* VerifierClientIdentifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifierClientIdentifier.swift; sourceTree = "<group>"; };
-		A100042AAAAA00000000002A /* VerifierDisplayName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifierDisplayName.swift; sourceTree = "<group>"; };
 		A1000301AAAA000000000001 /* ClaimGroupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaimGroupView.swift; sourceTree = "<group>"; };
 		A1000302AAAA000000000002 /* ClaimValueRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaimValueRow.swift; sourceTree = "<group>"; };
 		A1000303AAAA000000000003 /* CredentialDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDetailsView.swift; sourceTree = "<group>"; };
@@ -245,9 +243,10 @@
 				A1000301AAAA000000000001 /* ClaimGroupView.swift */,
 				A1000302AAAA000000000002 /* ClaimValueRow.swift */,
 				A1000303AAAA000000000003 /* CredentialDetailsView.swift */,
-				A1000426AAAA000000000026 /* VerifierDetailsView.swift */,
+				A1000426AAAA000000000026 /* VerifierReviewSections.swift */,
 				A1000427AAAA000000000027 /* PresentationReviewView.swift */,
 				A1000430AAAA000000000030 /* OfferReviewView.swift */,
+				A1000431AAAA000000000031 /* ReviewMetadataComponents.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -271,8 +270,6 @@
 				A1000307AAAA000000000007 /* CredentialDisplayVocabulary.swift */,
 				A1000308AAAA000000000008 /* CredentialTypeIdentifier.swift */,
 				A1000312AAAA000000000012 /* CredentialSystemInfo.swift */,
-				A1000429AAAA000000000029 /* VerifierClientIdentifier.swift */,
-				A100042AAAAA00000000002A /* VerifierDisplayName.swift */,
 			);
 			path = Display;
 			sourceTree = "<group>";
@@ -561,17 +558,16 @@
 				A1000301AAAA000100000001 /* ClaimGroupView.swift in Sources */,
 				A1000302AAAA000100000002 /* ClaimValueRow.swift in Sources */,
 				A1000303AAAA000100000003 /* CredentialDetailsView.swift in Sources */,
-				A1000426AAAA000100000026 /* VerifierDetailsView.swift in Sources */,
+				A1000426AAAA000100000026 /* VerifierReviewSections.swift in Sources */,
 				A1000427AAAA000100000027 /* PresentationReviewView.swift in Sources */,
 				A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */,
+				A1000431AAAA000100000031 /* ReviewMetadataComponents.swift in Sources */,
 				A1000304AAAA000100000004 /* CredentialDisplayModels.swift in Sources */,
 				A1000305AAAA000100000005 /* CredentialDisplayNormalizer.swift in Sources */,
 				A1000306AAAA000100000006 /* CredentialDisplayValueDecoder.swift in Sources */,
 				A1000307AAAA000100000007 /* CredentialDisplayVocabulary.swift in Sources */,
 				A1000308AAAA000100000008 /* CredentialTypeIdentifier.swift in Sources */,
 				A1000309AAAA000100000009 /* CredentialCardSummary.swift in Sources */,
-				A1000429AAAA000100000029 /* VerifierClientIdentifier.swift in Sources */,
-				A100042AAAAA00010000002A /* VerifierDisplayName.swift in Sources */,
 				A1000310AAAA000100000010 /* CredentialDetailsScreen.swift in Sources */,
 				A1000311AAAA000100000011 /* WalletAccessibilityID.swift in Sources */,
 				A1000312AAAA000100000012 /* CredentialSystemInfo.swift in Sources */,

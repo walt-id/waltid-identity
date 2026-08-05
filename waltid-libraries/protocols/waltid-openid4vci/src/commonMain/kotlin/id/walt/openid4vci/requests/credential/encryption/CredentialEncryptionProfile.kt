@@ -19,7 +19,11 @@ object CredentialEncryptionProfile {
 
     fun isSupportedCredentialRequestEncryptionJwk(jwk: JsonObject): Boolean =
         runCatching {
-            requireSupportedEncryptionJwk(jwk, "credential_request_encryption.jwks.keys[]")
+            requireSupportedEncryptionJwk(
+                jwk = jwk,
+                fieldName = "credential_request_encryption.jwks.keys[]",
+                requireKid = true,
+            )
         }.isSuccess
 
     fun isSupportedCredentialRequestDecryptionJwk(jwk: String): Boolean =
@@ -46,12 +50,20 @@ object CredentialEncryptionProfile {
         }
     }
 
-    internal fun requireSupportedEncryptionJwk(jwk: JsonObject, fieldName: String) {
+    internal fun requireSupportedEncryptionJwk(
+        jwk: JsonObject,
+        fieldName: String,
+        requireKid: Boolean,
+    ) {
         require("d" !in jwk) {
             "$fieldName.jwk must be a public key"
         }
-        require(jwk.string("kid")?.isNotBlank() == true) {
+        val kid = jwk.string("kid")
+        require(!requireKid || !kid.isNullOrBlank()) {
             "$fieldName.jwk.kid is required"
+        }
+        require("kid" !in jwk || !kid.isNullOrBlank()) {
+            "$fieldName.jwk.kid must not be blank"
         }
         require(jwk.string("kty") == KEY_TYPE_EC) {
             "$fieldName.jwk.kty must be $KEY_TYPE_EC"

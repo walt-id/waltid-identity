@@ -5,6 +5,7 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 
+@Deprecated("Use Crypto2JWTCryptoProvider")
 class WaltIdJWTCryptoProvider(private val keys: Map<String, Key>) : JWTCryptoProvider {
     override fun sign(payload: JsonObject, keyID: String?, typ: String, headers: Map<String, Any>): String = runBlocking {
         val key = keyID?.let { keys[it] } ?: throw Exception("No key found")

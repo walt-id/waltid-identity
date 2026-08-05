@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.logic.WalletDemoPresentationContinuation
 import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.ui.screens.PinScreen
 import id.walt.walletdemo.compose.ui.screens.PinStorageUnavailableScreen
@@ -19,6 +20,11 @@ import id.walt.walletdemo.compose.ui.screens.WalletScreen
 @Composable
 fun WalletDemoApp(controller: WalletDemoController) {
     val state by controller.state.collectAsState()
+    PresentationContinuationEffect(
+        continuation = state.pendingPresentationContinuation?.continuation,
+        onCompleted = controller::completePresentationContinuation,
+        onFailed = controller::failPresentationContinuation,
+    )
 
     MaterialTheme {
         Surface(
@@ -46,5 +52,26 @@ fun WalletDemoApp(controller: WalletDemoController) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PresentationContinuationEffect(
+    continuation: WalletDemoPresentationContinuation?,
+    onCompleted: () -> Unit,
+    onFailed: (String) -> Unit,
+) {
+    when (continuation) {
+        is WalletDemoPresentationContinuation.Url -> OpenPresentationContinuationUrlEffect(
+            url = continuation.value,
+            onCompleted = onCompleted,
+            onFailed = onFailed,
+        )
+        is WalletDemoPresentationContinuation.FormPostHtml -> PlatformFormPostEffect(
+            html = continuation.value,
+            onCompleted = onCompleted,
+            onFailed = onFailed,
+        )
+        null -> Unit
     }
 }

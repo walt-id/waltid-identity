@@ -4,6 +4,7 @@ package id.walt.mdoc.issuance
 
 import id.walt.cose.*
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.mdoc.credsdata.MdocData
 import id.walt.mdoc.objects.digest.ValueDigest
 import id.walt.mdoc.objects.digest.ValueDigestList
@@ -33,6 +34,7 @@ object MdocIssuer {
     )
 
 
+    @Deprecated("Use the crypto2 Key overload with an explicit signature algorithm")
     suspend fun signMsoForIssuerSignedObjects(
         /** Mapped data */
         namespaceIssuerSignedItems: Map<String, List<IssuerSignedItem>>,
@@ -62,7 +64,66 @@ object MdocIssuer {
          */
         protectedHeaderX5t: CoseCertHash? = null
     ): IssuerSigned {
-        val coseSigner = issuerKey.toCoseSigner()
+        return signMsoForIssuerSignedObjects(
+            namespaceIssuerSignedItems = namespaceIssuerSignedItems,
+            issuerCertificate = issuerCertificate,
+            holderKey = holderKey,
+            docType = docType,
+            validFrom = validFrom,
+            validUntil = validUntil,
+            status = status,
+            digestAlgorithm = digestAlgorithm,
+            protectedHeaderX5u = protectedHeaderX5u,
+            protectedHeaderX5t = protectedHeaderX5t,
+            coseSigner = issuerKey.toCoseSigner(),
+            coseAlgorithm = requireNotNull(issuerKey.keyType.toCoseAlgorithm()) {
+                "Issuer key type has no COSE signing algorithm: ${issuerKey.keyType}"
+            },
+        )
+    }
+
+    suspend fun signMsoForIssuerSignedObjects(
+        namespaceIssuerSignedItems: Map<String, List<IssuerSignedItem>>,
+        issuerKey: Crypto2Key,
+        signatureAlgorithm: Int,
+        issuerCertificate: List<CoseCertificate>,
+        holderKey: CoseKey,
+        docType: String,
+        validFrom: Instant? = null,
+        validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        status: Status? = null,
+        digestAlgorithm: String = "SHA-256",
+        protectedHeaderX5u: String? = null,
+        protectedHeaderX5t: CoseCertHash? = null,
+    ): IssuerSigned = signMsoForIssuerSignedObjects(
+        namespaceIssuerSignedItems = namespaceIssuerSignedItems,
+        issuerCertificate = issuerCertificate,
+        holderKey = holderKey,
+        docType = docType,
+        validFrom = validFrom,
+        validUntil = validUntil,
+        status = status,
+        digestAlgorithm = digestAlgorithm,
+        protectedHeaderX5u = protectedHeaderX5u,
+        protectedHeaderX5t = protectedHeaderX5t,
+        coseSigner = issuerKey.toCoseSigner(signatureAlgorithm),
+        coseAlgorithm = signatureAlgorithm,
+    )
+
+    private suspend fun signMsoForIssuerSignedObjects(
+        namespaceIssuerSignedItems: Map<String, List<IssuerSignedItem>>,
+        issuerCertificate: List<CoseCertificate>,
+        holderKey: CoseKey,
+        docType: String,
+        validFrom: Instant?,
+        validUntil: Instant,
+        status: Status?,
+        digestAlgorithm: String,
+        protectedHeaderX5u: String?,
+        protectedHeaderX5t: CoseCertHash?,
+        coseSigner: CoseSigner,
+        coseAlgorithm: Int,
+    ): IssuerSigned {
 
         val valueDigests = namespaceIssuerSignedItems.mapValues { (namespace, issuerSignedItems) ->
             ValueDigestList(issuerSignedItems.map { issuerSignedItem ->
@@ -88,10 +149,10 @@ object MdocIssuer {
             status = status
         )
 
-        runCatching {
+        try {
             mso.precheck()
-        }.onFailure { ex ->
-            throw IllegalArgumentException("Could not create valid MSO for issued mdoc: ${ex.message}", ex)
+        } catch (cause: Throwable) {
+            throw IllegalArgumentException("Could not create valid MSO for issued mdoc: ${cause.message}", cause)
         }
 
         // The MSO is wrapped in a tagged bytestring to become the payload
@@ -106,12 +167,12 @@ object MdocIssuer {
         val hasQualifiedHeaders = protectedHeaderX5u != null || protectedHeaderX5t != null
         val issuerAuth = CoseSign1.createAndSign(
             protectedHeaders = CoseHeaders(
-                algorithm = issuerKey.keyType.toCoseAlgorithm(),
+                algorithm = coseAlgorithm,
                 x5u = protectedHeaderX5u,
                 x5t = protectedHeaderX5t,
                 x5chain = if (hasQualifiedHeaders) issuerCertificate else null
             ),
-            unprotectedHeaders = CoseHeaders(x5chain = issuerCertificate),
+            unprotectedHeaders = CoseHeaders(x5chain = issuerCertificate.takeUnless { hasQualifiedHeaders }),
             payload = msoPayload,
             signer = coseSigner
         )
@@ -134,6 +195,7 @@ object MdocIssuer {
      * Issue mdocs credential that is not defined as type-safe credential
      * (providing raw JSON data)
      */
+    @Deprecated("Use the crypto2 Key overload with an explicit signature algorithm")
     suspend fun issueUniversal(
         /** Key to use for issuance (credentials will be signed with it) */
         issuerKey: Key,
@@ -165,15 +227,7 @@ object MdocIssuer {
             elementValueJson: JsonElement
         ) -> CborElement? = defaultSchemalessMappingFunction
     ): IssuerSigned {
-        var idx = 0u
-        val namespaceIssuerSignedItems = data.namespaces.mapValues { (namespace, namespaceData) ->
-            namespaceData.mapNotNull { (elementIdentifier, elementValueJson) ->
-                val mappedValue = valueMappingFunction(docType, namespace, elementIdentifier, elementValueJson)
-                if (mappedValue != null) {
-                    IssuerSignedItem.create(idx++, elementIdentifier, mappedValue)
-                } else null
-            }
-        }
+        val namespaceIssuerSignedItems = mapUniversalData(docType, data, valueMappingFunction)
 
         return signMsoForIssuerSignedObjects(
             namespaceIssuerSignedItems = namespaceIssuerSignedItems,
@@ -190,6 +244,41 @@ object MdocIssuer {
         )
     }
 
+    suspend fun issueUniversal(
+        issuerKey: Crypto2Key,
+        signatureAlgorithm: Int,
+        issuerCertificate: List<CoseCertificate>,
+        holderKey: CoseKey,
+        docType: String,
+        data: MdocUniversalIssuanceData,
+        validFrom: Instant? = null,
+        validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        status: Status? = null,
+        digestAlgorithm: String = "SHA-256",
+        protectedHeaderX5u: String? = null,
+        protectedHeaderX5t: CoseCertHash? = null,
+        valueMappingFunction: (
+            docType: String,
+            namespace: String,
+            elementIdentifier: String,
+            elementValueJson: JsonElement,
+        ) -> CborElement? = defaultSchemalessMappingFunction,
+    ): IssuerSigned = signMsoForIssuerSignedObjects(
+        namespaceIssuerSignedItems = mapUniversalData(docType, data, valueMappingFunction),
+        issuerKey = issuerKey,
+        signatureAlgorithm = signatureAlgorithm,
+        issuerCertificate = issuerCertificate,
+        holderKey = holderKey,
+        docType = docType,
+        validFrom = validFrom,
+        validUntil = validUntil,
+        status = status,
+        digestAlgorithm = digestAlgorithm,
+        protectedHeaderX5u = protectedHeaderX5u,
+        protectedHeaderX5t = protectedHeaderX5t,
+    )
+
+    @Deprecated("Use the crypto2 Key overload with an explicit signature algorithm")
     suspend fun issueTypesafe(
         /** Key to use for issuance (credentials will be signed with it) */
         issuerKey: Key,
@@ -222,5 +311,47 @@ object MdocIssuer {
         )
     }
 
-}
+    suspend fun issueTypesafe(
+        issuerKey: Crypto2Key,
+        signatureAlgorithm: Int,
+        issuerCertificate: List<CoseCertificate>,
+        holderKey: CoseKey,
+        typesafeData: MdocData,
+        validFrom: Instant? = null,
+        validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        status: Status? = null,
+        digestAlgorithm: String = "SHA-256",
+    ): IssuerSigned = signMsoForIssuerSignedObjects(
+        namespaceIssuerSignedItems = typesafeData.toNamespaceIssuerSignedItems(),
+        issuerKey = issuerKey,
+        signatureAlgorithm = signatureAlgorithm,
+        issuerCertificate = issuerCertificate,
+        holderKey = holderKey,
+        docType = typesafeData.docType,
+        validFrom = validFrom,
+        validUntil = validUntil,
+        status = status,
+        digestAlgorithm = digestAlgorithm,
+    )
 
+    private fun mapUniversalData(
+        docType: String,
+        data: MdocUniversalIssuanceData,
+        valueMappingFunction: (
+            docType: String,
+            namespace: String,
+            elementIdentifier: String,
+            elementValueJson: JsonElement,
+        ) -> CborElement?,
+    ): Map<String, List<IssuerSignedItem>> {
+        var index = 0u
+        return data.namespaces.mapValues { (namespace, namespaceData) ->
+            namespaceData.mapNotNull { (elementIdentifier, elementValueJson) ->
+                valueMappingFunction(docType, namespace, elementIdentifier, elementValueJson)?.let { mappedValue ->
+                    IssuerSignedItem.create(index++, elementIdentifier, mappedValue)
+                }
+            }
+        }
+    }
+
+}

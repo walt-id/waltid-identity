@@ -158,8 +158,25 @@ enabledFeatures = [
 ]
 
 # config/auth.conf
-jwtSecret = "change-this-secret-in-production-min-32-chars"
+signingStoredKey = """{"kind":"software","version":1,"id":"...","spec":{...},"usages":["SIGN","VERIFY"],"material":{...}}"""
+tokenExpiry = "PT24H"
 ```
+
+`signingStoredKey` is an encoded crypto2 `StoredKey` and is a complete configuration on its own. It is
+the only way to run auth off a managed (KMS/HSM) key: pass a `CryptoRuntime` carrying the matching
+`ManagedKeyProvider` to `configureWallet2Auth`, since the default runtime only has software providers.
+The JWS algorithm is derived from the `StoredKey`.
+
+The legacy alternative is a waltid-crypto JWK:
+
+```hocon
+signingKey = { type = "jwk", jwk = { kty = "EC", crv = "P-256", x = "...", y = "...", d = "..." } }
+```
+
+It is migrated to crypto2 in memory at startup and `auth.conf` is never rewritten. Setting both is the
+migration configuration: they must describe the same signing and verification key, `signingStoredKey`
+takes precedence, and malformed or mismatched values fail startup without legacy fallback. At least one
+of the two is required.
 
 ---
 
@@ -283,16 +300,22 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/requ
   }'
 
 ACCESS_TOKEN="..."
+
+# Step 3 (only when nonceEndpoint is advertised): obtain a fresh proof nonce
+curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/request-nonce \
+  -H "Content-Type: application/json" \
+  -d '{"credentialIssuer":"https://issuer.example.com"}'
+
 C_NONCE="..."
 
-# Step 3: Sign a proof of possession
+# Step 4: Sign a proof of possession; omit nonce when request-nonce returned null
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/sign-proof \
   -H "Content-Type: application/json" \
   -d "{\"issuerUrl\":\"https://issuer.example.com\",\"nonce\":\"$C_NONCE\",\"keyId\":\"$KEY_ID\"}"
 
 PROOF_JWT="..."
 
-# Step 4: Fetch the credential
+# Step 5: Fetch the credential
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/fetch-credential \
   -H "Content-Type: application/json" \
   -d "{
@@ -323,7 +346,13 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/exch
     "codeVerifier": "<pkce-verifier>",
     "redirectUri": "openid://"
   }'
-# → {"accessToken":"...","cNonce":"..."}
+# → {"accessToken":"..."}
+
+# Step 3 (only when nonceEndpoint is advertised): obtain a fresh proof nonce
+curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/request-nonce \
+  -H "Content-Type: application/json" \
+  -d '{"credentialIssuer":"https://issuer.example.com"}'
+# → {"nonce":"..."}; when no endpoint is advertised, proof JWTs omit the nonce claim
 ```
 
 ### Present credentials (OID4VP 1.0 / DCQL)

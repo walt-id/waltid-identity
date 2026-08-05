@@ -1,10 +1,13 @@
 package id.walt.openid4vci.handlers.credential
 
 import id.walt.crypto.keys.Key
-import id.walt.openid4vci.errors.OAuthError
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.openid4vci.errors.CredentialError
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
+import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
@@ -15,6 +18,7 @@ import id.walt.sdjwt.SDMap
 import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.coroutines.CancellationException
 import kotlin.time.Instant
 
 
@@ -47,11 +51,15 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
+        verifiedProofs: List<VerifiedCredentialProof>,
     ): CredentialResponseResult {
         return try {
             val docType = configuration.doctype
                 ?: return CredentialResponseResult.Failure(
-                    OAuthError("invalid_request", "Missing doctype in credential configuration for mso_mdoc")
+                    CredentialError(
+                        CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
+                        "Missing doctype in credential configuration for mso_mdoc",
+                    )
                 )
 
             val namespaceData = credentialData.entries
@@ -62,13 +70,16 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
 
             if (namespaceData.isEmpty()) {
                 return CredentialResponseResult.Failure(
-                    OAuthError("invalid_request", "credentialData must contain at least one namespace for mso_mdoc")
+                    CredentialError(
+                        CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
+                        "credentialData must contain at least one namespace for mso_mdoc",
+                    )
                 )
             }
 
-            val holderKey = extractHolderKey(request)
+            val holderKey = extractHolderKey(request, verifiedProofs)
                 ?: return CredentialResponseResult.Failure(
-                    OAuthError("invalid_or_missing_proof", "Could not extract holder key from proof")
+                    CredentialError(CredentialErrorCodes.INVALID_PROOF, "Could not extract holder key from proof")
                 )
 
             val issued = issueMdoc(
@@ -85,8 +96,10 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
                     credentials = listOf(IssuedCredential(credential = JsonPrimitive(issued))),
                 )
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            CredentialResponseResult.Failure(OAuthError("invalid_request", e.message))
+            CredentialResponseResult.Failure(e.toCredentialHandlerError())
         }
     }
 
@@ -94,14 +107,17 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
      * Extracts the holder's public key from the credential request proof.
      * Override to extract the key from the proof JWT header `jwk` claim or CWT.
      */
-    protected open suspend fun extractHolderKey(request: CredentialRequest): Key? = null
+    protected open suspend fun extractHolderKey(
+        request: CredentialRequest,
+        verifiedProofs: List<VerifiedCredentialProof>,
+    ): Crypto2Key? = verifiedProofs.firstOrNull()?.holderKey
 
     /**
      * Perform the actual mdoc CBOR/COSE signing.
      *
      * @param docType the document type (e.g. `"org.iso.18013.5.1.mDL"`)
      * @param namespaceData map of namespace → { elementIdentifier: value }
-     * @param holderKey the holder's public key for device key binding
+     * @param holderKey the holder's public crypto2 key for device key binding
      * @param issuerKey the issuer's signing key
      * @param x5Chain optional certificate chain for the issuer key
      * @param validityDays validity period in days
@@ -110,7 +126,7 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
     abstract suspend fun issueMdoc(
         docType: String,
         namespaceData: Map<String, JsonObject>,
-        holderKey: Key,
+        holderKey: Crypto2Key,
         issuerKey: Key,
         x5Chain: List<CertificateDer>?,
         validityDays: Int,

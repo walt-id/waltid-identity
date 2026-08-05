@@ -130,21 +130,28 @@ internal object WalletComposeE2EHelper {
     }
 
     fun clickByTag(device: UiDevice, tag: String) {
-        val node = waitForResource(device, tag, CLICK_VISIBLE_TIMEOUT)
-            ?: findVisibleResource(device, tag)
+        val initialNode = waitForVisibleResource(device, tag, CLICK_VISIBLE_TIMEOUT)
             ?: findResourceAfterScrolling(device, tag)
-        if (node == null) {
+        if (initialNode == null) {
             fail("$tag not found.\n${visibleUiSnapshot(device)}")
+            return
         }
-        assertTrue("$tag is disabled", node!!.isEnabled)
+        var node: UiObject2 = initialNode
+        val deadline = System.currentTimeMillis() + CLICK_VISIBLE_TIMEOUT
+        while (!node.isEnabled && System.currentTimeMillis() < deadline) {
+            Thread.sleep(200)
+            node = findVisibleResource(device, tag) ?: node
+        }
+        if (!node.isEnabled) {
+            fail("$tag is disabled.\n${visibleUiSnapshot(device)}")
+        }
         device.waitForIdle()
         node.clickableAncestorOrSelf()?.click() ?: node.click()
         device.waitForIdle()
     }
 
     fun setTextByTag(device: UiDevice, tag: String, value: String) {
-        val node = waitForResource(device, tag, CLICK_VISIBLE_TIMEOUT)
-            ?: findVisibleResource(device, tag)
+        val node = waitForVisibleResource(device, tag, CLICK_VISIBLE_TIMEOUT)
             ?: findResourceAfterScrolling(device, tag)
         if (node == null) {
             fail("$tag not found.\n${visibleUiSnapshot(device)}")
@@ -178,21 +185,32 @@ internal object WalletComposeE2EHelper {
             fail("$message. Claim row $tag not found.\n${visibleUiSnapshot(device)}")
             return
         }
-        val visibleTexts = node.flatten()
-            .mapNotNull { it.text?.trim()?.takeIf(String::isNotEmpty) }
-        val missingValues = expectedValues.filter { expected -> expected !in visibleTexts }
-        if (label !in visibleTexts || missingValues.isNotEmpty()) {
-            fail(
-                """
-                    $message.
-                    claim=$tag
-                    expectedLabel=$label
-                    expectedValues=$expectedValues
-                    visibleTexts=$visibleTexts
-                    ${visibleUiSnapshot(device)}
-                """.trimIndent()
-            )
+        var visibleTexts = node.visibleTexts()
+        fun expectedContentIsVisible(): Boolean =
+            label in visibleTexts && expectedValues.all { expected -> expected in visibleTexts }
+
+        if (expectedContentIsVisible()) return
+        repeat(6) {
+            device.scrollDown()
+            findVisibleResource(device, tag)?.let { visibleTexts = it.visibleTexts() }
+            if (expectedContentIsVisible()) return
         }
+        repeat(12) {
+            device.scrollUp()
+            findVisibleResource(device, tag)?.let { visibleTexts = it.visibleTexts() }
+            if (expectedContentIsVisible()) return
+        }
+
+        fail(
+            """
+                $message.
+                claim=$tag
+                expectedLabel=$label
+                expectedValues=$expectedValues
+                visibleTexts=$visibleTexts
+                ${visibleUiSnapshot(device)}
+            """.trimIndent()
+        )
     }
 
     fun waitForResource(device: UiDevice, tag: String, timeoutMs: Long): UiObject2? {
@@ -206,14 +224,13 @@ internal object WalletComposeE2EHelper {
         return null
     }
 
-    fun waitForResourceEnabled(device: UiDevice, tag: String, timeoutMs: Long): Boolean {
+    private fun waitForVisibleResource(device: UiDevice, tag: String, timeoutMs: Long): UiObject2? {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
-            val node = device.findObject(By.res(tag)) ?: findVisibleResource(device, tag)
-            if (node?.isEnabled == true) return true
+            findVisibleResource(device, tag)?.let { return it }
             Thread.sleep(200)
         }
-        return false
+        return null
     }
 
     private fun findTextAfterScrolling(device: UiDevice, texts: List<String>): UiObject2? {
@@ -233,29 +250,38 @@ internal object WalletComposeE2EHelper {
         device.findObjects(By.pkg("id.walt.walletdemo.compose"))
             .flatMap { it.flatten() }
             .firstOrNull { node ->
-                runCatching { node.text?.trim() in texts }.getOrDefault(false)
+                node.isVisibleOn(device) && runCatching { node.text?.trim() in texts }.getOrDefault(false)
             }
 
     private fun findVisibleResource(device: UiDevice, tag: String): UiObject2? =
         device.findObjects(By.pkg("id.walt.walletdemo.compose"))
             .flatMap { it.flatten() }
             .firstOrNull { node ->
-                runCatching { node.resourceName == tag }.getOrDefault(false)
+                node.isVisibleOn(device) && runCatching { node.resourceName == tag }.getOrDefault(false)
             }
 
     private fun findResourceAfterScrolling(device: UiDevice, tag: String): UiObject2? {
+        findVisibleResource(device, tag)?.let { return it }
         repeat(6) {
             device.scrollDown()
-            waitForResource(device, tag, 1_000L)?.let { return it }
             findVisibleResource(device, tag)?.let { return it }
         }
         repeat(12) {
             device.scrollUp()
-            waitForResource(device, tag, 1_000L)?.let { return it }
             findVisibleResource(device, tag)?.let { return it }
         }
         return null
     }
+
+    private fun UiObject2.isVisibleOn(device: UiDevice): Boolean = runCatching {
+        val bounds = visibleBounds
+        bounds.width() > 0 &&
+            bounds.height() > 0 &&
+            bounds.right > 0 &&
+            bounds.bottom > 0 &&
+            bounds.left < device.displayWidth &&
+            bounds.top < device.displayHeight
+    }.getOrDefault(false)
 
     private fun claimTag(path: String): String =
         "wallet.claim.${path.map { if (it.isLetterOrDigit()) it else '_' }.joinToString("")}"
@@ -339,6 +365,9 @@ internal object WalletComposeE2EHelper {
 
     private fun UiObject2.flatten(): List<UiObject2> =
         listOf(this) + runCatching { children.flatMap { it.flatten() } }.getOrDefault(emptyList())
+
+    private fun UiObject2.visibleTexts(): List<String> =
+        flatten().mapNotNull { it.text?.trim()?.takeIf(String::isNotEmpty) }
 
     private fun UiObject2.snapshotIdentity(): String =
         runCatching {

@@ -11,11 +11,17 @@ public struct WalletConfiguration: Sendable {
     /// Optional enterprise attestation configuration.
     public var attestation: WalletAttestationConfiguration?
 
+    /// Trust anchors used to authenticate verifier Request Objects.
+    public var clientIDTrustConfiguration: WalletClientIDTrustConfiguration
+
     /// Wallet-local persistence configuration.
     public var persistence: WalletPersistence
 
     /// Transaction data profiles this wallet accepts in OpenID4VP requests.
     public var transactionDataProfiles: [WalletTransactionDataProfile]
+
+    /// Ordered BCP 47 locale preferences used to select protocol display metadata.
+    public var preferredLocales: [String]
 
     /// Creates wallet configuration.
     ///
@@ -26,21 +32,43 @@ public struct WalletConfiguration: Sendable {
     ///     when no operation-specific override is supplied.
     ///   - attestation: Optional wallet attestation configuration for issuers
     ///     that require client attestation.
+    ///   - clientIDTrustConfiguration: Trust anchors used to authenticate verifier
+    ///     Request Objects. The default trusts no X.509 verifier by configuration.
     ///   - persistence: Local persistence configuration for wallet-owned state.
     ///   - transactionDataProfiles: OpenID4VP transaction data profiles this
     ///     wallet accepts before previewing or submitting a presentation.
+    ///   - preferredLocales: Ordered BCP 47 locale preferences used for issuer,
+    ///     credential, and verifier display metadata.
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
         attestation: WalletAttestationConfiguration? = nil,
+        clientIDTrustConfiguration: WalletClientIDTrustConfiguration = .init(),
         persistence: WalletPersistence = WalletPersistence(),
-        transactionDataProfiles: [WalletTransactionDataProfile] = []
+        transactionDataProfiles: [WalletTransactionDataProfile] = [],
+        preferredLocales: [String] = Locale.preferredLanguages
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
         self.attestation = attestation
+        self.clientIDTrustConfiguration = clientIDTrustConfiguration
         self.persistence = persistence
         self.transactionDataProfiles = transactionDataProfiles
+        self.preferredLocales = preferredLocales
+    }
+}
+
+/// Trust configuration used to authenticate verifier Request Objects.
+public struct WalletClientIDTrustConfiguration: Sendable, Equatable {
+    /// PEM-encoded X.509 trust anchors pinned by the hosting application.
+    public var x509TrustAnchorsPEM: [String]
+
+    /// Creates client-ID trust configuration.
+    ///
+    /// - Parameter x509TrustAnchorsPEM: PEM-encoded X.509 trust anchors pinned
+    ///   by the hosting application.
+    public init(x509TrustAnchorsPEM: [String] = []) {
+        self.x509TrustAnchorsPEM = x509TrustAnchorsPEM
     }
 }
 
@@ -74,22 +102,26 @@ public struct WalletPersistence: Sendable {
     /// Owner of the encrypted local database key.
     public var databaseKey: WalletDatabaseKeyConfiguration
 
-    /// Optional store overrides. Omitted credential and DID stores use the
-    /// encrypted local database; omitted key stores use platform signing-key
-    /// persistence and generation.
-    public var stores: WalletStores
+    /// Optional credential-store override. `nil` uses the encrypted local database.
+    public var credentialStore: (any WalletCredentialStore)?
+
+    /// Optional DID-store override. `nil` uses the encrypted local database.
+    public var didStore: (any WalletDidStore)?
 
     /// Creates wallet persistence configuration.
     ///
     /// - Parameters:
     ///   - databaseKey: Owner of the encrypted local database key.
-    ///   - stores: Optional store overrides.
+    ///   - credentialStore: Optional credential-store override.
+    ///   - didStore: Optional DID-store override.
     public init(
         databaseKey: WalletDatabaseKeyConfiguration = .managed,
-        stores: WalletStores = WalletStores()
+        credentialStore: (any WalletCredentialStore)? = nil,
+        didStore: (any WalletDidStore)? = nil
     ) {
         self.databaseKey = databaseKey
-        self.stores = stores
+        self.credentialStore = credentialStore
+        self.didStore = didStore
     }
 }
 
@@ -100,34 +132,6 @@ public enum WalletDatabaseKeyConfiguration: Sendable {
 
     /// Encrypted local database key material provided by app code.
     case provided(any WalletDatabaseKeyProvider)
-}
-
-/// Optional wallet store overrides.
-public struct WalletStores: Sendable {
-    /// Optional credential store override. `nil` uses the encrypted local database.
-    public var credentials: (any WalletCredentialStore)?
-
-    /// Optional DID document store override. `nil` uses the encrypted local database.
-    public var dids: (any WalletDidStore)?
-
-    /// Optional atomic key store and generator override. `nil` uses platform signing-key persistence.
-    public var keys: WalletKeys?
-
-    /// Creates wallet store overrides.
-    ///
-    /// - Parameters:
-    ///   - credentials: Optional credential store override.
-    ///   - dids: Optional DID document store override.
-    ///   - keys: Optional atomic key store and generator override.
-    public init(
-        credentials: (any WalletCredentialStore)? = nil,
-        dids: (any WalletDidStore)? = nil,
-        keys: WalletKeys? = nil
-    ) {
-        self.credentials = credentials
-        self.dids = dids
-        self.keys = keys
-    }
 }
 
 /// Database key material used for wallet-local SQLCipher persistence.
@@ -321,131 +325,6 @@ public enum WalletKeyType: Equatable, Sendable {
     case rsa4096
 }
 
-/// Lightweight metadata about a signing key stored by a custom Swift key store.
-public struct WalletKeyInfo: Equatable, Identifiable, Sendable {
-    /// Stable wallet-local key identifier.
-    public let keyID: String
-
-    /// Signing-key type.
-    public let keyType: WalletKeyType
-
-    /// Optional signing algorithm label, such as `EdDSA` or `ES256`.
-    public let algorithm: String?
-
-    /// Stable identifier for SwiftUI and collection APIs.
-    public var id: String { keyID }
-
-    /// Creates signing-key metadata.
-    ///
-    /// - Parameters:
-    ///   - keyID: Stable wallet-local key identifier.
-    ///   - keyType: Signing-key type.
-    ///   - algorithm: Optional signing algorithm label.
-    public init(keyID: String, keyType: WalletKeyType, algorithm: String? = nil) {
-        self.keyID = keyID
-        self.keyType = keyType
-        self.algorithm = algorithm
-    }
-}
-
-/// Serialized signing key used by custom Swift key stores.
-///
-/// The serialized key JSON may contain private signing material. Treat it like a secret and avoid
-/// logging or exporting it outside app-owned secure storage.
-public struct StoredKey: CustomDebugStringConvertible, CustomStringConvertible, Equatable, Identifiable, Sendable {
-    /// Stable wallet-local key identifier.
-    public let keyID: String
-
-    /// Signing-key type.
-    public let keyType: WalletKeyType
-
-    /// Optional signing algorithm label, such as `EdDSA` or `ES256`.
-    public let algorithm: String?
-
-    /// walt.id serialized key JSON payload.
-    public let serializedKeyJSON: String
-
-    /// Stable identifier for SwiftUI and collection APIs.
-    public var id: String { keyID }
-
-    /// Text representation that redacts serialized key material.
-    public var description: String {
-        "StoredKey(keyID: \(keyID), keyType: \(keyType), algorithm: \(algorithm ?? "nil"), serializedKeyJSON: <redacted>)"
-    }
-
-    /// Debug representation that redacts serialized key material.
-    public var debugDescription: String {
-        description
-    }
-
-    /// Creates a serialized signing-key entry for custom Swift key stores.
-    ///
-    /// - Parameters:
-    ///   - keyID: Stable wallet-local key identifier.
-    ///   - keyType: Signing-key type.
-    ///   - algorithm: Optional signing algorithm label.
-    ///   - serializedKeyJSON: walt.id serialized key JSON payload.
-    public init(
-        keyID: String,
-        keyType: WalletKeyType,
-        algorithm: String? = nil,
-        serializedKeyJSON: String
-    ) {
-        self.keyID = keyID
-        self.keyType = keyType
-        self.algorithm = algorithm
-        self.serializedKeyJSON = serializedKeyJSON
-    }
-}
-
-/// App-owned signing-key persistence override.
-public protocol WalletKeyStore: Sendable {
-    /// Returns a serialized signing key by wallet-local identifier.
-    ///
-    /// - Parameter id: Stable wallet-local key identifier.
-    /// - Returns: Stored key when present, or `nil` when absent.
-    func key(id: String) async throws -> StoredKey?
-
-    /// Lists signing-key metadata in this store.
-    ///
-    /// - Returns: Stored signing-key metadata currently owned by this store.
-    func keys() async throws -> [WalletKeyInfo]
-
-    /// Adds or replaces a serialized signing-key entry.
-    ///
-    /// - Parameter key: Serialized signing-key entry to persist.
-    /// - Returns: Stable wallet-local key identifier for the stored key.
-    func addKey(_ key: StoredKey) async throws -> String
-
-    /// Removes a signing key by wallet-local identifier.
-    ///
-    /// - Parameter id: Stable wallet-local key identifier to remove.
-    /// - Returns: `true` when the store removed an existing signing key.
-    func removeKey(id: String) async throws -> Bool
-}
-
-/// Atomic custom signing-key persistence configuration.
-public struct WalletKeys: Sendable {
-    /// App-owned signing-key store.
-    public let store: any WalletKeyStore
-
-    /// App-owned signing-key generator.
-    public let generate: @Sendable (WalletKeyType) async throws -> StoredKey
-
-    /// Creates an atomic signing-key store and generator override.
-    ///
-    /// - Parameters:
-    ///   - store: App-owned signing-key store.
-    ///   - generate: App-owned signing-key generator.
-    public init(
-        store: any WalletKeyStore,
-        generate: @escaping @Sendable (WalletKeyType) async throws -> StoredKey
-    ) {
-        self.store = store
-        self.generate = generate
-    }
-}
-
 /// Wallet attestation settings.
 public struct WalletAttestationConfiguration: Equatable, Sendable {
     /// Attestation API base URL.
@@ -480,31 +359,251 @@ public struct WalletAttestationConfiguration: Equatable, Sendable {
     }
 }
 
-/// Result of resolving an OpenID4VCI credential offer before issuance.
-public struct OfferResolution: Equatable, Sendable {
-    /// Whether the app must collect a transaction code from the user.
-    public let transactionCodeRequired: Bool
+/// Display metadata normalized from issuer, credential, or verifier protocol metadata.
+///
+/// URI values are untrusted protocol input. Rendering them does not establish
+/// issuer or verifier trust.
+public struct MetadataDisplay: Equatable, Sendable {
+    /// Best localized display name.
+    public let name: String?
+    /// BCP 47 language tag associated with the selected display entry.
+    public let locale: String?
+    /// Issuer- or verifier-provided logo URI.
+    public let logoURI: String?
+    /// Accessible alternative text for the logo.
+    public let logoAltText: String?
+    /// Human-readable description.
+    public let description: String?
+    /// Suggested credential background color.
+    public let backgroundColor: String?
+    /// Suggested credential background image URI.
+    public let backgroundImageURI: String?
+    /// Suggested credential text color.
+    public let textColor: String?
 
-    /// Issuer identifier (URL) from the credential offer.
-    public let credentialIssuer: String
-
-    /// Credential configuration IDs advertised in the offer.
-    public let offeredCredentials: [String]
-
-    /// Creates a credential-offer resolution result.
+    /// Creates normalized protocol display metadata.
     ///
     /// - Parameters:
-    ///   - transactionCodeRequired: Whether the app must collect a transaction code.
-    ///   - credentialIssuer: Issuer identifier from the credential offer.
-    ///   - offeredCredentials: Credential configuration identifiers advertised by the offer.
+    ///   - name: Best localized human-readable name.
+    ///   - locale: BCP 47 language tag for the selected display entry.
+    ///   - logoURI: Issuer- or verifier-provided logo URI.
+    ///   - logoAltText: Accessible alternative text for the logo.
+    ///   - description: Human-readable credential description.
+    ///   - backgroundColor: Suggested credential background color.
+    ///   - backgroundImageURI: Suggested credential background image URI.
+    ///   - textColor: Suggested credential text color.
     public init(
-        transactionCodeRequired: Bool,
-        credentialIssuer: String,
-        offeredCredentials: [String]
+        name: String?,
+        locale: String?,
+        logoURI: String?,
+        logoAltText: String?,
+        description: String? = nil,
+        backgroundColor: String? = nil,
+        backgroundImageURI: String? = nil,
+        textColor: String? = nil
     ) {
-        self.transactionCodeRequired = transactionCodeRequired
+        self.name = name
+        self.locale = locale
+        self.logoURI = logoURI
+        self.logoAltText = logoAltText
+        self.description = description
+        self.backgroundColor = backgroundColor
+        self.backgroundImageURI = backgroundImageURI
+        self.textColor = textColor
+    }
+}
+
+/// Typed credential issuer metadata shown during offer review.
+public struct IssuerMetadata: Equatable, Sendable {
+    /// Canonical credential issuer identifier.
+    public let credentialIssuer: String
+    /// Best localized issuer display entry.
+    public let display: MetadataDisplay?
+
+    /// Creates typed issuer metadata.
+    ///
+    /// - Parameters:
+    ///   - credentialIssuer: Canonical credential issuer identifier.
+    ///   - display: Best localized issuer display entry.
+    public init(credentialIssuer: String, display: MetadataDisplay?) {
         self.credentialIssuer = credentialIssuer
+        self.display = display
+    }
+}
+
+/// Display metadata for one claim declared by an offered credential configuration.
+public struct CredentialClaimMetadata: Equatable, Sendable {
+    /// Claim path relative to the credential root.
+    public let path: [String]
+    /// Whether the issuer declares the claim as always included.
+    public let mandatory: Bool?
+    /// Best localized human-readable claim name.
+    public let displayName: String?
+
+    /// Creates claim metadata declared by a credential configuration.
+    ///
+    /// - Parameters:
+    ///   - path: Claim path relative to the credential root.
+    ///   - mandatory: Whether the issuer declares the claim as always included.
+    ///   - displayName: Best localized human-readable claim name.
+    public init(path: [String], mandatory: Bool?, displayName: String?) {
+        self.path = path
+        self.mandatory = mandatory
+        self.displayName = displayName
+    }
+}
+
+/// Typed metadata for one credential configuration referenced by an offer.
+public struct OfferedCredentialMetadata: Equatable, Sendable {
+    /// Credential configuration identifier referenced by the offer.
+    public let configurationID: String
+    /// OpenID4VCI credential format.
+    public let format: String
+    /// Authorization scope associated with the configuration.
+    public let scope: String?
+    /// SD-JWT VC type identifier when present.
+    public let vct: String?
+    /// ISO mdoc document type when present.
+    public let doctype: String?
+    /// Best localized credential display entry.
+    public let display: MetadataDisplay?
+    /// Claims declared by the credential configuration.
+    public let claims: [CredentialClaimMetadata]
+
+    /// Creates typed metadata for an offered credential configuration.
+    ///
+    /// - Parameters:
+    ///   - configurationID: Credential configuration identifier referenced by the offer.
+    ///   - format: OpenID4VCI credential format.
+    ///   - scope: Authorization scope associated with the configuration.
+    ///   - vct: SD-JWT VC type identifier when present.
+    ///   - doctype: ISO mdoc document type when present.
+    ///   - display: Best localized credential display entry.
+    ///   - claims: Claims declared by the credential configuration.
+    public init(
+        configurationID: String,
+        format: String,
+        scope: String?,
+        vct: String?,
+        doctype: String?,
+        display: MetadataDisplay?,
+        claims: [CredentialClaimMetadata]
+    ) {
+        self.configurationID = configurationID
+        self.format = format
+        self.scope = scope
+        self.vct = vct
+        self.doctype = doctype
+        self.display = display
+        self.claims = claims
+    }
+}
+
+/// Input modes defined for an OpenID4VCI transaction code.
+public enum TransactionCodeInputMode: Equatable, Sendable {
+    /// ASCII decimal digits only.
+    case numeric
+    /// General text input.
+    case text
+}
+
+/// Transaction-code metadata used to collect issuer-delivered input.
+public struct TransactionCodeRequirement: Equatable, Sendable {
+    /// Permitted input character class.
+    public let inputMode: TransactionCodeInputMode
+    /// Exact expected character count when supplied by the issuer.
+    public let length: Int?
+    /// Issuer-provided guidance for obtaining or entering the code.
+    public let description: String?
+
+    /// Creates a transaction-code input requirement.
+    ///
+    /// - Parameters:
+    ///   - inputMode: Permitted input character class.
+    ///   - length: Exact expected character count when supplied by the issuer.
+    ///   - description: Issuer-provided guidance for obtaining or entering the code.
+    public init(inputMode: TransactionCodeInputMode, length: Int?, description: String?) {
+        self.inputMode = inputMode
+        self.length = length
+        self.description = description
+    }
+}
+
+/// Opaque handle for one reviewed OpenID4VCI credential offer.
+public struct IssuancePreviewHandle: Equatable, Sendable, CustomStringConvertible {
+    let value: String
+
+    /// Creates a handle for bridge adapters and test fixtures. Production handles come from preview operations.
+    ///
+    /// - Parameter value: Nonempty opaque handle value supplied by wallet core.
+    public init(value: String) {
+        precondition(!value.isEmpty, "Issuance preview handle must not be empty.")
+        self.value = value
+    }
+
+    /// Redacted representation that does not expose the opaque handle value.
+    public var description: String { "IssuancePreviewHandle(<redacted>)" }
+}
+
+/// Reviewed OpenID4VCI offer metadata bound to an opaque issuance handle.
+public struct OfferResolution: Equatable, Sendable {
+    /// Opaque handle required to receive credentials from this reviewed offer.
+    public let previewHandle: IssuancePreviewHandle
+    /// Typed issuer metadata selected for the configured locale preferences.
+    public let issuer: IssuerMetadata
+    /// Typed metadata for every credential configuration in the offer.
+    public let offeredCredentials: [OfferedCredentialMetadata]
+    /// Input requirement when the offer requires a separately delivered code.
+    public let transactionCode: TransactionCodeRequirement?
+
+    /// Creates an offer resolution retained for review and subsequent acceptance.
+    ///
+    /// - Parameters:
+    ///   - previewHandle: Opaque handle required to act on this reviewed offer.
+    ///   - issuer: Typed issuer metadata selected for the configured locales.
+    ///   - offeredCredentials: Metadata for every credential configuration in the offer.
+    ///   - transactionCode: Input requirement when a separately delivered code is required.
+    public init(
+        previewHandle: IssuancePreviewHandle,
+        issuer: IssuerMetadata,
+        offeredCredentials: [OfferedCredentialMetadata],
+        transactionCode: TransactionCodeRequirement?
+    ) {
+        self.previewHandle = previewHandle
+        self.issuer = issuer
         self.offeredCredentials = offeredCredentials
+        self.transactionCode = transactionCode
+    }
+}
+
+/// Typed OpenID4VP verifier metadata shown during presentation review.
+public struct VerifierMetadata: Equatable, Sendable {
+    /// Best localized verifier display entry.
+    public let display: MetadataDisplay?
+    /// Verifier information page URI.
+    public let clientURI: String?
+    /// Verifier privacy policy URI.
+    public let policyURI: String?
+    /// Verifier terms-of-service URI.
+    public let termsOfServiceURI: String?
+
+    /// Creates typed verifier metadata supplied by an OpenID4VP request.
+    ///
+    /// - Parameters:
+    ///   - display: Best localized verifier name and logo.
+    ///   - clientURI: Verifier information-page URI.
+    ///   - policyURI: Verifier privacy-policy URI.
+    ///   - termsOfServiceURI: Verifier terms-of-service URI.
+    public init(
+        display: MetadataDisplay?,
+        clientURI: String?,
+        policyURI: String?,
+        termsOfServiceURI: String?
+    ) {
+        self.display = display
+        self.clientURI = clientURI
+        self.policyURI = policyURI
+        self.termsOfServiceURI = termsOfServiceURI
     }
 }
 
@@ -583,36 +682,99 @@ public struct WalletBootstrapResult: Equatable, Sendable {
 }
 
 /// Result of responding to an OpenID4VP presentation request.
-public struct PresentationResult: Equatable, Sendable {
-    /// Indicates whether the presentation flow completed successfully.
-    public let success: Bool
+///
+/// Each case represents the next action required from the host app.
+public enum PresentationResult: Equatable, Sendable {
+    /// A protocol response that still requires a host-app delivery action.
+    public enum Prepared: Equatable, Sendable {
+        /// The host app must open the URL to deliver the protocol response.
+        case openURL(URL)
 
-    /// Optional verifier redirect URL.
-    public let redirectTo: URL?
+        /// The host app must render the HTML so its self-submitting form can deliver the protocol response.
+        case submitForm(html: String)
+    }
 
-    /// Optional raw verifier response JSON.
-    public let verifierResponseJSON: String?
+    /// A protocol response that was transmitted and received a JSON verifier response.
+    public enum Transmitted: Equatable, Sendable {
+        /// The verifier accepted the protocol response.
+        case succeeded(verifierResponseJSON: String, redirectURL: URL? = nil)
 
-    /// Creates a presentation result.
+        /// The verifier rejected or could not process the protocol response.
+        case failed(verifierResponseJSON: String)
+    }
+
+    /// The host app still needs to deliver the prepared response.
+    case prepared(Prepared)
+
+    /// The verifier returned a response after protocol transmission.
+    case transmitted(Transmitted)
+
+}
+
+/// Result of resolving and validating an OpenID4VP request for presentation preview.
+public enum PresentationPreviewResult: Equatable, Sendable {
+    /// The request is valid and can be reviewed, submitted, or declined.
+    case ready(PresentationPreview)
+
+    /// The request cannot be fulfilled, but its protocol error can be returned after user interaction.
+    case invalid(PresentationPreviewError)
+}
+
+/// Protocol error detected while previewing a presentation request.
+public struct PresentationPreviewError: Equatable, Sendable {
+    /// Opaque handle required to reject or discard this reviewed request.
+    public let previewHandle: PresentationPreviewHandle
+
+    /// Validated response destination and partial request context to show before returning the error.
+    public let request: PresentationRequestContext
+
+    /// OpenID4VP or OAuth authorization error code selected by the wallet.
+    public let code: PresentationErrorCode
+
+    /// Local diagnostic intended for wallet UI; it is not sent to the verifier automatically.
+    public let message: String
+
+    /// Creates a presentation preview error.
     ///
     /// - Parameters:
-    ///   - success: Indicates whether the presentation flow completed
-    ///     successfully.
-    ///   - redirectTo: Optional verifier redirect URL.
-    ///   - verifierResponseJSON: Optional raw verifier response JSON.
+    ///   - previewHandle: Opaque handle required to reject or discard this reviewed request.
+    ///   - request: Validated response destination and request context shown before responding.
+    ///   - code: OpenID4VP or OAuth authorization error code selected by the wallet.
+    ///   - message: Local diagnostic that is not sent to the verifier automatically.
     public init(
-        success: Bool,
-        redirectTo: URL?,
-        verifierResponseJSON: String?
+        previewHandle: PresentationPreviewHandle,
+        request: PresentationRequestContext,
+        code: PresentationErrorCode,
+        message: String
     ) {
-        self.success = success
-        self.redirectTo = redirectTo
-        self.verifierResponseJSON = verifierResponseJSON
+        self.previewHandle = previewHandle
+        self.request = request
+        self.code = code
+        self.message = message
     }
 }
 
-/// Preview of an OpenID4VP presentation request before the wallet submits a VP token.
+/// Opaque handle for one reviewed OpenID4VP presentation request.
+public struct PresentationPreviewHandle: Equatable, Sendable, CustomStringConvertible {
+    let value: String
+
+    /// Creates a handle for bridge adapters and test fixtures. Production handles come from preview operations.
+    ///
+    /// - Parameter value: Nonempty opaque handle value supplied by wallet core.
+    public init(value: String) {
+        precondition(!value.isEmpty, "Presentation preview handle must not be empty.")
+        self.value = value
+    }
+
+    /// Redacted representation that does not expose the opaque handle value.
+    public var description: String { "PresentationPreviewHandle(<redacted>)" }
+}
+
+/// Reviewed OpenID4VP request metadata bound to an opaque presentation handle.
 public struct PresentationPreview: Equatable, Sendable {
+    /// Opaque handle required to submit, reject, or discard this reviewed request.
+    public let previewHandle: PresentationPreviewHandle
+
     /// Verifier/request information shown to the user.
     public let request: PresentationRequestInfo
 
@@ -625,6 +787,7 @@ public struct PresentationPreview: Equatable, Sendable {
     /// Creates a presentation preview.
     ///
     /// - Parameters:
+    ///   - previewHandle: Opaque handle required to act on this reviewed request.
     ///   - request: Verifier and request metadata extracted from the
     ///     presentation request.
     ///   - credentialOptions: Wallet credentials that can satisfy the
@@ -632,10 +795,12 @@ public struct PresentationPreview: Equatable, Sendable {
     ///   - credentialRequirements: Required DCQL credential query combinations
     ///     that must be satisfied before submission.
     public init(
+        previewHandle: PresentationPreviewHandle,
         request: PresentationRequestInfo,
         credentialOptions: [PresentationCredentialOption],
         credentialRequirements: [PresentationCredentialRequirement] = []
     ) {
+        self.previewHandle = previewHandle
         self.request = request
         self.credentialOptions = credentialOptions
         self.credentialRequirements = credentialRequirements
@@ -655,17 +820,131 @@ public struct PresentationCredentialRequirement: Equatable, Sendable {
     /// - Parameter options: Alternative query-id combinations that can satisfy
     ///   this requirement.
     public init(options: [[String]]) {
+        precondition(
+            Self.hasValidOptions(options),
+            "A presentation credential requirement must contain non-empty options with non-blank query IDs."
+        )
         self.options = options
+    }
+
+    static func hasValidOptions(_ options: [[String]]) -> Bool {
+        !options.isEmpty && options.allSatisfy { option in
+            !option.isEmpty && option.allSatisfy(isNonBlank)
+        }
     }
 }
 
-/// Verifier and transaction metadata extracted from a presentation request.
+/// Partial request context retained when an OpenID4VP request is invalid.
+///
+/// A reportable invalid request has a validated, non-blank client identifier.
+/// Its nonce remains optional because a missing nonce can itself be the
+/// validation error. A ready preview exposes a validated, non-optional nonce
+/// through ``PresentationRequestInfo``.
+public struct PresentationRequestContext: Equatable, Sendable {
+    /// Validated OpenID4VP client identifier.
+    public let clientID: String
+
+    /// Typed metadata supplied by the OpenID4VP verifier when available.
+    public let verifierMetadata: VerifierMetadata?
+
+    /// Response URI used for direct-post responses when available.
+    public let responseURI: URL?
+
+    /// OpenID state value when available.
+    public let state: String?
+
+    /// OpenID nonce value when available.
+    public let nonce: String?
+
+    /// Response-encryption state selected for the request when available.
+    public let responseEncryption: PresentationResponseEncryption
+
+    /// Creates partial presentation request context.
+    ///
+    /// - Parameters:
+    ///   - clientID: Validated OpenID4VP client identifier from the request.
+    ///   - verifierMetadata: Typed metadata supplied by the verifier when available.
+    ///   - responseURI: Response URI to which the wallet would submit the presentation or error, when provided.
+    ///   - state: OpenID state value from the request, when provided.
+    ///   - nonce: OpenID nonce value from the request, when provided. May be nil if the missing nonce is the validation error.
+    ///   - responseEncryption: Response-encryption state selected for the request.
+    public init(
+        clientID: String,
+        verifierMetadata: VerifierMetadata? = nil,
+        responseURI: URL? = nil,
+        state: String? = nil,
+        nonce: String? = nil,
+        responseEncryption: PresentationResponseEncryption = .notRequired
+    ) {
+        precondition(
+            Self.hasValidClientID(clientID),
+            "A reportable presentation request must contain a non-blank client ID."
+        )
+        self.clientID = clientID
+        self.verifierMetadata = verifierMetadata
+        self.responseURI = responseURI
+        self.state = state
+        self.nonce = nonce
+        self.responseEncryption = responseEncryption
+    }
+
+    static func hasValidClientID(_ clientID: String) -> Bool {
+        isNonBlank(clientID)
+    }
+}
+
+/// Response encryption selected for an OpenID4VP presentation request.
+public enum PresentationResponseEncryption: Equatable, Sendable {
+    /// The reviewed request does not require an encrypted authorization response.
+    case notRequired
+
+    /// The reviewed request requires an encrypted authorization response.
+    case required(ResponseEncryptionDetails)
+}
+
+/// Algorithms and verifier key identity selected for response encryption.
+///
+/// These values describe response protection and do not establish verifier trust.
+public struct ResponseEncryptionDetails: Equatable, Sendable {
+    /// JWE `alg` value selected by the protocol implementation.
+    public let keyManagementAlgorithm: String
+
+    /// JWE `enc` value selected by the protocol implementation.
+    public let contentEncryptionAlgorithm: String
+
+    /// Verifier-provided identifier of the selected encryption key.
+    public let verifierKeyID: String?
+
+    /// RFC 7638 thumbprint of the selected verifier encryption key.
+    public let verifierKeyThumbprint: String
+
+    /// Creates response-encryption details.
+    ///
+    /// - Parameters:
+    ///   - keyManagementAlgorithm: JWE `alg` value selected for the response.
+    ///   - contentEncryptionAlgorithm: JWE `enc` value selected for the response.
+    ///   - verifierKeyID: Verifier-provided identifier of the selected public key.
+    ///   - verifierKeyThumbprint: RFC 7638 thumbprint of the selected public key.
+    public init(
+        keyManagementAlgorithm: String,
+        contentEncryptionAlgorithm: String,
+        verifierKeyID: String?,
+        verifierKeyThumbprint: String
+    ) {
+        self.keyManagementAlgorithm = keyManagementAlgorithm
+        self.contentEncryptionAlgorithm = contentEncryptionAlgorithm
+        self.verifierKeyID = verifierKeyID
+        self.verifierKeyThumbprint = verifierKeyThumbprint
+    }
+}
+
+/// Verifier, transaction, and response-protection metadata extracted from a presentation request.
 public struct PresentationRequestInfo: Equatable, Sendable {
     /// OpenID4VP client identifier.
-    public let clientID: String?
+    public let clientID: String
 
-    /// Human-readable verifier name from client metadata when available.
-    public let verifierName: String?
+    /// Typed metadata supplied by the OpenID4VP verifier when available.
+    public let verifierMetadata: VerifierMetadata?
 
     /// Response URI used for direct-post responses when available.
     public let responseURI: URL?
@@ -674,7 +953,10 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     public let state: String?
 
     /// OpenID nonce value.
-    public let nonce: String?
+    public let nonce: String
+
+    /// Response-encryption state selected for this request.
+    public let responseEncryption: PresentationResponseEncryption
 
     /// Decoded transaction data attached to the request.
     public let transactionData: [PresentationTransactionData]
@@ -683,26 +965,37 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     ///
     /// - Parameters:
     ///   - clientID: OpenID4VP client identifier from the request.
-    ///   - verifierName: Human-readable verifier name from client metadata
-    ///     when available.
+    ///   - verifierMetadata: Typed metadata supplied by the verifier.
     ///   - responseURI: Direct-post response URI when available.
     ///   - state: OpenID state value from the request.
     ///   - nonce: OpenID nonce value from the request.
+    ///   - responseEncryption: Response-encryption state selected for the request.
     ///   - transactionData: Decoded transaction data attached to the request.
     public init(
-        clientID: String? = nil,
-        verifierName: String? = nil,
+        clientID: String,
+        verifierMetadata: VerifierMetadata? = nil,
         responseURI: URL? = nil,
         state: String? = nil,
-        nonce: String? = nil,
+        nonce: String,
+        responseEncryption: PresentationResponseEncryption,
         transactionData: [PresentationTransactionData] = []
     ) {
+        precondition(
+            Self.hasRequiredFields(clientID: clientID, nonce: nonce),
+            "A presentation request must contain non-blank client ID and nonce values."
+        )
         self.clientID = clientID
-        self.verifierName = verifierName
+        self.verifierMetadata = verifierMetadata
         self.responseURI = responseURI
         self.state = state
         self.nonce = nonce
+        self.responseEncryption = responseEncryption
         self.transactionData = transactionData
+    }
+
+    static func hasRequiredFields(clientID: String, nonce: String) -> Bool {
+        !clientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !nonce.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 
@@ -766,6 +1059,10 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
         credentialDataJSON: String,
         disclosures: [PresentationDisclosure] = []
     ) {
+        precondition(
+            isNonBlank(queryID),
+            "A presentation credential option must contain a non-blank query ID."
+        )
         self.queryID = queryID
         self.credentialID = credentialID
         self.multiple = multiple
@@ -879,8 +1176,25 @@ public struct PresentationDisclosure: Equatable, Identifiable, Sendable {
         self.displayValue = displayValue
         self.selectivelyDisclosable = selectivelyDisclosable
         let resolvedRequired = required ?? !selectivelyDisclosable
+        let resolvedSelectable = selectable ?? (selectivelyDisclosable && !resolvedRequired)
+        precondition(
+            Self.hasValidSelectionState(
+                selectivelyDisclosable: selectivelyDisclosable,
+                required: resolvedRequired,
+                selectable: resolvedSelectable
+            ),
+            "A selectable disclosure must be selectively disclosable and optional."
+        )
         self.required = resolvedRequired
-        self.selectable = selectable ?? (selectivelyDisclosable && !resolvedRequired)
+        self.selectable = resolvedSelectable
+    }
+
+    static func hasValidSelectionState(
+        selectivelyDisclosable: Bool,
+        required: Bool,
+        selectable: Bool
+    ) -> Bool {
+        !selectable || (selectivelyDisclosable && !required)
     }
 }
 
@@ -921,6 +1235,14 @@ public struct PresentationTransactionData: Equatable, Sendable {
         rawJSON: String,
         detailsJSON: String
     ) {
+        precondition(
+            !credentialQueryIDs.isEmpty,
+            "Transaction data must reference at least one credential query ID."
+        )
+        precondition(
+            credentialQueryIDs.allSatisfy(isNonBlank),
+            "Transaction data must contain non-blank credential query IDs."
+        )
         self.type = type
         self.displayName = displayName
         self.credentialQueryIDs = credentialQueryIDs
@@ -930,31 +1252,153 @@ public struct PresentationTransactionData: Equatable, Sendable {
     }
 }
 
-/// Progress event emitted while issuance or presentation work is running.
-public struct WalletEvent: Equatable, Sendable {
-    /// Event name emitted by the wallet core.
-    public let name: String
+/// OAuth 2.0 and OpenID4VP 1.0 authorization error codes supported by the wallet.
+///
+/// Use ``accessDenied`` when the user declines, the wallet has no requested
+/// credential, or user authentication fails. Other cases describe protocol or
+/// availability failures and should not be presented as end-user choices.
+public enum PresentationErrorCode: String, Equatable, Sendable {
+    /// The user or wallet denied the presentation request.
+    case accessDenied = "access_denied"
+
+    /// The authorization request is malformed or missing a required parameter.
+    case invalidRequest = "invalid_request"
+
+    /// The request's client identification is invalid.
+    case invalidClient = "invalid_client"
+
+    /// The requested scope is invalid, unknown, or unsupported.
+    case invalidScope = "invalid_scope"
+
+    /// The client is not authorized to make this presentation request.
+    case unauthorizedClient = "unauthorized_client"
+
+    /// The wallet does not support the requested response type.
+    case unsupportedResponseType = "unsupported_response_type"
+
+    /// The wallet cannot fulfill the request because of an unexpected error.
+    case serverError = "server_error"
+
+    /// The wallet cannot fulfill the request because it is temporarily unavailable.
+    case temporarilyUnavailable = "temporarily_unavailable"
+
+    /// The wallet does not support any requested verifiable-presentation format.
+    case vpFormatsNotSupported = "vp_formats_not_supported"
+
+    /// The wallet does not support the request's `request_uri_method`.
+    case invalidRequestURIMethod = "invalid_request_uri_method"
+
+    /// The request contains invalid or unsupported transaction data.
+    case invalidTransactionData = "invalid_transaction_data"
+
+    /// The requested wallet is unavailable.
+    case walletUnavailable = "wallet_unavailable"
+
+    /// OpenID4VP error code sent for this reason.
+    public var errorCode: String { rawValue }
+}
+
+/// Lifecycle event emitted while issuance or presentation work is running.
+public enum WalletEvent: CaseIterable, Equatable, Sendable {
+    /// Credential offer resolution completed.
+    case issuanceOfferResolved
+    /// Wallet attestation was obtained.
+    case issuanceAttestationObtained
+    /// Issuance token was obtained.
+    case issuanceTokenObtained
+    /// Credential proof was signed.
+    case issuanceProofSigned
+    /// Credential was received from the issuer.
+    case issuanceCredentialReceived
+    /// Issuance was deferred by the issuer.
+    case issuanceDeferred
+    /// Credential was stored locally.
+    case issuanceCredentialStored
+    /// Issuance completed successfully.
+    case issuanceCompleted
+    /// Issuance failed.
+    case issuanceFailed
+    /// Presentation request was parsed.
+    case presentationRequestParsed
+    /// Presentation credentials were selected.
+    case presentationCredentialsSelected
+    /// Presentation was signed.
+    case presentationSigned
+    /// Presentation protocol response was prepared for delivery.
+    case presentationResponsePrepared
+    /// Presentation was submitted.
+    case presentationSubmitted
+    /// Presentation completed successfully.
+    case presentationCompleted
+    /// Presentation failed.
+    case presentationFailed
+
+    /// Creates an event from its stable wallet-core name.
+    ///
+    /// - Parameter name: Stable event name emitted by the wallet core.
+    public init?(name: String) {
+        guard let event = Self.allCases.first(where: { $0.name == name }) else {
+            return nil
+        }
+        self = event
+    }
+
+    /// Stable event name emitted by the wallet core.
+    public var name: String {
+        switch self {
+        case .issuanceOfferResolved: return "issuance_offer_resolved"
+        case .issuanceAttestationObtained: return "issuance_attestation_obtained"
+        case .issuanceTokenObtained: return "issuance_token_obtained"
+        case .issuanceProofSigned: return "issuance_proof_signed"
+        case .issuanceCredentialReceived: return "issuance_credential_received"
+        case .issuanceDeferred: return "issuance_deferred"
+        case .issuanceCredentialStored: return "issuance_credential_stored"
+        case .issuanceCompleted: return "issuance_completed"
+        case .issuanceFailed: return "issuance_failed"
+        case .presentationRequestParsed: return "presentation_request_parsed"
+        case .presentationCredentialsSelected: return "presentation_credentials_selected"
+        case .presentationSigned: return "presentation_signed"
+        case .presentationResponsePrepared: return "presentation_response_prepared"
+        case .presentationSubmitted: return "presentation_submitted"
+        case .presentationCompleted: return "presentation_completed"
+        case .presentationFailed: return "presentation_failed"
+        }
+    }
 
     /// High-level workflow phase for the event.
-    public let phase: WalletEventPhase
+    public var phase: WalletEventPhase {
+        switch self {
+        case .issuanceOfferResolved,
+             .issuanceAttestationObtained,
+             .issuanceTokenObtained,
+             .issuanceProofSigned,
+             .issuanceCredentialReceived,
+             .issuanceDeferred,
+             .issuanceCredentialStored,
+             .issuanceCompleted,
+             .issuanceFailed:
+            return .issuance
+        case .presentationRequestParsed,
+             .presentationCredentialsSelected,
+             .presentationSigned,
+             .presentationResponsePrepared,
+             .presentationSubmitted,
+             .presentationCompleted,
+             .presentationFailed:
+            return .presentation
+        }
+    }
 
     /// High-level status for the event.
-    public let status: WalletEventStatus
-
-    /// Creates a wallet progress event.
-    ///
-    /// - Parameters:
-    ///   - name: Event name emitted by the wallet core.
-    ///   - phase: High-level issuance or presentation phase.
-    ///   - status: High-level progress status.
-    public init(
-        name: String,
-        phase: WalletEventPhase,
-        status: WalletEventStatus
-    ) {
-        self.name = name
-        self.phase = phase
-        self.status = status
+    public var status: WalletEventStatus {
+        switch self {
+        case .issuanceCompleted, .presentationCompleted:
+            return .completed
+        case .issuanceFailed, .presentationFailed:
+            return .failed
+        default:
+            return .progress
+        }
     }
 }
 
@@ -977,4 +1421,8 @@ public enum WalletEventStatus: Equatable, Sendable {
 
     /// The operation failed.
     case failed
+}
+
+private func isNonBlank(_ value: String) -> Bool {
+    !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 }

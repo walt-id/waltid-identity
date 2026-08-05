@@ -1,13 +1,8 @@
 import SwiftUI
-
-struct OfferPreview {
-    let credentialIssuer: String
-    let offeredCredentials: [String]
-    let transactionCodeRequired: Bool
-}
+import WalletSDK
 
 struct OfferReviewView: View {
-    let preview: OfferPreview
+    let preview: OfferResolution
     let isAcceptEnabled: Bool
     let isReviewEnabled: Bool
     let txCode: String
@@ -20,53 +15,64 @@ struct OfferReviewView: View {
             Text("Credential offer")
                 .font(.headline)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Issuer")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(preview.credentialIssuer.isEmpty ? "Unknown issuer" : preview.credentialIssuer)
-                    .font(.subheadline)
+            ReviewMetadataSection(
+                title: "Issuer",
+                titleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerSection
+            ) {
+                MetadataIdentityView(
+                    display: preview.issuer.display,
+                    fallbackName: preview.issuer.credentialIssuer,
+                    supportingText: preview.issuer.display?.name == preview.issuer.credentialIssuer
+                        ? nil
+                        : preview.issuer.credentialIssuer
+                )
+            }
 
-                if !preview.offeredCredentials.isEmpty {
-                    Text("Offered credentials")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 4)
-                    ForEach(preview.offeredCredentials, id: \.self) { credentialType in
-                        Text(credentialType)
-                            .font(.caption)
+            if !preview.offeredCredentials.isEmpty {
+                ReviewMetadataSection(
+                    title: "Offered credentials",
+                    titleAccessibilityIdentifier: WalletAccessibilityID.offerCredentialsSection
+                ) {
+                    ForEach(Array(preview.offeredCredentials.enumerated()), id: \.offset) { index, credential in
+                        if index > 0 {
+                            Divider()
+                        }
+                        OfferedCredentialView(credential: credential)
                     }
                 }
             }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
 
-            if preview.transactionCodeRequired {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("This offer requires a transaction code.")
+            if let requirement = preview.transactionCode {
+                ReviewMetadataSection(
+                    title: "Transaction code",
+                    titleAccessibilityIdentifier: WalletAccessibilityID.offerTransactionCodeSection
+                ) {
+                    Text(requirement.description ?? "Enter the transaction code provided by the issuer.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     SecureField(
-                        "Transaction code",
-                        text: Binding(
-                            get: { txCode },
-                            set: onTxCodeChange
-                        )
+                        "Code",
+                        text: Binding(get: { txCode }, set: onTxCodeChange)
                     )
                     .textContentType(.oneTimeCode)
-                    .keyboardType(.asciiCapable)
+                    .keyboardType(requirement.inputMode == .numeric ? .numberPad : .asciiCapable)
                     .textInputAutocapitalization(.never)
                     .disableAutocorrection(true)
                     .padding(8)
                     .frame(minHeight: 52)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color(.separator), lineWidth: 1)
+                    .background(
+                        isReviewEnabled ? Color(.systemBackground) : Color(.secondarySystemFill),
+                        in: RoundedRectangle(cornerRadius: 8)
                     )
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(.separator), lineWidth: 1))
                     .disabled(!isReviewEnabled)
                     .accessibilityIdentifier(WalletAccessibilityID.txCodeInput)
+
+                    if let length = requirement.length {
+                        Text("\(length) characters")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
@@ -83,6 +89,59 @@ struct OfferReviewView: View {
                     .accessibilityIdentifier(WalletAccessibilityID.offerDeclineButton)
             }
         }
-        .accessibilityIdentifier(WalletAccessibilityID.offerReview)
+    }
+}
+
+private struct OfferedCredentialView: View {
+    let credential: OfferedCredentialMetadata
+
+    private var title: String {
+        credential.display?.name ?? credential.vct ?? credential.doctype ?? credential.configurationID
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            MetadataIdentityView(
+                display: credential.display,
+                fallbackName: title,
+                supportingText: credential.display?.description
+            )
+            let details = [
+                MetadataDetailItem(label: "Format", value: credential.format),
+                MetadataDetailItem(label: "Type", value: credential.vct ?? credential.doctype),
+            ].filter(\.isVisible)
+            if !details.isEmpty {
+                Divider()
+                MetadataDetailList(items: details)
+            }
+            if !credential.claims.isEmpty {
+                Divider()
+                MetadataDisclosure(
+                    title: "Supported claims (\(credential.claims.count))",
+                    initiallyExpanded: false,
+                    accessibilityIdentifier: WalletAccessibilityID.offerSupportedClaims
+                ) {
+                    ForEach(Array(credential.claimDisplayGroups.enumerated()), id: \.offset) { groupIndex, group in
+                        if groupIndex > 0 {
+                            Divider()
+                        }
+                        Text(group.title)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.tint)
+                        ForEach(Array(group.claims.enumerated()), id: \.offset) { index, claim in
+                            if index > 0 {
+                                Divider()
+                            }
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(claim.label).font(.caption)
+                                Text(claim.inclusion)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

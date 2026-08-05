@@ -20,6 +20,7 @@ import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.mso.MobileSecurityObject
+import id.walt.mdoc.objects.sha256
 import id.walt.mdoc.schema.MdocsSchemaMappingFunction.jsonToCborElement
 import id.walt.policies2.vp.policies.VPPolicyRunner
 import id.walt.policies2.vp.policies.VPVerificationPolicyManager
@@ -31,6 +32,7 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.encodeToHexString
+import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.time.Clock
@@ -254,6 +256,33 @@ class MdocIssuanceTest {
             namespaces = data.namespaces
         )
 
+        val qualifiedIssuerSigned = MdocIssuer.issueUniversal(
+            issuerKey = issuerKey,
+            issuerCertificate = issuerCertCose,
+            holderKey = holderKey,
+            docType = docType,
+            data = data,
+            valueMappingFunction = exampleValueMappingFunction,
+            protectedHeaderX5u = "https://issuer.example/document-signer.cer",
+            protectedHeaderX5t = CoseCertHash(
+                CoseCertHash.SHA_256,
+                issuerCertCose.first().rawBytes.sha256(),
+            ),
+        )
+        val qualifiedProtectedHeaders = coseCompliantCbor.decodeFromByteArray<CoseHeaders>(
+            qualifiedIssuerSigned.issuerAuth.protected
+        )
+        check(qualifiedProtectedHeaders.x5chain == issuerCertCose)
+        check(qualifiedIssuerSigned.issuerAuth.unprotected.x5chain == null)
+        verifyIssued(
+            document = makeDocument(docType, qualifiedIssuerSigned),
+            docType = docType,
+            issuerPublicCoseVerifier = issuerPublicCoseVerifier,
+            namespacesToCheck = listOf(ns),
+            holderKey = holderKey,
+            namespaces = data.namespaces,
+        )
+
     }
 
     @Test
@@ -304,5 +333,4 @@ class MdocIssuanceTest {
         )
     }
 }
-
 

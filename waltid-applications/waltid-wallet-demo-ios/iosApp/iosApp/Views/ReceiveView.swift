@@ -30,7 +30,15 @@ struct ReceiveView: View {
                         .tint(.waltBlue)
                         .disabled(!viewModel.receiveActionEnabled)
                         .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
-                    } else if let preview = viewModel.offerPreview {
+                    }
+
+                    StatusBannerView(
+                        message: viewModel.statusMessage(for: .receive),
+                        isLoading: viewModel.statusIsLoading(for: .receive),
+                        isError: viewModel.statusIsError(for: .receive)
+                    )
+
+                    if let preview = viewModel.offerPreview {
                         OfferReviewView(
                             preview: preview,
                             isAcceptEnabled: viewModel.acceptOfferEnabled,
@@ -41,12 +49,6 @@ struct ReceiveView: View {
                             onDecline: viewModel.declineOffer
                         )
                     }
-
-                    StatusBannerView(
-                        message: viewModel.statusMessage(for: .receive),
-                        isLoading: viewModel.statusIsLoading(for: .receive),
-                        isError: viewModel.statusIsError(for: .receive)
-                    )
 
                     if let warning = viewModel.transactionDataProfilesWarning {
                         WarningBannerView(message: warning)

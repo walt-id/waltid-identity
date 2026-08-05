@@ -1,0 +1,86 @@
+public abstract interface class id/walt/crypto2/kms/aws/sdk/AwsKmsSdkClient : java/lang/AutoCloseable {
+	public abstract fun createAlias (Laws/sdk/kotlin/services/kms/model/CreateAliasRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun createKey (Laws/sdk/kotlin/services/kms/model/CreateKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun decrypt (Laws/sdk/kotlin/services/kms/model/DecryptRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun encrypt (Laws/sdk/kotlin/services/kms/model/EncryptRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getPublicKey (Laws/sdk/kotlin/services/kms/model/GetPublicKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun replicateKey (Laws/sdk/kotlin/services/kms/model/ReplicateKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun scheduleKeyDeletion (Laws/sdk/kotlin/services/kms/model/ScheduleKeyDeletionRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun sign (Laws/sdk/kotlin/services/kms/model/SignRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun verify (Laws/sdk/kotlin/services/kms/model/VerifyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class id/walt/crypto2/kms/aws/sdk/AwsKmsSdkClientFactory {
+	public abstract fun create (Ljava/lang/String;)Lid/walt/crypto2/kms/aws/sdk/AwsKmsSdkClient;
+}
+
+public abstract interface class id/walt/crypto2/kms/aws/sdk/AwsKmsSdkFailoverPolicy {
+	public abstract fun shouldFailover (Ljava/lang/Throwable;)Z
+}
+
+public final class id/walt/crypto2/kms/aws/sdk/AwsKmsSdkKeyProvider : id/walt/crypto2/providers/ManagedKeyProvider {
+	public static final field Companion Lid/walt/crypto2/kms/aws/sdk/AwsKmsSdkKeyProvider$Companion;
+	public fun <init> ()V
+	public fun <init> (Lid/walt/crypto2/kms/aws/sdk/AwsKmsSdkClientFactory;Lid/walt/crypto2/kms/aws/sdk/AwsKmsSdkFailoverPolicy;)V
+	public synthetic fun <init> (Lid/walt/crypto2/kms/aws/sdk/AwsKmsSdkClientFactory;Lid/walt/crypto2/kms/aws/sdk/AwsKmsSdkFailoverPolicy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun generate (Lid/walt/crypto2/providers/GenerateManagedKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getId-v1VkqW4 ()Ljava/lang/String;
+	public fun restore (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/kms/aws/sdk/AwsKmsSdkKeyProvider$Companion {
+	public final fun getID-v1VkqW4 ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/kms/aws/sdk/AwsKmsSdkOptions {
+	public static final field Companion Lid/walt/crypto2/kms/aws/sdk/AwsKmsSdkOptions$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ZLjava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ZLjava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/util/Map;
+	public final fun component5 ()Z
+	public final fun component6 ()Ljava/util/List;
+	public final fun component7 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ZLjava/util/List;Ljava/util/List;)Lid/walt/crypto2/kms/aws/sdk/AwsKmsSdkOptions;
+	public static synthetic fun copy$default (Lid/walt/crypto2/kms/aws/sdk/AwsKmsSdkOptions;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ZLjava/util/List;Ljava/util/List;ILjava/lang/Object;)Lid/walt/crypto2/kms/aws/sdk/AwsKmsSdkOptions;
+	public final fun encode ()Lid/walt/crypto2/serialization/BinaryData;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlias ()Ljava/lang/String;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getFailoverOrder ()Ljava/util/List;
+	public final fun getMultiRegion ()Z
+	public final fun getPrimaryRegion ()Ljava/lang/String;
+	public final fun getReplicaRegions ()Ljava/util/List;
+	public final fun getTags ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/kms/aws/sdk/AwsKmsSdkOptions$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/kms/aws/sdk/AwsKmsSdkOptions$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/kms/aws/sdk/AwsKmsSdkOptions;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/kms/aws/sdk/AwsKmsSdkOptions;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/kms/aws/sdk/AwsKmsSdkOptions$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/kms/aws/sdk/DefaultAwsKmsSdkClientFactory : id/walt/crypto2/kms/aws/sdk/AwsKmsSdkClientFactory {
+	public fun <init> ()V
+	public fun create (Ljava/lang/String;)Lid/walt/crypto2/kms/aws/sdk/AwsKmsSdkClient;
+}
+
+public final class id/walt/crypto2/kms/aws/sdk/DefaultAwsKmsSdkFailoverPolicy : id/walt/crypto2/kms/aws/sdk/AwsKmsSdkFailoverPolicy {
+	public static final field INSTANCE Lid/walt/crypto2/kms/aws/sdk/DefaultAwsKmsSdkFailoverPolicy;
+	public fun shouldFailover (Ljava/lang/Throwable;)Z
+}
+

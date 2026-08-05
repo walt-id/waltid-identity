@@ -55,6 +55,7 @@ class Issuer2Module(
         sessionService = issuanceSessionService,
         preAuthorizedGrantAnonymousAccessSupported =
             openId4VciModule.preAuthorizedCodeIssuer.anonymousAccessSupported,
+        crypto2TokenSigningKey = openId4VciModule.crypto2TokenSigningKey,
     )
 
     private val credentialOfferService = CredentialOfferService(
@@ -71,6 +72,7 @@ class Issuer2Module(
         profileService = credentialProfileService,
         metadataService = metadataService,
         notificationService = notificationService,
+        credentialNonceService = openId4VciModule.credentialNonceService,
     )
 
     val managementController = Issuer2ManagementController(

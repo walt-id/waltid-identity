@@ -5,14 +5,15 @@ struct ClaimGroupView: View {
 
     var body: some View {
         if !group.items.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(group.title.uppercased())
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.tint)
-                    .accessibilityLabel(group.title)
-                    .accessibilityIdentifier(WalletAccessibilityID.claimGroup(group.title))
-
-                VStack(alignment: .leading, spacing: 12) {
+            ReviewMetadataSection(
+                title: group.title,
+                titleAccessibilityIdentifier: WalletAccessibilityID.claimGroup(group.title)
+            ) {
+                MetadataDisclosure(
+                    title: "\(group.items.count) \(group.items.count == 1 ? "entry" : "entries")",
+                    initiallyExpanded: group.initiallyExpanded,
+                    accessibilityIdentifier: WalletAccessibilityID.claimGroupDisclosure(group.title)
+                ) {
                     ForEach(Array(group.items.enumerated()), id: \.element.id) { index, item in
                         if index > 0 {
                             Divider()
@@ -20,9 +21,6 @@ struct ClaimGroupView: View {
                         ClaimValueRow(item: item)
                     }
                 }
-                .padding()
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
     }

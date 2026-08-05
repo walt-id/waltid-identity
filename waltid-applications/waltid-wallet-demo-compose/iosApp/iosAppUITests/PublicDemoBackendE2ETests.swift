@@ -190,6 +190,11 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         ui.replaceText(in: txCodeInput, value: incorrectCode(for: transactionCode))
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        try await Task.sleep(for: .seconds(1))
+        if ui.button(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept").isEnabled {
+            // Compose iOS can consume the first activation after auto-dismissing a text input.
+            ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        }
         let rejectedStatus = ui.waitForStatus(prefixes: ["Receive failed"], timeout: credentialOperationTimeout)
         guard rejectedStatus?.starts(with: "Receive failed") == true else {
             XCTFail("Incorrect transaction code was not rejected, status: \(rejectedStatus ?? "nil")")
@@ -262,7 +267,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         )
         XCTAssertEqual(previewStatus, "Review presentation request", "Presentation preview did not load, status: \(previewStatus ?? "nil")")
 
-        XCTAssertTrue(app.staticTexts["PAYMENT AUTHORIZATION"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Payment Authorization"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["42.00"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["EUR"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["ACME Corp"].waitForExistence(timeout: 10))

@@ -14,34 +14,24 @@ jobs:
       - name: Set release version
         id: set_version
         run: echo "release_version=${GITHUB_REF_SLUG}" >> $GITHUB_OUTPUT
-  docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
-    with:
-      jsonpath: ".github/workflows/data/docker-matrix.json"
   docker:
-    uses: walt-id/waltid-identity/.github/workflows/docker.yml@main
+    uses: ./.github/workflows/docker.yml
     secrets: inherit
-    needs: [ version, docker-matrix ]
+    needs: version
     with:
-      images: ${{ needs.docker-matrix.outputs.json }}s
       version: ${{ needs.version.outputs.release_version }}
       tags: '["dev", "latest"]'
       publish: true
-  api-docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
-    with:
-      jsonpath: ".github/workflows/data/api-docker-matrix.json"
   api-docker:
-    uses: walt-id/waltid-identity/.github/workflows/api-docker.yml@main
+    uses: ./.github/workflows/api-docker.yml
     secrets: inherit
-    needs: [ version, api-docker-matrix ]
+    needs: version
     with:
-      images: ${{ needs.api-docker-matrix.outputs.json }}
       version: ${{ needs.version.outputs.release_version }}
       tags: '["dev", "latest"]'
       publish: true
   deploy:
-    uses: walt-id/waltid-identity/.github/workflows/helm-deployment.yml@main
+    uses: ./.github/workflows/helm-deployment.yml
     secrets: inherit
     needs: [ version, docker, api-docker ]
     with:
