@@ -14,8 +14,6 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
-import id.walt.wallet2.handlers.BuildVpTokenRequest
-import id.walt.wallet2.handlers.BuildVpTokenResult
 import id.walt.wallet2.handlers.CredentialEndpointException
 import id.walt.wallet2.handlers.ExchangeCodeRequest
 import id.walt.wallet2.handlers.FetchCredentialRequest
@@ -39,7 +37,6 @@ import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.ResolveOfferResult
 import id.walt.wallet2.handlers.ResolveVpRequestRequest
 import id.walt.wallet2.handlers.ResolveVpRequestResult
-import id.walt.wallet2.handlers.SendAuthorizationResponseRequest
 import id.walt.wallet2.handlers.SignProofRequest
 import id.walt.wallet2.handlers.SignProofResult
 import id.walt.wallet2.handlers.WalletCredentialHandler
@@ -792,8 +789,15 @@ object Wallet2RouteHandler {
                         request { pathParameter<String>("walletId"); body<ResolveVpRequestRequest>() }
                         response { HttpStatusCode.OK to { body<ResolveVpRequestResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ResolveVpRequestRequest>()
-                        call.respond(WalletPresentationHandler.resolveRequest(req))
+                        call.respond(
+                            WalletPresentationHandler.resolveRequestWithTrust(
+                                wallet = wallet,
+                                request = req,
+                                clientIdTrustConfiguration = clientIdTrustConfiguration,
+                            )
+                        )
                     }
 
                     post("/match-credentials", {
@@ -820,34 +824,6 @@ object Wallet2RouteHandler {
                         call.respond(WalletPresentationHandler.matchCredentialsFromStore(wallet, req))
                     }
 
-                    post("/build-vp-token", {
-                        summary = "Build VP token from selected credentials"
-                        description =
-                            "Step 3 of the manual presentation flow. " +
-                                    "Takes the resolved authorization request (from /resolve-request) and the " +
-                                    "credential IDs selected by the user (from /match-credentials-from-store), " +
-                                    "then builds and signs the vp_token. " +
-                                    "Pass the result to /send-response to complete the flow."
-                        request { pathParameter<String>("walletId"); body<BuildVpTokenRequest>() }
-                        response { HttpStatusCode.OK to { body<BuildVpTokenResult>() } }
-                    }) {
-                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
-                        val req = call.receive<BuildVpTokenRequest>()
-                        call.respond(WalletPresentationHandler.buildVpToken(wallet, req))
-                    }
-
-                    post("/send-response", {
-                        summary = "Send authorization response to the verifier"
-                        description =
-                            "Step 4 of the manual presentation flow. " +
-                                    "Transmits the vp_token (from /build-vp-token) to the verifier " +
-                                    "according to the response_mode in the authorization request."
-                        request { pathParameter<String>("walletId"); body<SendAuthorizationResponseRequest>() }
-                        response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
-                    }) {
-                        val req = call.receive<SendAuthorizationResponseRequest>()
-                        call.respond(WalletPresentationHandler.sendAuthorizationResponse(req))
-                    }
                 }
             }
         }

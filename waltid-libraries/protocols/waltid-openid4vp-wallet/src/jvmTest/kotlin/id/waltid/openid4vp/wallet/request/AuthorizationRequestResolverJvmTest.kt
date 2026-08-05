@@ -132,7 +132,8 @@ class AuthorizationRequestResolverJvmTest {
             """
             {
               "client_id":"verifier2",
-              "nonce":"nonce-123"
+              "nonce":"nonce-123",
+              "aud":"https://self-issued.me/v2"
             }
             """.trimIndent(),
         )
@@ -159,7 +160,8 @@ class AuthorizationRequestResolverJvmTest {
             """
             {
               "client_id":"verifier2",
-              "nonce":"nonce-123"
+              "nonce":"nonce-123",
+              "aud":"https://self-issued.me/v2"
             }
             """.trimIndent(),
         )
@@ -299,6 +301,7 @@ class AuthorizationRequestResolverJvmTest {
         buildJsonObject {
             put("client_id", "verifier2")
             put("nonce", "nonce-123")
+            put("aud", "https://self-issued.me/v2")
         }.toString().encodeToByteArray(),
         mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
     )
