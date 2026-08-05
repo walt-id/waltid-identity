@@ -4,7 +4,6 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import io.ktor.http.Url
-import io.ktor.http.hostWithPort
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -56,10 +55,24 @@ class DPoPProofBuilder {
     internal fun normalizedTargetUri(value: String): String {
         val url = Url(value)
         require(url.host.isNotBlank()) { "DPoP target URI must include a host" }
+
+        val normalizedHost = when {
+            url.host.startsWith("[") -> url.host
+            ':' in url.host -> "[${url.host}]"
+            else -> url.host
+        }
+        val nonDefaultPort = url.specifiedPort.takeIf { port ->
+            port != 0 && port != url.protocol.defaultPort
+        }
+
         return buildString {
             append(url.protocol.name)
             append("://")
-            append(url.hostWithPort)
+            append(normalizedHost)
+            nonDefaultPort?.let { port ->
+                append(':')
+                append(port)
+            }
             append(url.encodedPath.ifEmpty { "/" })
         }
     }

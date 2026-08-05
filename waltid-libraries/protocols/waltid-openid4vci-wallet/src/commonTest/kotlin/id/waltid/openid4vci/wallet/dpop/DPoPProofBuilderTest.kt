@@ -15,6 +15,72 @@ import kotlin.test.assertNotNull
 
 class DPoPProofBuilderTest {
     @Test
+    fun omitsDefaultHttpsPort() {
+        assertEquals(
+            "https://issuer.example/token",
+            DPoPProofBuilder().normalizedTargetUri("https://issuer.example:443/token"),
+        )
+    }
+
+    @Test
+    fun omitsImplicitHttpsPort() {
+        assertEquals(
+            "https://issuer.example/token",
+            DPoPProofBuilder().normalizedTargetUri("https://issuer.example/token"),
+        )
+    }
+
+    @Test
+    fun omitsDefaultHttpPort() {
+        assertEquals(
+            "http://issuer.example/token",
+            DPoPProofBuilder().normalizedTargetUri("http://issuer.example:80/token"),
+        )
+    }
+
+    @Test
+    fun preservesNonDefaultPort() {
+        assertEquals(
+            "https://issuer.example:8443/token",
+            DPoPProofBuilder().normalizedTargetUri("https://issuer.example:8443/token"),
+        )
+    }
+
+    @Test
+    fun removesQueryAndFragment() {
+        assertEquals(
+            "https://issuer.example/token",
+            DPoPProofBuilder().normalizedTargetUri(
+                "https://issuer.example:443/token?secret=value#fragment",
+            ),
+        )
+    }
+
+    @Test
+    fun normalizesEmptyPathToSlash() {
+        assertEquals(
+            "https://issuer.example/",
+            DPoPProofBuilder().normalizedTargetUri("https://issuer.example:443"),
+        )
+    }
+
+    @Test
+    fun preservesIpv6AuthorityAndNonDefaultPort() {
+        assertEquals(
+            "https://[2001:db8::1]:8443/token",
+            DPoPProofBuilder().normalizedTargetUri("https://[2001:db8::1]:8443/token"),
+        )
+    }
+
+    @Test
+    fun omitsDefaultPortFromIpv6Authority() {
+        assertEquals(
+            "https://[2001:db8::1]/token",
+            DPoPProofBuilder().normalizedTargetUri("https://[2001:db8::1]:443/token"),
+        )
+    }
+
+    @Test
     fun createsFreshBoundProofsWithoutQueryOrFragmentInHtu() = runTest {
         val key = JWKKey.generate(KeyType.secp256k1)
         val builder = DPoPProofBuilder()
