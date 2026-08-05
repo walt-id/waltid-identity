@@ -490,14 +490,6 @@ public struct SignedMetadataProvenance: Equatable, Sendable {
     }
 }
 
-/// Authority category recorded for trusted signed metadata.
-public enum MetadataTrustType: Equatable, Sendable {
-    /// The metadata signer is trusted directly for the issuer.
-    case trustedIssuer
-    /// The metadata signer is trusted as a delegate of the issuer.
-    case trustedDelegate
-}
-
 /// Typed credential issuer metadata shown during offer review.
 public struct IssuerMetadata: Equatable, Sendable {
     /// Canonical credential issuer identifier.
