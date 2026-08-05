@@ -11,7 +11,7 @@ plugins {
 group = "id.walt.holderpolicies"
 
 kotlin {
-    js(IR) {
+    js {
         outputModuleName.set("holder-policies")
     }
 

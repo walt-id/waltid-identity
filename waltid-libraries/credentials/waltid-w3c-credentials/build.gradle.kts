@@ -6,7 +6,7 @@ plugins {
 
 group = "id.walt.credentials"
 kotlin {
-    js(IR) {
+    js {
         outputModuleName.set("w3c-credentials")
     }
     if (enableIosBuild) {
@@ -31,6 +31,8 @@ kotlin {
 
             // walt.id
             api(project(":waltid-libraries:crypto:waltid-crypto"))
+            api(project(":waltid-libraries:crypto:waltid-crypto2"))
+            api(project(":waltid-libraries:crypto:waltid-jose"))
             api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             api(project(":waltid-libraries:waltid-did"))
             api(project(":waltid-libraries:web:waltid-web-data-fetching"))

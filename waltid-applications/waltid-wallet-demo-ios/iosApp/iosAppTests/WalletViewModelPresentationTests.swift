@@ -11,7 +11,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
         let previewHandle = PresentationPreviewHandle(value: "invalid-presentation-preview")
         let previewError = PresentationPreviewError(
             previewHandle: previewHandle,
-            request: PresentationRequestInfo(
+            request: PresentationRequestContext(
                 clientID: "https://verifier.example",
                 verifierMetadata: VerifierMetadata(
                     display: MetadataDisplay(

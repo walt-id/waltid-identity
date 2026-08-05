@@ -2,6 +2,7 @@
 # Build/compilation versions
 kotlin = "2.4.0"
 suspend-transform = "2.4.0-0.14.0"
+jspecify = "1.0.0"
 
 # Used for build-plugins
 java-service = "21"
@@ -74,8 +75,6 @@ netty = "4.1.135.Final"
 netty-4_2 = "4.2.15.Final"
 jackson-core = "2.22.0"
 jackson-core-3 = "3.1.1"
-# web3j brings bcprov-jdk18on; pin to latest to override its 1.80
-bcprov-jdk18on = "1.84"
 oci-sdk = "3.90.0"
 
 # JVM-only: auth (platform-specific, not multiplatform)
@@ -88,7 +87,10 @@ onetime = "2.2.0"
 kedis = "0.0.12"
 
 # Crypto
-bouncycastle = "2.73.11"
+# One Bouncy Castle flavour for the whole repo: the mainline jdk18on line. The lts8on line (2.7x) publishes the
+# same org.bouncycastle packages, so having both on a classpath duplicates every class - which is what broke the
+# Android device tests. jdk18on is also what Signum and web3j pull in, and it is what crypto2 needs for secp256k1.
+bouncycastle = "1.84"
 nimbus-jose = "10.9.1"
 jose-npm = "5.10.0"
 kotlincrypto = "0.8.0"
@@ -213,6 +215,7 @@ smiley-ktor-swaggerui = { module = "io.github.smiley4:ktor-swagger-ui", version.
 smiley-ktor-redoc = { module = "io.github.smiley4:ktor-redoc", version.ref = "smiley-openapi" }
 
 ## Kotlinx
+jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 kotlinx-serialization-cbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref = "kotlinx-serialization-cbor-TEMP" }
@@ -234,8 +237,8 @@ kotlincrypto-macs-hmac-sha2 = { module = "org.kotlincrypto.macs:hmac-sha2", vers
 kotlincrypto-random = { module = "org.kotlincrypto.random:crypto-rand", version.ref = "kotlincrypto-rand" }
 whyoleg-cryptography-random = { module = "dev.whyoleg.cryptography:cryptography-random", version.ref = "whyoleg-cryptography" }
 tink = { module = "com.google.crypto.tink:tink", version.ref = "tink" }
-bouncycastle-prov = { module = "org.bouncycastle:bcprov-lts8on", version.ref = "bouncycastle" }
-bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-lts8on", version.ref = "bouncycastle" }
+bouncycastle-prov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
+bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
 nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbus-jose" }
 
 ## Testing
@@ -300,6 +303,7 @@ sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sq
 sqldelight-coroutines = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
 sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
 sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
+sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
 sqldelight-gradle-plugin = { module = "app.cash.sqldelight:gradle-plugin", version.ref = "sqldelight" }
 sqlcipher-android = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipher-android" }
 
@@ -349,7 +353,6 @@ netty-codec-http-v2 = { module = "io.netty:netty-codec-http", version.ref = "net
 netty-transport-classes-epoll = { module = "io.netty:netty-transport-classes-epoll", version.ref = "netty-4_2" }
 jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson-core" }
 jackson-core-tools = { module = "tools.jackson.core:jackson-core", version.ref = "jackson-core-3" }
-bcprov-jdk18on = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bcprov-jdk18on" }
 oci-sdk = { module = "com.oracle.oci.sdk:oci-java-sdk-shaded-full", version.ref = "oci-sdk" }
 
 ## JVM-only: auth

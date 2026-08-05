@@ -27,8 +27,14 @@ object Issuer2CredentialScenarios {
     const val ISO_MDL_AAMVA_PROFILE_ID = "isoMdlAamva"
     const val ISO_MDL_AAMVA_CONFIGURATION_ID = "org.iso.18013.5.1.mDL.aamva"
 
+    const val ISO_MDL_HAIP_PROFILE_ID = "isoMdlHaip"
+    const val ISO_MDL_HAIP_CONFIGURATION_ID = "org.iso.18013.5.1.mDL.haip"
+
     const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
     const val IDENTITY_SD_JWT_CONFIGURATION_ID = "identity_credential"
+
+    const val IDENTITY_HAIP_SD_JWT_PROFILE_ID = "identityCredentialHaipSdJwt"
+    const val IDENTITY_HAIP_SD_JWT_CONFIGURATION_ID = "identity_credential_haip"
 
     const val JWT_VC_JSON_FORMAT = "jwt_vc_json"
     const val MSO_MDOC_FORMAT = "mso_mdoc"
@@ -62,9 +68,23 @@ object Issuer2CredentialScenarios {
         family = Issuer2CredentialFamily.MDOC,
     )
 
+    val isoMdlHaip = Issuer2CredentialScenario(
+        profileId = ISO_MDL_HAIP_PROFILE_ID,
+        credentialConfigurationId = ISO_MDL_HAIP_CONFIGURATION_ID,
+        format = MSO_MDOC_FORMAT,
+        family = Issuer2CredentialFamily.MDOC,
+    )
+
     val identitySdJwt = Issuer2CredentialScenario(
         profileId = IDENTITY_SD_JWT_PROFILE_ID,
         credentialConfigurationId = IDENTITY_SD_JWT_CONFIGURATION_ID,
+        format = SD_JWT_VC_FORMAT,
+        family = Issuer2CredentialFamily.SD_JWT_VC,
+    )
+
+    val identityHaipSdJwt = Issuer2CredentialScenario(
+        profileId = IDENTITY_HAIP_SD_JWT_PROFILE_ID,
+        credentialConfigurationId = IDENTITY_HAIP_SD_JWT_CONFIGURATION_ID,
         format = SD_JWT_VC_FORMAT,
         family = Issuer2CredentialFamily.SD_JWT_VC,
     )
@@ -111,6 +131,7 @@ object Issuer2CredentialScenarios {
         jwtVcJson("proofOfAddress", "ProofOfAddress_jwt_vc_json"),
         isoMdl,
         isoMdlAamva,
+        isoMdlHaip,
         isoPhotoId,
         mdoc("eudiPidMdoc", "eu.europa.ec.eudi.pid.1"),
         mdoc("euAgeVerificationMdoc", "eu.europa.ec.av.1"),
@@ -122,5 +143,6 @@ object Issuer2CredentialScenarios {
         sdJwtVc("ehicSdJwt", "urn:eudi:ehic:1"),
         sdJwtVc("eudiPidSdJwt", "urn:eudi:pid:1"),
         identitySdJwt,
+        identityHaipSdJwt,
     )
 }

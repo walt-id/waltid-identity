@@ -24,6 +24,7 @@ import id.walt.openid4vci.responses.token.TokenResponseOptions
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
+import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.crypto.keys.Key
 import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
@@ -132,10 +133,29 @@ interface OAuth2Provider {
         accessTokenContext: CredentialAccessTokenContext? = null,
     ): CredentialRequestResult
 
+    @Deprecated("Use the Crypto2CredentialSigningKey overload")
     suspend fun createCredentialResponse(
         request: CredentialRequest,
         configuration: CredentialConfiguration,
         issuerKey: Key,
+        issuerId: String,
+        credentialData: JsonObject,
+        dataMapping: JsonObject? = null,
+        selectiveDisclosure: SDMap? = null,
+        x5Chain: List<CertificateDer>? = null,
+        display: List<CredentialDisplay>? = null,
+        w3cVersion: String? = null,
+        mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
+        credentialStatus: Status? = null,
+        validFrom: Instant? = null,
+        validUntil: Instant? = null,
+        proofValidationContext: CredentialProofValidationContext? = null,
+    ): CredentialResponseResult
+
+    suspend fun createCredentialResponse(
+        request: CredentialRequest,
+        configuration: CredentialConfiguration,
+        issuerKey: Crypto2CredentialSigningKey,
         issuerId: String,
         credentialData: JsonObject,
         dataMapping: JsonObject? = null,
@@ -158,5 +178,6 @@ interface OAuth2Provider {
 
     fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp
 
-    fun writeCredentialResponse(request: CredentialRequest, response: CredentialResponse): CredentialResponseHttp
+    /** Suspending because response encryption performs key agreement, which is asynchronous on every crypto2 target. */
+    suspend fun writeCredentialResponse(request: CredentialRequest, response: CredentialResponse): CredentialResponseHttp
 }

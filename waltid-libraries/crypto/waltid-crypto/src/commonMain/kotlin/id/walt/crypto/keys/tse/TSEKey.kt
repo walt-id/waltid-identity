@@ -7,19 +7,17 @@ import id.walt.crypto.keys.TseKeyMeta
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import io.ktor.util.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -151,7 +149,7 @@ class TSEKey(
     @JsPromise
     @JsExport.Ignore
     override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
-        val body = mapOf("input" to plaintext.encodeBase64())
+        val body = mapOf("input" to plaintext.encodeToBase64())
         val signatureBase64 = httpRequest(HttpMethod.Post, "sign/$id", body)
             .tseJsonDataBody().jsonObject["signature"]?.jsonPrimitive?.content?.removePrefix("vault:v1:")
             ?: throw MissingSignatureException(
@@ -190,7 +188,7 @@ class TSEKey(
         check(detachedPlaintext != null) { "An detached plaintext is needed." }
 
         val body = mapOf(
-            "input" to detachedPlaintext.encodeBase64(), "signature" to "vault:v1:${signed.encodeBase64()}"
+            "input" to detachedPlaintext.encodeToBase64(), "signature" to "vault:v1:${signed.encodeToBase64()}"
         )
         val valid = httpRequest(HttpMethod.Post, "verify/$id", body)
             .tseJsonDataBody().jsonObject["valid"]?.jsonPrimitive?.boolean
@@ -401,10 +399,6 @@ class TSEKey(
             }
             defaultRequest {
                 header(HttpHeaders.ContentType, ContentType.Application.Json)
-            }
-            install(Logging) {
-                logger = Logger.DEFAULT
-                level = LogLevel.ALL
             }
         }
     }

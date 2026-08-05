@@ -45,7 +45,7 @@ permissions:
 
 jobs:
   decide:
-    uses: ./.github/workflows/mobile-eligibility.yml
+    uses: ./.github/workflows/platform-eligibility.yml
     with:
       event-name: ${{ inputs.event-name }}
       ref: ${{ inputs.ref }}
@@ -60,7 +60,7 @@ jobs:
           ".github/workflows/gradle-macos.yml",
           ".github/workflows/mobile-sdk-docs.yml",
           ".github/workflows/macos-eligibility.yml",
-          ".github/workflows/mobile-eligibility.yml",
+          ".github/workflows/platform-eligibility.yml",
           ".github/actions/checkout-repos/*",
           ".github/actions/gradle-ios/*",
           ".github/actions/gradle-mobile-sdk-docs/*",

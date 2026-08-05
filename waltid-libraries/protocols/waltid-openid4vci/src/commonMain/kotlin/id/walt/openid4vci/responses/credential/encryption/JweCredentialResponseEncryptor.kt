@@ -3,14 +3,17 @@ package id.walt.openid4vci.responses.credential.encryption
 import id.walt.crypto.utils.JweUtils
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.openid4vci.requests.credential.encryption.CredentialResponseEncryptionParameters
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
+@Deprecated(
+    "Use Crypto2JweCredentialResponseEncryptor",
+    ReplaceWith("Crypto2JweCredentialResponseEncryptor"),
+)
 object JweCredentialResponseEncryptor : CredentialResponseEncryptor {
-    override fun encrypt(
+    override suspend fun encrypt(
         payload: JsonObject,
         encryption: CredentialResponseEncryptionParameters,
     ): String =

@@ -1,0 +1,238 @@
+public abstract interface class id/walt/crypto2/signum/SignumAuthenticationPolicy {
+	public static final field Companion Lid/walt/crypto2/signum/SignumAuthenticationPolicy$Companion;
+}
+
+public final class id/walt/crypto2/signum/SignumAuthenticationPolicy$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/signum/SignumAuthenticationPolicy$None : id/walt/crypto2/signum/SignumAuthenticationPolicy {
+	public static final field INSTANCE Lid/walt/crypto2/signum/SignumAuthenticationPolicy$None;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence : id/walt/crypto2/signum/SignumAuthenticationPolicy {
+	public static final field Companion Lid/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence$Companion;
+	public fun <init> ()V
+	public fun <init> (ZZZILjava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (ZZZILjava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Z
+	public final fun component3 ()Z
+	public final fun component4 ()I
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun copy (ZZZILjava/lang/String;Ljava/lang/String;)Lid/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence;
+	public static synthetic fun copy$default (Lid/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence;ZZZILjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAllowNewBiometrics ()Z
+	public final fun getBiometric ()Z
+	public final fun getCancelText ()Ljava/lang/String;
+	public final fun getDeviceCredential ()Z
+	public final fun getPrompt ()Ljava/lang/String;
+	public final fun getTimeoutSeconds ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/signum/SignumHardwarePolicy : java/lang/Enum {
+	public static final field Companion Lid/walt/crypto2/signum/SignumHardwarePolicy$Companion;
+	public static final field DISCOURAGED Lid/walt/crypto2/signum/SignumHardwarePolicy;
+	public static final field PREFERRED Lid/walt/crypto2/signum/SignumHardwarePolicy;
+	public static final field REQUIRED Lid/walt/crypto2/signum/SignumHardwarePolicy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/signum/SignumHardwarePolicy;
+	public static fun values ()[Lid/walt/crypto2/signum/SignumHardwarePolicy;
+}
+
+public final class id/walt/crypto2/signum/SignumHardwarePolicy$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/signum/SignumKeyAttestation {
+	public static final field Companion Lid/walt/crypto2/signum/SignumKeyAttestation$Companion;
+	public fun <init> (Ljava/lang/String;Lid/walt/crypto2/serialization/BinaryData;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Lid/walt/crypto2/serialization/BinaryData;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lid/walt/crypto2/serialization/BinaryData;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Lid/walt/crypto2/serialization/BinaryData;Ljava/util/List;)Lid/walt/crypto2/signum/SignumKeyAttestation;
+	public static synthetic fun copy$default (Lid/walt/crypto2/signum/SignumKeyAttestation;Ljava/lang/String;Lid/walt/crypto2/serialization/BinaryData;Ljava/util/List;ILjava/lang/Object;)Lid/walt/crypto2/signum/SignumKeyAttestation;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCertificateChain ()Ljava/util/List;
+	public final fun getFormat ()Ljava/lang/String;
+	public final fun getStatement ()Lid/walt/crypto2/serialization/BinaryData;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/signum/SignumKeyAttestation$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/signum/SignumKeyAttestation$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/signum/SignumKeyAttestation;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/signum/SignumKeyAttestation;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/signum/SignumKeyAttestation$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/signum/SignumKeyOptions {
+	public static final field Companion Lid/walt/crypto2/signum/SignumKeyOptions$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;)V
+	public synthetic fun <init> (Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lid/walt/crypto2/signum/SignumKeyPolicy;
+	public final fun copy (Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;)Lid/walt/crypto2/signum/SignumKeyOptions;
+	public static synthetic fun copy$default (Lid/walt/crypto2/signum/SignumKeyOptions;Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;ILjava/lang/Object;)Lid/walt/crypto2/signum/SignumKeyOptions;
+	public final fun encode ()Lid/walt/crypto2/serialization/BinaryData;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlias ()Ljava/lang/String;
+	public final fun getPolicy ()Lid/walt/crypto2/signum/SignumKeyPolicy;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/signum/SignumKeyOptions$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/signum/SignumKeyOptions$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/signum/SignumKeyOptions;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/signum/SignumKeyOptions;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/signum/SignumKeyOptions$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/signum/SignumKeyPolicy {
+	public static final field Companion Lid/walt/crypto2/signum/SignumKeyPolicy$Companion;
+	public fun <init> ()V
+	public fun <init> (Lid/walt/crypto2/signum/SignumHardwarePolicy;Lid/walt/crypto2/signum/SignumAuthenticationPolicy;ZLid/walt/crypto2/serialization/BinaryData;)V
+	public synthetic fun <init> (Lid/walt/crypto2/signum/SignumHardwarePolicy;Lid/walt/crypto2/signum/SignumAuthenticationPolicy;ZLid/walt/crypto2/serialization/BinaryData;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lid/walt/crypto2/signum/SignumHardwarePolicy;
+	public final fun component2 ()Lid/walt/crypto2/signum/SignumAuthenticationPolicy;
+	public final fun component3 ()Z
+	public final fun component4 ()Lid/walt/crypto2/serialization/BinaryData;
+	public final fun copy (Lid/walt/crypto2/signum/SignumHardwarePolicy;Lid/walt/crypto2/signum/SignumAuthenticationPolicy;ZLid/walt/crypto2/serialization/BinaryData;)Lid/walt/crypto2/signum/SignumKeyPolicy;
+	public static synthetic fun copy$default (Lid/walt/crypto2/signum/SignumKeyPolicy;Lid/walt/crypto2/signum/SignumHardwarePolicy;Lid/walt/crypto2/signum/SignumAuthenticationPolicy;ZLid/walt/crypto2/serialization/BinaryData;ILjava/lang/Object;)Lid/walt/crypto2/signum/SignumKeyPolicy;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAttestationChallenge ()Lid/walt/crypto2/serialization/BinaryData;
+	public final fun getAuthentication ()Lid/walt/crypto2/signum/SignumAuthenticationPolicy;
+	public final fun getHardware ()Lid/walt/crypto2/signum/SignumHardwarePolicy;
+	public final fun getKeyAgreement ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/signum/SignumKeyPolicy$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/signum/SignumKeyPolicy$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/signum/SignumKeyPolicy;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/signum/SignumKeyPolicy;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/signum/SignumKeyPolicy$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class id/walt/crypto2/signum/SignumManagedKey : id/walt/crypto2/keys/ManagedKey {
+	public abstract fun getAttestation ()Lid/walt/crypto2/signum/SignumKeyAttestation;
+	public abstract fun getProtectionLevel ()Lid/walt/crypto2/signum/SignumProtectionLevel;
+}
+
+public final class id/walt/crypto2/signum/SignumManagedKey$DefaultImpls {
+	public static fun getCapabilities (Lid/walt/crypto2/signum/SignumManagedKey;)Lid/walt/crypto2/keys/KeyCapabilities;
+	public static fun getId-1AhpoWA (Lid/walt/crypto2/signum/SignumManagedKey;)Ljava/lang/String;
+	public static fun getSpec (Lid/walt/crypto2/signum/SignumManagedKey;)Lid/walt/crypto2/keys/KeySpec;
+	public static fun getUsages (Lid/walt/crypto2/signum/SignumManagedKey;)Ljava/util/Set;
+}
+
+public final class id/walt/crypto2/signum/SignumManagedKeyProvider : id/walt/crypto2/providers/ManagedKeyProvider {
+	public static final field Companion Lid/walt/crypto2/signum/SignumManagedKeyProvider$Companion;
+	public fun <init> (Lid/walt/crypto2/signum/SignumPlatformBackend;)V
+	public fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun delete (Lid/walt/crypto2/keys/StoredKey$Managed;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun delete$default (Lid/walt/crypto2/signum/SignumManagedKeyProvider;Lid/walt/crypto2/keys/StoredKey$Managed;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public fun generate (Lid/walt/crypto2/providers/GenerateManagedKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun generateSignumKey (Lid/walt/crypto2/providers/GenerateManagedKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getId-v1VkqW4 ()Ljava/lang/String;
+	public fun restore (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun restoreSignumKey (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun storedKeyForExisting-FO05kzI (Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun storedKeyForExisting-FO05kzI$default (Lid/walt/crypto2/signum/SignumManagedKeyProvider;Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/signum/SignumManagedKeyProvider$Companion {
+}
+
+public abstract interface class id/walt/crypto2/signum/SignumPlatformBackend {
+	public abstract fun create (Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/signum/SignumKeyPolicy;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun delete (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getId-v1VkqW4 ()Ljava/lang/String;
+	public abstract fun load (Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/signum/SignumKeyPolicy;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun supports (Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/signum/SignumKeyPolicy;)Z
+}
+
+public abstract interface class id/walt/crypto2/signum/SignumPlatformKey {
+	public abstract fun generateSharedSecret (Lid/walt/crypto2/keys/EncodedKey;Lid/walt/crypto2/algorithms/KeyAgreementAlgorithm;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getAlias ()Ljava/lang/String;
+	public abstract fun getAttestation ()Lid/walt/crypto2/signum/SignumKeyAttestation;
+	public abstract fun getKeyAgreementAlgorithms ()Ljava/util/Set;
+	public abstract fun getProtectionLevel ()Lid/walt/crypto2/signum/SignumProtectionLevel;
+	public abstract fun getPublicKey ()Lid/walt/crypto2/keys/EncodedKey$SpkiDer;
+	public abstract fun getSignatureAlgorithms ()Ljava/util/Set;
+	public abstract fun getSpec ()Lid/walt/crypto2/keys/KeySpec;
+	public abstract fun sign ([BLid/walt/crypto2/algorithms/SignatureAlgorithm;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun verify ([B[BLid/walt/crypto2/algorithms/SignatureAlgorithm;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/signum/SignumProtectionLevel : java/lang/Enum {
+	public static final field Companion Lid/walt/crypto2/signum/SignumProtectionLevel$Companion;
+	public static final field HARDWARE Lid/walt/crypto2/signum/SignumProtectionLevel;
+	public static final field SOFTWARE Lid/walt/crypto2/signum/SignumProtectionLevel;
+	public static final field UNKNOWN Lid/walt/crypto2/signum/SignumProtectionLevel;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/signum/SignumProtectionLevel;
+	public static fun values ()[Lid/walt/crypto2/signum/SignumProtectionLevel;
+}
+
+public final class id/walt/crypto2/signum/SignumProtectionLevel$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/signum/SignumUserCancelledException : java/util/concurrent/CancellationException {
+	public fun <init> (Ljava/lang/Throwable;)V
+	public final fun getReason ()Ljava/lang/Throwable;
+}
+

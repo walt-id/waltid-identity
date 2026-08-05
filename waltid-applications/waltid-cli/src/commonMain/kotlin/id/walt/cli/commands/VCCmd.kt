@@ -10,7 +10,8 @@ class VCCmd : CliktCommand(
     name = "vc",
 ) {
 
-    override fun help(context: Context) = """Sign and apply a wide range verification policies on W3C Verifiable Credentials (VCs)."""
+    override fun help(context: Context) =
+        "Issue W3C JWT VCs and verify W3C, SD-JWT VC, and mdoc credentials with policies2."
     override val printHelpOnEmptyArgs = true
 
     init {

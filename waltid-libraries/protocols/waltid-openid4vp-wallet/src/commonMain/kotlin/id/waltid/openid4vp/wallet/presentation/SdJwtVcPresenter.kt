@@ -4,11 +4,14 @@ import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentialId
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.createKeyBindingJwt
+import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
+import id.waltid.openid4vp.wallet.supportedPresentationAlgorithms
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -16,12 +19,61 @@ object SdJwtVcPresenter {
 
     private val log = KotlinLogging.logger { }
 
+    @Deprecated("Use the Crypto2Key overload")
     suspend fun presentSdJwtVc(
         digitalCredential: DigitalCredential,
         matchResult: DcqlMatcher.DcqlMatchResult,
         authorizationRequest: AuthorizationRequest,
         holderKey: Key,
-        holderDid: String?
+        holderDid: String?,
+    ): JsonPrimitive = presentSdJwtVcWithKey(
+        digitalCredential,
+        matchResult,
+        authorizationRequest,
+        holderKey,
+        holderDid,
+        null,
+    )
+
+    suspend fun presentSdJwtVc(
+        digitalCredential: DigitalCredential,
+        matchResult: DcqlMatcher.DcqlMatchResult,
+        authorizationRequest: AuthorizationRequest,
+        holderKey: Crypto2Key,
+        holderDid: String?,
+    ): JsonPrimitive = presentSdJwtVcWithKey(
+        digitalCredential,
+        matchResult,
+        authorizationRequest,
+        null,
+        holderDid,
+        holderKey,
+    )
+
+    @Deprecated("Use the Crypto2Key overload")
+    suspend fun presentSdJwtVc(
+        digitalCredential: DigitalCredential,
+        matchResult: DcqlMatcher.DcqlMatchResult,
+        authorizationRequest: AuthorizationRequest,
+        holderKey: Key,
+        holderDid: String?,
+        holderCrypto2Key: Crypto2Key?,
+    ): JsonPrimitive = presentSdJwtVcWithKey(
+        digitalCredential,
+        matchResult,
+        authorizationRequest,
+        holderKey,
+        holderDid,
+        holderCrypto2Key,
+    )
+
+    private suspend fun presentSdJwtVcWithKey(
+        digitalCredential: DigitalCredential,
+        matchResult: DcqlMatcher.DcqlMatchResult,
+        authorizationRequest: AuthorizationRequest,
+        holderKey: Key?,
+        holderDid: String?,
+        holderCrypto2Key: Crypto2Key?,
     ): JsonPrimitive {
         val selectedClaimsMap = matchResult.selectedDisclosures
 
@@ -46,16 +98,32 @@ object SdJwtVcPresenter {
         val disclosed = sdJwtCredential.disclose(digitalCredential, disclosuresToPresent)
 
         // Construct the Key Binding JWT
-        val kbJwtString = createKeyBindingJwt(
-            disclosed = disclosed,
-            nonce = authorizationRequest.nonce!!,
-            audience = authorizationRequest.clientId,
-            selectedDisclosures = disclosuresToPresent,
-            holderKey = holderKey,
-            transactionData = filterTransactionDataForCredentialId(
-                transactionData = authorizationRequest.transactionData,
-                credentialId = matchResult.originalQuery.id,
-            ),
+        val acceptedAlgorithms = authorizationRequest.supportedPresentationAlgorithms(
+            WalletPresentationFormatRegistry.SupportedFormat.DC_SD_JWT,
+            "kb-jwt_alg_values",
+        )
+        val transactionData = filterTransactionDataForCredentialId(
+            transactionData = authorizationRequest.transactionData,
+            credentialId = matchResult.originalQuery.id,
+        )
+        val kbJwtString = holderCrypto2Key?.let {
+            createKeyBindingJwt(
+                disclosed,
+                authorizationRequest.nonce!!,
+                authorizationRequest.clientId,
+                disclosuresToPresent,
+                it,
+                transactionData,
+                acceptedAlgorithms,
+            )
+        } ?: createKeyBindingJwt(
+            disclosed,
+            authorizationRequest.nonce!!,
+            authorizationRequest.clientId,
+            disclosuresToPresent,
+            requireNotNull(holderKey),
+            transactionData,
+            acceptedAlgorithms,
         )
 
         // Use the disclose method from the interface, then append the KB-JWT
