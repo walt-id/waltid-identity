@@ -67,6 +67,12 @@ public final class id/walt/crypto2/signum/SignumHardwarePolicy$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class id/walt/crypto2/signum/SignumInteractionContextUnavailableException : java/lang/IllegalStateException {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
 public final class id/walt/crypto2/signum/SignumKeyAttestation {
 	public static final field Companion Lid/walt/crypto2/signum/SignumKeyAttestation$Companion;
 	public fun <init> (Ljava/lang/String;Lid/walt/crypto2/serialization/BinaryData;Ljava/util/List;)V
@@ -97,6 +103,18 @@ public final synthetic class id/walt/crypto2/signum/SignumKeyAttestation$$serial
 
 public final class id/walt/crypto2/signum/SignumKeyAttestation$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/signum/SignumKeyInvalidatedException : java/lang/IllegalStateException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAlias ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/signum/SignumKeyNotFoundException : java/lang/IllegalStateException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAlias ()Ljava/lang/String;
 }
 
 public final class id/walt/crypto2/signum/SignumKeyOptions {
@@ -166,8 +184,13 @@ public final class id/walt/crypto2/signum/SignumKeyPolicy$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class id/walt/crypto2/signum/SignumKeyPolicyKt {
+	public static final fun isBiometricCurrentSet (Lid/walt/crypto2/signum/SignumAuthenticationPolicy;)Z
+}
+
 public abstract interface class id/walt/crypto2/signum/SignumManagedKey : id/walt/crypto2/keys/ManagedKey {
 	public abstract fun getAttestation ()Lid/walt/crypto2/signum/SignumKeyAttestation;
+	public abstract fun getPolicy ()Lid/walt/crypto2/signum/SignumKeyPolicy;
 	public abstract fun getProtectionLevel ()Lid/walt/crypto2/signum/SignumProtectionLevel;
 }
 
@@ -187,6 +210,7 @@ public final class id/walt/crypto2/signum/SignumManagedKeyProvider : id/walt/cry
 	public fun generate (Lid/walt/crypto2/providers/GenerateManagedKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun generateSignumKey (Lid/walt/crypto2/providers/GenerateManagedKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getId-v1VkqW4 ()Ljava/lang/String;
+	public final fun inspect (Lid/walt/crypto2/keys/StoredKey$Managed;)Lid/walt/crypto2/signum/SignumStoredKeyInfo;
 	public fun restore (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun restoreSignumKey (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun storedKeyForExisting-FO05kzI (Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -229,6 +253,23 @@ public final class id/walt/crypto2/signum/SignumProtectionLevel : java/lang/Enum
 
 public final class id/walt/crypto2/signum/SignumProtectionLevel$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/signum/SignumStoredKeyInfo {
+	public fun <init> (Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;Lid/walt/crypto2/signum/SignumProtectionLevel;Lid/walt/crypto2/signum/SignumKeyAttestation;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lid/walt/crypto2/signum/SignumKeyPolicy;
+	public final fun component3 ()Lid/walt/crypto2/signum/SignumProtectionLevel;
+	public final fun component4 ()Lid/walt/crypto2/signum/SignumKeyAttestation;
+	public final fun copy (Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;Lid/walt/crypto2/signum/SignumProtectionLevel;Lid/walt/crypto2/signum/SignumKeyAttestation;)Lid/walt/crypto2/signum/SignumStoredKeyInfo;
+	public static synthetic fun copy$default (Lid/walt/crypto2/signum/SignumStoredKeyInfo;Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;Lid/walt/crypto2/signum/SignumProtectionLevel;Lid/walt/crypto2/signum/SignumKeyAttestation;ILjava/lang/Object;)Lid/walt/crypto2/signum/SignumStoredKeyInfo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlias ()Ljava/lang/String;
+	public final fun getAttestation ()Lid/walt/crypto2/signum/SignumKeyAttestation;
+	public final fun getPolicy ()Lid/walt/crypto2/signum/SignumKeyPolicy;
+	public final fun getProtectionLevel ()Lid/walt/crypto2/signum/SignumProtectionLevel;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class id/walt/crypto2/signum/SignumUserCancelledException : java/util/concurrent/CancellationException {

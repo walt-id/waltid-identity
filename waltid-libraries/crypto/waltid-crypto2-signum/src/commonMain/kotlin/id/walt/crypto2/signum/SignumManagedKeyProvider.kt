@@ -83,7 +83,7 @@ class SignumManagedKeyProvider(
         require(alias.isNotBlank()) { "Signum key alias cannot be blank" }
         validateRequest(spec, usages, policy)
         val handle = backend.load(alias, spec, usages, policy)
-            ?: throw IllegalStateException("Signum key alias does not exist: $alias")
+            ?: throw SignumKeyNotFoundException(alias)
         validateHandle(handle, alias, spec, usages, policy)
         val providerData = SignumStoredKeyData(
             alias = alias,
@@ -116,7 +116,7 @@ class SignumManagedKeyProvider(
         val providerData = SignumStoredKeyData.decode(stored.providerData)
         validateRequest(stored.spec, stored.usages, providerData.policy)
         val handle = backend.load(providerData.alias, stored.spec, stored.usages, providerData.policy)
-            ?: throw IllegalStateException("Signum key alias does not exist: ${providerData.alias}")
+            ?: throw SignumKeyNotFoundException(providerData.alias)
         validateHandle(handle, providerData.alias, stored.spec, stored.usages, providerData.policy)
         require(handle.publicKey.data == publicKey.data) { "Signum key public key changed after restore" }
         require(handle.protectionLevel == providerData.protectionLevel) {
@@ -139,6 +139,17 @@ class SignumManagedKeyProvider(
         return KeyDeletionResult.Deleted
     }
 
+    /** Reads the immutable Signum metadata without loading the native key. */
+    fun inspect(stored: StoredKey.Managed): SignumStoredKeyInfo {
+        require(stored.provider == id) { "Stored key belongs to a different provider" }
+        require(stored.providerSchemaVersion == PROVIDER_SCHEMA_VERSION) {
+            "Unsupported Signum provider schema: ${stored.providerSchemaVersion}"
+        }
+        val data = SignumStoredKeyData.decode(stored.providerData)
+        require(data.alias.isNotBlank()) { "Stored Signum key alias cannot be blank" }
+        return SignumStoredKeyInfo(data.alias, data.policy, data.protectionLevel, data.attestation)
+    }
+
     private fun key(
         stored: StoredKey.Managed,
         providerData: SignumStoredKeyData,
@@ -150,6 +161,7 @@ class SignumManagedKeyProvider(
         private val providerData: SignumStoredKeyData,
         private val handle: SignumPlatformKey,
     ) : SignumManagedKey {
+        override val policy: SignumKeyPolicy = providerData.policy
         override val protectionLevel: SignumProtectionLevel = providerData.protectionLevel
         override val attestation: SignumKeyAttestation? = providerData.attestation
         private val signatureAlgorithms = handle.signatureAlgorithms.expandEcdsaEncodings()
@@ -217,8 +229,8 @@ class SignumManagedKeyProvider(
             }
         }
         if (policy.hardware == SignumHardwarePolicy.REQUIRED) {
-            require(handle.protectionLevel == SignumProtectionLevel.HARDWARE && handle.attestation != null) {
-                "Signum backend did not provide attested hardware protection"
+            require(handle.protectionLevel == SignumProtectionLevel.HARDWARE) {
+                "Signum backend did not provide hardware protection"
             }
         }
         if (policy.attestationChallenge != null) {
@@ -247,9 +259,19 @@ class SignumManagedKeyProvider(
 }
 
 interface SignumManagedKey : ManagedKey {
+    /** Immutable policy enforced by the native platform key. */
+    val policy: SignumKeyPolicy
     val protectionLevel: SignumProtectionLevel
     val attestation: SignumKeyAttestation?
 }
+
+/** Immutable native metadata stored inside a managed Crypto2 key descriptor. */
+public data class SignumStoredKeyInfo(
+    val alias: String,
+    val policy: SignumKeyPolicy,
+    val protectionLevel: SignumProtectionLevel,
+    val attestation: SignumKeyAttestation?,
+)
 
 @Serializable
 private data class SignumStoredKeyData(

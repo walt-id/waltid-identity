@@ -37,6 +37,11 @@ kotlin {
                 }
             }
             if (enableAndroidBuild) {
+                androidMain.dependencies {
+                    api(identityLibs.androidx.fragment)
+                    implementation(identityLibs.androidx.biometric)
+                    implementation(identityLibs.androidx.lifecycle.runtime.ktx)
+                }
                 androidMain.get().dependsOn(mobileMain)
                 named("androidDeviceTest") {
                     dependencies {

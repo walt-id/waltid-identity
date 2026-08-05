@@ -72,5 +72,14 @@ data class SignumKeyAttestation(
 internal fun SignumKeyPolicy.effectiveProtection(attestation: SignumKeyAttestation?): SignumProtectionLevel = when {
     attestation != null -> SignumProtectionLevel.HARDWARE
     hardware == SignumHardwarePolicy.DISCOURAGED -> SignumProtectionLevel.SOFTWARE
+    hardware == SignumHardwarePolicy.REQUIRED -> SignumProtectionLevel.HARDWARE
     else -> SignumProtectionLevel.UNKNOWN
 }
+
+/** Whether this policy requires one strong biometric for every private-key operation. */
+public fun SignumAuthenticationPolicy.isBiometricCurrentSet(): Boolean =
+    this is SignumAuthenticationPolicy.UserPresence &&
+        biometric &&
+        !allowNewBiometrics &&
+        !deviceCredential &&
+        timeoutSeconds == 0

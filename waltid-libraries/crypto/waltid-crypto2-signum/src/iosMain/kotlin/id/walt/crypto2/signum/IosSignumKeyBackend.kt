@@ -1,6 +1,7 @@
 package id.walt.crypto2.signum
 
 import at.asitplus.signum.supreme.os.IosKeychainProvider
+import at.asitplus.signum.supreme.CFCryptoOperationFailed
 import at.asitplus.signum.supreme.os.PlatformSigningProviderSigner
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EcCurve
@@ -8,6 +9,7 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ProviderId
 import platform.Foundation.NSProcessInfo
+import platform.Security.errSecItemNotFound
 import kotlin.coroutines.cancellation.CancellationException
 
 class IosSignumKeyBackend : SignumPlatformBackend {
@@ -37,7 +39,10 @@ class IosSignumKeyBackend : SignumPlatformBackend {
             // configuration. PREFERRED has to mean preferred, so fall back to the software keychain. REQUIRED and
             // attested keys keep failing loudly, and the reported protection level stays UNKNOWN either way
             // because without an attestation the backing cannot be proven (see effectiveProtection).
-            if (policy.hardware != SignumHardwarePolicy.PREFERRED || policy.attestationChallenge != null) throw cause
+            if (policy.hardware != SignumHardwarePolicy.PREFERRED ||
+                policy.attestationChallenge != null ||
+                policy.authentication.isBiometricCurrentSet()
+            ) throw cause
             // Best-effort cleanup of anything the failed attempt left behind; a failure here must not hide `cause`.
             try {
                 delete(alias)
@@ -73,12 +78,18 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         usages: Set<KeyUsage>,
         policy: SignumKeyPolicy,
     ): SignumPlatformKey? {
-        val signer = IosKeychainProvider.getSignerForKey(alias).getOrNull() ?: return null
+        val signer = IosKeychainProvider.getSignerForKey(alias).getOrElse { failure ->
+            throw failure.mapSignumFailure(alias)
+        }
         return handle(alias, spec, usages, policy, signer)
     }
 
     override suspend fun delete(alias: String) {
-        IosKeychainProvider.deleteSigningKey(alias).getOrThrow()
+        IosKeychainProvider.deleteSigningKey(alias).getOrElse { failure ->
+            val mapped = failure.mapSignumFailure(alias)
+            if (mapped is SignumKeyNotFoundException) return
+            throw mapped
+        }
     }
 
     private fun handle(
@@ -103,6 +114,15 @@ class IosSignumKeyBackend : SignumPlatformBackend {
             defaultSigner = signer,
             keyAgreementEnabled = KeyUsage.KEY_AGREEMENT in usages && policy.keyAgreement,
         )
+    }
+}
+
+private fun Throwable.mapSignumFailure(alias: String): Throwable {
+    val causes = generateSequence(this) { it.cause }.toList()
+    return if (causes.filterIsInstance<CFCryptoOperationFailed>().any { it.osStatus == errSecItemNotFound }) {
+        SignumKeyNotFoundException(alias, this)
+    } else {
+        this
     }
 }
 
