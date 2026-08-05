@@ -3,15 +3,11 @@
 package id.walt.policies2.vp.policies
 
 import id.walt.credentials.presentations.formats.DcSdJwtPresentation
-import id.walt.crypto.utils.JwsUtils.decodeJws
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Instant
 
 private const val policyId = "dc+sd-jwt/kb-jwt_iat-check"
 
@@ -39,28 +35,13 @@ class KbJwtIatCheckSdJwtVPPolicy(
         presentation: DcSdJwtPresentation,
         verificationContext: VerificationSessionContext?
     ): Result<Unit> {
-        val kbJwtPayload = presentation.keyBindingJwt.decodeJws().payload
-        val iatSeconds = kbJwtPayload["iat"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
-
-        if (iatSeconds == null) {
-            log.debug { "KB-JWT has no 'iat' claim — skipping freshness check" }
-            return success()
-        }
-
-        val iatInstant = Instant.fromEpochSeconds(iatSeconds)
-        val now = Clock.System.now()
+        val now = verificationContext?.verificationTime ?: Clock.System.now()
         val maxSkew = maxAgeMinutes.minutes
+        val iatSeconds = requireFreshKbJwtIssuedAt(presentation.keyBindingJwt, now, maxSkew)
 
         addResult("kb_jwt_iat", iatSeconds.toString())
         addResult("now_epoch_seconds", now.epochSeconds.toString())
         addResult("max_age_minutes", maxAgeMinutes.toString())
-
-        if (iatInstant < now - maxSkew || iatInstant > now + maxSkew) {
-            throw IllegalArgumentException(
-                "KB-JWT 'iat' ($iatSeconds) is outside the ±${maxAgeMinutes}m freshness window " +
-                    "(now=${now.epochSeconds}). The presentation may be a replay."
-            )
-        }
 
         log.trace { "KB-JWT iat=$iatSeconds is within the ±${maxAgeMinutes}m freshness window" }
         return success()

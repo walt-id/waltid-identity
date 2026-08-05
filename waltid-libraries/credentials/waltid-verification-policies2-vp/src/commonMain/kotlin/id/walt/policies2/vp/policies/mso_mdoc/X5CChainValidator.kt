@@ -3,8 +3,9 @@
 package id.walt.policies2.vp.policies
 
 import id.walt.x509.CertificateDer
-import id.walt.x509.X509ValidationException
-import id.walt.x509.verifyOrderedCertificateChainSignatures
+import id.walt.mdoc.verification.validateDocumentSignerCertificateChain
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 object X5CChainValidator {
     /**
@@ -12,11 +13,7 @@ object X5CChainValidator {
      * Throws [IllegalArgumentException] if any signature or AKI/SKI mismatch is found.
      * Does nothing if the chain has only one certificate.
      */
-    fun verifyChain(certChainDer: List<ByteArray>) {
-        try {
-            verifyOrderedCertificateChainSignatures(certChainDer.map(::CertificateDer))
-        } catch (e: X509ValidationException) {
-            throw IllegalArgumentException(e.message, e)
-        }
+    fun verifyChain(certChainDer: List<ByteArray>, instant: Instant = Clock.System.now()) {
+        validateDocumentSignerCertificateChain(certChainDer.map(::CertificateDer), instant)
     }
 }

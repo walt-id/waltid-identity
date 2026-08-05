@@ -6,9 +6,11 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.jdbc.Database
+import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.io.File
+import java.sql.SQLException
 
 private val log = KotlinLogging.logger {}
 
@@ -81,15 +83,103 @@ fun initWallet2Database(
         minimumIdle = config.minimumIdle
         isAutoCommit = false
         transactionIsolation = "TRANSACTION_SERIALIZABLE"
+        if (config.jdbcUrl.startsWith("jdbc:sqlite:")) {
+            connectionInitSql = "PRAGMA busy_timeout=30000"
+        }
         validate()
     }
 
-    val db = Database.connect(HikariDataSource(hikari))
-
-    transaction(db) {
-        SchemaUtils.createMissingTablesAndColumns(*Wallet2Tables.ALL)
-        log.info { "wallet2 schema ready" }
+    // Pool warm-up already opens a connection (and runs connectionInitSql), which can contend with
+    // a concurrent migration on the same SQLite database, so it is serialized and retried as well.
+    return synchronized(schemaMigrationLock) {
+        val db = retryOnSchemaRace { Database.connect(HikariDataSource(hikari)) }
+        createOrMigrateSchema(db, config.jdbcUrl)
+        db
     }
-
-    return db
 }
+
+private fun createOrMigrateSchema(db: Database, jdbcUrl: String) {
+    retryOnSchemaRace {
+        transaction(db) {
+            if (jdbcUrl.startsWith("jdbc:postgresql:")) {
+                exec("SELECT pg_advisory_xact_lock($SCHEMA_MIGRATION_LOCK_ID)")
+            }
+            SchemaUtils.createMissingTablesAndColumns(*Wallet2Tables.ALL)
+            relaxLegacyKeyColumn(jdbcUrl)
+        }
+    }
+    log.info { "wallet2 schema ready" }
+}
+
+/**
+ * Drops the NOT NULL constraint on `wallet2_keys.serialized_key`.
+ *
+ * The crypto2 [id.walt.crypto2.keys.StoredKey] descriptor is the canonical record and crypto2-only
+ * keys (in particular managed KMS/HSM keys) have no legacy representation, so the legacy column has
+ * to be nullable. Databases created before that change still carry the constraint, and
+ * [SchemaUtils.createMissingTablesAndColumns] only adds missing columns - it does not relax existing
+ * ones, and SQLite has no ALTER for it, hence the explicit table rebuild.
+ */
+private fun JdbcTransaction.relaxLegacyKeyColumn(jdbcUrl: String) {
+    val alreadyNullable = connection.metadata { columns(Wallet2Tables.Keys) }[Wallet2Tables.Keys]
+        ?.firstOrNull { it.name.equals("serialized_key", ignoreCase = true) }
+        ?.nullable
+        ?: return
+    if (alreadyNullable) return
+
+    log.info { "Relaxing wallet2_keys.serialized_key so crypto2-only keys can be stored" }
+    if (jdbcUrl.startsWith("jdbc:sqlite:")) {
+        exec("ALTER TABLE wallet2_keys RENAME TO $LEGACY_KEYS_TABLE")
+        SchemaUtils.create(Wallet2Tables.Keys)
+        exec(
+            "INSERT INTO wallet2_keys(store_id, key_id, key_type, serialized_key, crypto2_stored_key) " +
+                    "SELECT store_id, key_id, key_type, serialized_key, crypto2_stored_key FROM $LEGACY_KEYS_TABLE"
+        )
+        exec("DROP TABLE $LEGACY_KEYS_TABLE")
+    } else {
+        exec("ALTER TABLE wallet2_keys ALTER COLUMN serialized_key DROP NOT NULL")
+    }
+}
+
+/** Runs [block], retrying while it fails with a transient concurrent-schema-change error. */
+private fun <T> retryOnSchemaRace(block: () -> T): T {
+    repeat(SCHEMA_MIGRATION_ATTEMPTS - 1) { attempt ->
+        try {
+            return block()
+        } catch (cause: Exception) {
+            if (!cause.isRetryableSchemaRace()) throw cause
+            Thread.sleep(SCHEMA_MIGRATION_RETRY_MILLIS * (attempt + 1))
+        }
+    }
+    return block()
+}
+
+private fun Throwable.isRetryableSchemaRace(): Boolean {
+    var current: Throwable? = this
+    while (current != null) {
+        if (current is SQLException) {
+            if (current.sqlState in setOf("40001", "40P01", "42701", "55P03")) return true
+            val message = current.message.orEmpty().lowercase()
+            if (listOf(
+                    "already exists",
+                    "duplicate column",
+                    "database is locked",
+                    "database is busy",
+                    "schema is locked",
+                    "table is locked",
+                    "no transaction is active",
+                ).any(message::contains)
+            ) {
+                return true
+            }
+        }
+        current = current.cause
+    }
+    return false
+}
+
+private const val LEGACY_KEYS_TABLE = "wallet2_keys_pre_crypto2"
+private const val SCHEMA_MIGRATION_ATTEMPTS = 5
+private const val SCHEMA_MIGRATION_RETRY_MILLIS = 100L
+private const val SCHEMA_MIGRATION_LOCK_ID = 0x57414c5432L
+private val schemaMigrationLock = Any()

@@ -8,6 +8,7 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.util.*
+import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -191,7 +192,7 @@ class TestJvm {
             val plaintext = "This is a plaintext for ${key.keyType.name}... 123".encodeToByteArray()
             println("Plaintext: ${plaintext.decodeToString()}")
 
-            val signed = key.signRaw(plaintext).encodeBase64()
+            val signed = key.signRaw(plaintext).encodeToBase64()
             println("Signed: $signed")
 
             val verified = key.verifyRaw(signed.decodeBase64Bytes(), plaintext)

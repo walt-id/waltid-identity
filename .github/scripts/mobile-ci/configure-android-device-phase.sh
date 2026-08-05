@@ -7,8 +7,8 @@ case "$phase" in
   wallet-mobile)
     script="./waltid-identity/.github/scripts/mobile-ci/run-android-wallet-mobile-tests.sh"
     emulator_options="-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
-    report_paths="waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/outputs/androidTest-results/**/*.xml"
-    artifact_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/outputs/androidTest-results/**'
+    report_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/outputs/androidTest-results/**/*.xml\nwaltid-identity/waltid-libraries/crypto/waltid-crypto2-signum/build/outputs/androidTest-results/**/*.xml'
+    artifact_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/outputs/androidTest-results/**\nwaltid-identity/waltid-libraries/crypto/waltid-crypto2-signum/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/crypto/waltid-crypto2-signum/build/outputs/androidTest-results/**'
     ;;
   compose-demo)
     script="./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
@@ -31,7 +31,9 @@ esac
 {
   echo "script=$script"
   echo "emulator_options=$emulator_options"
-  echo "report_paths=$report_paths"
+  echo "report_paths<<ANDROID_TEST_REPORT_PATHS"
+  printf '%s\n' "$report_paths"
+  echo "ANDROID_TEST_REPORT_PATHS"
   echo "artifact_paths<<ANDROID_TEST_ARTIFACT_PATHS"
   printf '%s\n' "$artifact_paths"
   echo "ANDROID_TEST_ARTIFACT_PATHS"

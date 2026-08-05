@@ -6,7 +6,7 @@ plugins {
 group = "id.walt.library-commons"
 
 kotlin {
-    js(IR) {
+    js {
         outputModuleName = "library-commons"
     }
 

@@ -413,6 +413,8 @@ data class CoseKey(
                     Cose.EllipticCurves.P_521 -> "P-521"
                     Cose.EllipticCurves.Ed25519 -> "Ed25519"
                     Cose.EllipticCurves.Ed448 -> "Ed448"
+                    Cose.EllipticCurves.X25519 -> "X25519"
+                    Cose.EllipticCurves.X448 -> "X448"
                     Cose.EllipticCurves.secp256k1 -> "secp256k1"
                     else -> null // Ignore unsupported curves
                 }
@@ -502,6 +504,9 @@ object Cose {
 
         /** ECDSA w/ SHA-256 */
         const val ES256 = -7
+
+        /** Fully specified ECDSA using P-256 and SHA-256 for algorithm negotiation. */
+        const val ESP256 = -9
 
         /** ECDSA w/ SHA-384 */
         const val ES384 = -35
@@ -597,6 +602,9 @@ object Cose {
         /** Elliptic Curve Keys w/ x- and y-coordinate pair */
         const val EC2 = 2
 
+        /** RSA key */
+        const val RSA = 3
+
         /** Symmetric Keys */
         const val SYMMETRIC = 4
     }
@@ -612,8 +620,11 @@ object Cose {
         /** NIST P-521 also known as secp521r1 */
         const val P_521 = 3
 
-        // X25519: 4 // X25519 for use w/ ECDH only
-        // X448: 5 // X448 for use w/ ECDH only
+        /** X25519 for use w/ XDH only */
+        const val X25519 = 4
+
+        /** X448 for use w/ XDH only */
+        const val X448 = 5
 
         /** Ed25519 for use w/ EdDSA only */
         const val Ed25519 = 6
@@ -624,6 +635,7 @@ object Cose {
         /** SECG secp256k1 curve */
         const val secp256k1 = 8
 
+        @Deprecated("Use EncodedKey.Jwk.toCoseKey() with a crypto2 JWK.")
         fun ellipticCurveForKeyType(keyType: KeyType) = when (keyType) {
             KeyType.secp256r1 -> P_256
             KeyType.secp384r1 -> P_384

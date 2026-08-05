@@ -1,0 +1,255 @@
+public final class id/walt/crypto2/jvm/JavaAsymmetricCiphertext : java/lang/Record {
+	public fun <init> (Lid/walt/crypto2/jvm/JavaAsymmetricCiphertext$Type;Lid/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm;[BLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;[B)V
+	public fun algorithm ()Lid/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm;
+	public fun context ()Ljava/util/Map;
+	public fun data ()[B
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun keyId ()Ljava/lang/String;
+	public fun keyVersion ()Ljava/lang/String;
+	public fun provider ()Ljava/lang/String;
+	public fun providerData ()[B
+	public static fun raw (Lid/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm;[B)Lid/walt/crypto2/jvm/JavaAsymmetricCiphertext;
+	public final fun toString ()Ljava/lang/String;
+	public fun type ()Lid/walt/crypto2/jvm/JavaAsymmetricCiphertext$Type;
+}
+
+public final class id/walt/crypto2/jvm/JavaAsymmetricCiphertext$Type : java/lang/Enum {
+	public static final field OPAQUE Lid/walt/crypto2/jvm/JavaAsymmetricCiphertext$Type;
+	public static final field RAW Lid/walt/crypto2/jvm/JavaAsymmetricCiphertext$Type;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/jvm/JavaAsymmetricCiphertext$Type;
+	public static fun values ()[Lid/walt/crypto2/jvm/JavaAsymmetricCiphertext$Type;
+}
+
+public final class id/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm : java/lang/Record {
+	public fun <init> (Lid/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm$Type;Lid/walt/crypto2/jvm/JavaDigestAlgorithm;Lid/walt/crypto2/jvm/JavaDigestAlgorithm;Ljava/lang/String;Ljava/util/Map;)V
+	public static fun custom (Ljava/lang/String;Ljava/util/Map;)Lid/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm;
+	public fun customId ()Ljava/lang/String;
+	public fun digest ()Lid/walt/crypto2/jvm/JavaDigestAlgorithm;
+	public final fun equals (Ljava/lang/Object;)Z
+	public final fun hashCode ()I
+	public fun mgfDigest ()Lid/walt/crypto2/jvm/JavaDigestAlgorithm;
+	public fun parameters ()Ljava/util/Map;
+	public static fun rsaOaep (Lid/walt/crypto2/jvm/JavaDigestAlgorithm;Lid/walt/crypto2/jvm/JavaDigestAlgorithm;)Lid/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm;
+	public static fun rsaPkcs1 ()Lid/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm;
+	public final fun toString ()Ljava/lang/String;
+	public fun type ()Lid/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm$Type;
+}
+
+public final class id/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm$Type : java/lang/Enum {
+	public static final field CUSTOM Lid/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm$Type;
+	public static final field RSA_OAEP Lid/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm$Type;
+	public static final field RSA_PKCS1 Lid/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm$Type;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm$Type;
+	public static fun values ()[Lid/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm$Type;
+}
+
+public abstract interface class id/walt/crypto2/jvm/JavaDecryptor {
+	public abstract fun decrypt (Lid/walt/crypto2/jvm/JavaAsymmetricCiphertext;[B)Ljava/util/concurrent/CompletionStage;
+}
+
+public final class id/walt/crypto2/jvm/JavaDigestAlgorithm : java/lang/Record {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun equals (Ljava/lang/Object;)Z
+	public final fun hashCode ()I
+	public fun name ()Ljava/lang/String;
+	public final fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/jvm/JavaEncodedKeyMaterial : java/lang/Record {
+	public fun <init> (Lid/walt/crypto2/jvm/JavaKeySpec;Lid/walt/crypto2/keys/EncodedKey;)V
+	public final fun equals (Ljava/lang/Object;)Z
+	public final fun hashCode ()I
+	public fun key ()Lid/walt/crypto2/keys/EncodedKey;
+	public fun spec ()Lid/walt/crypto2/jvm/JavaKeySpec;
+	public final fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class id/walt/crypto2/jvm/JavaEncryptor {
+	public abstract fun encrypt ([BLid/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm;[B)Ljava/util/concurrent/CompletionStage;
+}
+
+public final class id/walt/crypto2/jvm/JavaGenerateManagedKeyRequest {
+	public fun <init> (Ljava/lang/String;Lid/walt/crypto2/jvm/JavaKeySpec;Ljava/util/Set;[BLjava/util/Map;)V
+	public fun getId ()Ljava/lang/String;
+	public fun getMetadata ()Ljava/util/Map;
+	public fun getProviderOptions ()[B
+	public fun getSpec ()Lid/walt/crypto2/jvm/JavaKeySpec;
+	public fun getUsages ()Ljava/util/Set;
+}
+
+public abstract interface class id/walt/crypto2/jvm/JavaKeyAgreement {
+	public abstract fun generateSharedSecret (Lid/walt/crypto2/keys/EncodedKey;Lid/walt/crypto2/jvm/JavaNamedAlgorithm;)Ljava/util/concurrent/CompletionStage;
+}
+
+public abstract interface class id/walt/crypto2/jvm/JavaKeyDeleter {
+	public abstract fun delete ()Ljava/util/concurrent/CompletionStage;
+}
+
+public final class id/walt/crypto2/jvm/JavaKeySpec : java/lang/Record {
+	public fun <init> (Lid/walt/crypto2/jvm/JavaKeySpec$Type;Ljava/lang/String;Ljava/lang/Integer;Ljava/util/Map;)V
+	public fun bits ()Ljava/lang/Integer;
+	public static fun custom (Ljava/lang/String;Ljava/util/Map;)Lid/walt/crypto2/jvm/JavaKeySpec;
+	public static fun ec (Ljava/lang/String;)Lid/walt/crypto2/jvm/JavaKeySpec;
+	public static fun edwards (Ljava/lang/String;)Lid/walt/crypto2/jvm/JavaKeySpec;
+	public final fun equals (Ljava/lang/Object;)Z
+	public final fun hashCode ()I
+	public static fun montgomery (Ljava/lang/String;)Lid/walt/crypto2/jvm/JavaKeySpec;
+	public fun name ()Ljava/lang/String;
+	public fun parameters ()Ljava/util/Map;
+	public static fun rsa (I)Lid/walt/crypto2/jvm/JavaKeySpec;
+	public static fun symmetric (Ljava/lang/String;I)Lid/walt/crypto2/jvm/JavaKeySpec;
+	public final fun toString ()Ljava/lang/String;
+	public fun type ()Lid/walt/crypto2/jvm/JavaKeySpec$Type;
+}
+
+public final class id/walt/crypto2/jvm/JavaKeySpec$Type : java/lang/Enum {
+	public static final field CUSTOM Lid/walt/crypto2/jvm/JavaKeySpec$Type;
+	public static final field EC Lid/walt/crypto2/jvm/JavaKeySpec$Type;
+	public static final field EDWARDS Lid/walt/crypto2/jvm/JavaKeySpec$Type;
+	public static final field MONTGOMERY Lid/walt/crypto2/jvm/JavaKeySpec$Type;
+	public static final field RSA Lid/walt/crypto2/jvm/JavaKeySpec$Type;
+	public static final field SYMMETRIC Lid/walt/crypto2/jvm/JavaKeySpec$Type;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/jvm/JavaKeySpec$Type;
+	public static fun values ()[Lid/walt/crypto2/jvm/JavaKeySpec$Type;
+}
+
+public abstract interface class id/walt/crypto2/jvm/JavaKeyUnwrapper {
+	public abstract fun unwrapKey (Lid/walt/crypto2/jvm/JavaWrappedKey;)Ljava/util/concurrent/CompletionStage;
+}
+
+public abstract interface class id/walt/crypto2/jvm/JavaKeyWrapper {
+	public abstract fun wrapKey (Lid/walt/crypto2/jvm/JavaEncodedKeyMaterial;Lid/walt/crypto2/jvm/JavaNamedAlgorithm;)Ljava/util/concurrent/CompletionStage;
+}
+
+public abstract interface class id/walt/crypto2/jvm/JavaManagedKey {
+	public fun decryptor ()Lid/walt/crypto2/jvm/JavaDecryptor;
+	public fun deleter ()Lid/walt/crypto2/jvm/JavaKeyDeleter;
+	public fun encryptionAlgorithms ()Ljava/util/Set;
+	public fun encryptor ()Lid/walt/crypto2/jvm/JavaEncryptor;
+	public abstract fun getReference ()Lid/walt/crypto2/jvm/JavaManagedKeyReference;
+	public fun keyAgreement ()Lid/walt/crypto2/jvm/JavaKeyAgreement;
+	public fun keyAgreementAlgorithms ()Ljava/util/Set;
+	public fun keyUnwrapper ()Lid/walt/crypto2/jvm/JavaKeyUnwrapper;
+	public fun keyWrapper ()Lid/walt/crypto2/jvm/JavaKeyWrapper;
+	public fun keyWrappingAlgorithms ()Ljava/util/Set;
+	public fun signatureAlgorithms ()Ljava/util/Set;
+	public fun signer ()Lid/walt/crypto2/jvm/JavaSigner;
+	public fun supportsEncryptionAlgorithm (Lid/walt/crypto2/jvm/JavaAsymmetricEncryptionAlgorithm;)Z
+	public fun supportsKeyAgreementAlgorithm (Lid/walt/crypto2/jvm/JavaNamedAlgorithm;)Z
+	public fun supportsKeyWrappingAlgorithm (Lid/walt/crypto2/jvm/JavaNamedAlgorithm;)Z
+	public fun supportsSignatureAlgorithm (Lid/walt/crypto2/jvm/JavaSignatureAlgorithm;)Z
+	public fun verifier ()Lid/walt/crypto2/jvm/JavaVerifier;
+}
+
+public abstract interface class id/walt/crypto2/jvm/JavaManagedKeyProvider {
+	public fun close ()Ljava/util/concurrent/CompletionStage;
+	public abstract fun generate (Lid/walt/crypto2/jvm/JavaGenerateManagedKeyRequest;)Ljava/util/concurrent/CompletionStage;
+	public abstract fun id ()Ljava/lang/String;
+	public abstract fun restore (Lid/walt/crypto2/jvm/JavaManagedKeyReference;)Ljava/util/concurrent/CompletionStage;
+}
+
+public final class id/walt/crypto2/jvm/JavaManagedKeyProviders {
+	public static final field INSTANCE Lid/walt/crypto2/jvm/JavaManagedKeyProviders;
+	public static final fun load ()Ljava/util/List;
+	public static final fun load (Ljava/lang/ClassLoader;)Ljava/util/List;
+	public static synthetic fun load$default (Ljava/lang/ClassLoader;ILjava/lang/Object;)Ljava/util/List;
+}
+
+public final class id/walt/crypto2/jvm/JavaManagedKeyReference {
+	public fun <init> (ILjava/lang/String;Lid/walt/crypto2/jvm/JavaKeySpec;Ljava/util/Set;Ljava/lang/String;I[BLid/walt/crypto2/keys/EncodedKey;Ljava/util/Map;)V
+	public fun getId ()Ljava/lang/String;
+	public fun getMetadata ()Ljava/util/Map;
+	public fun getProvider ()Ljava/lang/String;
+	public fun getProviderData ()[B
+	public fun getProviderSchemaVersion ()I
+	public fun getPublicKey ()Lid/walt/crypto2/keys/EncodedKey;
+	public fun getSpec ()Lid/walt/crypto2/jvm/JavaKeySpec;
+	public fun getUsages ()Ljava/util/Set;
+	public fun getVersion ()I
+}
+
+public final class id/walt/crypto2/jvm/JavaNamedAlgorithm : java/lang/Record {
+	public fun <init> (Lid/walt/crypto2/jvm/JavaNamedAlgorithm$Type;Ljava/lang/String;Ljava/util/Map;)V
+	public static fun builtin (Ljava/lang/String;)Lid/walt/crypto2/jvm/JavaNamedAlgorithm;
+	public static fun custom (Ljava/lang/String;Ljava/util/Map;)Lid/walt/crypto2/jvm/JavaNamedAlgorithm;
+	public final fun equals (Ljava/lang/Object;)Z
+	public final fun hashCode ()I
+	public fun id ()Ljava/lang/String;
+	public static fun named (Ljava/lang/String;Ljava/util/Map;)Lid/walt/crypto2/jvm/JavaNamedAlgorithm;
+	public fun parameters ()Ljava/util/Map;
+	public final fun toString ()Ljava/lang/String;
+	public fun type ()Lid/walt/crypto2/jvm/JavaNamedAlgorithm$Type;
+}
+
+public final class id/walt/crypto2/jvm/JavaNamedAlgorithm$Type : java/lang/Enum {
+	public static final field BUILTIN Lid/walt/crypto2/jvm/JavaNamedAlgorithm$Type;
+	public static final field CUSTOM Lid/walt/crypto2/jvm/JavaNamedAlgorithm$Type;
+	public static final field NAMED Lid/walt/crypto2/jvm/JavaNamedAlgorithm$Type;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/jvm/JavaNamedAlgorithm$Type;
+	public static fun values ()[Lid/walt/crypto2/jvm/JavaNamedAlgorithm$Type;
+}
+
+public final class id/walt/crypto2/jvm/JavaProviderAdapterKt {
+	public static final fun asKotlinProvider (Lid/walt/crypto2/jvm/JavaManagedKeyProvider;)Lid/walt/crypto2/providers/ManagedKeyProvider;
+}
+
+public final class id/walt/crypto2/jvm/JavaSignatureAlgorithm : java/lang/Record {
+	public fun <init> (Lid/walt/crypto2/jvm/JavaSignatureAlgorithm$Type;Lid/walt/crypto2/jvm/JavaDigestAlgorithm;Ljava/lang/String;Lid/walt/crypto2/jvm/JavaDigestAlgorithm;Ljava/lang/Integer;Ljava/lang/String;Ljava/util/Map;)V
+	public static fun custom (Ljava/lang/String;Ljava/util/Map;)Lid/walt/crypto2/jvm/JavaSignatureAlgorithm;
+	public fun customId ()Ljava/lang/String;
+	public fun digest ()Lid/walt/crypto2/jvm/JavaDigestAlgorithm;
+	public static fun ecdsa (Lid/walt/crypto2/jvm/JavaDigestAlgorithm;Ljava/lang/String;)Lid/walt/crypto2/jvm/JavaSignatureAlgorithm;
+	public static fun edDsa ()Lid/walt/crypto2/jvm/JavaSignatureAlgorithm;
+	public fun encoding ()Ljava/lang/String;
+	public final fun equals (Ljava/lang/Object;)Z
+	public final fun hashCode ()I
+	public fun mgfDigest ()Lid/walt/crypto2/jvm/JavaDigestAlgorithm;
+	public fun parameters ()Ljava/util/Map;
+	public static fun rsaPkcs1 (Lid/walt/crypto2/jvm/JavaDigestAlgorithm;)Lid/walt/crypto2/jvm/JavaSignatureAlgorithm;
+	public static fun rsaPss (Lid/walt/crypto2/jvm/JavaDigestAlgorithm;Lid/walt/crypto2/jvm/JavaDigestAlgorithm;Ljava/lang/Integer;)Lid/walt/crypto2/jvm/JavaSignatureAlgorithm;
+	public fun saltLengthBytes ()Ljava/lang/Integer;
+	public final fun toString ()Ljava/lang/String;
+	public fun type ()Lid/walt/crypto2/jvm/JavaSignatureAlgorithm$Type;
+}
+
+public final class id/walt/crypto2/jvm/JavaSignatureAlgorithm$Type : java/lang/Enum {
+	public static final field CUSTOM Lid/walt/crypto2/jvm/JavaSignatureAlgorithm$Type;
+	public static final field ECDSA Lid/walt/crypto2/jvm/JavaSignatureAlgorithm$Type;
+	public static final field EDDSA Lid/walt/crypto2/jvm/JavaSignatureAlgorithm$Type;
+	public static final field RSA_PKCS1 Lid/walt/crypto2/jvm/JavaSignatureAlgorithm$Type;
+	public static final field RSA_PSS Lid/walt/crypto2/jvm/JavaSignatureAlgorithm$Type;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/jvm/JavaSignatureAlgorithm$Type;
+	public static fun values ()[Lid/walt/crypto2/jvm/JavaSignatureAlgorithm$Type;
+}
+
+public abstract interface class id/walt/crypto2/jvm/JavaSigner {
+	public abstract fun sign ([BLid/walt/crypto2/jvm/JavaSignatureAlgorithm;)Ljava/util/concurrent/CompletionStage;
+}
+
+public abstract interface class id/walt/crypto2/jvm/JavaVerifier {
+	public abstract fun verify ([B[BLid/walt/crypto2/jvm/JavaSignatureAlgorithm;)Ljava/util/concurrent/CompletionStage;
+}
+
+public final class id/walt/crypto2/jvm/JavaWrappedKey : java/lang/Record {
+	public fun <init> (Lid/walt/crypto2/jvm/JavaWrappedKey$Type;Lid/walt/crypto2/jvm/JavaNamedAlgorithm;[BLid/walt/crypto2/jvm/JavaKeySpec;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[B)V
+	public fun algorithm ()Lid/walt/crypto2/jvm/JavaNamedAlgorithm;
+	public fun blob ()[B
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun keyVersion ()Ljava/lang/String;
+	public fun provider ()Ljava/lang/String;
+	public fun providerData ()[B
+	public final fun toString ()Ljava/lang/String;
+	public fun type ()Lid/walt/crypto2/jvm/JavaWrappedKey$Type;
+	public fun wrappedKeySpec ()Lid/walt/crypto2/jvm/JavaKeySpec;
+	public fun wrappingKeyId ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/jvm/JavaWrappedKey$Type : java/lang/Enum {
+	public static final field OPAQUE Lid/walt/crypto2/jvm/JavaWrappedKey$Type;
+	public static final field RAW Lid/walt/crypto2/jvm/JavaWrappedKey$Type;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/jvm/JavaWrappedKey$Type;
+	public static fun values ()[Lid/walt/crypto2/jvm/JavaWrappedKey$Type;
+}
+

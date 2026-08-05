@@ -1,5 +1,7 @@
 package id.walt.x509
 
+import id.walt.x509.iso.DocumentSignerEkuOID
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
@@ -76,6 +78,14 @@ internal expect class PlatformX509Certificate {
     val subjectKeyIdentifier: ByteArray?
     val authorityKeyIdentifier: ByteArray?
     val subjectAlternativeDnsNames: List<String>
+    val isCertificateAuthority: Boolean
+    val pathLengthConstraint: Int?
+    val canSignCertificates: Boolean
+    val canSignData: Boolean
+    val extendedKeyUsageOids: Set<String>?
+    val basicConstraintsCritical: Boolean
+    val keyUsageCritical: Boolean
+    val criticalExtensionOids: Set<String>
 
     fun hasIssuerNameMatching(issuer: PlatformX509Certificate): Boolean
     fun verifySignedBy(issuer: PlatformX509Certificate)
@@ -86,3 +96,35 @@ internal expect class PlatformX509Certificate {
         fun parse(der: CertificateDer): PlatformX509Certificate
     }
 }
+
+fun CertificateDer.validateClientAuthenticationCertificateUsage() {
+    val certificate = PlatformX509Certificate.parse(this)
+    require(!certificate.isCertificateAuthority) { "Client authentication certificate must not be a CA" }
+    require(certificate.canSignData) { "Client authentication certificate must permit digitalSignature" }
+    certificate.extendedKeyUsageOids?.let { usages ->
+        require(CLIENT_AUTH_EXTENDED_KEY_USAGE_OID in usages) {
+            "Client authentication certificate extended key usage must permit clientAuth"
+        }
+    }
+}
+
+fun CertificateDer.validateDocumentSigningCertificateUsage(instant: Instant = Clock.System.now()) {
+    val certificate = PlatformX509Certificate.parse(this)
+    certificate.checkValidityAt(instant)
+    require(!certificate.isCertificateAuthority) { "Document signer certificate must not be a CA" }
+    require(certificate.canSignData) { "Document signer certificate must permit digitalSignature" }
+    certificate.extendedKeyUsageOids?.let { usages ->
+        require(DocumentSignerEkuOID in usages) {
+            "Document signer certificate extended key usage must contain $DocumentSignerEkuOID"
+        }
+    }
+}
+
+fun CertificateDer.validateCertificateAuthorityUsage(instant: Instant = Clock.System.now()) {
+    val certificate = PlatformX509Certificate.parse(this)
+    certificate.checkValidityAt(instant)
+    require(certificate.isCertificateAuthority) { "Issuer certificate must be a CA" }
+    require(certificate.canSignCertificates) { "Issuer certificate must permit keyCertSign" }
+}
+
+private const val CLIENT_AUTH_EXTENDED_KEY_USAGE_OID = "1.3.6.1.5.5.7.3.2"

@@ -1,11 +1,14 @@
 package id.walt.credentials.formats
 
 import id.walt.cose.toCoseVerifier
+import id.walt.cose.verify
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.CredentialSignature
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.did.dids.resolver.local.DidJwkResolver
+import id.walt.mdoc.crypto.MdocCrypto
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.parser.MdocParser
@@ -56,18 +59,26 @@ data class MdocsCredential(
         //val issuerKey = issuerDidResolver.resolveToKey(issuerVirtualDid).getOrThrow()
         return signature.signerKey
     }*/
+    @Deprecated("Use getSignerCrypto2Key()")
     override suspend fun getSignerKey(): Key {
         require(signature is CoseCredentialSignature) { "Invalid signature for Mdocs credential" }
         return signature.signerKey.key
     }
 
+    @Deprecated("Use getHolderCrypto2Key()")
     override suspend fun getHolderKey(): Key =
         JWKKey.importJWK(documentMso.deviceKeyInfo.deviceKey.toJWK().toString()).getOrThrow()
+
+    override suspend fun getHolderCrypto2Key(): Crypto2Key =
+        MdocCrypto.coseKeyToCrypto2Key(documentMso.deviceKeyInfo.deviceKey)
+
+    override suspend fun getSignerCrypto2Key(): Crypto2Key = document.issuerSigned.getParsedIssuerAuthCrypto2().signerKey
 
     companion object {
         private val log = KotlinLogging.logger { }
         private val issuerDidResolver = DidJwkResolver()
 
+        @Deprecated("Use the shared crypto2 mdoc issuer-authentication verification API")
         suspend fun verifyMdocSignature(document: Document, issuerKey: Key) {
             log.trace { "Verifying issuerAuth signature with issuer key..." }
             val issuerAuthSignatureValid = document.issuerSigned.issuerAuth.verify(issuerKey.toCoseVerifier())
@@ -95,11 +106,24 @@ data class MdocsCredential(
         return MdocParser.parseToDocument(signed)
     }
 
+    @Deprecated("Use verifyCrypto2(publicKey, allowedAlgorithms)")
     override suspend fun verify(publicKey: Key): Result<JsonElement> {
         return runCatching { verifyMdocSignature(document, publicKey) }
             .map { credentialData }
     }
 
+    override suspend fun verifyCrypto2(
+        publicKey: Crypto2Key,
+        allowedAlgorithms: Crypto2VerificationAlgorithms,
+    ): Result<JsonElement> = crypto2Result {
+        require(allowedAlgorithms.cose.isNotEmpty()) { "Mdoc verification requires an explicit COSE allowlist" }
+        require(document.issuerSigned.issuerAuth.verify(publicKey, allowedAlgorithms.cose)) {
+            "IssuerAuth signature is invalid"
+        }
+        credentialData
+    }
+
+    @Deprecated("Use getSignerCrypto2Key() and verifyCrypto2() with an explicit algorithm allowlist")
     suspend fun verify(): Result<JsonElement> {
         val signerKey = getSignerKey()
         return verify(signerKey)
