@@ -33,6 +33,7 @@ import id.waltid.openid4vci.wallet.oauth.PKCEManager
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
+import id.waltid.openid4vci.wallet.proof.ProofKeyBinding
 import id.waltid.openid4vci.wallet.token.DPoPProofFactory
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import id.waltid.openid4vci.wallet.token.TokenRequestException
@@ -996,23 +997,20 @@ class WalletIssuanceSessionService(
         }
         // Prefer a DID only after proving that its verification method belongs to the selected key.
         // This preserves the holder identity needed by W3C VC issuers without weakening key binding.
-        val proofs = if (supportsHolderDid) {
-            builder.buildJwtProof(
-                key = active.key,
-                audience = active.resolved.offer.credentialIssuer,
-                nonce = nonce,
-                keyId = didKeyId,
-            )
-        } else if (methods.any { it is CryptographicBindingMethod.Jwk || it is CryptographicBindingMethod.CoseKey }) {
-            builder.buildJwtProof(
-                key = active.key,
-                audience = active.resolved.offer.credentialIssuer,
-                nonce = nonce,
-                includeJwk = true,
-            )
-        } else {
-            error("Issuer requires a DID that is bound to the selected holder key")
+        // TODO(crypto2): prefer wallet.resolveKeyMaterial + crypto2 JwtProofBuilder.buildProof once
+        // ActiveSession key resolution is crypto2-first (SqlDelightKeyStore has no legacy Key).
+        val binding = when {
+            supportsHolderDid -> ProofKeyBinding.KeyId(requireNotNull(didKeyId))
+            methods.any { it is CryptographicBindingMethod.Jwk || it is CryptographicBindingMethod.CoseKey } ->
+                ProofKeyBinding.Jwk
+            else -> error("Issuer requires a DID that is bound to the selected holder key")
         }
+        val proofs = builder.buildProof(
+            key = active.key,
+            audience = active.resolved.offer.credentialIssuer,
+            nonce = nonce,
+            binding = binding,
+        )
         return proofs.jwt?.singleOrNull() ?: error("Credential proof builder returned no JWT")
     }
 
