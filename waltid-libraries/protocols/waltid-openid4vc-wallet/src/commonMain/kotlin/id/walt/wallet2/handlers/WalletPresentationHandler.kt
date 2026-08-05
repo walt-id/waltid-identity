@@ -6,9 +6,9 @@ import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.dcql.DcqlDisclosure
-import id.walt.dcql.DcqlMatchException
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
+import id.walt.dcql.RequiredCredentialUnavailableException
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
@@ -310,7 +310,7 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
-        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): WalletPresentResult {
         val keyMaterial = wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
@@ -362,7 +362,7 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
-        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): WalletPresentResult {
         val keyMaterial = wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available for isolated presentation")
@@ -410,7 +410,7 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
-        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): PreviewPresentationResult {
         // Selected once up front so advertised wallet metadata, request validation and the retained
         // preview all refer to the same key, but only *required* where a key is genuinely needed: a
@@ -479,7 +479,7 @@ object WalletPresentationHandler {
         // propagate because they indicate malformed or unsupported DCQL rather than availability.
         val matched = try {
             selectFromStores(wallet, query, useWalletCredentialIds = true)
-        } catch (error: DcqlMatchException) {
+        } catch (error: RequiredCredentialUnavailableException) {
             emptyMap()
         }
         val availableCredentialQueryIds = matched.filterValues { it.isNotEmpty() }.keys
@@ -640,7 +640,7 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
-        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): Result<WalletPresentResult> = keyMaterial.crypto2Key?.let { crypto2Key ->
         WalletPresentFunctionality2.walletPresentHandling(
             holderKey = crypto2Key,
@@ -686,14 +686,22 @@ object WalletPresentationHandler {
         wallet: Wallet,
         request: ResolveVpRequestRequest,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
-        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): ResolveVpRequestResult {
+        val keyMaterial = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
+            ?: error("No key available: wallet has no keyStores and no staticKey")
         val authRequest = WalletPresentFunctionality2.resolveAuthorizationRequest(
             presentationRequestUrl = request.requestUrl,
             unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
             legacyFallbackCallback = null,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
             expectedRequestObjectAudience = expectedRequestObjectAudience,
+            requestUriPostWalletMetadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                vpFormatsSupported = WalletPresentationFormatRegistry.buildVpFormatsSupported(
+                    keyMaterial.presentationCapabilities(),
+                ),
+                trustConfiguration = clientIdTrustConfiguration,
+            ),
         )
 
         return ResolveVpRequestResult(
@@ -955,7 +963,7 @@ object WalletPresentationHandler {
         capabilities: () -> WalletPresentationFormatRegistry.RuntimeCapabilities,
         requestUrl: Url,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
-        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): ResolvedAuthorizationRequest {
         val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
         return AuthorizationRequestResolver.resolve(

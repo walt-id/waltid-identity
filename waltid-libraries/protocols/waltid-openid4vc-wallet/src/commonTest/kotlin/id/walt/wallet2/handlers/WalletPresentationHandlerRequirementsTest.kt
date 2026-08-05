@@ -7,11 +7,14 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
+import id.walt.dcql.UnsupportedDcqlConstraintException
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.CredentialSetQuery
 import id.walt.dcql.models.DcqlQuery
+import id.walt.dcql.models.TrustedAuthoritiesQuery
+import id.walt.dcql.models.TrustedAuthorityType
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
@@ -353,6 +356,41 @@ class WalletPresentationHandlerRequirementsTest {
             "https://verifier.example/callback#error=access_denied&state=state-123",
             rejection.getUrl,
         )
+    }
+
+    @Test
+    fun unsupportedDcqlConstraintIsNotPresentedAsCredentialUnavailable() = runTest {
+        val wallet = Wallet(
+            id = "wallet-unsupported-dcql",
+            staticKey = JWKKey.generate(KeyType.Ed25519),
+            credentialStores = listOf(InMemoryCredentialStore()),
+        )
+        val requestUrl = AuthorizationRequest(
+            clientId = "redirect_uri:https://verifier.example/callback",
+            redirectUri = "https://verifier.example/callback",
+            responseMode = OpenID4VPResponseMode.FRAGMENT,
+            nonce = "nonce",
+            dcqlQuery = DcqlQuery(
+                credentials = listOf(
+                    credentialQuery("pid").copy(
+                        trustedAuthorities = listOf(
+                            TrustedAuthoritiesQuery(
+                                type = TrustedAuthorityType.AKI,
+                                values = listOf("authority-key-id"),
+                            )
+                        )
+                    )
+                )
+            ),
+        ).toHttpUrl()
+
+        assertFailsWith<UnsupportedDcqlConstraintException> {
+            WalletPresentationHandler.previewPresentation(
+                wallet = wallet,
+                request = PreviewPresentationRequest(requestUrl),
+                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+            )
+        }
     }
 
     @Test

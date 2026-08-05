@@ -48,13 +48,20 @@ object DcqlMatcher {
         // Find matches for each individual CredentialQuery
         for (credentialQuery in query.credentials) {
             log.trace { "Processing CredentialQuery: ${credentialQuery.id} (format: ${credentialQuery.format})" }
+            if (!credentialQuery.trustedAuthorities.isNullOrEmpty() && trustedAuthoritiesChecker == null) {
+                return Result.failure(
+                    UnsupportedDcqlConstraintException(
+                        "trusted_authorities matching requires a trusted-authorities checker",
+                    )
+                )
+            }
             val potentialMatchesByFormat = availableCredentials.filter { it.format in credentialQuery.format.id }
             log.trace { "Potential matches for ${credentialQuery.id} based on format: ${potentialMatchesByFormat.map { it.id + "(${it.format})" }}" }
 
             val successfullyMatchedCredentialsForThisQuery = mutableListOf<DcqlMatchResult>()
 
             for (credential in potentialMatchesByFormat) {
-                val metaCheck = matchesMeta(credential, credentialQuery.meta ?: NoMeta, credentialQuery.format)
+                val metaCheck = matchesMeta(credential, credentialQuery.meta, credentialQuery.format)
                 if (!metaCheck) {
                     log.trace { "Credential ${credential.id} failed meta check for query ${credentialQuery.id}" }
                     continue
@@ -104,7 +111,7 @@ object DcqlMatcher {
             if (!satisfied) {
                 val errorMsg = "Required credential set constraints not met."
                 log.warn { errorMsg }
-                return Result.failure(DcqlMatchException(errorMsg))
+                return Result.failure(RequiredCredentialUnavailableException(emptyList(), errorMsg))
             }
         } ?: run {
             val missingRequired = query.credentials.map { it.id }
@@ -112,7 +119,7 @@ object DcqlMatcher {
             if (missingRequired.isNotEmpty()) {
                 val errorMsg = "No matches found for required credential queries: $missingRequired"
                 log.warn { errorMsg }
-                return Result.failure(DcqlMatchException(errorMsg))
+                return Result.failure(RequiredCredentialUnavailableException(missingRequired, errorMsg))
             }
         }
 
@@ -139,6 +146,13 @@ object DcqlMatcher {
         // 1. Find matches for each individual CredentialQuery
         for (credQuery in query.credentials) {
             log.trace { "Processing CredentialQuery: ${credQuery.id} (format: ${credQuery.format})" }
+            if (!credQuery.trustedAuthorities.isNullOrEmpty() && trustedAuthoritiesChecker == null) {
+                return Result.failure(
+                    UnsupportedDcqlConstraintException(
+                        "trusted_authorities matching requires a trusted-authorities checker",
+                    )
+                )
+            }
             val potentialMatches = availableCredentials.filter { it.format in credQuery.format.id }
             log.trace { "Potential matches for ${credQuery.id} based on format: ${potentialMatches.map { it.id }}" }
 
@@ -174,7 +188,12 @@ object DcqlMatcher {
         query.credentialSets?.let { sets ->
             val satisfied = checkCredentialSets(sets, individualMatches.keys)
             if (!satisfied) {
-                return Result.failure(DcqlMatchException("Required credential set constraints not met."))
+                return Result.failure(
+                    RequiredCredentialUnavailableException(
+                        emptyList(),
+                        "Required credential set constraints not met.",
+                    )
+                )
             }
         }
 
@@ -192,7 +211,7 @@ object DcqlMatcher {
         if (query.credentialSets == null && missingRequired.isNotEmpty()) {
             val errorMsg = "No matches found for required credential queries: $missingRequired"
             log.warn { errorMsg }
-            return Result.failure(DcqlMatchException(errorMsg))
+            return Result.failure(RequiredCredentialUnavailableException(missingRequired, errorMsg))
         }
 
 
