@@ -34,6 +34,7 @@ class DidJwkResolver : LocalResolverMethod("jwk") {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Deprecated("Use Crypto2DidKeyResolver or Crypto2DidService for key resolution")
     override suspend fun resolveToKey(did: String): Result<Key> =
         JWKKey.importJWK(DidUtils.pathFromDid(did)!!.decodeFromBase64Url().decodeToString())
 }

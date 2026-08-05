@@ -1,74 +1,90 @@
 package id.walt.cli.util
 
-import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.credentials.CredentialParser
+import id.walt.credentials.formats.DigitalCredential
+import id.walt.crypto2.jose.defaultJwsAlgorithm
+import id.walt.crypto2.keys.Key
 import id.walt.did.dids.DidService
-import id.walt.policies.PolicyManager
-import id.walt.policies.Verifier
-import id.walt.policies.models.PolicyRequest
-import id.walt.policies.models.PolicyResult
+import id.walt.policies2.vc.policies.AllowedIssuerPolicy
+import id.walt.policies2.vc.policies.CredentialSignaturePolicy
+import id.walt.policies2.vc.policies.CredentialVerificationPolicy2
+import id.walt.policies2.vc.policies.ExpirationDatePolicy
+import id.walt.policies2.vc.policies.JsonSchemaPolicy
+import id.walt.policies2.vc.policies.NotBeforePolicy
+import id.walt.policies2.vc.policies.RevocationPolicy
+import id.walt.policies2.vc.policies.WebhookPolicy
 import id.walt.w3c.issuance.Issuer.mergingJwtIssue
 import id.walt.w3c.vc.vcs.W3CVC
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
-class VCUtil {
+data class CredentialPolicyRun(
+    val policy: CredentialVerificationPolicy2,
+    val result: Result<JsonElement>,
+)
 
-    companion object {
-
-        init {
-            runBlocking {
-                // TODO: What exactly is needed?
-                // DidService.apply {
-                //     registerResolver(LocalResolver())
-                //     updateResolversForMethods()
-                //     registerRegistrar(LocalRegistrar())
-                //     updateRegistrarsForMethods()
-                // }
-                DidService.minimalInit()
-            }
-        }
-
-        suspend fun sign(key: JWKKey, issuerDid: String, subjectDid: String, payload: String): String {
-
-            val vcAsMap = Json.decodeFromString<Map<String, JsonElement>>(payload)
-            val vc = W3CVC(vcAsMap)
-            val jws =
-                vc.mergingJwtIssue(
-                    issuerKey = key,
-                    issuerId = issuerDid,
-                    subjectDid = subjectDid,
-                    mappings = JsonObject(emptyMap()),
-                    additionalJwtHeader = emptyMap(),
-                    additionalJwtOptions = emptyMap<String, JsonObject>()
-                )
-            // .w3cVc.signJws(issuerKey = key, issuerDid = issuerDid, subjectDid = subjectDid)
-
-            return jws
-        }
-
-        suspend fun verify(
-            jws: String,
-            policies: List<String>,
-            args: Map<String, JsonElement> = emptyMap()
-        ): List<PolicyResult> {
-            @Suppress("NAME_SHADOWING")
-            val policies = policies.ifEmpty { listOf("signature") }
-
-            val requests = ArrayList<PolicyRequest>()
-
-            policies.forEach { policy ->
-                val verificationPolicy = PolicyManager.getPolicy(policy)
-                requests += PolicyRequest(policy = verificationPolicy, args = args[policy])
-            }
-
-            try {
-                return Verifier.verifyCredential(jws, requests) // jws.decodeJws().payload.toString(), requests
-            } catch (e: IllegalStateException) {
-                println("Something went wrong.")
-                return emptyList()
-            }
-        }
+object VCUtil {
+    init {
+        runBlocking { DidService.minimalInit() }
     }
+
+    suspend fun sign(key: Key, issuerDid: String, subjectDid: String, payload: String): String {
+        val vc = W3CVC(Json.decodeFromString<Map<String, JsonElement>>(payload))
+        return vc.mergingJwtIssue(
+            issuerKey = key,
+            algorithm = key.spec.defaultJwsAlgorithm(),
+            issuerId = issuerDid,
+            subjectDid = subjectDid,
+            mappings = JsonObject(emptyMap()),
+            additionalJwtHeader = emptyMap(),
+            additionalJwtOptions = emptyMap(),
+        )
+    }
+
+    suspend fun parse(rawCredential: String): DigitalCredential = CredentialParser.parseOnly(rawCredential)
+
+    suspend fun verify(
+        rawCredential: String,
+        policies: List<CredentialVerificationPolicy2>,
+    ): List<CredentialPolicyRun> = verify(parse(rawCredential), policies)
+
+    suspend fun verify(
+        credential: DigitalCredential,
+        policies: List<CredentialVerificationPolicy2>,
+    ): List<CredentialPolicyRun> = policies.map { policy -> CredentialPolicyRun(policy, policy.verify(credential)) }
+
+    fun policies(
+        names: List<String>,
+        arguments: Map<String, List<String>>,
+    ): List<CredentialVerificationPolicy2> = (listOf("signature") + names.ifEmpty { listOf("expired", "not-before") })
+        .distinct()
+        .map { name ->
+            when (name) {
+                "signature" -> CredentialSignaturePolicy()
+                "expired", "expiration" -> ExpirationDatePolicy()
+                "not-before" -> NotBeforePolicy()
+                "revoked-status-list" -> RevocationPolicy()
+                "schema" -> JsonSchemaPolicy(
+                    schema = Json.parseToJsonElement(requiredArgument(arguments, "schema", name)) as? JsonObject
+                        ?: throw IllegalArgumentException("Schema must be a JSON object"),
+                )
+                "allowed-issuer" -> AllowedIssuerPolicy(
+                    JsonArray(requiredArguments(arguments, "issuer", name).map(::JsonPrimitive)),
+                )
+                "webhook" -> WebhookPolicy(requiredArgument(arguments, "url", name))
+                else -> throw IllegalArgumentException("Unknown credential policy: $name")
+            }
+        }
+
+    private fun requiredArgument(arguments: Map<String, List<String>>, key: String, policy: String): String =
+        requiredArguments(arguments, key, policy).singleOrNull()
+            ?: throw IllegalArgumentException("Policy $policy requires exactly one --arg=$key=value")
+
+    private fun requiredArguments(arguments: Map<String, List<String>>, key: String, policy: String): List<String> =
+        arguments[key]?.filter(String::isNotBlank)?.takeIf(List<String>::isNotEmpty)
+            ?: throw IllegalArgumentException("Policy $policy requires --arg=$key=value")
 }

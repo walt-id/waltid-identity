@@ -21,6 +21,7 @@ object Wallet2Tables {
     object Wallets : Table("wallet2_wallets") {
         val id = varchar("id", 128)
         val serializedStaticKey = text("static_key").nullable()
+        val crypto2StaticKey = text("crypto2_static_key").nullable()
         val staticDid = varchar("static_did", 1024).nullable()
         val defaultKeyId = varchar("default_key_id", 512).nullable()
         val defaultDidId = varchar("default_did_id", 1024).nullable()
@@ -70,15 +71,22 @@ object Wallet2Tables {
 
     /**
      * Keys stored per key store.
-     * [serializedKey]: output of [id.walt.crypto.keys.KeySerialization.serializeKey] —
+     *
+     * [crypto2StoredKey] is the canonical record: a versioned crypto2 [id.walt.crypto2.keys.StoredKey]
+     * descriptor covering both software and managed (KMS/HSM) keys. It is null only for rows written
+     * before the crypto2 migration; those are migrated from [serializedKey] on first read.
+     *
+     * [serializedKey] is legacy-only: output of [id.walt.crypto.keys.KeySerialization.serializeKey],
      * a JSON string of the form `{"type":"jwk","jwk":{...}}` that round-trips via
-     * [id.walt.crypto.keys.KeyManager.resolveSerializedKey].
+     * [id.walt.crypto.keys.KeyManager.resolveSerializedKey]. It is null for crypto2-only keys, which
+     * have no legacy representation, and it is never used to correct [crypto2StoredKey].
      */
     object Keys : Table("wallet2_keys") {
         val storeId = reference("store_id", KeyStores.id)
         val keyId = varchar("key_id", 512)
         val keyType = varchar("key_type", 64)
-        val serializedKey = text("serialized_key")
+        val serializedKey = text("serialized_key").nullable()
+        val crypto2StoredKey = text("crypto2_stored_key").nullable()
         override val primaryKey = PrimaryKey(storeId, keyId)
     }
 

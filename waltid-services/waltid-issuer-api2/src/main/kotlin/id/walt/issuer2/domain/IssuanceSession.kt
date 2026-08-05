@@ -6,6 +6,7 @@ import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Instant
@@ -44,4 +45,6 @@ data class IssuanceSession(
     val notifications: IssuanceNotifications? = null,
     val isClosed: Boolean = false,
     val credentialStatus: JsonElement? = null,
+    @Transient
+    val crypto2IssuerStoredKey: String? = null,
 )

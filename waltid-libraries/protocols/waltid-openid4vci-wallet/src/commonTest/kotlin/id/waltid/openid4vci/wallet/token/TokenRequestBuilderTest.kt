@@ -41,13 +41,12 @@ class TokenRequestBuilderTest {
         (body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
 
     @Test
-    fun testExchangeAuthorizationCodeIgnoresTokenResponseNonceExtension() = runTest {
+    fun testExchangeAuthorizationCodeSuccess() = runTest {
         val mockResponse = """
             {
                 "access_token": "test-access-token",
                 "token_type": "Bearer",
-                "expires_in": 3600,
-                "c_nonce": "test-nonce"
+                "expires_in": 3600
             }
         """.trimIndent()
 

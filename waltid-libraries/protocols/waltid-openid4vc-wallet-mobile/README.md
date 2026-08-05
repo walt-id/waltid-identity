@@ -89,7 +89,7 @@ does not establish verifier trust and does not expose verifier key material.
 
 `MobileWalletConfig()` uses managed encrypted SQLDelight persistence by default on Android and iOS. Normal SDK users do not provide a database key: the SDK generates one per wallet database, stores it in platform-protected storage, and uses SQLCipher for the local wallet database.
 
-Managed keys are device-local by default. They protect data at rest on the current device, but they are not a cross-device recovery mechanism. Use `MobileWalletDatabaseKey.Provided` when an app needs enterprise/KMS ownership or recoverable database-key material. Store overrides are independent: `null` credential and DID overrides use the encrypted SQLDelight database opened by this persistence configuration, while a `null` key override keeps platform-backed signing-key persistence and generation. Supported mobile platforms intentionally do not fall back to plaintext wallet databases.
+Managed signing keys are device-local by default. They protect data at rest on the current device, but they are not a cross-device recovery mechanism. Use `MobileWalletDatabaseKey.Provided` when an app needs enterprise/KMS ownership or recoverable database-key material. Credential and DID store overrides are independent; signing keys always remain platform-managed. Supported mobile platforms intentionally do not fall back to plaintext wallet databases.
 
 `MobileWalletConfig()` does not accept any OpenID4VP `transaction_data` profiles by default. Wallet apps must pass the profile types they understand through `transactionDataProfiles`; requests containing unknown transaction data types are rejected before the user can submit a presentation. Profile fields are preserved for app UI and display metadata.
 
@@ -142,35 +142,27 @@ Override only credential storage while retaining the default encrypted database,
 val config = MobileWalletConfig(
     walletId = "consumer-wallet",
     persistence = MobileWalletPersistence(
-        stores = MobileWalletStores(
-            credentials = appCredentialStore
-        )
+        credentialStore = appCredentialStore
     )
 )
 ```
 <!-- doc-snippet:end kotlin-custom-credential-store -->
 
-KMP consumers can override all wallet stores. Key storage and key generation are configured together so platform-managed signing keys cannot be accidentally mixed with app-owned key persistence:
+KMP consumers can override credential and DID storage while signing keys remain platform-managed:
 
-<!-- doc-snippet:start kotlin-full-store-overrides -->
+<!-- doc-snippet:start kotlin-store-overrides -->
 ```kotlin
 val config = MobileWalletConfig(
     walletId = "consumer-wallet",
     persistence = MobileWalletPersistence(
-        stores = MobileWalletStores(
-            credentials = appCredentialStore,
-            dids = appDidStore,
-            keys = MobileWalletKeys(
-                store = appKeyStore,
-                generate = { keyType -> appKeyProvider.generateKey(keyType) }
-            )
-        )
+        credentialStore = appCredentialStore,
+        didStore = appDidStore,
     )
 )
 ```
-<!-- doc-snippet:end kotlin-full-store-overrides -->
+<!-- doc-snippet:end kotlin-store-overrides -->
 
-Call `MobileWallet.deleteWallet()` to delete local wallet material for a wallet: stored key references, credentials, DIDs, platform signing keys referenced by the active key store, encrypted database files and sidecars, and the configured database key. Store cleanup uses the active store interfaces, so custom stores receive the same remove calls as default stores.
+Call `MobileWallet.deleteWallet()` to delete local wallet material for a wallet: stored key descriptors, credentials, DIDs, platform signing keys, encrypted database files and sidecars, and the configured database key. Credential and DID custom stores receive the corresponding remove calls.
 
 If a local development build has an old plaintext database or a database restored without its matching key, opening the wallet can fail with a typed storage error. Reset local state by calling `deleteWallet()`, uninstalling the app, or deleting the app's local wallet data. WAL-1085 does not perform plaintext-to-encrypted migration.
 

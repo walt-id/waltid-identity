@@ -774,6 +774,9 @@ class WalletIssuanceSessionService(
     private fun ActiveSession.dpopFactory(): DPoPProofFactory? =
         dpopAlgorithms()?.let { algorithms ->
             { endpoint: String, nonce: String? ->
+                // TODO(crypto2): DPoPProofBuilder still signs with id.walt.crypto.keys.Key / signJws.
+                // Migrate to crypto2 CompactJws once ActiveSession key resolution uses
+                // WalletKeyStore.getKeyMaterial / resolveCrypto2Key for SqlDelightKeyStore.
                 DPoPProofBuilder().buildProof(
                     key = key,
                     httpMethod = "POST",
@@ -1079,6 +1082,9 @@ class WalletIssuanceSessionService(
         repeat(2) { attempt ->
             val proof = try {
                 dpop?.let { algorithms ->
+                    // TODO(crypto2): DPoPProofBuilder still signs with id.walt.crypto.keys.Key / signJws.
+                    // Migrate to crypto2 CompactJws once protected-resource DPoP uses WalletKeyStore
+                    // getKeyMaterial / resolveCrypto2Key instead of legacy Key.
                     DPoPProofBuilder().buildProof(
                         key = key,
                         httpMethod = "POST",

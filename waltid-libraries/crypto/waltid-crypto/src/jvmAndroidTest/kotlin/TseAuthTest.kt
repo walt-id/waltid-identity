@@ -3,6 +3,7 @@ import id.walt.crypto.keys.tse.TSEAuth
 import id.walt.crypto.keys.tse.TSEKey
 import id.walt.crypto.keys.tse.TSEKeyMetadata
 import io.ktor.util.*
+import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import kotlinx.coroutines.test.runTest
 
 class TseAuthTest {
@@ -14,7 +15,7 @@ class TseAuthTest {
         )
         val plaintext = "This is a plaintext 123".encodeToByteArray()
 
-        val signed = tseKey.signRaw(plaintext).encodeBase64()
+        val signed = tseKey.signRaw(plaintext).encodeToBase64()
 
         val verified = tseKey.verifyRaw(signed.decodeBase64Bytes(), plaintext)
 

@@ -36,16 +36,19 @@ sealed interface PresentationRequestValidationResult {
  */
 object PresentationRequestValidator {
     /**
-     * @param formatCapabilities Signing-key format/algorithm capabilities to check against the
-     *   request. Pass `null` to run only key-independent request validation (nonce, response type,
-     *   DCQL shape, transaction_data). Callers that will sign should pass capabilities derived from
-     *   the effective signing key.
+     * @param formatCapabilities resolved lazily, and only for the format/algorithm decision below.
+     *   Establishing them can require resolving the wallet's signing key, and a request that is already
+     *   invalid for a key-independent reason must report that reason rather than a wallet-local
+     *   key-resolution failure.
+     *   Pass `null` to run only key-independent request validation (nonce, response type, DCQL shape,
+     *   transaction_data) — used by non-signing continuation steps such as send-response.
      */
     fun validate(
         resolvedRequest: ResolvedAuthorizationRequest,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
-        formatCapabilities: WalletPresentationFormatRegistry.RuntimeCapabilities? =
-            WalletPresentationFormatRegistry.defaultCapabilities(),
+        formatCapabilities: (() -> WalletPresentationFormatRegistry.RuntimeCapabilities)? = {
+            WalletPresentationFormatRegistry.defaultCapabilities()
+        },
     ): PresentationRequestValidationResult {
         val request = resolvedRequest.authorizationRequest
         requireUsableResponse(request)
@@ -93,12 +96,13 @@ object PresentationRequestValidator {
             val requestedFormats = query.credentials
                 .mapNotNull { credentialQuery -> WalletPresentationFormatRegistry.resolve(credentialQuery.format.id.first()) }
                 .toSet()
+            val capabilities = formatCapabilities()
             val verifierFormats = request.clientMetadata?.vpFormatsSupported
-            val walletSupportsRequestedFormat = requestedFormats.any(formatCapabilities.supportedFormats::contains)
+            val walletSupportsRequestedFormat = requestedFormats.any(capabilities.supportedFormats::contains)
             val verifierSupportsRequestedFormat = verifierFormats?.let {
                 WalletPresentationFormatRegistry.supportsAny(
                     verifierFormats = it,
-                    capabilities = formatCapabilities,
+                    capabilities = capabilities,
                     requestedFormats = requestedFormats,
                 )
             } ?: true

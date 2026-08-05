@@ -44,6 +44,7 @@ private fun OCIsdkMetadata.createAuthProvider(): AbstractAuthenticationDetailsPr
 
 @Serializable
 @SerialName("oci")
+@Deprecated("Legacy v1 OCI SDK adapter; use OciKmsKeyProvider for new integrations")
 actual class OCIKey actual constructor(
     actual val id: String,
     actual val config: OCIsdkMetadata,

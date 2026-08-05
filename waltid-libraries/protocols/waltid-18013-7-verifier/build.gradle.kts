@@ -38,12 +38,10 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
             implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
+            implementation(project(":waltid-libraries:crypto:waltid-cose"))
+            implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
+            implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
             implementation(project(":waltid-libraries:web:waltid-ktor-notifications-core"))
-        }
-
-        jvmMain.dependencies {
-            implementation(identityLibs.bouncycastle.prov)
-            implementation(identityLibs.nimbus.jose.jwt)
         }
 
         commonTest.dependencies {
@@ -53,6 +51,8 @@ kotlin {
 
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)
+            implementation(identityLibs.bouncycastle.prov)
+            implementation(identityLibs.nimbus.jose.jwt)
         }
     }
 }

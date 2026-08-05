@@ -8,7 +8,7 @@ group = "id.walt.policies"
 
 
 kotlin {
-    js(IR) {
+    js {
         outputModuleName = "verification-policies"
     }
 

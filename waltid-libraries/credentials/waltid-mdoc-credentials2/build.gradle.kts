@@ -1,5 +1,5 @@
 plugins {
-    id("waltid.multiplatform.library")
+    id("waltid.full.library")
     id("waltid.publish.maven")
     id("waltid.publish.npm")
 }
@@ -40,7 +40,10 @@ kotlin {
              * walt.id:
              */
             api(project(":waltid-libraries:crypto:waltid-cose"))
-            implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+            api(project(":waltid-libraries:crypto:waltid-crypto"))
+            api(project(":waltid-libraries:crypto:waltid-crypto2"))
+            implementation(project(":waltid-libraries:crypto:waltid-jose"))
+            api(project(":waltid-libraries:crypto:waltid-x509"))
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

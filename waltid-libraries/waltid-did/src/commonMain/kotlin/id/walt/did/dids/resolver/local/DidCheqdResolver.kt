@@ -31,6 +31,7 @@ class DidCheqdResolver(private val fetcher: WebDataFetcher) : LocalResolverMetho
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Deprecated("Use Crypto2DidKeyResolver or Crypto2DidService for key resolution")
     override suspend fun resolveToKey(did: String): Result<Key> {
         TODO("Not yet implemented")
         // response verificationMethod contains only publicKeyMultibase

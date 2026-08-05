@@ -4,6 +4,7 @@ package id.walt.iso18013.annexc
 
 import id.walt.cose.coseCompliantCbor
 import id.walt.iso18013.annexc.TestResources.createJwkKeyFromRawHex
+import id.walt.iso18013.annexc.TestResources.migrateToCrypto2
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.sha256
 import kotlinx.coroutines.test.runTest
@@ -49,7 +50,7 @@ class AnnexCDeterministicVectorTest {
             encryptedResponseB64 = v.encryptedResponseB64,
             encryptionInfoB64 = v.encryptionInfoB64,
             origin = v.origin,
-            recipientPrivateKey = createJwkKeyFromRawHex(v.recipientPrivateKeyHex)
+            recipientPrivateKey = migrateToCrypto2(createJwkKeyFromRawHex(v.recipientPrivateKeyHex))
         )
         assertEquals(v.expected.deviceResponseCborSha256Hex, plaintext.sha256().toHex())
 

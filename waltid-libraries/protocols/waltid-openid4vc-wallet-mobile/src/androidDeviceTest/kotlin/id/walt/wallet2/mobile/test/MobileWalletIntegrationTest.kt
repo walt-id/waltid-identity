@@ -8,6 +8,7 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.mobile.test.backend.EudiTestBackend
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
@@ -24,7 +25,9 @@ import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
+import id.walt.x509.CertificateDer
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -367,7 +370,7 @@ class MobileWalletIntegrationTest {
     fun eudiPidSdJwtPersistsAcrossWalletRecreation() = runBlocking {
         val walletConfig = walletConfig("eudi-pid-sd-jwt-persistence")
 
-        val client1 = MobileWalletFactory(context).create(walletConfig)
+        val client1 = createEudiWallet(walletConfig)
         client1.bootstrap()
 
         val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
@@ -376,7 +379,7 @@ class MobileWalletIntegrationTest {
             transactionCode = offer.txCode,
         )
 
-        val client2 = MobileWalletFactory(context).create(walletConfig)
+        val client2 = createEudiWallet(walletConfig)
         val credentials = client2.credentials()
         assertTrue(credentials.isNotEmpty(), "Credentials should persist across client recreation")
     }
@@ -436,6 +439,14 @@ class MobileWalletIntegrationTest {
             is WalletIssuanceOutcome.Failed -> error("Expected stored credentials, got failed outcome: ${error.message}")
         }
 
+    @OptIn(ExperimentalSerializationApi::class)
+    private val eudiVerifierTrust = ClientIdTrustConfiguration(
+        x509TrustAnchors = listOf(CertificateDer.fromPEMEncodedString(EudiTestBackend.verifierTrustAnchorPem)),
+    )
+
+    private suspend fun createEudiWallet(config: MobileWalletConfig) =
+        MobileWalletFactory(context).create(config, eudiVerifierTrust)
+
     private suspend fun receiveCredentialFromDemoIssuer2(scenarioId: String) {
         val scenario = demoScenario(scenarioId)
         val client = MobileWalletFactory(context).create(walletConfig("receive-${scenario.id}"))
@@ -451,7 +462,7 @@ class MobileWalletIntegrationTest {
     }
 
     private suspend fun receiveAndPresentEudiCredential(credentialId: String) {
-        val client = MobileWalletFactory(context).create(walletConfig("eudi-present-$credentialId"))
+        val client = createEudiWallet(walletConfig("eudi-present-$credentialId"))
         val bootstrapResult = client.bootstrap()
 
         val offer = EudiTestBackend.generateOffer(credentialId)
@@ -476,7 +487,7 @@ class MobileWalletIntegrationTest {
     }
 
     private suspend fun previewAndSubmitEudiCredential(credentialId: String) {
-        val client = MobileWalletFactory(context).create(walletConfig("eudi-preview-submit-$credentialId"))
+        val client = createEudiWallet(walletConfig("eudi-preview-submit-$credentialId"))
         val bootstrapResult = client.bootstrap()
 
         val offer = EudiTestBackend.generateOffer(credentialId)
@@ -601,7 +612,7 @@ class MobileWalletIntegrationTest {
         (this as? MobileWalletPresentationPreviewResult.Ready)?.preview
             ?: error("Expected a valid presentation preview, got $this")
 
-    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @OptIn(ExperimentalSerializationApi::class)
     private fun invalidTransactionDataRequestUrl(): String = AuthorizationRequest(
         clientId = "redirect_uri:https://verifier.example/callback",
         redirectUri = "https://verifier.example/callback",

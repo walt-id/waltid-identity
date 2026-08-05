@@ -228,7 +228,7 @@ actual class JWKKey actual constructor(
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
-        log.trace { "Signing JWS, Key: ${toString()}" }
+        log.trace { "Signing JWS with ${_internalJwsAlgorithm.name}" }
 
         // Nimbus signature:
         val jwsObject = JWSObject(
@@ -256,8 +256,6 @@ actual class JWKKey actual constructor(
         }
 
         val customJws = "$payloadToSign.${signed.encodeToBase64Url()}"
-        log.trace { "Signed JWS: $customJws" }
-
         return customJws
     }
 
@@ -396,7 +394,7 @@ actual class JWKKey actual constructor(
             // Custom verification (handles DER):
             val (header, payload, signature) = signedJws.split(".")
 
-            log.debug { "> Signature verification: Fallback verification checking... (NIMBUS VERIFICATION FAILED) for: $signedJws" }
+            log.debug { "Nimbus JWS verification failed; trying DER signature fallback" }
             val res = verifyRaw(signature.decodeFromBase64Url(), "$header.$payload".encodeToByteArray()).map {
                 it.decodeToString().decodeJws().payload
             }
@@ -651,8 +649,6 @@ actual class JWKKey actual constructor(
             KeyType.secp256r1 -> Triple(HPKE.kem_P256_SHA256, HPKE.kdf_HKDF_SHA256, HPKE.aead_AES_GCM128)
             KeyType.secp384r1 -> Triple(HPKE.kem_P384_SHA348, HPKE.kdf_HKDF_SHA384, HPKE.aead_AES_GCM256)
             KeyType.secp521r1 -> Triple(HPKE.kem_P521_SHA512, HPKE.kdf_HKDF_SHA512, HPKE.aead_AES_GCM256)
-            KeyType.Ed25519 -> Triple(HPKE.kem_X25519_SHA256, HPKE.kdf_HKDF_SHA256, HPKE.aead_AES_GCM128)
-            // Using Ed25519 keys for HPKE (encryption) usually implies converting them to X25519 or using them as X25519.
             else -> throw IllegalArgumentException("HPKE not supported for key type: $keyType")
         }
     }
@@ -662,7 +658,6 @@ actual class JWKKey actual constructor(
             HPKE.kem_P256_SHA256 -> 65 // Uncompressed point (0x04 + 32 + 32)
             HPKE.kem_P384_SHA348 -> 97 // Uncompressed point (0x04 + 48 + 48)
             HPKE.kem_P521_SHA512 -> 133 // Uncompressed point (0x04 + 66 + 66)
-            HPKE.kem_X25519_SHA256 -> 32
             else -> throw IllegalArgumentException("Unknown KEM ID enc length")
         }
     }
@@ -685,12 +680,6 @@ actual class JWKKey actual constructor(
                 ECPublicKeyParameters(point, domainParams)
             }
 
-            KeyType.Ed25519 -> {
-                // Assuming the underlying bytes are X25519 compatible or intended for it
-                val octKey = _internalJwk.toOctetKeyPair()
-                X25519PublicKeyParameters(octKey.x.decode(), 0)
-            }
-
             else -> throw IllegalArgumentException("Unsupported key type for HPKE: $keyType")
         }
     }
@@ -709,11 +698,6 @@ actual class JWKKey actual constructor(
                 val d = ecKey.d.decodeToBigInteger()
 
                 ECPrivateKeyParameters(d, domainParams)
-            }
-
-            KeyType.Ed25519 -> {
-                val octKey = _internalJwk.toOctetKeyPair()
-                X25519PrivateKeyParameters(octKey.d.decode(), 0)
             }
 
             else -> throw IllegalArgumentException("Unsupported key type for HPKE: $keyType")
