@@ -113,6 +113,7 @@ public data class MobileWalletPresentationCredentialRequirement(
  * @property nonce Required OpenID4VP nonce value supplied by the verifier.
  * @property responseEncryption Response-encryption state selected for this request.
  * @property transactionData Decoded transaction data items requested by the verifier.
+ * @property responseMode Serialized OpenID4VP response mode requested by the verifier.
  */
 public data class MobileWalletPresentationRequestInfo(
     val clientId: String,
@@ -122,6 +123,7 @@ public data class MobileWalletPresentationRequestInfo(
     val nonce: String,
     val responseEncryption: MobileWalletResponseEncryption,
     val transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
+    val responseMode: String? = null,
 ) {
     init {
         require(clientId.isNotBlank()) { "A presentation request client ID must not be blank." }

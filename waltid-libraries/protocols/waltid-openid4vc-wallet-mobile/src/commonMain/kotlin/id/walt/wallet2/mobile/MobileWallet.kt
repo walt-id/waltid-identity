@@ -8,6 +8,7 @@ import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -635,6 +636,9 @@ private fun AuthorizationRequest.toMobileRequestInfo(
         },
         responseEncryption = responseEncryption.toMobileResponseEncryption(),
         transactionData = transactionData,
+        responseMode = responseMode?.let { mode ->
+            Json.encodeToString(OpenID4VPResponseMode.serializer(), mode).trim('"')
+        },
     )
 }
 
