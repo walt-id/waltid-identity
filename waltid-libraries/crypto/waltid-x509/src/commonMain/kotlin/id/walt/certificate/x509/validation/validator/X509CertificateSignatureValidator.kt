@@ -15,9 +15,7 @@ class X509CertificateSignatureValidator(
         context: ValidationContext,
         x509Certificate: X509Certificate
     ) {
-        val found = context.findCertificateBySubjectDn("C=US,O=Google Trust Services LLC,CN=GTS Root R4")
         val trustedIssuerCertificates = context.findCertificateBySubjectDn(x509Certificate.data.issuerDn)
-        println("found: ${found.size}")
         if (trustedIssuerCertificates.isEmpty()) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,

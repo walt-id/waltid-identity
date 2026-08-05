@@ -45,9 +45,6 @@ class X509CertificateSigningTest {
             }
         }
 
-        println("Cert: ${certificate.fingerprintSha256Hex}")
-        println(certificate.encodedPem)
-
         assertNotNull(certificate.data.extensionBasicConstraints) { constraints ->
             assertFalse(constraints.critical)
             assertTrue(constraints.cA)

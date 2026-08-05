@@ -16,6 +16,12 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import at.asitplus.signum.indispensable.pki.X509Certificate as SignumCertificate
 
+/**
+ * Test-only signature validation for either a self-signed root or one
+ * certificate directly issued by the supplied root.
+ *
+ * This is not a general certificate-path or trust evaluation utility.
+ */
 actual object SignatureValidationUtil {
 
     actual fun verifyPemChain(chainPem: String, selfSignedCaPem: String) {

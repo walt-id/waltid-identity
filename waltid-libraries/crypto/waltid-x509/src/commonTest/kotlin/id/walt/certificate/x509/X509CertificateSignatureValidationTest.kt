@@ -3,7 +3,6 @@ package id.walt.certificate.x509
 import id.walt.certificate.x509.testdata.TestDataCertificates.gtsRootR4CrtPem
 import id.walt.certificate.x509.testdata.TestDataCertificates.gtsWe2CrtPem
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
-import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.x509.X509TestCertificates
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Ignore
@@ -22,12 +21,7 @@ class X509CertificateSignatureValidationTest {
             }),
             trustStore
         )
-        if (!validationResult.valid) {
-            validationResult.log
-                .filter { it.severity == ValidationResult.Severity.ERROR }
-                .forEach { println(it) }
-        }
-        assertTrue(validationResult.valid)
+        assertTrue(validationResult.valid, "Validation log: ${validationResult.log}")
     }
 
     @Test

@@ -14,10 +14,7 @@ class AttributeTypeTest {
             .eachCount()
             .filter { it.value > 1 }
 
-        groups.forEach {
-            println(it.key)
-        }
-        assertTrue(groups.isEmpty())
+        assertTrue(groups.isEmpty(), "Duplicate attribute names or OIDs: ${groups.keys}")
     }
 
 

@@ -42,10 +42,7 @@ class IsoDocumentSignerX509CertificateProfileTest {
                     )
                 }
                 val result = validator.validate(cert)
-                if (!result.valid) {
-                    result.log.forEach { println(it) }
-                }
-                assertTrue(result.valid)
+                assertTrue(result.valid, "Validation log: ${result.log}")
             }
         }
     }

@@ -36,12 +36,7 @@ class X509CertificateChainValidationTest {
     @Test
     fun shouldValidateGoogleCertificateChainWithOneEntry() = runTest {
         val result = certUtil.validatePemCertificateChain(gtsWe2CrtPem)
-        if (!result.valid) {
-            result.log
-                .filter { it.severity == ValidationResult.Severity.ERROR }
-                .forEach { println("${it.validatorId}: ${it.subjectDn} - ${it.message}") }
-        }
-        assertTrue(result.valid)
+        assertTrue(result.valid, "Validation log: ${result.log}")
         result.log.filter { it.validatorId == X509CertificateSignatureValidator.ID }
             .also { signatureValidatorLog ->
                 assertEquals(2, signatureValidatorLog.size)
