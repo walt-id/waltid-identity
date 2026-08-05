@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.waltid.openid4vp.wallet.request
 
 import id.walt.credentials.utils.JwtUtils.isJwt
@@ -11,6 +13,7 @@ import id.walt.openid4vp.clientidprefix.ClientIdPrefixParser
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
 import id.walt.openid4vp.clientidprefix.prefixes.RedirectUri
+import id.walt.x509.platformSupportsPkixCertificatePathValidation
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
@@ -36,7 +39,7 @@ import kotlin.time.Clock
 object AuthorizationRequestResolver {
     private val log = KotlinLogging.logger { }
     private const val REQUEST_OBJECT_TYPE = "oauth-authz-req+jwt"
-    private const val DEFAULT_REQUEST_OBJECT_AUDIENCE = "https://self-issued.me/v2"
+    const val DEFAULT_REQUEST_OBJECT_AUDIENCE = "https://self-issued.me/v2"
     private const val CLOCK_SKEW_SECONDS = 60L
 
     private val json = Json {
@@ -101,7 +104,7 @@ object AuthorizationRequestResolver {
                 put("response_types_supported", responseTypesSupported.toJsonArray())
                 put("response_modes_supported", responseModesSupported.toJsonArray())
                 val unsupported = unsupportedClientIdPrefixes + buildSet {
-                    if (trustConfiguration.x509TrustAnchors.isEmpty()) {
+                    if (trustConfiguration.x509TrustAnchors.isEmpty() || !platformSupportsPkixCertificatePathValidation) {
                         add(ClientIdPrefix.X509_SAN_DNS)
                         add(ClientIdPrefix.X509_HASH)
                     }
@@ -203,13 +206,16 @@ object AuthorizationRequestResolver {
         trustConfiguration: ClientIdTrustConfiguration,
         expectedRequestObjectAudience: String = DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): ResolvedAuthorizationRequest {
+        val strictFinalValidation = enforceFinalRequestObject
         val requestUri = requestUrl.parameters["request_uri"]
         val requestObject = requestUrl.parameters["request"]
-        require(requestUri == null || requestObject == null) {
-            "Authorization Request must not contain both request and request_uri"
-        }
-        require(requestUri != null || requestUrl.parameters["request_uri_method"] == null) {
-            "request_uri_method must not be present without request_uri"
+        if (strictFinalValidation) {
+            require(requestUri == null || requestObject == null) {
+                "Authorization Request must not contain both request and request_uri"
+            }
+            require(requestUri != null || requestUrl.parameters["request_uri_method"] == null) {
+                "request_uri_method must not be present without request_uri"
+            }
         }
         if (requestUri != null) {
             return resolveFromRequestUri(
@@ -233,7 +239,10 @@ object AuthorizationRequestResolver {
             expectedRequestObjectAudience = expectedRequestObjectAudience,
         )
 
-        return ResolvedAuthorizationRequest.Plain(parsePlainRequest(requestUrl.parameters))
+        return ResolvedAuthorizationRequest.Plain(
+            if (strictFinalValidation) parsePlainRequest(requestUrl.parameters)
+            else parseParametersLegacy(requestUrl.parameters),
+        )
     }
 
     fun parseParameters(parameters: Parameters): AuthorizationRequest {
@@ -286,6 +295,18 @@ object AuthorizationRequestResolver {
         })
     }
 
+    private fun parseParametersLegacy(parameters: Parameters): AuthorizationRequest =
+        json.decodeFromJsonElement(
+            AuthorizationRequest.serializer(),
+            buildJsonObject {
+                parameters.entries()
+                    .mapNotNull { (key, values) -> values.lastOrNull()?.let { key to it } }
+                    .forEach { (key, value) ->
+                        put(key, AuthorizationRequestParameterCodec.parse(json, value))
+                    }
+            },
+        )
+
     private suspend fun resolveFromRequestUri(
         requestUri: String,
         requestUriMethod: String?,
@@ -303,9 +324,15 @@ object AuthorizationRequestResolver {
         val response = fetchRequestUri(requestUri, requestUriMethod)
         response.status.run { check(isSuccess()) { "AuthorizationRequest cannot be retrieved ($this) from $requestUri: ${response.body}" } }
 
+        if (enforceFinalRequestObject && requestUriMethod == RequestUriHttpMethod.POST) {
+            requireNotNull(response.walletNonce) {
+                "request_uri_method=post response is missing the wallet_nonce binding"
+            }
+        }
+
         val contentType = requireNotNull(response.contentType) { "AuthorizationRequest response does not define a content type" }
         log.trace { "Resolved AuthorizationRequest response with content type $contentType" }
-        val requestObjectPolicy = if (requestUriMethod == RequestUriHttpMethod.POST) {
+        val requestObjectPolicy = if (enforceFinalRequestObject && requestUriMethod == RequestUriHttpMethod.POST) {
             UnsignedRequestObjectPolicy.REQUIRE_SIGNED
         } else {
             unsignedRequestObjectPolicy
@@ -329,7 +356,7 @@ object AuthorizationRequestResolver {
                     )
                 }
                 val authorizationRequest = json.decodeFromString<AuthorizationRequest>(response.body)
-                    .also { it.dcqlQuery?.precheck() }
+                    .also { if (enforceFinalRequestObject) it.dcqlQuery?.precheck() }
                 if (enforceFinalRequestObject) requireMatchingClientId(outerClientId, authorizationRequest.clientId)
                 ResolvedAuthorizationRequest.Plain(authorizationRequest)
             }
@@ -359,7 +386,6 @@ object AuthorizationRequestResolver {
                 innerClientId = authReqJws.payload["client_id"]?.jsonPrimitive?.contentOrNull,
             )
             validateCommonRequestObjectClaims(
-                header = authReqJws.header,
                 payload = authReqJws.payload,
                 expectedAudience = expectedRequestObjectAudience,
             )
@@ -391,13 +417,12 @@ object AuthorizationRequestResolver {
             authorizationRequest = json.decodeFromJsonElement(
                 deserializer = AuthorizationRequest.serializer(),
                 element = authReqJws.payload,
-            ).also { it.dcqlQuery?.precheck() },
+            ).also { if (enforceFinalRequestObject) it.dcqlQuery?.precheck() },
             requestObject = requestObject,
         )
     }
 
     private fun validateCommonRequestObjectClaims(
-        header: JsonObject,
         payload: JsonObject,
         expectedAudience: String,
     ) {
