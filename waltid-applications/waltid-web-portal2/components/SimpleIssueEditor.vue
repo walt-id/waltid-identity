@@ -13,7 +13,7 @@ const credentialDataJson = ref("");
 const parseError = ref<string | null>(null);
 
 const issueCredentialOptions = computed(() =>
-  SIMPLE_CREDENTIAL_OPTIONS.filter((option) => option.id !== "pid"),
+  SIMPLE_CREDENTIAL_OPTIONS.filter((option) => !option.verifyOnly),
 );
 const selectedOption = computed(() =>
   getSimpleCredentialOption(selectedOptionId.value),
@@ -95,7 +95,7 @@ async function submit() {
         the credential.
       </p>
 
-      <div class="grid md:grid-cols-3 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <button
           v-for="option in issueCredentialOptions"
           :key="option.id"
@@ -187,9 +187,9 @@ async function submit() {
       </p>
     </section>
 
-    <div class="flex items-center gap-3">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-3">
       <button
-        class="btn btn-primary"
+        class="btn btn-primary w-full sm:w-auto"
         :disabled="!canSubmit || session.loading.value"
         @click="submit"
       >

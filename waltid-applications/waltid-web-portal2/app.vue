@@ -5,6 +5,9 @@ const verifierBase = config.public.verifierBase as string;
 
 const activeTab = ref<"issue" | "verify">("issue");
 const mode = ref<"simple" | "advanced">("simple");
+const isMobile = ref(false);
+
+const MOBILE_BREAKPOINT_PX = 768;
 
 const ISSUER_DOCS_URL =
   "https://docs.walt.id/community-stack/issuer2/getting-started";
@@ -39,10 +42,25 @@ watch(verifierSwagger.examples, (list) => {
   }
 });
 
+function syncViewportMode() {
+  isMobile.value = window.matchMedia(
+    `(max-width: ${MOBILE_BREAKPOINT_PX - 1}px)`,
+  ).matches;
+  if (isMobile.value) {
+    mode.value = "simple";
+  }
+}
+
 onMounted(() => {
   issuerSwagger.load();
   issuerProfiles.load();
   verifierSwagger.load();
+  syncViewportMode();
+  window.addEventListener("resize", syncViewportMode);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", syncViewportMode);
 });
 
 const docsUrl = computed(() =>
@@ -61,17 +79,28 @@ const hasResult = computed(() =>
     ? !!issuerSession.result.value
     : !!verifierSession.result.value,
 );
+
+const effectiveMode = computed(() =>
+  isMobile.value ? "simple" : mode.value,
+);
 </script>
 
 <template>
-  <main class="max-w-[1100px] mx-auto px-5 pt-8 pb-12">
-    <header class="flex items-center justify-between gap-4 flex-wrap mb-2">
-      <div class="flex items-center gap-4">
-        <img src="/waltid-logo.svg" alt="walt.id" class="h-[60px] w-auto" />
-        <h1 class="text-3xl font-bold m-0">Demo Portal</h1>
+  <main class="max-w-[1100px] mx-auto px-4 sm:px-5 pt-5 sm:pt-8 pb-10 sm:pb-12">
+    <header
+      class="flex items-center justify-between gap-3 sm:gap-4 flex-wrap mb-2"
+    >
+      <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+        <img
+          src="/waltid-logo.svg"
+          alt="walt.id"
+          class="h-10 sm:h-[60px] w-auto shrink-0"
+        />
+        <h1 class="text-2xl sm:text-3xl font-bold m-0 truncate">Demo Portal</h1>
       </div>
 
       <div
+        v-if="!isMobile"
         class="inline-flex rounded-lg border border-[--color-border-strong] bg-white p-1"
       >
         <button
@@ -101,17 +130,21 @@ const hasResult = computed(() =>
       </div>
     </header>
 
-    <p class="text-[--color-text-secondary] mb-6">
+    <p class="text-[--color-text-secondary] text-sm sm:text-base mb-5 sm:mb-6">
       Issue and verify digital credentials using the issuer2 &amp; verifier2
       APIs.
     </p>
 
-    <div class="flex gap-5 items-start mb-5">
-      <!-- Left card: editor -->
-      <div class="card flex-1 min-w-0 flex flex-col">
-        <div class="flex items-center border-b border-[--color-border]">
+    <div
+      class="flex flex-col md:flex-row gap-4 sm:gap-5 items-stretch md:items-start mb-5"
+    >
+      <!-- Editor -->
+      <div class="card flex-1 min-w-0 flex flex-col order-1">
+        <div
+          class="flex items-center gap-1 border-b border-[--color-border] overflow-x-auto"
+        >
           <button
-            class="px-5 py-3 font-semibold transition-colors relative"
+            class="px-4 sm:px-5 py-3 font-semibold transition-colors relative shrink-0"
             :class="
               activeTab === 'issue'
                 ? 'text-[--color-accent] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[--color-accent]'
@@ -122,7 +155,7 @@ const hasResult = computed(() =>
             Issue
           </button>
           <button
-            class="px-5 py-3 font-semibold transition-colors relative"
+            class="px-4 sm:px-5 py-3 font-semibold transition-colors relative shrink-0"
             :class="
               activeTab === 'verify'
                 ? 'text-[--color-accent] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[--color-accent]'
@@ -137,7 +170,7 @@ const hasResult = computed(() =>
             :href="docsUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="ml-auto mr-4 inline-flex items-center gap-1.5 text-sm font-medium text-[--color-text-muted] hover:text-[--color-accent] transition-colors"
+            class="ml-auto mr-3 sm:mr-4 inline-flex items-center gap-1.5 text-sm font-medium text-[--color-text-muted] hover:text-[--color-accent] transition-colors shrink-0"
           >
             Docs
             <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -151,10 +184,11 @@ const hasResult = computed(() =>
           </a>
 
           <a
+            v-if="!isMobile"
             :href="swaggerUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="mr-4 inline-flex items-center gap-1.5 text-sm font-medium text-[--color-text-muted] hover:text-[--color-accent] transition-colors"
+            class="mr-4 inline-flex items-center gap-1.5 text-sm font-medium text-[--color-text-muted] hover:text-[--color-accent] transition-colors shrink-0"
           >
             Swagger
             <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -168,19 +202,19 @@ const hasResult = computed(() =>
           </a>
         </div>
 
-        <div class="p-5 flex-1">
+        <div class="p-4 sm:p-5 flex-1">
           <KeepAlive>
             <SimpleIssueEditor
-              v-if="mode === 'simple' && activeTab === 'issue'"
+              v-if="effectiveMode === 'simple' && activeTab === 'issue'"
               :session="issuerSession"
             />
             <SimpleVerifyEditor
-              v-else-if="mode === 'simple' && activeTab === 'verify'"
+              v-else-if="effectiveMode === 'simple' && activeTab === 'verify'"
               :session="verifierSession"
             />
           </KeepAlive>
           <IssueEditor
-            v-if="mode === 'advanced' && activeTab === 'issue'"
+            v-if="effectiveMode === 'advanced' && activeTab === 'issue'"
             v-model:json="issuerJson"
             v-model:selected-index="issuerSelectedIndex"
             :swagger="issuerSwagger"
@@ -188,7 +222,7 @@ const hasResult = computed(() =>
             :profiles="issuerProfiles"
           />
           <VerifyEditor
-            v-else-if="mode === 'advanced' && activeTab === 'verify'"
+            v-else-if="effectiveMode === 'advanced' && activeTab === 'verify'"
             v-model:json="verifierJson"
             v-model:selected-index="verifierSelectedIndex"
             :swagger="verifierSwagger"
@@ -197,9 +231,9 @@ const hasResult = computed(() =>
         </div>
       </div>
 
-      <!-- Right card: QR + buttons -->
+      <!-- Result panel -->
       <div
-        class="card w-[340px] h-[440px] shrink-0 p-5 flex flex-col justify-center sticky top-5"
+        class="card w-full md:w-[340px] min-h-[280px] md:h-[440px] shrink-0 p-4 sm:p-5 flex flex-col justify-center md:sticky md:top-5 order-2"
       >
         <IssueResult v-if="activeTab === 'issue'" :session="issuerSession" />
         <VerifyResult v-else :session="verifierSession" />
@@ -207,7 +241,7 @@ const hasResult = computed(() =>
     </div>
 
     <!-- Bottom: event log (full width) -->
-    <div v-show="hasResult" class="card p-5">
+    <div v-show="hasResult" class="card p-4 sm:p-5">
       <EventLog
         :events="activeSession.sse.events.value"
         :status="activeSession.sse.status.value"
