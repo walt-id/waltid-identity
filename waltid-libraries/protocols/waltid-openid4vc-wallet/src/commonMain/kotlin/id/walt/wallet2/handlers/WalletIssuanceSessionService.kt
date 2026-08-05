@@ -3,6 +3,19 @@ package id.walt.wallet2.handlers
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.preferredJwsAlgorithm
+import id.walt.crypto2.jose.selectJwsAlgorithm
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.keys.toPublicJwk
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.crypto2.serialization.BinaryData
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
@@ -15,7 +28,9 @@ import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.WalletKeyStoreEntry
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.data.resolveKeyMaterial
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
@@ -38,6 +53,7 @@ import id.waltid.openid4vci.wallet.token.DPoPProofFactory
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import id.waltid.openid4vci.wallet.token.TokenRequestException
 import io.github.oshai.kotlinlogging.KotlinLogging
+import id.walt.crypto2.keys.Key as Crypto2Key
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.header
@@ -80,6 +96,7 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
+private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
 /** Grant selected for a resolved issuance session. */
 @Serializable
@@ -268,8 +285,7 @@ class WalletIssuanceSessionService(
 
     /** Resolves and binds an offer without initiating any authorization-server side effects. */
     suspend fun start(request: WalletIssuanceSessionRequest): WalletIssuanceSession {
-        val key = wallet.resolveKey(request.key, request.keyId)
-            ?: error("No holder key is available for credential issuance")
+        val keyMaterial = resolveIssuanceKeyMaterial(request.key, request.keyId)
         val resolved = resolve(request)
         val grant = resolved.offer.getGrantType()
             ?: error("Credential offer does not contain a supported grant")
@@ -279,15 +295,17 @@ class WalletIssuanceSessionService(
             offer = resolved.toPreview(grant),
         )
         val selectedKeyId = request.keyId ?: if (request.key == null) {
-            wallet.defaultKeyId ?: wallet.listAllKeys().firstOrNull()?.keyId
+            keyMaterial.keyId.takeIf { it.isNotBlank() }
+                ?: wallet.defaultKeyId
+                ?: wallet.listAllKeys().firstOrNull()?.keyId
         } else {
-            null
+            keyMaterial.keyId.takeIf { it.isNotBlank() }
         }
         val active = ActiveSession(
             public = publicSession,
             request = request,
             resolved = resolved,
-            key = key,
+            keyMaterial = keyMaterial,
             keyId = selectedKeyId,
             did = request.did ?: wallet.defaultDid(),
             authorization = null,
@@ -349,7 +367,7 @@ class WalletIssuanceSessionService(
         if (!claimed) throw IllegalStateException("Issuance session is not awaiting acceptance")
         try {
             persistActive(active)
-            val authorization = buildAuthorization(active.resolved, active.request, active.key)
+            val authorization = buildAuthorization(active.resolved, active.request, active.keyMaterial)
             mutex.withLock {
                 check(sessions[sessionId] === active && active.state == SessionState.PROCESSING) {
                     "Issuance session changed while authorization was being built"
@@ -486,7 +504,7 @@ class WalletIssuanceSessionService(
                 accessToken = record.accessToken,
                 tokenType = record.tokenType,
                 dpop = record.dpop,
-                key = record.key,
+                keyMaterial = record.keyMaterial,
                 dpopNonce = record.dpopNonce,
                 body = buildJsonObject { put("transaction_id", record.transactionId) }.toString(),
             )
@@ -539,7 +557,7 @@ class WalletIssuanceSessionService(
         var persistedDeferredIds: List<String> = emptyList()
         return try {
             val advertisedDpop = active.dpopAlgorithms()
-            if (advertisedDpop != null && active.key.keyType.jwsAlg !in advertisedDpop) {
+            if (advertisedDpop != null && active.keyMaterial.jwsAlgorithmIdentifier() !in advertisedDpop) {
                 throw IssuanceStageException(WalletIssuanceErrorCode.CRYPTO)
             }
             val token = obtainToken()
@@ -640,7 +658,7 @@ class WalletIssuanceSessionService(
                 accessToken = token.access_token,
                 tokenType = token.token_type,
                 dpop = dpopAlgorithms,
-                key = active.key,
+                keyMaterial = active.keyMaterial,
                 dpopNonce = null,
                 body = requestBody,
             )
@@ -706,9 +724,9 @@ class WalletIssuanceSessionService(
                             tokenType = token.token_type,
                             dpop = dpopAlgorithms,
                             dpopNonce = protected.dpopNonce,
-                            key = active.key,
+                            keyMaterial = active.keyMaterial,
                             keyId = active.keyId,
-                            selectedPublicJwk = active.key.getPublicKey().exportJWKObject().toString(),
+                            selectedPublicJwk = active.keyMaterial.exportPublicJwkObject().toString(),
                             persistable = active.persistable,
                             label = label,
                         ),
@@ -736,7 +754,7 @@ class WalletIssuanceSessionService(
     ): TokenRequestBuilder.TokenResponse {
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
-        val attestation = attestationHeaders(metadata, active.request.clientId, active.key)
+        val attestation = attestationHeaders(metadata, active.request.clientId, active.keyMaterial)
         val anonymous = metadata.preAuthorizedGrantAnonymousAccessSupported == true &&
             active.request.tokenRequestHeaders.isEmpty() && attestation == null
         return TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangePreAuthorizedCode(
@@ -757,7 +775,7 @@ class WalletIssuanceSessionService(
     ): TokenRequestBuilder.TokenResponse {
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
-        val attestation = attestationHeaders(metadata, active.request.clientId, active.key)
+        val attestation = attestationHeaders(metadata, active.request.clientId, active.keyMaterial)
         return TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangeAuthorizationCode(
             tokenEndpoint = tokenEndpoint,
             code = code,
@@ -775,11 +793,10 @@ class WalletIssuanceSessionService(
     private fun ActiveSession.dpopFactory(): DPoPProofFactory? =
         dpopAlgorithms()?.let { algorithms ->
             { endpoint: String, nonce: String? ->
-                // TODO(crypto2): DPoPProofBuilder still signs with id.walt.crypto.keys.Key / signJws.
-                // Migrate to crypto2 CompactJws once ActiveSession key resolution uses
-                // WalletKeyStore.getKeyMaterial / resolveCrypto2Key for SqlDelightKeyStore.
+                val crypto2Key = keyMaterial.requireCrypto2SigningKey()
                 DPoPProofBuilder().buildProof(
-                    key = key,
+                    key = crypto2Key,
+                    algorithm = crypto2Key.selectJwsAlgorithm(algorithms),
                     httpMethod = "POST",
                     targetUri = endpoint,
                     nonce = nonce,
@@ -791,7 +808,7 @@ class WalletIssuanceSessionService(
     private suspend fun buildAuthorization(
         resolved: ResolvedOffer,
         request: WalletIssuanceSessionRequest,
-        key: Key,
+        keyMaterial: WalletKeyStoreEntry,
     ): AuthorizationState {
         val metadata = resolved.authorizationServerMetadata
         val endpoint = requireNotNull(metadata.authorizationEndpoint) {
@@ -806,8 +823,8 @@ class WalletIssuanceSessionService(
         require(metadata.requirePushedAuthorizationRequests != true || parEndpoint != null) {
             "Authorization server requires PAR but does not advertise an endpoint"
         }
-        val dpopJkt = dpopAlgorithmsForAuthorization(metadata, key)?.let {
-            key.getPublicKey().getThumbprint()
+        val dpopJkt = dpopAlgorithmsForAuthorization(metadata, keyMaterial)?.let {
+            keyMaterial.jwkThumbprint()
         }
 
         if (parEndpoint != null) {
@@ -819,7 +836,7 @@ class WalletIssuanceSessionService(
                 redirectUri = request.redirectUri.toString(),
                 dpopJkt = dpopJkt,
             )
-            val attestation = attestationHeaders(metadata, request.clientId, key)
+            val attestation = attestationHeaders(metadata, request.clientId, keyMaterial)
             val response = httpClient.post(parEndpoint) {
                 contentType(ContentType.Application.FormUrlEncoded)
                 setBody(Parameters.build {
@@ -884,12 +901,12 @@ class WalletIssuanceSessionService(
 
     private fun dpopAlgorithmsForAuthorization(
         metadata: AuthorizationServerMetadata,
-        key: Key,
+        keyMaterial: WalletKeyStoreEntry,
     ): Set<String>? {
         val algorithms = metadata.dpopSigningAlgValuesSupported
             ?.takeIf { it.isNotEmpty() }
             ?: return null
-        require(key.keyType.jwsAlg in algorithms) {
+        require(keyMaterial.jwsAlgorithmIdentifier() in algorithms) {
             "Selected key algorithm is not supported for DPoP"
         }
         return algorithms
@@ -975,7 +992,7 @@ class WalletIssuanceSessionService(
     private fun proofForCredential(active: ActiveSession, configuration: CredentialConfiguration): CredentialProofRequirement {
         val proofTypes = configuration.proofTypesSupported ?: return CredentialProofRequirement(false)
         val jwt = proofTypes["jwt"] ?: error("Issuer requires an unsupported credential proof type")
-        require(active.key.keyType.jwsAlg in jwt.proofSigningAlgValuesSupported) {
+        require(active.keyMaterial.jwsAlgorithmIdentifier() in jwt.proofSigningAlgValuesSupported) {
             "Selected holder key algorithm is not supported for credential proof"
         }
         return CredentialProofRequirement(true)
@@ -997,16 +1014,17 @@ class WalletIssuanceSessionService(
         }
         // Prefer a DID only after proving that its verification method belongs to the selected key.
         // This preserves the holder identity needed by W3C VC issuers without weakening key binding.
-        // TODO(crypto2): prefer wallet.resolveKeyMaterial + crypto2 JwtProofBuilder.buildProof once
-        // ActiveSession key resolution is crypto2-first (SqlDelightKeyStore has no legacy Key).
         val binding = when {
             supportsHolderDid -> ProofKeyBinding.KeyId(requireNotNull(didKeyId))
             methods.any { it is CryptographicBindingMethod.Jwk || it is CryptographicBindingMethod.CoseKey } ->
                 ProofKeyBinding.Jwk
             else -> error("Issuer requires a DID that is bound to the selected holder key")
         }
+        val accepted = configuration.proofTypesSupported?.get("jwt")?.proofSigningAlgValuesSupported
+        val crypto2Key = active.keyMaterial.requireCrypto2SigningKey()
         val proofs = builder.buildProof(
-            key = active.key,
+            key = crypto2Key,
+            algorithm = crypto2Key.selectJwsAlgorithm(accepted),
             audience = active.resolved.offer.credentialIssuer,
             nonce = nonce,
             binding = binding,
@@ -1018,7 +1036,7 @@ class WalletIssuanceSessionService(
         val did = active.did ?: return null
         val baseDid = did.substringBefore('#')
         val requestedKeyId = did.takeIf { '#' in it }
-        val selectedJwk = active.key.getPublicKey().exportJWKObject()
+        val selectedJwk = active.keyMaterial.exportPublicJwkObject()
         val storedDid = wallet.didStore?.getDid(baseDid)
 
         if (storedDid != null) {
@@ -1072,7 +1090,7 @@ class WalletIssuanceSessionService(
         accessToken: String,
         tokenType: String,
         dpop: Set<String>?,
-        key: Key,
+        keyMaterial: WalletKeyStoreEntry,
         dpopNonce: String?,
         body: String,
     ): ProtectedResponse {
@@ -1080,11 +1098,10 @@ class WalletIssuanceSessionService(
         repeat(2) { attempt ->
             val proof = try {
                 dpop?.let { algorithms ->
-                    // TODO(crypto2): DPoPProofBuilder still signs with id.walt.crypto.keys.Key / signJws.
-                    // Migrate to crypto2 CompactJws once protected-resource DPoP uses WalletKeyStore
-                    // getKeyMaterial / resolveCrypto2Key instead of legacy Key.
+                    val crypto2Key = keyMaterial.requireCrypto2SigningKey()
                     DPoPProofBuilder().buildProof(
-                        key = key,
+                        key = crypto2Key,
+                        algorithm = crypto2Key.selectJwsAlgorithm(algorithms),
                         httpMethod = "POST",
                         targetUri = endpoint,
                         accessToken = accessToken,
@@ -1142,7 +1159,7 @@ class WalletIssuanceSessionService(
     private suspend fun attestationHeaders(
         metadata: AuthorizationServerMetadata,
         clientId: String,
-        key: Key,
+        keyMaterial: WalletKeyStoreEntry,
     ): ClientAttestationHeaders? {
         val assembler = attestationAssembler ?: return null
         if (metadata.tokenEndpointAuthMethodsSupported
@@ -1150,7 +1167,8 @@ class WalletIssuanceSessionService(
         ) {
             return null
         }
-        return assembler.buildAttestationHeaders(key, clientId, metadata.issuer).also {
+        val crypto2Key = keyMaterial.requireCrypto2SigningKey()
+        return assembler.buildAttestationHeaders(crypto2Key, clientId, metadata.issuer).also {
             emitEvent(WalletSessionEvent.issuance_attestation_obtained)
         }
     }
@@ -1247,7 +1265,7 @@ class WalletIssuanceSessionService(
             redirectUri = Url(persisted.request.redirectUri),
             tokenRequestHeaders = persisted.request.tokenRequestHeaders,
         )
-        val key = resolvePersistedKey(persisted.request.keyId, persisted.selectedPublicJwk)
+        val keyMaterial = resolvePersistedKeyMaterial(persisted.request.keyId, persisted.selectedPublicJwk)
         require((persisted.authorization != null) == (persisted.codeVerifier != null)) {
             "Stored issuance session PKCE binding is invalid"
         }
@@ -1281,7 +1299,7 @@ class WalletIssuanceSessionService(
             public = persisted.public,
             request = request,
             resolved = resolved,
-            key = key,
+            keyMaterial = keyMaterial,
             keyId = persisted.request.keyId,
             did = persisted.request.did,
             authorization = authorization,
@@ -1318,14 +1336,16 @@ class WalletIssuanceSessionService(
         require(public.offer.grant == resolvedGrant) { "Stored issuance grant binding is invalid" }
     }
 
-    private suspend fun resolvePersistedKey(keyId: String?, selectedPublicJwk: String): Key {
-        val key = keyId?.let { wallet.findKey(it) } ?: wallet.defaultKey()
-            ?: error("The holder key for the issuance session is no longer available")
+    private suspend fun resolvePersistedKeyMaterial(
+        keyId: String?,
+        selectedPublicJwk: String,
+    ): WalletKeyStoreEntry {
+        val keyMaterial = resolveIssuanceKeyMaterial(inlineKey = null, keyId = keyId)
         val expected = Json.parseToJsonElement(selectedPublicJwk).jsonObject
-        require(publicJwkMatches(key.getPublicKey().exportJWKObject(), expected)) {
+        require(publicJwkMatches(keyMaterial.exportPublicJwkObject(), expected)) {
             "The holder key no longer matches the issuance session"
         }
-        return key
+        return keyMaterial
     }
 
     private suspend fun persistActive(active: ActiveSession) {
@@ -1343,7 +1363,7 @@ class WalletIssuanceSessionService(
             offer = json.encodeToString(active.resolved.offer),
             issuerMetadata = json.encodeToString(active.resolved.issuerMetadata),
             authorizationServerMetadata = json.encodeToString(active.resolved.authorizationServerMetadata),
-            selectedPublicJwk = active.key.getPublicKey().exportJWKObject().toString(),
+            selectedPublicJwk = active.keyMaterial.exportPublicJwkObject().toString(),
             authorization = active.authorization?.public,
             codeVerifier = active.authorization?.pkce?.codeVerifier,
             state = active.state,
@@ -1440,7 +1460,7 @@ class WalletIssuanceSessionService(
         require(persisted.public.id == id && persisted.sessionId == record.sessionId) {
             "Stored deferred credential binding is invalid"
         }
-        val key = resolvePersistedKey(persisted.keyId, persisted.selectedPublicJwk)
+        val keyMaterial = resolvePersistedKeyMaterial(persisted.keyId, persisted.selectedPublicJwk)
         sessionStore.remove(record.id)
         return DeferredRecord(
             public = persisted.public,
@@ -1451,7 +1471,7 @@ class WalletIssuanceSessionService(
             tokenType = persisted.tokenType,
             dpop = persisted.dpop,
             dpopNonce = persisted.dpopNonce,
-            key = key,
+            keyMaterial = keyMaterial,
             keyId = persisted.keyId,
             selectedPublicJwk = persisted.selectedPublicJwk,
             persistable = true,
@@ -1598,7 +1618,7 @@ class WalletIssuanceSessionService(
         val public: WalletIssuanceSession,
         val request: WalletIssuanceSessionRequest,
         val resolved: ResolvedOffer,
-        val key: Key,
+        val keyMaterial: WalletKeyStoreEntry,
         val keyId: String?,
         val did: String?,
         var authorization: AuthorizationState?,
@@ -1617,7 +1637,7 @@ class WalletIssuanceSessionService(
         val tokenType: String,
         val dpop: Set<String>?,
         val dpopNonce: String?,
-        val key: Key,
+        val keyMaterial: WalletKeyStoreEntry,
         val keyId: String?,
         val selectedPublicJwk: String,
         val persistable: Boolean,
@@ -1671,6 +1691,56 @@ class WalletIssuanceSessionService(
         val selectedPublicJwk: String,
         val label: String?,
     )
+
+    private suspend fun resolveIssuanceKeyMaterial(
+        inlineKey: DirectSerializedKey?,
+        keyId: String?,
+    ): WalletKeyStoreEntry =
+        inlineKey?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
+            ?: wallet.resolveKeyMaterial(keyId, setOf(KeyUsage.SIGN))
+            ?: error("No holder key is available for credential issuance")
+
+    private suspend fun WalletKeyStoreEntry.requireCrypto2SigningKey(): Crypto2Key =
+        crypto2Key
+            ?: legacyKey?.let { migrateLocalJwk(it) }?.let { crypto2Runtime.restore(it) }
+            ?: error("Key '$keyId' has no usable crypto2 signing representation")
+
+    private suspend fun migrateLocalJwk(key: Key) =
+        (key as? JWKKey)?.takeUnless { it.keyType == KeyType.secp256k1 }?.let {
+            val jwk = it.exportJWKObject()
+            EncodedKey.Jwk(
+                BinaryData(Json.encodeToString(jwk).encodeToByteArray()),
+                privateMaterial = Jwk.containsPrivateMaterial(jwk),
+            ).toStoredSoftwareKey(KeyId(it.getKeyId()), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
+        }
+
+    private suspend fun WalletKeyStoreEntry.exportPublicJwkObject(): JsonObject {
+        crypto2Key?.let { key ->
+            val exported = requireNotNull(key.capabilities.publicKeyExporter) {
+                "Key '$keyId' does not export public material"
+            }.exportPublicKey().toPublicJwk(key.spec)
+            return Json.parseToJsonElement(exported.data.toByteArray().decodeToString()).jsonObject
+        }
+        val legacy = requireNotNull(legacyKey) { "Key '$keyId' has no usable public representation" }
+        return legacy.getPublicKey().exportJWKObject()
+    }
+
+    private suspend fun WalletKeyStoreEntry.jwkThumbprint(): String {
+        crypto2Key?.let { key ->
+            val exported = requireNotNull(key.capabilities.publicKeyExporter) {
+                "Key '$keyId' does not export public material"
+            }.exportPublicKey().toPublicJwk(key.spec)
+            return Jwk.sha256Thumbprint(exported)
+        }
+        val legacy = requireNotNull(legacyKey) { "Key '$keyId' has no usable public representation" }
+        return legacy.getPublicKey().getThumbprint()
+    }
+
+    private fun WalletKeyStoreEntry.jwsAlgorithmIdentifier(): String {
+        crypto2Key?.let { return it.preferredJwsAlgorithm().identifier }
+        val legacy = requireNotNull(legacyKey) { "Key '$keyId' has no usable signing representation" }
+        return legacy.keyType.jwsAlg
+    }
 
     private class IssuanceStageException(
         val code: WalletIssuanceErrorCode,
