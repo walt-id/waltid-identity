@@ -1,0 +1,65 @@
+public final class id/walt/crypto2/migration/v1/V1KeyMigration {
+	public static final field Companion Lid/walt/crypto2/migration/v1/V1KeyMigration$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun migrate-1locDDc (Ljava/lang/String;Ljava/lang/String;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun migrate-1locDDc (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/migration/v1/V1KeyMigration$Companion {
+}
+
+public abstract class id/walt/crypto2/migration/v1/V1KeyMigrationException : java/lang/IllegalArgumentException {
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class id/walt/crypto2/migration/v1/V1KeyMigrationException$MissingManagedMigrator : id/walt/crypto2/migration/v1/V1KeyMigrationException {
+	public fun <init> (Ljava/lang/String;)V
+}
+
+public final class id/walt/crypto2/migration/v1/V1KeyMigrationKt {
+	public static final field V1_LEGACY_KEY_ID_METADATA_KEY Ljava/lang/String;
+	public static final fun legacyKeyId (Lid/walt/crypto2/keys/StoredKey;)Ljava/lang/String;
+	public static final fun v1PublicKeyReference (Ljava/lang/String;)Lid/walt/crypto2/migration/v1/V1PublicKeyReference;
+	public static final fun v1PublicKeyReference (Lkotlinx/serialization/json/JsonObject;)Lid/walt/crypto2/migration/v1/V1PublicKeyReference;
+}
+
+public abstract interface class id/walt/crypto2/migration/v1/V1ManagedKeyMigrator {
+	public abstract fun migrate (Lid/walt/crypto2/migration/v1/V1ManagedKeyRecord;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/migration/v1/V1ManagedKeyRecord {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lid/walt/crypto2/keys/KeySpec;Lkotlinx/serialization/json/JsonObject;Ljava/util/Set;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-1AhpoWA ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component4 ()Lid/walt/crypto2/keys/KeySpec;
+	public final fun component5 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component6 ()Ljava/util/Set;
+	public final fun copy-A3IiLVg (Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lid/walt/crypto2/keys/KeySpec;Lkotlinx/serialization/json/JsonObject;Ljava/util/Set;)Lid/walt/crypto2/migration/v1/V1ManagedKeyRecord;
+	public static synthetic fun copy-A3IiLVg$default (Lid/walt/crypto2/migration/v1/V1ManagedKeyRecord;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lid/walt/crypto2/keys/KeySpec;Lkotlinx/serialization/json/JsonObject;Ljava/util/Set;ILjava/lang/Object;)Lid/walt/crypto2/migration/v1/V1ManagedKeyRecord;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-1AhpoWA ()Ljava/lang/String;
+	public final fun getPublicJwk ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getSource ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getSpec ()Lid/walt/crypto2/keys/KeySpec;
+	public final fun getType ()Ljava/lang/String;
+	public final fun getUsages ()Ljava/util/Set;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/migration/v1/V1PublicKeyReference {
+	public fun <init> (Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;)V
+	public final fun component1 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;)Lid/walt/crypto2/migration/v1/V1PublicKeyReference;
+	public static synthetic fun copy$default (Lid/walt/crypto2/migration/v1/V1PublicKeyReference;Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/crypto2/migration/v1/V1PublicKeyReference;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKeyId ()Ljava/lang/String;
+	public final fun getPublicJwk ()Lkotlinx/serialization/json/JsonObject;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+

@@ -158,7 +158,7 @@ class PresentationRequestValidatorTest {
                 requestObject = "authenticated.request.object",
             ),
             transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
-            formatCapabilities = ed25519Capabilities,
+            formatCapabilities = { ed25519Capabilities },
         )
 
         assertIs<PresentationRequestValidationResult.Valid>(result)
@@ -417,7 +417,7 @@ class PresentationRequestValidatorTest {
     ): PresentationRequestValidationResult = PresentationRequestValidator.validate(
         resolvedRequest = resolvedRequest,
         transactionDataTypeRegistry = transactionDataTypes,
-        formatCapabilities = p256Capabilities,
+        formatCapabilities = { p256Capabilities },
     )
 
     private fun request(

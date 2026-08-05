@@ -7,7 +7,7 @@ plugins {
 kotlin {
     jvm()
 
-    js(IR) {
+    js {
         useCommonJs()
         generateTypeScriptDefinitions()
         binaries.library()

@@ -4,6 +4,8 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
@@ -15,7 +17,9 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier.openid.transactiondata.decodeList
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.WalletKeyStoreEntry
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.data.resolveKeyMaterial
 import id.walt.wallet2.handlers.WalletPresentationHandler.matchCredentials
 import id.walt.wallet2.handlers.WalletPresentationHandler.matchCredentialsFromStore
 import id.walt.webdatafetching.WebDataFetcher
@@ -266,6 +270,11 @@ object WalletPresentationHandler {
         data class Ready(
             override val requestUrl: Url,
             override val resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
+            /**
+             * The concrete signing key selected while previewing. Submission re-resolves exactly this
+             * key so that the request was validated against the key that actually signs the response.
+             */
+            val keyId: String,
         ) : PreviewedPresentation
 
         data class Invalid(
@@ -304,8 +313,12 @@ object WalletPresentationHandler {
         request: PresentCredentialRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
-    ): WalletPresentResult = presentCredential(
-        wallet, request, onEvent, transactionDataTypeRegistry, beforeCredentialsUsed = {},
+    ): WalletPresentResult = presentCredentialWithTrust(
+        wallet,
+        request,
+        onEvent,
+        transactionDataTypeRegistry,
+        ClientIdTrustConfiguration(),
     )
 
     suspend fun presentCredential(
@@ -314,17 +327,32 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         beforeCredentialsUsed: suspend (Int) -> Unit,
+    ): WalletPresentResult = presentCredentialWithTrust(
+        wallet,
+        request,
+        onEvent,
+        transactionDataTypeRegistry,
+        ClientIdTrustConfiguration(),
+        beforeCredentialsUsed,
+    )
+
+    suspend fun presentCredentialWithTrust(
+        wallet: Wallet,
+        request: PresentCredentialRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        beforeCredentialsUsed: suspend (Int) -> Unit = {},
     ): WalletPresentResult {
-        val key = wallet.resolveKey(keyId = request.keyId)
+        val keyMaterial = wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
-        val keyId = key.getKeyId()
-        log.trace { "presentCredential: keyId=$keyId, did=$did, requestUrl=${request.requestUrl}" }
+        log.trace { "presentCredential: keyId=${keyMaterial.keyId}, did=$did, requestUrl=${request.requestUrl}" }
 
         onEvent(WalletSessionEvent.presentation_request_parsed)
 
-        val result = WalletPresentFunctionality2.walletPresentHandling(
-            holderKey = key,
+        val result = presentWithKeyMaterial(
+            keyMaterial = keyMaterial,
             holderDid = did,
             presentationRequestUrl = request.requestUrl,
             selectCredentialsForQuery = { query ->
@@ -335,9 +363,9 @@ object WalletPresentationHandler {
                         onEvent(WalletSessionEvent.presentation_credentials_selected)
                     }
             },
-            holderPoliciesToRun = null,
             runPolicies = request.runPolicies,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
             beforeCredentialsUsed = beforeCredentialsUsed,
         )
 
@@ -369,8 +397,12 @@ object WalletPresentationHandler {
         request: PresentCredentialIsolatedRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
-    ): WalletPresentResult = presentCredentialIsolated(
-        wallet, request, onEvent, transactionDataTypeRegistry, beforeCredentialsUsed = {},
+    ): WalletPresentResult = presentCredentialIsolatedWithTrust(
+        wallet,
+        request,
+        onEvent,
+        transactionDataTypeRegistry,
+        ClientIdTrustConfiguration(),
     )
 
     suspend fun presentCredentialIsolated(
@@ -379,8 +411,24 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         beforeCredentialsUsed: suspend (Int) -> Unit,
+    ): WalletPresentResult = presentCredentialIsolatedWithTrust(
+        wallet,
+        request,
+        onEvent,
+        transactionDataTypeRegistry,
+        ClientIdTrustConfiguration(),
+        beforeCredentialsUsed,
+    )
+
+    suspend fun presentCredentialIsolatedWithTrust(
+        wallet: Wallet,
+        request: PresentCredentialIsolatedRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        beforeCredentialsUsed: suspend (Int) -> Unit = {},
     ): WalletPresentResult {
-        val key = wallet.resolveKey(keyId = request.keyId)
+        val keyMaterial = wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available for isolated presentation")
         val did = request.did ?: wallet.defaultDid()
 
@@ -390,17 +438,17 @@ object WalletPresentationHandler {
             stored.credential.toRawDcqlCredential(idx.toString())
         }
 
-        val result = WalletPresentFunctionality2.walletPresentHandling(
-            holderKey = key,
+        val result = presentWithKeyMaterial(
+            keyMaterial = keyMaterial,
             holderDid = did,
             presentationRequestUrl = request.requestUrl,
             selectCredentialsForQuery = { query ->
                 DcqlMatcher.match(query, rawCredentials).getOrThrow()
                     .also { onEvent(WalletSessionEvent.presentation_credentials_selected) }
             },
-            holderPoliciesToRun = null,
             runPolicies = null,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
             beforeCredentialsUsed = beforeCredentialsUsed,
         )
 
@@ -412,17 +460,46 @@ object WalletPresentationHandler {
         request: PreviewPresentationRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
-    ): PreviewPresentationResult = previewPresentation(
-        wallet = wallet,
-        request = request,
-        onEvent = onEvent,
-        transactionDataTypeRegistry = transactionDataTypeRegistry,
-        resolveAuthorizationRequest = ::resolveAuthorizationRequest,
+    ): PreviewPresentationResult = previewPresentationWithTrust(
+        wallet,
+        request,
+        onEvent,
+        transactionDataTypeRegistry,
+        ClientIdTrustConfiguration(),
     )
+
+    suspend fun previewPresentationWithTrust(
+        wallet: Wallet,
+        request: PreviewPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+    ): PreviewPresentationResult {
+        // Selected once up front so advertised wallet metadata, request validation and the retained
+        // preview all refer to the same key, but only *required* where a key is genuinely needed: a
+        // request that fails resolution or client-ID trust validation must report that failure rather
+        // than a wallet-local missing-key condition.
+        val executionKey = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)).requiredOnUse()
+        return previewPresentation(
+            wallet = wallet,
+            request = request,
+            executionKey = executionKey,
+            onEvent = onEvent,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+            resolveAuthorizationRequest = { requestUrl ->
+                resolveAuthorizationRequest(
+                    { executionKey().presentationCapabilities() },
+                    requestUrl,
+                    clientIdTrustConfiguration,
+                )
+            },
+        )
+    }
 
     internal suspend fun previewPresentation(
         wallet: Wallet,
         request: PreviewPresentationRequest,
+        executionKey: () -> WalletKeyStoreEntry,
         onEvent: suspend (WalletSessionEvent) -> Unit,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest,
@@ -430,12 +507,10 @@ object WalletPresentationHandler {
         onEvent(WalletSessionEvent.presentation_request_parsed)
         val resolvedAuthorizationRequest = resolveAuthorizationRequest(request.requestUrl)
         val authorizationRequest = resolvedAuthorizationRequest.authorizationRequest
-        val key = wallet.resolveKey(keyId = null)
-            ?: error("No key available: wallet has no keyStores and no staticKey")
         val validation = PresentationRequestValidator.validate(
             resolvedRequest = resolvedAuthorizationRequest,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
-            formatCapabilities = WalletPresentationFormatRegistry.capabilitiesFromKeyTypes(setOf(key.keyType)),
+            formatCapabilities = { executionKey().presentationCapabilities() },
         )
         if (validation is PresentationRequestValidationResult.Invalid) {
             val handle = rememberPreviewedAuthorizationRequest(
@@ -459,7 +534,7 @@ object WalletPresentationHandler {
                 details = decoded.details,
             )
         }
-        val responseEncryption = ResponseEncryption.resolve(authorizationRequest)?.metadata()
+        val responseEncryption = ResponseEncryption.resolveCrypto2(authorizationRequest)?.metadata()
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
         val matched = selectFromStores(wallet, query, useWalletCredentialIds = true)
         val availableCredentialQueryIds = matched.filterValues { it.isNotEmpty() }.keys
@@ -506,6 +581,7 @@ object WalletPresentationHandler {
             preview = PreviewedPresentation.Ready(
                 requestUrl = request.requestUrl,
                 resolvedAuthorizationRequest = resolvedAuthorizationRequest,
+                keyId = executionKey().keyId,
             ),
         )
         return PreviewPresentationResult.Ready(
@@ -530,11 +606,12 @@ object WalletPresentationHandler {
                 "Cannot submit an invalid presentation request; reject it or dismiss it locally"
             }
         }
-        val resolvedAuthorizationRequest = (preview as? PreviewedPresentation.Ready)
-            ?.resolvedAuthorizationRequest
+        val ready = preview as? PreviewedPresentation.Ready
             ?: error("Unexpected presentation preview state")
-        val key = wallet.resolveKey(keyId = null)
-            ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
+        val resolvedAuthorizationRequest = ready.resolvedAuthorizationRequest
+        // Sign with exactly the key the request was validated against during preview.
+        val keyMaterial = wallet.resolveKeyMaterial(ready.keyId, setOf(KeyUsage.SIGN))
+            ?: error("Key '${ready.keyId}' selected while previewing is no longer available")
         val did = request.did ?: wallet.defaultDid()
         val selectedQueryIds = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.queryId }
         validateSelectedTransactionDataCredentials(
@@ -544,8 +621,8 @@ object WalletPresentationHandler {
 
         onEvent(WalletSessionEvent.presentation_request_parsed)
 
-        val result = WalletPresentFunctionality2.walletPresentHandling(
-            holderKey = key,
+        val result = presentWithKeyMaterial(
+            keyMaterial = keyMaterial,
             holderDid = did,
             presentationRequestUrl = preview.requestUrl,
             resolvedAuthorizationRequest = resolvedAuthorizationRequest,
@@ -572,7 +649,6 @@ object WalletPresentationHandler {
                     onEvent(WalletSessionEvent.presentation_credentials_selected)
                 }
             },
-            holderPoliciesToRun = null,
             runPolicies = request.runPolicies,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
         )
@@ -609,6 +685,46 @@ object WalletPresentationHandler {
 
         return result.emitPresentationOutcome(onEvent)
     }
+
+    private suspend fun presentWithKeyMaterial(
+        keyMaterial: WalletKeyStoreEntry,
+        holderDid: String?,
+        presentationRequestUrl: Url,
+        selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+        runPolicies: Boolean?,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        beforeCredentialsUsed: suspend (Int) -> Unit = {},
+    ): Result<WalletPresentResult> = keyMaterial.crypto2Key?.let { crypto2Key ->
+        WalletPresentFunctionality2.walletPresentHandling(
+            holderKey = crypto2Key,
+            holderDid = holderDid,
+            presentationRequestUrl = presentationRequestUrl,
+            selectCredentialsForQuery = selectCredentialsForQuery,
+            holderPoliciesToRun = null,
+            runPolicies = runPolicies,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+            resolvedAuthorizationRequest = resolvedAuthorizationRequest,
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
+            beforeCredentialsUsed = beforeCredentialsUsed,
+        )
+    } ?: WalletPresentFunctionality2.walletPresentHandling(
+        holderKey = requireNotNull(keyMaterial.legacyKey) {
+            "Key '${keyMaterial.keyId}' has no usable signing representation"
+        },
+        holderDid = holderDid,
+        presentationRequestUrl = presentationRequestUrl,
+        selectCredentialsForQuery = selectCredentialsForQuery,
+        holderPoliciesToRun = null,
+        runPolicies = runPolicies,
+        transactionDataTypeRegistry = transactionDataTypeRegistry,
+        resolvedAuthorizationRequest = resolvedAuthorizationRequest,
+        holderCrypto2Key = null,
+        clientIdTrustConfiguration = clientIdTrustConfiguration,
+        beforeCredentialsUsed = beforeCredentialsUsed,
+    )
+
     // ---------------------------------------------------------------------------
     // Isolated step handlers
     // ---------------------------------------------------------------------------
@@ -708,7 +824,8 @@ object WalletPresentationHandler {
      *   and optional key/DID overrides.
      */
     suspend fun buildVpToken(wallet: Wallet, request: BuildVpTokenRequest): BuildVpTokenResult {
-        val key = wallet.resolveKey(request.key, request.keyId)
+        val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
+            ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: throw IllegalArgumentException("Wallet has no key available for VP token building")
         val did = request.did ?: wallet.defaultDid()
 
@@ -743,13 +860,33 @@ object WalletPresentationHandler {
             matches
         }
 
-        val vpToken = WalletPresentFunctionality2.buildVpToken(
-            authorizationRequest = request.authorizationRequest,
-            matchedCredentials = matchedCredentials,
-            holderKey = key,
-            holderDid = did,
-        )
-        val idToken = WalletPresentFunctionality2.buildIdToken(request.authorizationRequest, key, did)
+        val crypto2Key = keyMaterial.crypto2Key
+        val vpToken = if (crypto2Key != null) {
+            WalletPresentFunctionality2.buildVpToken(
+                authorizationRequest = request.authorizationRequest,
+                matchedCredentials = matchedCredentials,
+                holderKey = crypto2Key,
+                holderDid = did,
+            )
+        } else {
+            WalletPresentFunctionality2.buildVpToken(
+                authorizationRequest = request.authorizationRequest,
+                matchedCredentials = matchedCredentials,
+                holderKey = requireNotNull(keyMaterial.legacyKey) {
+                    "Key '${keyMaterial.keyId}' has no usable signing representation"
+                },
+                holderDid = did,
+            )
+        }
+        val idToken = if (crypto2Key != null) {
+            WalletPresentFunctionality2.buildIdToken(request.authorizationRequest, crypto2Key, did)
+        } else {
+            WalletPresentFunctionality2.buildIdToken(
+                request.authorizationRequest,
+                requireNotNull(keyMaterial.legacyKey),
+                did,
+            )
+        }
         return BuildVpTokenResult(vpToken = vpToken, idToken = idToken)
     }
 
@@ -941,16 +1078,29 @@ object WalletPresentationHandler {
             credentialId = credential.id,
         )
 
-    private suspend fun resolveAuthorizationRequest(requestUrl: Url): ResolvedAuthorizationRequest {
+    /**
+     * @param capabilities resolved lazily: wallet metadata is only advertised when a `request_uri` is
+     *   actually fetched, so a request carrying its object inline needs no signing key to be resolved.
+     */
+    private suspend fun resolveAuthorizationRequest(
+        capabilities: () -> WalletPresentationFormatRegistry.RuntimeCapabilities,
+        requestUrl: Url,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+    ): ResolvedAuthorizationRequest {
         val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
         return AuthorizationRequestResolver.resolve(
             requestUrl = requestUrl,
             unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            trustConfiguration = clientIdTrustConfiguration,
             fetchRequestUri = { requestUri, requestUriMethod ->
                 AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
                     webResolveAuthReq = fetcher,
                     requestUri = requestUri,
                     requestUriMethod = requestUriMethod,
+                    requestUriPostWalletMetadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                        WalletPresentationFormatRegistry.buildVpFormatsSupported(capabilities()),
+                        clientIdTrustConfiguration,
+                    ),
                 )
             },
         )
@@ -1128,6 +1278,31 @@ object WalletPresentationHandler {
         )
     }
 }
+
+/**
+ * Presentation capabilities of exactly this key material.
+ *
+ * Deliberately scoped to one key rather than to the union of every signing key in the wallet:
+ * submission signs with a single key, so anything advertised to or accepted from a Verifier beyond
+ * that key's capabilities could be accepted while previewing and then fail while signing.
+ * Mirrors the capability computation in `WalletPresentFunctionality2.walletPresentHandlingWithKey`.
+ */
+/**
+ * Defers the "a key is required" failure to the point where the key is actually used.
+ *
+ * The key is still selected once, before anything else, so every consumer sees the same key. But a
+ * request that is rejected without ever needing a key - an untrusted client identifier, a malformed
+ * request - must surface that rejection, not a wallet-local missing-key error.
+ */
+internal fun WalletKeyStoreEntry?.requiredOnUse(): () -> WalletKeyStoreEntry = {
+    this ?: error("No key available: wallet has no keyStores and no staticKey")
+}
+
+internal fun WalletKeyStoreEntry.presentationCapabilities(): WalletPresentationFormatRegistry.RuntimeCapabilities =
+    WalletPresentationFormatRegistry.capabilitiesFromKeys(
+        keys = listOfNotNull(crypto2Key),
+        fallbackKeyTypes = setOfNotNull(legacyKey?.keyType?.takeIf { crypto2Key == null }),
+    )
 
 // ---------------------------------------------------------------------------
 // Isolated-step request / response types for the manual presentation flow

@@ -59,6 +59,7 @@ class Issuer2Module @JvmOverloads constructor(
         sessionService = issuanceSessionService,
         preAuthorizedGrantAnonymousAccessSupported =
             openId4VciModule.preAuthorizedCodeIssuer.anonymousAccessSupported,
+        crypto2TokenSigningKey = openId4VciModule.crypto2TokenSigningKey,
     )
 
     val credentialOfferService = CredentialOfferService(

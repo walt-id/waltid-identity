@@ -6,6 +6,7 @@ import id.walt.credentials.keyresolver.resolvers.X5CKeyResolver
 import id.walt.crypto.keys.Key
 import id.walt.did.dids.DidUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -18,36 +19,32 @@ import kotlinx.serialization.json.jsonPrimitive
  * the JWT represents a credential (issuer key) or a presentation (holder key).
  *
  * Priority order:
- * 1. DID — if `iss` / `issuer` is a DID URL
- * 2. x5c — if the JWT header contains an `x5c` certificate chain
- * 3. HTTPS well-known — if `iss` / `issuer` is an HTTPS URL (JWT VC Issuer Metadata)
+ * 1. DID - if `iss` / `issuer` is a DID URL
+ * 2. x5c - if the JWT header contains an `x5c` certificate chain
+ * 3. HTTPS well-known - if `iss` / `issuer` is an HTTPS URL (JWT VC Issuer Metadata)
  */
 object JwtKeyResolver {
 
     private val log = KotlinLogging.logger { }
 
+    @Deprecated(
+        "Use Crypto2JwtKeyResolver",
+        ReplaceWith(
+            "Crypto2JwtKeyResolver().resolveFromJwt(jwtHeader, jwtPayload)?.key",
+            "id.walt.credentials.keyresolver.Crypto2JwtKeyResolver",
+        ),
+    )
     suspend fun resolveFromJwt(jwtHeader: JsonObject?, jwtPayload: JsonObject): Key? {
         val signerIdentifier = extractSignerIdentifier(jwtPayload)
         log.trace { "Attempting to resolve JWT signer key for: $signerIdentifier" }
 
-        return runCatching {
+        return try {
             val kid = jwtHeader?.get("kid")?.jsonPrimitive?.contentOrNull
 
             when {
-                // 1. DID Resolution — pass kid for multi-key DID documents.
-                // If DID resolution fails but x5c is also present, fall through to x5c below.
-                signerIdentifier != null && DidUtils.isDidUrl(signerIdentifier) -> {
-                    val didKey = runCatching { DidKeyResolver.resolveKeyFromDid(signerIdentifier, kid) }
-                        .getOrNull()
-                    didKey
-                        ?: if (jwtHeader?.contains("x5c") == true) {
-                            log.debug { "DID resolution failed for $signerIdentifier, falling back to x5c header" }
-                            X5CKeyResolver.resolveKeyFromX5c(jwtHeader["x5c"]!!.jsonArray)
-                        } else {
-                            log.warn { "DID resolution failed for $signerIdentifier and no x5c fallback available" }
-                            null
-                        }
-                }
+                // 1. DID Resolution - pass kid for multi-key DID documents.
+                signerIdentifier != null && DidUtils.isDidUrl(signerIdentifier) ->
+                    DidKeyResolver.resolveKeyFromDid(signerIdentifier, kid)
 
                 // 2. Inline X.509 Certificate Chain
                 jwtHeader?.contains("x5c") == true
@@ -62,8 +59,10 @@ object JwtKeyResolver {
                     null
                 }
             }
-        }.getOrElse {
-            log.debug { "Could not resolve JWT signer key: ${it.stackTraceToString()}" }
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (cause: Exception) {
+            log.debug { "Could not resolve JWT signer key: ${cause.stackTraceToString()}" }
             null
         }
     }
@@ -84,6 +83,6 @@ object JwtKeyResolver {
 
 }
 
-/** Backward-compat alias — prefer [JwtKeyResolver]. */
-@Deprecated("Renamed to JwtKeyResolver", ReplaceWith("JwtKeyResolver", "id.walt.credentials.keyresolver.JwtKeyResolver"))
+/** Backward-compatibility alias for the v1 key resolver. */
+@Deprecated("Use Crypto2JwtKeyResolver")
 typealias IssuerKeyResolver = JwtKeyResolver

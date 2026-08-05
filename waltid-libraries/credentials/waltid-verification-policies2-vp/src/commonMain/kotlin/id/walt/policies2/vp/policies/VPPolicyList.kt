@@ -79,7 +79,7 @@ object VPPolicyListSerializer : KSerializer<VPPolicyList> {
     }
 
     private fun List<VPPolicy2>.serializePolicyList() =
-        JsonArray(map { if (VPVerificationPolicyManager.isSimplePolicy(it.id)) JsonPrimitive(it.id) else Json.encodeToJsonElement(it) })
+        JsonArray(map { if (VPVerificationPolicyManager.shouldSerializeAsSimple(it)) JsonPrimitive(it.id) else Json.encodeToJsonElement(it) })
 
 
     override fun serialize(encoder: Encoder, value: VPPolicyList) {

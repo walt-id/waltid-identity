@@ -57,7 +57,7 @@ class MobileWalletPersistenceIntegrationTest {
             walletId = walletId,
             persistence = MobileWalletPersistence(
                 databaseKey = MobileWalletDatabaseKey.Provided(databaseKeyProvider),
-                stores = MobileWalletStores(credentials = credentialStore),
+                credentialStore = credentialStore,
             ),
         )
 

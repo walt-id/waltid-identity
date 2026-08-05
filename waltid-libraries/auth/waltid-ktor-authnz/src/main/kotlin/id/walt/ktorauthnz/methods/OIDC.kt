@@ -1,15 +1,25 @@
 package id.walt.ktorauthnz.methods
 
-import id.walt.crypto.keys.jwk.JwkKeyProvider
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.crypto2.serialization.BinaryData
 import id.walt.ktorauthnz.AuthContext
+import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
-import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.methods.config.OidcAuthConfiguration
 import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticatedData
 import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticatedData.TokenValidationData
 import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticationStepData
+import id.walt.ktorauthnz.methods.sessiondata.OidcTokenValidationPolicyData
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionNextStepRedirectData
 import id.walt.ktorauthnz.sessions.SessionManager
@@ -29,6 +39,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -38,6 +49,7 @@ import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 
 object OIDC : AuthenticationMethod("oidc") {
@@ -52,14 +64,13 @@ object OIDC : AuthenticationMethod("oidc") {
 
     internal const val OIDC_SESSION_NAMESPACE = "oidc-session"
     internal const val OIDC_STATE_NAMESPACE = "oidc-state"
+    internal const val OIDC_TOKEN_VALIDATION_NAMESPACE = "oidc-token-validation-v2"
 
 
     private val configurationCache = mutableMapOf<Url, OpenIdConfiguration>()
 
-    private val keyProviderCache = mutableMapOf<String, JwkKeyProvider>()
-    private fun getJwkProvider(jwksUri: String) = keyProviderCache.getOrPut(jwksUri) {
-        JwkKeyProvider(jwksUri)
-    }
+    private val jwksCache = mutableMapOf<String, List<JsonObject>>()
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     suspend fun resolveConfiguration(configUrl: Url): OpenIdConfiguration {
         return configurationCache.getOrPut(configUrl) {
@@ -187,7 +198,13 @@ object OIDC : AuthenticationMethod("oidc") {
 
                 val tokenResponse = exchangeCodeForTokens(config, returnedCode, tempSessionData.codeVerifier)
                 log.trace { "OIDC Token Response: $tokenResponse" }
-                val idTokenPayload = validateIdToken(oidcConfig, tokenResponse.idToken, config.clientId, tempSessionData.nonce)
+                val tokenValidationPolicy = OidcTokenValidationPolicyData(oidcConfig)
+                val idTokenPayload = validateIdToken(
+                    tokenValidationPolicy,
+                    tokenResponse.idToken,
+                    config.clientId,
+                    tempSessionData.nonce,
+                )
 
                 val userInfo = userInfo(oidcConfig, tokenResponse.accessToken)
                 log.trace { "OIDC UserInfo Response: $userInfo" }
@@ -214,8 +231,7 @@ object OIDC : AuthenticationMethod("oidc") {
                 session.setSessionData(
                     this@OIDC, OidcSessionAuthenticatedData(
                         tokenValidationData = TokenValidationData(
-                            idpJwksUrl = oidcConfig.jwksUri,
-                            idpIss = oidcConfig.issuer,
+                            oidcConfig,
                         ),
                         oidcIdentifier = identifier,
                         externalRoles = externalRoles,
@@ -224,6 +240,7 @@ object OIDC : AuthenticationMethod("oidc") {
                         idTokenRaw = tokenResponse.idToken,
                     )
                 )
+                session.setOidcTokenValidationPolicy(tokenValidationPolicy)
 
                 val accountId = identifier.resolveIfExists() ?: run {
                     // No existing account found - use addAccountIdentifierToAccount to create one
@@ -265,9 +282,7 @@ object OIDC : AuthenticationMethod("oidc") {
 
                 // TODO: logout token can also be encrypted
 
-                val jwsParts = logoutTokenStr.decodeJws() // Decode without validation to get clientId
-                val clientId = jwsParts.payload["aud"]?.jsonPrimitive?.content
-                    ?: return@post call.respond(HttpStatusCode.BadRequest, "Logout token missing 'aud' claim")
+                val jwsParts = logoutTokenStr.decodeJws()
 
                 val sid =
                     jwsParts.payload["sid"]?.jsonPrimitive?.content ?: throw IllegalStateException("Logout token is missing 'sid' claim.")
@@ -281,8 +296,18 @@ object OIDC : AuthenticationMethod("oidc") {
                 val sessionOidcConfig = session.getSessionData<OidcSessionAuthenticatedData>(this@OIDC)
                 log.trace { "Retrieved data to verify logout token: $sessionOidcConfig" }
                 requireNotNull(sessionOidcConfig) { "Could not get OIDC data for session" }
+                val tokenValidationPolicy = session.getOidcTokenValidationPolicy()
+                    ?: return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        "OIDC session has no versioned token validation policy",
+                    )
+                val clientId = sessionOidcConfig.idTokenClaims?.let(::validatedClientId)
+                    ?: return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        "OIDC session does not contain a validated client audience",
+                    )
 
-                validateLogoutToken(sessionOidcConfig, logoutTokenStr, clientId)
+                validateLogoutToken(tokenValidationPolicy, logoutTokenStr, clientId)
 
                 session.run {
                     call.logoutAndDeleteCookie()
@@ -378,10 +403,12 @@ object OIDC : AuthenticationMethod("oidc") {
 
                 // Build response
                 if (endSessionEndpoint == null) {
-                    call.respond(HttpStatusCode.OK, mapOf(
-                        "status" to "logged_out",
-                        "message" to "Local session terminated. No IdP end_session_endpoint available."
-                    ))
+                    call.respond(
+                        HttpStatusCode.OK, mapOf(
+                            "status" to "logged_out",
+                            "message" to "Local session terminated. No IdP end_session_endpoint available."
+                        )
+                    )
                     return@get
                 }
 
@@ -393,11 +420,13 @@ object OIDC : AuthenticationMethod("oidc") {
 
                 log.trace { "OIDC: IdP end_session_endpoint: $endSessionUrl" }
 
-                call.respond(HttpStatusCode.OK, mapOf(
-                    "status" to "logged_out",
-                    "end_session_url" to endSessionUrl.toString(),
-                    "message" to "Local session terminated. Redirect to end_session_url for full SSO logout."
-                ))
+                call.respond(
+                    HttpStatusCode.OK, mapOf(
+                        "status" to "logged_out",
+                        "end_session_url" to endSessionUrl.toString(),
+                        "message" to "Local session terminated. Redirect to end_session_url for full SSO logout."
+                    )
+                )
             }
         }
     }
@@ -450,33 +479,29 @@ object OIDC : AuthenticationMethod("oidc") {
      * @throws IllegalArgumentException if validation fails.
      */
     private suspend fun validateOidcJws(
-        oidcConfig: TokenValidationData,
+        oidcConfig: OidcTokenValidationPolicyData,
         token: String,
         clientId: String
     ): JsonObject {
-        val jwsParts = token.decodeJws()
-        val header = jwsParts.header
-        val payload = jwsParts.payload
-
-        // 1. Verify Signature
-        val kid = header["kid"]?.jsonPrimitive?.content
-            ?: throw IllegalArgumentException("JWS header is missing 'kid' (Key ID).")
-
-        val keyProvider = getJwkProvider(oidcConfig.idpJwksUrl)
-        val validationKey = keyProvider.getKey(kid).getOrThrow()
-
-        val verificationResult = validationKey.verifyJws(token)
-        if (verificationResult.isFailure) {
-            throw IllegalArgumentException("JWS signature verification failed: ${verificationResult.exceptionOrNull()?.message}")
+        val decoded = CompactJws.decodeUnverified(token)
+        val algorithm = decoded.algorithm
+        require(oidcConfig.idTokenSigningAlgorithms.isNotEmpty()) {
+            "OpenID Provider metadata did not advertise ID Token signing algorithms"
         }
+        require(algorithm.identifier in oidcConfig.idTokenSigningAlgorithms) {
+            "JWS algorithm is not advertised by the OpenID Provider"
+        }
+        val kid = decoded.protectedHeader["kid"]?.jsonPrimitive?.content
+            ?: throw IllegalArgumentException("JWS header is missing 'kid' (Key ID).")
+        val verifiedPayload = verifyOidcSignatureWithRefresh(token, algorithm) { forceRefresh ->
+            resolveOidcVerificationKey(oidcConfig.idpJwksUrl, kid, forceRefresh)
+        }
+        val payload = Json.parseToJsonElement(verifiedPayload.decodeToString()).jsonObject
 
-        // 2. Validate Common Claims
         if (payload["iss"]?.jsonPrimitive?.content != oidcConfig.idpIss) {
             throw IllegalArgumentException("Invalid issuer ('iss') in token.")
         }
-        if (payload["aud"]?.jsonPrimitive?.content != clientId) {
-            throw IllegalArgumentException("Invalid audience ('aud') in token.")
-        }
+        validateAudience(payload, clientId)
 
         val exp = payload["exp"]?.jsonPrimitive?.long ?: 0
         if (Instant.fromEpochSeconds(exp) < Clock.System.now()) {
@@ -486,14 +511,85 @@ object OIDC : AuthenticationMethod("oidc") {
         return payload
     }
 
+    internal fun validateAudience(payload: JsonObject, clientId: String) {
+        val audiences = when (val audience = payload["aud"]) {
+            is JsonPrimitive -> listOf(audience.content)
+            is JsonArray -> audience.map { it.jsonPrimitive.content }
+            else -> emptyList()
+        }
+        require(clientId in audiences) { "Invalid audience ('aud') in token." }
+        val authorizedParty = payload["azp"]?.jsonPrimitive?.contentOrNull
+        if (authorizedParty != null) {
+            require(authorizedParty == clientId) {
+                "Invalid authorized party ('azp') in token."
+            }
+        }
+        if (audiences.size > 1) {
+            require(authorizedParty != null) {
+                "Invalid or missing authorized party ('azp') in multi-audience token."
+            }
+        }
+    }
+
+    private fun validatedClientId(payload: JsonObject): String? {
+        val audiences = when (val audience = payload["aud"]) {
+            is JsonPrimitive -> listOf(audience.content)
+            is JsonArray -> audience.map { it.jsonPrimitive.content }
+            else -> emptyList()
+        }
+        return when (audiences.size) {
+            0 -> null
+            1 -> audiences.single()
+            else -> payload["azp"]?.jsonPrimitive?.contentOrNull
+        }
+    }
+
+    internal suspend fun verifyOidcSignatureWithRefresh(
+        token: String,
+        algorithm: JwsAlgorithm,
+        resolveKey: suspend (forceRefresh: Boolean) -> Crypto2Key,
+    ): ByteArray {
+        return try {
+            CompactJws.verify(token, resolveKey(false), setOf(algorithm)).payload
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: IllegalArgumentException) {
+            CompactJws.verify(token, resolveKey(true), setOf(algorithm)).payload
+        }
+    }
+
+    private suspend fun resolveOidcVerificationKey(
+        jwksUrl: String,
+        kid: String,
+        forceRefresh: Boolean = false,
+    ): Crypto2Key {
+        var keys = jwksCache[jwksUrl]
+        if (forceRefresh || keys == null || keys.none { it["kid"]?.jsonPrimitive?.contentOrNull == kid }) {
+            val jwks = http.get(jwksUrl).body<JsonObject>()
+            keys = jwks["keys"]?.jsonArray?.map { it.jsonObject }
+                ?: throw IllegalArgumentException("OIDC JWKS response is missing keys")
+            jwksCache[jwksUrl] = keys
+        }
+        val matches = keys.filter { it["kid"]?.jsonPrimitive?.contentOrNull == kid }
+        require(matches.size == 1) { "OIDC JWKS must contain exactly one key for kid: $kid" }
+        val jwk = matches.single()
+        require(!Jwk.containsPrivateMaterial(jwk)) { "OIDC JWKS verification key must be public" }
+        val encoded = EncodedKey.Jwk(
+            data = BinaryData(Json.encodeToString(jwk).encodeToByteArray()),
+            privateMaterial = false,
+        )
+        val stored = encoded.toStoredSoftwareKey(KeyId(kid), setOf(KeyUsage.VERIFY))
+        return crypto2Runtime.restore(stored)
+    }
+
     private suspend fun validateIdToken(
-        oidcConfig: OpenIdConfiguration,
+        oidcConfig: OidcTokenValidationPolicyData,
         token: String,
         clientId: String,
         expectedNonce: String
     ): JsonObject {
         // Perform common signature and claim validation
-        val payload = validateOidcJws(TokenValidationData(oidcConfig), token, clientId)
+        val payload = validateOidcJws(oidcConfig, token, clientId)
 
         // Perform ID Token-specific claim validation
         if (payload["nonce"]?.jsonPrimitive?.content != expectedNonce) {
@@ -509,9 +605,13 @@ object OIDC : AuthenticationMethod("oidc") {
         return payload
     }
 
-    private suspend fun validateLogoutToken(oidcConfig: OidcSessionAuthenticatedData, token: String, clientId: String): JsonObject {
+    private suspend fun validateLogoutToken(
+        oidcConfig: OidcTokenValidationPolicyData,
+        token: String,
+        clientId: String,
+    ): JsonObject {
         // Perform common signature and claim validation
-        val payload = validateOidcJws(oidcConfig.tokenValidationData, token, clientId)
+        val payload = validateOidcJws(oidcConfig, token, clientId)
 
         // Perform Logout Token-specific claim validation
         if (payload.containsKey("nonce")) {
@@ -526,6 +626,15 @@ object OIDC : AuthenticationMethod("oidc") {
 
         return payload
     }
+
+    private suspend fun AuthSession.setOidcTokenValidationPolicy(policy: OidcTokenValidationPolicyData) {
+        if (sessionData == null) sessionData = HashMap()
+        sessionData!![OIDC_TOKEN_VALIDATION_NAMESPACE] = policy
+        SessionManager.updateSession(this)
+    }
+
+    private fun AuthSession.getOidcTokenValidationPolicy(): OidcTokenValidationPolicyData? =
+        sessionData?.get(OIDC_TOKEN_VALIDATION_NAMESPACE) as? OidcTokenValidationPolicyData
 
     private val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 

@@ -6,32 +6,15 @@ import com.github.ajalt.mordant.rendering.TextColors
 import com.github.ajalt.mordant.rendering.Whitespace
 import com.github.ajalt.mordant.widgets.Panel
 import com.github.ajalt.mordant.widgets.Text
+import io.github.oshai.kotlinlogging.KotlinLoggingConfiguration
 
 fun t(args: Array<String>) {
     println("T() Function: $args.toString()")
 }
 
 fun main(args: Array<String>) {
-    val cmd = WaltIdCmd()
-    if (args.isEmpty() || args.joinToString(" ").trim() == "") {
-        cmd.echoFormattedHelp(null)
-        return
-    }
-    try {
-        cmd.parse(args)
-    } catch (e: PrintHelpMessage) {
-        handlePrintHelpMessage(cmd, e)
-    } catch (e: InvalidFileFormat) {
-        handleInvalidFileFormat(cmd, e)
-    } catch (e: MultiUsageError) {
-        handleMultiUsageError(cmd, e)
-    } catch (e: NoSuchOption) {
-        handleNoSuchOption(cmd, e)
-    } catch (e: CliktError) {
-        handleCliktError(cmd, e)
-    } catch (e: Exception) {
-        handleGenericException(cmd, e)
-    }
+    KotlinLoggingConfiguration.logStartupMessage = false
+    WaltIdCmd().main(args)
 }
 
 fun handleGenericException(cmd: WaltIdCmd, e: Exception) {

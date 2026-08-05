@@ -10,7 +10,10 @@ package id.walt.policies2.vc.policies
  */
 enum class PolicyServiceKey {
     /** Key for a [TrustRegistryServiceResolver] used by [ETSITrustListPolicy]. */
-    TRUST_REGISTRY_RESOLVER
+    TRUST_REGISTRY_RESOLVER,
+
+    /** Key for a status-list signer authorizer used by [StatusPolicy] and [RevocationPolicy]. */
+    STATUS_LIST_SIGNER_AUTHORIZER,
 }
 
 /**

@@ -1,9 +1,13 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.wallet2.mobile
 
 import android.content.Context
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.persistence.encryption.AndroidDatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.AndroidPlatformKeyProvider
 import id.walt.wallet2.persistence.stores.DriverFactory
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Android [MobileWallet] factory backed by Android KeyStore and an app-private SQLDelight database.
@@ -17,10 +21,22 @@ public actual class MobileWalletFactory(private val context: Context) {
      * The database is named from [MobileWalletConfig.walletId], and signing keys are created or loaded
      * through the Android platform key provider.
      */
-    public actual suspend fun create(config: MobileWalletConfig): MobileWallet {
+    public actual suspend fun create(config: MobileWalletConfig): MobileWallet =
+        create(config, ClientIdTrustConfiguration())
+
+    public actual suspend fun create(
+        config: MobileWalletConfig,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+    ): MobileWallet = createWallet(config, clientIdTrustConfiguration)
+
+    private suspend fun createWallet(
+        config: MobileWalletConfig,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+    ): MobileWallet {
         val driverFactory = DriverFactory(context)
         return createEncryptedSqlDelightMobileWallet(
             config = config,
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
             managedDatabaseKeyProvider = AndroidDatabaseEncryptionKeyProvider(context),
             platformKeyProvider = AndroidPlatformKeyProvider(),
             openEncryptedDriver = driverFactory::createEncryptedDriver,

@@ -14,11 +14,24 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import org.bouncycastle.asn1.ASN1BitString
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
+import org.bouncycastle.crypto.params.ECPrivateKeyParameters
+import org.bouncycastle.crypto.params.ECPublicKeyParameters
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
+import org.bouncycastle.crypto.params.RSAKeyParameters
+import org.bouncycastle.crypto.params.RSAPrivateCrtKeyParameters
+import org.bouncycastle.crypto.util.PrivateKeyFactory
+import org.bouncycastle.crypto.util.SubjectPublicKeyInfoFactory
+import org.bouncycastle.openssl.PEMParser
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
+import org.bouncycastle.openssl.jcajce.JcaPEMWriter
 import org.bouncycastle.asn1.ASN1Integer
 import org.bouncycastle.asn1.ASN1Sequence
 import org.bouncycastle.jce.ECNamedCurveTable
 import org.bouncycastle.math.ec.ECCurve
 import org.bouncycastle.math.ec.ECPoint
+import java.io.StringReader
+import java.io.StringWriter
 import java.security.KeyFactory
 import java.security.interfaces.RSAPublicKey
 import java.security.spec.RSAPublicKeySpec
@@ -84,8 +97,47 @@ object JvmJWKKeyCreator : JWKKeyCreator() {
     override suspend fun importJWK(jwk: String): Result<JWKKey> =
         runCatching { JWKKey(nimbusJwkParsing(jwk)) }
 
+    /**
+     * Imports a PEM key.
+     *
+     * Nimbus can only build a JWK from PEM objects it is given, so for an EC or Edwards key it needs the
+     * public point and fails a private-key-only PEM with "Missing PEM-encoded public key to construct
+     * JWK". That is the normal output of `openssl pkcs8 -topk8` and of most key tooling, so the public
+     * half is derived from the private key and appended before retrying.
+     */
     override suspend fun importPEM(pem: String): Result<JWKKey> =
         runCatching { JWKKey(JWK.parseFromPEMEncodedObjects(pem)) }
+            .recoverCatching { cause ->
+                val completed = pem.withDerivedPublicKeyPem() ?: throw cause
+                JWKKey(JWK.parseFromPEMEncodedObjects(completed))
+            }
+
+    /**
+     * Returns [this] PEM with an appended SPKI PUBLIC KEY block derived from its private key, or null
+     * when there is no private key to derive one from (so the original failure is the useful one).
+     */
+    private fun String.withDerivedPublicKeyPem(): String? {
+        if (!contains("PRIVATE KEY") || contains("PUBLIC KEY")) return null
+        val privateKey = PEMParser(StringReader(this)).use { parser ->
+            generateSequence(parser::readObject).firstNotNullOfOrNull { it as? PrivateKeyInfo }
+        } ?: return null
+        val converter = JcaPEMKeyConverter().setProvider(BouncyCastleProviderSingleton.getInstance())
+        val publicKey = when (val parameters = PrivateKeyFactory.createKey(privateKey)) {
+            is ECPrivateKeyParameters -> ECPublicKeyParameters(
+                parameters.parameters.g.multiply(parameters.d).normalize(),
+                parameters.parameters,
+            )
+
+            is Ed25519PrivateKeyParameters -> parameters.generatePublicKey()
+            is RSAPrivateCrtKeyParameters -> RSAKeyParameters(false, parameters.modulus, parameters.publicExponent)
+            else -> return null
+        }
+        val spki = SubjectPublicKeyInfoFactory.createSubjectPublicKeyInfo(publicKey)
+        val publicPem = StringWriter().also { writer ->
+            JcaPEMWriter(writer).use { it.writeObject(converter.getPublicKey(spki)) }
+        }.toString()
+        return "$this\n$publicPem"
+    }
 
     private fun ecRawToJwk(rawPublicKey: ByteArray, curve: Curve): JWK {
         val bcEC = ECNamedCurveTable.getParameterSpec(curve.name).curve
@@ -103,7 +155,10 @@ object JvmJWKKeyCreator : JWKKeyCreator() {
             val subjectPublicKeyObject = asn1PubKeySequence.getObjectAt(1)
             val subjectPublicKeyBitStr = ASN1BitString.getInstance(subjectPublicKeyObject)
             bcEC.decodePoint(subjectPublicKeyBitStr.bytes)
-        } catch (e: IllegalArgumentException) {
+        } catch (e: RuntimeException) {
+            // Not SPKI: a raw (compressed) point can still start with a byte sequence that BouncyCastle
+            // decodes as some other ASN.1 object, which surfaces as IllegalStateException instead of
+            // IllegalArgumentException. Any ASN.1 failure means the input is a plain curve point.
             //and this here is so that uniresolver tests in the did library don't break :)
             bcEC.decodePoint(rawEncodedPoint)
         }

@@ -10,7 +10,7 @@ plugins {
 group = "id.walt.credentials"
 
 kotlin {
-    js(IR) {
+    js {
         outputModuleName = "vical"
     }
 
@@ -25,6 +25,9 @@ kotlin {
             // walt.id
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(project(":waltid-libraries:crypto:waltid-cose"))
+            implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
+            implementation(project(":waltid-libraries:crypto:waltid-jose"))
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
         }
         commonTest.dependencies {
             implementation(kotlin("test-common"))

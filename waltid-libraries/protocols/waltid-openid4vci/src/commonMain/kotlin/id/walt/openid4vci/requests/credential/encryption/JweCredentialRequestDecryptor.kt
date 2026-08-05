@@ -4,6 +4,10 @@ import id.walt.crypto.utils.JweUtils
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile.requireSupportedHeader
 import kotlinx.serialization.json.JsonObject
 
+@Deprecated(
+    "Use Crypto2JweCredentialRequestDecryptor",
+    ReplaceWith("Crypto2JweCredentialRequestDecryptor"),
+)
 class JweCredentialRequestDecryptor(
     private val privateJwk: String,
 ) : CredentialRequestDecryptor {

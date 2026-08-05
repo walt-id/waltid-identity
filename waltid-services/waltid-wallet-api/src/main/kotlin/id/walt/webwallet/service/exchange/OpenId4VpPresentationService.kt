@@ -12,6 +12,7 @@ import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
 import id.walt.commons.config.ConfigManager
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.webwallet.db.models.WalletCredential
@@ -38,6 +39,7 @@ class OpenId4VpPresentationService(
     private val credentialService: CredentialsService,
     private val unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
         AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+    private val clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
 ) {
     private val logger = KotlinLogging.logger { }
     private val json = Json {
@@ -56,14 +58,16 @@ class OpenId4VpPresentationService(
             requestUrl = Url(request),
             unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
             enforceFinalRequestObject = false,
-        ) { requestUri, requestUriMethod ->
-            AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
-                webResolveAuthReq = webResolveAuthReq,
-                requestUri = requestUri,
-                requestUriMethod = requestUriMethod,
-                requestUriPostWalletMetadata = runtimeRequestUriPostWalletMetadata,
-            )
-        }.also { resolvedRequest ->
+            fetchRequestUri = { requestUri, requestUriMethod ->
+                AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                    webResolveAuthReq = webResolveAuthReq,
+                    requestUri = requestUri,
+                    requestUriMethod = requestUriMethod,
+                    requestUriPostWalletMetadata = runtimeRequestUriPostWalletMetadata,
+                )
+            },
+            trustConfiguration = clientIdTrustConfiguration,
+        ).also { resolvedRequest ->
             val authorizationRequest = resolvedRequest.authorizationRequest
             require(authorizationRequest.transactionData.isNullOrEmpty() || authorizationRequest.dcqlQuery != null) {
                 "invalid_request: transaction_data requires dcql_query"

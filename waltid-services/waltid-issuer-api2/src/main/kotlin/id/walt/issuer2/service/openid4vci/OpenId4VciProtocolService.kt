@@ -3,6 +3,10 @@ package id.walt.issuer2.service.openid4vci
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.keys.toPublicJwk
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionStatus
@@ -17,6 +21,7 @@ import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
+import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
@@ -46,6 +51,7 @@ import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.tokens.access.parseAccessTokenAuthorization
 import id.walt.x509.CertificateDer
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.mdoc.objects.mso.Status as MdocStatus
 import id.walt.mdoc.objects.mso.Status.StatusListInfo as MdocStatusListInfo
 import io.ktor.http.parseQueryString
@@ -71,6 +77,20 @@ private const val TOKEN_ENDPOINT_PATH = "token"
 private const val CREDENTIAL_ENDPOINT_PATH = "credential"
 private val AUTHORIZATION_CODE_SESSION_LIFETIME = 5.minutes
 
+internal suspend fun restoreSessionIssuerCrypto2Key(
+    session: IssuanceSession,
+    runtime: CryptoRuntime,
+): Crypto2Key? {
+    val encoded = session.crypto2IssuerStoredKey
+    if (encoded == null) {
+        require(session.issuerKey["type"]?.jsonPrimitive?.content != "jwk") {
+            "JWK issuer session is missing its validated crypto2 key"
+        }
+        return null
+    }
+    return runtime.restore(StoredKeyCodec.decodeFromString(encoded))
+}
+
 class OpenId4VciProtocolService @JvmOverloads constructor(
     private val oauth2Provider: OAuth2Provider,
     private val sessionService: IssuanceSessionService,
@@ -88,6 +108,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         ignoreUnknownKeys = true
         explicitNulls = false
     }
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     suspend fun processPushedAuthorizationRequest(
         parameters: Map<String, List<String>>,
@@ -459,6 +480,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         var committedProofKeyJwk: JsonObject? = null
         try {
             val issuerKey = KeyManager.resolveSerializedKey(session.issuerKey)
+            val crypto2IssuerKey = restoreSessionIssuerCrypto2Key(session, crypto2Runtime)
             val x5Chain = session.x5Chain?.map { CertificateDer.fromPEMEncodedString(it) }
 
             credentialProofKeyAcceptance?.let { acceptance ->
@@ -526,27 +548,45 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 }
             }
 
-            val credentialResponse = when (val result = oauth2Provider.createCredentialResponse(
-                request = requestWithSession,
-                configuration = configuration,
-                issuerKey = issuerKey,
-                issuerId = issuerId,
-                credentialData = credentialDataWithStatus,
-                dataMapping = session.mapping,
-                selectiveDisclosure = session.selectiveDisclosure,
-                x5Chain = x5Chain,
-                mDocNameSpacesDataMappingConfig = session.mDocNameSpacesDataMappingConfig,
-                credentialStatus = mDocStatus,
-                proofValidationContext = CredentialProofValidationContext(
-                    credentialIssuer = nonceBinding.credentialIssuer,
-                    clientId = requestWithSession.accessTokenClientId,
-                    anonymousPreAuthorizedAccess = requestWithSession.anonymousPreAuthorizedAccess,
-                    nonceValidation = CredentialNonceValidationContext(
-                        service = credentialNonceService,
-                        binding = nonceBinding,
-                    ),
+            val proofValidationContext = CredentialProofValidationContext(
+                credentialIssuer = nonceBinding.credentialIssuer,
+                clientId = requestWithSession.accessTokenClientId,
+                anonymousPreAuthorizedAccess = requestWithSession.anonymousPreAuthorizedAccess,
+                nonceValidation = CredentialNonceValidationContext(
+                    service = credentialNonceService,
+                    binding = nonceBinding,
                 ),
-            )) {
+            )
+            val credentialResponseResult = if (crypto2IssuerKey != null) {
+                oauth2Provider.createCredentialResponse(
+                    request = requestWithSession,
+                    configuration = configuration,
+                    issuerKey = Crypto2CredentialSigningKey.select(crypto2IssuerKey, configuration),
+                    issuerId = issuerId,
+                    credentialData = credentialDataWithStatus,
+                    dataMapping = session.mapping,
+                    selectiveDisclosure = session.selectiveDisclosure,
+                    x5Chain = x5Chain,
+                    mDocNameSpacesDataMappingConfig = session.mDocNameSpacesDataMappingConfig,
+                    credentialStatus = mDocStatus,
+                    proofValidationContext = proofValidationContext,
+                )
+            } else {
+                oauth2Provider.createCredentialResponse(
+                    request = requestWithSession,
+                    configuration = configuration,
+                    issuerKey = issuerKey,
+                    issuerId = issuerId,
+                    credentialData = credentialDataWithStatus,
+                    dataMapping = session.mapping,
+                    selectiveDisclosure = session.selectiveDisclosure,
+                    x5Chain = x5Chain,
+                    mDocNameSpacesDataMappingConfig = session.mDocNameSpacesDataMappingConfig,
+                    credentialStatus = mDocStatus,
+                    proofValidationContext = proofValidationContext,
+                )
+            }
+            val credentialResponse = when (val result = credentialResponseResult) {
                 is CredentialResponseResult.Success -> result.response
                 is CredentialResponseResult.Failure -> {
                     val response = if (result.error.isRetryableProofFailure()) {
@@ -833,7 +873,13 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 ),
             ),
         ).firstOrNull() ?: throw IllegalArgumentException("Credential request has no credential proof")
-        return verifiedProof.holderKey.getPublicKey().exportJWKObject()
+        // The verified holder key is a crypto2 key since the crypto updates, so the public JWK comes
+        // from its public key exporter rather than the legacy getPublicKey().exportJWKObject().
+        val holderKey = verifiedProof.holderKey
+        val holderPublicJwk = requireNotNull(holderKey.capabilities.publicKeyExporter) {
+            "Credential proof holder key does not export public material"
+        }.exportPublicKey().toPublicJwk(holderKey.spec)
+        return Json.parseToJsonElement(holderPublicJwk.data.toByteArray().decodeToString()).jsonObject
     }
 
     private suspend fun validateExpectedCredentialProofKey(

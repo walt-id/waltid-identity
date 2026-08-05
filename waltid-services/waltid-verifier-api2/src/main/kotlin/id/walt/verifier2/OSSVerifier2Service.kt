@@ -59,12 +59,16 @@ object Verifier2Service {
         block: Verification2Session.() -> Unit
     ) -> Unit = { session, event, block ->
         log.trace { "Updating session due to '$event': ${session.id}" }
+        val notificationConfig = session.notifications
         val updated = repository.update(session.id, block).session
 
         try {
-            Verifier2SessionUpdate(updated.id, event, updated)
+            // publicView() keeps the ephemeral decryption keys and internal policy detail out of
+            // the notification payload.
+            val publicSession = updated.publicView()
+            Verifier2SessionUpdate(publicSession.id, event, publicSession)
                 .toKtorSessionUpdate()
-                .notifySessionUpdate(updated.id, updated.notifications)
+                .notifySessionUpdate(publicSession.id, notificationConfig)
         } catch (exception: Exception) {
             log.warn(exception) { "Could not deliver verification session notification for ${updated.id}" }
         }
@@ -106,7 +110,7 @@ object Verifier2Service {
                         val verifierSession =
                             repository.get(call.parameters.getOrFail(VERIFICATION_SESSION))?.session
                                 ?: throw VerificationSessionNotFoundException(call.parameters.getOrFail(VERIFICATION_SESSION))
-                        call.respond(verifierSession)
+                        call.respond(verifierSession.publicView())
                     }
 
                     route({
@@ -164,7 +168,9 @@ object Verifier2Service {
 
                     call.respondRequestUriPost(
                         verificationSession = verificationSession,
-                        updateSessionCallback = updateSessionCallback
+                        updateSessionCallback = updateSessionCallback,
+                        resolveSigningKey = OSSVerifier2Manager::resolveRequestSigningKey,
+                        resolveCrypto2SigningKey = OSSVerifier2Manager::resolveCrypto2RequestSigningKey,
                     )
                 }
 

@@ -14,6 +14,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Duration
 import kotlin.time.measureTimedValue
+import kotlinx.coroutines.CancellationException
 
 @OptIn(ExperimentalSerializationApi::class)
 @JsonClassDiscriminator("policy")
@@ -60,8 +61,12 @@ sealed class VPPolicy2() {
         val policyContext = VPPolicyRunContext()
 
         val timedRunResult = measureTimedValue {
-            runCatching {
+            try {
                 block.invoke(policyContext)
+            } catch (cause: CancellationException) {
+                throw cause
+            } catch (cause: Throwable) {
+                Result.failure(cause)
             }
         }
         val runResult = timedRunResult.value
