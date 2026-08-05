@@ -87,6 +87,16 @@ enum class WalletIssuanceGrant {
     AUTHORIZATION_CODE,
 }
 
+/** Client-selected policy for using DPoP during an issuance session. */
+@Serializable
+enum class WalletIssuanceDpopMode {
+    /** Do not include DPoP authorization bindings or proofs. */
+    DISABLED,
+
+    /** Use DPoP when the authorization server advertises supported algorithms. */
+    IF_SUPPORTED,
+}
+
 /** Typed transaction-code requirement from a pre-authorized offer. */
 @Serializable
 data class WalletIssuanceTransactionCode(
@@ -160,6 +170,7 @@ data class WalletIssuanceSessionRequest(
     val clientId: String = "eudiw-abca",
     val redirectUri: Url = Url("openid://"),
     val tokenRequestHeaders: Map<String, String> = emptyMap(),
+    val dpopMode: WalletIssuanceDpopMode = WalletIssuanceDpopMode.IF_SUPPORTED,
 ) : CredentialOfferSource {
     init {
         checkOfferSource()
@@ -768,12 +779,12 @@ class WalletIssuanceSessionService(
     }
 
     private fun ActiveSession.dpopAlgorithms(): Set<String>? {
-        val metadata = resolved.authorizationServerMetadata
-        val grant = resolved.offer.getGrantType() ?: return null
-        val grantIsAdvertised = metadata.grantTypesSupported?.contains(grant.value)
-            ?: (grant is GrantType.AuthorizationCode)
-        return metadata.dpopSigningAlgValuesSupported
-            ?.takeIf { grantIsAdvertised && it.isNotEmpty() }
+        return when (request.dpopMode) {
+            WalletIssuanceDpopMode.DISABLED -> null
+            WalletIssuanceDpopMode.IF_SUPPORTED ->
+                resolved.authorizationServerMetadata.dpopSigningAlgValuesSupported
+                    ?.takeIf { it.isNotEmpty() }
+        }
     }
 
     private fun ActiveSession.dpopFactory(): DPoPProofFactory? =
@@ -807,7 +818,7 @@ class WalletIssuanceSessionService(
         require(metadata.requirePushedAuthorizationRequests != true || parEndpoint != null) {
             "Authorization server requires PAR but does not advertise an endpoint"
         }
-        val dpopJkt = dpopAlgorithmsForAuthorization(metadata, key)?.let {
+        val dpopJkt = dpopAlgorithmsForAuthorization(metadata, key, request.dpopMode)?.let {
             key.getPublicKey().getThumbprint()
         }
 
@@ -886,13 +897,18 @@ class WalletIssuanceSessionService(
     private fun dpopAlgorithmsForAuthorization(
         metadata: AuthorizationServerMetadata,
         key: Key,
-    ): Set<String>? = metadata.dpopSigningAlgValuesSupported
-        ?.takeIf { it.isNotEmpty() }
-        ?.also { algorithms ->
-            require(key.keyType.jwsAlg in algorithms) {
-                "Selected key algorithm is not supported for DPoP"
-            }
+        mode: WalletIssuanceDpopMode,
+    ): Set<String>? {
+        if (mode == WalletIssuanceDpopMode.DISABLED) return null
+
+        val algorithms = metadata.dpopSigningAlgValuesSupported
+            ?.takeIf { it.isNotEmpty() }
+            ?: return null
+        require(key.keyType.jwsAlg in algorithms) {
+            "Selected key algorithm is not supported for DPoP"
         }
+        return algorithms
+    }
 
     private suspend fun resolve(request: WalletIssuanceSessionRequest): ResolvedOffer {
         val offer = if (request.offerJson != null) {
@@ -1245,6 +1261,7 @@ class WalletIssuanceSessionService(
             clientId = persisted.request.clientId,
             redirectUri = Url(persisted.request.redirectUri),
             tokenRequestHeaders = persisted.request.tokenRequestHeaders,
+            dpopMode = persisted.request.dpopMode,
         )
         val key = resolvePersistedKey(persisted.request.keyId, persisted.selectedPublicJwk)
         require((persisted.authorization != null) == (persisted.codeVerifier != null)) {
@@ -1338,6 +1355,7 @@ class WalletIssuanceSessionService(
                 clientId = active.request.clientId,
                 redirectUri = active.request.redirectUri.toString(),
                 tokenRequestHeaders = active.request.tokenRequestHeaders,
+                dpopMode = active.request.dpopMode,
             ),
             offer = json.encodeToString(active.resolved.offer),
             issuerMetadata = json.encodeToString(active.resolved.issuerMetadata),
@@ -1640,6 +1658,7 @@ class WalletIssuanceSessionService(
         val clientId: String,
         val redirectUri: String,
         val tokenRequestHeaders: Map<String, String>,
+        val dpopMode: WalletIssuanceDpopMode = WalletIssuanceDpopMode.IF_SUPPORTED,
     )
 
     @Serializable

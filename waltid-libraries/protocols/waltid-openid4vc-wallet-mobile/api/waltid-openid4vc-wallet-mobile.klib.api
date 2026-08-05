@@ -92,6 +92,17 @@ final enum class id.walt.wallet2.mobile/MobileWalletEventStatus : kotlin/Enum<id
     final fun values(): kotlin/Array<id.walt.wallet2.mobile/MobileWalletEventStatus> // id.walt.wallet2.mobile/MobileWalletEventStatus.values|values#static(){}[0]
 }
 
+final enum class id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode : kotlin/Enum<id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode> { // id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode|null[0]
+    enum entry DISABLED // id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode.DISABLED|null[0]
+    enum entry IF_SUPPORTED // id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode.IF_SUPPORTED|null[0]
+
+    final val entries // id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode> // id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode // id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode> // id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode.values|values#static(){}[0]
+}
+
 final enum class id.walt.wallet2.mobile/MobileWalletKeyType : kotlin/Enum<id.walt.wallet2.mobile/MobileWalletKeyType> { // id.walt.wallet2.mobile/MobileWalletKeyType|null[0]
     enum entry Ed25519 // id.walt.wallet2.mobile/MobileWalletKeyType.Ed25519|null[0]
     enum entry RSA // id.walt.wallet2.mobile/MobileWalletKeyType.RSA|null[0]
@@ -713,12 +724,14 @@ final class id.walt.wallet2.mobile/MobileWalletFactory { // id.walt.wallet2.mobi
 }
 
 final class id.walt.wallet2.mobile/MobileWalletIssuanceRequest { // id.walt.wallet2.mobile/MobileWalletIssuanceRequest|null[0]
-    constructor <init>(kotlin/String, kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ...) // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?){}[0]
+    constructor <init>(kotlin/String, kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode = ...) // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;id.walt.wallet2.mobile.MobileWalletIssuanceDpopMode){}[0]
 
     final val clientId // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.clientId|{}clientId[0]
         final fun <get-clientId>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.clientId.<get-clientId>|<get-clientId>(){}[0]
     final val did // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.did|{}did[0]
         final fun <get-did>(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.did.<get-did>|<get-did>(){}[0]
+    final val dpopMode // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.dpopMode|{}dpopMode[0]
+        final fun <get-dpopMode>(): id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.dpopMode.<get-dpopMode>|<get-dpopMode>(){}[0]
     final val keyId // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.keyId|{}keyId[0]
         final fun <get-keyId>(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.keyId.<get-keyId>|<get-keyId>(){}[0]
     final val offerUrl // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.offerUrl|{}offerUrl[0]
@@ -731,7 +744,8 @@ final class id.walt.wallet2.mobile/MobileWalletIssuanceRequest { // id.walt.wall
     final fun component3(): kotlin/String // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.component3|component3(){}[0]
     final fun component4(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.component4|component4(){}[0]
     final fun component5(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.component5|component5(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ...): id.walt.wallet2.mobile/MobileWalletIssuanceRequest // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?){}[0]
+    final fun component6(): id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.component6|component6(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ..., id.walt.wallet2.mobile/MobileWalletIssuanceDpopMode = ...): id.walt.wallet2.mobile/MobileWalletIssuanceRequest // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?;id.walt.wallet2.mobile.MobileWalletIssuanceDpopMode){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.toString|toString(){}[0]

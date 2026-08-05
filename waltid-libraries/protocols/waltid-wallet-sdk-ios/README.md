@@ -101,6 +101,11 @@ let presentation = try await wallet.present(
 for the app's review UI. `WalletConfiguration` uses
 `Locale.preferredLanguages` by default and also accepts an explicit locale order.
 
+Issuance uses DPoP when the authorization server advertises supported algorithms
+by default. For an issuer that does not support DPoP, pass
+`dpopMode: .disabled` in `IssuanceRequest`; this omits both the authorization
+request binding and issuance request proofs.
+
 ## Local persistence
 
 `WalletConfiguration()` uses managed persistence by default. The SDK opens an encrypted SQLDelight database through SQLCipher and manages the per-wallet database key internally in iOS Keychain. Apps using the normal Swift facade do not pass database key material.

@@ -89,18 +89,27 @@ final class MobileWalletIntegrationTests: XCTestCase {
         )
     }
 
-    private func startIssuance(wallet: Wallet, offerURL: URL) async throws -> IssuanceSession {
+    private func startIssuance(
+        wallet: Wallet,
+        offerURL: URL,
+        dpopMode: IssuanceDpopMode = .ifSupported
+    ) async throws -> IssuanceSession {
         try await wallet.startIssuance(
-            IssuanceRequest(offer: offerURL, redirectURI: URL(string: "openid://")!)
+            IssuanceRequest(
+                offer: offerURL,
+                redirectURI: URL(string: "openid://")!,
+                dpopMode: dpopMode
+            )
         )
     }
 
     private func receiveIssuedCredentials(
         wallet: Wallet,
         offerURL: URL,
-        transactionCode: String? = nil
+        transactionCode: String? = nil,
+        dpopMode: IssuanceDpopMode = .ifSupported
     ) async throws -> [String] {
-        let session = try await startIssuance(wallet: wallet, offerURL: offerURL)
+        let session = try await startIssuance(wallet: wallet, offerURL: offerURL, dpopMode: dpopMode)
         let outcome = try await wallet.continuePreAuthorizedIssuance(
             sessionID: session.id,
             transactionCode: transactionCode
@@ -204,7 +213,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: Self.eudiPidSdJwtCredentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let session = try await startIssuance(wallet: wallet, offerURL: offerURL)
+        let session = try await startIssuance(wallet: wallet, offerURL: offerURL, dpopMode: .disabled)
         XCTAssertFalse(session.offer.issuer.identifier.isEmpty)
         XCTAssertFalse(session.offer.credentials.isEmpty)
         XCTAssertTrue(session.offer.credentials.allSatisfy {
@@ -334,7 +343,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: Self.eudiPidSdJwtCredentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await receiveIssuedCredentials(wallet: wallet1, offerURL: offerURL, transactionCode: offer.txCode)
+        let credentialIDs = try await receiveIssuedCredentials(
+            wallet: wallet1,
+            offerURL: offerURL,
+            transactionCode: offer.txCode,
+            dpopMode: .disabled
+        )
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
 
         // Recreate wallet facade (simulates app restart)
@@ -394,7 +408,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: credentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await receiveIssuedCredentials(wallet: wallet, offerURL: offerURL, transactionCode: offer.txCode)
+        let credentialIDs = try await receiveIssuedCredentials(
+            wallet: wallet,
+            offerURL: offerURL,
+            transactionCode: offer.txCode,
+            dpopMode: .disabled
+        )
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive EUDI credential \(credentialID)")
 
         let credentials = try await wallet.credentials()
@@ -423,7 +442,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: credentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await receiveIssuedCredentials(wallet: wallet, offerURL: offerURL, transactionCode: offer.txCode)
+        let credentialIDs = try await receiveIssuedCredentials(
+            wallet: wallet,
+            offerURL: offerURL,
+            transactionCode: offer.txCode,
+            dpopMode: .disabled
+        )
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive EUDI credential \(credentialID)")
 
         let offeredCredentialID = await EudiTestBackend.shared.extractCredentialIdFromOfferUrl(offerUrl: offer.offerUrl)

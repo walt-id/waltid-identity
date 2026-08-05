@@ -64,7 +64,8 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
                 clientId: request.clientID,
                 redirectUri: request.redirectURI.absoluteString,
                 keyId: request.keyID,
-                did: request.did
+                did: request.did,
+                dpopMode: request.dpopMode.toKMPDpopMode()
             )
         )
         let value = try Self.successValue(
@@ -263,6 +264,17 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         }
 
         return value
+    }
+}
+
+private extension IssuanceDpopMode {
+    func toKMPDpopMode() -> MobileWalletIssuanceDpopMode {
+        switch self {
+        case .disabled:
+            return .disabled
+        case .ifSupported:
+            return .ifSupported
+        }
     }
 }
 
