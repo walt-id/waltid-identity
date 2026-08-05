@@ -63,6 +63,9 @@ kotlin {
             androidMain.dependencies {
                 implementation(identityLibs.sqldelight.android.driver)
                 implementation(identityLibs.sqlcipher.android)
+                implementation(identityLibs.androidx.fragment)
+                implementation(identityLibs.androidx.biometric)
+                implementation(identityLibs.androidx.lifecycle.runtime.ktx)
             }
             named("androidHostTest") {
                 dependencies {

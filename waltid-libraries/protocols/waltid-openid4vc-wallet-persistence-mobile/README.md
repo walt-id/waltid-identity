@@ -71,13 +71,21 @@ val driver = DriverFactory(context).createEncryptedDriver(
 )
 val queries = WalletPersistenceDatabase(driver).walletPersistenceQueries
 
-val keyProvider = AndroidPlatformKeyProvider()
+val keyProvider = AndroidPlatformKeyProvider(context, interactionContextProvider = { currentActivity })
 val keyStore = SqlDelightKeyStore(keyProvider, queries)
 val credentialStore = SqlDelightCredentialStore(queries)
 val didStore = SqlDelightDidStore(queries)
 ```
 
 The higher-level `waltid-openid4vc-wallet-mobile` facade performs this wiring automatically. Use this module directly only when assembling custom platform persistence.
+
+`SqlDelightKeyStore` persists one versioned Crypto2 `StoredKey` descriptor per
+key. The SQL schema remains `key_id`, `created_at`, and `stored_key`; key type,
+backing, authorization policy, and native alias metadata are authoritative in
+the descriptor rather than duplicated SQL columns. Protected requests are
+preflighted and never downgraded to a software key. Missing ordinary platform
+keys return `null`; missing protected keys surface
+`KeyUseAuthorizationFailure.ProtectedKeyUnavailable`.
 
 ## Encryption and cleanup
 
