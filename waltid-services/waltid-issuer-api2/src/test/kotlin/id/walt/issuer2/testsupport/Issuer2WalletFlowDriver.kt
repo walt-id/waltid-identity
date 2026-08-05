@@ -3,6 +3,7 @@ package id.walt.issuer2.testsupport
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.issuer2.models.CredentialOfferCreateResponse
@@ -23,6 +24,7 @@ import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
+import id.waltid.openid4vci.wallet.proof.ProofKeyBinding
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -51,7 +53,7 @@ class Issuer2WalletFlowDriver(
     ),
     private val attestationAssembler: ClientAttestationAssembler? = null,
 ) {
-    private var walletInstanceKey: Key? = null
+    private var walletInstanceKey: Crypto2Key? = null
 
     suspend fun resolve(createdOffer: CredentialOfferCreateResponse): ResolvedCredentialOffer {
         val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(createdOffer.credentialOffer)
@@ -297,8 +299,8 @@ class Issuer2WalletFlowDriver(
         )
     }
 
-    private suspend fun getWalletInstanceKey(): Key =
-        walletInstanceKey ?: JWKKey.generate(KeyType.secp256r1).also {
+    private suspend fun getWalletInstanceKey(): Crypto2Key =
+        walletInstanceKey ?: generateIssuer2WalletInstanceKey().also {
             walletInstanceKey = it
         }
 
@@ -369,12 +371,11 @@ class Issuer2WalletFlowDriver(
             null
         }
 
-        return JwtProofBuilder().buildJwtProof(
+        return JwtProofBuilder().buildProof(
             key = proofKey,
             audience = issuerMetadata.credentialIssuer,
             nonce = requireNotNull(nonceResponse["c_nonce"]?.jsonPrimitive?.contentOrNull),
-            keyId = holderDid?.let { "$it#0" },
-            includeJwk = !useDidInProof,
+            binding = holderDid?.let { ProofKeyBinding.KeyId("$it#0") } ?: ProofKeyBinding.Jwk,
         )
     }
 

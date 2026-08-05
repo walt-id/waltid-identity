@@ -1,16 +1,18 @@
 package id.walt.openid4vci.dpop
 
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.ShaUtils
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.*
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.crypto2.serialization.BinaryData
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
-import io.ktor.http.Url
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.longOrNull
+import io.ktor.http.*
+import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -20,6 +22,8 @@ class DefaultDPoPProofVerifier(
     private val clockSkewSeconds: Long = DEFAULT_CLOCK_SKEW_SECONDS,
     private val now: () -> Instant = { Clock.System.now() },
 ) : DPoPProofVerifier {
+
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     init {
         require(proofMaxAgeSeconds > 0) { "DPoP proof maximum age must be positive" }
@@ -67,17 +71,29 @@ class DefaultDPoPProofVerifier(
             }
         }
 
-        val verificationKey = JWKKey.importJWK(jwk.toString()).getOrElse {
-            throw IllegalArgumentException("DPoP proof contains an invalid JWK", it)
-        }
-        require(!verificationKey.hasPrivateKey) { "DPoP proof JWK must not contain private key material" }
-        require(verificationKey.keyType == KeyType.secp256r1) {
+        require(!Jwk.containsPrivateMaterial(jwk)) { "DPoP proof JWK must not contain private key material" }
+        val encodedKey = EncodedKey.Jwk(
+            data = BinaryData(Json.encodeToString(JsonObject.serializer(), jwk).encodeToByteArray()),
+            privateMaterial = false,
+        )
+        val thumbprint = Jwk.sha256Thumbprint(encodedKey)
+        val verificationKey = runCatching {
+            crypto2Runtime.restore(
+                encodedKey.toStoredSoftwareKey(KeyId(thumbprint), setOf(KeyUsage.VERIFY)),
+            )
+        }.getOrElse { throw IllegalArgumentException("DPoP proof contains an invalid JWK", it) }
+        require(verificationKey.spec == KeySpec.Ec(EcCurve.P256)) {
             "DPoP proof key does not match algorithm $algorithm"
         }
 
-        val verifiedPayload = verificationKey.verifyJws(request.proofJwt).getOrElse {
+        val verifiedPayload = runCatching {
+            CompactJws.verify(request.proofJwt, verificationKey, setOf(JwsAlgorithm.ES256))
+        }.getOrElse {
             throw IllegalArgumentException("Invalid DPoP proof signature", it)
-        } as? JsonObject ?: throw IllegalArgumentException("DPoP proof payload must be a JSON object")
+        }.payload.decodeToString().let { payload ->
+            runCatching { Json.parseToJsonElement(payload) }.getOrNull() as? JsonObject
+                ?: throw IllegalArgumentException("DPoP proof payload must be a JSON object")
+        }
 
         val jti = verifiedPayload.stringValue(JwtPayloadClaims.JWT_ID)
             ?: throw IllegalArgumentException("DPoP proof is missing ${JwtPayloadClaims.JWT_ID} claim")
@@ -110,7 +126,7 @@ class DefaultDPoPProofVerifier(
             }
         }
 
-        return VerifiedDPoPProof(verificationKey.getThumbprint())
+        return VerifiedDPoPProof(thumbprint)
     }
 
     private fun normalizeTargetUri(value: String): NormalizedTargetUri {

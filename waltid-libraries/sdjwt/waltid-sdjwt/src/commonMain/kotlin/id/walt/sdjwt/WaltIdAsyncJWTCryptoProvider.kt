@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+@Deprecated("Use Crypto2AsyncJWTCryptoProvider")
 class WaltIdAsyncJWTCryptoProvider(private val keys: Map<String, Key>) : AsyncJWTCryptoProvider {
     override suspend fun sign(
         payload: JsonObject,

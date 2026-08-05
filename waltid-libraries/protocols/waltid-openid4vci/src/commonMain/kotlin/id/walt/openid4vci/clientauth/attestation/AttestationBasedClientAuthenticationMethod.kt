@@ -2,7 +2,10 @@ package id.walt.openid4vci.clientauth.attestation
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.clientauth.ClientAuthenticationContext
 import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
@@ -18,11 +21,17 @@ import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.tokens.jwt.JwtConfirmationClaims
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -37,6 +46,7 @@ class AttestationBasedClientAuthenticationMethod(
     private val clockSkewSeconds: Long = 60,
     private val popMaxAgeSeconds: Long = 300,
 ) : ClientAuthenticationMethod {
+    private val inlineJwkResolver = Crypto2JwtKeyResolver(allowInlineJwk = true)
 
     constructor(
         trustedAttesterKeys: suspend (
@@ -119,18 +129,27 @@ class AttestationBasedClientAuthenticationMethod(
                 "Client attestation ${JwtPayloadClaims.CONFIRMATION}.${JwtConfirmationClaims.JWK} claim is required",
             )
 
-        val clientInstanceKey = runCatching {
-            JWKKey.importJWK(confirmationJwk.toString()).getOrThrow()
-        }.getOrElse {
-            return failure(
-                "Client attestation ${JwtPayloadClaims.CONFIRMATION}.${JwtConfirmationClaims.JWK} is invalid",
-            )
-        }
-
-        if (clientInstanceKey.hasPrivateKey) {
+        if (runCatching { Jwk.containsPrivateMaterial(confirmationJwk) }.getOrDefault(true)) {
             return failure(
                 "Client attestation ${JwtPayloadClaims.CONFIRMATION}.${JwtConfirmationClaims.JWK} must not contain " +
                     "a private key",
+            )
+        }
+        val crypto2ClientInstanceKey = inlineJwkResolver.resolveFromJwt(
+            jwtHeader = buildJsonObject { put("jwk", confirmationJwk) },
+            jwtPayload = JsonObject(emptyMap()),
+        )?.key
+        // Keep v1 only for accepted optional algorithms not implemented by the portable crypto2 provider.
+        val legacyClientInstanceKey = if (
+            crypto2ClientInstanceKey == null &&
+            confirmationJwk["kty"]?.jsonPrimitive?.contentOrNull == "EC" &&
+            confirmationJwk["crv"]?.jsonPrimitive?.contentOrNull == "secp256k1"
+        ) {
+            runCatching { JWKKey.importJWK(confirmationJwk.toString()).getOrThrow() }.getOrNull()
+        } else null
+        if (crypto2ClientInstanceKey == null && legacyClientInstanceKey == null) {
+            return failure(
+                "Client attestation ${JwtPayloadClaims.CONFIRMATION}.${JwtConfirmationClaims.JWK} is invalid",
             )
         }
 
@@ -143,7 +162,28 @@ class AttestationBasedClientAuthenticationMethod(
         )
         if (popError != null) return failure(popError)
 
-        clientInstanceKey.verifyJws(popJwt).getOrElse {
+        val popAlgorithm = runCatching {
+            JwsAlgorithm.parse(requireNotNull(pop.header.stringClaim(JwtHeaderParams.ALGORITHM)))
+        }.getOrElse {
+            return failure("Client attestation PoP algorithm is invalid")
+        }
+        val confirmationAlgorithm = confirmationJwk["alg"]?.jsonPrimitive?.contentOrNull
+        if (confirmationAlgorithm != null && confirmationAlgorithm != popAlgorithm.identifier) {
+            return failure("Client attestation PoP algorithm does not match confirmation JWK alg")
+        }
+        val popSignatureValid = if (crypto2ClientInstanceKey != null) {
+            try {
+                CompactJws.verify(popJwt, crypto2ClientInstanceKey, popAlgorithm)
+                true
+            } catch (cause: CancellationException) {
+                throw cause
+            } catch (_: Throwable) {
+                false
+            }
+        } else {
+            popAlgorithm == JwsAlgorithm.ES256K && legacyClientInstanceKey?.verifyJws(popJwt)?.isSuccess == true
+        }
+        if (!popSignatureValid) {
             return failure("Client attestation PoP signature is invalid")
         }
 
@@ -237,8 +277,11 @@ class AttestationBasedClientAuthenticationMethod(
 
     private fun decodeJwt(jwt: String): DecodedJwt? =
         runCatching {
-            val decoded = jwt.decodeJws()
-            DecodedJwt(header = decoded.header, payload = decoded.payload)
+            val decoded = CompactJws.decodeUnverified(jwt)
+            DecodedJwt(
+                header = decoded.protectedHeader,
+                payload = Json.parseToJsonElement(decoded.payload.decodeToString()).jsonObject,
+            )
         }.getOrNull()
 
     private fun invalidJwt(label: String): ClientAuthenticationResult.Failure =

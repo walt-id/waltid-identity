@@ -34,7 +34,9 @@ object VPPolicyRunner {
         presentation: DcSdJwtPresentation,
         policies: List<DcSdJwtVPPolicy>,
         verificationContext: VerificationSessionContext?
-    ) = executeParallelPolicies(policies) { runPolicy(presentation, verificationContext) }
+    ) = executeParallelPolicies(policies.normalizedTransactionDataPolicies()) {
+        runPolicy(presentation, verificationContext)
+    }
 
     suspend fun verifySpecificPresentation(
         presentation: MsoMdocPresentation,
@@ -49,12 +51,20 @@ object VPPolicyRunner {
     ): Map<String, PolicyRunResult> {
         return when (presentation) {
             is JwtVcJsonPresentation -> executeParallelPolicies(policies.jwtVcJson) { runPolicy(presentation, verificationContext) }
-            is DcSdJwtPresentation -> executeParallelPolicies(policies.dcSdJwt) { runPolicy(presentation, verificationContext) }
+            is DcSdJwtPresentation -> executeParallelPolicies(policies.dcSdJwt.normalizedTransactionDataPolicies()) {
+                runPolicy(presentation, verificationContext)
+            }
             is MsoMdocPresentation -> executeParallelPolicies(policies.msoMdoc) { runPolicy(presentation, verificationContext) }
 
             is LdpVcPresentation -> throw NotImplementedError("Verifying LDP presentations is not yet implemented!")
         }
 
     }
+
+    @Suppress("DEPRECATION")
+    internal fun List<DcSdJwtVPPolicy>.normalizedTransactionDataPolicies(): List<DcSdJwtVPPolicy> =
+        if (any { it is TransactionDataHashCheckSdJwtVPPolicy }) {
+            filterNot { it is TransactionDataHashesVPPolicy }
+        } else this
 
 }

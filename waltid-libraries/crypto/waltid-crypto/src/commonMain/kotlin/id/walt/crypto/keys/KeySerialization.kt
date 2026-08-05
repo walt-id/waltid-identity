@@ -57,7 +57,7 @@ object KeySerialization {
                 subclass(AzureKeyRestApi::class)
                 registeredExternalKeyTypes.forEach {
                     @Suppress("UNCHECKED_CAST")
-                    subclass(it as KClass<Key>, it.serializer() as KSerializer<Key>)
+                    subclass(it as KClass<Key>, it.serializer())
                 }
             }
         }

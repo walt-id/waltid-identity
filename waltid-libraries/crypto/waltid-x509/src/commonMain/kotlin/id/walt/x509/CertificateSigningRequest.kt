@@ -1,6 +1,9 @@
 package id.walt.x509
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.Key as Crypto2Key
 import kotlinx.io.bytestring.ByteString
 import kotlin.io.encoding.Base64
 
@@ -60,6 +63,10 @@ data class X509SubjectAlternativeNames(
     val emails: List<String> = emptyList(),
     val ipAddresses: List<String> = emptyList(),
 ) {
+    init {
+        uris.forEach { requireAbsoluteUri(it, "Subject alternative name URI") }
+    }
+
     val isEmpty: Boolean
         get() = dnsNames.isEmpty() && uris.isEmpty() && emails.isEmpty() && ipAddresses.isEmpty()
 }
@@ -77,10 +84,14 @@ data class CertificateSigningRequestBundle(
 data class DecodedCertificateSigningRequest(
     val subjectName: X509DistinguishedName,
     val subjectAlternativeNames: X509SubjectAlternativeNames? = null,
+    @Deprecated("Use crypto2PublicKey().", ReplaceWith("crypto2PublicKey()"))
     val publicKey: Key,
-)
+) {
+    suspend fun crypto2PublicKey(): EncodedKey.Jwk = publicKey.toCrypto2PublicJwk()
+}
 
 class CertificateSigningRequestBuilder {
+    @Deprecated("Use buildDer with a crypto2 key and an explicit SignatureAlgorithm.")
     suspend fun build(
         profileData: CertificateSigningRequestProfileData,
         signingKey: Key,
@@ -93,8 +104,19 @@ class CertificateSigningRequestBuilder {
             signingKey = signingKey,
         )
     }
+
+    suspend fun buildDer(
+        profileData: CertificateSigningRequestProfileData,
+        signingKey: Crypto2Key,
+        signatureAlgorithm: SignatureAlgorithm,
+    ): CertificateSigningRequestDer = buildCrypto2CertificateSigningRequestDer(
+        profileData = profileData,
+        signingKey = signingKey,
+        signatureAlgorithm = signatureAlgorithm,
+    )
 }
 
+@Deprecated("Use CertificateSigningRequestBuilder.buildDer with a crypto2 key and an explicit SignatureAlgorithm.")
 expect suspend fun platformBuildCertificateSigningRequest(
     profileData: CertificateSigningRequestProfileData,
     signingKey: Key,

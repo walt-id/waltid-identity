@@ -6,7 +6,7 @@ plugins {
 group = "id.walt.crypto"
 
 kotlin {
-    js(IR) {
+    js {
         outputModuleName = "crypto"
     }
 
@@ -69,13 +69,6 @@ kotlin {
                         implementation(identityLibs.cryptography.provider.jdk)
                     }
                 }
-                // Exclude signum's jdk18on BouncyCastle — we use lts8on from jvmAndroidMain
-                configurations.all {
-                    exclude(group = "org.bouncycastle", module = "bcprov-jdk18on")
-                    exclude(group = "org.bouncycastle", module = "bcpkix-jdk18on")
-                    exclude(group = "org.bouncycastle", module = "bcutil-jdk18on")
-                }
-
                 named("androidDeviceTest") {
                     dependencies {
                         implementation(kotlin("test"))

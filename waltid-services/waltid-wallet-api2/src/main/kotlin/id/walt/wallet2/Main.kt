@@ -9,14 +9,9 @@ import id.walt.commons.web.WebService
 import id.walt.did.dids.DidService
 import id.walt.wallet2.auth.configureWallet2Auth
 import id.walt.wallet2.auth.registerWallet2AuthRoutes
-import id.walt.wallet2.config.UrlHopliteDecoder
-import id.walt.wallet2.persistence.ExposedCredentialStore
-import id.walt.wallet2.persistence.ExposedDidStore
-import id.walt.wallet2.persistence.ExposedKeyStore
-import id.walt.wallet2.persistence.ExposedWalletStore
+import id.walt.wallet2.config.registerWallet2ConfigDecoders
 import id.walt.wallet2.persistence.Wallet2PersistenceConfig
 import id.walt.wallet2.persistence.initWallet2Database
-import id.walt.wallet2.server.StoreFactory
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.callid.*
@@ -29,8 +24,7 @@ import io.ktor.server.routing.*
 import org.slf4j.event.Level
 
 suspend fun main(args: Array<String>) {
-    // Register custom decoder for Url before config loading
-    ConfigManager.registerCustomDecoder(UrlHopliteDecoder())
+    registerWallet2ConfigDecoders()
 
     ServiceMain(
         ServiceConfiguration("wallet", version = BuildConfig.VERSION),
@@ -42,13 +36,7 @@ suspend fun main(args: Array<String>) {
                 if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.persistenceFeature)) {
                     val config = ConfigManager.getConfig<Wallet2PersistenceConfig>()
                     val db = initWallet2Database(config)
-                    OSSWallet2Service.walletStore = ExposedWalletStore(db)
-                    // Wire Exposed-backed store factories so all auto-created and named stores
-                    // are backed by the same database. The resolver's computeIfAbsent cache
-                    // ensures that store IDs from previous runs are resolved on first access.
-                    OSSWallet2Service.keyStoreFactory = { id -> ExposedKeyStore(id, db) }
-                    OSSWallet2Service.credentialStoreFactory = { id -> ExposedCredentialStore(id, db) }
-                    OSSWallet2Service.didStoreFactory = { id -> ExposedDidStore(id, db) }
+                    OSSWallet2Service.configurePersistence(db)
                 }
             },
             run = WebService {

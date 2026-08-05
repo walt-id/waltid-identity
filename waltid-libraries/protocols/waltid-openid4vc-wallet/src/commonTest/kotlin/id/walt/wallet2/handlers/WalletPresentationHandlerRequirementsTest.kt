@@ -1,6 +1,7 @@
 package id.walt.wallet2.handlers
 
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.dcql.DcqlDisclosure
@@ -17,6 +18,7 @@ import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.data.resolveKeyMaterial
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
@@ -33,6 +35,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
@@ -452,6 +455,7 @@ class WalletPresentationHandlerRequirementsTest {
         val preview = WalletPresentationHandler.previewPresentation(
             wallet = wallet,
             request = PreviewPresentationRequest(requestUrl),
+            executionKey = assertNotNull(wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))).let { { it } },
             onEvent = {},
             transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
             resolveAuthorizationRequest = { resolvedUrl ->
@@ -571,10 +575,11 @@ class WalletPresentationHandlerRequirementsTest {
             )
         )
 
-    private fun readyPreview(requestUrl: Url, state: String) =
+    private fun readyPreview(requestUrl: Url, state: String, keyId: String = "preview-key") =
         WalletPresentationHandler.PreviewedPresentation.Ready(
             requestUrl = requestUrl,
             resolvedAuthorizationRequest = resolvedRequest(state),
+            keyId = keyId,
         )
 
     @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
@@ -1012,6 +1017,9 @@ class WalletPresentationHandlerRequirementsTest {
             }
         }
     }
+
+    private fun AuthorizationRequest.toHttpUrl(): Url =
+        Url("https://verifier.example/authorize?client_id=${clientId.orEmpty()}&nonce=${nonce.orEmpty()}")
 
     private fun credentialQuery(
         id: String,

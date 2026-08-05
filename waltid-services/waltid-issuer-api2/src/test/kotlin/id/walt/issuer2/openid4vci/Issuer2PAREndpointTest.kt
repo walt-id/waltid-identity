@@ -153,7 +153,7 @@ class Issuer2PAREndpointTest {
         }
 
         assertEquals(
-            "key-reference client attestation verification requires a key reference resolver",
+            "key-reference client attestation verification requires at least one key reference resolver",
             error.message,
         )
     }

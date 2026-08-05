@@ -1,6 +1,8 @@
 package id.walt.credentials.keyresolver.resolvers
 
 import id.walt.crypto.keys.Key
+import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
+import id.walt.credentials.keyresolver.JwtKeyResolutionSource
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.DidResolver
 import id.walt.did.dids.resolver.local.DidWebResolver
@@ -18,12 +20,15 @@ import io.ktor.server.routing.routing
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
+@Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
 class DidKeyResolverKeyRotationTest {
 
     private var previousWebResolver: DidResolver? = null
@@ -92,11 +97,56 @@ class DidKeyResolverKeyRotationTest {
         assertEquals("$KEY_ROTATION_DID#$OLD_KEY_ID", key.getKeyId())
     }
 
+    @Test
+    fun `crypto2 resolver selects supported rotated DID key by kid`() = runTest {
+        val resolved = Crypto2JwtKeyResolver().resolveFromJwt(
+            jwtHeader = buildJsonObject { put("kid", "$KEY_ROTATION_DID#$OLD_KEY_ID") },
+            jwtPayload = buildJsonObject { put("iss", KEY_ROTATION_DID) },
+        )
+
+        assertEquals(JwtKeyResolutionSource.DID, resolved?.source)
+        assertEquals("$KEY_ROTATION_DID#$OLD_KEY_ID", resolved?.key?.id?.value)
+    }
+
+    @Test
+    fun `crypto2 resolver selects Azure key ID embedded as DID fragment`() = runTest {
+        val resolved = Crypto2JwtKeyResolver().resolveFromJwt(
+            jwtHeader = buildJsonObject { put("kid", OLD_KEY_ID) },
+            jwtPayload = buildJsonObject { put("iss", KEY_ROTATION_DID) },
+        )
+
+        assertEquals(JwtKeyResolutionSource.DID, resolved?.source)
+        assertEquals("$KEY_ROTATION_DID#$OLD_KEY_ID", resolved?.key?.id?.value)
+    }
+
+    @Test
+    fun `crypto2 resolver rejects wrong kid`() = runTest {
+        val resolver = Crypto2JwtKeyResolver()
+        assertEquals(
+            null,
+            resolver.resolveFromJwt(
+                jwtHeader = buildJsonObject { put("kid", "missing") },
+                jwtPayload = buildJsonObject { put("iss", KEY_ROTATION_DID) },
+            ),
+        )
+    }
+
+    @Test
+    fun `crypto2 resolver rejects ambiguous DID keys without kid`() = runTest {
+        val resolved = Crypto2JwtKeyResolver().resolveFromJwt(
+            jwtHeader = null,
+            jwtPayload = buildJsonObject { put("iss", KEY_ROTATION_DID) },
+        )
+
+        assertEquals(null, resolved)
+    }
+
     private companion object {
         const val DID_WEB_PORT = 18089
         const val KEY_ROTATION_DID = "did:web:localhost%3A$DID_WEB_PORT:key-rotation"
         const val OLD_KEY_ID = "https://vault.azure.net/keys/old-key-xxx"
         const val NEW_KEY_ID = "https://vault.azure.net/keys/new-key-yyy"
+        const val SECOND_SUPPORTED_KEY_ID = "https://vault.azure.net/keys/second-supported-key"
 
         val didWebResolver = DidWebResolver(WebDataFetcher(id = "did-key-resolver-key-rotation-test"))
 
@@ -152,6 +202,19 @@ class DidKeyResolverKeyRotationTest {
                     "use": "sig",
                     "x": "eKx_FaLzPMT4ndwvImdV_pTv-JX1SQpJ8tDK6GLiYIE",
                     "y": "-TzpGxGLPnXWMJWTqYvqn55Z8Xi-J_ZM40bjtjGaELs"
+                  },
+                  "type": "JsonWebKey2020"
+                },
+                {
+                  "controller": "$KEY_ROTATION_DID",
+                  "id": "$KEY_ROTATION_DID#$SECOND_SUPPORTED_KEY_ID",
+                  "publicKeyJwk": {
+                    "alg": "EdDSA",
+                    "crv": "Ed25519",
+                    "kid": "$SECOND_SUPPORTED_KEY_ID",
+                    "kty": "OKP",
+                    "use": "sig",
+                    "x": "qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM"
                   },
                   "type": "JsonWebKey2020"
                 }

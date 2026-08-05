@@ -3,6 +3,7 @@ package id.walt.wallet2.mobile.swiftinterop
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletEvent
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -10,8 +11,8 @@ import kotlinx.coroutines.flow.emptyFlow
  * Factory for creating [WalletSdkBridge] instances with iOS storage and key dependencies.
  */
 public class WalletSdkBridgeFactory() {
-    private var createDependencies: suspend (MobileWalletConfig) -> WalletSdkBridgeDependencies = { config ->
-        val wallet = MobileWalletFactory().create(config)
+    private var createDependencies: suspend (MobileWalletConfig, ClientIdTrustConfiguration) -> WalletSdkBridgeDependencies = { config, trustConfiguration ->
+        val wallet = MobileWalletFactory().create(config, trustConfiguration)
         WalletSdkBridgeDependencies(
             operations = MobileWalletSdkBridgeOperations(wallet),
             eventFlow = wallet.events,
@@ -21,7 +22,7 @@ public class WalletSdkBridgeFactory() {
     private constructor(
         createOperations: suspend (MobileWalletConfig) -> WalletSdkBridgeOperations,
     ) : this() {
-        this.createDependencies = { config ->
+        this.createDependencies = { config, _ ->
             WalletSdkBridgeDependencies(
                 operations = createOperations(config),
                 eventFlow = emptyFlow(),
@@ -36,7 +37,10 @@ public class WalletSdkBridgeFactory() {
         configuration: WalletBridgeConfiguration = WalletBridgeConfiguration(),
     ): WalletBridgeResult<WalletSdkBridge> =
         try {
-            val dependencies = createDependencies(configuration.toMobileWalletConfig())
+            val dependencies = createDependencies(
+                configuration.toMobileWalletConfig(),
+                configuration.clientIdTrustConfiguration.toClientIdTrustConfiguration(),
+            )
             WalletBridgeResult.Success(
                 WalletSdkBridge.forOperations(
                     operations = dependencies.operations,
@@ -52,6 +56,18 @@ public class WalletSdkBridgeFactory() {
             createOperations: suspend (MobileWalletConfig) -> WalletSdkBridgeOperations,
         ): WalletSdkBridgeFactory =
             WalletSdkBridgeFactory(createOperations)
+
+        internal fun forOperationsFactoryWithTrust(
+            createOperations: suspend (MobileWalletConfig, ClientIdTrustConfiguration) -> WalletSdkBridgeOperations,
+        ): WalletSdkBridgeFactory =
+            WalletSdkBridgeFactory().also { factory ->
+                factory.createDependencies = { config, trustConfiguration ->
+                    WalletSdkBridgeDependencies(
+                        operations = createOperations(config, trustConfiguration),
+                        eventFlow = emptyFlow(),
+                    )
+                }
+            }
     }
 }
 

@@ -43,6 +43,9 @@ kotlin {
             implementation(project(":waltid-libraries:web:waltid-ktor-notifications-core"))
 
             implementation(project(":waltid-libraries:protocols:waltid-18013-7-verifier"))
+            implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
+            implementation(project(":waltid-libraries:crypto:waltid-jose"))
+            implementation(project(":waltid-libraries:waltid-did"))
         }
 
         jvmMain.dependencies {
@@ -57,6 +60,7 @@ kotlin {
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)
             implementation(identityLibs.ktor.server.test.host)
+            implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
         }
     }
 }
