@@ -33,19 +33,19 @@ object IsoProfileX509CertificateValidationUtil {
         x509Certificate: X509Certificate
     ) {
         val raw = x509Certificate.data.serialNumberRaw
-        if (raw.size < 9) {
-            //less than 64 bits
+        if (raw.size < 8) {
+            //less than 52 bits
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
                 "serialNumber",
-                "Serial number must have at least 71 bits"
+                "Serial number must have at least 63 bits"
             )
-        } else if (raw.size == 9 && (raw[0] and 0x7f).toInt() < 0x40) {
-            //less than 71 bits
+        } else if (raw.size == 8 && (raw[0] and 0x7f).toInt() < 0x40) {
+            //less than 63 bits
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
                 "serialNumber",
-                "Serial number must have at least 71 bits"
+                "Serial number must have at least 63 bits"
             )
         } else if (raw.size > 20) {
             context.addLogEntry(

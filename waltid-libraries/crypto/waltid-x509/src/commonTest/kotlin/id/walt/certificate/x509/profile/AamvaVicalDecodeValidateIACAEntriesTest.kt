@@ -1,20 +1,19 @@
-package id.walt.x509.iso.vical
+package id.walt.certificate.x509.profile
 
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.x509.CertificateDer
-import id.walt.x509.iso.iaca.parser.IACACertificateParser
-import id.walt.x509.iso.iaca.validate.IACAValidator
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.validation.X509SingleCertificateValidator
 import kotlinx.coroutines.test.runTest
-import kotlinx.io.bytestring.ByteString
+import kotlinx.io.bytestring.decodeToByteString
 import kotlinx.serialization.json.Json
+import kotlin.io.encoding.Base64
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
-class AAMVAVicalDecodeValidateIACAEntriesTest {
+class AamvaVicalDecodeValidateIACAEntriesTest {
 
     companion object {
 
-        private val iacaParser = IACACertificateParser()
-        private val validator = IACAValidator()
+        private val validator = X509SingleCertificateValidator(listOf(IsoIaCaRootX509CertificateProfile))
 
         /**
          * List of cherry-picked base64-encoded DER IACA certificates pulled from the AAMVA VICAL.
@@ -23,7 +22,7 @@ class AAMVAVicalDecodeValidateIACAEntriesTest {
          * The resulting list (below) was produced by filtering-out IACA certificates that:
          * - Expire in less than a year (give or take ;)) at the time of the list's compilation
          * */
-        private val iacaPemEncodedCertificates = Json.decodeFromString<List<String>>(
+        private val iacaDerEncodedCertificates = Json.decodeFromString<List<String>>(
             """
             [
                 "MIICejCCAh+gAwIBAgIQP1fWX6bK5IWafQpOzL3JyjAKBggqhkjOPQQDAjBIMRYwFAYDVQQDDA1JQUNBLVVUQUgtVVNBMREwDwYDVQQKDAhVdGFoIERMRDEOMAwGA1UECAwFVVMtVVQxCzAJBgNVBAYTAlVTMB4XDTI1MDMxMTEyNDkyNVoXDTM0MDYwNzEyNDkyNFowSDEWMBQGA1UEAwwNSUFDQS1VVEFILVVTQTERMA8GA1UECgwIVXRhaCBETEQxDjAMBgNVBAgMBVVTLVVUMQswCQYDVQQGEwJVUzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABA9gsjBB4V6FtUGvCF/ZuQu65dfWIK87Yr1r4KzBM6LFvwxTB5MoWuS/JjyTZO3fENEFm3TtG+Js7KxIZMDClKyjgeowgecwEgYDVR0TAQH/BAgwBgEB/wIBADAfBgNVHSMEGDAWgBR9Bklm+FL6KtqQNeKXdsOkEUNg3TAnBgNVHRIEIDAehhxodHRwczovL21vYmlsZWRsLnVzL2lhY2EtdXQvMBEGA1UdIAQKMAgwBgYEVR0gADBFBgNVHR8EPjA8MDqgOKA2hjRodHRwOi8vd3d3Lm1vYmlsZWRsLnVzL3V0LWlhY2EvbWRsRFMtVVRBSC1VU0EwMDMuY3JsMB0GA1UdDgQWBBR9Bklm+FL6KtqQNeKXdsOkEUNg3TAOBgNVHQ8BAf8EBAMCAQYwCgYIKoZIzj0EAwIDSQAwRgIhAP2roq3hwjl7IQ9j52KMANKn9L9ornH31k42AAUjYALYAiEAhla2itEIdVuVipPO2JorLhEgkF1FzMIw0ggETTzLmGo=",
@@ -44,18 +43,13 @@ class AAMVAVicalDecodeValidateIACAEntriesTest {
         )
     }
 
-    //@Test
+    @Test
     fun `must be able to decode and validate all qualified AAMVA IACA certificate entries`() = runTest {
-        iacaPemEncodedCertificates.map { pemEncodedCertificate ->
-            JWKKey.convertDERorPEMtoByteArray(pemEncodedCertificate)
-        }.forEach { derEncodedCertificate ->
-            val iacaDecodedCertificate = iacaParser.parse(
-                certificate = CertificateDer(
-                    bytes = ByteString(derEncodedCertificate),
-                ),
-            )
-
-            validator.validate(iacaDecodedCertificate)
+        iacaDerEncodedCertificates.map { derEncodedCertificate ->
+            X509CertificateUtil.parseCertificateDerEncoded(Base64.decodeToByteString(derEncodedCertificate))
+        }.forEach { cert ->
+            val result = validator.validate(cert)
+            assertTrue(result.valid)
         }
     }
 }

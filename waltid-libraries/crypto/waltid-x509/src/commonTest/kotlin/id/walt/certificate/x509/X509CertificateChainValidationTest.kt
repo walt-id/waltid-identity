@@ -1,11 +1,14 @@
 package id.walt.certificate.x509
 
+import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
 import id.walt.certificate.x509.testdata.TestDataCertificates.googleComCrtPem
 import id.walt.certificate.x509.testdata.TestDataCertificates.gtsRootR4CrtPem
 import id.walt.certificate.x509.testdata.TestDataCertificates.gtsWe2CrtPem
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
+import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.TypedKeyGenerationRequest
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
@@ -68,6 +71,41 @@ class X509CertificateChainValidationTest {
                 assertEquals(ValidationResult.Severity.INFO, signatureValidatorLog[2].severity)
                 assertEquals("CN=*.google.com", signatureValidatorLog[2].subjectDn)
             }
+    }
+
+    @Test
+    fun shouldValidateCertChainWithTrustAnchorInTheMiddle() = runTest {
+        val rootCaKey = KeyManager.createKey(TypedKeyGenerationRequest.Jwk())
+        val rootCaCert = X509CertificateUtil.createSelfSignedCertificate(rootCaKey) {
+            subjectDn = "CN=Root CA, OU=Walt.id"
+            extensionBasicConstraints {
+                cA = true
+            }
+        }
+        val intermediateCaKey = KeyManager.createKey(TypedKeyGenerationRequest.Jwk())
+        val intermediateCaCert = X509CertificateUtil.createCertificate(rootCaKey, rootCaCert) {
+            subjectDn = "CN=Intermediate CA, OU=Walt.id"
+            subjectPublicKey(intermediateCaKey)
+            extensionBasicConstraints {
+                cA = true
+            }
+        }
+
+        val leafKey = KeyManager.createKey(TypedKeyGenerationRequest.Jwk())
+        val leafCert = X509CertificateUtil.createCertificate(intermediateCaKey, intermediateCaCert) {
+            subjectDn = "CN=Leaf, OU=Walt.id"
+            subjectPublicKey(leafKey)
+        }
+        val trust = InMemoryTrustStore(listOf(rootCaCert, intermediateCaCert))
+        certUtil.validateCertificateChain(listOf(leafCert), trust).also {
+            assertTrue(it.valid)
+        }
+        certUtil.validateCertificateChain(listOf(intermediateCaCert, leafCert), trust).also {
+            assertTrue(it.valid)
+        }
+        certUtil.validateCertificateChain(listOf(intermediateCaCert, leafCert, rootCaCert), trust).also {
+            assertTrue(it.valid)
+        }
     }
 
     companion object {

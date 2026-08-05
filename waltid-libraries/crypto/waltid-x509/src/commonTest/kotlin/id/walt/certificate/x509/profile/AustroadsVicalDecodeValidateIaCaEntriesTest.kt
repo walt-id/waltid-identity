@@ -1,23 +1,21 @@
-package id.walt.x509.iso.vical
+package id.walt.certificate.x509.profile
 
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.x509.CertificateDer
-import id.walt.x509.iso.iaca.parser.IACACertificateParser
-import id.walt.x509.iso.iaca.validate.IACAValidationConfig
-import id.walt.x509.iso.iaca.validate.IACAValidator
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.validation.ValidationResult
+import id.walt.certificate.x509.validation.X509SingleCertificateValidator
 import kotlinx.coroutines.test.runTest
-import kotlinx.io.bytestring.ByteString
+import kotlinx.io.bytestring.decodeToByteString
 import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
-import kotlin.test.assertFails
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
-class AustroadsVicalDecodeValidateIACAEntriesTest {
+class AustroadsVicalDecodeValidateIaCaEntriesTest {
 
     companion object {
 
-        private val iacaParser = IACACertificateParser()
-        private val validator = IACAValidator()
+        private val validator = X509SingleCertificateValidator(listOf(IsoIaCaRootX509CertificateProfile))
 
         /**
          * List of cherry-picked base64-encoded DER IACA certificates pulled from the Austroads Pre-Production VICAL.
@@ -29,7 +27,7 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
          * 3. Have the KeyUsage extension marked as "non-critical" -> refer to the other test case in this file
          * 4. Have 'ZZ' as country code -> refer to the respective test case in this file for more info
          * */
-        private val iacaPemEncodedCertificates = Json.decodeFromString<List<String>>(
+        private val iacaDerEncodedCertificates = Json.decodeFromString<List<String>>(
             """
             [
                 "MIICejCCAh+gAwIBAgIQP1fWX6bK5IWafQpOzL3JyjAKBggqhkjOPQQDAjBIMRYwFAYDVQQDDA1JQUNBLVVUQUgtVVNBMREwDwYDVQQKDAhVdGFoIERMRDEOMAwGA1UECAwFVVMtVVQxCzAJBgNVBAYTAlVTMB4XDTI1MDMxMTEyNDkyNVoXDTM0MDYwNzEyNDkyNFowSDEWMBQGA1UEAwwNSUFDQS1VVEFILVVTQTERMA8GA1UECgwIVXRhaCBETEQxDjAMBgNVBAgMBVVTLVVUMQswCQYDVQQGEwJVUzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABA9gsjBB4V6FtUGvCF/ZuQu65dfWIK87Yr1r4KzBM6LFvwxTB5MoWuS/JjyTZO3fENEFm3TtG+Js7KxIZMDClKyjgeowgecwEgYDVR0TAQH/BAgwBgEB/wIBADAfBgNVHSMEGDAWgBR9Bklm+FL6KtqQNeKXdsOkEUNg3TAnBgNVHRIEIDAehhxodHRwczovL21vYmlsZWRsLnVzL2lhY2EtdXQvMBEGA1UdIAQKMAgwBgYEVR0gADBFBgNVHR8EPjA8MDqgOKA2hjRodHRwOi8vd3d3Lm1vYmlsZWRsLnVzL3V0LWlhY2EvbWRsRFMtVVRBSC1VU0EwMDMuY3JsMB0GA1UdDgQWBBR9Bklm+FL6KtqQNeKXdsOkEUNg3TAOBgNVHQ8BAf8EBAMCAQYwCgYIKoZIzj0EAwIDSQAwRgIhAP2roq3hwjl7IQ9j52KMANKn9L9ornH31k42AAUjYALYAiEAhla2itEIdVuVipPO2JorLhEgkF1FzMIw0ggETTzLmGo=",
@@ -40,7 +38,6 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
                 "MIIC5DCCAoqgAwIBAgIKYUzzI7gPkqKIATAKBggqhkjOPQQDAjA/MQswCQYDVQQGEwJOWjEwMC4GA1UEAwwnaW50ZXJvcC52aWkuZWxlY3Ryb24ubWF0dHJsYWJzLm5ldCBJQUNBMB4XDTI1MTAzMDIwNDYyOFoXDTM1MTAzMTAwMDAwMFowPzELMAkGA1UEBhMCTloxMDAuBgNVBAMMJ2ludGVyb3AudmlpLmVsZWN0cm9uLm1hdHRybGFicy5uZXQgSUFDQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABKc3qtmiJdm4tx29B1sI+7hUMqRn5vvDpAEtiHRsJG1K8Qe0IX1BLhh1jmg2PPpFdoW8cBKH5QI1LrmCiPFNheSjggFsMIIBaDAdBgNVHQ4EFgQUdUrOPnrYQ1Yhr824RwJbTitIPj0wDgYDVR0PAQH/BAQDAgEGMBIGA1UdEwEB/wQIMAYBAf8CAQAwgYAGA1UdHwR5MHcwdaBzoHGGb2h0dHBzOi8vaW50ZXJvcC52aWkuZWxlY3Ryb24ubWF0dHJsYWJzLm5ldC92Mi9jcmVkZW50aWFscy9tb2JpbGUvaWFjYXMvY2M5MDE1YzItZDc5Mi00YmE2LThiZDEtMWZjM2RmMmVlOGVkL2NybDA1BgNVHRIELjAshipodHRwczovL2ludGVyb3AudmlpLmVsZWN0cm9uLm1hdHRybGFicy5uZXQwaQYJKwYBBAGD4GpkBFwMWmh0dHBzOi8vaW50ZXJvcC52aWkuZWxlY3Ryb24ubWF0dHJsYWJzLm5ldC92Mi9jcmVkZW50aWFscy9tb2JpbGUvc3RhdHVzLWxpc3RzL2Rpc3RyaWJ1dGlvbjAKBggqhkjOPQQDAgNIADBFAiEAwHuq/F8VypvZ5T3ViFpf5OwFuuIHUAaAIHPvG341gAICIBl7Pu7vUdrfqCLJEDsKCAKwhveGngpmWxyCCRAprji9",
                 "MIIC5jCCAmygAwIBAgIRALx1kgxevAyQv4ja0Ojs/ZAwCgYIKoZIzj0EAwMwXzEvMC0GA1UEAwwmTG91aXNpYW5hIERlcGFydG1lbnQgb2YgTW90b3IgVmVoaWNsZXMxEjAQBgNVBAoMCUxBIFdhbGxldDELMAkGA1UECAwCTEExCzAJBgNVBAYTAlVTMB4XDTIzMDkwNzAwMDAwMFoXDTI4MDgxMjAwMDAwMFowXzEvMC0GA1UEAwwmTG91aXNpYW5hIERlcGFydG1lbnQgb2YgTW90b3IgVmVoaWNsZXMxEjAQBgNVBAoMCUxBIFdhbGxldDELMAkGA1UECAwCTEExCzAJBgNVBAYTAlVTMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEHOUM2Naj4sPC/2nNPyOvaXF7vRMceG7rhVOW8pAS6y55FHnJHeHb/MLF+vadwQcrPhp0eM67QVcRqRvzJYsePuN8maDRhsUJgC1OI+624vAU6I6wbhEymiEi6K4KGGFvo4HrMIHoMBIGA1UdEwEB/wQIMAYBAf8CAQAwHQYDVR0OBBYEFDHnw6szJSIvwMU5sFhhNFzSF8VPMA4GA1UdDwEB/wQEAwIBBjBTBgNVHR8ETDBKMEigRqBEhkJodHRwczovL3RydXN0LmxvdWlzaWFuYS5nb3YvcmV2b2NhdGlvbnMvbGEtbURMLWlhY2EtMjAyMy0wOS0wOC5jcmwwTgYDVR0SBEcwRYZDaHR0cHM6Ly90cnVzdC5sb3Vpc2lhbmEuZ292L2NlcnRpZmljYXRlcy9sYS1tREwtaWFjYS0yMDIzLTA5LTA4LmNlcjAKBggqhkjOPQQDAwNoADBlAjEA+8UHRHLLAYy/gwpO3iiUOt1xGEXZzfcIMvjBbHuL8RboSGqJ960JuJtyu5i7S8RRAjBvZPoTmr+82b+Yd2gZS8iCMgHt2PVvRY6wGupQoy0gniORYuiOUcCzcQ2hS4ZgfCs=",
                 "MIIDBTCCAqygAwIBAgIUKuFzbunBYUZxFDYKYdPC+unmS/MwCgYIKoZIzj0EAwIwfzESMBAGA1UEAwwJTVZNVGVzdENBMS0wKwYDVQQKDCRBcml6b25hIERlcGFydG1lbnQgb2YgVHJhbnNwb3J0YXRpb24xCzAJBgNVBAsMAklUMQswCQYDVQQGEwJVUzEOMAwGA1UECAwFVVMtQVoxEDAOBgNVBAcMB1Bob2VuaXgwHhcNMjQwNzMwMTY1NDA2WhcNMzQwNzMwMTY1NDA2WjB/MRIwEAYDVQQDDAlNVk1UZXN0Q0ExLTArBgNVBAoMJEFyaXpvbmEgRGVwYXJ0bWVudCBvZiBUcmFuc3BvcnRhdGlvbjELMAkGA1UECwwCSVQxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVVUy1BWjEQMA4GA1UEBwwHUGhvZW5peDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABDMnPWRJsoB6AlkNQO4T7np+K0H2y0l1qiUUHcKyK+8Ue3JDXOBP1/8WMi5ahRP0r40M1koQ7VaVeotgJF/f9gWjggEEMIIBADAdBgNVHQ4EFgQUFG/HSDZGXTdSSgUImYgv8+aSslYwHwYDVR0jBBgwFoAUFG/HSDZGXTdSSgUImYgv8+aSslYwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwLAYDVR0SBCUwI4YhaHR0cHM6Ly9hemRvdC5nb3YvbXZkL2NvbnRhY3QtbXZkMGwGA1UdHwRlMGMwYaBfoF2GW2h0dHBzOi8vbXZtcHVibGljLmJsb2IuY29yZS51c2dvdmNsb3VkYXBpLm5ldC9jZXJ0aWZpY2F0ZS1yZXZvY2F0aW9uLWxpc3QvTVZNUHJvZENBLmNybC5wZW0wCgYIKoZIzj0EAwIDRwAwRAIgdk8IZYQM8svbCTrll+eD+WrI29QPKmSr0VVbk1UYJKACIADEQzO2bcYIgOr+8xj8LIIG7HxBVSLlNmDfed0nDLux",
-                "MIICbjCCAhSgAwIBAgIJDY4vb9sj4PTLMAoGCCqGSM49BAMCMEYxCzAJBgNVBAYTAlBIMQ4wDAYDVQQIDAVQSC0wMDELMAkGA1UECgwCREwxCzAJBgNVBAsMAlZSMQ0wCwYDVQQDDARnb0lEMB4XDTI0MDEwOTAwMDAwMFoXDTMzMDEwOTIzNTk1OVowRjELMAkGA1UEBhMCUEgxDjAMBgNVBAgMBVBILTAwMQswCQYDVQQKDAJETDELMAkGA1UECwwCVlIxDTALBgNVBAMMBGdvSUQwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQJ8tbOXpAPblIxbmGFLI0YosOW1XgmgwgQwvn8enIENSowpyd2f6dVqL36ZNPxRtXrZJhTmfYo24dIiPt9RNVko4HqMIHnMBIGA1UdEwEB/wQIMAYBAf8CAQAwDgYDVR0PAQH/BAQDAgEGMB0GA1UdDgQWBBQCwqigg1O1afapyqOvMPdUGhT9KjArBgNVHRAEJDAigA8yMDI0MDEwOTAwMDAwMFqBDzIwMjkwMTA5MjM1OTU5WjAkBgNVHRIEHTAbhhlodHRwOi8vd3d3LmhpZGdsb2JhbC5jb20vME8GA1UdHwRIMEYwRKBCoECGPmh0dHBzOi8vZGV2LWxzLmdvaWRodWIuaGlkY2xvdWQuY29tL2NpZC9oaWR0ZXN0aWFjYW1kbC5jcmwucGVtMAoGCCqGSM49BAMCA0gAMEUCIQDCfjRXqUL1sgxqSwMqdQbUm8qLk7kyS2iZdOvtBG8VLgIgL/7CB3UesqScGZTFTRlji1nEY/FF5/Iaqwi8M6NmQWk=",
                 "MIIDQjCCAuegAwIBAgIUALj0FeW5Es6+r08rWsHsIA1igMAwCgYIKoZIzj0EAwIwgZ8xDjAMBgNVBAgTBVVTLU5EMQswCQYDVQQGEwJVUzERMA8GA1UEBxMIQmlzbWFyY2sxMjAwBgNVBAoTKU5vcnRoIERha290YSBEZXBhcnRtZW50IG9mIFRyYW5zcG9ydGF0aW9uMQ8wDQYDVQQLEwZMRUdFTkQxKDAmBgNVBAMTH2h0dHBzOi8vcGFydG5lci5tZGwuZG90Lm5kLmdvdi8wHhcNMjUwNjEwMDYwMDAwWhcNMzAwNjEwMDYwMDAwWjCBnzEOMAwGA1UECBMFVVMtTkQxCzAJBgNVBAYTAlVTMREwDwYDVQQHEwhCaXNtYXJjazEyMDAGA1UEChMpTm9ydGggRGFrb3RhIERlcGFydG1lbnQgb2YgVHJhbnNwb3J0YXRpb24xDzANBgNVBAsTBkxFR0VORDEoMCYGA1UEAxMfaHR0cHM6Ly9wYXJ0bmVyLm1kbC5kb3QubmQuZ292LzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABH7Etk/9zy7wqAwn8Qb1vzhMsx7H7JOYuTUbirPu26Q766Bndw8yyjZTRJp3pZeWWs4TbS668mcI1IUB+0e3gnqjgf4wgfswDgYDVR0PAQH/BAQDAgEGMBIGA1UdEwEB/wQIMAYBAf8CAQAwHQYDVR0OBBYEFGgohKo4OSffuHWBD5zP+1RjMCEGMDAGA1UdEgQpMCeBEGRvdG12dGVjaEBuZC5nb3aGE2h0dHBzOi8vZG90Lm5kLmdvdi8wcgYDVR0fBGswaTBnoGWgY4ZhaHR0cHM6Ly9kb3QubmQuZ292L0xFR0VOREVYVC9ETVAvRFNWUy9XZWJTZXJ2aWNlcy9tZGwvdjEvY3JsLzQ5ZDNmOTliMGQwNDQyMDY4ZDVlNzY0NWM0Njc5ZTk4LmNybDAQBgkrBgEEAYPFIQEEA0RNUDAKBggqhkjOPQQDAgNJADBGAiEA8ieW8neYho+hsu4hB2c9rekEh1+GopZ7r8Sz4JU1ctECIQDUGD/4QFHseFdQb/lLDjD6/xUfLfvrPD5my+wMSy8AIA==",
                 "MIIDBzCCAqygAwIBAgIUe6dqz3Fm2OsyTbzWzoc1HwZ8Bq8wCgYIKoZIzj0EAwIwfzESMBAGA1UEAwwJTVZNVGVzdENBMS0wKwYDVQQKDCRBcml6b25hIERlcGFydG1lbnQgb2YgVHJhbnNwb3J0YXRpb24xCzAJBgNVBAsMAklUMQswCQYDVQQGEwJVUzEOMAwGA1UECAwFVVMtQVoxEDAOBgNVBAcMB1Bob2VuaXgwHhcNMjQwNzMwMTYxOTU2WhcNMzQwNzMwMTYxOTU2WjB/MRIwEAYDVQQDDAlNVk1UZXN0Q0ExLTArBgNVBAoMJEFyaXpvbmEgRGVwYXJ0bWVudCBvZiBUcmFuc3BvcnRhdGlvbjELMAkGA1UECwwCSVQxCzAJBgNVBAYTAlVTMQ4wDAYDVQQIDAVVUy1BWjEQMA4GA1UEBwwHUGhvZW5peDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABNg3teQ9Jr1scyXzDAQwJDgL+IqOeD9Jp5yxtBjaNYvNSHG7MMUJZups80g2yotUoAwe9t94lv89eCSd+auPb+SjggEEMIIBADAdBgNVHQ4EFgQU7VrHHGCQbGyWDDzc0pgogAEEuhEwHwYDVR0jBBgwFoAU7VrHHGCQbGyWDDzc0pgogAEEuhEwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwLAYDVR0SBCUwI4YhaHR0cHM6Ly9hemRvdC5nb3YvbXZkL2NvbnRhY3QtbXZkMGwGA1UdHwRlMGMwYaBfoF2GW2h0dHBzOi8vbXZtcHVibGljLmJsb2IuY29yZS51c2dvdmNsb3VkYXBpLm5ldC9jZXJ0aWZpY2F0ZS1yZXZvY2F0aW9uLWxpc3QvTVZNUHJvZENBLmNybC5wZW0wCgYIKoZIzj0EAwIDSQAwRgIhANlr4HxxBC6fiDw1mYVyEG+xMOLib1F5PhUAEcyRg2OPAiEA1uvcks4CYxb7EzJC5RcJRAPDpxH3IxFaUiQc+ZgLseg=",
                 "MIICXTCCAeKgAwIBAgIUPoLnGds6DJJoa8Q1wFvGjl6rTREwCgYIKoZIzj0EAwMwLjEfMB0GA1UEAwwWUGFuYXNvbmljIENvbm5lY3QgSUFDQTELMAkGA1UEBhMCSlAwHhcNMjUwMzMxMDYxODIwWhcNMzAwODAxMDYxODE5WjAuMR8wHQYDVQQDDBZQYW5hc29uaWMgQ29ubmVjdCBJQUNBMQswCQYDVQQGEwJKUDB2MBAGByqGSM49AgEGBSuBBAAiA2IABLdoILiTNq+1bbtIUnOTnaK8KWbU7hAoxo0Jgs4BEnaExUvvUh128gVXjsCwxCP/+r8Dz8ZRtGeEyl8Sf9O0t+kATtOAvV+Lvnxx06digRU1Jkt3Lwfb9qWroz+2o4VAL6OBwDCBvTASBgNVHRMBAf8ECDAGAQH/AgEAMEwGA1UdHwRFMEMwQaA/oD2GO2h0dHBzOi8vbWRscGlsb3QuamFwYW5lYXN0LmNsb3VkYXBwLmF6dXJlLmNvbS9DUkxzL21kb2MuY3JsMB0GA1UdDgQWBBQQsPCYeOwtEV6xpjwiOgJTwYxMjTAOBgNVHQ8BAf8EBAMCAQYwKgYDVR0SBCMwIYYfaHR0cHM6Ly9tZG9jLnBhbmFzb25pYy5nb3YvbWRvYzAKBggqhkjOPQQDAwNpADBmAjEA8YbSkct8LWZ4HFSSEyI7HFyph+m63RxMapWmUhDFbNilsEnlCEDpqIEivQFD1aQ/AjEA0usFB/4Umx5/b5ZeBNiG+qf7HvS25JI+opgfzCDn15nO9NMnSZ2FjvaannUW4534",
@@ -70,22 +67,22 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
 
     }
 
-    //@Test
+    @Test
     fun `must be able to decode and validate all qualified Austroads IACA certificate entries`() = runTest {
-        iacaPemEncodedCertificates.map { pemEncodedCertificate ->
-            JWKKey.convertDERorPEMtoByteArray(pemEncodedCertificate)
-        }.forEach { derEncodedCertificate ->
-            val iacaDecodedCertificate = iacaParser.parse(
-                certificate = CertificateDer(
-                    bytes = ByteString(derEncodedCertificate),
-                ),
-            )
-
-            validator.validate(iacaDecodedCertificate)
-        }
+        iacaDerEncodedCertificates
+            .map { it.trimIndent().replace("\\s".toRegex(), "") }
+            .map { derEncodedCertificate ->
+                X509CertificateUtil.parseCertificateDerEncoded(Base64.decodeToByteString(derEncodedCertificate))
+            }.forEach { certificate ->
+                val validationResult = validator.validate(certificate)
+                if (!validationResult.valid) {
+                    println(certificate.encodedPem)
+                }
+                assertTrue(validationResult.valid)
+            }
     }
 
-    //@Test
+    @Test
     fun `must be able to decode but validation will fail because KeyUsage extension marked as non-critical`() =
         runTest {
             listOf(
@@ -109,7 +106,7 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
                     hWcGVlhAj6LE4pTrKJnkdWslX9Djic1Z1W2/KN7oUcnzpQjzxZvhEuqrbA/JbUsC
                     MQDhZyd2llRipxu1mIVIyflKBzy1a5uymgyGNwxQ4gAUJtTTaZ3oUNrlIVcTmTSq
                     yOg=
-                """.trimIndent(),
+                """,
                 //Oneproof IACA TEST
                 """
                     MIICJzCCAc2gAwIBAgIUE/qk/YIW/LUBva09BUFhZAImTykwCgYIKoZIzj0EAwIw
@@ -124,53 +121,19 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
                     HR8EITAfMB2gG6AZhhdodHRwczovL2V4YW1wbGUuY29tL2NybDAKBggqhkjOPQQD
                     AgNIADBFAiBM/hKnF0Ch+hLtYxwDgVbf5s6n10//n3rc9NFbf8NZEgIhANmCmsF8
                     7ZFYovtxhTXNsvAjA10mNkWofo2DEL2jxtlr
-                """.trimIndent(),
-            ).forEach {
-
-                val iacaDecodedCertificate = iacaParser.parse(
-                    certificate = CertificateDer(
-                        bytes = ByteString(Base64.Mime.decode(it)),
-                    ),
-                )
-
-                assertFails {
-                    validator.validate(iacaDecodedCertificate)
+                """,
+            ).map { it.trimIndent().replace("\\s".toRegex(), "") }
+                .forEach {
+                    val iacaDecodedCertificate =
+                        X509CertificateUtil.parseCertificateDerEncoded(Base64.decodeToByteString(it))
+                    val result = validator.validate(iacaDecodedCertificate)
+                    assertFalse(result.valid)
+                    assertTrue(result.log.any { it.severity == ValidationResult.Severity.ERROR && it.validatorId == "iso-iaca-root.keyUsage" })
                 }
-
-                //turn off critical extension validation
-                val modifiedValidator = IACAValidator(
-                    config = IACAValidationConfig(
-                        requiredCriticalExtensionOIDs = false,
-                    )
-                )
-
-                //this should not throw now
-                modifiedValidator.validate(iacaDecodedCertificate)
-
-            }
         }
 
-    //@Test
-    fun `must be able to decode but validation will fail because 'ZZ' is not a valid ISO country code`() = runTest {
-        /*
-            Table B.1 - "IACA root certificate" of Section B.1.2 - "IACA root certificate" of Annex B - "Certificate and
-            CRL profiles" of ISO/IEC 18013-5 states the following regarding the certificate issuer's X500 name:
-
-            countryName is mandatory. The value shall be in upper case and
-            contain the ISO 3166-1 alpha-2 code of the issuing country, exactly
-            the same value as in the issuing country data element. The
-            countryName shall be PrintableString.
-
-            In our code, countryName == country.
-
-            However, there exists an IACA certificate entry in this VICAL that has a countryName of "ZZ". This is
-            not a valid country code, it is part of a country code set that "can be user-assigned".
-
-            So, ISO 3166-1 says it's not a valid country code, which is also what the JVM's Locale class says.
-
-            However, various VICAL-parsing resources, will happily parse it and not throw an error :man-shrugging:
-
-            * */
+    @Test
+    fun `must be able to decode but validation will fail because serial number is too short`() = runTest {
         listOf(
             //OWF Identity Credential TEST IACA
             """
@@ -188,51 +151,19 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
                 aN5gyfUwCgYIKoZIzj0EAwMDaAAwZQIxAJJDZ5Js5BdvcpxcaTW8nqHDMsvyEPFS
                 aM2AvfF4YHUmlNiAibbJpbw5QoVoaAV5ugIwbycvXRI6z6m2pxlC0y/Dp0MI+87J
                 HFMK+WcuHCgIGPfHBqR4T1XMMqyFeFrO4AKA
-            """.trimIndent(),
-            //Payground Root
-            """
-                MIIC/jCCAmCgAwIBAgIJAI2FjRUdyT0BMAoGCCqGSM49BAMEMDcxCzAJBgNVBAYT
-                AlpaMQ8wDQYDVQQKDAZHb29nbGUxFzAVBgNVBAMMDlBheWdyb3VuZCBSb290MB4X
-                DTI1MDQyODA0MDcxMFoXDTM1MDQyNjA0MDcxMFowNzELMAkGA1UEBhMCWloxDzAN
-                BgNVBAoMBkdvb2dsZTEXMBUGA1UEAwwOUGF5Z3JvdW5kIFJvb3QwgZswEAYHKoZI
-                zj0CAQYFK4EEACMDgYYABAEjCus99ox1/datgRORqDvJq34+Xm1keediDUXacFW+
-                RzMFOu4sK1yDDliqWtXThHi8jTUVsoYohzxCmPbOumFTvAArCpNF5BoYFRtDTcME
-                KZ0ZZ5NM8OLDO+FMrWZq6GJoDbA+HkDkgdIX3/Xrh52CZRc1ulOlWjzwtu1eSFLf
-                XfVlY6OCARAwggEMMB0GA1UdDgQWBBRzpwQeUIGTnuDbtwKK43Ev0Ko2wTAfBgNV
-                HSMEGDAWgBRzpwQeUIGTnuDbtwKK43Ev0Ko2wTASBgNVHRMBAf8ECDAGAQH/AgEA
-                MA4GA1UdDwEB/wQEAwIBBjAhBgNVHRIEGjAYhhZodHRwczovL3d3dy5nb29nbGUu
-                Y29tMIGCBgNVHR8EezB5MHegdaBzhnFodHRwOi8vcHJpdmF0ZWNhLWNvbnRlbnQt
-                NjYwM2M2NDctMDAwMC0yOWQ0LWFlYTYtZjRmNWU4MGQxYjkwLnN0b3JhZ2UuZ29v
-                Z2xlYXBpcy5jb20vNDFkNDM2ODU5ZTQ1ZGJmM2U1YTkvY3JsLmNybDAKBggqhkjO
-                PQQDBAOBiwAwgYcCQgH+co3yU5I2KQyAP8Rf85onNd65dzjBna6nvd7HAMFxcPSG
-                7xMu+drc8uVSmi0SYAw4M0fo0YTxphg/xDuc5ekGTQJBcqy8C/+CBBVt4YsJWLgV
-                5rSqIf7u7i69b2s2NHL8nypSqTn9pQRlQjs7qLgZyM1LjKbCPaCU8OrsLiNoCOxM
-                Xvc=
-            """.trimIndent()
-        ).forEach {
-
-            val iacaDecodedCertificate = iacaParser.parse(
-                certificate = CertificateDer(
-                    bytes = ByteString(Base64.Mime.decode(it)),
-                ),
-            )
-
-            assertFails {
-                validator.validate(iacaDecodedCertificate)
-            }
-
-            //turn off principal name validation
-            //and serialNo because both are violated
-            val modifiedValidator = IACAValidator(
-                config = IACAValidationConfig(
-                    principalName = false,
-                    serialNo = false,
+            """,
+        ).map { it.trimIndent().replace("\\s".toRegex(), "") }
+            .forEach {
+                val iacaCertificate = X509CertificateUtil.parseCertificateDerEncoded(
+                    Base64.decodeToByteString(it)
                 )
-            )
 
-            //this should not throw now
-            modifiedValidator.validate(iacaDecodedCertificate)
-
-        }
+                val result = validator.validate(iacaCertificate)
+                if (result.valid) {
+                    println(iacaCertificate.encodedPem)
+                }
+                assertFalse(result.valid)
+                assertTrue(result.log.any { it.severity == ValidationResult.Severity.ERROR && it.validatorId == "iso-iaca-root.serialNumber" })
+            }
     }
 }
