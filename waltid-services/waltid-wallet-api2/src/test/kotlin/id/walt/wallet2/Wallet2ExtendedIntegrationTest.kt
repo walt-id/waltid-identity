@@ -420,6 +420,21 @@ class Wallet2ExtendedIntegrationTest {
                     val code = params["pre-authorized_code"] ?: return@post call.respond(
                         HttpStatusCode.BadRequest, buildJsonObject { put("error", "invalid_request") }
                     )
+                    if (code == "invalid-pre-authorized-code") return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject {
+                            put("error", "invalid_grant")
+                            put("error_description", "do-not-leak")
+                        },
+                    )
+                    if (code == "unauthorized-pre-authorized-code") return@post call.respond(
+                        HttpStatusCode.Unauthorized,
+                        buildJsonObject { put("error", "invalid_client") },
+                    )
+                    if (code == "server-failure-pre-authorized-code") return@post call.respond(
+                        HttpStatusCode.InternalServerError,
+                        buildJsonObject { put("error", "server_error") },
+                    )
                     val tokenRequest = provider.createAccessTokenRequest(
                         mapOf(
                             "grant_type" to listOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"),
@@ -538,6 +553,68 @@ class Wallet2ExtendedIntegrationTest {
                         .body<RequestTokenResult>()
                 }
                 assertNotNull(tokenResult.accessToken)
+
+                val rejectedToken = testAndReturn("Isolated: invalid token request maps upstream 4xx") {
+                    http.post("/wallet/$walletId/credentials/receive/request-token") {
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            RequestTokenRequest(
+                                tokenEndpoint = requireNotNull(resolveResult.tokenEndpoint),
+                                preAuthorizedCode = "invalid-pre-authorized-code",
+                                credentialIssuer = resolveResult.credentialIssuer,
+                            )
+                        )
+                    }.also {
+                        assertEquals(HttpStatusCode.BadRequest, it.status, it.bodyAsText())
+                    }
+                }
+                val rejectedTokenBody = rejectedToken.bodyAsText()
+                assertTrue("invalid_grant" in rejectedTokenBody || "Token request failed" in rejectedTokenBody)
+                assertTrue("do-not-leak" !in rejectedTokenBody)
+
+                testAndReturn("Isolated: upstream 401 is preserved") {
+                    http.post("/wallet/$walletId/credentials/receive/request-token") {
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            RequestTokenRequest(
+                                tokenEndpoint = requireNotNull(resolveResult.tokenEndpoint),
+                                preAuthorizedCode = "unauthorized-pre-authorized-code",
+                                credentialIssuer = resolveResult.credentialIssuer,
+                            )
+                        )
+                    }.also {
+                        assertEquals(HttpStatusCode.Unauthorized, it.status, it.bodyAsText())
+                    }
+                }
+
+                testAndReturn("Isolated: upstream 5xx maps to 502") {
+                    http.post("/wallet/$walletId/credentials/receive/request-token") {
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            RequestTokenRequest(
+                                tokenEndpoint = requireNotNull(resolveResult.tokenEndpoint),
+                                preAuthorizedCode = "server-failure-pre-authorized-code",
+                                credentialIssuer = resolveResult.credentialIssuer,
+                            )
+                        )
+                    }.also {
+                        assertEquals(HttpStatusCode.BadGateway, it.status, it.bodyAsText())
+                    }
+                }
+
+                testAndReturn("Isolated: token transport failure maps to 502") {
+                    http.post("/wallet/$walletId/credentials/receive/request-token") {
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            RequestTokenRequest(
+                                tokenEndpoint = Url("http://127.0.0.1:1/token"),
+                                preAuthorizedCode = "unreachable",
+                            )
+                        )
+                    }.also {
+                        assertEquals(HttpStatusCode.BadGateway, it.status, it.bodyAsText())
+                    }
+                }
 
                 // -- Isolated step 3: Obtain a fresh proof nonce --
                 val nonceResult = testAndReturn("Isolated: request-nonce") {

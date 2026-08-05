@@ -1,5 +1,6 @@
 package id.walt.wallet2.server.handlers
 
+import id.walt.commons.web.WebException
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.did.dids.DidService
@@ -18,6 +19,7 @@ import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
+import id.waltid.openid4vci.wallet.token.TokenRequestException
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.delete
 import io.github.smiley4.ktoropenapi.get
@@ -37,6 +39,15 @@ import kotlinx.serialization.json.jsonObject
 import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
+
+private fun TokenRequestException.toWebException(): WebException {
+    val status = if (statusCode in 400..499) {
+        HttpStatusCode.fromValue(statusCode)
+    } else {
+        HttpStatusCode.BadGateway
+    }
+    return WebException(status.value, message ?: "Token request failed").also { it.initCause(this) }
+}
 
 // ---------------------------------------------------------------------------
 // Wallet management request / response types
@@ -562,15 +573,8 @@ object Wallet2RouteHandler {
                                 attestationAssembler = attestationAssembler,
                             )
                             call.respond(result)
-                        } catch (e: Exception) {
-                            // TokenRequestBuilder throws a plain Exception with this prefix when the
-                            // token endpoint returns 4xx (e.g. wrong PIN / tx_code). Reclassify as
-                            // IllegalArgumentException so the status pages handler maps it to 400.
-                            // TODO: Replace once TokenRequestBuilder throws a typed exception.
-                            if (e.message?.startsWith("Token request failed") == true) {
-                                throw IllegalArgumentException(e.message, e)
-                            }
-                            throw e
+                        } catch (e: TokenRequestException) {
+                            throw e.toWebException()
                         }
                     }
 
@@ -595,13 +599,17 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<RequestTokenRequest>()
-                        call.respond(
-                            WalletIssuanceHandler.requestToken(
-                                wallet = wallet,
-                                request = req,
-                                attestationAssembler = attestationAssembler,
+                        try {
+                            call.respond(
+                                WalletIssuanceHandler.requestToken(
+                                    wallet = wallet,
+                                    request = req,
+                                    attestationAssembler = attestationAssembler,
+                                )
                             )
-                        )
+                        } catch (e: TokenRequestException) {
+                            throw e.toWebException()
+                        }
                     }
 
                     post("/request-nonce", {
@@ -676,13 +684,17 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ExchangeCodeRequest>()
-                        call.respond(
-                            WalletIssuanceHandler.exchangeCode(
-                                wallet = wallet,
-                                request = req,
-                                attestationAssembler = attestationAssembler,
+                        try {
+                            call.respond(
+                                WalletIssuanceHandler.exchangeCode(
+                                    wallet = wallet,
+                                    request = req,
+                                    attestationAssembler = attestationAssembler,
+                                )
                             )
-                        )
+                        } catch (e: TokenRequestException) {
+                            throw e.toWebException()
+                        }
                     }
 
                     post("/deferred", {

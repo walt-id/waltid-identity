@@ -38,6 +38,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoCredentialClaimMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoIssuerMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
+import id.walt.walletdemo.compose.logic.WalletDemoIssuanceAuthorization
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceOutcome
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceSession

@@ -36,6 +36,7 @@ import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
 import id.waltid.openid4vci.wallet.token.DPoPProofFactory
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import id.waltid.openid4vci.wallet.token.TokenRequestException
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.header
@@ -76,6 +77,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+
+private val log = KotlinLogging.logger {}
 
 /** Grant selected for a resolved issuance session. */
 @Serializable
@@ -364,7 +367,9 @@ class WalletIssuanceSessionService(
             removeSession(sessionId)
             throw error
         } catch (error: Exception) {
-            restoreSession(active, SessionState.AWAITING_ACCEPTANCE)
+            withContext(NonCancellable) {
+                rollbackAuthorizationStart(active)
+            }
             throw error
         }
     }
@@ -496,7 +501,7 @@ class WalletIssuanceSessionService(
             return failed(record.sessionId, WalletIssuanceErrorCode.PROTOCOL)
         }
 
-        if (response.response.status == HttpStatusCode.Accepted || response.response.oauthError() == "issuance_pending") {
+        if (response.response.status == HttpStatusCode.Accepted || response.oauthError == "issuance_pending") {
             restoreDeferred(record.copy(dpopNonce = response.dpopNonce))
             return WalletIssuanceOutcome.Deferred(record.sessionId, emptyList(), listOf(record.public))
         }
@@ -558,6 +563,11 @@ class WalletIssuanceSessionService(
             }
             throw error
         } catch (error: TokenRequestException) {
+            log.warn {
+                "Issuance token request failed: status=${error.statusCode}, " +
+                    "oauthError=${error.oauthError}, grant=${active.public.offer.grant}, " +
+                    "clientId=${active.request.clientId}, dpopAdvertised=${active.dpopAlgorithms() != null}"
+            }
             if (
                 retryTokenRejection &&
                 storedIds.isEmpty() &&
@@ -704,7 +714,15 @@ class WalletIssuanceSessionService(
                     )
                 }
 
-                else -> throw IssuanceStageException(WalletIssuanceErrorCode.ISSUER_RESPONSE)
+                else -> {
+                    log.warn {
+                        "Issuance credential request failed: status=${protected.response.status.value}, " +
+                            "oauthError=${protected.oauthError}, " +
+                            "credentialConfigurationId=${offered.credentialConfigurationId}, " +
+                            "tokenType=${token.token_type}, dpopSent=${dpopAlgorithms != null}"
+                    }
+                    throw IssuanceStageException(WalletIssuanceErrorCode.ISSUER_RESPONSE)
+                }
             }
         }
         return pending
@@ -750,8 +768,12 @@ class WalletIssuanceSessionService(
     }
 
     private fun ActiveSession.dpopAlgorithms(): Set<String>? {
-        return resolved.authorizationServerMetadata.dpopSigningAlgValuesSupported
-            ?.takeIf { it.isNotEmpty() }
+        val metadata = resolved.authorizationServerMetadata
+        val grant = resolved.offer.getGrantType() ?: return null
+        val grantIsAdvertised = metadata.grantTypesSupported?.contains(grant.value)
+            ?: (grant is GrantType.AuthorizationCode)
+        return metadata.dpopSigningAlgValuesSupported
+            ?.takeIf { grantIsAdvertised && it.isNotEmpty() }
     }
 
     private fun ActiveSession.dpopFactory(): DPoPProofFactory? =
@@ -865,7 +887,12 @@ class WalletIssuanceSessionService(
         metadata: AuthorizationServerMetadata,
         key: Key,
     ): Set<String>? = metadata.dpopSigningAlgValuesSupported
-        ?.takeIf { it.isNotEmpty() && key.keyType.jwsAlg in it }
+        ?.takeIf { it.isNotEmpty() }
+        ?.also { algorithms ->
+            require(key.keyType.jwsAlg in algorithms) {
+                "Selected key algorithm is not supported for DPoP"
+            }
+        }
 
     private suspend fun resolve(request: WalletIssuanceSessionRequest): ResolvedOffer {
         val offer = if (request.offerJson != null) {
@@ -1081,17 +1108,18 @@ class WalletIssuanceSessionService(
             } catch (error: Exception) {
                 throw IssuanceStageException(WalletIssuanceErrorCode.NETWORK, error)
             }
+            val oauthError = response.oauthError()
             val suppliedNonce = response.headers[DPOP_NONCE_HEADER]
             if (
                 attempt == 0 &&
                 proof != null &&
-                response.oauthError() == USE_DPOP_NONCE &&
+                oauthError == USE_DPOP_NONCE &&
                 !suppliedNonce.isNullOrBlank()
             ) {
                 nonce = suppliedNonce
                 return@repeat
             }
-            return ProtectedResponse(response, suppliedNonce ?: nonce)
+            return ProtectedResponse(response, suppliedNonce ?: nonce, oauthError)
         }
         error("DPoP nonce retry exhausted")
     }
@@ -1474,6 +1502,30 @@ class WalletIssuanceSessionService(
         if (restored) persistActive(active)
     }
 
+    private suspend fun rollbackAuthorizationStart(active: ActiveSession) {
+        val restored = mutex.withLock {
+            if (
+                sessions[active.public.id] !== active ||
+                active.state !in setOf(SessionState.PROCESSING, SessionState.AWAITING_CALLBACK)
+            ) {
+                false
+            } else {
+                active.authorization = null
+                active.state = SessionState.AWAITING_ACCEPTANCE
+                active.expiresAtEpochMilliseconds = nowEpochMilliseconds() +
+                    sessionPolicy.reviewTtl.inWholeMilliseconds
+                true
+            }
+        }
+        if (!restored) return
+
+        try {
+            persistActive(active)
+        } catch (_: Exception) {
+            invalidateActiveSessionBestEffort(active.public.id)
+        }
+    }
+
     private suspend fun failAndRemove(
         sessionId: String,
         code: WalletIssuanceErrorCode,
@@ -1575,7 +1627,11 @@ class WalletIssuanceSessionService(
         val public: WalletDeferredCredential,
         val record: DeferredRecord,
     )
-    private data class ProtectedResponse(val response: HttpResponse, val dpopNonce: String?)
+    private data class ProtectedResponse(
+        val response: HttpResponse,
+        val dpopNonce: String?,
+        val oauthError: String?,
+    )
 
     @Serializable
     private data class PersistedRequest(

@@ -788,7 +788,7 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
-    fun dpopIsAppliedWithoutSelectedGrantAdvertisement() = runTest {
+    fun dpopIsNotAppliedToAnUnadvertisedGrant() = runTest {
         val key = JWKKey.generate(KeyType.secp256r1)
         val client = client { request ->
             when (request.url.toString()) {
@@ -801,7 +801,7 @@ class WalletIssuanceSessionServiceTest {
                     )
                 )
                 TOKEN_ENDPOINT -> {
-                    assertNotNull(request.headers["DPoP"])
+                    assertEquals(null, request.headers["DPoP"])
                     jsonResponse("""{"access_token":"access-token","token_type":"Bearer"}""")
                 }
                 CREDENTIAL_ENDPOINT -> {
@@ -853,6 +853,36 @@ class WalletIssuanceSessionServiceTest {
             service.continueAuthorization(
                 WalletIssuanceAuthorizationCallback(session.id, callback(authorization, "authorization-code"))
             )
+        )
+    }
+
+    @Test
+    fun unsupportedDpopKeyIsRejectedBeforePushedAuthorizationRequest() = runTest {
+        var parCalls = 0
+        val service = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(
+                    """{"issuer":"$ISSUER","authorization_endpoint":"$AUTHORIZATION_ENDPOINT","token_endpoint":"$TOKEN_ENDPOINT","pushed_authorization_request_endpoint":"$PAR_ENDPOINT","response_types_supported":["code"],"dpop_signing_alg_values_supported":["RS256"]}"""
+                )
+                PAR_ENDPOINT -> {
+                    parCalls += 1
+                    jsonResponse("""{"request_uri":"urn:example:par:1","expires_in":60}""", HttpStatusCode.Created)
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+
+        val session = service.start(authRequest())
+        assertFailsWith<IllegalArgumentException> { service.beginAuthorization(session.id) }
+        assertEquals(0, parCalls)
+        assertEquals(
+            WalletIssuanceErrorCode.INVALID_SESSION,
+            assertIs<WalletIssuanceOutcome.Failed>(
+                service.continueAuthorization(
+                    WalletIssuanceAuthorizationCallback(session.id, "${REDIRECT_URI}?code=unused&state=unused")
+                )
+            ).error.code,
         )
     }
 
@@ -966,6 +996,30 @@ class WalletIssuanceSessionServiceTest {
         parStatus = HttpStatusCode.Created
         val second = service.start(authRequest())
         assertFailsWith<Exception> { service.beginAuthorization(second.id) }
+    }
+
+    @Test
+    fun authorizationPersistenceFailureAfterCallbackTransitionRollsBackSession() = runTest {
+        val records = FailingAuthorizationStateStore()
+        val service = WalletIssuanceSessionService(
+            wallet = Wallet("authorization-rollback", staticKey = JWKKey.generate(KeyType.secp256r1)),
+            sessionStore = records,
+            httpClient = client { request ->
+                when (request.url.toString()) {
+                    ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                    AS_METADATA -> jsonResponse(authorizationServerMetadata())
+                    else -> respondError(HttpStatusCode.NotFound)
+                }
+            },
+        )
+
+        val session = service.start(authRequest())
+        assertFailsWith<AuthorizationStatePersistenceFailure> {
+            service.beginAuthorization(session.id)
+        }
+
+        assertTrue(records.records.values.single().payload.contains("\"state\":\"AWAITING_ACCEPTANCE\""))
+        assertNotNull(service.beginAuthorization(session.id))
     }
 
     @Test
@@ -1184,4 +1238,22 @@ class WalletIssuanceSessionServiceTest {
         }
         override suspend fun remove(id: String): Boolean = records.remove(id) != null
     }
+
+    private class FailingAuthorizationStateStore : WalletIssuanceSessionStore {
+        val records = linkedMapOf<String, WalletIssuanceSessionRecord>()
+        private var failAwaitingCallback = true
+
+        override suspend fun get(id: String): WalletIssuanceSessionRecord? = records[id]
+        override suspend fun list(): List<WalletIssuanceSessionRecord> = records.values.toList()
+        override suspend fun put(record: WalletIssuanceSessionRecord) {
+            if (failAwaitingCallback && "\"state\":\"AWAITING_CALLBACK\"" in record.payload) {
+                failAwaitingCallback = false
+                throw AuthorizationStatePersistenceFailure()
+            }
+            records[record.id] = record
+        }
+        override suspend fun remove(id: String): Boolean = records.remove(id) != null
+    }
+
+    private class AuthorizationStatePersistenceFailure : Exception()
 }
