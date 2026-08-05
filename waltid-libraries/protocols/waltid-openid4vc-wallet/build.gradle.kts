@@ -75,6 +75,7 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
+            implementation(identityLibs.ktor.client.mock)
             implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
         }
 

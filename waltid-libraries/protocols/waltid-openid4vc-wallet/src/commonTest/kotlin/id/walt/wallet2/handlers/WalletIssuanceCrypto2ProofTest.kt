@@ -17,6 +17,9 @@ import id.walt.openid4vci.metadata.issuer.ProofType
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.handlers.SignProofTestSupport.CONFIG_ID
+import id.walt.wallet2.handlers.SignProofTestSupport.ISSUER
+import id.walt.wallet2.handlers.SignProofTestSupport.issuerMetadataClient
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.Flow
@@ -43,10 +46,12 @@ class WalletIssuanceCrypto2ProofTest {
         val proof = WalletIssuanceHandler.signProof(
             wallet = wallet,
             request = SignProofRequest(
-                issuerUrl = Url("https://issuer.example"),
+                issuerUrl = Url(ISSUER),
+                credentialConfigurationId = CONFIG_ID,
                 nonce = "nonce",
                 keyId = "enterprise.resource.key",
             ),
+            httpClient = issuerMetadataClient(),
         ).proofJwt
 
         assertEquals(
@@ -65,7 +70,12 @@ class WalletIssuanceCrypto2ProofTest {
 
         val proof = WalletIssuanceHandler.signProof(
             wallet = Wallet(id = "wallet", keyStores = listOf(store)),
-            request = SignProofRequest(issuerUrl = Url("https://issuer.example"), nonce = "nonce"),
+            request = SignProofRequest(
+                issuerUrl = Url(ISSUER),
+                credentialConfigurationId = CONFIG_ID,
+                nonce = "nonce",
+            ),
+            httpClient = issuerMetadataClient(),
         ).proofJwt
 
         assertEquals(
@@ -74,6 +84,25 @@ class WalletIssuanceCrypto2ProofTest {
                 .jsonObject["nonce"]?.jsonPrimitive?.content,
         )
         assertEquals(1, key.signCalls)
+    }
+
+    @Test
+    fun `sign-proof rejects unknown credential configuration ids`() = runTest {
+        val key = FakeSigningKey(KeyId("crypto2-key"))
+        val store = Crypto2BackedStore("enterprise.resource.key", key)
+
+        assertFailsWith<IllegalStateException> {
+            WalletIssuanceHandler.signProof(
+                wallet = Wallet(id = "wallet", keyStores = listOf(store)),
+                request = SignProofRequest(
+                    issuerUrl = Url(ISSUER),
+                    credentialConfigurationId = "missing-config",
+                    nonce = "nonce",
+                    keyId = "enterprise.resource.key",
+                ),
+                httpClient = issuerMetadataClient(),
+            )
+        }
     }
 
     @Test
