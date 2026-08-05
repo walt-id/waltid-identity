@@ -161,6 +161,7 @@ internal fun validateAndroidNativePolicy(
         if (securityLevel != null && securityLevel !in setOf(
                 KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
                 KeyProperties.SECURITY_LEVEL_STRONGBOX,
+                KeyProperties.SECURITY_LEVEL_UNKNOWN_SECURE,
             )
         ) {
             throw SignumKeyPolicyMismatchException(alias, "the native key is not backed by a hardware security level")

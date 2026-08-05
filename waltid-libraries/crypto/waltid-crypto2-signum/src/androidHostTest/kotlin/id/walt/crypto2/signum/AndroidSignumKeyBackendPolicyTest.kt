@@ -36,6 +36,36 @@ class AndroidSignumKeyBackendPolicyTest {
     }
 
     @Test
+    fun `required hardware accepts an unknown secure hardware level`() {
+        validateAndroidNativePolicy(
+            alias = "hardware-required",
+            policy = SignumKeyPolicy(hardware = SignumHardwarePolicy.REQUIRED),
+            isInsideSecureHardware = true,
+            securityLevel = KeyProperties.SECURITY_LEVEL_UNKNOWN_SECURE,
+            isUserAuthenticationRequired = false,
+            userAuthenticationValidityDurationSeconds = -1,
+            isInvalidatedByBiometricEnrollment = false,
+            userAuthenticationType = null,
+        )
+    }
+
+    @Test
+    fun `required hardware rejects an unknown non-secure level`() {
+        assertFailsWith<SignumKeyPolicyMismatchException> {
+            validateAndroidNativePolicy(
+                alias = "hardware-required",
+                policy = SignumKeyPolicy(hardware = SignumHardwarePolicy.REQUIRED),
+                isInsideSecureHardware = true,
+                securityLevel = KeyProperties.SECURITY_LEVEL_UNKNOWN,
+                isUserAuthenticationRequired = false,
+                userAuthenticationValidityDurationSeconds = -1,
+                isInvalidatedByBiometricEnrollment = false,
+                userAuthenticationType = null,
+            )
+        }
+    }
+
+    @Test
     fun `biometric current set rejects missing auth per use`() {
         val policy = SignumKeyPolicy(
             authentication = SignumAuthenticationPolicy.UserPresence(

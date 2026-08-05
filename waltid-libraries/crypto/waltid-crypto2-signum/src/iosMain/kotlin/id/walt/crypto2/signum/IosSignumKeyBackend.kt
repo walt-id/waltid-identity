@@ -219,11 +219,19 @@ class IosSignumKeyBackend : SignumPlatformBackend {
                     return@any false
                 }
                 val nativeKey = keyRef.value as? SecKeyRef ?: return@any false
-                val attributes = SecKeyCopyAttributes(nativeKey) ?: return@any false
                 try {
-                    CFDictionaryGetValue(attributes, kSecAttrTokenID) == kSecAttrTokenIDSecureEnclave
+                    val attributes = SecKeyCopyAttributes(nativeKey) ?: return@any false
+                    try {
+                        val tokenId = CFDictionaryGetValue(attributes, kSecAttrTokenID)
+                        tokenId != null &&
+                            CFBridgingRelease(CFBridgingRetain(tokenId)) ==
+                            CFBridgingRelease(CFBridgingRetain(kSecAttrTokenIDSecureEnclave))
+                    } finally {
+                        CFRelease(attributes)
+                    }
                 } finally {
-                    CFRelease(attributes)
+                    CFRelease(nativeKey)
+                    keyRef.value = null
                 }
             } finally {
                 query.release()
