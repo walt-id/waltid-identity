@@ -12,15 +12,15 @@ class BouncyExtendedKeyUsageExtension(extension: BouncyCastleExtension) : Bouncy
 
     private val keyUsage = ExtendedKeyUsage.getInstance(extension.parsedValue)
 
-    override val keyPurposeIdList: Set<ExtendedKeyUsageExtension.KeyUsage>
+    override val keyPurposeIdList: Set<String>
         get() = keyUsage.usages.map {
-            ExtendedKeyUsageExtension.getKeyUsageById(it.id)
+            it.id
         }.toSet()
 
     companion object {
         fun createExtension(ext: ExtendedKeyUsageExtension): ASN1Object {
             val purposes = ext.keyPurposeIdList.map {
-                KeyPurposeId.getInstance(ASN1ObjectIdentifier(it.id))
+                KeyPurposeId.getInstance(ASN1ObjectIdentifier(it))
             }.toTypedArray()
             return ExtendedKeyUsage(purposes)
         }

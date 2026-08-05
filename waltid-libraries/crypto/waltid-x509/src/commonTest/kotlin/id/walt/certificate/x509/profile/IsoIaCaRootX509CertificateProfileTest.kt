@@ -39,6 +39,9 @@ class IsoIaCaRootX509CertificateProfileTest {
         assertEquals("CN=walt.id+SERIALNUMBER=1234567,O=Walt ID,C=AT", cert.data.subjectDn)
         assertEquals("CN=walt.id+SERIALNUMBER=1234567,O=Walt ID,C=AT", cert.data.issuerDn)
         val validationResult = validator.validate(cert)
+        if (!validationResult.valid) {
+            validationResult.log.forEach { println(it) }
+        }
         assertTrue(validationResult.valid)
         assertFalse(
             validationResult.hasWarnings,

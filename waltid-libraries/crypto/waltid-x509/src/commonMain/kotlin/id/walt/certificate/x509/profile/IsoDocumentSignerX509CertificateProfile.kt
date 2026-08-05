@@ -2,9 +2,12 @@ package id.walt.certificate.x509.profile
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
-import id.walt.certificate.x509.extension.BasicConstraintsExtension
-import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
+import id.walt.certificate.x509.dn.DistinguishedName
+import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension
+import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension.Companion.extensionCrlDistributionPoints
+import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension
+import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension.Companion.extensionExtendedKeyUsage
 import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension
 import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension.Companion.extensionIssuerAltName
 import id.walt.certificate.x509.extension.KeyUsageExtension
@@ -12,6 +15,7 @@ import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionK
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.model.GeneralName
+import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateExtensionsAreNotCritical
 import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateSerialNumber
 import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateSignatureAlgorithm
 import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateValidityTime
@@ -35,15 +39,25 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
 
     const val ID = "iso-document-signer"
 
-    val allowedSignatureAlgorithmsOid = listOf(
+    private val criticalExtensions = setOf(
+        "2.5.29.15", // Key usage
+        "2.5.29.37"  // Extended key usage
+    )
+
+    private val allowedSignatureAlgorithmsOid = setOf(
         "1.2.840.10045.4.3.2", // ECDSA-with SHA256
         "1.2.840.10045.4.3.3", // ECDSA-with SHA384
         "1.2.840.10045.4.3.4"  // ECDSA with SHA512
     )
 
-    val allowedSubjectPulicKeyAlgorithmOid = "1.2.840.10045.2.1"
+    private val allowedSubjectPublicKeyAlgorithmOid = setOf(
+        "1.2.840.10045.2.1",
+        "1.3.101.112",
+        "1.3.101.113"
+    )
 
-    val allowedSubjectPublicKeyEllipticCurveOid = listOf(
+
+    private val allowedSubjectPublicKeyEllipticCurveOid = listOf(
         // FIPS 186-4:
         "1.2.840.10045.3.1.7", // (Curve P-256)
         "1.3.132.0.34", // (Curve P-384)
@@ -58,12 +72,15 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
     /**
      * Maximum of 457 days after “notBefore” date
      */
-    val maxValidityTime = 457.days
+    private val maxValidityTime = 457.days
 
     override val id: String = ID
 
     fun X509CertificateDataBuilder.profileDocumentSignerCertificate(
         issuerCertificate: X509Certificate,
+        crlDistributionPointUri: String,
+        issuerEmailAddress: String? = null,
+        issuerUri: String? = null,
         subjectKey: Key,
         subjectDnCountryCode: String,
         subjectDnStateOrProvinceName: String? = null,
@@ -72,7 +89,6 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
         subjectDnCommonName: String,
         subjectDnSerialNumber: String? = null,
     ) {
-        require(issuerDn.isNotBlank()) { "issuerDn must not be blank" }
         require(subjectDnCountryCode.length == 2) { "Require two letter country code but is '${subjectDnCountryCode}'" }
         require(subjectDnCommonName.isNotBlank()) { "common name must not be blank" }
         val subjectDn = listOfNotNull(
@@ -83,17 +99,55 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
             subjectDnCountryCode.let { "C=${it.uppercase().trim()}" },
         )
             .joinToString(",")
-        profileDocumentSignerCertificate(issuerCertificate, subjectKey, subjectDn)
+        profileDocumentSignerCertificate(
+            issuerCertificate = issuerCertificate,
+            crlDistributionPointUri = crlDistributionPointUri,
+            issuerEmailAddress = issuerEmailAddress,
+            issuerUri = issuerUri,
+            subjectKey = subjectKey,
+            subjectDn = subjectDn,
+        )
     }
 
     fun X509CertificateDataBuilder.profileDocumentSignerCertificate(
         issuerCertificate: X509Certificate,
+        crlDistributionPointUri: String,
+        issuerEmailAddress: String? = null,
+        issuerUri: String? = null,
         subjectKey: Key,
-        subjectDn: String
+        subjectDn: String,
     ) {
         this.issuerDnRaw = issuerCertificate.data.subjectDnRaw
         this.subjectDn = subjectDn
         subjectPublicKey(subjectKey)
+        extensionSubjectKeyIdentifier()
+        extensionKeyUsage {
+            critical = true
+            addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature)
+        }
+        extensionExtendedKeyUsage {
+            critical = true
+            addKeyUsage(ExtendedKeyUsageExtension.KeyUsage.mdlDS)
+        }
+        extensionIssuerAltName {
+            require(issuerEmailAddress != null || issuerUri != null) { "Either issuerEmailAddress or issuerUri must be set" }
+            if (issuerEmailAddress != null) {
+                addEmail(issuerEmailAddress)
+            }
+            if (issuerUri != null) {
+                addUri(issuerUri)
+            }
+        }
+        extensionCrlDistributionPoints {
+            addDistributionPointFullName(
+                listOf(
+                    GeneralName(
+                        GeneralName.NameType.uniformResourceIdentifier,
+                        crlDistributionPointUri
+                    )
+                )
+            )
+        }
     }
 
     override suspend fun validate(
@@ -102,17 +156,20 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
     ) {
         validateVersion(context, x509Certificate)
         validateSerialNumber(context, x509Certificate)
-        validateSignatureAlgorithm(context, x509Certificate)
         validateValidityTime(context, x509Certificate, maxValidityTime)
         validateSubjectDn(context, x509Certificate)
         validateSubjectPublicKeyInfo(context, x509Certificate)
+        validateExtensionAuthorityKeyIdentifier(context, x509Certificate)
         validateExtensionSubjectKeyIdentifier(context, x509Certificate)
         validateExtensionKeyUsage(context, x509Certificate)
+        validateExtensionExtendedKeyUsage(context, x509Certificate)
         validateExtensionIssuerAlternativeName(context, x509Certificate)
-        validateExtensionBasicConstraints(context, x509Certificate)
         validateExtensionCrlDistributionPoints(context, x509Certificate)
+        validateSignatureAlgorithm(context, x509Certificate, allowedSignatureAlgorithmsOid)
+        validateExtensionsAreNotCritical(context, x509Certificate, criticalExtensions)
     }
 
+    private val countryNameRegex = Regex("^[A-Z]{2}$")
 
     /**
      * countryName is mandatory. The value shall be in upper case and
@@ -138,56 +195,134 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
      * encoding is not listed above syntax shall be either
      * PrintableString or UTF8String.
      */
-
-    private val countryCodeRegx = Regex("""\bc\s*=\s*"?([A-Z]{2})"?\b""", RegexOption.IGNORE_CASE)
-
-    /**
-     * Same exact binary value as Issuer.
-     */
     fun validateSubjectDn(
         context: ValidationContext,
         x509Certificate: X509Certificate
     ) {
-        if (x509Certificate.data.subjectDn != x509Certificate.data.issuerDn) {
+        val dn = DistinguishedName.ofString(x509Certificate.data.subjectDn)
+        val grouped = dn.rdnList.flatMap { it }
+            .groupBy { it.type.name.lowercase() }
+
+        val countryName = grouped.get("c")
+        if (countryName == null) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
                 "subjectDn",
-                "Subject DN '${x509Certificate.data.subjectDn}' must be same as issuer DN ''${x509Certificate.data.issuerDn}'"
+                "Missing countryName in DN"
             )
+        } else {
+            if (countryName.size != 1) {
+                context.addLogEntry(
+                    ValidationResult.Severity.ERROR,
+                    "subjectDn",
+                    "Multiple countryName in DN"
+                )
+            }
+            countryName.forEach {
+                if (!countryNameRegex.matches(it.value)) {
+                    context.addLogEntry(
+                        ValidationResult.Severity.ERROR,
+                        "subjectDn",
+                        "Invalid countryName in DN: '${it}'"
+                    )
+                }
+            }
+        }
+
+        val cn = grouped.get("cn")
+        if (cn == null) {
+            context.addLogEntry(
+                ValidationResult.Severity.ERROR,
+                "subjectDn",
+                "Missing commonName in DN"
+            )
+        } else {
+            cn.forEach {
+                if (it.value.isBlank()) {
+                    context.addLogEntry(
+                        ValidationResult.Severity.ERROR,
+                        "subjectDn",
+                        "commonName must not be blank"
+                    )
+                }
+            }
         }
     }
 
     /**
-     * Algorithm: 1.2.840.10045.2.1 (Elliptic curve)
+     * Algorithm:
+     * If any of the curves specified below for the parameters field is used, the following OID must be used, as
+     * specified in RFC 5480 and RFC 5639:
+     * 1.2.840.10045.2.1 (id-ecPublicKey)
+     * For curves Ed25519 or Ed448, one of the following OIDs must be
+     * used, as specified in RFC 8410:
+     * 1.3.101.112(Curve Ed25519)
+     * 1.3.101.113(Curve Ed448)
+     *
      * Parameter:
-     *   one of the following curves specified in FIPS 186-4:
-     *     1.2.840.10045.3.1.7 (Curve P-256)
-     *     1.3.132.0.34 (Curve P-384)
-     *     1.3.132.0.35 (Curve P-521)
-     *   or one of the following curves specified in RFC 5639:
-     *     1.3.36.3.3.2.8.1.1.7 (brainpoolP256r1)
-     *     1.3.36.3.3.2.8.1.1.9 (brainpoolP320r1)
-     *     1.3.36.3.3.2.8.1.1.11 (brainpoolP384r1)
-     *     1.3.36.3.3.2.8.1.1.13 (brainpoolP512r1)
+     * This field must only be present when the algorithm field contains the OID 1.2.840.10045.2.1.
+     * Implicitly specify curve parameters through an OID associated with
+     * one of the following curves specified in FIPS 186-4:
+     * 1.2.840.10045.3.1.7 (Curve P-256)
+     * 1.3.132.0.34 (Curve P-384)
+     * 1.3.132.0.35 (Curve P-521)
+     * Or one of the following curves specified in RFC 5639:
+     * 1.3.36.3.3.2.8.1.1.7 (brainpoolP256r1)
+     * 1.3.36.3.3.2.8.1.1.9 (brainpoolP320r1)
+     * 1.3.36.3.3.2.8.1.1.11 (brainpoolP384r1)
+     * 1.3.36.3.3.2.8.1.1.13 (brainpoolP512r1
      */
     fun validateSubjectPublicKeyInfo(
         context: ValidationContext,
         x509Certificate: X509Certificate
     ) {
         val subjectPublicKeyInfo = x509Certificate.data.subjectPublicKeyInfo
-        if (allowedSubjectPulicKeyAlgorithmOid != subjectPublicKeyInfo.algorithmOid) {
+        if (!allowedSubjectPublicKeyAlgorithmOid.contains(subjectPublicKeyInfo.algorithmOid)) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
                 "subjectPublicKeyInfo",
-                "Subject public key algorithm OID expected to be '${allowedSubjectPulicKeyAlgorithmOid}' but is '${subjectPublicKeyInfo.algorithmOid}' ('${subjectPublicKeyInfo.algorithmName}') "
+                "Subject public key algorithm OID expected to be one of '${allowedSubjectPublicKeyAlgorithmOid}' but is '${subjectPublicKeyInfo.algorithmOid}' ('${subjectPublicKeyInfo.algorithmName}') "
             )
-        } else if (subjectPublicKeyInfo.ellipticCurveOid == null ||
-            !allowedSubjectPublicKeyEllipticCurveOid.contains(subjectPublicKeyInfo.ellipticCurveOid)
-        ) {
+        } else {
+            if ("1.2.840.10045.2.1".equals(subjectPublicKeyInfo.algorithmOid)) {
+                if (subjectPublicKeyInfo.ellipticCurveOid == null) {
+                    context.addLogEntry(
+                        ValidationResult.Severity.ERROR,
+                        "subjectPublicKeyInfo",
+                        "Subject public key parameter elliptic curve OID expected to be one of '${allowedSubjectPublicKeyEllipticCurveOid}' but is null"
+                    )
+                } else if (!allowedSubjectPublicKeyEllipticCurveOid.contains(subjectPublicKeyInfo.ellipticCurveOid)) {
+                    context.addLogEntry(
+                        ValidationResult.Severity.ERROR,
+                        "subjectPublicKeyInfo",
+                        "Subject public key parameter elliptic curve OID expected to be one of '${allowedSubjectPublicKeyEllipticCurveOid}' but is '${subjectPublicKeyInfo.ellipticCurveOid}'"
+                    )
+                }
+            } else {
+                if (subjectPublicKeyInfo.ellipticCurveOid != null) {
+                    context.addLogEntry(
+                        ValidationResult.Severity.ERROR,
+                        "subjectPublicKeyInfo",
+                        "Subject public key parameter 'elliptic curve OID' to be null but is '${subjectPublicKeyInfo.ellipticCurveOid}'"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Same value as the subject key identifier of the IACA root certificate
+     */
+    fun validateExtensionAuthorityKeyIdentifier(
+        context: ValidationContext,
+        x509Certificate: X509Certificate
+    ) {
+        val authorityKeyId = x509Certificate.data.extensionAuthorityKeyIdentifier?.keyIdentifier
+        if (authorityKeyId == null) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
-                "subjectPublicKeyInfo",
-                "Subject public key parameter elliptic curve OID expected to be one of '${allowedSubjectPublicKeyEllipticCurveOid}' but is '${subjectPublicKeyInfo.ellipticCurveOid}'"
+                "authorityKeyIdentifier",
+                "Certificate extension '${AuthorityKeyIdentifierExtension.OID}' ('${AuthorityKeyIdentifierExtension.NAME}') is not present OR keyId is not set"
             )
         }
     }
@@ -216,21 +351,17 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
         }
     }
 
-    val requiredKeyUsage = setOf(
-        KeyUsageExtension.KeyUsage.keyCertSign,
-        KeyUsageExtension.KeyUsage.cRLSign,
-    )
-
     /**
+     * Extension Key usage 4.2.1.3
+     * Mandatory Critical
      * Extension Key Usage:
-     * Mandator, Critical
-     *  - Digital signature:         false
+     *  - Digital signature:         true
      *  - Non-repudiation:           false
      *  - Key encipherment:          false
      *  - Data encipherment:         false
      *  - Key agreement:             false
-     *  - Key certificate signature: true
-     *  - CRL signature:             true
+     *  - Key certificate signature: false
+     *  - CRL signature:             false
      *  - Encipher only:             false
      *  - Decipher only:             false
      */
@@ -245,26 +376,26 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
                 "keyUsage",
                 "Certificate extension '${KeyUsageExtension.OID}' ('${KeyUsageExtension.NAME}') is not present"
             )
-        } else if (!extension.critical) {
-            context.addLogEntry(
-                ValidationResult.Severity.ERROR,
-                "keyUsage",
-                "Certificate extension '${KeyUsageExtension.OID}' ('${KeyUsageExtension.NAME}') must have a critical flag set"
-            )
-        }
-        extension?.keyPurposeIdList?.also { actualKeyUsage ->
-            KeyUsageExtension.KeyUsage.entries.forEach {
-                if (requiredKeyUsage.contains(it) && !actualKeyUsage.contains(it)) {
+        } else {
+            if (!extension.critical) {
+                context.addLogEntry(
+                    ValidationResult.Severity.ERROR,
+                    "keyUsage",
+                    "Certificate extension '${KeyUsageExtension.OID}' ('${KeyUsageExtension.NAME}') must have critical flag set"
+                )
+            }
+            extension.keyPurposeIdList.also { actualKeyUsage ->
+                if (actualKeyUsage.size != 1) {
                     context.addLogEntry(
                         ValidationResult.Severity.ERROR,
                         "keyUsage",
-                        "Certificate extension '${KeyUsageExtension.OID}' ('${KeyUsageExtension.NAME}') requires '${it} flag set, but is false"
+                        "Certificate extension '${KeyUsageExtension.OID}' ('${KeyUsageExtension.NAME}') requires ony 'digitalSignature' flag set, but has set $actualKeyUsage"
                     )
-                } else if (!requiredKeyUsage.contains(it) && actualKeyUsage.contains(it)) {
+                } else if (actualKeyUsage.first() != KeyUsageExtension.KeyUsage.digitalSignature) {
                     context.addLogEntry(
                         ValidationResult.Severity.ERROR,
                         "keyUsage",
-                        "Certificate extension '${KeyUsageExtension.OID}' ('${KeyUsageExtension.NAME}') requires '${it} flag not to be set, but is true"
+                        "Certificate extension '${KeyUsageExtension.OID}' ('${KeyUsageExtension.NAME}') requires digitalSignature flag set, but is false"
                     )
                 }
             }
@@ -272,7 +403,47 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
     }
 
     /**
-     * Extension Issuer alternative name:
+     * Extension: Extended key usage 4.2.1.12
+     * Mandatory Critical
+     * Key usage must be: OID 1.0.18013.5.1.2 (mdlDS)
+     */
+    fun validateExtensionExtendedKeyUsage(
+        context: ValidationContext,
+        x509Certificate: X509Certificate
+    ) {
+        val extension = x509Certificate.data.extensionExtendedKeyUsage
+        if (extension == null || extension.keyPurposeIdList.isEmpty()) {
+            context.addLogEntry(
+                ValidationResult.Severity.ERROR,
+                "extendedKeyUsage",
+                "Certificate extension '${ExtendedKeyUsageExtension.OID}' ('${ExtendedKeyUsageExtension.NAME}') is not present"
+            )
+        } else {
+            if (!extension.critical) {
+                context.addLogEntry(
+                    ValidationResult.Severity.ERROR,
+                    "extendedKeyUsage",
+                    "Certificate extension '${ExtendedKeyUsageExtension.OID}' ('${ExtendedKeyUsageExtension.NAME}') must have critical flag set"
+                )
+            }
+            if (extension.keyPurposeIdList.size > 1) {
+                context.addLogEntry(
+                    ValidationResult.Severity.ERROR,
+                    "extendedKeyUsage",
+                    "Extended Key Usage expected to have one entry but it has ${extension.keyPurposeIdList.size} entries"
+                )
+            } else if (!extension.keyPurposeList.contains(ExtendedKeyUsageExtension.KeyUsage.mdlDS)) {
+                context.addLogEntry(
+                    ValidationResult.Severity.ERROR,
+                    "extendedKeyUsage",
+                    "Extended Key Usage expected to have one entry of type 'mdlDS' (oid: '${ExtendedKeyUsageExtension.KeyUsage.mdlDS.id}') but it has ${extension.keyPurposeList} entries"
+                )
+            }
+        }
+    }
+
+    /**
+     * Extension Issuer alternative name
      * Mandatory, not critical
      * The issuer alternative name extension shall provide contact
      * information for the issuer of the certificate. For that purpose, the
@@ -319,57 +490,29 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
     }
 
     /**
-     * Extension Basic constraints:
-     * Mandatory, Critical
+     * CRLDistributionPoints (mandatory, not critical):
+     * The ‘reasons’ and ‘cRL Issuer’ fields shall not be used.
+     * distributionPoint: mandatory URI for CRL distribution point
      */
-    fun validateExtensionBasicConstraints(
-        context: ValidationContext,
-        x509Certificate: X509Certificate
-    ) {
-        val extension = x509Certificate.data.extensionBasicConstraints
-        if (extension == null) {
-            context.addLogEntry(
-                ValidationResult.Severity.ERROR,
-                "basicConstraints",
-                "Certificate extension '${BasicConstraintsExtension.OID}' ('${BasicConstraintsExtension.NAME}') is not present"
-            )
-        } else {
-            if (!extension.critical) {
-                context.addLogEntry(
-                    ValidationResult.Severity.ERROR,
-                    "basicConstraints",
-                    "Certificate extension '${BasicConstraintsExtension.OID}' ('${BasicConstraintsExtension.NAME}') must have a critical flag set"
-                )
-            }
-            if (!extension.cA) {
-                context.addLogEntry(
-                    ValidationResult.Severity.ERROR,
-                    "basicConstraints",
-                    "Certificate extension '${BasicConstraintsExtension.OID}' ('${BasicConstraintsExtension.NAME}') must have cA flag set"
-                )
-            }
-            if (extension.pathLenConstraint != 0) {
-                context.addLogEntry(
-                    ValidationResult.Severity.ERROR,
-                    "basicConstraints",
-                    "Certificate extension '${BasicConstraintsExtension.OID}' ('${BasicConstraintsExtension.NAME}') must have pathLenConstraint set to '0' but is '${extension.pathLenConstraint}'"
-                )
-            }
-        }
-    }
-
     fun validateExtensionCrlDistributionPoints(
         context: ValidationContext,
         x509Certificate: X509Certificate
     ) {
         val extension = x509Certificate.data.extensionCrlDistributionPoints
-        if (extension != null) {
+        if (extension == null) {
             context.addLogEntry(
-                ValidationResult.Severity.WARNING,
+                ValidationResult.Severity.ERROR,
                 "crlDistributionPoints",
-                "Presence of CRL Distribution Points is not recommended; its presence is allowed for backwards compatibility reasons"
+                "Extension CRL Distribution Points is missing"
             )
-
+        } else {
+            if (extension.distributionPoints.isEmpty()) {
+                context.addLogEntry(
+                    ValidationResult.Severity.ERROR,
+                    "crlDistributionPoints",
+                    "Extension CRL Distribution Points should contain at least one DistributionPoint"
+                )
+            }
             extension.distributionPoints.forEachIndexed { index, dp ->
                 if (dp.reason != null) {
                     context.addLogEntry(

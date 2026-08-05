@@ -1,7 +1,6 @@
 package id.walt.certificate.x509.profile
 
 import id.walt.certificate.x509.X509Certificate
-import id.walt.certificate.x509.profile.IsoDocumentSignerX509CertificateProfile.allowedSignatureAlgorithmsOid
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
 import kotlin.experimental.and
@@ -73,7 +72,8 @@ object IsoProfileX509CertificateValidationUtil {
      */
     fun validateSignatureAlgorithm(
         context: ValidationContext,
-        x509Certificate: X509Certificate
+        x509Certificate: X509Certificate,
+        allowedSignatureAlgorithmsOid: Set<String>
     ) {
         if (!allowedSignatureAlgorithmsOid.contains(x509Certificate.signatureAlgorithmOid)) {
             context.addLogEntry(
@@ -104,6 +104,22 @@ object IsoProfileX509CertificateValidationUtil {
                 "validityTime",
                 "Validity time must be less than ${maxValidityTime}"
             )
+        }
+    }
+
+    fun validateExtensionsAreNotCritical(
+        context: ValidationContext,
+        x509Certificate: X509Certificate,
+        criticalExtensions: Set<String>
+    ) {
+        x509Certificate.data.extensions.forEach {
+            if (it.value.critical && !criticalExtensions.contains(it.key)) {
+                context.addLogEntry(
+                    ValidationResult.Severity.ERROR,
+                    "extensionNotCritical",
+                    "Extension '${it.key}' is critical"
+                )
+            }
         }
     }
 }

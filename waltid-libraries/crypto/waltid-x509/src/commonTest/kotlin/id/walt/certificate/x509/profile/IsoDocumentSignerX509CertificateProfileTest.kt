@@ -7,26 +7,29 @@ import id.walt.certificate.x509.profile.IsoDocumentSignerX509CertificateProfile.
 import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile.profileIaCaRootCertificate
 import id.walt.certificate.x509.validation.X509SingleCertificateValidator
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
 class IsoDocumentSignerX509CertificateProfileTest {
 
-    @Ignore
+    //TODO: Add tests for all supported key types
+    //      waltid-crypto only supports a subset of key types and every platform has a different set of supported key types
     @Test
-    fun abc() = runTest {
+    fun shouldCreateValidDocumentSignerCertificate() = runTest {
         val rootCert = rootCaCertDeferred.await()
-        val subjectKey = JWKKey.importPEM(TestKeys.ed25519KeyPem).getOrThrow()
+        val subjectKey = JWKKey.generate(KeyType.secp384r1)
         val cert = X509CertificateUtil.createCertificate(
             rootCaKeyDeferred.await(),
             rootCaCertDeferred.await()
         ) {
             profileDocumentSignerCertificate(
                 issuerCertificate = rootCert,
+                crlDistributionPointUri = "https://crl.walt.id/crl.der",
+                issuerEmailAddress = "office@walt.id",
                 subjectKey = subjectKey,
                 subjectDnCountryCode = "AT",
                 subjectDnStateOrProvinceName = "Styria",

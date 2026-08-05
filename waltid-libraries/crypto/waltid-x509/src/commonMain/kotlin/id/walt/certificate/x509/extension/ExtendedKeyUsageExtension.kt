@@ -2,7 +2,10 @@ package id.walt.certificate.x509.extension
 
 interface ExtendedKeyUsageExtension : Extension {
 
-    val keyPurposeIdList: Set<KeyUsage>
+    val keyPurposeIdList: Set<String>
+
+    val keyPurposeList: Set<KeyUsage>
+        get() = keyPurposeIdList.map { getKeyUsageById(it) }.toSet()
 
     enum class KeyUsage(val id: String) {
         anyExtendedKeyUsage("2.5.29.37.0"),
@@ -31,7 +34,9 @@ interface ExtendedKeyUsageExtension : Extension {
         smartcardlogon("1.3.6.1.4.1.311.20.2.2"),
         macAddress("1.3.6.1.1.1.1.22"),
         msSGC("1.3.6.1.4.1.311.10.3.3"),
-        nsSGC("2.16.840.1.113730.4.1")
+        nsSGC("2.16.840.1.113730.4.1"),
+        mdlDS("1.0.18013.5.1.2"),
+        unknown("")
     }
 
     companion object {
@@ -53,7 +58,7 @@ interface ExtendedKeyUsageExtension : Extension {
         private val keyUsageById = KeyUsage.entries.associateBy { it.id }
 
         fun getKeyUsageById(id: String): KeyUsage =
-            keyUsageById[id] ?: error("No key usage for id $id")
+            keyUsageById[id] ?: KeyUsage.unknown
 
     }
 
@@ -61,10 +66,10 @@ interface ExtendedKeyUsageExtension : Extension {
         override val oid: String = OID,
         override var critical: Boolean = false
     ) : ExtendedKeyUsageExtension {
-        override val keyPurposeIdList: MutableSet<KeyUsage> = mutableSetOf()
+        override val keyPurposeIdList: MutableSet<String> = mutableSetOf()
 
         fun addKeyUsage(vararg keyUsage: KeyUsage) {
-            keyPurposeIdList.addAll(keyUsage)
+            keyPurposeIdList.addAll(keyUsage.map { it.id })
         }
     }
 }

@@ -295,8 +295,8 @@ class SignumImplementationTest {
 
         assertNotNull(intermediateCert.data.extensionExtendedKeyUsage) {
             assertEquals(2, it.keyPurposeIdList.size)
-            assertTrue(it.keyPurposeIdList.contains(ExtendedKeyUsageExtension.KeyUsage.clientAuth))
-            assertTrue(it.keyPurposeIdList.contains(ExtendedKeyUsageExtension.KeyUsage.serverAuth))
+            assertTrue(it.keyPurposeList.contains(ExtendedKeyUsageExtension.KeyUsage.clientAuth))
+            assertTrue(it.keyPurposeList.contains(ExtendedKeyUsageExtension.KeyUsage.serverAuth))
         }
 
         assertNotNull(intermediateCert.data.subjectPublicKeyInfo) { keyInfo ->

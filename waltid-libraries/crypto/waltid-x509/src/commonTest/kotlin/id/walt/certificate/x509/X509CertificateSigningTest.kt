@@ -141,10 +141,10 @@ class X509CertificateSigningTest {
         }
 
         assertNotNull(intermediateCert.data.extensionExtendedKeyUsage) {
-            assertTrue(it.keyPurposeIdList.contains(ExtendedKeyUsageExtension.KeyUsage.clientAuth))
-            assertTrue(it.keyPurposeIdList.contains(ExtendedKeyUsageExtension.KeyUsage.serverAuth))
-            assertFalse(it.keyPurposeIdList.contains(ExtendedKeyUsageExtension.KeyUsage.eapOverLAN))
-            assertFalse(it.keyPurposeIdList.contains(ExtendedKeyUsageExtension.KeyUsage.anyExtendedKeyUsage))
+            assertTrue(it.keyPurposeList.contains(ExtendedKeyUsageExtension.KeyUsage.clientAuth))
+            assertTrue(it.keyPurposeList.contains(ExtendedKeyUsageExtension.KeyUsage.serverAuth))
+            assertFalse(it.keyPurposeList.contains(ExtendedKeyUsageExtension.KeyUsage.eapOverLAN))
+            assertFalse(it.keyPurposeList.contains(ExtendedKeyUsageExtension.KeyUsage.anyExtendedKeyUsage))
         }
 
         assertNotNull(intermediateCert.data.subjectPublicKeyInfo) { keyInfo ->

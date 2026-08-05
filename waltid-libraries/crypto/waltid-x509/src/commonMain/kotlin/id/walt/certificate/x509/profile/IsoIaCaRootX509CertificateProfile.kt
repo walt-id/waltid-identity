@@ -13,6 +13,7 @@ import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionK
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.model.GeneralName
+import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateExtensionsAreNotCritical
 import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateSerialNumber
 import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateSignatureAlgorithm
 import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.validateValidityTime
@@ -36,15 +37,20 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
 
     const val ID = "iso-iaca-root"
 
-    val allowedSignatureAlgorithmsOid = listOf(
+    private val criticalExtensions = setOf(
+        "2.5.29.15", // Key Usage
+        "2.5.29.19"  // Basic Constraints
+    )
+
+    private val allowedSignatureAlgorithmsOid = setOf(
         "1.2.840.10045.4.3.2", // ECDSA-with SHA256
         "1.2.840.10045.4.3.3", // ECDSA-with SHA384
         "1.2.840.10045.4.3.4"  // ECDSA with SHA512
     )
 
-    val allowedSubjectPulicKeyAlgorithmOid = "1.2.840.10045.2.1"
+    private val allowedSubjectPulicKeyAlgorithmOid = "1.2.840.10045.2.1"
 
-    val allowedSubjectPublicKeyEllipticCurveOid = listOf(
+    private val allowedSubjectPublicKeyEllipticCurveOid = setOf(
         // FIPS 186-4:
         "1.2.840.10045.3.1.7", // (Curve P-256)
         "1.3.132.0.34", // (Curve P-384)
@@ -65,7 +71,7 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
      * used to issue mDLs, a maximum validity period of 9 years is
      * sufficient.
      */
-    val maxValidityTime = 365.days * 20 // 20 years
+    private val maxValidityTime = 365.days * 20 // 20 years
 
     override val id: String = ID
 
@@ -129,7 +135,7 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
     ) {
         validateVersion(context, x509Certificate)
         validateSerialNumber(context, x509Certificate)
-        validateSignatureAlgorithm(context, x509Certificate)
+        validateSignatureAlgorithm(context, x509Certificate, allowedSignatureAlgorithmsOid)
         validateIssuerDn(context, x509Certificate)
         validateValidityTime(context, x509Certificate, maxValidityTime)
         validateSubjectDn(context, x509Certificate)
@@ -139,6 +145,7 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
         validateExtensionIssuerAlternativeName(context, x509Certificate)
         validateExtensionBasicConstraints(context, x509Certificate)
         validateExtensionCrlDistributionPoints(context, x509Certificate)
+        validateExtensionsAreNotCritical(context, x509Certificate, criticalExtensions)
     }
 
     /**
