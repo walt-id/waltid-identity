@@ -413,7 +413,9 @@ object DemoTestBackend {
         val payload = buildJsonObject {
             put("flow_type", "cross_device")
             putJsonObject("core_flow") {
-                put("signed_request", signedRequest)
+                if (signedRequest) {
+                    put("signed_request", true)
+                }
                 requestedSessionId?.let { sessionId ->
                     val responseUri = "$VERIFIER_BASE_URL/verification-session/$sessionId/response"
                     put("sessionId", sessionId)

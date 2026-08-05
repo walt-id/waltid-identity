@@ -258,8 +258,10 @@ public final class DemoBackend {
             "dcql_query": [
                 "credentials": [scenario.verifierCredentialQuery],
             ],
-            "signed_request": signedRequest,
         ]
+        if signedRequest {
+            coreFlow["signed_request"] = true
+        }
         if let requestedSessionID {
             let responseURI = Self.verifierBaseURL
                 .appendingPathComponent("verification-session")
