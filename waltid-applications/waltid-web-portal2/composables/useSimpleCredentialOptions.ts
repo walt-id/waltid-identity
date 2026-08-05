@@ -1,5 +1,7 @@
 export type SimpleCredentialFormat = "jwt_vc_json" | "dc+sd-jwt" | "mso_mdoc";
 
+export type SimpleVerifierFlowType = "cross_device" | "dc_api";
+
 export interface SimpleCredentialClaim {
   id: string;
   label: string;
@@ -14,12 +16,309 @@ export interface SimpleCredentialOption {
   format: SimpleCredentialFormat;
   pills: Array<{ label: string; tone: "blue" | "green" | "purple" | "slate" }>;
   defaultCredentialData: Record<string, unknown>;
+  /** When true, the option is only shown in the simple verify editor. */
+  verifyOnly?: boolean;
+  /** Verification transport. Defaults to cross_device (QR / HTTP). */
+  verifierFlowType?: SimpleVerifierFlowType;
   verifier: {
     credentialId: string;
     meta: Record<string, unknown>;
     claims: SimpleCredentialClaim[];
   };
 }
+
+const MDL_DEFAULT_CREDENTIAL_DATA: Record<string, unknown> = {
+  "org.iso.18013.5.1": {
+    family_name: "Musterfrau",
+    given_name: "Anna Maria",
+    birth_date: "1988-08-25",
+    issue_date: "2025-01-15",
+    expiry_date: "2035-01-15",
+    issuing_country: "AT",
+    issuing_authority: "Bundesministerium für Inneres",
+    document_number: "DL-AT-2025-00018427",
+    portrait:
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0i8AAAAASUVORK5CYII=",
+    driving_privileges: [
+      {
+        vehicle_category_code: "B",
+        issue_date: "2006-09-14",
+        expiry_date: "2035-01-15",
+      },
+      {
+        vehicle_category_code: "AM",
+        issue_date: "2004-08-25",
+        expiry_date: "2035-01-15",
+      },
+    ],
+    un_distinguishing_sign: "A",
+    administrative_number: "AT-FS-99817234",
+    sex: 2,
+    height: 170,
+    weight: 63,
+    eye_colour: "brown",
+    hair_colour: "brown",
+    birth_place: "Graz",
+    resident_address: "Mariahilfer Strasse 120/8",
+    portrait_capture_date: "2024-12-20",
+    age_in_years: 36,
+    age_birth_year: 1988,
+    age_over_12: true,
+    age_over_13: true,
+    age_over_14: true,
+    age_over_16: true,
+    age_over_18: true,
+    age_over_21: true,
+    age_over_25: true,
+    age_over_60: false,
+    age_over_62: false,
+    age_over_65: false,
+    age_over_68: false,
+    issuing_jurisdiction: "AT-9",
+    nationality: "AUT",
+    resident_city: "Wien",
+    resident_state: "Wien",
+    resident_postal_code: "1070",
+    resident_country: "AT",
+    family_name_national_character: "Musterfrau",
+    given_name_national_character: "Anna Maria",
+    signature_usual_mark:
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0i8AAAAASUVORK5CYII=",
+    biometric_template_face: null,
+    biometric_template_finger: null,
+    biometric_template_signature_sign: null,
+    biometric_template_iris: null,
+  },
+};
+
+const MDL_VERIFIER_CLAIMS: SimpleCredentialClaim[] = [
+  {
+    id: "family_name",
+    label: "Family name",
+    path: ["org.iso.18013.5.1", "family_name"],
+  },
+  {
+    id: "given_name",
+    label: "Given name",
+    path: ["org.iso.18013.5.1", "given_name"],
+  },
+  {
+    id: "birth_date",
+    label: "Birth date",
+    path: ["org.iso.18013.5.1", "birth_date"],
+  },
+  {
+    id: "issue_date",
+    label: "Issue date",
+    path: ["org.iso.18013.5.1", "issue_date"],
+  },
+  {
+    id: "expiry_date",
+    label: "Expiry date",
+    path: ["org.iso.18013.5.1", "expiry_date"],
+  },
+  {
+    id: "issuing_country",
+    label: "Issuing country",
+    path: ["org.iso.18013.5.1", "issuing_country"],
+  },
+  {
+    id: "issuing_authority",
+    label: "Issuing authority",
+    path: ["org.iso.18013.5.1", "issuing_authority"],
+  },
+  {
+    id: "document_number",
+    label: "Document number",
+    path: ["org.iso.18013.5.1", "document_number"],
+  },
+  {
+    id: "portrait",
+    label: "Portrait",
+    path: ["org.iso.18013.5.1", "portrait"],
+  },
+  {
+    id: "driving_privileges",
+    label: "Driving privileges",
+    path: ["org.iso.18013.5.1", "driving_privileges"],
+  },
+  {
+    id: "un_distinguishing_sign",
+    label: "UN distinguishing sign",
+    path: ["org.iso.18013.5.1", "un_distinguishing_sign"],
+  },
+  {
+    id: "administrative_number",
+    label: "Administrative number",
+    path: ["org.iso.18013.5.1", "administrative_number"],
+  },
+  { id: "sex", label: "Sex", path: ["org.iso.18013.5.1", "sex"] },
+  {
+    id: "height",
+    label: "Height",
+    path: ["org.iso.18013.5.1", "height"],
+  },
+  {
+    id: "weight",
+    label: "Weight",
+    path: ["org.iso.18013.5.1", "weight"],
+  },
+  {
+    id: "eye_colour",
+    label: "Eye colour",
+    path: ["org.iso.18013.5.1", "eye_colour"],
+  },
+  {
+    id: "hair_colour",
+    label: "Hair colour",
+    path: ["org.iso.18013.5.1", "hair_colour"],
+  },
+  {
+    id: "birth_place",
+    label: "Birth place",
+    path: ["org.iso.18013.5.1", "birth_place"],
+  },
+  {
+    id: "resident_address",
+    label: "Resident address",
+    path: ["org.iso.18013.5.1", "resident_address"],
+  },
+  {
+    id: "portrait_capture_date",
+    label: "Portrait capture date",
+    path: ["org.iso.18013.5.1", "portrait_capture_date"],
+  },
+  {
+    id: "age_in_years",
+    label: "Age in years",
+    path: ["org.iso.18013.5.1", "age_in_years"],
+  },
+  {
+    id: "age_birth_year",
+    label: "Birth year",
+    path: ["org.iso.18013.5.1", "age_birth_year"],
+  },
+  {
+    id: "age_over_12",
+    label: "Over 12",
+    path: ["org.iso.18013.5.1", "age_over_12"],
+  },
+  {
+    id: "age_over_13",
+    label: "Over 13",
+    path: ["org.iso.18013.5.1", "age_over_13"],
+  },
+  {
+    id: "age_over_14",
+    label: "Over 14",
+    path: ["org.iso.18013.5.1", "age_over_14"],
+  },
+  {
+    id: "age_over_16",
+    label: "Over 16",
+    path: ["org.iso.18013.5.1", "age_over_16"],
+  },
+  {
+    id: "age_over_18",
+    label: "Over 18",
+    path: ["org.iso.18013.5.1", "age_over_18"],
+  },
+  {
+    id: "age_over_21",
+    label: "Over 21",
+    path: ["org.iso.18013.5.1", "age_over_21"],
+  },
+  {
+    id: "age_over_25",
+    label: "Over 25",
+    path: ["org.iso.18013.5.1", "age_over_25"],
+  },
+  {
+    id: "age_over_60",
+    label: "Over 60",
+    path: ["org.iso.18013.5.1", "age_over_60"],
+  },
+  {
+    id: "age_over_62",
+    label: "Over 62",
+    path: ["org.iso.18013.5.1", "age_over_62"],
+  },
+  {
+    id: "age_over_65",
+    label: "Over 65",
+    path: ["org.iso.18013.5.1", "age_over_65"],
+  },
+  {
+    id: "age_over_68",
+    label: "Over 68",
+    path: ["org.iso.18013.5.1", "age_over_68"],
+  },
+  {
+    id: "issuing_jurisdiction",
+    label: "Issuing jurisdiction",
+    path: ["org.iso.18013.5.1", "issuing_jurisdiction"],
+  },
+  {
+    id: "nationality",
+    label: "Nationality",
+    path: ["org.iso.18013.5.1", "nationality"],
+  },
+  {
+    id: "resident_city",
+    label: "Resident city",
+    path: ["org.iso.18013.5.1", "resident_city"],
+  },
+  {
+    id: "resident_state",
+    label: "Resident state",
+    path: ["org.iso.18013.5.1", "resident_state"],
+  },
+  {
+    id: "resident_postal_code",
+    label: "Resident postal code",
+    path: ["org.iso.18013.5.1", "resident_postal_code"],
+  },
+  {
+    id: "resident_country",
+    label: "Resident country",
+    path: ["org.iso.18013.5.1", "resident_country"],
+  },
+  {
+    id: "family_name_national_character",
+    label: "Family name national characters",
+    path: ["org.iso.18013.5.1", "family_name_national_character"],
+  },
+  {
+    id: "given_name_national_character",
+    label: "Given name national characters",
+    path: ["org.iso.18013.5.1", "given_name_national_character"],
+  },
+  {
+    id: "signature_usual_mark",
+    label: "Signature usual mark",
+    path: ["org.iso.18013.5.1", "signature_usual_mark"],
+  },
+  {
+    id: "biometric_template_face",
+    label: "Face biometric template",
+    path: ["org.iso.18013.5.1", "biometric_template_face"],
+  },
+  {
+    id: "biometric_template_finger",
+    label: "Finger biometric template",
+    path: ["org.iso.18013.5.1", "biometric_template_finger"],
+  },
+  {
+    id: "biometric_template_signature_sign",
+    label: "Signature biometric template",
+    path: ["org.iso.18013.5.1", "biometric_template_signature_sign"],
+  },
+  {
+    id: "biometric_template_iris",
+    label: "Iris biometric template",
+    path: ["org.iso.18013.5.1", "biometric_template_iris"],
+  },
+];
 
 export const SIMPLE_CREDENTIAL_OPTIONS: SimpleCredentialOption[] = [
   {
@@ -190,302 +489,36 @@ export const SIMPLE_CREDENTIAL_OPTIONS: SimpleCredentialOption[] = [
     profileId: "isoMdl",
     format: "mso_mdoc",
     pills: [{ label: "ISO 18013-5", tone: "purple" }],
-    defaultCredentialData: {
-      "org.iso.18013.5.1": {
-        family_name: "Musterfrau",
-        given_name: "Anna Maria",
-        birth_date: "1988-08-25",
-        issue_date: "2025-01-15",
-        expiry_date: "2035-01-15",
-        issuing_country: "AT",
-        issuing_authority: "Bundesministerium für Inneres",
-        document_number: "DL-AT-2025-00018427",
-        portrait:
-          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0i8AAAAASUVORK5CYII=",
-        driving_privileges: [
-          {
-            vehicle_category_code: "B",
-            issue_date: "2006-09-14",
-            expiry_date: "2035-01-15",
-          },
-          {
-            vehicle_category_code: "AM",
-            issue_date: "2004-08-25",
-            expiry_date: "2035-01-15",
-          },
-        ],
-        un_distinguishing_sign: "A",
-        administrative_number: "AT-FS-99817234",
-        sex: 2,
-        height: 170,
-        weight: 63,
-        eye_colour: "brown",
-        hair_colour: "brown",
-        birth_place: "Graz",
-        resident_address: "Mariahilfer Strasse 120/8",
-        portrait_capture_date: "2024-12-20",
-        age_in_years: 36,
-        age_birth_year: 1988,
-        age_over_12: true,
-        age_over_13: true,
-        age_over_14: true,
-        age_over_16: true,
-        age_over_18: true,
-        age_over_21: true,
-        age_over_25: true,
-        age_over_60: false,
-        age_over_62: false,
-        age_over_65: false,
-        age_over_68: false,
-        issuing_jurisdiction: "AT-9",
-        nationality: "AUT",
-        resident_city: "Wien",
-        resident_state: "Wien",
-        resident_postal_code: "1070",
-        resident_country: "AT",
-        family_name_national_character: "Musterfrau",
-        given_name_national_character: "Anna Maria",
-        signature_usual_mark:
-          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0i8AAAAASUVORK5CYII=",
-        biometric_template_face: null,
-        biometric_template_finger: null,
-        biometric_template_signature_sign: null,
-        biometric_template_iris: null,
-      },
-    },
+    defaultCredentialData: MDL_DEFAULT_CREDENTIAL_DATA,
     verifier: {
       credentialId: "simple_iso_mdl",
       meta: {
         doctype_value: "org.iso.18013.5.1.mDL",
       },
-      claims: [
-        {
-          id: "family_name",
-          label: "Family name",
-          path: ["org.iso.18013.5.1", "family_name"],
-        },
-        {
-          id: "given_name",
-          label: "Given name",
-          path: ["org.iso.18013.5.1", "given_name"],
-        },
-        {
-          id: "birth_date",
-          label: "Birth date",
-          path: ["org.iso.18013.5.1", "birth_date"],
-        },
-        {
-          id: "issue_date",
-          label: "Issue date",
-          path: ["org.iso.18013.5.1", "issue_date"],
-        },
-        {
-          id: "expiry_date",
-          label: "Expiry date",
-          path: ["org.iso.18013.5.1", "expiry_date"],
-        },
-        {
-          id: "issuing_country",
-          label: "Issuing country",
-          path: ["org.iso.18013.5.1", "issuing_country"],
-        },
-        {
-          id: "issuing_authority",
-          label: "Issuing authority",
-          path: ["org.iso.18013.5.1", "issuing_authority"],
-        },
-        {
-          id: "document_number",
-          label: "Document number",
-          path: ["org.iso.18013.5.1", "document_number"],
-        },
-        {
-          id: "portrait",
-          label: "Portrait",
-          path: ["org.iso.18013.5.1", "portrait"],
-        },
-        {
-          id: "driving_privileges",
-          label: "Driving privileges",
-          path: ["org.iso.18013.5.1", "driving_privileges"],
-        },
-        {
-          id: "un_distinguishing_sign",
-          label: "UN distinguishing sign",
-          path: ["org.iso.18013.5.1", "un_distinguishing_sign"],
-        },
-        {
-          id: "administrative_number",
-          label: "Administrative number",
-          path: ["org.iso.18013.5.1", "administrative_number"],
-        },
-        { id: "sex", label: "Sex", path: ["org.iso.18013.5.1", "sex"] },
-        {
-          id: "height",
-          label: "Height",
-          path: ["org.iso.18013.5.1", "height"],
-        },
-        {
-          id: "weight",
-          label: "Weight",
-          path: ["org.iso.18013.5.1", "weight"],
-        },
-        {
-          id: "eye_colour",
-          label: "Eye colour",
-          path: ["org.iso.18013.5.1", "eye_colour"],
-        },
-        {
-          id: "hair_colour",
-          label: "Hair colour",
-          path: ["org.iso.18013.5.1", "hair_colour"],
-        },
-        {
-          id: "birth_place",
-          label: "Birth place",
-          path: ["org.iso.18013.5.1", "birth_place"],
-        },
-        {
-          id: "resident_address",
-          label: "Resident address",
-          path: ["org.iso.18013.5.1", "resident_address"],
-        },
-        {
-          id: "portrait_capture_date",
-          label: "Portrait capture date",
-          path: ["org.iso.18013.5.1", "portrait_capture_date"],
-        },
-        {
-          id: "age_in_years",
-          label: "Age in years",
-          path: ["org.iso.18013.5.1", "age_in_years"],
-        },
-        {
-          id: "age_birth_year",
-          label: "Birth year",
-          path: ["org.iso.18013.5.1", "age_birth_year"],
-        },
-        {
-          id: "age_over_12",
-          label: "Over 12",
-          path: ["org.iso.18013.5.1", "age_over_12"],
-        },
-        {
-          id: "age_over_13",
-          label: "Over 13",
-          path: ["org.iso.18013.5.1", "age_over_13"],
-        },
-        {
-          id: "age_over_14",
-          label: "Over 14",
-          path: ["org.iso.18013.5.1", "age_over_14"],
-        },
-        {
-          id: "age_over_16",
-          label: "Over 16",
-          path: ["org.iso.18013.5.1", "age_over_16"],
-        },
-        {
-          id: "age_over_18",
-          label: "Over 18",
-          path: ["org.iso.18013.5.1", "age_over_18"],
-        },
-        {
-          id: "age_over_21",
-          label: "Over 21",
-          path: ["org.iso.18013.5.1", "age_over_21"],
-        },
-        {
-          id: "age_over_25",
-          label: "Over 25",
-          path: ["org.iso.18013.5.1", "age_over_25"],
-        },
-        {
-          id: "age_over_60",
-          label: "Over 60",
-          path: ["org.iso.18013.5.1", "age_over_60"],
-        },
-        {
-          id: "age_over_62",
-          label: "Over 62",
-          path: ["org.iso.18013.5.1", "age_over_62"],
-        },
-        {
-          id: "age_over_65",
-          label: "Over 65",
-          path: ["org.iso.18013.5.1", "age_over_65"],
-        },
-        {
-          id: "age_over_68",
-          label: "Over 68",
-          path: ["org.iso.18013.5.1", "age_over_68"],
-        },
-        {
-          id: "issuing_jurisdiction",
-          label: "Issuing jurisdiction",
-          path: ["org.iso.18013.5.1", "issuing_jurisdiction"],
-        },
-        {
-          id: "nationality",
-          label: "Nationality",
-          path: ["org.iso.18013.5.1", "nationality"],
-        },
-        {
-          id: "resident_city",
-          label: "Resident city",
-          path: ["org.iso.18013.5.1", "resident_city"],
-        },
-        {
-          id: "resident_state",
-          label: "Resident state",
-          path: ["org.iso.18013.5.1", "resident_state"],
-        },
-        {
-          id: "resident_postal_code",
-          label: "Resident postal code",
-          path: ["org.iso.18013.5.1", "resident_postal_code"],
-        },
-        {
-          id: "resident_country",
-          label: "Resident country",
-          path: ["org.iso.18013.5.1", "resident_country"],
-        },
-        {
-          id: "family_name_national_character",
-          label: "Family name national characters",
-          path: ["org.iso.18013.5.1", "family_name_national_character"],
-        },
-        {
-          id: "given_name_national_character",
-          label: "Given name national characters",
-          path: ["org.iso.18013.5.1", "given_name_national_character"],
-        },
-        {
-          id: "signature_usual_mark",
-          label: "Signature usual mark",
-          path: ["org.iso.18013.5.1", "signature_usual_mark"],
-        },
-        {
-          id: "biometric_template_face",
-          label: "Face biometric template",
-          path: ["org.iso.18013.5.1", "biometric_template_face"],
-        },
-        {
-          id: "biometric_template_finger",
-          label: "Finger biometric template",
-          path: ["org.iso.18013.5.1", "biometric_template_finger"],
-        },
-        {
-          id: "biometric_template_signature_sign",
-          label: "Signature biometric template",
-          path: ["org.iso.18013.5.1", "biometric_template_signature_sign"],
-        },
-        {
-          id: "biometric_template_iris",
-          label: "Iris biometric template",
-          path: ["org.iso.18013.5.1", "biometric_template_iris"],
-        },
-      ],
+      claims: MDL_VERIFIER_CLAIMS,
+    },
+  },
+  {
+    id: "mdoc-mdl-dc-api",
+    title: "mDL over DC API",
+    description:
+      "Verify a mobile driving licence through the browser Digital Credentials API using OpenID4VP or ISO 18013-7.",
+    profileId: "isoMdl",
+    format: "mso_mdoc",
+    pills: [
+      { label: "ISO 18013-5", tone: "purple" },
+      { label: "DC API", tone: "blue" },
+      { label: "18013-7", tone: "slate" },
+    ],
+    defaultCredentialData: {},
+    verifyOnly: true,
+    verifierFlowType: "dc_api",
+    verifier: {
+      credentialId: "simple_iso_mdl_dc_api",
+      meta: {
+        doctype_value: "org.iso.18013.5.1.mDL",
+      },
+      claims: MDL_VERIFIER_CLAIMS,
     },
   },
   {
@@ -497,6 +530,7 @@ export const SIMPLE_CREDENTIAL_OPTIONS: SimpleCredentialOption[] = [
     format: "mso_mdoc",
     pills: [{ label: "eIDAS 2", tone: "purple" }],
     defaultCredentialData: {},
+    verifyOnly: true,
     verifier: {
       credentialId: "simple_pid",
       meta: {

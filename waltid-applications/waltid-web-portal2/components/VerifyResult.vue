@@ -57,9 +57,9 @@ const verifiedClaims = computed(() => {
 
     <div
       v-else
-      class="flex items-center justify-center min-h-[200px] text-sm text-[--color-text-muted] text-center"
+      class="flex items-center justify-center min-h-[160px] md:min-h-[200px] text-sm text-[--color-text-muted] text-center px-2"
     >
-      QR code will appear here after creating a session
+      Session result will appear here after starting verification
     </div>
   </div>
 </template>
