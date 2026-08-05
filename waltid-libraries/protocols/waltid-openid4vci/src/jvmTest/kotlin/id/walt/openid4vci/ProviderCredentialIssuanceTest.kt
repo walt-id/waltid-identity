@@ -34,6 +34,27 @@ import kotlin.test.assertTrue
 class ProviderCredentialIssuanceTest {
 
     @Test
+    fun `unsupported credential handler is rejected`() = runBlocking {
+        val provider = buildOAuth2Provider(createTestConfig())
+        val requestResult = provider.createCredentialRequest(
+            parameters = mapOf("credential_configuration_id" to listOf("unsupported-credential")),
+            session = DefaultSession(subject = "demo-subject"),
+        )
+        assertTrue(requestResult is CredentialRequestResult.Success)
+
+        val responseResult = provider.createCredentialResponse(
+            request = requestResult.request,
+            configuration = CredentialConfiguration(format = CredentialFormat.LDP_VC),
+            issuerKey = JWKKey.generate(KeyType.Ed25519),
+            issuerId = "did:example:issuer",
+            credentialData = buildJsonObject { put("given_name", "Alice") },
+        )
+
+        assertTrue(responseResult is CredentialResponseResult.Failure)
+        assertEquals(CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION, responseResult.error.error)
+    }
+
+    @Test
     fun `authorization flow issues signed sd-jwt credential`() = runBlocking {
         val credentialId = "test-credential"
         val issuerId = "did:example:issuer"
