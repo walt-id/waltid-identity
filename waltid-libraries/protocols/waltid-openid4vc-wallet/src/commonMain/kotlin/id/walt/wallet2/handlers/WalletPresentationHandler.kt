@@ -6,6 +6,7 @@ import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.dcql.DcqlDisclosure
+import id.walt.dcql.DcqlMatchException
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.ClaimsQuery
@@ -473,7 +474,14 @@ object WalletPresentationHandler {
         }
         val responseEncryption = ResponseEncryption.resolveCrypto2(authorizationRequest)?.metadata()
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
-        val matched = selectFromStores(wallet, query, useWalletCredentialIds = true)
+        // A required query with no local match is a normal preview outcome: retain the reviewed
+        // request so the caller can reject it with a protocol error. Other matcher failures still
+        // propagate because they indicate malformed or unsupported DCQL rather than availability.
+        val matched = try {
+            selectFromStores(wallet, query, useWalletCredentialIds = true)
+        } catch (error: DcqlMatchException) {
+            emptyMap()
+        }
         val availableCredentialQueryIds = matched.filterValues { it.isNotEmpty() }.keys
         val availabilityError = PresentationRequestValidator.validateTransactionDataCredentialAvailability(
             transactionData = valid.transactionData,

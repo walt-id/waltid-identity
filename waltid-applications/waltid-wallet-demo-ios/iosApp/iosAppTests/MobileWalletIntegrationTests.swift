@@ -104,6 +104,50 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     // MARK: - Tests (mirror Android MobileWalletIntegrationTest.kt)
 
+    func testAppHostedWalletValidatesSignedRequestObjectCertificateChain() async throws {
+        let wallet = try await Wallet(
+            configuration: WalletConfiguration(
+                walletID: testWalletId,
+                clientIDTrustConfiguration: WalletClientIDTrustConfiguration(
+                    x509TrustAnchorsPEM: [X509RequestObjectFixture.trustAnchorPEM]
+                )
+            )
+        )
+        _ = try await wallet.bootstrap()
+
+        do {
+            _ = try await wallet.previewPresentation(request: X509RequestObjectFixture.authorizationRequestURL)
+            XCTFail("Expected the fixture's required credential query to have no local match")
+        } catch {
+            let description = String(describing: error)
+            XCTAssertTrue(description.contains("No matches found for required credential queries"), description)
+            XCTAssertFalse(description.contains("UntrustedCertificateChain"), description)
+        }
+    }
+
+    func testAppHostedWalletRejectsUntrustedSignedRequestObjectCertificateChain() async throws {
+        let wallet = try await Wallet(
+            configuration: WalletConfiguration(
+                walletID: testWalletId,
+                clientIDTrustConfiguration: WalletClientIDTrustConfiguration(
+                    x509TrustAnchorsPEM: [EudiTestBackend.verifierTrustAnchorPEM]
+                )
+            )
+        )
+
+        do {
+            _ = try await wallet.previewPresentation(request: X509RequestObjectFixture.authorizationRequestURL)
+            XCTFail("Expected the signed Request Object to be rejected without the pinned trust anchor")
+        } catch {
+            let description = String(describing: error)
+            XCTAssertFalse(description.contains("No matches found for required credential queries"), description)
+            XCTAssertTrue(
+                description.contains("UntrustedCertificateChain") || description.contains("InvalidSignature"),
+                description
+            )
+        }
+    }
+
     func testBootstrapCreatesKeyAndDid() async throws {
         let wallet = try await makeWallet()
 

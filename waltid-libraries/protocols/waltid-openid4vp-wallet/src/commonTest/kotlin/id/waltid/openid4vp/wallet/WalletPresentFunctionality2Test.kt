@@ -181,6 +181,7 @@ class WalletPresentFunctionality2Test {
             buildJsonObject {
                 put("client_id", "verifier")
                 put("nonce", "nonce")
+                put("aud", "https://self-issued.me/v2")
             }.toString().encodeToByteArray(),
             mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
         )
@@ -217,6 +218,7 @@ class WalletPresentFunctionality2Test {
             buildJsonObject {
                 put("client_id", "verifier")
                 put("nonce", "nonce")
+                put("aud", "https://self-issued.me/v2")
             }.toString().encodeToByteArray(),
             mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
         )
@@ -275,7 +277,7 @@ class WalletPresentFunctionality2Test {
 
     private fun unsignedRequestObject(clientId: String, type: String): String {
         val header = """{"alg":"none","typ":"$type"}"""
-        val payload = """{"client_id":"$clientId","nonce":"nonce"}"""
+        val payload = """{"client_id":"$clientId","nonce":"nonce","aud":"https://self-issued.me/v2"}"""
         return listOf(header, payload).joinToString(".") {
             Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL).encode(it.encodeToByteArray())
         } + "."
