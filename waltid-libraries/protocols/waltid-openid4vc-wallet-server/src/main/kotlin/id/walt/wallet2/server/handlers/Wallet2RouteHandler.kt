@@ -29,8 +29,10 @@ import id.walt.wallet2.handlers.MatchCredentialsResult
 import id.walt.wallet2.handlers.PollDeferredRequest
 import id.walt.wallet2.handlers.PresentCredentialIsolatedRequest
 import id.walt.wallet2.handlers.PresentCredentialRequest
+import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
 import id.walt.wallet2.handlers.ReceiveCredentialResult
+import id.walt.wallet2.handlers.RejectPresentationByRequestUrlRequest
 import id.walt.wallet2.handlers.RequestNonceRequest
 import id.walt.wallet2.handlers.RequestNonceResult
 import id.walt.wallet2.handlers.RequestTokenRequest

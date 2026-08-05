@@ -1245,7 +1245,7 @@ object WalletPresentationHandler {
         return resolvedAuthorizationRequest.authorizationRequest
     }
 
-    internal suspend fun rememberPreviewedAuthorizationRequest(    internal suspend fun rememberPreviewedAuthorizationRequest(
+    internal suspend fun rememberPreviewedAuthorizationRequest(
         wallet: Wallet,
         preview: PreviewedPresentation,
     ): PresentationPreviewHandle = PresentationPreviewHandle(
