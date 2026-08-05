@@ -26,6 +26,7 @@ import platform.CoreFoundation.kCFTypeDictionaryKeyCallBacks
 import platform.CoreFoundation.kCFTypeDictionaryValueCallBacks
 import platform.Foundation.CFBridgingRelease
 import platform.Foundation.CFBridgingRetain
+import platform.Foundation.NSBundle
 import platform.Foundation.NSProcessInfo
 import platform.Security.SecItemCopyMatching
 import platform.Security.SecKeyCopyAttributes
@@ -33,6 +34,7 @@ import platform.Security.SecKeyRef
 import platform.Security.errSecSuccess
 import platform.Security.errSecItemNotFound
 import platform.Security.kSecAttrApplicationLabel
+import platform.Security.kSecAttrApplicationTag
 import platform.Security.kSecAttrKeyClass
 import platform.Security.kSecAttrKeyClassPublic
 import platform.Security.kSecAttrTokenID
@@ -144,7 +146,11 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         return SignumPlatformKeyHandle(
             alias = alias,
             spec = spec,
-            protectionLevel = policy.effectiveProtection(attestation),
+            // REQUIRED has already been independently checked against the Keychain public-key attributes above;
+            // only then may the backend report the observed Secure Enclave hardware level.
+            protectionLevel = if (policy.hardware == SignumHardwarePolicy.REQUIRED) {
+                SignumProtectionLevel.HARDWARE
+            } else policy.effectiveProtection(attestation),
             attestation = attestation,
             authentication = policy.authentication,
             signerFor = { algorithm: SignatureAlgorithm ->
@@ -163,10 +169,29 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         policy: SignumKeyPolicy,
         alias: String,
     ) {
-        if (!policy.authentication.isBiometricCurrentSet()) return
+        if (policy.hardware != SignumHardwarePolicy.REQUIRED && !policy.authentication.isBiometricCurrentSet()) return
         val iosSigner = signer as? IosSigner
             ?: throw SignumKeyPolicyMismatchException(alias, "the native signer is not Keychain-backed")
-        if (!iosSigner.needsAuthenticationForEveryUse || !isSecureEnclaveKey(alias)) {
+        validateIosNativePolicy(
+            alias = alias,
+            policy = policy,
+            needsAuthenticationForEveryUse = iosSigner.needsAuthenticationForEveryUse,
+            isSecureEnclave = isSecureEnclaveKey(alias),
+        )
+    }
+
+    internal fun validateIosNativePolicy(
+        alias: String,
+        policy: SignumKeyPolicy,
+        needsAuthenticationForEveryUse: Boolean,
+        isSecureEnclave: Boolean,
+    ) {
+        if (policy.hardware == SignumHardwarePolicy.REQUIRED && !isSecureEnclave) {
+            throw SignumKeyPolicyMismatchException(alias, "the native key is not Secure Enclave-backed")
+        }
+        if (policy.authentication.isBiometricCurrentSet() &&
+            (!needsAuthenticationForEveryUse || !isSecureEnclave)
+        ) {
             throw SignumKeyPolicyMismatchException(
                 alias,
                 "the native key does not enforce Secure Enclave biometric authentication for every use",
@@ -178,26 +203,31 @@ class IosSignumKeyBackend : SignumPlatformBackend {
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
     private fun isSecureEnclaveKey(alias: String): Boolean = memScoped {
         val keyRef = alloc<platform.CoreFoundation.CFTypeRefVar>()
-        val query = RetainedDictionary(5)
-        query.add(kSecClass, kSecClassKey)
-        // The public half exposes the token identifier without evaluating the
-        // private key's access-control prompt during restore.
-        query.add(kSecAttrKeyClass, kSecAttrKeyClassPublic)
-        query.addRetained(kSecAttrApplicationLabel, alias)
-        query.add(kSecReturnRef, kCFBooleanTrue)
-        try {
-            if (SecItemCopyMatching(query.dictionary, keyRef.ptr) != errSecSuccess || keyRef.value == null) {
-                return@memScoped false
-            }
-            val nativeKey = keyRef.value as? SecKeyRef ?: return@memScoped false
-            val attributes = SecKeyCopyAttributes(nativeKey) ?: return@memScoped false
+        publicKeyTags.any { tag ->
+            val query = RetainedDictionary(6)
+            query.add(kSecClass, kSecClassKey)
+            // The public half exposes the token identifier without evaluating the
+            // private key's access-control prompt during restore. Matching the
+            // application tag as well as the label avoids selecting another key
+            // that happens to reuse the alias.
+            query.add(kSecAttrKeyClass, kSecAttrKeyClassPublic)
+            query.addRetained(kSecAttrApplicationLabel, alias)
+            query.addRetained(kSecAttrApplicationTag, tag)
+            query.add(kSecReturnRef, kCFBooleanTrue)
             try {
-                CFDictionaryGetValue(attributes, kSecAttrTokenID) == kSecAttrTokenIDSecureEnclave
+                if (SecItemCopyMatching(query.dictionary, keyRef.ptr) != errSecSuccess || keyRef.value == null) {
+                    return@any false
+                }
+                val nativeKey = keyRef.value as? SecKeyRef ?: return@any false
+                val attributes = SecKeyCopyAttributes(nativeKey) ?: return@any false
+                try {
+                    CFDictionaryGetValue(attributes, kSecAttrTokenID) == kSecAttrTokenIDSecureEnclave
+                } finally {
+                    CFRelease(attributes)
+                }
             } finally {
-                CFRelease(attributes)
+                query.release()
             }
-        } finally {
-            query.release()
         }
     }
 
@@ -226,6 +256,13 @@ class IosSignumKeyBackend : SignumPlatformBackend {
             CFBridgingRelease(dictionary)
         }
     }
+}
+
+private val publicKeyTags: List<String> by lazy {
+    listOfNotNull(
+        "supreme.publickey",
+        NSBundle.mainBundle.bundleIdentifier?.let { "supreme.publickey-$it" },
+    )
 }
 
 private fun Throwable.mapSignumFailure(alias: String): Throwable {

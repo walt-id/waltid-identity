@@ -80,7 +80,11 @@ public class AndroidSignumKeyBackend(
         return SignumPlatformKeyHandle(
             alias = alias,
             spec = spec,
-            protectionLevel = policy.effectiveProtection(attestation),
+            // REQUIRED has already been independently checked against KeyInfo above; only then may the
+            // backend report the observed hardware level. Other policies remain attestation-derived.
+            protectionLevel = if (policy.hardware == SignumHardwarePolicy.REQUIRED) {
+                SignumProtectionLevel.HARDWARE
+            } else policy.effectiveProtection(attestation),
             attestation = attestation,
             authentication = policy.authentication,
             signerFor = { algorithm: SignatureAlgorithm ->
@@ -103,29 +107,28 @@ public class AndroidSignumKeyBackend(
         )
     }
 
+    @Suppress("DEPRECATION") // Required as the pre-S fallback when KeyInfo.securityLevel is unavailable.
     private fun validateNativePolicy(
         signer: PlatformSigningProviderSigner<*, *>,
         policy: SignumKeyPolicy,
         alias: String,
     ) {
-        if (!policy.authentication.isBiometricCurrentSet()) return
+        if (policy.hardware != SignumHardwarePolicy.REQUIRED && !policy.authentication.isBiometricCurrentSet()) return
         val androidSigner = signer as? AndroidKeystoreSigner
             ?: throw SignumKeyPolicyMismatchException(alias, "the native signer is not Android Keystore-backed")
         val info = androidSigner.keyInfo
-        if (!info.isUserAuthenticationRequired ||
-            info.userAuthenticationValidityDurationSeconds > 0 ||
-            !info.isInvalidatedByBiometricEnrollment
-        ) {
-            throw SignumKeyPolicyMismatchException(
-                alias,
-                "the native key does not require biometric authentication for every use",
-            )
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
-            info.userAuthenticationType != KeyProperties.AUTH_BIOMETRIC_STRONG
-        ) {
-            throw SignumKeyPolicyMismatchException(alias, "the native key does not require BIOMETRIC_STRONG")
-        }
+        validateAndroidNativePolicy(
+            alias = alias,
+            policy = policy,
+            isInsideSecureHardware = info.isInsideSecureHardware,
+            securityLevel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) info.securityLevel else null,
+            isUserAuthenticationRequired = info.isUserAuthenticationRequired,
+            userAuthenticationValidityDurationSeconds = info.userAuthenticationValidityDurationSeconds,
+            isInvalidatedByBiometricEnrollment = info.isInvalidatedByBiometricEnrollment,
+            userAuthenticationType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                info.userAuthenticationType
+            } else null,
+        )
     }
 
     private fun requireInteractionContext(alias: String): FragmentActivity {
@@ -138,6 +141,44 @@ public class AndroidSignumKeyBackend(
             )
         }
         return activity
+    }
+}
+
+internal fun validateAndroidNativePolicy(
+    alias: String,
+    policy: SignumKeyPolicy,
+    isInsideSecureHardware: Boolean,
+    securityLevel: Int?,
+    isUserAuthenticationRequired: Boolean,
+    userAuthenticationValidityDurationSeconds: Int,
+    isInvalidatedByBiometricEnrollment: Boolean,
+    userAuthenticationType: Int?,
+) {
+    if (policy.hardware == SignumHardwarePolicy.REQUIRED) {
+        if (!isInsideSecureHardware) {
+            throw SignumKeyPolicyMismatchException(alias, "the native key is not backed by secure hardware")
+        }
+        if (securityLevel != null && securityLevel !in setOf(
+                KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
+                KeyProperties.SECURITY_LEVEL_STRONGBOX,
+            )
+        ) {
+            throw SignumKeyPolicyMismatchException(alias, "the native key is not backed by a hardware security level")
+        }
+    }
+    if (policy.authentication.isBiometricCurrentSet()) {
+        if (!isUserAuthenticationRequired ||
+            userAuthenticationValidityDurationSeconds > 0 ||
+            !isInvalidatedByBiometricEnrollment
+        ) {
+            throw SignumKeyPolicyMismatchException(
+                alias,
+                "the native key does not require biometric authentication for every use",
+            )
+        }
+        if (userAuthenticationType != null && userAuthenticationType != KeyProperties.AUTH_BIOMETRIC_STRONG) {
+            throw SignumKeyPolicyMismatchException(alias, "the native key does not require BIOMETRIC_STRONG")
+        }
     }
 }
 

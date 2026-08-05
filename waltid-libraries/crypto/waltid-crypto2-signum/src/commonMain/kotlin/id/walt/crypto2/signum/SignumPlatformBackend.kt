@@ -34,6 +34,7 @@ interface SignumPlatformKey {
     val alias: String
     val spec: KeySpec
     val publicKey: EncodedKey.SpkiDer
+    /** Observed protection backing; policy requests must not be used as evidence. */
     val protectionLevel: SignumProtectionLevel
     val attestation: SignumKeyAttestation?
     val signatureAlgorithms: Set<SignatureAlgorithm>

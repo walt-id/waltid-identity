@@ -155,7 +155,15 @@ public class SqlDelightKeyStore(
     override suspend fun removeKey(keyId: String): Boolean {
         val ref = queries.selectByKeyId(keyId).executeAsOneOrNull() ?: return false
         when (val stored = decodeStoredKey(ref.key_id, ref.stored_key)) {
-            is StoredKey.Managed -> managedKeyProvider.deleteManagedKey(stored)
+            is StoredKey.Managed -> try {
+                managedKeyProvider.deleteManagedKey(stored)
+            } catch (cause: SignumStoredKeyMetadataException) {
+                throw KeyUseAuthorizationException(
+                    KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
+                    "Stored managed key metadata is invalid",
+                    cause,
+                )
+            }
             is StoredKey.Software -> Unit
         }
         queries.deleteByKeyId(keyId)

@@ -69,10 +69,10 @@ data class SignumKeyAttestation(
     }
 }
 
+/** Derives only evidence-backed protection; REQUIRED is verified by each native backend before reporting HARDWARE. */
 internal fun SignumKeyPolicy.effectiveProtection(attestation: SignumKeyAttestation?): SignumProtectionLevel = when {
     attestation != null -> SignumProtectionLevel.HARDWARE
     hardware == SignumHardwarePolicy.DISCOURAGED -> SignumProtectionLevel.SOFTWARE
-    hardware == SignumHardwarePolicy.REQUIRED -> SignumProtectionLevel.HARDWARE
     else -> SignumProtectionLevel.UNKNOWN
 }
 

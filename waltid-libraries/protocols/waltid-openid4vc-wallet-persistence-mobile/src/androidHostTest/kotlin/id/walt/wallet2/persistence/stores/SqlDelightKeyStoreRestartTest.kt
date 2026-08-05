@@ -18,6 +18,7 @@ import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.crypto2.signum.SignumKeyInvalidatedException
 import id.walt.crypto2.signum.SignumKeyNotFoundException
+import id.walt.crypto2.signum.SignumStoredKeyMetadataException
 import id.walt.crypto2.signum.SignumUserCancelledException
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
@@ -125,6 +126,30 @@ class SqlDelightKeyStoreRestartTest {
             val failure = assertFailsWith<KeyUseAuthorizationException> { store.removeKey("corrupt") }
             assertEquals(KeyUseAuthorizationFailure.InvalidStoredKeyMetadata, failure.failure)
             assertNotNull(database.queries.selectByKeyId("corrupt").executeAsOneOrNull())
+        }
+    }
+
+    @Test
+    fun `corrupt managed provider metadata maps to stable failure during deletion`() = runTest {
+        database().use { database ->
+            val stored = storedDescriptor("corrupt-managed-provider-data")
+            database.queries.insert(
+                key_id = stored.id.value,
+                created_at = 0,
+                stored_key = StoredKeyCodec.encodeToString(stored),
+            )
+            val store = SqlDelightKeyStore(
+                FakePlatformManagedKeyProvider(
+                    deleteFailure = SignumStoredKeyMetadataException("bad provider data"),
+                ),
+                database.queries,
+            )
+
+            val failure = assertFailsWith<KeyUseAuthorizationException> {
+                store.removeKey(stored.id.value)
+            }
+            assertEquals(KeyUseAuthorizationFailure.InvalidStoredKeyMetadata, failure.failure)
+            assertNotNull(database.queries.selectByKeyId(stored.id.value).executeAsOneOrNull())
         }
     }
 
@@ -322,17 +347,20 @@ class SqlDelightKeyStoreRestartTest {
             restoreFailure: Throwable? = null,
             signFailure: Throwable? = null,
             inspectFailure: Throwable? = null,
+            deleteFailure: Throwable? = null,
         ) {
             this.authorizationPolicy = authorizationPolicy
             this.restoreFailure = restoreFailure
             this.signFailure = signFailure
             this.inspectFailure = inspectFailure
+            this.deleteFailure = deleteFailure
         }
 
         private val authorizationPolicy: KeyUseAuthorizationPolicy
         private val restoreFailure: Throwable?
         private val signFailure: Throwable?
         private val inspectFailure: Throwable?
+        private val deleteFailure: Throwable?
         val managedIds = mutableSetOf<KeyId>()
         var deleteCount = 0
 
@@ -351,6 +379,7 @@ class SqlDelightKeyStoreRestartTest {
         }
 
         override suspend fun deleteManagedKey(stored: StoredKey.Managed) {
+            deleteFailure?.let { throw it }
             managedIds -= stored.id
             deleteCount++
         }

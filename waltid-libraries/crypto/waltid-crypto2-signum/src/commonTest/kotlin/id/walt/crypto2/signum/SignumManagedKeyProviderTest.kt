@@ -307,10 +307,10 @@ class SignumManagedKeyProviderTest {
     }
 
     @Test
-    fun `required hardware policy reports hardware without attestation evidence`() {
+    fun `required hardware policy remains unknown without attestation evidence`() {
         val policy = SignumKeyPolicy(hardware = SignumHardwarePolicy.REQUIRED)
 
-        assertEquals(SignumProtectionLevel.HARDWARE, policy.effectiveProtection(null))
+        assertEquals(SignumProtectionLevel.UNKNOWN, policy.effectiveProtection(null))
         assertEquals(
             SignumProtectionLevel.HARDWARE,
             policy.effectiveProtection(SignumKeyAttestation("test", BinaryData(byteArrayOf(1)))),
