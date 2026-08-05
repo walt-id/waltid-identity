@@ -18,8 +18,9 @@ ISSUER_HOST_PORT="7005"
 LOCAL_CREDENTIAL_ISSUER_URL="https://$ISSUER_PROXY_HOST:$ISSUER_PROXY_PORT/openid4vci"
 TRUSTSTORE_ALIAS="${CONFORMANCE_TRUSTSTORE_ALIAS:-conformance-test-localhost}"
 TRUSTSTORE_PASSWORD="${CONFORMANCE_TRUSTSTORE_PASSWORD:-changeit}"
-CERT_FILE="${CONFORMANCE_LOCAL_CERT_FILE:-/tmp/conformance-nginx.crt}"
-KEY_FILE="${CONFORMANCE_LOCAL_KEY_FILE:-/tmp/conformance-nginx.key}"
+TLS_DIR="$RUNNER_DIR/build/conformance"
+CERT_FILE="${CONFORMANCE_LOCAL_CERT_FILE:-$TLS_DIR/nginx.crt}"
+KEY_FILE="${CONFORMANCE_LOCAL_KEY_FILE:-$TLS_DIR/nginx.key}"
 
 OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="${OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL:-$LOCAL_CREDENTIAL_ISSUER_URL}"
 export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL
@@ -300,13 +301,18 @@ if [[ -z "$NGINX_ID" ]]; then
   exit 1
 fi
 
-echo "Generating local conformance TLS certificate..."
-openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-  -keyout "$KEY_FILE" \
-  -out "$CERT_FILE" \
-  -subj "/CN=$CONFORMANCE_HOST" \
-  -addext "subjectAltName=DNS:$CONFORMANCE_HOST,DNS:localhost,IP:127.0.0.1" \
-  >/dev/null 2>&1
+mkdir -p "$(dirname "$CERT_FILE")" "$(dirname "$KEY_FILE")"
+if [[ ! -s "$CERT_FILE" || ! -s "$KEY_FILE" ]]; then
+  echo "Generating local conformance TLS certificate..."
+  openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+    -keyout "$KEY_FILE" \
+    -out "$CERT_FILE" \
+    -subj "/CN=$CONFORMANCE_HOST" \
+    -addext "subjectAltName=DNS:$CONFORMANCE_HOST,DNS:localhost,IP:127.0.0.1" \
+    >/dev/null 2>&1
+else
+  echo "Reusing local conformance TLS certificate: $CERT_FILE"
+fi
 
 echo "Installing certificate into nginx container..."
 docker cp "$CERT_FILE" "$NGINX_ID":/etc/ssl/certs/nginx-selfsigned.crt

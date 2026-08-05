@@ -10,7 +10,6 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -38,9 +37,6 @@ class ConformanceInterface(
         install(ContentNegotiation) {
             json()
         }
-        install(Logging) {
-            level = LogLevel.INFO
-        }
         install(HttpTimeout) {
             requestTimeoutMillis = 60_000
             connectTimeoutMillis = 30_000
@@ -52,10 +48,7 @@ class ConformanceInterface(
         conformanceHttp.get("/api/server")
             .body<JsonObject>()["version"]?.jsonPrimitive?.content
 
-    /**
-     * To create a test plan, some parameters already have to be put into the URL
-     * This method allows for creation of said URL.
-     */
+    /** Builds a test-plan URL with the suite-defined creation parameters. */
     fun createTestPlanUrlWithConfig(testPlanCreationUrl: ParametersBuilder.() -> Unit) =
         URLBuilder("/api/plan").apply {
             baseUrlBuilderSetup(conformanceHost, conformancePort)
@@ -73,25 +66,28 @@ class ConformanceInterface(
         createTestPlanUrl: Url,
         testPlanCreationConfiguration: JsonObject
     ): CreateTestPlanResponse {
-        println("POST body: $testPlanCreationConfiguration")
         val response = conformanceHttp.post(createTestPlanUrl) {
             contentType(ContentType.Application.Json)
             setBody(testPlanCreationConfiguration)
-        }.bodyAsText().also { println(it) }
-
-        // Check if response is an error
-        if (response.contains("\"error\"")) {
-            throw IllegalStateException("Conformance suite error: $response")
+        }
+        val responseBody = response.bodyAsText()
+        check(response.status.isSuccess()) {
+            "Conformance suite returned ${response.status} while creating a test plan: ${responseBody.take(1_000)}"
         }
 
-        return response.fromJson<CreateTestPlanResponse>()
+        if (responseBody.contains("\"error\"")) {
+            throw IllegalStateException("Conformance suite error: ${responseBody.take(1_000)}")
+        }
+
+        return responseBody.fromJson<CreateTestPlanResponse>()
     }
 
-    /**
-     * To create a test, some parameters already have to be put into the URL
-     * This method allows for creation of said URL to create a test.
-     */
-    fun buildCreateTestUrl(testPlanId: String, testModule: String, variant: kotlinx.serialization.json.JsonObject = kotlinx.serialization.json.JsonObject(emptyMap())) =
+    /** Builds a test-instance URL with the selected module variant. */
+    fun buildCreateTestUrl(
+        testPlanId: String,
+        testModule: String,
+        variant: JsonObject = JsonObject(emptyMap()),
+    ) =
         URLBuilder("/api/runner").apply {
             baseUrlBuilderSetup(conformanceHost, conformancePort)
             parameters.apply {
@@ -105,25 +101,37 @@ class ConformanceInterface(
      * Create a test with configuration URL created with [buildCreateTestUrl] supplied in [createTestUrl]
      */
     suspend fun createTest(createTestUrl: Url): CreateTestResponse {
-        val response = conformanceHttp.post(createTestUrl).bodyAsText().also { println(it) }
-
-        if (response.contains("\"error\"")) {
-            throw IllegalStateException("Conformance suite error: $response")
+        val response = conformanceHttp.post(createTestUrl)
+        val responseBody = response.bodyAsText()
+        check(response.status.isSuccess()) {
+            "Conformance suite returned ${response.status} while creating a test: ${responseBody.take(1_000)}"
         }
 
-        return response.fromJson<CreateTestResponse>()
+        if (responseBody.contains("\"error\"")) {
+            throw IllegalStateException("Conformance suite error: ${responseBody.take(1_000)}")
+        }
+
+        return responseBody.fromJson<CreateTestResponse>()
     }
 
     /** Get [TestRunResult] for a test referenced by [testId] */
     suspend fun getTestRun(testId: String): TestRunResult =
         conformanceHttp.get("/api/runner/$testId").body<TestRunResult>()
 
+    /** Stop a test that cannot progress because the local adapter has already failed. */
+    suspend fun cancelTest(testId: String) {
+        val response = conformanceHttp.delete("/api/runner/$testId")
+        check(response.status.value in 200..299) {
+            "Conformance suite returned ${response.status} while cancelling test $testId"
+        }
+    }
+
     /** Mark a front-channel browser URL as visited, matching the conformance-suite UI behavior. */
     suspend fun markBrowserUrlVisited(testId: String, url: String) {
         val response = conformanceHttp.post("/api/runner/browser/$testId/visit") {
             parameter("url", url)
         }
-        check(!(response.status.value !in 200..299)) {
+        check(response.status.value in 200..299) {
             "Conformance suite returned ${response.status} while marking browser URL as visited"
         }
     }
@@ -139,7 +147,7 @@ class ConformanceInterface(
         }.build()
 
         val response = conformanceHttp.get(url)
-        check(!(response.status.value !in 200..299)) {
+        check(response.status.value in 200..299) {
             "Conformance suite returned ${response.status} while delivering credential offer"
         }
     }
@@ -170,19 +178,18 @@ class ConformanceInterface(
             println("Current conformance test status: ${testRunInfo.status}")
 
 
-            if (shouldBeWaiting) {
-                if (testRunInfo.status == "WAITING") {
-                    break
-                }
+            val expectedStatusReached = if (shouldBeWaiting) {
+                testRunInfo.status == "WAITING"
             } else {
-                if (testRunInfo.status != "WAITING") {
-                    break
-                }
+                testRunInfo.status != "WAITING"
             }
-
+            if (expectedStatusReached) break
 
             if (counter > 30) {
-                throw IllegalStateException("Waited for ${counter - 1} tries, but test is still not ready for presentation (waiting for waiting=$shouldBeWaiting)")
+                throw IllegalStateException(
+                    "Waited for ${counter - 1} tries, but test is still not ready " +
+                        "for presentation (waiting=$shouldBeWaiting)"
+                )
             }
 
             delay(1.seconds)

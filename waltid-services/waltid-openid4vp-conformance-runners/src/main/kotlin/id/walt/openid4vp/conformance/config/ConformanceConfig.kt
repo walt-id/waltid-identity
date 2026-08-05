@@ -55,16 +55,16 @@ object ConformanceConfig {
     /**
      * Wallet API base URL for programmatic credential operations.
      * 
-     * NOTE: Use wallet-api2 (port 7005), not the old wallet-api (port 7005).
+     * Wallet API2 runs on port 7006. Issuer2 uses port 7005.
      * Start with: ./gradlew :waltid-services:waltid-wallet-api2:run
      */
-    const val WALLET_API_URL = "http://127.0.0.1:7005"
+    const val WALLET_API_URL = "http://127.0.0.1:7006"
     
     /**
      * Wallet conformance adapter port.
      * The adapter bridges conformance suite -> wallet API.
      */
-    const val WALLET_ADAPTER_PORT = 7006
+    const val WALLET_ADAPTER_PORT = 7007
     
     /**
      * Wallet adapter authorization endpoint URL.
