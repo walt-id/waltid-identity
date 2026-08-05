@@ -14,6 +14,8 @@ import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.sanitizeForStorage
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.responses.token.TokenFailureStage
+import id.walt.openid4vci.responses.token.tokenFailure
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import id.walt.openid4vci.tokens.refresh.RefreshTokenGenerationRequest
@@ -40,6 +42,11 @@ class RefreshTokenTokenEndpoint(
             )
         }
 
+        var sessionSubject: String? = null
+
+        fun failure(error: OAuthError, stage: TokenFailureStage = TokenFailureStage.UNSPECIFIED) =
+            tokenFailure(error, sessionSubject, stage)
+
         return try {
             val rawRefreshToken = request.requestForm["refresh_token"]?.firstOrNull()
                 ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "Missing refresh_token"))
@@ -52,31 +59,47 @@ class RefreshTokenTokenEndpoint(
             val refreshTokenSignature = refreshTokenIssuer.signature(rawRefreshToken)
             val record = refreshTokenRepository.get(refreshTokenSignature)
                 ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Refresh token is invalid"))
+            sessionSubject = record.session.subject
 
             if (!record.active || Clock.System.now() >= record.expiresAt) {
-                return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Refresh token is invalid"))
+                return failure(
+                    OAuthError("invalid_grant", "Refresh token is invalid"),
+                    TokenFailureStage.GRANT_VALIDATION,
+                )
             }
 
             val tokenClientId = verifiedRefreshToken.issuedFor?.takeIf { it.isNotBlank() }
             if (record.clientId != null) {
                 if (tokenClientId != record.clientId) {
-                    return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Client mismatch for refresh token"))
+                    return failure(
+                        OAuthError("invalid_grant", "Client mismatch for refresh token"),
+                        TokenFailureStage.CLIENT_AUTHENTICATION,
+                    )
                 }
                 if (clientId != null && clientId != record.clientId) {
-                    return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Client mismatch for refresh token"))
+                    return failure(
+                        OAuthError("invalid_grant", "Client mismatch for refresh token"),
+                        TokenFailureStage.CLIENT_AUTHENTICATION,
+                    )
                 }
             } else if (tokenClientId != null) {
-                return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Client mismatch for refresh token"))
+                return failure(
+                    OAuthError("invalid_grant", "Client mismatch for refresh token"),
+                    TokenFailureStage.CLIENT_AUTHENTICATION,
+                )
             }
 
             val requestedScope = request.requestedScopes.ifEmpty { record.grantedScopes }
             if (!record.grantedScopes.containsAll(requestedScope)) {
-                return AccessTokenResponseResult.Failure(OAuthError("invalid_scope", "Requested scopes exceed the authorized scope"))
+                return failure(
+                    OAuthError("invalid_scope", "Requested scopes exceed the authorized scope"),
+                    TokenFailureStage.SCOPE_VALIDATION,
+                )
             }
 
             val session = record.session.copy()
             val subject = session.subject?.takeIf { it.isNotBlank() }
-                ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "subject is required in session"))
+                ?: return failure(OAuthError("invalid_request", "subject is required in session"))
 
             val grantedScopes = requestedScope.toSet()
             val effectiveClientId = clientId ?: record.clientId ?: tokenClientId
@@ -151,7 +174,10 @@ class RefreshTokenTokenEndpoint(
             )
 
             if (refreshTokenRepository.rotate(refreshTokenSignature, newRecord) == null) {
-                return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Refresh token is invalid"))
+                return failure(
+                    OAuthError("invalid_grant", "Refresh token is invalid"),
+                    TokenFailureStage.GRANT_VALIDATION,
+                )
             }
 
             val expiresIn = if (sessionExpiresAt == null) {
@@ -172,9 +198,12 @@ class RefreshTokenTokenEndpoint(
                 ),
             )
         } catch (e: DuplicateCodeException) {
-            AccessTokenResponseResult.Failure(OAuthError("server_error", e.message))
+            failure(OAuthError("server_error", e.message))
         } catch (e: IllegalArgumentException) {
-            AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Refresh token is invalid"))
+            failure(
+                OAuthError("invalid_grant", "Refresh token is invalid"),
+                TokenFailureStage.GRANT_VALIDATION,
+            )
         }
     }
 

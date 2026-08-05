@@ -15,6 +15,8 @@ import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.sanitizeForStorage
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.responses.token.TokenFailureStage
+import id.walt.openid4vci.responses.token.tokenFailure
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import id.walt.openid4vci.tokens.access.accessTokenType
 import id.walt.openid4vci.tokens.access.dpopAccessTokenClaims
@@ -41,6 +43,11 @@ class AuthorizationCodeTokenEndpoint(
         request.grantTypes.contains(GrantType.AuthorizationCode.value)
 
     override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): AccessTokenResponseResult {
+        var sessionSubject: String? = null
+
+        fun failure(error: OAuthError, stage: TokenFailureStage = TokenFailureStage.UNSPECIFIED) =
+            tokenFailure(error, sessionSubject, stage)
+
         return try {
             if (!canHandleTokenEndpointRequest(request)) {
                 return AccessTokenResponseResult.Failure(OAuthError("unsupported_grant_type", "authorization_code grant not requested"))
@@ -51,17 +58,24 @@ class AuthorizationCodeTokenEndpoint(
 
             val record = codeRepository.consume(code)
                 ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Authorization code is invalid or has already been used"))
+            sessionSubject = record.session.subject
 
             val client = request.client
             if (client.id != record.clientId) {
-                return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Client mismatch for authorization code"))
+                return failure(
+                    OAuthError("invalid_grant", "Client mismatch for authorization code"),
+                    TokenFailureStage.CLIENT_AUTHENTICATION,
+                )
             }
 
             val redirectParam = request.requestForm["redirect_uri"]?.firstOrNull()
             // RFC6749 §4.1.3: If redirect_uri was present in the authorize request, it MUST be present here and match exactly.
             record.redirectUri?.let { authorizedRedirect ->
                 if (redirectParam.isNullOrBlank() || authorizedRedirect != redirectParam) {
-                    return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "redirect_uri does not match authorization request"))
+                    return failure(
+                        OAuthError("invalid_grant", "redirect_uri does not match authorization request"),
+                        TokenFailureStage.REDIRECT_URI_VALIDATION,
+                    )
                 }
             }
 
@@ -74,7 +88,10 @@ class AuthorizationCodeTokenEndpoint(
             // RFC6749 §5.1 and §3.3: If requested scope exceeds granted scope, reject; otherwise cap to granted.
             val requestedScope = updatedRequest.requestedScopes.ifEmpty { record.grantedScopes }
             if (!record.grantedScopes.containsAll(requestedScope)) {
-                return AccessTokenResponseResult.Failure(OAuthError("invalid_scope", "Requested scopes exceed the authorized scope"))
+                return failure(
+                    OAuthError("invalid_scope", "Requested scopes exceed the authorized scope"),
+                    TokenFailureStage.SCOPE_VALIDATION,
+                )
             }
             val scopedRequest = updatedRequest.withGrantedScopes(requestedScope.toSet())
 
@@ -82,7 +99,7 @@ class AuthorizationCodeTokenEndpoint(
             val expiresAt = sessionExpiresAt ?: (Clock.System.now() + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds)
 
             val subject = session.subject?.takeIf { it.isNotBlank() }
-                ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "subject is required in session"))
+                ?: return failure(OAuthError("invalid_request", "subject is required in session"))
 
             val claims = defaultAccessTokenClaims(
                 subject = subject,
@@ -130,9 +147,9 @@ class AuthorizationCodeTokenEndpoint(
                 ),
             )
         } catch (e: SerializationException) {
-            AccessTokenResponseResult.Failure(OAuthError("invalid_request", e.message))
+            failure(OAuthError("invalid_request", e.message))
         } catch (e: DuplicateCodeException) {
-            AccessTokenResponseResult.Failure(OAuthError("server_error", e.message))
+            failure(OAuthError("server_error", e.message))
         }
     }
 

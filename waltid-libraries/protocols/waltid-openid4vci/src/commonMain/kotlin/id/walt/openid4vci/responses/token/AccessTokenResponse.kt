@@ -82,9 +82,44 @@ sealed class AccessTokenResponseResult {
         val request: AccessTokenRequest,
         val response: AccessTokenResponse,
     ) : AccessTokenResponseResult()
-    data class Failure(val error: OAuthError) : AccessTokenResponseResult()
+    data class Failure(val error: OAuthError) : AccessTokenResponseResult() {
+        // Outside the primary constructor: this type is published, so a new parameter would change
+        // the generated constructor and `copy` signatures for compiled consumers. Consequently
+        // `copy()` does not carry it over, and it takes no part in equals/hashCode.
+        var context: TokenFailureContext? = null
+            internal set
+
+        internal fun withContext(context: TokenFailureContext): Failure = apply { this.context = context }
+    }
 
     fun isSuccess(): Boolean = this is Success
+}
+
+internal fun tokenFailure(
+    error: OAuthError,
+    sessionSubject: String?,
+    stage: TokenFailureStage = TokenFailureStage.UNSPECIFIED,
+): AccessTokenResponseResult.Failure {
+    val failure = AccessTokenResponseResult.Failure(error)
+    return sessionSubject
+        ?.takeIf { it.isNotBlank() }
+        ?.let { failure.withContext(TokenFailureContext(sessionSubject = it, stage = stage)) }
+        ?: failure
+}
+
+data class TokenFailureContext(
+    /** The grant's session subject, verbatim. Issuers that key sessions by subject can correlate on it. */
+    val sessionSubject: String,
+    val stage: TokenFailureStage = TokenFailureStage.UNSPECIFIED,
+)
+
+enum class TokenFailureStage {
+    GRANT_VALIDATION,
+    CLIENT_AUTHENTICATION,
+    TX_CODE_VALIDATION,
+    REDIRECT_URI_VALIDATION,
+    SCOPE_VALIDATION,
+    UNSPECIFIED,
 }
 
 data class AccessTokenResponseHttp(

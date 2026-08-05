@@ -106,6 +106,11 @@ class CredentialOfferService(
             credentialStatus = overrides?.credentialStatus ?: profile.credentialStatus,
         )
         sessionService.createSession(session)
+        // BY_VALUE offers are never dereferenced, so this is their only offer-stage event.
+        notificationService.notify(
+            session = session,
+            event = IssuanceSessionEvent.credential_offer_created,
+        )
 
         val offerRequest = when (request.valueMode) {
             CredentialOfferValueMode.BY_VALUE -> CredentialOfferRequest(credentialOffer = credentialOffer)
