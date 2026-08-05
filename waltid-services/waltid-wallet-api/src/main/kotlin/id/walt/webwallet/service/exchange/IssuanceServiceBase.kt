@@ -1,6 +1,7 @@
 package id.walt.webwallet.service.exchange
 
 import cbor.Cbor
+import id.walt.commons.config.ConfigManager
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.JwsUtils.decodeJwsOrSdjwt
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
@@ -15,7 +16,6 @@ import id.walt.webwallet.utils.WalletHttpClients
 import id.waltid.openid4vc.wallet.legacy.ConfiguredIssuerMetadataTrustResolver
 import id.waltid.openid4vc.wallet.legacy.LegacyIssuerMetadataResolver
 import id.waltid.openid4vc.wallet.legacy.TrustedIssuerMetadataSigner
-import id.walt.commons.config.ConfigManager
 import io.klogging.Klogger
 import io.ktor.client.call.*
 import io.ktor.client.request.*
