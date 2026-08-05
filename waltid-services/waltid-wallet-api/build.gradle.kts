@@ -67,6 +67,7 @@ dependencies {
 
     // walt.id
     implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
+    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
     implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
     implementation(project(":waltid-libraries:protocols:waltid-openid4vp-clientidprefix"))
     implementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))

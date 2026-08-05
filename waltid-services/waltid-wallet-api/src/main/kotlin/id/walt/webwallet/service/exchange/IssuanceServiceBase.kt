@@ -10,7 +10,12 @@ import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.OfferedCredential
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
+import id.walt.webwallet.config.TrustConfig
 import id.walt.webwallet.utils.WalletHttpClients
+import id.waltid.openid4vc.wallet.legacy.ConfiguredIssuerMetadataTrustResolver
+import id.waltid.openid4vc.wallet.legacy.LegacyIssuerMetadataResolver
+import id.waltid.openid4vc.wallet.legacy.TrustedIssuerMetadataSigner
+import id.walt.commons.config.ConfigManager
 import io.klogging.Klogger
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -25,6 +30,24 @@ import kotlinx.serialization.json.jsonPrimitive
 abstract class IssuanceServiceBase {
 
     protected val http = WalletHttpClients.getHttpClient()
+    protected val legacyIssuerMetadataResolver by lazy {
+        val trustConfig = runCatching { ConfigManager.getConfig<TrustConfig>() }.getOrNull()
+        val trustedSigners = trustConfig?.issuerMetadataSigners.orEmpty().flatMap { (issuer, signers) ->
+            signers.map { signer ->
+                TrustedIssuerMetadataSigner(
+                    issuer = issuer,
+                    publicJwk = signer.publicJwk,
+                    keyId = signer.keyId,
+                    algorithm = signer.algorithm,
+                )
+            }
+        }
+        LegacyIssuerMetadataResolver(
+            httpClient = http,
+            metadataTrustResolver = trustedSigners.takeIf { it.isNotEmpty() }
+                ?.let(::ConfiguredIssuerMetadataTrustResolver),
+        )
+    }
     protected abstract val logger: Klogger
 
     protected fun parseOfferParams(offerURL: String) = Url(offerURL).parameters.toMap()

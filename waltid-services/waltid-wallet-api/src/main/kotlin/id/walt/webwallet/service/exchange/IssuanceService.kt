@@ -5,7 +5,6 @@ import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.GrantType
-import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialRequest
@@ -90,7 +89,7 @@ object IssuanceService : IssuanceServiceBase() {
 
         logger.debug { "credentialOffer: $credentialOffer" }
 
-        val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(credentialOffer)
+        val providerMetadata = legacyIssuerMetadataResolver.resolve(credentialOffer.credentialIssuer)
 
         logger.debug { "providerMetadata: $providerMetadata" }
 
@@ -112,7 +111,7 @@ object IssuanceService : IssuanceServiceBase() {
                 preAuthorizedCode
             )
 
-            providerMetadata is OpenIDProviderMetadata.Draft11 -> TokenRequest.PreAuthorizedCode(
+            credentialOffer is CredentialOffer.Draft11 -> TokenRequest.PreAuthorizedCode(
                 preAuthorizedCode = preAuthorizedCode,
                 userPIN = pinOrTxCode
             )

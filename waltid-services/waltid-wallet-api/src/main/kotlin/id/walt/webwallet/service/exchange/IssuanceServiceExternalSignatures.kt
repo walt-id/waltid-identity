@@ -45,7 +45,7 @@ object IssuanceServiceExternalSignatures : IssuanceServiceBase() {
         didAuthKeyId: String,
         publicKey: Key,
     ): PrepareExternalClaimResult {
-        val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(credentialOffer)
+        val providerMetadata = legacyIssuerMetadataResolver.resolve(credentialOffer.credentialIssuer)
 
         logger.debug { "providerMetadata: $providerMetadata" }
 
@@ -140,7 +140,7 @@ object IssuanceServiceExternalSignatures : IssuanceServiceBase() {
         accessToken: String?,
     ): List<ProcessedCredentialOffer> {
         logger.debug { "// get issuer metadata" }
-        val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(credentialIssuerURL)
+        val providerMetadata = legacyIssuerMetadataResolver.resolve(credentialIssuerURL)
 
         logger.debug { "providerMetadata: $providerMetadata" }
         logger.debug { "Using issuer URL: $credentialIssuerURL" }
