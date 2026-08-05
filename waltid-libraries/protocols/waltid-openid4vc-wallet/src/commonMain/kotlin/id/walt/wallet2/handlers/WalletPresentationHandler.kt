@@ -1203,7 +1203,7 @@ object WalletPresentationHandler {
             format = format,
             data = credentialData,
             originalCredential = this,
-            disclosures = sdvc?.disclosures?.map { DcqlDisclosure(it.name, it.value) }
+            disclosures = sdvc?.disclosures?.map { DcqlDisclosure(it.name, it.value, it.location) }
         )
     }
 }
