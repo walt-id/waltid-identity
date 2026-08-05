@@ -19,13 +19,16 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
-import id.walt.crypto2.signum.SignumKeyPolicy
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.PlatformKeyPreflight
+import id.walt.wallet2.persistence.keys.PlatformKeyRequest
+import id.walt.wallet2.persistence.keys.PlatformManagedKeyInfo
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import kotlinx.coroutines.test.runTest
@@ -220,40 +223,41 @@ class MobileWalletFactoryTest {
         var generateCount = 0
         var deleteCount = 0
 
-        override suspend fun generateManagedKey(
-            id: KeyId,
-            spec: KeySpec,
-            usages: Set<KeyUsage>,
-            policy: SignumKeyPolicy?,
-        ): ManagedKey {
+        override suspend fun preflight(request: PlatformKeyRequest): PlatformKeyPreflight =
+            PlatformKeyPreflight(true)
+
+        override suspend fun generateManagedKey(request: PlatformKeyRequest): ManagedKey {
             generateCount++
-            val software = softwareProvider.generate(GenerateSoftwareKeyRequest(id, spec, usages))
-            keys[id] = software
-            val publicKey = assertNotNull(software.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(spec)
+            val software = softwareProvider.generate(GenerateSoftwareKeyRequest(request.id, request.spec, request.usages))
+            keys[request.id] = software
+            val publicKey = assertNotNull(software.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(request.spec)
             return managedKey(
                 StoredKey.Managed(
                     version = StoredKey.CURRENT_VERSION,
-                    id = id,
-                    spec = spec,
-                    usages = usages,
+                    id = request.id,
+                    spec = request.spec,
+                    usages = request.usages,
                     provider = PROVIDER_ID,
                     providerSchemaVersion = 1,
-                    providerData = BinaryData(id.value.encodeToByteArray()),
+                    providerData = BinaryData(request.id.value.encodeToByteArray()),
                     publicKey = publicKey,
                 ),
                 software,
             )
         }
 
-        override suspend fun restoreManagedKey(stored: StoredKey.Managed): ManagedKey {
+        override suspend fun restoreManagedKey(stored: StoredKey.Managed): ManagedKey? {
             require(stored.provider == PROVIDER_ID)
-            return managedKey(stored, requireNotNull(keys[stored.id]))
+            return keys[stored.id]?.let { managedKey(stored, it) }
         }
 
         override suspend fun deleteManagedKey(stored: StoredKey.Managed) {
             deleteCount++
             keys.remove(stored.id)
         }
+
+        override fun inspectManagedKey(stored: StoredKey.Managed): PlatformManagedKeyInfo =
+            PlatformManagedKeyInfo(KeyUseAuthorizationPolicy.None)
 
         private fun managedKey(stored: StoredKey.Managed, software: SoftwareKey): ManagedKey = object : ManagedKey {
             override val storedKey = stored

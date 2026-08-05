@@ -43,10 +43,15 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         }
     }
 
-    func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult {
+    func bootstrap(
+        keyType: WalletKeyType,
+        didMethod: String,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy?
+    ) async throws -> WalletBootstrapResult {
         let result = try await bridge.bootstrap(
             keyType: keyType.toKMPKeyType(),
-            didMethod: didMethod
+            didMethod: didMethod,
+            keyUseAuthorizationPolicy: keyUseAuthorizationPolicy?.toKMPAuthorizationPolicy()
         )
         let value = try Self.successValue(
             result,
@@ -55,6 +60,25 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
 
         return .init(keyID: value.keyId, did: value.did)
+    }
+
+    func keyUseAuthorizationPreflight(
+        keyType: WalletKeyType,
+        policy: WalletKeyUseAuthorizationPolicy
+    ) async throws -> WalletKeyUseAuthorizationPreflight {
+        let result = try await bridge.keyUseAuthorizationPreflight(
+            keyType: keyType.toKMPKeyType(),
+            policy: policy.toKMPAuthorizationPolicy()
+        )
+        let value = try Self.successValue(
+            result,
+            as: Waltid_openid4vc_wallet_persistence_mobilePlatformKeyPreflight.self,
+            operation: "key authorization preflight"
+        )
+        return .init(
+            supported: value.supported,
+            failure: value.failure?.toSwiftAuthorizationFailure()
+        )
     }
 
     func resolveOffer(offer: URL) async throws -> OfferResolution {
@@ -264,7 +288,12 @@ private extension WalletConfiguration {
             attestation: attestation?.toKMPAttestationConfiguration(),
             preferredLocales: preferredLocales,
             transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
-            clientIdTrustConfiguration: clientIDTrustConfiguration.toKMPClientIDTrustConfiguration()
+            clientIdTrustConfiguration: clientIDTrustConfiguration.toKMPClientIDTrustConfiguration(),
+            defaultKeyUseAuthorizationPolicy: defaultKeyUseAuthorizationPolicy.toKMPAuthorizationPolicy(),
+            keyUseAuthorizationPrompt: Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPrompt(
+                message: keyUseAuthorizationPrompt.message,
+                cancelText: keyUseAuthorizationPrompt.cancelText
+            )
         )
     }
 }
@@ -472,6 +501,31 @@ private extension WalletKeyType {
             return .rsa3072
         case .rsa4096:
             return .rsa4096
+        }
+    }
+}
+
+private extension WalletKeyUseAuthorizationPolicy {
+    func toKMPAuthorizationPolicy() -> Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPolicy {
+        switch self {
+        case .none:
+            return .none
+        case .biometricCurrentSet:
+            return .biometricCurrentSet
+        }
+    }
+}
+
+private extension Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationFailure {
+    func toSwiftAuthorizationFailure() -> WalletKeyUseAuthorizationFailure {
+        switch self {
+        case .unsupportedCombination: return .unsupportedCombination
+        case .biometricUnavailable: return .biometricUnavailable
+        case .biometricNotEnrolled: return .biometricNotEnrolled
+        case .interactionContextUnavailable: return .interactionContextUnavailable
+        case .authorizationNotCompleted: return .authorizationNotCompleted
+        case .protectedKeyUnavailable: return .protectedKeyUnavailable
+        case .invalidStoredKeyMetadata: return .invalidStoredKeyMetadata
         }
     }
 }
@@ -835,6 +889,9 @@ private extension MobileWalletEvent {
 
 private extension WalletBridgeError {
     func toSwiftWalletError() -> WalletError {
+        if let authorizationFailure {
+            return .keyUseAuthorization(authorizationFailure.toSwiftAuthorizationFailure())
+        }
         switch category {
         case .invalidInput:
             return .invalidInput(message)

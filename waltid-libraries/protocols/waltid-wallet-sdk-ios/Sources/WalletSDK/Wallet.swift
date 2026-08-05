@@ -50,11 +50,24 @@ public actor Wallet {
     ///   or bridge communication fails.
     public func bootstrap(
         keyType: WalletKeyType? = nil,
-        didMethod: String = "key"
+        didMethod: String = "key",
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy? = nil
     ) async throws -> WalletBootstrapResult {
         try await bridge.bootstrap(
             keyType: keyType ?? configuration.defaultKeyType,
-            didMethod: didMethod
+            didMethod: didMethod,
+            keyUseAuthorizationPolicy: keyUseAuthorizationPolicy
+        )
+    }
+
+    /// Checks whether an exact key-use authorization request can be enforced without creating a key.
+    public func keyUseAuthorizationPreflight(
+        keyType: WalletKeyType? = nil,
+        policy: WalletKeyUseAuthorizationPolicy? = nil
+    ) async throws -> WalletKeyUseAuthorizationPreflight {
+        try await bridge.keyUseAuthorizationPreflight(
+            keyType: keyType ?? configuration.defaultKeyType,
+            policy: policy ?? configuration.defaultKeyUseAuthorizationPolicy
         )
     }
 

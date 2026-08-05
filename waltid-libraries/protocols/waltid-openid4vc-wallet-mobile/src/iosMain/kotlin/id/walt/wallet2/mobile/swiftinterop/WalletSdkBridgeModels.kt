@@ -17,6 +17,10 @@ import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import id.walt.x509.CertificateDer
 import kotlinx.coroutines.CancellationException
@@ -50,6 +54,8 @@ public data class WalletBridgeConfiguration(
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     public val clientIdTrustConfiguration: WalletBridgeClientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(),
+    public val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+    public val keyUseAuthorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
 )
 
 /**
@@ -69,6 +75,8 @@ internal fun WalletBridgeClientIdTrustConfiguration.toClientIdTrustConfiguration
 internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConfig(
     walletId = walletId,
     defaultKeyType = defaultKeyType,
+    defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy,
+    keyUseAuthorizationPrompt = keyUseAuthorizationPrompt,
     attestationConfig = attestation,
     persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
     preferredLocales = preferredLocales,
@@ -358,6 +366,7 @@ public data class WalletBridgeError(
     val category: WalletBridgeErrorCategory,
     val message: String,
     val causeClass: String? = null,
+    val authorizationFailure: KeyUseAuthorizationFailure? = null,
 ) {
     internal companion object {
         fun fromThrowable(throwable: Throwable): WalletBridgeError {
@@ -373,6 +382,7 @@ public data class WalletBridgeError(
                 category = category,
                 message = throwable.message ?: throwable::class.simpleName ?: "Unknown wallet error",
                 causeClass = throwable::class.simpleName,
+                authorizationFailure = (throwable as? KeyUseAuthorizationException)?.failure,
             )
         }
     }

@@ -14,6 +14,10 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.PlatformKeyPreflight
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.PresentationCredentialOption
 import id.walt.wallet2.handlers.PresentationCredentialRequirement
@@ -182,8 +186,13 @@ public class MobileWallet internal constructor(
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
     private val generateAndPersistKey: suspend (MobileWalletKeyType) -> Key,
+    private val generateAndPersistKeyWithPolicy: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> Key =
+        { keyType, _ -> generateAndPersistKey(keyType) },
+    private val runKeyUseAuthorizationPreflight: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> PlatformKeyPreflight =
+        { _, _ -> PlatformKeyPreflight(true) },
     private val didService: Crypto2DidService = Crypto2DidService,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
+    private val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
     attestationConfig: WalletAttestationConfig? = null,
     private val preferredLocales: List<String> = emptyList(),
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
@@ -229,6 +238,7 @@ public class MobileWallet internal constructor(
     public suspend fun bootstrap(
         keyType: MobileWalletKeyType? = null,
         didMethod: String = "key",
+        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy? = null,
     ): MobileWalletBootstrapResult {
         MobileDidSupport.ensureInitialized()
         val existingDids = didStore.listDids().toList()
@@ -249,12 +259,27 @@ public class MobileWallet internal constructor(
         }
 
         val effectiveKeyType = keyType ?: defaultKeyType
-        return createKeyAndDid(effectiveKeyType, didMethod)
+        val effectivePolicy = keyUseAuthorizationPolicy ?: defaultKeyUseAuthorizationPolicy
+        val preflight = runKeyUseAuthorizationPreflight(effectiveKeyType, effectivePolicy)
+        if (!preflight.supported) {
+            throw KeyUseAuthorizationException(
+                preflight.failure ?: KeyUseAuthorizationFailure.UnsupportedCombination,
+                "The requested mobile key authorization policy is unavailable",
+            )
+        }
+        return createKeyAndDid(effectiveKeyType, didMethod, effectivePolicy)
     }
+
+    /** Checks an exact key-use authorization request without creating or persisting a key. */
+    public suspend fun keyUseAuthorizationPreflight(
+        keyType: MobileWalletKeyType = defaultKeyType,
+        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy,
+    ): PlatformKeyPreflight = runKeyUseAuthorizationPreflight(keyType, keyUseAuthorizationPolicy)
 
     private suspend fun createKeyAndDid(
         keyType: MobileWalletKeyType,
         didMethod: String,
+        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy,
     ): MobileWalletBootstrapResult {
         val normalizedMethod = didMethod.lowercase()
         val options = when (normalizedMethod) {
@@ -262,7 +287,7 @@ public class MobileWallet internal constructor(
             "jwk" -> DidJwkCreateOptions()
             else -> throw IllegalArgumentException("Mobile bootstrap supports only did:key and did:jwk")
         }
-        val key = generateAndPersistKey(keyType)
+        val key = generateAndPersistKeyWithPolicy(keyType, keyUseAuthorizationPolicy)
         try {
             val didResult = didService.registerByKey(normalizedMethod, key, options)
             didStore.addDid(

@@ -8,6 +8,12 @@ public struct WalletConfiguration: Sendable {
     /// Default key type used when bootstrapping a new wallet DID.
     public var defaultKeyType: WalletKeyType
 
+    /// Default authorization policy for newly created wallet signing keys.
+    public var defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+
+    /// Prompt text used for protected signing operations.
+    public var keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt
+
     /// Optional enterprise attestation configuration.
     public var attestation: WalletAttestationConfiguration?
 
@@ -39,6 +45,9 @@ public struct WalletConfiguration: Sendable {
     ///     wallet accepts before previewing or submitting a presentation.
     ///   - preferredLocales: Ordered BCP 47 locale preferences used for issuer,
     ///     credential, and verifier display metadata.
+    ///   - defaultKeyUseAuthorizationPolicy: Default authorization policy for newly
+    ///     created wallet signing keys.
+    ///   - keyUseAuthorizationPrompt: Prompt text used for protected signing operations.
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
@@ -46,15 +55,64 @@ public struct WalletConfiguration: Sendable {
         clientIDTrustConfiguration: WalletClientIDTrustConfiguration = .init(),
         persistence: WalletPersistence = WalletPersistence(),
         transactionDataProfiles: [WalletTransactionDataProfile] = [],
-        preferredLocales: [String] = Locale.preferredLanguages
+        preferredLocales: [String] = Locale.preferredLanguages,
+        defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .none,
+        keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt = .init()
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
+        self.defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy
+        self.keyUseAuthorizationPrompt = keyUseAuthorizationPrompt
         self.attestation = attestation
         self.clientIDTrustConfiguration = clientIDTrustConfiguration
         self.persistence = persistence
         self.transactionDataProfiles = transactionDataProfiles
         self.preferredLocales = preferredLocales
+    }
+}
+
+/// Authorization policy for private-key use selected when a wallet key is created.
+public enum WalletKeyUseAuthorizationPolicy: Equatable, Sendable {
+    /// Ordinary non-interactive private-key operations.
+    case none
+
+    /// Strong biometric authentication for every operation; new biometric enrollment invalidates the key.
+    case biometricCurrentSet
+}
+
+/// Prompt text supplied to the operating-system-owned authorization UI.
+public struct WalletKeyUseAuthorizationPrompt: Equatable, Sendable {
+    public var message: String
+    public var cancelText: String
+
+    public init(
+        message: String = "Please authorize cryptographic signature",
+        cancelText: String = "Cancel"
+    ) {
+        self.message = message
+        self.cancelText = cancelText
+    }
+}
+
+/// Stable protected-key failure reasons exposed by the wallet SDK.
+public enum WalletKeyUseAuthorizationFailure: Equatable, Sendable {
+    case unsupportedCombination
+    case biometricUnavailable
+    case biometricNotEnrolled
+    case interactionContextUnavailable
+    case authorizationNotCompleted
+    case protectedKeyUnavailable
+    case invalidStoredKeyMetadata
+}
+
+/// Result of checking whether an exact protected-key request can be enforced.
+public struct WalletKeyUseAuthorizationPreflight: Equatable, Sendable {
+    public let supported: Bool
+    public let failure: WalletKeyUseAuthorizationFailure?
+
+    public init(supported: Bool, failure: WalletKeyUseAuthorizationFailure? = nil) {
+        self.supported = supported
+        self.failure = failure
     }
 }
 

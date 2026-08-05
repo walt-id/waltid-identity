@@ -4,7 +4,15 @@ import Foundation
 protocol WalletCoreBridge: Sendable {
     var events: AsyncStream<WalletEvent> { get }
 
-    func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult
+    func bootstrap(
+        keyType: WalletKeyType,
+        didMethod: String,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy?
+    ) async throws -> WalletBootstrapResult
+    func keyUseAuthorizationPreflight(
+        keyType: WalletKeyType,
+        policy: WalletKeyUseAuthorizationPolicy
+    ) async throws -> WalletKeyUseAuthorizationPreflight
     func resolveOffer(offer: URL) async throws -> OfferResolution
     func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String]
     func receive(previewHandle: IssuancePreviewHandle, txCode: String?, clientID: String) async throws -> [String]
@@ -47,7 +55,18 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         }
     }
 
-    func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult {
+    func bootstrap(
+        keyType: WalletKeyType,
+        didMethod: String,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy?
+    ) async throws -> WalletBootstrapResult {
+        throw unavailableError()
+    }
+
+    func keyUseAuthorizationPreflight(
+        keyType: WalletKeyType,
+        policy: WalletKeyUseAuthorizationPolicy
+    ) async throws -> WalletKeyUseAuthorizationPreflight {
         throw unavailableError()
     }
 

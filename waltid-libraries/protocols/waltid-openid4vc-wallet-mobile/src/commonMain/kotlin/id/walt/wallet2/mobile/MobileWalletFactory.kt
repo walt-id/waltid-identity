@@ -12,6 +12,9 @@ import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
+import id.walt.wallet2.persistence.keys.PlatformKeyRequest
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
@@ -25,6 +28,9 @@ import kotlin.uuid.Uuid
  *
  * @property walletId Stable wallet identifier used for database naming and persisted wallet state.
  * @property defaultKeyType Key type used by [MobileWallet.bootstrap] when no key type override is supplied.
+ * @property defaultKeyUseAuthorizationPolicy Authorization policy used for newly created keys.
+ * The policy never changes an existing persisted key.
+ * @property keyUseAuthorizationPrompt Prompt text used for protected signing operations.
  * @property attestationConfig Optional client-attestation configuration for issuer deployments that require it.
  * @property persistence Persistence mode used for wallet-local state.
  * @property onEvent Optional callback for observing wallet issuance and presentation session events.
@@ -40,6 +46,8 @@ public data class MobileWalletConfig(
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    public val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+    public val keyUseAuthorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
 )
 
 /**
@@ -178,8 +186,31 @@ internal fun createSqlDelightMobileWallet(
                 usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
             )
         },
+        generateAndPersistKeyWithPolicy = { keyType, policy ->
+            keyStore.generateKey(
+                PlatformKeyRequest(
+                    id = KeyId("wallet_key_${Uuid.random()}"),
+                    spec = keyType.toKeySpec(),
+                    usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                    authorizationPolicy = policy,
+                    prompt = config.keyUseAuthorizationPrompt,
+                )
+            )
+        },
+        runKeyUseAuthorizationPreflight = { keyType, policy ->
+            keyStore.preflight(
+                PlatformKeyRequest(
+                    id = KeyId("wallet_preflight"),
+                    spec = keyType.toKeySpec(),
+                    usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                    authorizationPolicy = policy,
+                    prompt = config.keyUseAuthorizationPrompt,
+                )
+            )
+        },
         didService = didService,
         defaultKeyType = config.defaultKeyType,
+        defaultKeyUseAuthorizationPolicy = config.defaultKeyUseAuthorizationPolicy,
         attestationConfig = config.attestationConfig,
         preferredLocales = config.preferredLocales,
         transactionDataProfiles = config.transactionDataProfiles,

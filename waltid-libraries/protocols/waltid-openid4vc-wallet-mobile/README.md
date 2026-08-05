@@ -34,6 +34,33 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 - Present credentials using OpenID4VP.
 - Support mobile issuance flows using OAuth 2.0 client attestation.
 
+## Key-use authorization
+
+New wallet keys can require biometric authorization for every private-key operation:
+
+```kotlin
+val wallet = MobileWalletFactory(context, interactionContextProvider = { currentActivity }).create(
+    MobileWalletConfig(
+        walletId = "consumer-wallet",
+        defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+        keyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(
+            message = "Authorize wallet signing",
+            cancelText = "Cancel",
+        ),
+    )
+)
+wallet.keyUseAuthorizationPreflight()
+wallet.bootstrap()
+```
+
+`BiometricCurrentSet` applies only when a new key is created. It is P-256 only,
+uses strong biometrics, rejects device-credential fallback, and invalidates the
+key when the enrolled biometric set changes. Android resolves a current resumed
+`FragmentActivity` for each prompt; do not retain an activity in application
+state. iOS protected keys require a physical Secure Enclave device; simulator
+preflight is expected to report `BiometricUnavailable`. A changed default does
+not retrofit an existing persisted key.
+
 ## Receiving credentials
 
 Resolve an offer before issuance so the application can collect a separately
