@@ -554,6 +554,7 @@ class Wallet2ExtendedIntegrationTest {
                         setBody(
                             SignProofRequest(
                                 issuerUrl = Url(issuerBase),
+                                credentialConfigurationId = credentialConfigId,
                                 nonce = nonceResult.nonce,
                                 keyId = keyInfo.keyId
                             )

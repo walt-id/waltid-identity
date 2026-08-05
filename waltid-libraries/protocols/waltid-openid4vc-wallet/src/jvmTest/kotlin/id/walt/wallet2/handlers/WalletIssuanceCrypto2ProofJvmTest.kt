@@ -7,20 +7,20 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toStoredSoftwareKey
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.migration.v1.V1KeyMigration
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidService
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.handlers.SignProofTestSupport.CONFIG_ID
+import id.walt.wallet2.handlers.SignProofTestSupport.ISSUER
+import id.walt.wallet2.handlers.SignProofTestSupport.issuerMetadataClient
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -43,7 +43,12 @@ class WalletIssuanceCrypto2ProofJvmTest {
         val legacyKey = JWKKey.generate(KeyType.secp256r1)
         val proof = WalletIssuanceHandler.signProof(
             wallet = Wallet(id = "wallet", staticKey = legacyKey),
-            request = SignProofRequest(issuerUrl = Url("https://issuer.example"), nonce = "nonce"),
+            request = SignProofRequest(
+                issuerUrl = Url(ISSUER),
+                credentialConfigurationId = CONFIG_ID,
+                nonce = "nonce",
+            ),
+            httpClient = issuerMetadataClient(),
         ).proofJwt
         val decoded = CompactJws.decodeUnverified(proof)
         val bindingJwk = assertNotNull(decoded.protectedHeader["jwk"]).jsonObject
@@ -62,8 +67,24 @@ class WalletIssuanceCrypto2ProofJvmTest {
 
         assertEquals("openid4vci-proof+jwt", verified.protectedHeader["typ"]?.jsonPrimitive?.content)
         assertFalse("d" in bindingJwk)
-        assertEquals("https://issuer.example", payload["aud"]?.jsonPrimitive?.content)
+        assertEquals(ISSUER, payload["aud"]?.jsonPrimitive?.content)
         assertEquals("nonce", payload["nonce"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `Ed25519 wallet proof negotiates EdDSA from issuer-accepted algorithms`() = runTest {
+        val legacyKey = JWKKey.generate(KeyType.Ed25519)
+        val proof = WalletIssuanceHandler.signProof(
+            wallet = Wallet(id = "wallet", staticKey = legacyKey),
+            request = SignProofRequest(
+                issuerUrl = Url(ISSUER),
+                credentialConfigurationId = CONFIG_ID,
+                nonce = "nonce",
+            ),
+            httpClient = issuerMetadataClient(proofAlgorithms = setOf("ES256", "EdDSA")),
+        ).proofJwt
+
+        assertEquals(JwsAlgorithm.EDDSA, CompactJws.decodeUnverified(proof).algorithm)
     }
 
     @Test
@@ -84,10 +105,12 @@ class WalletIssuanceCrypto2ProofJvmTest {
             WalletIssuanceHandler.signProof(
                 wallet = Wallet(id = "wallet", keyStores = listOf(store)),
                 request = SignProofRequest(
-                    issuerUrl = Url("https://issuer.example"),
+                    issuerUrl = Url(ISSUER),
+                    credentialConfigurationId = CONFIG_ID,
                     nonce = "nonce",
                     keyId = "resource-key",
                 ),
+                httpClient = issuerMetadataClient(),
             )
         }
     }
@@ -99,7 +122,12 @@ class WalletIssuanceCrypto2ProofJvmTest {
         assertFailsWith<IllegalArgumentException> {
             WalletIssuanceHandler.signProof(
                 wallet = Wallet(id = "wallet", staticKey = publicKey),
-                request = SignProofRequest(issuerUrl = Url("https://issuer.example"), nonce = "nonce"),
+                request = SignProofRequest(
+                    issuerUrl = Url(ISSUER),
+                    credentialConfigurationId = CONFIG_ID,
+                    nonce = "nonce",
+                ),
+                httpClient = issuerMetadataClient(),
             )
         }
     }
@@ -111,7 +139,13 @@ class WalletIssuanceCrypto2ProofJvmTest {
         val did = DidService.registerByKey("key", key).did
         val proof = WalletIssuanceHandler.signProof(
             wallet = Wallet(id = "wallet", staticKey = key),
-            request = SignProofRequest(issuerUrl = Url("https://issuer.example"), nonce = "nonce", did = did),
+            request = SignProofRequest(
+                issuerUrl = Url(ISSUER),
+                credentialConfigurationId = CONFIG_ID,
+                nonce = "nonce",
+                did = did,
+            ),
+            httpClient = issuerMetadataClient(proofAlgorithms = setOf("ES256", "EdDSA")),
         ).proofJwt
 
         assertEquals(

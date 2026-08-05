@@ -328,12 +328,23 @@ data class RequestNonceResult(
 @Serializable
 data class SignProofRequest(
     val issuerUrl: Url,
+    /**
+     * Credential configuration id whose `proof_types_supported` constrains the proof algorithm.
+     * Resolved against the issuer metadata at [issuerUrl].
+     */
+    val credentialConfigurationId: String,
     val nonce: String? = null,
     /** Inline key to sign the proof with; takes precedence over [keyId]. */
     val key: DirectSerializedKey? = null,
     val keyId: String? = null,
-    val did: String? = null
-)
+    val did: String? = null,
+) {
+    init {
+        require(credentialConfigurationId.isNotBlank()) {
+            "credentialConfigurationId must not be blank"
+        }
+    }
+}
 
 @Serializable
 data class SignProofResult(
@@ -948,16 +959,33 @@ object WalletIssuanceHandler {
         )
     }
 
-    suspend fun signProof(wallet: Wallet, request: SignProofRequest): SignProofResult {
+    suspend fun signProof(
+        wallet: Wallet,
+        request: SignProofRequest,
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+    ): SignProofResult {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available for signing proof")
+        val issuerMetadata = IssuerMetadataResolver(httpClient)
+            .resolveCredentialIssuerMetadata(request.issuerUrl.toString())
+        val configuration = issuerMetadata.credentialConfigurationsSupported[request.credentialConfigurationId]
+            ?: error(
+                "Unknown credential configuration '${request.credentialConfigurationId}' " +
+                    "for issuer '${issuerMetadata.credentialIssuer}'"
+            )
+        val acceptedAlgorithms = supportedJwtProofAlgorithms(configuration.proofTypesSupported)
+            ?: error(
+                "Credential configuration '${request.credentialConfigurationId}' " +
+                    "does not advertise JWT proof types"
+            )
         val proofs = buildJwtProof(
             proofBuilder = JwtProofBuilder(),
             keyMaterial = keyMaterial,
-            audience = request.issuerUrl.toString(),
+            audience = issuerMetadata.credentialIssuer,
             nonce = request.nonce,
             did = request.did,
+            acceptedAlgorithms = acceptedAlgorithms,
         )
         return SignProofResult(proofJwt = proofs.jwt?.firstOrNull() ?: error("Proof signing produced no JWT"))
     }
