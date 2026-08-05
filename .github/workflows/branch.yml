@@ -12,6 +12,14 @@ on:
         required: false
         type: string
         default: ${{ github.repository }}
+      ref:
+        description: |
+          Branch to create the release branch from. If it exists in the target
+          repository it is used, otherwise the repository's default branch (main)
+          is used. Defaults to the branch that started the calling workflow.
+        required: false
+        type: string
+        default: ${{ github.ref_name }}
     outputs:
       branch:
         description: "The created branch"
@@ -24,9 +32,24 @@ jobs:
     outputs:
       result: ${{ steps.branch.outputs.branch }}
     steps:
+      - name: Determine ref to branch from
+        id: ref
+        env:
+          REF: ${{ inputs.ref }}
+          REPO: ${{ inputs.repository }}
+          TOKEN: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+        run: |
+          if [ -n "$REF" ] && git ls-remote --exit-code --heads "https://${TOKEN}@github.com/${REPO}.git" "$REF"; then
+            echo "Branch '$REF' found in $REPO, branching from it."
+            echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "Branch '$REF' not found in $REPO, using default branch."
+            echo "ref=" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v6
         with:
           repository: ${{ inputs.repository }}
+          ref: ${{ steps.ref.outputs.ref }}
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
       - name: Create and push the release branch
         id: branch

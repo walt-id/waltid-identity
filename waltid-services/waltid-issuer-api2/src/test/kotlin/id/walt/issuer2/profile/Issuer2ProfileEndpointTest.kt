@@ -69,6 +69,7 @@ class Issuer2ProfileEndpointTest {
         val profilesConfig = ConfigManager.getConfig<Issuer2ProfilesConfig>()
 
         profilesConfig.profiles.forEach { (profileId, profile) ->
+            val expectedMaterial = expectedIssuerMaterial(profileId, profilesConfig)
             val metadataEntry = assertNotNull(
                 metadata.credentialConfigurations[profile.credentialConfigurationId],
                 "Expected metadata for profile $profileId credential configuration ${profile.credentialConfigurationId}",
@@ -91,9 +92,9 @@ class Issuer2ProfileEndpointTest {
                 MSO_MDOC_FORMAT -> {
                     assertNull(profile.issuerDid, "mDOC profile $profileId must not configure issuerDid")
                     assertEquals(
-                        profilesConfig.defaultIssuerX5chain,
+                        expectedMaterial.x5Chain,
                         profile.x5Chain,
-                        "Expected mDOC profile $profileId to use the default issuer x5 chain",
+                        "Expected mDOC profile $profileId to use its configured issuer x5 chain",
                     )
                 }
 
@@ -109,7 +110,7 @@ class Issuer2ProfileEndpointTest {
                         assertEquals(ISSUER_DID, profile.issuerDid)
                     }
                     if (usesX5Chain) {
-                        assertEquals(profilesConfig.defaultIssuerX5chain, profile.x5Chain)
+                        assertEquals(expectedMaterial.x5Chain, profile.x5Chain)
                     }
                 }
 
@@ -134,18 +135,29 @@ class Issuer2ProfileEndpointTest {
             profilesConfig.defaultIssuerX5chain.single().contains("-----BEGIN CERTIFICATE-----"),
             "Expected defaultIssuerX5chain to contain PEM certificate data",
         )
+        assertIssuerKeyShape(assertNotNull(profilesConfig.defaultHaipIssuerKey), "defaultHaipIssuerKey")
+        assertEquals(1, profilesConfig.defaultHaipIssuerX5chain.size)
+        assertTrue(
+            profilesConfig.defaultHaipIssuerX5chain.single().contains("-----BEGIN CERTIFICATE-----"),
+            "Expected defaultHaipIssuerX5chain to contain PEM certificate data",
+        )
 
         profilesConfig.profiles.forEach { (profileId, profile) ->
             assertNoUnresolvedSubstitutions(profileId, profile)
-            assertDefaultIssuerKey(profile.issuerKey, "$profileId.issuerKey")
+            val expectedMaterial = expectedIssuerMaterial(profileId, profilesConfig)
+            assertEquals(
+                expectedMaterial.key,
+                profile.issuerKey,
+                "Expected profile $profileId to resolve its configured issuer key",
+            )
             profile.issuerDid?.let {
                 assertEquals(ISSUER_DID, it, "Expected profile $profileId to resolve defaultIssuerDid")
             }
             profile.x5Chain?.let {
                 assertEquals(
-                    profilesConfig.defaultIssuerX5chain,
+                    expectedMaterial.x5Chain,
                     it,
-                    "Expected profile $profileId to resolve defaultIssuerX5chain",
+                    "Expected profile $profileId to resolve its configured issuer x5 chain",
                 )
             }
         }
@@ -163,7 +175,8 @@ class Issuer2ProfileEndpointTest {
         val profiles = json.decodeFromString<List<CredentialProfile>>(profilesResponseBody)
         assertTrue(profiles.isNotEmpty(), "Expected at least one configured issuer2 profile")
         assertProfilesCoverCredentialMetadata(profiles)
-        profiles.forEach(::assertProfileHasDefaultIssuerKey)
+        val profilesConfig = ConfigManager.getConfig<Issuer2ProfilesConfig>()
+        profiles.forEach { profile -> assertProfileHasConfiguredIssuerKey(profile, profilesConfig) }
 
         profiles.forEach { listedProfile ->
             val configuredProfileRaw = client.get("/issuer2/profiles/${listedProfile.profileId}")
@@ -414,21 +427,51 @@ class Issuer2ProfileEndpointTest {
         assertEquals("$.registered_given_name", profile.idTokenClaimsMapping?.get("$.given_name"))
     }
 
-    private fun assertProfileHasDefaultIssuerKey(profile: CredentialProfile) {
-        assertDefaultIssuerKey(profile.issuerKey, "${profile.profileId}.issuerKey")
+    private fun assertProfileHasConfiguredIssuerKey(
+        profile: CredentialProfile,
+        profilesConfig: Issuer2ProfilesConfig,
+    ) {
+        assertEquals(
+            expectedIssuerMaterial(profile.profileId, profilesConfig).key,
+            profile.issuerKey,
+            "Expected ${profile.profileId}.issuerKey to match its configured issuer key",
+        )
     }
 
     private fun assertDefaultIssuerKey(issuerKey: JsonObject, context: String) {
-        val jwk = assertNotNull(issuerKey["jwk"]?.jsonObject, "Expected $context.jwk")
-        assertEquals("jwk", issuerKey["type"]?.jsonPrimitive?.content, "Expected $context.type")
+        val jwk = assertIssuerKeyShape(issuerKey, context)
         assertEquals(DEFAULT_ISSUER_KEY_D, jwk["d"]?.jsonPrimitive?.content, "Expected $context.jwk.d")
         assertEquals(DEFAULT_ISSUER_KEY_X, jwk["x"]?.jsonPrimitive?.content, "Expected $context.jwk.x")
         assertEquals(DEFAULT_ISSUER_KEY_Y, jwk["y"]?.jsonPrimitive?.content, "Expected $context.jwk.y")
     }
 
+    private fun assertIssuerKeyShape(issuerKey: JsonObject, context: String): JsonObject {
+        val jwk = assertNotNull(issuerKey["jwk"]?.jsonObject, "Expected $context.jwk")
+        assertEquals("jwk", issuerKey["type"]?.jsonPrimitive?.content, "Expected $context.type")
+        assertTrue(!jwk["d"]?.jsonPrimitive?.contentOrNull.isNullOrBlank(), "Expected $context.jwk.d")
+        assertTrue(!jwk["x"]?.jsonPrimitive?.contentOrNull.isNullOrBlank(), "Expected $context.jwk.x")
+        assertTrue(!jwk["y"]?.jsonPrimitive?.contentOrNull.isNullOrBlank(), "Expected $context.jwk.y")
+        return jwk
+    }
+
+    private fun expectedIssuerMaterial(
+        profileId: String,
+        profilesConfig: Issuer2ProfilesConfig,
+    ): IssuerMaterial =
+        if (profileId in HAIP_PROFILE_IDS) {
+            IssuerMaterial(
+                key = assertNotNull(profilesConfig.defaultHaipIssuerKey, "Expected defaultHaipIssuerKey"),
+                x5Chain = profilesConfig.defaultHaipIssuerX5chain,
+            )
+        } else {
+            IssuerMaterial(
+                key = assertNotNull(profilesConfig.defaultIssuerKey, "Expected defaultIssuerKey"),
+                x5Chain = profilesConfig.defaultIssuerX5chain,
+            )
+        }
+
     private fun assertIssuerKeyIsExposed(responseBody: String) {
         assertTrue(responseBody.contains("issuerKey"), "Profile API should expose issuerKey in the first version")
-        assertTrue(responseBody.contains(DEFAULT_ISSUER_KEY_D), "Profile API should expose private JWK values in the first version")
     }
 
     // Walk all profile fields that can contain strings or nested JSON. A plain "$"
@@ -490,6 +533,11 @@ class Issuer2ProfileEndpointTest {
         val sampleNamespace: String,
         val sampleClaim: String,
         val sampleClaimValue: JsonPrimitive,
+    )
+
+    private data class IssuerMaterial(
+        val key: JsonObject,
+        val x5Chain: List<String>,
     )
 
     private fun assertProfileJsonEquals(
@@ -554,9 +602,13 @@ class Issuer2ProfileEndpointTest {
         const val ISO_PHOTO_ID_COMMON_NAMESPACE_ID = "org.iso.23220.1"
         const val ISO_MDL_PROFILE_ID = "isoMdl"
         const val ISO_MDL_CONFIGURATION_ID = "org.iso.18013.5.1.mDL"
+        const val ISO_MDL_HAIP_PROFILE_ID = "isoMdlHaip"
+        const val ISO_MDL_HAIP_CONFIGURATION_ID = "org.iso.18013.5.1.mDL.haip"
         const val ISO_MDL_NAMESPACE_ID = "org.iso.18013.5.1"
         const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
         const val IDENTITY_SD_JWT_CONFIGURATION_ID = "identity_credential"
+        const val IDENTITY_HAIP_SD_JWT_PROFILE_ID = "identityCredentialHaipSdJwt"
+        const val IDENTITY_HAIP_SD_JWT_CONFIGURATION_ID = "identity_credential_haip"
         const val TAX_ID_SD_JWT_PROFILE_ID = "taxIdCredentialSdJwt"
         const val TAX_ID_SD_JWT_CONFIGURATION_ID = "asit.tax-id-credential"
         const val JWT_VC_JSON_FORMAT = "jwt_vc_json"
@@ -569,12 +621,21 @@ class Issuer2ProfileEndpointTest {
         const val DEFAULT_ISSUER_KEY_Y = "ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"
         const val ISSUER_DID =
             "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6IkcwUklOQmlGLW9RVUQzZDVER25lZ1F1WGVuSTI5SkRhTUdvTXZpb0tSQk0iLCJ5IjoiZWQzZUZHczJwRXRycDd2QVo3QkxjYnJVdHBLa1lXQVQySlBVUUs0bE40RSJ9"
+        val HAIP_PROFILE_IDS = setOf(ISO_MDL_HAIP_PROFILE_ID, IDENTITY_HAIP_SD_JWT_PROFILE_ID)
 
         val MDOC_CATALOG_PROFILE_EXPECTATIONS = listOf(
             MdocProfileExpectation(
                 profileId = ISO_MDL_PROFILE_ID,
                 name = "ISO 18013-5 Mobile Driving License",
                 credentialConfigurationId = ISO_MDL_CONFIGURATION_ID,
+                sampleNamespace = ISO_MDL_NAMESPACE_ID,
+                sampleClaim = "family_name",
+                sampleClaimValue = JsonPrimitive("Musterfrau"),
+            ),
+            MdocProfileExpectation(
+                profileId = ISO_MDL_HAIP_PROFILE_ID,
+                name = "ISO 18013-5 Mobile Driving License HAIP",
+                credentialConfigurationId = ISO_MDL_HAIP_CONFIGURATION_ID,
                 sampleNamespace = ISO_MDL_NAMESPACE_ID,
                 sampleClaim = "family_name",
                 sampleClaimValue = JsonPrimitive("Musterfrau"),
@@ -672,6 +733,13 @@ class Issuer2ProfileEndpointTest {
                 sampleClaim = "given_name",
                 sampleClaimValue = "John",
                 usesIssuerDid = true,
+            ),
+            SdJwtProfileExpectation(
+                profileId = IDENTITY_HAIP_SD_JWT_PROFILE_ID,
+                name = "Identity Credential HAIP",
+                credentialConfigurationId = IDENTITY_HAIP_SD_JWT_CONFIGURATION_ID,
+                sampleClaim = "given_name",
+                sampleClaimValue = "John",
             ),
         )
 
