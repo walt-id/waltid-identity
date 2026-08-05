@@ -279,7 +279,13 @@ class WalletMigrationTest {
             assertEquals(1, keys.size, "Should have exactly 1 key")
             assertEquals(KEY_ID, keys[0][Wallet2Tables.Keys.keyId])
             // The serialized key document must round-trip — starts with {"type":"jwk"
-            assertTrue(keys[0][Wallet2Tables.Keys.serializedKey].contains("\"type\""),
+            // serializedKey is nullable so crypto2-only keys can be stored without a legacy
+            // representation, but a migrated v1 key always has one.
+            val serializedKey = assertNotNull(
+                keys[0][Wallet2Tables.Keys.serializedKey],
+                "Migrated key must keep its legacy serialized representation",
+            )
+            assertTrue(serializedKey.contains("\"type\""),
                 "Serialized key must contain type discriminator")
 
             // ── Credential ──────────────────────────────────────────────────
