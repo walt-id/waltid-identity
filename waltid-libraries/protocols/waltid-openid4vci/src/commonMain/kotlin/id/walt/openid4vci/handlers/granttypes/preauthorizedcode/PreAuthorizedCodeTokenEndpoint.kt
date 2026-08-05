@@ -16,6 +16,8 @@ import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.sanitizeForStorage
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.responses.token.TokenFailureStage
+import id.walt.openid4vci.responses.token.tokenFailure
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import id.walt.openid4vci.tokens.access.accessTokenType
 import id.walt.openid4vci.tokens.access.dpopAccessTokenClaims
@@ -62,27 +64,45 @@ class PreAuthorizedCodeTokenEndpoint(
                     description = "Pre-authorized code is invalid or has already been used",
                 ),
             )
+        val sessionSubject = record.session.subject
+
+        fun failure(error: OAuthError, stage: TokenFailureStage = TokenFailureStage.UNSPECIFIED) =
+            tokenFailure(error, sessionSubject, stage)
 
         record.clientId?.let { boundClientId ->
             val authenticatedClient = request.authenticatedClient
-                ?: return AccessTokenResponseResult.Failure(
+                ?: return failure(
                     OAuthError("invalid_client", "Client authentication is required for this pre-authorized code"),
+                    TokenFailureStage.CLIENT_AUTHENTICATION,
                 )
 
             if (authenticatedClient.id != boundClientId) {
-                return AccessTokenResponseResult.Failure(
+                return failure(
                     OAuthError("invalid_grant", "Client mismatch for pre-authorized code"),
+                    TokenFailureStage.CLIENT_AUTHENTICATION,
                 )
             }
         }
 
-        val providedTxCode = request.requestForm["tx_code"]?.firstOrNull()
-        if (record.txCode != null && providedTxCode.isNullOrBlank()) {
-            return AccessTokenResponseResult.Failure(
+        // OpenID4VCI 1.0 section 6.3: missing or unexpected is invalid_request, wrong is invalid_grant.
+        val providedTxCode = request.requestForm["tx_code"]?.firstOrNull()?.takeIf { it.isNotBlank() }
+        if (record.txCode != null && providedTxCode == null) {
+            return failure(
                 OAuthError(
-                    error = "invalid_grant",
+                    error = "invalid_request",
                     description = "tx_code is required for this pre-authorized code",
                 ),
+                TokenFailureStage.TX_CODE_VALIDATION,
+            )
+        }
+
+        if (record.txCode == null && providedTxCode != null) {
+            return failure(
+                OAuthError(
+                    error = "invalid_request",
+                    description = "tx_code was provided but is not expected for this pre-authorized code",
+                ),
+                TokenFailureStage.TX_CODE_VALIDATION,
             )
         }
 
@@ -90,20 +110,22 @@ class PreAuthorizedCodeTokenEndpoint(
             providedTxCode != null &&
             record.txCodeValue != hashTxCode(providedTxCode)
         ) {
-            return AccessTokenResponseResult.Failure(
+            return failure(
                 OAuthError(
                     error = "invalid_grant",
                     description = "tx_code is invalid",
                 ),
+                TokenFailureStage.TX_CODE_VALIDATION,
             )
         }
 
         val consumed = codeRepository.consume(code)
-            ?: return AccessTokenResponseResult.Failure(
+            ?: return failure(
                 OAuthError(
                     error = "invalid_grant",
                     description = "Pre-authorized code is invalid or has already been used",
                 ),
+                TokenFailureStage.GRANT_VALIDATION,
             )
 
         val session = consumed.session.copy()
@@ -131,7 +153,7 @@ class PreAuthorizedCodeTokenEndpoint(
         val expiresAt = sessionExpiresAt ?: (Clock.System.now() + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds)
 
         val subject = session.subject?.takeIf { it.isNotBlank() }
-            ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "subject is required in session"))
+            ?: return failure(OAuthError("invalid_request", "subject is required in session"))
 
         val claims = defaultAccessTokenClaims(
             subject = subject,
