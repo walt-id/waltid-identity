@@ -70,7 +70,9 @@ Use ``Wallet/keyUseAuthorizationPreflight(keyType:policy:)`` to check a
 protected request before creating a key. `biometricCurrentSet` is immutable per
 key, P-256 only, requires strong biometrics without passcode fallback, and is
 supported only on a physical Secure Enclave device. Changing the default does
-not change an existing key.
+not change an existing key. The host app must also declare
+`NSFaceIDUsageDescription` in `Info.plist` before using this policy; the
+simulator cannot validate Secure Enclave or Face ID behavior.
 
 Use the returned ``WalletBootstrapResult/did`` when a verifier flow needs an
 explicit wallet DID.

@@ -82,9 +82,16 @@ public enum WalletKeyUseAuthorizationPolicy: Equatable, Sendable {
 
 /// Prompt text supplied to the operating-system-owned authorization UI.
 public struct WalletKeyUseAuthorizationPrompt: Equatable, Sendable {
+    /// Human-readable reason shown by the platform authorization UI.
     public var message: String
+    /// Action label shown for cancelling the platform authorization UI.
     public var cancelText: String
 
+    /// Creates prompt text for protected signing operations.
+    ///
+    /// - Parameters:
+    ///   - message: Human-readable authorization reason.
+    ///   - cancelText: Cancellation action label.
     public init(
         message: String = "Please authorize cryptographic signature",
         cancelText: String = "Cancel"
@@ -96,20 +103,34 @@ public struct WalletKeyUseAuthorizationPrompt: Equatable, Sendable {
 
 /// Stable protected-key failure reasons exposed by the wallet SDK.
 public enum WalletKeyUseAuthorizationFailure: Equatable, Sendable {
+    /// The key type or usage set cannot satisfy the selected policy.
     case unsupportedCombination
+    /// The platform cannot provide the required biometric capability.
     case biometricUnavailable
+    /// No biometric is enrolled on the device.
     case biometricNotEnrolled
+    /// The host application did not provide a usable interaction context.
     case interactionContextUnavailable
+    /// The user cancelled or did not complete authorization.
     case authorizationNotCompleted
+    /// The protected native key is missing or invalidated.
     case protectedKeyUnavailable
+    /// Persisted key metadata is malformed or inconsistent.
     case invalidStoredKeyMetadata
 }
 
 /// Result of checking whether an exact protected-key request can be enforced.
 public struct WalletKeyUseAuthorizationPreflight: Equatable, Sendable {
+    /// Whether the requested policy can be enforced exactly.
     public let supported: Bool
+    /// The stable reason the request is unsupported, when applicable.
     public let failure: WalletKeyUseAuthorizationFailure?
 
+    /// Creates a preflight result.
+    ///
+    /// - Parameters:
+    ///   - supported: Whether the request can be enforced exactly.
+    ///   - failure: Stable failure reason when `supported` is false.
     public init(supported: Bool, failure: WalletKeyUseAuthorizationFailure? = nil) {
         self.supported = supported
         self.failure = failure

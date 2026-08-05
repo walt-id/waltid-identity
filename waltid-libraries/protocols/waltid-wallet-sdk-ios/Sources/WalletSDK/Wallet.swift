@@ -44,6 +44,8 @@ public actor Wallet {
     ///   - keyType: Optional key type override. When omitted, the wallet uses
     ///     ``WalletConfiguration/defaultKeyType``.
     ///   - didMethod: DID method to create for the bootstrapped wallet DID.
+    ///   - keyUseAuthorizationPolicy: Optional per-bootstrap authorization
+    ///     policy override. When omitted, the configured default is used.
     /// - Returns: Persisted key and DID information for subsequent wallet
     ///   operations.
     /// - Throws: ``WalletError`` when key creation, DID creation, persistence,
@@ -61,6 +63,10 @@ public actor Wallet {
     }
 
     /// Checks whether an exact key-use authorization request can be enforced without creating a key.
+    ///
+    /// - Parameters:
+    ///   - keyType: Optional key type override. When omitted, the configured default is used.
+    ///   - policy: Optional authorization policy override. When omitted, the configured default is used.
     public func keyUseAuthorizationPreflight(
         keyType: WalletKeyType? = nil,
         policy: WalletKeyUseAuthorizationPolicy? = nil
