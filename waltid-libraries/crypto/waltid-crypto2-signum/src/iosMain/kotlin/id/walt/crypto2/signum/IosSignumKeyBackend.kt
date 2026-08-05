@@ -1,6 +1,7 @@
 package id.walt.crypto2.signum
 
 import at.asitplus.signum.supreme.os.IosKeychainProvider
+import at.asitplus.signum.supreme.os.IosSigner
 import at.asitplus.signum.supreme.CFCryptoOperationFailed
 import at.asitplus.signum.supreme.os.PlatformSigningProviderSigner
 import id.walt.crypto2.algorithms.SignatureAlgorithm
@@ -8,8 +9,37 @@ import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ProviderId
+import kotlinx.cinterop.BetaInteropApi
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.value
+import platform.CoreFoundation.CFDictionaryAddValue
+import platform.CoreFoundation.CFDictionaryCreateMutable
+import platform.CoreFoundation.CFDictionaryGetValue
+import platform.CoreFoundation.CFRelease
+import platform.CoreFoundation.CFTypeRef
+import platform.CoreFoundation.kCFAllocatorDefault
+import platform.CoreFoundation.kCFBooleanTrue
+import platform.CoreFoundation.kCFTypeDictionaryKeyCallBacks
+import platform.CoreFoundation.kCFTypeDictionaryValueCallBacks
+import platform.Foundation.CFBridgingRelease
+import platform.Foundation.CFBridgingRetain
 import platform.Foundation.NSProcessInfo
+import platform.Security.SecItemCopyMatching
+import platform.Security.SecKeyCopyAttributes
+import platform.Security.SecKeyRef
+import platform.Security.errSecSuccess
 import platform.Security.errSecItemNotFound
+import platform.Security.kSecAttrApplicationLabel
+import platform.Security.kSecAttrKeyClass
+import platform.Security.kSecAttrKeyClassPublic
+import platform.Security.kSecAttrTokenID
+import platform.Security.kSecAttrTokenIDSecureEnclave
+import platform.Security.kSecClass
+import platform.Security.kSecClassKey
+import platform.Security.kSecReturnRef
 import kotlin.coroutines.cancellation.CancellationException
 
 class IosSignumKeyBackend : SignumPlatformBackend {
@@ -51,6 +81,16 @@ class IosSignumKeyBackend : SignumPlatformBackend {
             }
             createSigner(alias, spec, usages, policy.copy(hardware = SignumHardwarePolicy.DISCOURAGED))
         }
+        try {
+            validateNativePolicy(signer, policy, alias)
+        } catch (cause: Throwable) {
+            try {
+                delete(alias)
+            } catch (cleanupFailure: Throwable) {
+                cause.addSuppressed(cleanupFailure)
+            }
+            throw cause
+        }
         return handle(alias, spec, usages, policy, signer)
     }
 
@@ -81,6 +121,7 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         val signer = IosKeychainProvider.getSignerForKey(alias).getOrElse { failure ->
             throw failure.mapSignumFailure(alias)
         }
+        validateNativePolicy(signer, policy, alias)
         return handle(alias, spec, usages, policy, signer)
     }
 
@@ -114,6 +155,76 @@ class IosSignumKeyBackend : SignumPlatformBackend {
             defaultSigner = signer,
             keyAgreementEnabled = KeyUsage.KEY_AGREEMENT in usages && policy.keyAgreement,
         )
+    }
+
+    @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
+    private fun validateNativePolicy(
+        signer: PlatformSigningProviderSigner<*, *>,
+        policy: SignumKeyPolicy,
+        alias: String,
+    ) {
+        if (!policy.authentication.isBiometricCurrentSet()) return
+        val iosSigner = signer as? IosSigner
+            ?: throw SignumKeyPolicyMismatchException(alias, "the native signer is not Keychain-backed")
+        if (!iosSigner.needsAuthenticationForEveryUse || !isSecureEnclaveKey(alias)) {
+            throw SignumKeyPolicyMismatchException(
+                alias,
+                "the native key does not enforce Secure Enclave biometric authentication for every use",
+            )
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
+    private fun isSecureEnclaveKey(alias: String): Boolean = memScoped {
+        val keyRef = alloc<platform.CoreFoundation.CFTypeRefVar>()
+        val query = RetainedDictionary(5)
+        query.add(kSecClass, kSecClassKey)
+        // The public half exposes the token identifier without evaluating the
+        // private key's access-control prompt during restore.
+        query.add(kSecAttrKeyClass, kSecAttrKeyClassPublic)
+        query.addRetained(kSecAttrApplicationLabel, alias)
+        query.add(kSecReturnRef, kCFBooleanTrue)
+        try {
+            if (SecItemCopyMatching(query.dictionary, keyRef.ptr) != errSecSuccess || keyRef.value == null) {
+                return@memScoped false
+            }
+            val nativeKey = keyRef.value as? SecKeyRef ?: return@memScoped false
+            val attributes = SecKeyCopyAttributes(nativeKey) ?: return@memScoped false
+            try {
+                CFDictionaryGetValue(attributes, kSecAttrTokenID) == kSecAttrTokenIDSecureEnclave
+            } finally {
+                CFRelease(attributes)
+            }
+        } finally {
+            query.release()
+        }
+    }
+
+    @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
+    private class RetainedDictionary(capacity: Long) {
+        val dictionary = CFDictionaryCreateMutable(
+            kCFAllocatorDefault,
+            capacity,
+            kCFTypeDictionaryKeyCallBacks.ptr,
+            kCFTypeDictionaryValueCallBacks.ptr,
+        )
+        private val retainedValues = mutableListOf<CFTypeRef?>()
+
+        fun add(key: CFTypeRef?, value: CFTypeRef?) {
+            CFDictionaryAddValue(dictionary, key, value)
+        }
+
+        fun addRetained(key: CFTypeRef?, value: Any?) {
+            val retained = CFBridgingRetain(value)
+            retainedValues += retained
+            CFDictionaryAddValue(dictionary, key, retained)
+        }
+
+        fun release() {
+            retainedValues.forEach { CFBridgingRelease(it) }
+            CFBridgingRelease(dictionary)
+        }
     }
 }
 

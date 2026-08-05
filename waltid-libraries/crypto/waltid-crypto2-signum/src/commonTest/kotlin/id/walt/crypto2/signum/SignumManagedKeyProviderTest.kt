@@ -135,6 +135,27 @@ class SignumManagedKeyProviderTest {
     }
 
     @Test
+    fun `malformed restored provider data is a stable metadata failure`() = runTest {
+        val backend = FakeBackend()
+        val generated = runtime(backend).generateManagedKey(
+            backend.id,
+            GenerateManagedKeyRequest(
+                id = KeyId("malformed-provider-data"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN),
+                providerOptions = SignumKeyOptions().encode(),
+            ),
+        )
+        val malformed = generated.storedKey.copy(
+            providerData = BinaryData("{not-signum-data".encodeToByteArray()),
+        )
+
+        assertFailsWith<SignumStoredKeyMetadataException> {
+            SignumManagedKeyProvider(backend).restoreSignumKey(malformed)
+        }
+    }
+
+    @Test
     fun `key survives restart with DER conversion and attestation`() = runTest {
         val challenge = BinaryData(byteArrayOf(1, 2, 3))
         val attestation = SignumKeyAttestation("test", BinaryData(byteArrayOf(4, 5, 6)))

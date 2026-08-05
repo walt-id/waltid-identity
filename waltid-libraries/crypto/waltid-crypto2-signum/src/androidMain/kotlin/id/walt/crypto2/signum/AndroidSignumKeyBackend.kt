@@ -1,8 +1,11 @@
 package id.walt.crypto2.signum
 
+import android.os.Build
+import android.security.keystore.KeyProperties
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
+import at.asitplus.signum.supreme.os.AndroidKeystoreSigner
 import at.asitplus.signum.supreme.os.AndroidKeyStoreProvider
 import at.asitplus.signum.supreme.os.PlatformSigningProviderSigner
 import id.walt.crypto2.algorithms.SignatureAlgorithm
@@ -32,6 +35,16 @@ public class AndroidSignumKeyBackend(
         val signer = AndroidKeyStoreProvider.createSigningKey(alias) {
             configureSignumKey(spec, usages, policy)
         }.getOrThrow()
+        try {
+            validateNativePolicy(signer, policy, alias)
+        } catch (cause: Throwable) {
+            try {
+                delete(alias)
+            } catch (cleanupFailure: Throwable) {
+                cause.addSuppressed(cleanupFailure)
+            }
+            throw cause
+        }
         return handle(alias, spec, usages, policy, signer)
     }
 
@@ -44,6 +57,7 @@ public class AndroidSignumKeyBackend(
         val signer = AndroidKeyStoreProvider.getSignerForKey(alias).getOrElse { failure ->
             throw failure.mapSignumFailure(alias)
         }
+        validateNativePolicy(signer, policy, alias)
         return handle(alias, spec, usages, policy, signer)
     }
 
@@ -87,6 +101,31 @@ public class AndroidSignumKeyBackend(
             defaultSigner = signer,
             keyAgreementEnabled = KeyUsage.KEY_AGREEMENT in usages && policy.keyAgreement,
         )
+    }
+
+    private fun validateNativePolicy(
+        signer: PlatformSigningProviderSigner<*, *>,
+        policy: SignumKeyPolicy,
+        alias: String,
+    ) {
+        if (!policy.authentication.isBiometricCurrentSet()) return
+        val androidSigner = signer as? AndroidKeystoreSigner
+            ?: throw SignumKeyPolicyMismatchException(alias, "the native signer is not Android Keystore-backed")
+        val info = androidSigner.keyInfo
+        if (!info.isUserAuthenticationRequired ||
+            info.userAuthenticationValidityDurationSeconds > 0 ||
+            !info.isInvalidatedByBiometricEnrollment
+        ) {
+            throw SignumKeyPolicyMismatchException(
+                alias,
+                "the native key does not require biometric authentication for every use",
+            )
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            info.userAuthenticationType != KeyProperties.AUTH_BIOMETRIC_STRONG
+        ) {
+            throw SignumKeyPolicyMismatchException(alias, "the native key does not require BIOMETRIC_STRONG")
+        }
     }
 
     private fun requireInteractionContext(alias: String): FragmentActivity {

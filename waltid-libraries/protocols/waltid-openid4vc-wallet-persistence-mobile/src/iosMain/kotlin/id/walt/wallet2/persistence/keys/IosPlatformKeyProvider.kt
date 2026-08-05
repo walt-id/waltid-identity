@@ -103,9 +103,19 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
     }
 }
 
-private fun SignumKeyPolicy.toWalletPolicy(): KeyUseAuthorizationPolicy =
-    KeyUseAuthorizationPolicy.BiometricCurrentSet.takeIf { authentication.isBiometricCurrentSet() }
-        ?: KeyUseAuthorizationPolicy.None
+private fun SignumKeyPolicy.toWalletPolicy(): KeyUseAuthorizationPolicy = when (val authentication = authentication) {
+    SignumAuthenticationPolicy.None -> KeyUseAuthorizationPolicy.None
+    is SignumAuthenticationPolicy.UserPresence -> if (
+        authentication.isBiometricCurrentSet() && hardware == SignumHardwarePolicy.REQUIRED
+    ) {
+        KeyUseAuthorizationPolicy.BiometricCurrentSet
+    } else {
+        throw KeyUseAuthorizationException(
+            KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
+            "Stored Signum key uses an unsupported iOS authentication policy",
+        )
+    }
+}
 
 private val isSimulator: Boolean by lazy {
     NSProcessInfo.processInfo.environment.keys.any { it == "SIMULATOR_UDID" || it == "SIMULATOR_DEVICE_NAME" }

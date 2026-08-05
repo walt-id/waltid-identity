@@ -17,3 +17,16 @@ public class SignumInteractionContextUnavailableException(
     message: String = "A resumed interaction context is required for this Signum operation",
     cause: Throwable? = null,
 ) : IllegalStateException(message, cause)
+
+/** A persisted Signum descriptor is structurally invalid or no longer self-consistent. */
+public class SignumStoredKeyMetadataException(
+    message: String,
+    cause: Throwable? = null,
+) : IllegalArgumentException(message, cause)
+
+/** The native key exists, but its immutable platform policy is weaker than requested. */
+public class SignumKeyPolicyMismatchException(
+    public val alias: String,
+    message: String,
+    cause: Throwable? = null,
+) : IllegalStateException("Signum key policy cannot satisfy alias $alias: $message", cause)

@@ -256,6 +256,13 @@ final class id.walt.crypto2.signum/SignumKeyPolicy { // id.walt.crypto2.signum/S
     }
 }
 
+final class id.walt.crypto2.signum/SignumKeyPolicyMismatchException : kotlin/IllegalStateException { // id.walt.crypto2.signum/SignumKeyPolicyMismatchException|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/Throwable? = ...) // id.walt.crypto2.signum/SignumKeyPolicyMismatchException.<init>|<init>(kotlin.String;kotlin.String;kotlin.Throwable?){}[0]
+
+    final val alias // id.walt.crypto2.signum/SignumKeyPolicyMismatchException.alias|{}alias[0]
+        final fun <get-alias>(): kotlin/String // id.walt.crypto2.signum/SignumKeyPolicyMismatchException.alias.<get-alias>|<get-alias>(){}[0]
+}
+
 final class id.walt.crypto2.signum/SignumManagedKeyProvider : id.walt.crypto2.providers/ManagedKeyProvider { // id.walt.crypto2.signum/SignumManagedKeyProvider|null[0]
     constructor <init>(id.walt.crypto2.signum/SignumPlatformBackend) // id.walt.crypto2.signum/SignumManagedKeyProvider.<init>|<init>(id.walt.crypto2.signum.SignumPlatformBackend){}[0]
 
@@ -293,6 +300,10 @@ final class id.walt.crypto2.signum/SignumStoredKeyInfo { // id.walt.crypto2.sign
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.signum/SignumStoredKeyInfo.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.crypto2.signum/SignumStoredKeyInfo.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.crypto2.signum/SignumStoredKeyInfo.toString|toString(){}[0]
+}
+
+final class id.walt.crypto2.signum/SignumStoredKeyMetadataException : kotlin/IllegalArgumentException { // id.walt.crypto2.signum/SignumStoredKeyMetadataException|null[0]
+    constructor <init>(kotlin/String, kotlin/Throwable? = ...) // id.walt.crypto2.signum/SignumStoredKeyMetadataException.<init>|<init>(kotlin.String;kotlin.Throwable?){}[0]
 }
 
 final class id.walt.crypto2.signum/SignumUserCancelledException : kotlin.coroutines.cancellation/CancellationException { // id.walt.crypto2.signum/SignumUserCancelledException|null[0]

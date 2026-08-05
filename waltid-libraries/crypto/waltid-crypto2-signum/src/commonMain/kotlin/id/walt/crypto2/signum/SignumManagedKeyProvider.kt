@@ -107,33 +107,45 @@ class SignumManagedKeyProvider(
     override suspend fun restore(stored: StoredKey.Managed): ManagedKey = restoreSignumKey(stored)
 
     suspend fun restoreSignumKey(stored: StoredKey.Managed): SignumManagedKey {
-        require(stored.provider == id) { "Stored key belongs to a different provider" }
-        require(stored.providerSchemaVersion == PROVIDER_SCHEMA_VERSION) {
-            "Unsupported Signum provider schema: ${stored.providerSchemaVersion}"
+        val publicKey = storedMetadata("Stored Signum key is missing its SPKI public key") {
+            require(stored.provider == id) { "Stored key belongs to a different provider" }
+            require(stored.providerSchemaVersion == PROVIDER_SCHEMA_VERSION) {
+                "Unsupported Signum provider schema: ${stored.providerSchemaVersion}"
+            }
+            stored.publicKey as? EncodedKey.SpkiDer
+                ?: throw SignumStoredKeyMetadataException("Stored Signum key is missing its SPKI public key")
         }
-        val publicKey = stored.publicKey as? EncodedKey.SpkiDer
-            ?: throw IllegalArgumentException("Stored Signum key is missing its SPKI public key")
-        val providerData = SignumStoredKeyData.decode(stored.providerData)
-        validateRequest(stored.spec, stored.usages, providerData.policy)
+        val providerData = storedMetadata("Stored Signum key provider data is invalid") {
+            SignumStoredKeyData.decode(stored.providerData)
+        }
+        storedMetadata("Stored Signum key request is invalid") {
+            require(providerData.alias.isNotBlank()) { "Stored Signum key alias cannot be blank" }
+            validateRequest(stored.spec, stored.usages, providerData.policy)
+        }
         val handle = backend.load(providerData.alias, stored.spec, stored.usages, providerData.policy)
             ?: throw SignumKeyNotFoundException(providerData.alias)
-        validateHandle(handle, providerData.alias, stored.spec, stored.usages, providerData.policy)
-        require(handle.publicKey.data == publicKey.data) { "Signum key public key changed after restore" }
-        require(handle.protectionLevel == providerData.protectionLevel) {
-            "Signum key protection level changed after restore"
+        storedMetadata("Restored Signum key does not match its stored metadata") {
+            validateHandle(handle, providerData.alias, stored.spec, stored.usages, providerData.policy)
+            require(handle.publicKey.data == publicKey.data) { "Signum key public key changed after restore" }
+            require(handle.protectionLevel == providerData.protectionLevel) {
+                "Signum key protection level changed after restore"
+            }
+            require(handle.attestation == providerData.attestation) { "Signum key attestation changed after restore" }
         }
-        require(handle.attestation == providerData.attestation) { "Signum key attestation changed after restore" }
         return key(stored, providerData, handle)
     }
 
     suspend fun delete(stored: StoredKey.Managed, expectedAlias: String? = null): KeyDeletionResult {
-        require(stored.provider == id) { "Stored key belongs to a different provider" }
-        require(stored.providerSchemaVersion == PROVIDER_SCHEMA_VERSION) {
-            "Unsupported Signum provider schema: ${stored.providerSchemaVersion}"
-        }
-        val providerData = SignumStoredKeyData.decode(stored.providerData)
-        expectedAlias?.let {
-            require(providerData.alias == it) { "Stored Signum key alias does not match the expected alias" }
+        val providerData = storedMetadata("Stored Signum key metadata is invalid") {
+            require(stored.provider == id) { "Stored key belongs to a different provider" }
+            require(stored.providerSchemaVersion == PROVIDER_SCHEMA_VERSION) {
+                "Unsupported Signum provider schema: ${stored.providerSchemaVersion}"
+            }
+            SignumStoredKeyData.decode(stored.providerData).also { data ->
+                expectedAlias?.let {
+                    require(data.alias == it) { "Stored Signum key alias does not match the expected alias" }
+                }
+            }
         }
         backend.delete(providerData.alias)
         return KeyDeletionResult.Deleted
@@ -141,13 +153,15 @@ class SignumManagedKeyProvider(
 
     /** Reads the immutable Signum metadata without loading the native key. */
     fun inspect(stored: StoredKey.Managed): SignumStoredKeyInfo {
-        require(stored.provider == id) { "Stored key belongs to a different provider" }
-        require(stored.providerSchemaVersion == PROVIDER_SCHEMA_VERSION) {
-            "Unsupported Signum provider schema: ${stored.providerSchemaVersion}"
+        return storedMetadata("Stored Signum key metadata is invalid") {
+            require(stored.provider == id) { "Stored key belongs to a different provider" }
+            require(stored.providerSchemaVersion == PROVIDER_SCHEMA_VERSION) {
+                "Unsupported Signum provider schema: ${stored.providerSchemaVersion}"
+            }
+            val data = SignumStoredKeyData.decode(stored.providerData)
+            require(data.alias.isNotBlank()) { "Stored Signum key alias cannot be blank" }
+            SignumStoredKeyInfo(data.alias, data.policy, data.protectionLevel, data.attestation)
         }
-        val data = SignumStoredKeyData.decode(stored.providerData)
-        require(data.alias.isNotBlank()) { "Stored Signum key alias cannot be blank" }
-        return SignumStoredKeyInfo(data.alias, data.policy, data.protectionLevel, data.attestation)
     }
 
     private fun key(
@@ -251,6 +265,17 @@ class SignumManagedKeyProvider(
         require(backend.supports(spec, usages, policy)) {
             "Signum backend ${backend.id.value} does not support the requested key and policy"
         }
+    }
+
+    private inline fun <T> storedMetadata(
+        message: String,
+        block: () -> T,
+    ): T = try {
+        block()
+    } catch (cause: SignumStoredKeyMetadataException) {
+        throw cause
+    } catch (cause: Throwable) {
+        throw SignumStoredKeyMetadataException(cause.message ?: message, cause)
     }
 
     companion object {

@@ -15,6 +15,9 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.crypto2.signum.SignumInteractionContextUnavailableException
 import id.walt.crypto2.signum.SignumKeyInvalidatedException
+import id.walt.crypto2.signum.SignumKeyNotFoundException
+import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
+import id.walt.crypto2.signum.SignumStoredKeyMetadataException
 import id.walt.crypto2.signum.SignumUserCancelledException
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
@@ -159,11 +162,20 @@ public class SqlDelightKeyStore(
         return true
     }
 
-    private fun decodeStoredKey(keyId: String, serialized: String): StoredKey =
+    private fun decodeStoredKey(keyId: String, serialized: String): StoredKey = try {
         StoredKeyCodec.decodeFromString(serialized).also { stored ->
             require(stored.id == KeyId(keyId)) { "Stored key ID does not match mobile key reference" }
             require(stored.usages.isNotEmpty()) { "Stored key usages cannot be empty" }
         }
+    } catch (cause: KeyUseAuthorizationException) {
+        throw cause
+    } catch (cause: Throwable) {
+        throw KeyUseAuthorizationException(
+            KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
+            "Stored mobile key descriptor is invalid",
+            cause,
+        )
+    }
 
     private suspend fun restoreStoredKey(stored: StoredKey): StoredKeyMaterial? = when (stored) {
         is StoredKey.Managed -> {
@@ -173,6 +185,18 @@ public class SqlDelightKeyStore(
                 throw KeyUseAuthorizationException(
                     KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
                     "Protected mobile key '${stored.id.value}' is unavailable",
+                    cause,
+                )
+            } catch (cause: SignumKeyPolicyMismatchException) {
+                throw KeyUseAuthorizationException(
+                    KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
+                    "Protected mobile key '${stored.id.value}' is unavailable",
+                    cause,
+                )
+            } catch (cause: SignumStoredKeyMetadataException) {
+                throw KeyUseAuthorizationException(
+                    KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
+                    "Stored managed key metadata is invalid",
                     cause,
                 )
             }
@@ -196,12 +220,28 @@ public class SqlDelightKeyStore(
                 restored.withAuthorizationFailureMapping(metadata.authorizationPolicy)
             }
         }
-        is StoredKey.Software -> softwareRuntime.restore(stored)
+        is StoredKey.Software -> try {
+            softwareRuntime.restore(stored)
+        } catch (cause: Throwable) {
+            throw KeyUseAuthorizationException(
+                KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
+                "Stored software key descriptor is invalid",
+                cause,
+            )
+        }
     }.also { key ->
         if (key != null) {
-            require(key.id == stored.id) { "Restored key ID does not match its stored descriptor" }
-            require(key.spec == stored.spec) { "Restored key specification does not match its stored descriptor" }
-            require(key.usages == stored.usages) { "Restored key usages do not match its stored descriptor" }
+            try {
+                require(key.id == stored.id) { "Restored key ID does not match its stored descriptor" }
+                require(key.spec == stored.spec) { "Restored key specification does not match its stored descriptor" }
+                require(key.usages == stored.usages) { "Restored key usages do not match its stored descriptor" }
+            } catch (cause: Throwable) {
+                throw KeyUseAuthorizationException(
+                    KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
+                    "Restored key does not match its stored descriptor",
+                    cause,
+                )
+            }
         }
     }
 
@@ -236,6 +276,12 @@ public class SqlDelightKeyStore(
                                 cause,
                             )
                         } catch (cause: SignumKeyInvalidatedException) {
+                            throw KeyUseAuthorizationException(
+                                KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
+                                "Protected mobile key '${storedKey.id.value}' is unavailable",
+                                cause,
+                            )
+                        } catch (cause: SignumKeyNotFoundException) {
                             throw KeyUseAuthorizationException(
                                 KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
                                 "Protected mobile key '${storedKey.id.value}' is unavailable",

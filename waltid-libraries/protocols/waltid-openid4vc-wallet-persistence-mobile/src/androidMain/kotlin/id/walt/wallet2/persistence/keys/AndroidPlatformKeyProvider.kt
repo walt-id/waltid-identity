@@ -94,6 +94,14 @@ private fun hasResumedActivity(provider: () -> FragmentActivity?): Boolean {
         activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
 }
 
-private fun SignumKeyPolicy.toWalletPolicy(): KeyUseAuthorizationPolicy =
-    KeyUseAuthorizationPolicy.BiometricCurrentSet.takeIf { authentication.isBiometricCurrentSet() }
-        ?: KeyUseAuthorizationPolicy.None
+private fun SignumKeyPolicy.toWalletPolicy(): KeyUseAuthorizationPolicy = when (val authentication = authentication) {
+    SignumAuthenticationPolicy.None -> KeyUseAuthorizationPolicy.None
+    is SignumAuthenticationPolicy.UserPresence -> if (authentication.isBiometricCurrentSet()) {
+        KeyUseAuthorizationPolicy.BiometricCurrentSet
+    } else {
+        throw KeyUseAuthorizationException(
+            KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
+            "Stored Signum key uses an unsupported Android authentication policy",
+        )
+    }
+}

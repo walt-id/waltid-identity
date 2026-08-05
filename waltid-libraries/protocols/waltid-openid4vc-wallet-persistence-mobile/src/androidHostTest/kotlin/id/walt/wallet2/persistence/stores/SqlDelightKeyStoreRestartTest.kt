@@ -17,6 +17,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.crypto2.signum.SignumKeyInvalidatedException
+import id.walt.crypto2.signum.SignumKeyNotFoundException
 import id.walt.crypto2.signum.SignumUserCancelledException
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
@@ -121,7 +122,8 @@ class SqlDelightKeyStoreRestartTest {
             val store = SqlDelightKeyStore(FakePlatformManagedKeyProvider(), database.queries)
 
             assertFails { store.getCrypto2Key("corrupt", setOf(KeyUsage.SIGN)) }
-            assertFailsWith<IllegalArgumentException> { store.removeKey("corrupt") }
+            val failure = assertFailsWith<KeyUseAuthorizationException> { store.removeKey("corrupt") }
+            assertEquals(KeyUseAuthorizationFailure.InvalidStoredKeyMetadata, failure.failure)
             assertNotNull(database.queries.selectByKeyId("corrupt").executeAsOneOrNull())
         }
     }
@@ -238,6 +240,53 @@ class SqlDelightKeyStoreRestartTest {
         }
     }
 
+    @Test
+    fun `protected signing with a missing native key is a stable unavailable failure`() = runTest {
+        database().use { database ->
+            val provider = FakePlatformManagedKeyProvider(
+                authorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                signFailure = SignumKeyNotFoundException("protected-missing-sign"),
+            )
+            val store = SqlDelightKeyStore(provider, database.queries)
+            val key = store.generateKey(
+                PlatformKeyRequest(
+                    id = KeyId("protected-missing-sign"),
+                    spec = KeySpec.Ec(EcCurve.P256),
+                    usages = KEY_USAGES,
+                    authorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                )
+            )
+
+            val error = assertFailsWith<KeyUseAuthorizationException> {
+                assertNotNull(key.capabilities.signer).sign(
+                    "payload".encodeToByteArray(), SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)
+                )
+            }
+            assertEquals(KeyUseAuthorizationFailure.ProtectedKeyUnavailable, error.failure)
+        }
+    }
+
+    @Test
+    fun `managed metadata inspection failures are stable invalid metadata failures`() = runTest {
+        database().use { database ->
+            val stored = storedDescriptor("invalid-inspection")
+            database.queries.insert(
+                key_id = stored.id.value,
+                created_at = 0,
+                stored_key = StoredKeyCodec.encodeToString(stored),
+            )
+            val store = SqlDelightKeyStore(
+                FakePlatformManagedKeyProvider(inspectFailure = IllegalArgumentException("bad policy")),
+                database.queries,
+            )
+
+            val error = assertFailsWith<KeyUseAuthorizationException> {
+                store.getCrypto2Key(stored.id.value, KEY_USAGES)
+            }
+            assertEquals(KeyUseAuthorizationFailure.InvalidStoredKeyMetadata, error.failure)
+        }
+    }
+
     private fun database(): TestDatabase {
         val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
         WalletPersistenceDatabase.Schema.create(driver)
@@ -272,15 +321,18 @@ class SqlDelightKeyStoreRestartTest {
             authorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
             restoreFailure: Throwable? = null,
             signFailure: Throwable? = null,
+            inspectFailure: Throwable? = null,
         ) {
             this.authorizationPolicy = authorizationPolicy
             this.restoreFailure = restoreFailure
             this.signFailure = signFailure
+            this.inspectFailure = inspectFailure
         }
 
         private val authorizationPolicy: KeyUseAuthorizationPolicy
         private val restoreFailure: Throwable?
         private val signFailure: Throwable?
+        private val inspectFailure: Throwable?
         val managedIds = mutableSetOf<KeyId>()
         var deleteCount = 0
 
@@ -303,8 +355,10 @@ class SqlDelightKeyStoreRestartTest {
             deleteCount++
         }
 
-        override fun inspectManagedKey(stored: StoredKey.Managed): PlatformManagedKeyInfo =
-            PlatformManagedKeyInfo(authorizationPolicy)
+        override fun inspectManagedKey(stored: StoredKey.Managed): PlatformManagedKeyInfo {
+            inspectFailure?.let { throw it }
+            return PlatformManagedKeyInfo(authorizationPolicy)
+        }
 
         private fun descriptor(id: KeyId, spec: KeySpec, usages: Set<KeyUsage>) = StoredKey.Managed(
             version = StoredKey.CURRENT_VERSION,
