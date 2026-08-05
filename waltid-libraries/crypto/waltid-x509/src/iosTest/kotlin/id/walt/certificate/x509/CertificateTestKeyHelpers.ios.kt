@@ -18,6 +18,8 @@ actual suspend fun createCertificateTestKey(keyType: KeyType): Key {
         when (keyType) {
             KeyType.RSA -> rsa { paddings = setOf(RSAPadding.PKCS1) }
             KeyType.secp256r1 -> ec { curve = ECCurve.SECP_256_R_1 }
+            KeyType.secp384r1 -> ec { curve = ECCurve.SECP_384_R_1 }
+            KeyType.secp521r1 -> ec { curve = ECCurve.SECP_521_R_1 }
             else -> error("Unsupported X.509 test key type on iOS: $keyType")
         }
     }.getOrThrow()
