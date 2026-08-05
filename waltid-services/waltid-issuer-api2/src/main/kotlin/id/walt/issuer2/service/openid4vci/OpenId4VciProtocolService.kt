@@ -4,6 +4,7 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.domain.IssuanceSessionFailure
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.notifications.IssuanceSessionEvent
@@ -12,6 +13,7 @@ import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.utils.JsonObjectPathMapper
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
+import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
@@ -38,10 +40,12 @@ import id.walt.openid4vci.responses.par.PushedAuthorizationResponseHttp
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.responses.token.TokenFailureStage
 import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.tokens.access.parseAccessTokenAuthorization
 import id.walt.mdoc.objects.mso.Status as MdocStatus
 import id.walt.mdoc.objects.mso.Status.StatusListInfo as MdocStatusListInfo
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.parseQueryString
 import io.ktor.server.plugins.NotFoundException
 import kotlinx.serialization.json.Json
@@ -57,6 +61,13 @@ import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
+
+private val logger = KotlinLogging.logger {}
+
+private val PROOF_VALIDATION_ERROR_CODES = setOf(
+    CredentialErrorCodes.INVALID_PROOF,
+    CredentialErrorCodes.INVALID_NONCE,
+)
 
 private const val INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER = "_issuer2_session_id"
 private const val TOKEN_ENDPOINT_PATH = "token"
@@ -80,22 +91,43 @@ class OpenId4VciProtocolService(
         parameters: Map<String, List<String>>,
         headers: Map<String, List<String>> = emptyMap(),
     ): PushedAuthorizationResponseHttp {
+        var sessionId: String? = null
         return try {
             val parRequest = when (val result = oauth2Provider.createPushedAuthorizationRequest(parameters, headers)) {
                 is AuthorizationRequestResult.Success -> result.request
                 is AuthorizationRequestResult.Failure -> return oauth2Provider.writePushedAuthorizationError(result.error)
             }
+            sessionId = parRequest.issuerState
+            notifySessionEvent(
+                sessionId = sessionId,
+                event = IssuanceSessionEvent.pushed_authorization_request_received,
+                authenticationMethod = AuthenticationMethod.AUTHORIZED,
+            )
 
             when (val result = oauth2Provider.createPushedAuthorizationResponse(parRequest)) {
                 is PushedAuthorizationResponseResult.Success ->
                     oauth2Provider.writePushedAuthorizationResponse(result.request, result.response)
 
-                is PushedAuthorizationResponseResult.Failure ->
+                is PushedAuthorizationResponseResult.Failure -> {
+                    notifySessionEvent(
+                        sessionId = sessionId,
+                        event = IssuanceSessionEvent.pushed_authorization_request_failed,
+                        authenticationMethod = AuthenticationMethod.AUTHORIZED,
+                        failure = IssuanceSessionFailure(result.error.error, result.error.description ?: result.error.error),
+                    )
                     oauth2Provider.writePushedAuthorizationError(parRequest, result.error)
+                }
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            logger.warn(e) { "PAR processing failed for issuance session $sessionId" }
+            notifySessionEvent(
+                sessionId = sessionId,
+                event = IssuanceSessionEvent.pushed_authorization_request_failed,
+                authenticationMethod = AuthenticationMethod.AUTHORIZED,
+                failure = IssuanceSessionFailure(OAuthErrorCodes.SERVER_ERROR, e.message ?: "PAR processing failed"),
+            )
             oauth2Provider.writePushedAuthorizationError(
                 OAuthError(
                     error = OAuthErrorCodes.SERVER_ERROR,
@@ -119,12 +151,21 @@ class OpenId4VciProtocolService(
         } catch (e: Exception) {
             return oauth2Provider.writeAuthorizationError(authorizationRequest, e.toAuthorizationError())
         }
+        notificationService.notify(
+            session = issuanceSession,
+            event = IssuanceSessionEvent.authorization_request_received,
+        )
         val internalAuthorizationRequest =
             resolvedParameters.withInternalAuthorizationSession(issuanceSession.sessionId)
         val authorizationRequestEnvelope = try {
             internalAuthorizationRequest.encodeExternalLoginAuthorizationParameters()
         } catch (e: IllegalArgumentException) {
-            return oauth2Provider.writeAuthorizationError(authorizationRequest, e.toAuthorizationError())
+            val authorizationError = e.toAuthorizationError()
+            notificationService.notify(
+                session = issuanceSession.withFailure(authorizationError.error, authorizationError.description),
+                event = IssuanceSessionEvent.authorization_request_failed,
+            )
+            return oauth2Provider.writeAuthorizationError(authorizationRequest, authorizationError)
         }
 
         val redirectUri =
@@ -178,19 +219,30 @@ class OpenId4VciProtocolService(
             ?: return oauth2Provider.writeAuthorizationError(
                 OAuthError(OAuthErrorCodes.INVALID_REQUEST, "No issuance session found for external OAuth state")
             )
-        val authorizationRequestParameters = session.authorizationRequest
-            ?: return oauth2Provider.writeAuthorizationError(
+        val authorizationRequestParameters = session.authorizationRequest ?: run {
+            notificationService.notify(
+                session = session.withFailure(OAuthErrorCodes.INVALID_REQUEST, "Session has no stored authorization request"),
+                event = IssuanceSessionEvent.authorization_request_failed,
+            )
+            return oauth2Provider.writeAuthorizationError(
                 OAuthError(
                     OAuthErrorCodes.INVALID_REQUEST,
                     "Issuance session ${session.sessionId} has no stored authorization request",
                 )
             )
+        }
 
         val authorizationRequest = when (
             val result = oauth2Provider.createAuthorizationRequest(authorizationRequestParameters)
         ) {
             is AuthorizationRequestResult.Success -> result.request.withIssuer(metadataService.issuerBaseUrl())
-            is AuthorizationRequestResult.Failure -> return oauth2Provider.writeAuthorizationError(result.error)
+            is AuthorizationRequestResult.Failure -> {
+                notificationService.notify(
+                    session = session.withFailure(result.error.error, result.error.description),
+                    event = IssuanceSessionEvent.authorization_request_failed,
+                )
+                return oauth2Provider.writeAuthorizationError(result.error)
+            }
         }
 
         val idTokenClaims = try {
@@ -198,7 +250,13 @@ class OpenId4VciProtocolService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            return oauth2Provider.writeAuthorizationError(authorizationRequest, e.toAuthorizationError())
+            logger.warn(e) { "Could not decode external id_token for issuance session ${session.sessionId}" }
+            val authorizationError = e.toAuthorizationError()
+            notificationService.notify(
+                session = session.withFailure(authorizationError.error, authorizationError.description),
+                event = IssuanceSessionEvent.authorization_request_failed,
+            )
+            return oauth2Provider.writeAuthorizationError(authorizationRequest, authorizationError)
         }
         val credentialData = try {
             session.idTokenClaimsMapping?.let { claimsMapping ->
@@ -211,7 +269,13 @@ class OpenId4VciProtocolService(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            return oauth2Provider.writeAuthorizationError(authorizationRequest, e.toAuthorizationError())
+            logger.warn(e) { "Could not map id_token claims for issuance session ${session.sessionId}" }
+            val authorizationError = e.toAuthorizationError()
+            notificationService.notify(
+                session = session.withFailure(authorizationError.error, authorizationError.description),
+                event = IssuanceSessionEvent.authorization_request_failed,
+            )
+            return oauth2Provider.writeAuthorizationError(authorizationRequest, authorizationError)
         }
         val updatedSession = session.copy(
             credentialData = credentialData,
@@ -246,6 +310,23 @@ class OpenId4VciProtocolService(
             is AccessTokenResponseResult.Success -> result.request to result.response
 
             is AccessTokenResponseResult.Failure -> {
+                val failureContext = result.context
+                val tokenFailure = IssuanceSessionFailure(
+                    errorCode = result.error.error,
+                    reason = result.error.description ?: result.error.error,
+                )
+                if (failureContext?.stage == TokenFailureStage.TX_CODE_VALIDATION) {
+                    notifySessionEvent(
+                        sessionId = failureContext.sessionSubject,
+                        event = IssuanceSessionEvent.tx_code_validation_failed,
+                        failure = tokenFailure,
+                    )
+                }
+                notifySessionEvent(
+                    sessionId = failureContext?.sessionSubject,
+                    event = IssuanceSessionEvent.token_request_failed,
+                    failure = tokenFailure,
+                )
                 return oauth2Provider.writeAccessTokenError(accessTokenRequest, result.error)
             }
         }
@@ -260,6 +341,12 @@ class OpenId4VciProtocolService(
             session = session,
             event = IssuanceSessionEvent.requested_token,
         )
+        if (GrantType.RefreshToken.value in updatedAccessTokenRequest.handledGrantTypes) {
+            notificationService.notify(
+                session = session,
+                event = IssuanceSessionEvent.access_token_refreshed,
+            )
+        }
 
         return oauth2Provider.writeAccessTokenResponse(updatedAccessTokenRequest, response)
     }
@@ -322,7 +409,17 @@ class OpenId4VciProtocolService(
         ) {
             is CredentialRequestResult.Success -> result.request
             is CredentialRequestResult.Failure -> return oauth2Provider.writeCredentialError(result.error)
-            is CredentialRequestResult.OAuthFailure -> return oauth2Provider.writeCredentialError(result.error)
+            is CredentialRequestResult.OAuthFailure -> {
+                // A token presented with the wrong key is invalid_token, so not published here.
+                if (result.error.error == OAuthErrorCodes.INVALID_DPOP_PROOF) {
+                    notifySessionEvent(
+                        sessionId = accessTokenSubject(accessToken),
+                        event = IssuanceSessionEvent.dpop_proof_validation_failed,
+                        failure = IssuanceSessionFailure(result.error.error, result.error.description ?: result.error.error),
+                    )
+                }
+                return oauth2Provider.writeCredentialError(result.error)
+            }
         }
         val tokenClaims = try {
             accessToken.decodeJws().payload
@@ -354,6 +451,10 @@ class OpenId4VciProtocolService(
         val requestWithSession = credentialRequest
             .withSession(DefaultSession(subject = sessionId))
             .withIssuer(issuerId)
+        notificationService.notify(
+            session = session,
+            event = IssuanceSessionEvent.credential_request_received,
+        )
 
         val credentialConfigurationId = when (
             val resolution = credentialRequest.resolveCredentialConfigurationId(
@@ -458,6 +559,12 @@ class OpenId4VciProtocolService(
             )) {
                 is CredentialResponseResult.Success -> result.response
                 is CredentialResponseResult.Failure -> {
+                    if (result.error.error in PROOF_VALIDATION_ERROR_CODES) {
+                        notificationService.notify(
+                            session = session.withFailure(result.error.error, result.error.description),
+                            event = IssuanceSessionEvent.credential_request_proof_validation_failed,
+                        )
+                    }
                     return failCredentialRequest(requestWithSession, session, result.error)
                 }
             }
@@ -518,18 +625,27 @@ class OpenId4VciProtocolService(
             val result = oauth2Provider.createAuthorizationResponse(requestWithIssuer, oauthSession)
         ) {
             is AuthorizationResponseResult.Success -> result.response
-            is AuthorizationResponseResult.Failure -> return oauth2Provider.writeAuthorizationError(
-                requestWithIssuer,
-                result.error,
-            )
+            is AuthorizationResponseResult.Failure -> {
+                notificationService.notify(
+                    session = issuanceSession.withFailure(result.error.error, result.error.description),
+                    event = IssuanceSessionEvent.authorization_request_failed,
+                )
+                return oauth2Provider.writeAuthorizationError(
+                    requestWithIssuer,
+                    result.error,
+                )
+            }
         }
 
-        sessionService.saveSession(
-            issuanceSession.copy(
-                authorizationRequest = parameters,
-                authorizationClaims = claims ?: issuanceSession.authorizationClaims,
-                externalAuthorizationState = null,
-            )
+        val updatedSession = issuanceSession.copy(
+            authorizationRequest = parameters,
+            authorizationClaims = claims ?: issuanceSession.authorizationClaims,
+            externalAuthorizationState = null,
+        )
+        sessionService.saveSession(updatedSession)
+        notificationService.notify(
+            session = updatedSession,
+            event = IssuanceSessionEvent.authorization_code_issued,
         )
 
         return oauth2Provider.writeAuthorizationResponse(requestWithIssuer, authorizationResponse)
@@ -638,18 +754,16 @@ class OpenId4VciProtocolService(
     private fun JsonObject.stringClaim(name: String): String? =
         this[name]?.jsonPrimitive?.contentOrNull
 
+    /** Only call once the token has been verified; an unverified subject must not be trusted. */
+    private fun accessTokenSubject(accessToken: String): String? =
+        runCatching { accessToken.decodeJws().payload.stringClaim("sub") }.getOrNull()
+
     private suspend fun failCredentialRequest(
         request: CredentialRequest,
         session: IssuanceSession,
         error: CredentialError,
     ): CredentialResponseHttp {
-        val updatedSession = sessionService.updateStatus(
-            session.sessionId,
-            IssuanceSessionStatus.UNSUCCESSFUL,
-            error.description ?: error.error,
-            close = true,
-        )
-        notificationService.emitIssuanceStatus(updatedSession)
+        closeFailedIssuance(session, error.error, error.description)
         return oauth2Provider.writeCredentialError(request, error)
     }
 
@@ -658,14 +772,29 @@ class OpenId4VciProtocolService(
         session: IssuanceSession,
         error: OAuthError,
     ): CredentialResponseHttp {
+        closeFailedIssuance(session, error.error, error.description)
+        return oauth2Provider.writeCredentialError(request, error)
+    }
+
+    // The failure event reports the rejected stage; issuance_status reports the concluded session.
+    private suspend fun closeFailedIssuance(
+        session: IssuanceSession,
+        errorCode: String,
+        errorDescription: String?,
+    ) {
+        logger.warn { "Credential request failed for session ${session.sessionId}: $errorCode - $errorDescription" }
+        val failure = IssuanceSessionFailure(errorCode, errorDescription ?: errorCode)
+        notificationService.notify(
+            session = session.copy(failure = failure),
+            event = IssuanceSessionEvent.credential_request_failed,
+        )
         val updatedSession = sessionService.updateStatus(
             session.sessionId,
             IssuanceSessionStatus.UNSUCCESSFUL,
-            error.description ?: error.error,
+            errorDescription ?: errorCode,
             close = true,
         )
         notificationService.emitIssuanceStatus(updatedSession)
-        return oauth2Provider.writeCredentialError(request, error)
     }
 
     private suspend fun emitCredentialIssuedEvent(
@@ -695,6 +824,29 @@ class OpenId4VciProtocolService(
 
             CredentialFormat.LDP_VC -> Unit
         }
+    }
+
+    private fun IssuanceSession.withFailure(errorCode: String, reason: String?): IssuanceSession =
+        copy(failure = IssuanceSessionFailure(errorCode = errorCode, reason = reason ?: errorCode))
+
+    private suspend fun notifySessionEvent(
+        sessionId: String?,
+        event: IssuanceSessionEvent,
+        authenticationMethod: AuthenticationMethod? = null,
+        failure: IssuanceSessionFailure? = null,
+    ) {
+        if (sessionId.isNullOrBlank()) return
+        val session = try {
+            sessionService.getSessionOrNull(sessionId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.warn(e) { "Could not load issuance session $sessionId to emit event $event" }
+            null
+        }
+        session
+            ?.takeIf { authenticationMethod == null || it.authenticationMethod == authenticationMethod }
+            ?.let { notificationService.notify(failure?.let { f -> it.copy(failure = f) } ?: it, event) }
     }
 
     private fun Map<String, List<String>>.withInternalAuthorizationSession(sessionId: String): Map<String, List<String>> =
