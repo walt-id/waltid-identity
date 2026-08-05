@@ -1,6 +1,14 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.verifier2.verification2
 
+import id.walt.cose.protectedAlgorithm
+import id.walt.cose.Cose
+import id.walt.cose.acceptsCoseAlgorithm
 import id.walt.credentials.presentations.formats.*
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.KeySpec
 import id.walt.dcql.DcqlCredential
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.CredentialFormat
@@ -22,32 +30,17 @@ import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.Presen
 import id.walt.verifier2.verification.DcqlFulfillmentChecker
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 object PresentationVerificationEngine {
 
     private val log = KotlinLogging.logger {}
 
     suspend fun parsePresentation(presentationString: String, format: CredentialFormat): VerifiablePresentation = when (format) {
-        CredentialFormat.JWT_VC_JSON -> {
-            if (presentationString.contains("~")) {
-                // The presentation string has SD-JWT structure (~) under a jwt_vc_json query.
-                // Per OID4VP §jwt_vc_json, this format expects a plain JWT VP envelope; SD-JWT
-                // structure is not defined for jwt_vc_json. The correct format identifier for
-                // W3C VCDM secured with SD-JWT is dc+sd-jwt (SD-JWT VCLD, OID4VP §sd-jwt_vcld).
-                //
-                // As a pragmatic fallback for wallets that present W3C+SD-JWT under jwt_vc_json,
-                // we attempt to parse it as dc+sd-jwt. This allows interoperability during the
-                // migration to the correct dc+sd-jwt format identifier.
-                log.warn {
-                    "Received SD-JWT structure (~) under jwt_vc_json format — " +
-                            "attempting dc+sd-jwt parsing as a fallback. " +
-                            "The wallet should use the 'dc+sd-jwt' DCQL format identifier for SD-JWT credentials."
-                }
-                DcSdJwtPresentation.parse(presentationString).getOrThrow()
-            } else {
-                JwtVcJsonPresentation.parse(presentationString).getOrThrow()
-            }
-        }
+        CredentialFormat.JWT_VC_JSON -> JwtVcJsonPresentation.parse(presentationString).getOrThrow()
 
         CredentialFormat.DC_SD_JWT -> DcSdJwtPresentation.parse(presentationString).getOrThrow()
         CredentialFormat.MSO_MDOC -> MsoMdocPresentation.parse(presentationString).getOrThrow()
@@ -63,8 +56,10 @@ object PresentationVerificationEngine {
         presentationString: String,
         session: Verification2Session,
         expectedTransactionData: List<String>?,
+        verificationTime: Instant,
     ): Map<String, VPPolicy2.PolicyRunResult> {
-        requireNotNull(session.policies.vp_policies) { "TODO: vpPolicies cannot be null right now" }
+        val vpPolicies = requireNotNull(session.policies.vp_policies) { "TODO: vpPolicies cannot be null right now" }
+        verifyAdvertisedAlgorithms(presentation, session)
 
         val authorizationRequest = session.authorizationRequest
         val responseMode = session.authorizationRequest.responseMode
@@ -86,33 +81,128 @@ object PresentationVerificationEngine {
             isEncrypted = isEncrypted,
             jwkThumbprint = jwkThumbprint,
             isAnnexC = session.setup is DcApiAnnexCFlowSetup,
+            verificationTime = verificationTime,
             customData = session.data as? JsonObject,
             transactionData = authorizationRequest.transactionData
         )
 
         return VPPolicyRunner.verifyPresentation(
             presentation = presentation,
-            policies = session.policies.vp_policies,
+            policies = vpPolicies,
             verificationContext = verificationContext
         )
+    }
+
+    internal suspend fun verifyAdvertisedAlgorithms(
+        presentation: VerifiablePresentation,
+        session: Verification2Session,
+    ) {
+        when (presentation) {
+            is JwtVcJsonPresentation -> {
+                val allowed = advertisedAlgorithms(session, CredentialFormat.JWT_VC_JSON, "alg_values", strings = true)
+                requireJwsAlgorithm(presentation.jwt, allowed, "jwt_vc_json presentation")
+                presentation.credentials.orEmpty().forEach { credential ->
+                    requireJwsAlgorithm(
+                        requireNotNull(credential.signed) { "jwt_vc_json credential is unsigned" }.substringBefore('~'),
+                        allowed,
+                        "jwt_vc_json credential",
+                    )
+                }
+            }
+            is DcSdJwtPresentation -> {
+                requireJwsAlgorithm(
+                    presentation.sdJwt,
+                    advertisedAlgorithms(session, CredentialFormat.DC_SD_JWT, "sd-jwt_alg_values", strings = true),
+                    "dc+sd-jwt credential",
+                )
+                requireJwsAlgorithm(
+                    presentation.keyBindingJwt,
+                    advertisedAlgorithms(session, CredentialFormat.DC_SD_JWT, "kb-jwt_alg_values", strings = true),
+                    "dc+sd-jwt key binding",
+                )
+            }
+            is MsoMdocPresentation -> {
+                val document = presentation.mdoc.document
+                requireCoseAlgorithm(
+                    document.issuerSigned.issuerAuth.protectedAlgorithm(),
+                    advertisedAlgorithms(session, CredentialFormat.MSO_MDOC, "issuerauth_alg_values", strings = false),
+                    document.issuerSigned.getParsedIssuerAuthCrypto2().signerKey.spec == KeySpec.Ec(EcCurve.P256),
+                    "mso_mdoc issuer authentication",
+                )
+                val deviceSignature = requireNotNull(document.deviceSigned?.deviceAuth?.deviceSignature) {
+                    "mso_mdoc device signature is missing"
+                }
+                requireCoseAlgorithm(
+                    deviceSignature.protectedAlgorithm(),
+                    advertisedAlgorithms(session, CredentialFormat.MSO_MDOC, "deviceauth_alg_values", strings = false),
+                    presentation.mdoc.documentMso.deviceKeyInfo.deviceKey.crv == Cose.EllipticCurves.P_256,
+                    "mso_mdoc device authentication",
+                )
+            }
+            is LdpVcPresentation -> throw UnsupportedOperationException("LDP presentations are not supported")
+        }
+    }
+
+    private fun advertisedAlgorithms(
+        session: Verification2Session,
+        format: CredentialFormat,
+        field: String,
+        strings: Boolean,
+    ): Set<String>? {
+        val formats = requireNotNull(session.authorizationRequest.clientMetadata?.vpFormatsSupported) {
+            "Verifier metadata is missing vp_formats_supported"
+        }
+        val formatMetadata = formats.entries.firstOrNull { it.key in format.id }?.value
+            ?: throw IllegalArgumentException("Verifier metadata is missing ${format.id.first()} support")
+        val value = formatMetadata[field] ?: return null
+        val values = value as? JsonArray
+            ?: throw IllegalArgumentException("Verifier metadata $field must be an array")
+        require(values.isNotEmpty()) { "Verifier metadata $field must not be empty" }
+        return values.mapTo(mutableSetOf()) { value ->
+            val primitive = value as? JsonPrimitive
+                ?: throw IllegalArgumentException("Verifier metadata $field values must be primitives")
+            require(primitive.isString == strings) {
+                "Verifier metadata $field contains a value with the wrong JSON type"
+            }
+            primitive.content
+        }
+    }
+
+    private fun requireJwsAlgorithm(jwt: String, allowed: Set<String>?, label: String) {
+        if (allowed == null) return
+        val algorithm = CompactJws.decodeUnverified(jwt).algorithm.identifier
+        require(algorithm in allowed) { "$label algorithm is not allowed: $algorithm" }
+    }
+
+    private fun requireCoseAlgorithm(
+        algorithm: Int,
+        allowed: Set<String>?,
+        p256Key: Boolean,
+        label: String,
+    ) {
+        if (allowed == null) return
+        val accepted = allowed.mapTo(mutableSetOf(), String::toInt).acceptsCoseAlgorithm(algorithm, p256Key)
+        require(accepted) { "$label algorithm is not allowed: $algorithm" }
     }
 
 
     suspend fun verifyAllPresentations(
         parsedPresentations: Map<Pair<String, CredentialQuery>, VerifiablePresentation>,
-        session: Verification2Session
+        session: Verification2Session,
+        verificationTime: Instant,
     ): Map<String, Map<String, VPPolicy2.PolicyRunResult>> {
         val verifiedPresentations = parsedPresentations.map { (entry, presentation) ->
             val (presentationString, query) = entry
             val expectedTransactionData = filterTransactionDataForCredentialId(
                 transactionData = session.authorizationRequest.transactionData,
                 credentialId = query.id,
-            ).takeIf(List<String>::isNotEmpty)
+            )
             val policyResults = verifySinglePresentation(
                 presentation = presentation,
                 presentationString = presentationString,
                 session = session,
                 expectedTransactionData = expectedTransactionData,
+                verificationTime = verificationTime,
             )
 
             query.id to policyResults
@@ -185,6 +275,7 @@ object PresentationVerificationEngine {
         updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
         failSessionCallback: suspend (session: Verification2Session, event: SessionEvent, updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit) -> Unit,
         policyContext: PolicyExecutionContext = PolicyExecutionContext.Empty,
+        verificationTime: Instant = Clock.System.now(),
         /**
          * Optional callback for checking `trusted_authorities` constraints declared in a DCQL
          * `CredentialQuery`. Receives the credential (wrapped as [DcqlCredential]) and the list of
@@ -234,7 +325,7 @@ object PresentationVerificationEngine {
                 presentedPresentations = parsedPresentations.map { it.key.second.id to it.value }.toMap()
             }
 
-            val presentationValidationResult = verifyAllPresentations(parsedPresentations, session)
+            val presentationValidationResult = verifyAllPresentations(parsedPresentations, session, verificationTime)
 
             session.updateSession(SessionEvent.presentation_validation_available) {
                 presentationValidationResults = presentationValidationResult

@@ -55,6 +55,7 @@ class LocalResolver : DidResolver {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Deprecated("Use Crypto2DidKeyResolver or Crypto2DidService for key resolution")
     override suspend fun resolveToKey(did: String): Result<Key> =
         getResolverForDid(did).resolveToKey(did)
 
@@ -62,6 +63,7 @@ class LocalResolver : DidResolver {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Deprecated("Use Crypto2DidKeyResolver or Crypto2DidService for key resolution")
     override suspend fun resolveToKeys(did: String): Result<Set<Key>> =
         getResolverForDid(did).resolveToKeys(did)
 }

@@ -91,6 +91,58 @@ class ETSITrustListPolicyTest {
         assertEquals(originalPolicy, deserializedPolicy)
     }
 
+    @Test
+    fun `authenticated source is required even when stale source is allowed`() {
+        val result = ETSITrustListPolicy(
+            allowStaleSource = true,
+            requireAuthenticated = true
+        ).evaluateDecision(
+            ETSITrustListPolicy.TrustDecisionResponse(
+                decision = "STALE_SOURCE",
+                sourceFreshness = "EXPIRED",
+                authenticity = "UNVERIFIED"
+            )
+        )
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()!!.message!!.contains("not authenticated"))
+    }
+
+    @Test
+    fun `structured source assurance is accepted from new service responses`() {
+        val result = ETSITrustListPolicy(requireAuthenticated = true).evaluateDecision(
+            ETSITrustListPolicy.TrustDecisionResponse(
+                decision = "TRUSTED",
+                sourceFreshness = "FRESH",
+                sourceAssurance = ETSITrustListPolicy.SourceAssuranceDto(
+                    signatureStatus = "VALID",
+                    signerTrust = "TRUSTED",
+                    authenticityState = "AUTHENTICATED",
+                    accepted = true
+                )
+            )
+        )
+
+        assertTrue(result.isSuccess)
+    }
+
+    @Test
+    fun `failed source authenticity is rejected in permissive mode`() {
+        val result = ETSITrustListPolicy(
+            allowStaleSource = true,
+            requireAuthenticated = false
+        ).evaluateDecision(
+            ETSITrustListPolicy.TrustDecisionResponse(
+                decision = "TRUSTED",
+                sourceFreshness = "FRESH",
+                authenticity = "FAILED"
+            )
+        )
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()!!.message!!.contains("authenticity validation failed"))
+    }
+
     // Note: The following tests would require either:
     // 1. A running trust-registry-service instance
     // 2. Mocking the HTTP client (which requires restructuring the policy)

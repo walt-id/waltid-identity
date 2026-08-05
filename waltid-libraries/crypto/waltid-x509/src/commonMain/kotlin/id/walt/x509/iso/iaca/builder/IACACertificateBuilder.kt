@@ -1,6 +1,10 @@
 package id.walt.x509.iso.iaca.builder
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.x509.CertificateDer
+import id.walt.x509.buildCrypto2IacaCertificateDer
 import id.walt.x509.iso.blockingBridge
 import id.walt.x509.iso.iaca.certificate.IACACertificateBundle
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
@@ -33,6 +37,7 @@ class IACACertificateBuilder {
      * any milliseconds or nanoseconds in the input are discarded. The decoded
      * certificate returned by this builder exposes the truncated values.
      */
+    @Deprecated("Use buildDer with a crypto2 key and an explicit SignatureAlgorithm.")
     suspend fun build(
         profileData: IACACertificateProfileData,
         signingKey: Key,
@@ -45,9 +50,20 @@ class IACACertificateBuilder {
         )
     }
 
+    /** Build an IACA certificate directly with a crypto2 key. */
+    suspend fun buildDer(
+        profileData: IACACertificateProfileData,
+        signingKey: Crypto2Key,
+        signatureAlgorithm: SignatureAlgorithm,
+    ): CertificateDer {
+        validator.validateCertificateProfileData(profileData)
+        return buildCrypto2IacaCertificateDer(profileData, signingKey, signatureAlgorithm)
+    }
+
     /**
      * Blocking variant of [build].
      */
+    @Deprecated("Use buildDer with a crypto2 key and an explicit SignatureAlgorithm.")
     fun buildBlocking(
         profileData: IACACertificateProfileData,
         signingKey: Key,

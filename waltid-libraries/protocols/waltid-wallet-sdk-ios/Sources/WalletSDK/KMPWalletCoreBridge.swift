@@ -263,8 +263,15 @@ private extension WalletConfiguration {
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
             attestation: attestation?.toKMPAttestationConfiguration(),
             preferredLocales: preferredLocales,
-            transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() }
+            transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
+            clientIdTrustConfiguration: clientIDTrustConfiguration.toKMPClientIDTrustConfiguration()
         )
+    }
+}
+
+private extension WalletClientIDTrustConfiguration {
+    func toKMPClientIDTrustConfiguration() -> WalletBridgeClientIdTrustConfiguration {
+        WalletBridgeClientIdTrustConfiguration(x509TrustAnchorsPem: x509TrustAnchorsPEM)
     }
 }
 
@@ -282,7 +289,8 @@ private extension WalletPersistence {
     func toKMPPersistence() -> WalletBridgePersistence {
         WalletBridgePersistence(
             databaseKey: databaseKey.toKMPDatabaseKeyConfiguration(),
-            stores: stores.toKMPStores()
+            credentialStore: credentialStore.map { KMPWalletCredentialStoreAdapter(store: $0) },
+            didStore: didStore.map { KMPWalletDidStoreAdapter(store: $0) }
         )
     }
 
@@ -308,21 +316,6 @@ private extension WalletDatabaseKeyConfiguration {
         case let .provided(provider):
             return KMPWalletDatabaseKeyProviderAdapter(provider: provider)
         }
-    }
-}
-
-private extension WalletStores {
-    func toKMPStores() -> WalletBridgeStores {
-        WalletBridgeStores(
-            credentials: credentials.map { KMPWalletCredentialStoreAdapter(store: $0) },
-            dids: dids.map { KMPWalletDidStoreAdapter(store: $0) },
-            keys: keys.map { keyOverride in
-                WalletBridgeKeys(
-                    store: KMPWalletKeyStoreAdapter(store: keyOverride.store),
-                    generate: KMPWalletKeyGeneratorAdapter(generate: keyOverride.generate)
-                )
-            }
-        )
     }
 }
 
@@ -394,42 +387,6 @@ private final class KMPWalletDidStoreAdapter: WalletBridgeDidStore, @unchecked S
     }
 }
 
-private final class KMPWalletKeyStoreAdapter: WalletBridgeKeyStore, @unchecked Sendable {
-    private let store: any WalletKeyStore
-
-    init(store: any WalletKeyStore) {
-        self.store = store
-    }
-
-    func __getKey(keyId: String) async throws -> WalletBridgeStoredKey? {
-        try await store.key(id: keyId)?.toKMPStoredKey()
-    }
-
-    func __listKeys() async throws -> [WalletBridgeKeyInfo] {
-        try await store.keys().map { $0.toKMPKeyInfo() }
-    }
-
-    func __addKey(entry: WalletBridgeStoredKey) async throws -> String {
-        try await store.addKey(entry.toSwiftStoredKey())
-    }
-
-    func __removeKey(keyId: String) async throws -> KotlinBoolean {
-        KotlinBoolean(bool: try await store.removeKey(id: keyId))
-    }
-}
-
-private final class KMPWalletKeyGeneratorAdapter: WalletBridgeKeyGenerator, @unchecked Sendable {
-    private let generate: @Sendable (WalletKeyType) async throws -> StoredKey
-
-    init(generate: @escaping @Sendable (WalletKeyType) async throws -> StoredKey) {
-        self.generate = generate
-    }
-
-    func __generateKey(keyType: MobileWalletKeyType) async throws -> WalletBridgeStoredKey {
-        try await generate(keyType.toSwiftKeyType()).toKMPStoredKey()
-    }
-}
-
 private extension StoredCredential {
     func toKMPStoredCredential() -> WalletBridgeStoredCredential {
         WalletBridgeStoredCredential(
@@ -472,38 +429,6 @@ private extension WalletBridgeStoredDid {
     }
 }
 
-private extension WalletKeyInfo {
-    func toKMPKeyInfo() -> WalletBridgeKeyInfo {
-        WalletBridgeKeyInfo(
-            keyId: keyID,
-            keyType: keyType.bridgeName,
-            algorithm: algorithm
-        )
-    }
-}
-
-private extension StoredKey {
-    func toKMPStoredKey() -> WalletBridgeStoredKey {
-        WalletBridgeStoredKey(
-            keyId: keyID,
-            keyType: keyType.bridgeName,
-            algorithm: algorithm,
-            serializedKeyJson: serializedKeyJSON
-        )
-    }
-}
-
-private extension WalletBridgeStoredKey {
-    func toSwiftStoredKey() throws -> StoredKey {
-        StoredKey(
-            keyID: keyId,
-            keyType: try WalletKeyType(bridgeName: keyType),
-            algorithm: algorithm,
-            serializedKeyJSON: serializedKeyJson
-        )
-    }
-}
-
 private extension Data {
     func toKotlinByteArray() -> KotlinByteArray {
         let bytes = [UInt8](self)
@@ -529,74 +454,7 @@ private extension WalletAttestationConfiguration {
 }
 
 private extension WalletKeyType {
-    init(bridgeName: String) throws {
-        switch bridgeName {
-        case "Ed25519":
-            self = .ed25519
-        case "secp256k1":
-            self = .secp256k1
-        case "secp256r1":
-            self = .secp256r1
-        case "secp384r1":
-            self = .secp384r1
-        case "secp521r1":
-            self = .secp521r1
-        case "RSA":
-            self = .rsa
-        case "RSA3072":
-            self = .rsa3072
-        case "RSA4096":
-            self = .rsa4096
-        default:
-            throw WalletError.invalidInput("Unsupported wallet key type: \(bridgeName)")
-        }
-    }
-
-    var bridgeName: String {
-        switch self {
-        case .ed25519:
-            return "Ed25519"
-        case .secp256k1:
-            return "secp256k1"
-        case .secp256r1:
-            return "secp256r1"
-        case .secp384r1:
-            return "secp384r1"
-        case .secp521r1:
-            return "secp521r1"
-        case .rsa:
-            return "RSA"
-        case .rsa3072:
-            return "RSA3072"
-        case .rsa4096:
-            return "RSA4096"
-        }
-    }
-
     func toKMPKeyType() -> MobileWalletKeyType {
-        switch self {
-        case .ed25519:
-            return .ed25519
-        case .secp256k1:
-            return .secp256k1
-        case .secp256r1:
-            return .secp256r1
-        case .secp384r1:
-            return .secp384r1
-        case .secp521r1:
-            return .secp521r1
-        case .rsa:
-            return .rsa
-        case .rsa3072:
-            return .rsa3072
-        case .rsa4096:
-            return .rsa4096
-        }
-    }
-}
-
-private extension MobileWalletKeyType {
-    func toSwiftKeyType() -> WalletKeyType {
         switch self {
         case .ed25519:
             return .ed25519
@@ -641,7 +499,7 @@ private extension MobileWalletPresentationPreviewResult {
             return .invalid(
                 PresentationPreviewError(
                     previewHandle: PresentationPreviewHandle(value: result.previewHandle.value),
-                    request: result.request.toSwiftRequestInfo(),
+                    request: result.request.toSwiftRequestContext(),
                     code: result.errorCode.toSwiftErrorCode(),
                     message: result.message
                 )
@@ -661,6 +519,19 @@ private extension MobileWalletPresentationPreview {
                 .map { $0.toSwiftCredentialOption() },
             credentialRequirements: swiftArray(credentialRequirements, of: MobileWalletPresentationCredentialRequirement.self)
                 .map { $0.toSwiftCredentialRequirement() }
+        )
+    }
+}
+
+private extension MobileWalletPresentationRequestContext {
+    func toSwiftRequestContext() -> PresentationRequestContext {
+        PresentationRequestContext(
+            clientID: clientId,
+            verifierMetadata: verifierMetadata?.toSwiftVerifierMetadata(),
+            responseURI: responseUri.flatMap(URL.init(string:)),
+            state: state,
+            nonce: nonce,
+            responseEncryption: responseEncryption.toSwiftResponseEncryption()
         )
     }
 }
@@ -941,34 +812,23 @@ private func swiftArray<T>(_ value: Any, of type: T.Type) -> [T] {
 
 private extension MobileWalletEvent {
     func toSwiftEvent() -> WalletEvent {
-        WalletEvent(
-            name: name,
-            phase: phase.toSwiftPhase(),
-            status: status.toSwiftStatus()
-        )
-    }
-}
-
-private extension MobileWalletEventPhase {
-    func toSwiftPhase() -> WalletEventPhase {
         switch self {
-        case .presentation:
-            return .presentation
-        case .issuance:
-            return .issuance
-        }
-    }
-}
-
-private extension MobileWalletEventStatus {
-    func toSwiftStatus() -> WalletEventStatus {
-        switch self {
-        case .completed:
-            return .completed
-        case .failed:
-            return .failed
-        case .progress:
-            return .progress
+        case .issuanceOfferResolved: return .issuanceOfferResolved
+        case .issuanceAttestationObtained: return .issuanceAttestationObtained
+        case .issuanceTokenObtained: return .issuanceTokenObtained
+        case .issuanceProofSigned: return .issuanceProofSigned
+        case .issuanceCredentialReceived: return .issuanceCredentialReceived
+        case .issuanceDeferred: return .issuanceDeferred
+        case .issuanceCredentialStored: return .issuanceCredentialStored
+        case .issuanceCompleted: return .issuanceCompleted
+        case .issuanceFailed: return .issuanceFailed
+        case .presentationRequestParsed: return .presentationRequestParsed
+        case .presentationCredentialsSelected: return .presentationCredentialsSelected
+        case .presentationSigned: return .presentationSigned
+        case .presentationResponsePrepared: return .presentationResponsePrepared
+        case .presentationSubmitted: return .presentationSubmitted
+        case .presentationCompleted: return .presentationCompleted
+        case .presentationFailed: return .presentationFailed
         }
     }
 }

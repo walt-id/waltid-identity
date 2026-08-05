@@ -2,6 +2,8 @@ package id.walt.openid4vci.proofs
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultClient
@@ -35,7 +37,30 @@ class DefaultCredentialProofVerifierTest {
         )
 
         assertEquals(1, verified.size)
-        assertEquals(holderKey.getPublicKey().getThumbprint(), verified.single().holderKey.getThumbprint())
+        assertEquals(
+            holderKey.getPublicKey().getThumbprint(),
+            Jwk.sha256Thumbprint(verified.single().holderKey.exportPublicJwk()),
+        )
+    }
+
+    @Test
+    fun `verifies EdDSA jwt proof signature`() = runTest {
+        val holderKey = JWKKey.generate(KeyType.Ed25519)
+        val proof = createProof(holderKey)
+
+        val verified = verifier.verify(
+            credentialRequest = credentialRequest(proof),
+            credentialConfiguration = credentialConfiguration(
+                proofSigningAlgorithms = setOf("ES256", "EdDSA"),
+            ),
+            context = context(),
+        )
+
+        assertEquals("EdDSA", verified.single().algorithm)
+        assertEquals(
+            holderKey.getPublicKey().getThumbprint(),
+            Jwk.sha256Thumbprint(verified.single().holderKey.exportPublicJwk()),
+        )
     }
 
     @Test
@@ -136,12 +161,14 @@ class DefaultCredentialProofVerifierTest {
         credentialResponseEncryption = null,
     )
 
-    private fun credentialConfiguration() = CredentialConfiguration(
+    private fun credentialConfiguration(
+        proofSigningAlgorithms: Set<String> = setOf("ES256"),
+    ) = CredentialConfiguration(
         format = CredentialFormat.SD_JWT_VC,
         vct = CREDENTIAL_CONFIGURATION_ID,
         cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
         proofTypesSupported = mapOf(
-            "jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256")),
+            "jwt" to ProofType(proofSigningAlgValuesSupported = proofSigningAlgorithms),
         ),
     )
 

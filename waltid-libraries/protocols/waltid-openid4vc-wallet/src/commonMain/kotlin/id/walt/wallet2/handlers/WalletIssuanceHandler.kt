@@ -3,22 +3,33 @@ package id.walt.wallet2.handlers
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.selectJwsAlgorithm
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.crypto2.serialization.BinaryData
+import id.walt.did.dids.DidService
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
+import id.walt.openid4vci.metadata.issuer.ProofType
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.TxCode
+import id.walt.openid4vci.prooftypes.Proofs
 import id.walt.openid4vci.responses.credential.CredentialResponse
-import id.walt.wallet2.data.StoredCredential
-import id.walt.wallet2.data.Wallet
-import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.data.*
 import id.walt.wallet2.handlers.WalletIssuanceHandler.exchangeCode
-import id.walt.wallet2.handlers.WalletIssuanceHandler.generateAuthorizationUrl
 import id.walt.wallet2.handlers.WalletIssuanceHandler.pollDeferredFlow
-import id.walt.wallet2.handlers.WalletIssuanceHandler.receiveCredentialFlow
+import id.walt.wallet2.handlers.WalletIssuanceHandler.resolveOffer
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
@@ -30,6 +41,7 @@ import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
+import id.waltid.openid4vci.wallet.proof.ProofKeyBinding
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -41,9 +53,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import kotlin.jvm.JvmInline
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
-import kotlin.jvm.JvmInline
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 private val log = KotlinLogging.logger {}
 private const val DEFAULT_CLIENT_ID = "eudiw-abca"
@@ -135,7 +148,9 @@ data class ReceiveCredentialRequest(
      */
     val tokenRequestHeaders: Map<String, String> = emptyMap()
 ) : CredentialOfferSource {
-    init { checkOfferSource() }
+    init {
+        checkOfferSource()
+    }
 }
 
 /** Opaque identifier binding an issuance action to one reviewed credential-offer resolution. */
@@ -188,7 +203,9 @@ data class ResolveOfferRequest(
     override val offerUrl: Url? = null,
     override val offerJson: JsonObject? = null
 ) : CredentialOfferSource {
-    init { checkOfferSource() }
+    init {
+        checkOfferSource()
+    }
 }
 
 @Serializable
@@ -355,7 +372,9 @@ data class GenerateAuthorizationUrlRequest(
     val redirectUri: Url = Url("openid://"),
     val usePkce: Boolean = true
 ) : CredentialOfferSource {
-    init { checkOfferSource() }
+    init {
+        checkOfferSource()
+    }
 }
 
 @Serializable
@@ -391,6 +410,7 @@ data class ExchangeCodeRequest(
  * react to each credential as it arrives (useful for streaming UIs).
  */
 object WalletIssuanceHandler {
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val lenientJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
     private val previewedOffers = PreviewSessionStore<ResolvedIssuanceOffer>(sessionName = "Issuance")
 
@@ -424,20 +444,15 @@ object WalletIssuanceHandler {
      */
     private suspend fun resolveOffer(source: CredentialOfferSource, httpClient: HttpClient) =
         if (source.offerJson != null) {
-            val inlineOffer = lenientJson.decodeFromString<id.walt.openid4vci.offers.CredentialOffer>(source.getEffectiveOfferString())
+            val inlineOffer = lenientJson.decodeFromString<CredentialOffer>(source.getEffectiveOfferString())
             CredentialOfferResolver(httpClient).resolveCredentialOffer(credentialOffer = inlineOffer, credentialOfferUri = null)
         } else {
             val req = CredentialOfferParser.parseCredentialOfferUrl(source.getEffectiveOfferString())
-            CredentialOfferResolver(httpClient).resolveCredentialOffer(credentialOffer = req.credentialOffer, credentialOfferUri = req.credentialOfferUri)
+            CredentialOfferResolver(httpClient).resolveCredentialOffer(
+                credentialOffer = req.credentialOffer,
+                credentialOfferUri = req.credentialOfferUri
+            )
         }
-
-    /**
-     * Builds a proof JWT, choosing DID-based binding when [did] is non-null, or JWK-inclusion
-     * otherwise. Extracted to eliminate three identical `if (did != null)` proof-building blocks.
-     */
-    private suspend fun JwtProofBuilder.buildProof(key: Key, issuer: String, nonce: String?, did: String?) =
-        if (did != null) buildJwtProof(key, issuer, nonce, keyId = did)
-        else buildJwtProof(key, issuer, nonce, includeJwk = true)
 
     /** Immediate, non-previewed pre-authorized-code issuance flow. */
     fun receiveCredentialFlow(
@@ -445,7 +460,7 @@ object WalletIssuanceHandler {
         request: ReceiveCredentialRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         /**
          * Called whenever the issuer defers a credential.
          * [credentialConfigurationId] identifies which credential was deferred;
@@ -472,7 +487,7 @@ object WalletIssuanceHandler {
         request: ReceiveCredentialFromPreviewRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit = { _, _ -> },
     ): Flow<StoredCredential> = channelFlow {
         previewedOffers.useRetainingOnFailure(
@@ -500,7 +515,8 @@ object WalletIssuanceHandler {
         httpClient: HttpClient,
         onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit,
     ): Flow<StoredCredential> = channelFlow {
-        val key = wallet.resolveKey(request.key, request.keyId)
+        val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
+            ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available: wallet has no keyStores, no staticKey, no inline key, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
 
@@ -542,7 +558,7 @@ object WalletIssuanceHandler {
             asMetadata = asMetadata,
             clientId = request.clientId,
             attestationAssembler = attestationAssembler,
-            resolveInstanceKey = { key },
+            resolveInstanceKey = { keyMaterial.crypto2AttestationKey() },
             onAttestationObtained = { onEvent(WalletSessionEvent.issuance_attestation_obtained) },
         )
 
@@ -568,18 +584,22 @@ object WalletIssuanceHandler {
         // 5. Issue each offered credential with a fresh nonce when proof is required.
         for (offeredCredential in offeredCredentials) {
             log.trace { "Issuing credential configId=${offeredCredential.credentialConfigurationId}, format=${offeredCredential.configuration.format}" }
+            val jwtProofAlgorithms = supportedJwtProofAlgorithms(offeredCredential.configuration.proofTypesSupported)
             val buildProof: (suspend (String?) -> String?)? =
-                if (offeredCredential.configuration.proofTypesSupported?.isNotEmpty() == true) {
+                if (jwtProofAlgorithms != null) {
                     { nonce ->
                         log.trace { "Building credential proof JWT" }
                         val preferJwkBinding = shouldPreferJwkBinding(
                             offeredCredential.configuration.cryptographicBindingMethodsSupported
                         )
-                        if (did != null && !preferJwkBinding) {
-                            proofBuilder.buildJwtProof(key, offer.credentialIssuer, nonce, keyId = did).jwt?.firstOrNull()
-                        } else {
-                            proofBuilder.buildJwtProof(key, offer.credentialIssuer, nonce, includeJwk = true).jwt?.firstOrNull()
-                        }
+                        buildJwtProof(
+                            proofBuilder = proofBuilder,
+                            keyMaterial = keyMaterial,
+                            audience = offer.credentialIssuer,
+                            nonce = nonce,
+                            did = did?.takeUnless { preferJwkBinding },
+                            acceptedAlgorithms = jwtProofAlgorithms,
+                        ).jwt?.firstOrNull()
                     }
                 } else null
 
@@ -611,7 +631,10 @@ object WalletIssuanceHandler {
             }
 
             for (issuedCredential in rawCredentials) {
-                val entry = wallet.parseAndStore(issuedCredential, label = offeredCredential.configuration.credentialMetadata?.display?.firstOrNull()?.name)
+                val entry = wallet.parseAndStore(
+                    issuedCredential,
+                    label = offeredCredential.configuration.credentialMetadata?.display?.firstOrNull()?.name
+                )
                 onEvent(WalletSessionEvent.issuance_credential_stored)
                 send(entry)
             }
@@ -629,7 +652,7 @@ object WalletIssuanceHandler {
         request: ReceiveCredentialRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = defaultHttpClient()
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient
     ): ReceiveCredentialResult {
         val ids = mutableListOf<String>()
         val deferredIds = mutableMapOf<String, String>()
@@ -650,7 +673,7 @@ object WalletIssuanceHandler {
         request: ReceiveCredentialFromPreviewRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): ReceiveCredentialResult {
         val ids = mutableListOf<String>()
         val deferredIds = mutableMapOf<String, String>()
@@ -679,7 +702,7 @@ object WalletIssuanceHandler {
     suspend fun previewOffer(
         wallet: Wallet,
         request: ResolveOfferRequest,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): WalletOfferPreviewResult {
         val resolvedOffer = resolveIssuanceOffer(request, httpClient)
         val previewHandle = IssuancePreviewHandle(
@@ -705,7 +728,7 @@ object WalletIssuanceHandler {
 
     private suspend fun resolveIssuanceOffer(
         request: ResolveOfferRequest,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): ResolvedIssuanceOffer {
         val offer = resolveOffer(request, httpClient)
         val metadataResolver = IssuerMetadataResolver(httpClient)
@@ -776,7 +799,7 @@ object WalletIssuanceHandler {
         wallet: Wallet,
         request: RequestTokenRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         onAttestationObtained: suspend () -> Unit = {},
     ): RequestTokenResult {
         val credentialIssuer = request.credentialIssuer?.takeIf { it.isNotBlank() }
@@ -790,15 +813,17 @@ object WalletIssuanceHandler {
                 asMetadata = it,
                 clientId = request.clientId,
                 attestationAssembler = attestationAssembler,
-                resolveInstanceKey = { wallet.resolveKey() },
+                resolveInstanceKey = {
+                    wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))?.crypto2AttestationKey()
+                },
                 onAttestationObtained = onAttestationObtained,
             )
         }
         val anonymousPreAuthorizedCode =
             request.anonymousPreAuthorizedCode ||
-                (asMetadata?.preAuthorizedGrantAnonymousAccessSupported == true &&
-                    request.tokenRequestHeaders.isEmpty() &&
-                    attestationHeaders == null)
+                    (asMetadata?.preAuthorizedGrantAnonymousAccessSupported == true &&
+                            request.tokenRequestHeaders.isEmpty() &&
+                            attestationHeaders == null)
 
         return requestToken(
             request = request,
@@ -812,7 +837,7 @@ object WalletIssuanceHandler {
         request: RequestTokenRequest,
         attestationHeaders: ClientAttestationHeaders?,
         anonymousPreAuthorizedCode: Boolean,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): RequestTokenResult {
         val clientConfig = ClientConfiguration(
             clientId = request.clientId,
@@ -834,7 +859,7 @@ object WalletIssuanceHandler {
 
     suspend fun requestNonce(
         request: RequestNonceRequest,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): RequestNonceResult {
         val issuerMetadata = IssuerMetadataResolver(httpClient)
             .resolveCredentialIssuerMetadata(request.credentialIssuer.toString())
@@ -847,15 +872,21 @@ object WalletIssuanceHandler {
     }
 
     suspend fun signProof(wallet: Wallet, request: SignProofRequest): SignProofResult {
-        val key = wallet.resolveKey(request.key, request.keyId)
+        val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
+            ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available for signing proof")
-        val proofBuilder = JwtProofBuilder()
-        val proofs = proofBuilder.buildProof(key, request.issuerUrl.toString(), request.nonce, request.did)
+        val proofs = buildJwtProof(
+            proofBuilder = JwtProofBuilder(),
+            keyMaterial = keyMaterial,
+            audience = request.issuerUrl.toString(),
+            nonce = request.nonce,
+            did = request.did,
+        )
         return SignProofResult(proofJwt = proofs.jwt?.firstOrNull() ?: error("Proof signing produced no JWT"))
     }
 
     suspend fun fetchCredential(request: FetchCredentialRequest): FetchCredentialResult =
-        fetchCredential(request, defaultHttpClient())
+        fetchCredential(request, httpClient)
 
     internal suspend fun fetchCredential(
         request: FetchCredentialRequest,
@@ -984,7 +1015,7 @@ object WalletIssuanceHandler {
         asMetadata: AuthorizationServerMetadata,
         clientId: String,
         attestationAssembler: ClientAttestationAssembler?,
-        resolveInstanceKey: suspend () -> Key?,
+        resolveInstanceKey: suspend () -> Crypto2Key?,
         onAttestationObtained: suspend () -> Unit = {},
     ): ClientAttestationHeaders? {
         val assembler = attestationAssembler ?: return null
@@ -1001,6 +1032,9 @@ object WalletIssuanceHandler {
         onAttestationObtained()
         return headers
     }
+
+    private suspend fun WalletKeyStoreEntry.crypto2AttestationKey(): Crypto2Key? =
+        crypto2Key ?: legacyKey?.let { migrateLocalJwk(it) }?.let { crypto2Runtime.restore(it) }
 
     private fun AuthorizationServerMetadata.supportsAttestationBasedClientAuthentication(): Boolean =
         tokenEndpointAuthMethodsSupported?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) == true
@@ -1108,7 +1142,7 @@ object WalletIssuanceHandler {
      * Wraps [TokenRequestBuilder.exchangeAuthorizationCode].
      */
     suspend fun exchangeCode(request: ExchangeCodeRequest): RequestTokenResult {
-        val httpClient = defaultHttpClient()
+        val httpClient = httpClient
         val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
             ?: error("credentialIssuerBaseUrl must be provided")
         val asMetadata = resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient)
@@ -1125,7 +1159,7 @@ object WalletIssuanceHandler {
         wallet: Wallet,
         request: ExchangeCodeRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         onAttestationObtained: suspend () -> Unit = {},
     ): RequestTokenResult {
         val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
@@ -1137,7 +1171,9 @@ object WalletIssuanceHandler {
             asMetadata = asMetadata,
             clientId = request.clientId,
             attestationAssembler = attestationAssembler,
-            resolveInstanceKey = { wallet.resolveKey() },
+            resolveInstanceKey = {
+                wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))?.crypto2AttestationKey()
+            },
             onAttestationObtained = onAttestationObtained,
         )
         return exchangeCode(
@@ -1152,7 +1188,7 @@ object WalletIssuanceHandler {
         request: ExchangeCodeRequest,
         tokenEndpoint: String,
         attestationHeaders: ClientAttestationHeaders?,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): RequestTokenResult {
         val clientConfig = ClientConfiguration(
             clientId = request.clientId,
@@ -1188,7 +1224,7 @@ object WalletIssuanceHandler {
         wallet: Wallet,
         request: PollDeferredRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = defaultHttpClient()
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient
     ): Flow<StoredCredential> = channelFlow {
         val response = httpClient.post(request.deferredCredentialEndpoint.toString()) {
             header(HttpHeaders.Authorization, "Bearer ${request.accessToken}")
@@ -1255,9 +1291,10 @@ object WalletIssuanceHandler {
         inlineDid: String? = null,
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = defaultHttpClient()
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient
     ): Flow<StoredCredential> = channelFlow {
-        val key = wallet.resolveKey(inlineKey)
+        val keyMaterial = inlineKey?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
+            ?: wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
             ?: error("No key available for proof-of-possession")
         val did = inlineDid ?: wallet.defaultDid()
 
@@ -1287,6 +1324,10 @@ object WalletIssuanceHandler {
             }
         }
         val proofBuilder = JwtProofBuilder()
+        // The proof must use an algorithm the issuer advertises for this configuration.
+        val jwtProofAlgorithms = supportedJwtProofAlgorithms(
+            issuerMetadata.credentialConfigurationsSupported[credentialConfigurationId]?.proofTypesSupported
+        )
         val credentialResponse = requestCredentialWithNonceRetry(
             request = FetchCredentialRequest(
                 credentialEndpoint = credentialEndpoint,
@@ -1297,7 +1338,14 @@ object WalletIssuanceHandler {
             nonceEndpoint = issuerMetadata.nonceEndpoint,
             httpClient = httpClient,
             buildProof = { nonce ->
-                proofBuilder.buildProof(key, credentialIssuerBaseUrl, nonce, did).jwt?.firstOrNull()
+                buildJwtProof(
+                    proofBuilder = proofBuilder,
+                    keyMaterial = keyMaterial,
+                    audience = credentialIssuerBaseUrl,
+                    nonce = nonce,
+                    did = did,
+                    acceptedAlgorithms = jwtProofAlgorithms,
+                ).jwt?.firstOrNull()
             },
             onProofGenerated = { onEvent(WalletSessionEvent.issuance_proof_signed) },
         )
@@ -1320,4 +1368,66 @@ object WalletIssuanceHandler {
         }
         onEvent(WalletSessionEvent.issuance_completed)
     }
+
+    /**
+     * Builds a JWT proof through the proof-builder contracts - no proof assembly happens here.
+     *
+     * [nonce] is null whenever the Credential Issuer advertises no Nonce Endpoint; the builder then
+     * omits the `nonce` claim. The legacy branch is only reached for keys that cannot be represented
+     * in crypto2 (remote v1 KMS keys, secp256k1) and goes away with the legacy key API.
+     */
+    private suspend fun buildJwtProof(
+        proofBuilder: JwtProofBuilder,
+        keyMaterial: WalletKeyStoreEntry,
+        audience: String,
+        nonce: String?,
+        did: String?,
+        acceptedAlgorithms: Set<String>? = null,
+    ): Proofs {
+        val binding = did
+            ?.let { ProofKeyBinding.KeyId(DidService.resolveAuthenticationMethodId(it, keyMaterial.keyId)) }
+            ?: ProofKeyBinding.Jwk
+        val effectiveCrypto2Key = keyMaterial.crypto2Key
+            ?: keyMaterial.legacyKey?.let { migrateLocalJwk(it) }?.let { crypto2Runtime.restore(it) }
+        return effectiveCrypto2Key?.let {
+            proofBuilder.buildProof(
+                key = it,
+                algorithm = it.selectJwsAlgorithm(acceptedAlgorithms),
+                audience = audience,
+                nonce = nonce,
+                binding = binding,
+            )
+        } ?: run {
+            val legacyKey = requireNotNull(keyMaterial.legacyKey) {
+                "Key '${keyMaterial.keyId}' has no usable signing representation"
+            }
+            acceptedAlgorithms?.let {
+                require(legacyKey.keyType.jwsAlg in it) {
+                    "Issuer does not support proof algorithm ${legacyKey.keyType.jwsAlg}"
+                }
+            }
+            proofBuilder.buildProof(
+                key = legacyKey,
+                audience = audience,
+                nonce = nonce,
+                binding = binding,
+            )
+        }
+    }
+
+    private suspend fun migrateLocalJwk(key: Key) =
+        (key as? JWKKey)?.takeUnless { it.keyType == KeyType.secp256k1 }?.let {
+            val jwk = it.exportJWKObject()
+            EncodedKey.Jwk(
+                BinaryData(Json.encodeToString(jwk).encodeToByteArray()),
+                privateMaterial = Jwk.containsPrivateMaterial(jwk),
+            ).toStoredSoftwareKey(KeyId(it.getKeyId()), setOf(KeyUsage.SIGN))
+        }
+}
+
+internal fun supportedJwtProofAlgorithms(proofTypes: Map<String, ProofType>?): Set<String>? {
+    if (proofTypes.isNullOrEmpty()) return null
+    return requireNotNull(proofTypes["jwt"]) {
+        "Issuer requires an unsupported proof type: ${proofTypes.keys}"
+    }.proofSigningAlgValuesSupported
 }

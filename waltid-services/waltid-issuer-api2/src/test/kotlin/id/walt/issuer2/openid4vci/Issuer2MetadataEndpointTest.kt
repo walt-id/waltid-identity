@@ -45,6 +45,7 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -116,7 +117,14 @@ class Issuer2MetadataEndpointTest {
         assertEquals("$ISSUER_BASE_URL/jwks", authorizationServerMetadata.jwksUri)
         assertEquals("$ISSUER_BASE_URL/par", authorizationServerMetadata.pushedAuthorizationRequestEndpoint)
         assertEquals(false, authorizationServerMetadata.requirePushedAuthorizationRequests)
-        assertNull(authorizationServerMetadata.codeChallengeMethodsSupported)
+        assertEquals(true, authorizationServerMetadata.authorizationResponseIssParameterSupported)
+        assertEquals(
+            true,
+            authorizationServerMetadataJson["authorization_response_iss_parameter_supported"]
+                ?.jsonPrimitive
+                ?.booleanOrNull,
+        )
+        assertEquals(listOf("S256"), authorizationServerMetadata.codeChallengeMethodsSupported)
         assertEquals(setOf("attest_jwt_client_auth"), authorizationServerMetadata.tokenEndpointAuthMethodsSupported)
         assertNull(authorizationServerMetadata.tokenEndpointAuthSigningAlgValuesSupported)
         assertEquals(
@@ -137,7 +145,12 @@ class Issuer2MetadataEndpointTest {
             ),
             authorizationServerMetadata.grantTypesSupported,
         )
-        assertFalse("code_challenge_methods_supported" in authorizationServerMetadataJson)
+        assertEquals(
+            listOf("S256"),
+            authorizationServerMetadataJson["code_challenge_methods_supported"]
+                ?.jsonArray
+                ?.map { it.jsonPrimitive.content },
+        )
 
         assertEquals(ISSUER_BASE_URL, jwtVcIssuerMetadata.issuer)
         assertEquals("$ISSUER_BASE_URL/jwks", jwtVcIssuerMetadata.jwksUri)
@@ -292,7 +305,10 @@ class Issuer2MetadataEndpointTest {
             assertEquals(JWT_PROOF_BINDING_METHODS, configuration.cryptographicBindingMethodsSupported)
             assertEquals(credentialConfigurationId, configuration.scope)
             assertEquals("$ISSUER_BASE_URL/$credentialConfigurationId", configuration.vct)
-            assertNotNull(configuration.proofTypesSupported?.get("jwt"))
+            assertEquals(
+                JWT_PROOF_SIGNING_ALGORITHMS,
+                assertNotNull(configuration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+            )
         }
     }
 
@@ -316,7 +332,10 @@ class Issuer2MetadataEndpointTest {
             setOf("VerifiableCredential", "OpenBadgeCredential"),
             openBadgeConfiguration.credentialDefinition?.type?.toSet(),
         )
-        assertNotNull(openBadgeConfiguration.proofTypesSupported?.get("jwt"))
+        assertEquals(
+            JWT_PROOF_SIGNING_ALGORITHMS,
+            assertNotNull(openBadgeConfiguration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+        )
     }
 
     private fun assertMdocConfiguration(
@@ -338,6 +357,10 @@ class Issuer2MetadataEndpointTest {
             )
             assertEquals(doctype, mdocConfiguration.doctype)
             assertEquals(credentialConfigurationId, mdocConfiguration.scope)
+            assertEquals(
+                JWT_PROOF_SIGNING_ALGORITHMS,
+                assertNotNull(mdocConfiguration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+            )
         }
     }
 
@@ -356,7 +379,10 @@ class Issuer2MetadataEndpointTest {
         assertEquals(JWT_PROOF_BINDING_METHODS, sdJwtConfiguration.cryptographicBindingMethodsSupported)
         assertEquals(SD_JWT_INTERNAL_CONFIG_ID, sdJwtConfiguration.scope)
         assertEquals(INTERNAL_SD_JWT_VCT, sdJwtConfiguration.vct)
-        assertNotNull(sdJwtConfiguration.proofTypesSupported?.get("jwt"))
+        assertEquals(
+            JWT_PROOF_SIGNING_ALGORITHMS,
+            assertNotNull(sdJwtConfiguration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+        )
     }
 
     private fun ApplicationTestBuilder.installIssuer2WithConfigFiles() {
@@ -403,15 +429,22 @@ class Issuer2MetadataEndpointTest {
             ?: error("Could not locate waltid-issuer-api2 config directory")
 
     private companion object {
-        const val ISSUER_AUTHORITY_BASE_URL = "http://localhost:7002"
         const val OPENID4VCI_PREFIX = "/openid4vci"
-        const val ISSUER_BASE_URL = "$ISSUER_AUTHORITY_BASE_URL/openid4vci"
+
+        /**
+         * Taken from the config files this test loads rather than hardcoded: the deployed port is owned by
+         * `web.conf`/`issuer-service.conf`, and pinning it here only produced a test failure the next time it
+         * changed.
+         */
+        val ISSUER_AUTHORITY_BASE_URL: String
+            get() = ConfigManager.getConfig<Issuer2ServiceConfig>().baseUrl.trimEnd('/')
+        val ISSUER_BASE_URL: String get() = "$ISSUER_AUTHORITY_BASE_URL$OPENID4VCI_PREFIX"
         const val AUTHORIZATION_SERVER_METADATA_PATH = "/.well-known/oauth-authorization-server/openid4vci"
         const val JWT_VC_ISSUER_METADATA_PATH = "/.well-known/jwt-vc-issuer/openid4vci"
         const val NESTED_JWT_VC_ISSUER_METADATA_PATH = "$OPENID4VCI_PREFIX/.well-known/jwt-vc-issuer"
         const val OPEN_BADGE_CONFIG_ID = "OpenBadgeCredential_jwt_vc_json"
         const val SD_JWT_INTERNAL_CONFIG_ID = "identity_credential"
-        const val INTERNAL_SD_JWT_VCT = "$ISSUER_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
+        val INTERNAL_SD_JWT_VCT: String get() = "$ISSUER_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
 
         val MDOC_CATALOG_CONFIG_IDS = listOf(
             "org.iso.18013.5.1.mDL" to "org.iso.18013.5.1.mDL",
@@ -439,6 +472,8 @@ class Issuer2MetadataEndpointTest {
             CryptographicBindingMethod.DidJwk,
             CryptographicBindingMethod.DidEbsi,
         )
+
+        val JWT_PROOF_SIGNING_ALGORITHMS = setOf("ES256", "EdDSA")
 
         val configFiles: List<Pair<String, KClass<out WaltConfig>>> = listOf(
             "issuer-service" to Issuer2ServiceConfig::class,

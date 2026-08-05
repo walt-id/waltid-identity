@@ -207,5 +207,13 @@ data class AuthorizationRequest(
         if (responseMode in OpenID4VPResponseMode.DIRECT_POST_RESPONSES) {
             requireNotNull(responseUri) { "response_uri must not be null if response_mode is direct_post / direct_post_jwt" }
         }
+        if (responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN) {
+            require(scope?.split(' ')?.contains("openid") == true) {
+                "scope must contain openid for response_type=vp_token id_token"
+            }
+            require(idTokenType == "subject_signed") {
+                "id_token_type must be subject_signed for response_type=vp_token id_token"
+            }
+        }
     }
 }

@@ -6,6 +6,7 @@ import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.policies2.vc.CredentialPolicyResult
 import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vc.policies.WebhookPolicy
 import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyList
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
@@ -17,6 +18,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -32,7 +34,7 @@ data class Verification2Session(
      */
     val id: String = Uuid.random().toString(),
 
-    val setup: VerificationSessionSetup,
+    var setup: VerificationSessionSetup,
     val data: JsonElement? = null, // Custom data
 
     val creationDate: Instant = Clock.System.now(),
@@ -61,7 +63,7 @@ data class Verification2Session(
     var status: VerificationSessionStatus,
     var attempted: Boolean = false,
 
-    val notifications: KtorSessionNotifications? = null,
+    var notifications: KtorSessionNotifications? = null,
 
     val reattemptable: Boolean = true,
 
@@ -78,8 +80,13 @@ data class Verification2Session(
     val authorizationRequestUrl: Url?,
 
     val signedAuthorizationRequestJwt: String? = null,
-    val ephemeralDecryptionKey: DirectSerializedKey? = null,
-    /** JWK Thumbprint for [ephemeralDecryptionKey] */
+    /** Opaque service-level reference used to resolve the request-object signing key after restart. */
+    val requestSigningKeyReference: String? = null,
+    var ephemeralDecryptionKey: DirectSerializedKey? = null,
+    /** Versioned crypto2 key used by new OpenID4VP JWE and Annex C HPKE sessions. */
+    @Transient
+    var crypto2EphemeralDecryptionKey: String? = null,
+    /** JWK thumbprint for the response-encryption key. */
     val jwkThumbprint: String? = null,
 
     /**
@@ -90,7 +97,7 @@ data class Verification2Session(
     /**
      * Policies
      */
-    val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
+    var policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
 
     @SerialName("policy_results")
     var policyResults: Verifier2PolicyResults? = null,
@@ -139,6 +146,11 @@ data class Verification2Session(
 ) {
 
     fun deletePII() {
+        setup = setup.publicView()
+        notifications = notifications?.publicView()
+        ephemeralDecryptionKey = null
+        crypto2EphemeralDecryptionKey = null
+        policies = policies.publicView()
         presentedRawData = null
         presentedPresentations = null
         presentedCredentials = null
@@ -165,6 +177,14 @@ data class Verification2Session(
             ?.flatMap { it.values }
             ?.forEach { it.results = emptyMap() }
     }
+
+    fun publicView(): Verification2Session = copy(
+        setup = setup.publicView(),
+        notifications = notifications?.publicView(),
+        policies = policies.publicView(),
+        ephemeralDecryptionKey = null,
+        crypto2EphemeralDecryptionKey = null,
+    )
 
     private fun redactCredentialSubject(resultElement: JsonElement): JsonElement {
         val resultObj = resultElement.jsonObject
@@ -297,3 +317,20 @@ data class Verification2Session(
         DC_API
     }
 }
+
+internal fun Verification2Session.DefinedVerificationPolicies.publicView() = copy(
+    vc_policies = vc_policies?.publicView(),
+    specific_vc_policies = specific_vc_policies?.mapValues { (_, policies) -> policies.publicView() },
+)
+
+private fun VCPolicyList.publicView() = copy(
+    policies = policies.map { policy ->
+        if (policy is WebhookPolicy) {
+            policy.copy(
+                basicAuthUsername = null,
+                basicAuthPassword = null,
+                bearerAuthToken = null,
+            )
+        } else policy
+    }
+)

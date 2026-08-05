@@ -10,7 +10,6 @@ import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletPersistence
-import id.walt.wallet2.mobile.MobileWalletStores
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
@@ -210,7 +209,7 @@ class MobileWalletEncryptionTest {
         val config = MobileWalletConfig(
             walletId = walletId,
             persistence = MobileWalletPersistence(
-                stores = MobileWalletStores(credentials = credentialStore),
+                credentialStore = credentialStore,
             ),
         )
         val factory = MobileWalletFactory(context)

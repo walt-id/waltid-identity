@@ -1,11 +1,10 @@
 package id.walt.cli.util
 
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.did.dids.DidService
+import id.walt.crypto2.keys.Key
+import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions
-import id.walt.did.dids.resolver.local.DidWebResolver
+import id.walt.did.dids.DidService
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 
@@ -15,44 +14,32 @@ class DidUtil {
         init {
             runBlocking {
                 DidService.minimalInit()
-                DidWebResolver.enableHttps(false) // we want to accept DIDs without "httpS for development purposes
             }
         }
 
         fun createDid(
             method: DidMethod,
-            key: JWKKey,
+            key: Key,
             options: DidCreateOptions? = null
         ): DidResult {
             return runBlocking {
                 if (options != null)
-                    DidService.registerByKey(method.name.lowercase(), key, options)
+                    Crypto2DidService.registerByKey(method.name.lowercase(), key, options)
                 else
-                    DidService.registerByKey(method.name.lowercase(), key)
+                    Crypto2DidService.registerByKey(method.name.lowercase(), key)
             }
         }
 
-        fun resolveDid(did: String): JsonObject? {
+        fun resolveDid(did: String): JsonObject {
             return runBlocking {
-                DidService.resolve(did).getOrNull()
+                Crypto2DidService.resolve(did).getOrThrow()
             }
         }
 
-        fun resolveToKey(did: String): Key? {
+        fun resolveToKeys(did: String): Set<Key> {
             return runBlocking {
-                DidService.resolveToKey(did).getOrNull()
+                Crypto2DidService.resolveToKeys(did).getOrThrow()
             }
-        }
-
-        fun getSupportedMethods(): Set<String> {
-            val methods = mutableSetOf<String>()
-            for (registrar in DidService.didRegistrars) {
-                runBlocking {
-                    methods.addAll(registrar.getSupportedMethods().getOrThrow())
-                }
-            }
-
-            return methods
         }
     }
 }

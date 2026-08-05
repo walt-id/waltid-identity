@@ -17,6 +17,7 @@ import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 import id.walt.issuer2.testsupport.createIssuer2ClientAttestationTestMaterial
+import id.walt.issuer2.testsupport.generateIssuer2WalletInstanceKey
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
@@ -130,7 +131,6 @@ class Issuer2PARRouteTest {
         assertEquals("no-store", response.headers[HttpHeaders.CacheControl])
         val payload = response.body<JsonObject>()
         val nonce = assertNotNull(payload["c_nonce"]?.jsonPrimitive?.contentOrNull)
-        assertEquals("300", payload["c_nonce_expires_in"]?.jsonPrimitive?.content)
         assertTrue(KeyManager.resolveSerializedKey(serviceConfig.ciTokenKey).getPublicKey().verifyJws(nonce).isSuccess)
     }
 
@@ -171,7 +171,7 @@ class Issuer2PARRouteTest {
     @Test
     fun `par route accepts client attestation headers`() = testApplication {
         val clientAttestation = createIssuer2ClientAttestationTestMaterial()
-        val walletInstanceKey = JWKKey.generate(KeyType.secp256r1)
+        val walletInstanceKey = generateIssuer2WalletInstanceKey("par-wallet-instance")
         val attestationHeaders = clientAttestation.attestationAssembler.buildAttestationHeaders(
             instanceKey = walletInstanceKey,
             clientId = EUDI_WALLET_CLIENT_ID,

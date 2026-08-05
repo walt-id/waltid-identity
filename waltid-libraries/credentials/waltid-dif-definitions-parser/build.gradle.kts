@@ -7,7 +7,7 @@ plugins {
 group = "id.walt.dif-definitions-parser"
 
 kotlin {
-    js(IR) {
+    js {
         outputModuleName = "definitions-parser"
     }
 
