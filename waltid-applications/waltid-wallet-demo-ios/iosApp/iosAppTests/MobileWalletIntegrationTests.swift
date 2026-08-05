@@ -91,14 +91,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     private func startIssuance(
         wallet: Wallet,
-        offerURL: URL,
-        dpopMode: IssuanceDpopMode = .ifSupported
+        offerURL: URL
     ) async throws -> IssuanceSession {
         try await wallet.startIssuance(
             IssuanceRequest(
                 offer: offerURL,
-                redirectURI: URL(string: "openid://")!,
-                dpopMode: dpopMode
+                redirectURI: URL(string: "openid://")!
             )
         )
     }
@@ -106,10 +104,9 @@ final class MobileWalletIntegrationTests: XCTestCase {
     private func receiveIssuedCredentials(
         wallet: Wallet,
         offerURL: URL,
-        transactionCode: String? = nil,
-        dpopMode: IssuanceDpopMode = .ifSupported
+        transactionCode: String? = nil
     ) async throws -> [String] {
-        let session = try await startIssuance(wallet: wallet, offerURL: offerURL, dpopMode: dpopMode)
+        let session = try await startIssuance(wallet: wallet, offerURL: offerURL)
         let outcome = try await wallet.continuePreAuthorizedIssuance(
             sessionID: session.id,
             transactionCode: transactionCode
@@ -213,7 +210,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: Self.eudiPidSdJwtCredentialID)
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let session = try await startIssuance(wallet: wallet, offerURL: offerURL, dpopMode: .disabled)
+        let session = try await startIssuance(wallet: wallet, offerURL: offerURL)
         XCTAssertFalse(session.offer.issuer.identifier.isEmpty)
         XCTAssertFalse(session.offer.credentials.isEmpty)
         XCTAssertTrue(session.offer.credentials.allSatisfy {
@@ -346,8 +343,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let credentialIDs = try await receiveIssuedCredentials(
             wallet: wallet1,
             offerURL: offerURL,
-            transactionCode: offer.txCode,
-            dpopMode: .disabled
+            transactionCode: offer.txCode
         )
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
 
@@ -411,8 +407,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let credentialIDs = try await receiveIssuedCredentials(
             wallet: wallet,
             offerURL: offerURL,
-            transactionCode: offer.txCode,
-            dpopMode: .disabled
+            transactionCode: offer.txCode
         )
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive EUDI credential \(credentialID)")
 
@@ -445,8 +440,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let credentialIDs = try await receiveIssuedCredentials(
             wallet: wallet,
             offerURL: offerURL,
-            transactionCode: offer.txCode,
-            dpopMode: .disabled
+            transactionCode: offer.txCode
         )
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive EUDI credential \(credentialID)")
 

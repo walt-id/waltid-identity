@@ -16,7 +16,6 @@ import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
-import id.walt.wallet2.mobile.MobileWalletIssuanceDpopMode
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
@@ -107,7 +106,6 @@ class MobileWalletIntegrationTest {
         val session = client.startIssuance(
             MobileWalletIssuanceRequest(
                 offerUrl = offer.offerUrl,
-                dpopMode = MobileWalletIssuanceDpopMode.DISABLED,
             )
         )
         assertTrue(session.offer.issuer.identifier.isNotBlank(), "Resolved issuer metadata should include its identifier")
@@ -376,7 +374,6 @@ class MobileWalletIntegrationTest {
         client1.receiveCredential(
             offerUrl = offer.offerUrl,
             transactionCode = offer.txCode,
-            dpopMode = MobileWalletIssuanceDpopMode.DISABLED,
         )
 
         val client2 = MobileWalletFactory(context).create(walletConfig)
@@ -421,13 +418,11 @@ class MobileWalletIntegrationTest {
     private suspend fun MobileWallet.receiveCredential(
         offerUrl: String,
         transactionCode: String?,
-        dpopMode: MobileWalletIssuanceDpopMode = MobileWalletIssuanceDpopMode.IF_SUPPORTED,
     ): List<String> =
         continuePreAuthorizedIssuance(
             sessionId = startIssuance(
                 MobileWalletIssuanceRequest(
                     offerUrl = offerUrl,
-                    dpopMode = dpopMode,
                 )
             ).id,
             transactionCode = transactionCode,
@@ -463,7 +458,6 @@ class MobileWalletIntegrationTest {
         val credentialIds = client.receiveCredential(
             offerUrl = offer.offerUrl,
             transactionCode = offer.txCode,
-            dpopMode = MobileWalletIssuanceDpopMode.DISABLED,
         )
         assertTrue(credentialIds.isNotEmpty(), "Should receive EUDI credential $credentialId")
 
@@ -489,7 +483,6 @@ class MobileWalletIntegrationTest {
         val credentialIds = client.receiveCredential(
             offerUrl = offer.offerUrl,
             transactionCode = offer.txCode,
-            dpopMode = MobileWalletIssuanceDpopMode.DISABLED,
         )
         assertTrue(credentialIds.isNotEmpty(), "Should receive EUDI credential $credentialId")
 

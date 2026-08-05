@@ -53,10 +53,9 @@ guard case let .stored(_, credentialIDs) = outcome else {
 }
 ```
 
-DPoP is used when the authorization server advertises supported algorithms by
-default. For an issuer that does not support DPoP, pass
-`dpopMode: .disabled` in ``IssuanceRequest``. Disabled mode omits the
-authorization request binding and issuance request proofs for the session.
+Issuance uses DPoP consistently for authorization binding, token exchange, and
+protected credential requests whenever the authorization server advertises
+supported DPoP signing algorithms.
 
 The returned identifiers can be used to refresh local UI or to load credential
 metadata through ``Wallet/credentials()``.

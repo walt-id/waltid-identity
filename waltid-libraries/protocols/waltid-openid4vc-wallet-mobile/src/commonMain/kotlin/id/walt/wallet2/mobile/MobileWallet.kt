@@ -31,7 +31,6 @@ import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceSession
 import id.walt.wallet2.handlers.WalletIssuanceSessionRequest
 import id.walt.wallet2.handlers.WalletIssuanceSessionService
-import id.walt.wallet2.handlers.WalletIssuanceDpopMode
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
@@ -265,7 +264,6 @@ public class MobileWallet internal constructor(
             did = request.did,
             clientId = request.clientId,
             redirectUri = request.redirectUri.trim(),
-            dpopMode = request.dpopMode,
         )
     )
 
@@ -322,7 +320,6 @@ public class MobileWallet internal constructor(
         redirectUri: String,
         keyId: String? = null,
         did: String? = null,
-        dpopMode: MobileWalletIssuanceDpopMode = MobileWalletIssuanceDpopMode.IF_SUPPORTED,
     ): WalletIssuanceSessionRequest {
         val selectedKeyId = keyId ?: keyStore.listKeys().toList().firstOrNull()?.keyId
             ?: error("No holder key is available for credential issuance")
@@ -333,13 +330,7 @@ public class MobileWallet internal constructor(
             did = selectedDid,
             clientId = clientId,
             redirectUri = Url(redirectUri),
-            dpopMode = dpopMode.toCore(),
         )
-    }
-
-    private fun MobileWalletIssuanceDpopMode.toCore(): WalletIssuanceDpopMode = when (this) {
-        MobileWalletIssuanceDpopMode.DISABLED -> WalletIssuanceDpopMode.DISABLED
-        MobileWalletIssuanceDpopMode.IF_SUPPORTED -> WalletIssuanceDpopMode.IF_SUPPORTED
     }
 
     /**

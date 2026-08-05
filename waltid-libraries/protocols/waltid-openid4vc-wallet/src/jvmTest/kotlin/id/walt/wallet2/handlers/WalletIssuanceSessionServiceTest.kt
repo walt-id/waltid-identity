@@ -822,36 +822,7 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
-    fun disabledDpopModeOmitsTokenProof() = runTest {
-        val client = client { request ->
-            when (request.url.toString()) {
-                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
-                AS_METADATA -> jsonResponse(authorizationServerMetadata(dpop = true, authorizationCode = false))
-                TOKEN_ENDPOINT -> {
-                    assertEquals(null, request.headers["DPoP"])
-                    jsonResponse("""{"access_token":"access-token","token_type":"Bearer"}""")
-                }
-                CREDENTIAL_ENDPOINT -> {
-                    assertEquals(null, request.headers["DPoP"])
-                    jsonResponse(
-                        """{"transaction_id":"transaction-1","interval":7}""",
-                        HttpStatusCode.Accepted,
-                    )
-                }
-                else -> respondError(HttpStatusCode.NotFound)
-            }
-        }
-        val service = WalletIssuanceSessionService(
-            Wallet("test", staticKey = JWKKey.generate(KeyType.secp256r1)),
-            httpClient = client,
-        )
-
-        val session = service.start(preAuthorizedRequest().copy(dpopMode = WalletIssuanceDpopMode.DISABLED))
-        assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
-    }
-
-    @Test
-    fun disabledDpopModeOmitsAuthorizationDpopJkt() = runTest {
+    fun advertisedDpopAddsAuthorizationDpopJkt() = runTest {
         val client = client { request ->
             when (request.url.toString()) {
                 ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
@@ -864,26 +835,7 @@ class WalletIssuanceSessionServiceTest {
             httpClient = client,
         )
 
-        val session = service.start(authRequest().copy(dpopMode = WalletIssuanceDpopMode.DISABLED))
-        val authorization = service.beginAuthorization(session.id)
-        assertEquals(null, Url(authorization.url).parameters["dpop_jkt"])
-    }
-
-    @Test
-    fun ifSupportedDpopModeAddsAuthorizationDpopJkt() = runTest {
-        val client = client { request ->
-            when (request.url.toString()) {
-                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
-                AS_METADATA -> jsonResponse(authorizationServerMetadata(dpop = true))
-                else -> respondError(HttpStatusCode.NotFound)
-            }
-        }
-        val service = WalletIssuanceSessionService(
-            Wallet("test", staticKey = JWKKey.generate(KeyType.secp256r1)),
-            httpClient = client,
-        )
-
-        val session = service.start(authRequest().copy(dpopMode = WalletIssuanceDpopMode.IF_SUPPORTED))
+        val session = service.start(authRequest())
         val authorization = service.beginAuthorization(session.id)
         assertNotNull(Url(authorization.url).parameters["dpop_jkt"])
     }
@@ -922,42 +874,6 @@ class WalletIssuanceSessionServiceTest {
         val proofJwk = assertNotNull(jwtPart(assertNotNull(tokenDpop), 0)["jwk"])
         val proofJkt = JWKKey.importJWK(proofJwk.toString()).getOrThrow().getPublicKey().getThumbprint()
         assertEquals(authorizationJkt, proofJkt)
-    }
-
-    @Test
-    fun persistedSessionRetainsDpopMode() = runTest {
-        val key = JWKKey.generate(KeyType.secp256r1)
-        val records = RecordingSessionStore()
-        var tokenDpop: String? = null
-        val client = client { request ->
-            when (request.url.toString()) {
-                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
-                AS_METADATA -> jsonResponse(authorizationServerMetadata(dpop = true, authorizationCode = false))
-                TOKEN_ENDPOINT -> {
-                    tokenDpop = request.headers["DPoP"]
-                    jsonResponse("""{"access_token":"access-token","token_type":"Bearer"}""")
-                }
-                CREDENTIAL_ENDPOINT -> jsonResponse(
-                    """{"transaction_id":"transaction-1","interval":7}""",
-                    HttpStatusCode.Accepted,
-                )
-                else -> respondError(HttpStatusCode.NotFound)
-            }
-        }
-        val first = WalletIssuanceSessionService(
-            Wallet("persisted", staticKey = key),
-            sessionStore = records,
-            httpClient = client,
-        )
-        val session = first.start(preAuthorizedRequest().copy(dpopMode = WalletIssuanceDpopMode.DISABLED))
-
-        val resumed = WalletIssuanceSessionService(
-            Wallet("persisted", staticKey = key),
-            sessionStore = records,
-            httpClient = client,
-        )
-        assertIs<WalletIssuanceOutcome.Deferred>(resumed.continuePreAuthorized(session.id))
-        assertEquals(null, tokenDpop)
     }
 
     @Test

@@ -658,15 +658,6 @@ public struct WalletBootstrapResult: Equatable, Sendable {
     }
 }
 
-/// Client-selected policy for using DPoP during an issuance session.
-public enum IssuanceDpopMode: Equatable, Sendable {
-    /// Do not include DPoP authorization bindings or proofs.
-    case disabled
-
-    /// Use DPoP when the authorization server advertises supported algorithms.
-    case ifSupported
-}
-
 /// Input used to start either OpenID4VCI issuance grant.
 public struct IssuanceRequest: Equatable, Sendable {
     /// Credential-offer URL to resolve.
@@ -684,9 +675,6 @@ public struct IssuanceRequest: Equatable, Sendable {
     /// Optional holder DID URL used when the credential requires DID binding.
     public let did: String?
 
-    /// Client-selected DPoP policy for the issuance session.
-    public let dpopMode: IssuanceDpopMode
-
     /// Creates an issuance request.
     ///
     /// - Parameters:
@@ -695,21 +683,18 @@ public struct IssuanceRequest: Equatable, Sendable {
     ///   - redirectURI: Exact registered callback URI.
     ///   - keyID: Optional identifier of the selected holder key.
     ///   - did: Optional holder DID URL identifying the selected key.
-    ///   - dpopMode: Client-selected DPoP policy. Defaults to ``IssuanceDpopMode/ifSupported``.
     public init(
         offer: URL,
         clientID: String = "eudiw-abca",
         redirectURI: URL,
         keyID: String? = nil,
-        did: String? = nil,
-        dpopMode: IssuanceDpopMode = .ifSupported
+        did: String? = nil
     ) {
         self.offer = offer
         self.clientID = clientID
         self.redirectURI = redirectURI
         self.keyID = keyID
         self.did = did
-        self.dpopMode = dpopMode
     }
 
 }

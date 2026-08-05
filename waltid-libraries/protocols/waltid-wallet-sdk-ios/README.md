@@ -101,10 +101,9 @@ let presentation = try await wallet.present(
 for the app's review UI. `WalletConfiguration` uses
 `Locale.preferredLanguages` by default and also accepts an explicit locale order.
 
-Issuance uses DPoP when the authorization server advertises supported algorithms
-by default. For an issuer that does not support DPoP, pass
-`dpopMode: .disabled` in `IssuanceRequest`; this omits both the authorization
-request binding and issuance request proofs.
+Issuance uses DPoP consistently for authorization binding, token exchange, and
+protected credential requests whenever the authorization server advertises
+supported DPoP signing algorithms.
 
 ## Local persistence
 
