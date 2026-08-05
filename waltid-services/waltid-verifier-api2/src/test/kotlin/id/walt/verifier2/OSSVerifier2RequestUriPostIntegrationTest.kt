@@ -96,6 +96,7 @@ class OSSVerifier2RequestUriPostIntegrationTest {
                 val decoded = requestObject.decodeJws()
                 assertEquals("oauth-authz-req+jwt", decoded.header["typ"]?.jsonPrimitive?.content)
                 assertEquals(configuredKey.getKeyId(), decoded.header["kid"]?.jsonPrimitive?.content)
+                assertEquals("ES256", decoded.header["alg"]?.jsonPrimitive?.content)
                 assertEquals(expectedNonce, decoded.payload["wallet_nonce"]?.jsonPrimitive?.content)
                 assertEquals("configured-oss-verifier", decoded.payload["client_id"]?.jsonPrimitive?.content)
                 assertNotNull(decoded.payload["dcql_query"])
