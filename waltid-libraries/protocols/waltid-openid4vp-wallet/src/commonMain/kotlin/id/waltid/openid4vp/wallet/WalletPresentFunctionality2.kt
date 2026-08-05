@@ -782,6 +782,7 @@ object WalletPresentFunctionality2 {
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
         holderCrypto2Key: Crypto2Key?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
     ): Result<WalletPresentResult> = walletPresentHandlingWithKey(
         holderKey,
         holderDid,
@@ -795,7 +796,7 @@ object WalletPresentFunctionality2 {
         resolvedAuthorizationRequest,
         holderCrypto2Key,
         clientIdTrustConfiguration,
-        "https://self-issued.me/v2",
+        expectedRequestObjectAudience,
     )
 
     suspend fun walletPresentHandling(

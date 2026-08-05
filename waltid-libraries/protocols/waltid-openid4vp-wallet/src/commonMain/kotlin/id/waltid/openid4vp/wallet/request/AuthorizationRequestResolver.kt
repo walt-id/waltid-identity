@@ -391,7 +391,7 @@ object AuthorizationRequestResolver {
             authorizationRequest = json.decodeFromJsonElement(
                 deserializer = AuthorizationRequest.serializer(),
                 element = authReqJws.payload,
-            ),
+            ).also { it.dcqlQuery?.precheck() },
             requestObject = requestObject,
         )
     }

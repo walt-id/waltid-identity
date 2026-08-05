@@ -309,6 +309,7 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
     ): WalletPresentResult {
         val keyMaterial = wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
@@ -332,6 +333,7 @@ object WalletPresentationHandler {
             runPolicies = request.runPolicies,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
+            expectedRequestObjectAudience = expectedRequestObjectAudience,
         )
 
         return result.emitPresentationOutcome(onEvent)
@@ -359,6 +361,7 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
     ): WalletPresentResult {
         val keyMaterial = wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available for isolated presentation")
@@ -381,6 +384,7 @@ object WalletPresentationHandler {
             runPolicies = null,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
+            expectedRequestObjectAudience = expectedRequestObjectAudience,
         )
 
         return result.emitPresentationOutcome(onEvent)
@@ -405,6 +409,7 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
     ): PreviewPresentationResult {
         // Selected once up front so advertised wallet metadata, request validation and the retained
         // preview all refer to the same key, but only *required* where a key is genuinely needed: a
@@ -422,6 +427,7 @@ object WalletPresentationHandler {
                     { executionKey().presentationCapabilities() },
                     requestUrl,
                     clientIdTrustConfiguration,
+                    expectedRequestObjectAudience,
                 )
             },
         )
@@ -626,6 +632,7 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
     ): Result<WalletPresentResult> = keyMaterial.crypto2Key?.let { crypto2Key ->
         WalletPresentFunctionality2.walletPresentHandling(
             holderKey = crypto2Key,
@@ -637,6 +644,7 @@ object WalletPresentationHandler {
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             resolvedAuthorizationRequest = resolvedAuthorizationRequest,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
+            expectedRequestObjectAudience = expectedRequestObjectAudience,
         )
     } ?: WalletPresentFunctionality2.walletPresentHandling(
         holderKey = requireNotNull(keyMaterial.legacyKey) {
@@ -651,6 +659,7 @@ object WalletPresentationHandler {
         resolvedAuthorizationRequest = resolvedAuthorizationRequest,
         holderCrypto2Key = null,
         clientIdTrustConfiguration = clientIdTrustConfiguration,
+        expectedRequestObjectAudience = expectedRequestObjectAudience,
     )
 
     // ---------------------------------------------------------------------------
@@ -938,12 +947,14 @@ object WalletPresentationHandler {
         capabilities: () -> WalletPresentationFormatRegistry.RuntimeCapabilities,
         requestUrl: Url,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
     ): ResolvedAuthorizationRequest {
         val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
         return AuthorizationRequestResolver.resolve(
             requestUrl = requestUrl,
             unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
             trustConfiguration = clientIdTrustConfiguration,
+            expectedRequestObjectAudience = expectedRequestObjectAudience,
             fetchRequestUri = { requestUri, requestUriMethod ->
                 AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
                     webResolveAuthReq = fetcher,
