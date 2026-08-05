@@ -89,6 +89,11 @@ public struct IssuerMetadataSigner: Equatable, Sendable {
     public let trustType: MetadataTrustType
 
     /// Creates trusted signer details.
+    ///
+    /// - Parameters:
+    ///   - keyID: Identifier of the trusted verification key, as reported by the trust resolver.
+    ///   - algorithm: JWS algorithm verified by the trust resolver.
+    ///   - trustType: Authority category established by the trust resolver.
     public init(keyID: String?, algorithm: String, trustType: MetadataTrustType) {
         self.keyID = keyID
         self.algorithm = algorithm
