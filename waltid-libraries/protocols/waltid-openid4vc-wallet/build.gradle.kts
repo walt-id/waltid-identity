@@ -37,6 +37,8 @@ kotlin {
             // OpenID4VCI 1.0 — wallet-side client logic (offer parsing, token, proof)
             // package: id.waltid.openid4vci.wallet.*
             api(project(":waltid-libraries:protocols:waltid-openid4vci-wallet"))
+            // Legacy OpenID4VC models used by wallet1 compatibility flows.
+            api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
             // OpenID4VP 1.0 — core protocol types (AuthorizationRequest, response modes, etc.)
             // package: id.walt.verifier.openid.*
