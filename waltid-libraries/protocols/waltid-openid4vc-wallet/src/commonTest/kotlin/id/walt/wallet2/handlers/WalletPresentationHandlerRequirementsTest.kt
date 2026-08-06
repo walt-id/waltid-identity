@@ -1031,7 +1031,7 @@ class WalletPresentationHandlerRequirementsTest {
     @Test
     fun statelessPreviewBindsRequestedSigningKey() = runTest {
         val defaultKey = JWKKey.generate(KeyType.Ed25519)
-        val signingKey = JWKKey.generate(KeyType.secp256r1)
+        val signingKey = JWKKey.generate(KeyType.secp256k1)
         val keyStore = InMemoryKeyStore().also {
             it.addKey(defaultKey)
             it.addKey(signingKey)
