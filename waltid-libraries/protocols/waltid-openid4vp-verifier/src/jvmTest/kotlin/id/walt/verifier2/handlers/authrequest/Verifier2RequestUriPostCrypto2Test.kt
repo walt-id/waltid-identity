@@ -10,15 +10,93 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.migration.v1.V1KeyMigration
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.dcql.models.CredentialFormat
+import id.walt.dcql.models.CredentialQuery
+import id.walt.dcql.models.DcqlQuery
+import id.walt.dcql.models.meta.NoMeta
+import id.walt.verifier2.data.CrossDeviceFlowSetup
+import id.walt.verifier2.data.GeneralFlowConfig
+import id.walt.verifier2.data.Verification2Session
+import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreator
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.server.routing.post
+import io.ktor.server.routing.routing
+import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 
 class Verifier2RequestUriPostCrypto2Test {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val migration = V1KeyMigration()
+
+    @Test
+    fun `signed request URI POST returns a nonce-bound request object`() = runTest {
+        val verifierKey = JWKKey.generate(KeyType.secp256r1)
+        val clientId = "decentralized_identifier:did:jwk:${verifierKey.getKeyId()}"
+        val session = VerificationSessionCreator.createVerificationSession(
+            setup = CrossDeviceFlowSetup(
+                core = GeneralFlowConfig(
+                    signedRequest = true,
+                    clientId = clientId,
+                    key = DirectSerializedKey(verifierKey),
+                    dcqlQuery = DcqlQuery(
+                        credentials = listOf(
+                            CredentialQuery("pid", CredentialFormat.DC_SD_JWT, meta = NoMeta)
+                        )
+                    )
+                )
+            ),
+            clientId = clientId,
+            urlPrefix = "https://verifier.example.com/verification-session",
+            urlHost = "openid4vp://authorize",
+            key = verifierKey,
+        )
+
+        val bootstrapUrl = assertNotNull(session.bootstrapAuthorizationRequestUrl)
+        assertEquals("post", bootstrapUrl.parameters["request_uri_method"])
+
+        testApplication {
+            application {
+                routing {
+                    post("/request") {
+                        Verifier2RequestUriPostHandler.run {
+                            call.respondRequestUriPost(
+                                verificationSession = session,
+                                updateSessionCallback = { current, _, block -> current.apply(block) },
+                            )
+                        }
+                    }
+                }
+            }
+
+            val response = client.post("/request") {
+                contentType(ContentType.Application.FormUrlEncoded)
+                setBody("wallet_nonce=wallet-nonce&wallet_metadata=%7B%7D")
+            }
+
+            assertEquals(200, response.status.value)
+            assertEquals("application/oauth-authz-req+jwt", response.contentType()?.withoutParameters()?.toString())
+            val jwt = response.bodyAsText()
+            assertEquals(3, jwt.split('.').size)
+            verifierKey.getPublicKey().verifyJws(jwt).getOrThrow()
+            val payload = Json.parseToJsonElement(
+                java.util.Base64.getUrlDecoder().decode(jwt.split('.')[1]).decodeToString()
+            ).jsonObject
+            assertEquals("wallet-nonce", payload["wallet_nonce"]?.jsonPrimitive?.content)
+        }
+
+        assertEquals(Verification2Session.VerificationSessionStatus.IN_USE, session.status)
+        assertNotNull(session.signedAuthorizationRequestJwt)
+    }
 
     @Test
     fun `direct crypto2 re-sign verifies existing JAR and preserves protected headers`() = runTest {
@@ -111,20 +189,23 @@ class Verifier2RequestUriPostCrypto2Test {
     }
 
     @Test
-    fun `resolved key must match original request kid`() = runTest {
+    fun `re-signing preserves kid and signature verification selects the actual key`() = runTest {
         val originalKey = JWKKey.generate(KeyType.secp256r1)
         val replacementKey = JWKKey.generate(KeyType.secp256r1)
 
+        val resigned = Verifier2RequestUriPostHandler.signRequestObject(
+            signingKey = replacementKey,
+            payload = buildJsonObject { put("wallet_nonce", "nonce") },
+            headers = buildJsonObject {
+                put("alg", "ES256")
+                put("kid", originalKey.getKeyId())
+            },
+        )
+
         assertFailsWith<IllegalArgumentException> {
-            Verifier2RequestUriPostHandler.signRequestObject(
-                signingKey = replacementKey,
-                payload = buildJsonObject { put("wallet_nonce", "nonce") },
-                headers = buildJsonObject {
-                    put("alg", "ES256")
-                    put("kid", originalKey.getKeyId())
-                },
-            )
+            Verifier2RequestUriPostHandler.verifyExistingRequestObject(resigned, originalKey)
         }
+        Verifier2RequestUriPostHandler.verifyExistingRequestObject(resigned, replacementKey)
     }
 
     @Test
