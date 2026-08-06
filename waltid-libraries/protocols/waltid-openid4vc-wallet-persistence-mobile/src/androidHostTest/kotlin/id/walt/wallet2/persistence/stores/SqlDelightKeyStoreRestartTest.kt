@@ -16,10 +16,6 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
-import id.walt.crypto2.signum.SignumKeyInvalidatedException
-import id.walt.crypto2.signum.SignumKeyNotFoundException
-import id.walt.crypto2.signum.SignumStoredKeyMetadataException
-import id.walt.crypto2.signum.SignumUserCancelledException
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
@@ -196,7 +192,10 @@ class SqlDelightKeyStoreRestartTest {
             )
             val store = SqlDelightKeyStore(
                 FakePlatformManagedKeyProvider(
-                    deleteFailure = SignumStoredKeyMetadataException("bad provider data"),
+                    deleteFailure = KeyUseAuthorizationException(
+                        KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
+                        "bad provider data",
+                    ),
                 ),
                 database.queries,
             )
@@ -283,7 +282,10 @@ class SqlDelightKeyStoreRestartTest {
             val store = SqlDelightKeyStore(
                 FakePlatformManagedKeyProvider(
                     authorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-                    restoreFailure = SignumKeyInvalidatedException(stored.id.value),
+                    restoreFailure = KeyUseAuthorizationException(
+                        KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
+                        "protected key invalidated",
+                    ),
                 ),
                 database.queries,
             )
@@ -300,7 +302,10 @@ class SqlDelightKeyStoreRestartTest {
         database().use { database ->
             val provider = FakePlatformManagedKeyProvider(
                 authorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-                signFailure = SignumUserCancelledException(IllegalStateException("cancelled")),
+                signFailure = KeyUseAuthorizationException(
+                    KeyUseAuthorizationFailure.AuthorizationNotCompleted,
+                    "cancelled",
+                ),
             )
             val store = SqlDelightKeyStore(provider, database.queries)
             val key = store.generateKey(
@@ -328,7 +333,10 @@ class SqlDelightKeyStoreRestartTest {
         database().use { database ->
             val provider = FakePlatformManagedKeyProvider(
                 authorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-                signFailure = SignumKeyNotFoundException("protected-missing-sign"),
+                signFailure = KeyUseAuthorizationException(
+                    KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
+                    "protected key missing",
+                ),
             )
             val store = SqlDelightKeyStore(provider, database.queries)
             val key = store.generateKey(
@@ -362,7 +370,10 @@ class SqlDelightKeyStoreRestartTest {
             )
             val store = SqlDelightKeyStore(
                 FakePlatformManagedKeyProvider(
-                    metadataFailure = SignumStoredKeyMetadataException("bad policy"),
+                    metadataFailure = KeyUseAuthorizationException(
+                        KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
+                        "bad policy",
+                    ),
                 ),
                 database.queries,
             )
