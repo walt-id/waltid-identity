@@ -28,7 +28,7 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 
 ## Capabilities
 
-- Bootstrap a mobile wallet with platform-backed keys and DID material.
+- Bootstrap a mobile wallet with Crypto2 managed or software signing keys and DID material.
 - Receive credentials using OpenID4VCI.
 - List credentials stored in mobile persistence.
 - Present credentials using OpenID4VP.
@@ -110,7 +110,7 @@ does not establish verifier trust and does not expose verifier key material.
 
 `MobileWalletConfig()` uses managed encrypted SQLDelight persistence by default on Android and iOS. Normal SDK users do not provide a database key: the SDK generates one per wallet database, stores it in platform-protected storage, and uses SQLCipher for the local wallet database.
 
-Managed signing keys are device-local by default. They protect data at rest on the current device, but they are not a cross-device recovery mechanism. Use `MobileWalletDatabaseKey.Provided` when an app needs enterprise/KMS ownership or recoverable database-key material. Credential and DID store overrides are independent; signing keys always remain platform-managed. Supported mobile platforms intentionally do not fall back to plaintext wallet databases.
+Managed signing keys are device-local by default. They protect data at rest on the current device, but they are not a cross-device recovery mechanism. Use `MobileWalletDatabaseKey.Provided` when an app needs enterprise/KMS ownership or recoverable database-key material. Credential and DID store overrides are independent. Protected signing keys remain platform-managed; unprotected key types unsupported by the native provider use Crypto2 software-key descriptors stored in the encrypted wallet database. Supported mobile platforms intentionally do not fall back to plaintext wallet databases.
 
 `MobileWalletConfig()` does not accept any OpenID4VP `transaction_data` profiles by default. Wallet apps must pass the profile types they understand through `transactionDataProfiles`; requests containing unknown transaction data types are rejected before the user can submit a presentation. Profile fields are preserved for app UI and display metadata.
 
@@ -169,7 +169,7 @@ val config = MobileWalletConfig(
 ```
 <!-- doc-snippet:end kotlin-custom-credential-store -->
 
-KMP consumers can override credential and DID storage while signing keys remain platform-managed:
+KMP consumers can override credential and DID storage while protected signing keys remain platform-managed:
 
 <!-- doc-snippet:start kotlin-store-overrides -->
 ```kotlin

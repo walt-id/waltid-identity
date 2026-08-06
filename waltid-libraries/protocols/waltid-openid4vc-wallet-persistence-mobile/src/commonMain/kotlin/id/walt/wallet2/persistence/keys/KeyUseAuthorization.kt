@@ -54,7 +54,7 @@ public class KeyUseAuthorizationException(
 ) : Exception(message, cause)
 
 /**
- * Capabilities required from a wallet key.
+ * Capabilities required from a wallet signing key.
  *
  * @property spec Cryptographic key specification.
  * @property usages Operations the key must support.
@@ -66,12 +66,12 @@ public data class WalletKeyRequirements(
     public val authorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
 ) {
     init {
-        require(usages.isNotEmpty()) { "Platform key usages cannot be empty" }
+        require(usages.isNotEmpty()) { "Wallet key usages cannot be empty" }
     }
 }
 
 /**
- * Request to create one platform-managed key.
+ * Request to create one wallet signing key.
  *
  * @property id Stable identifier assigned to the generated key.
  * @property requirements Capabilities the generated key must satisfy.
@@ -85,7 +85,7 @@ public data class WalletKeyCreationRequest(
 
 /** Result of checking whether exact key requirements can be enforced without fallback. */
 public sealed interface KeyUseAuthorizationSupport {
-    /** The platform can enforce every requested capability without fallback. */
+    /** The wallet can satisfy the requested key and authorization requirements. */
     public data object Supported : KeyUseAuthorizationSupport
 
     /** The platform cannot enforce the requested capability set. */

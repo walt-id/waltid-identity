@@ -76,22 +76,23 @@ public class AndroidPlatformKeyProvider(
         signumProvider.delete(stored, expectedAlias = stored.id.value)
     }
 
-    private fun WalletKeyCreationRequest.toSignumPolicy(): SignumKeyPolicy = when (requirements.authorizationPolicy) {
+    private fun WalletKeyCreationRequest.toSignumPolicy(): SignumKeyPolicy =
+        requirements.authorizationPolicy.toSignumPolicy(prompt)
+
+    private fun KeyUseAuthorizationPolicy.toSignumPolicy(
+        prompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
+    ): SignumKeyPolicy = when (this) {
         KeyUseAuthorizationPolicy.None -> SignumKeyPolicy()
         KeyUseAuthorizationPolicy.BiometricCurrentSet -> SignumKeyPolicy(
             hardware = SignumHardwarePolicy.REQUIRED,
-            authentication = SignumAuthenticationPolicy.BiometricCurrentSet(
-                reason = prompt.reason,
+            authentication = SignumAuthenticationPolicy.UserPresence(
+                biometric = true,
+                allowNewBiometrics = false,
+                deviceCredential = false,
+                timeoutSeconds = 0,
+                prompt = prompt.reason,
                 cancelText = prompt.cancelText,
             ),
-        )
-    }
-
-    private fun KeyUseAuthorizationPolicy.toSignumPolicy(): SignumKeyPolicy = when (this) {
-        KeyUseAuthorizationPolicy.None -> SignumKeyPolicy()
-        KeyUseAuthorizationPolicy.BiometricCurrentSet -> SignumKeyPolicy(
-            hardware = SignumHardwarePolicy.REQUIRED,
-            authentication = SignumAuthenticationPolicy.BiometricCurrentSet(),
         )
     }
 }
@@ -104,12 +105,19 @@ private fun hasResumedActivity(provider: () -> FragmentActivity?): Boolean {
 
 private fun SignumKeyPolicy.toWalletPolicy(): KeyUseAuthorizationPolicy = when (val authentication = authentication) {
     SignumAuthenticationPolicy.None -> KeyUseAuthorizationPolicy.None
-    is SignumAuthenticationPolicy.BiometricCurrentSet -> {
-        if (hardware == SignumHardwarePolicy.REQUIRED) KeyUseAuthorizationPolicy.BiometricCurrentSet else {
-            throw KeyUseAuthorizationException(
-                KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
-                "Stored Signum key uses an unsupported Android authentication policy",
-            )
-        }
+    else -> if (hardware == SignumHardwarePolicy.REQUIRED && authentication.isWalletBiometricCurrentSet()) {
+        KeyUseAuthorizationPolicy.BiometricCurrentSet
+    } else {
+        throw KeyUseAuthorizationException(
+            KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
+            "Stored Signum key uses an unsupported wallet authorization policy",
+        )
     }
 }
+
+private fun SignumAuthenticationPolicy.isWalletBiometricCurrentSet(): Boolean =
+    this is SignumAuthenticationPolicy.UserPresence &&
+        biometric &&
+        !allowNewBiometrics &&
+        !deviceCredential &&
+        timeoutSeconds == 0

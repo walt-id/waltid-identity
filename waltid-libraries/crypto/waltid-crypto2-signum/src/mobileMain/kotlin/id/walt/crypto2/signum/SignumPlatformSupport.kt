@@ -67,13 +67,13 @@ internal fun PlatformSigningKeyConfigurationBase<*>.configureSignumKey(
             policy.attestationChallenge?.let { challenge ->
                 attestation { this.challenge = challenge.toByteArray() }
             }
-            (policy.authentication as? SignumAuthenticationPolicy.BiometricCurrentSet)?.let { auth ->
+            (policy.authentication as? SignumAuthenticationPolicy.UserPresence)?.let { auth ->
                 protection {
-                    timeout = 0.seconds
+                    timeout = auth.timeoutSeconds.seconds
                     factors {
-                        biometry = true
-                        biometryWithNewFactors = false
-                        deviceLock = false
+                        biometry = auth.biometric
+                        biometryWithNewFactors = auth.allowNewBiometrics
+                        deviceLock = auth.deviceCredential
                     }
                 }
             }
@@ -98,9 +98,9 @@ internal fun PlatformSignerConfigurationBase.configureSignumOperation(
         }
         else -> error("Unsupported Signum signature algorithm: $algorithm")
     }
-    (authentication as? SignumAuthenticationPolicy.BiometricCurrentSet)?.let { auth ->
+    (authentication as? SignumAuthenticationPolicy.UserPresence)?.let { auth ->
         unlockPrompt {
-            message = auth.reason
+            message = auth.prompt
             cancelText = auth.cancelText
         }
     }
@@ -113,10 +113,10 @@ internal class SignumPlatformKeyHandle(
     override val attestation: SignumKeyAttestation?,
     private val authentication: SignumAuthenticationPolicy,
     private val signerFor: suspend (SignatureAlgorithm) -> PlatformSigningProviderSigner<*, *>,
-    defaultSigner: PlatformSigningProviderSigner<*, *>,
+    private val nativePublicKey: CryptoPublicKey,
     keyAgreementEnabled: Boolean,
 ) : SignumPlatformKey {
-    override val publicKey = EncodedKey.SpkiDer(BinaryData(defaultSigner.publicKey.encodeToTlv().derEncoded))
+    override val publicKey = EncodedKey.SpkiDer(BinaryData(nativePublicKey.encodeToTlv().derEncoded))
     override val signatureAlgorithms = spec.nativeSignatureAlgorithms()
     override val keyAgreementAlgorithms = if (keyAgreementEnabled) setOf(KeyAgreementAlgorithm.Ecdh) else emptySet()
 
@@ -137,7 +137,7 @@ internal class SignumPlatformKeyHandle(
             is KeySpec.Rsa -> CryptoSignature.RSA(signature)
             else -> error("Unsupported Signum key specification")
         }
-        return signumAlgorithm.verifierFor(signerFor(algorithm).publicKey).getOrThrow()
+        return signumAlgorithm.verifierFor(nativePublicKey).getOrThrow()
             .verify(SignatureInput(data), cryptoSignature).isSuccess
     }
 

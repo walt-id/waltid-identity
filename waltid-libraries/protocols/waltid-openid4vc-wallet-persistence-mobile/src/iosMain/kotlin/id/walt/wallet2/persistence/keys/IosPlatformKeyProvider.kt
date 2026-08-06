@@ -73,16 +73,8 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
         signumProvider.delete(stored, expectedAlias = stored.id.value)
     }
 
-    private fun WalletKeyCreationRequest.toSignumPolicy(): SignumKeyPolicy = when (requirements.authorizationPolicy) {
-        KeyUseAuthorizationPolicy.None -> SignumKeyPolicy()
-        KeyUseAuthorizationPolicy.BiometricCurrentSet -> SignumKeyPolicy(
-            hardware = SignumHardwarePolicy.REQUIRED,
-            authentication = SignumAuthenticationPolicy.BiometricCurrentSet(
-                reason = prompt.reason,
-                cancelText = prompt.cancelText,
-            ),
-        )
-    }
+    private fun WalletKeyCreationRequest.toSignumPolicy(): SignumKeyPolicy =
+        requirements.authorizationPolicy.toSignumPolicy(prompt)
 
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
     private fun biometricAvailabilityFailure(): KeyUseAuthorizationUnsupportedReason? = memScoped {
@@ -99,26 +91,42 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
         }
     }
 
-    private fun KeyUseAuthorizationPolicy.toSignumPolicy(): SignumKeyPolicy = when (this) {
+    private fun KeyUseAuthorizationPolicy.toSignumPolicy(
+        prompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
+    ): SignumKeyPolicy = when (this) {
         KeyUseAuthorizationPolicy.None -> SignumKeyPolicy()
         KeyUseAuthorizationPolicy.BiometricCurrentSet -> SignumKeyPolicy(
             hardware = SignumHardwarePolicy.REQUIRED,
-            authentication = SignumAuthenticationPolicy.BiometricCurrentSet(),
+            authentication = SignumAuthenticationPolicy.UserPresence(
+                biometric = true,
+                allowNewBiometrics = false,
+                deviceCredential = false,
+                timeoutSeconds = 0,
+                prompt = prompt.reason,
+                cancelText = prompt.cancelText,
+            ),
         )
     }
 }
 
 private fun SignumKeyPolicy.toWalletPolicy(): KeyUseAuthorizationPolicy = when (val authentication = authentication) {
     SignumAuthenticationPolicy.None -> KeyUseAuthorizationPolicy.None
-    is SignumAuthenticationPolicy.BiometricCurrentSet -> if (hardware == SignumHardwarePolicy.REQUIRED) {
+    else -> if (hardware == SignumHardwarePolicy.REQUIRED && authentication.isWalletBiometricCurrentSet()) {
         KeyUseAuthorizationPolicy.BiometricCurrentSet
     } else {
         throw KeyUseAuthorizationException(
             KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
-            "Stored Signum key uses an unsupported iOS authentication policy",
+            "Stored Signum key uses an unsupported wallet authorization policy",
         )
     }
 }
+
+private fun SignumAuthenticationPolicy.isWalletBiometricCurrentSet(): Boolean =
+    this is SignumAuthenticationPolicy.UserPresence &&
+        biometric &&
+        !allowNewBiometrics &&
+        !deviceCredential &&
+        timeoutSeconds == 0
 
 private val isSimulator: Boolean by lazy {
     NSProcessInfo.processInfo.environment.keys.any { it == "SIMULATOR_UDID" || it == "SIMULATOR_DEVICE_NAME" }

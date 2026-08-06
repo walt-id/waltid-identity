@@ -20,7 +20,7 @@
 
 ## Overview
 
-This library provides Android/iOS persistence implementations for the wallet store interfaces defined in [waltid-openid4vc-wallet](../waltid-openid4vc-wallet). It uses SQLDelight for credential and DID storage, SQLCipher-capable platform drivers for encrypted wallet databases, and platform-managed signing keys.
+This library provides Android/iOS persistence implementations for the wallet store interfaces defined in [waltid-openid4vc-wallet](../waltid-openid4vc-wallet). It uses SQLDelight for credential and DID storage, SQLCipher-capable platform drivers for encrypted wallet databases, and managed or software signing-key descriptors.
 
 Use this library when you need persistent wallet storage inside a mobile wallet application.
 
@@ -28,7 +28,7 @@ Use this library when you need persistent wallet storage inside a mobile wallet 
 
 - **SQLDelight** — Kotlin Multiplatform database layer for Android and iOS
 - **Encrypted local databases** — SQLCipher-backed Android and iOS drivers
-- **Platform key stores** — Android KeyStore and iOS Keychain / Secure Enclave integration
+- **Platform key stores** — Android KeyStore and iOS Keychain / Secure Enclave integration for managed keys
 - **Credential persistence** — SQL-backed credential storage with metadata
 - **DID persistence** — SQL-backed DID document storage
 - **Shared schema** — Common mobile schema across supported platforms
@@ -83,9 +83,14 @@ The higher-level `waltid-openid4vc-wallet-mobile` facade performs this wiring au
 key. The SQL schema remains `key_id`, `created_at`, and `stored_key`; key type,
 backing, authorization policy, and native alias metadata are authoritative in
 the descriptor rather than duplicated SQL columns. Protected requests are
-preflighted and never downgraded to a software key. Missing ordinary platform
-keys return `null`; missing protected keys surface
+preflighted and never downgraded to a software key. Unprotected requests use a
+managed key when supported and otherwise use a `StoredKey.Software` descriptor
+from Crypto2. Missing ordinary managed keys return `null`; missing protected keys surface
 `KeyUseAuthorizationFailure.ProtectedKeyUnavailable`.
+
+The host-configurable authorization prompt is captured when a protected key is
+created and remains associated with that persisted Signum policy. Runtime prompt
+replacement is intentionally outside this PR.
 
 ## Encryption and cleanup
 

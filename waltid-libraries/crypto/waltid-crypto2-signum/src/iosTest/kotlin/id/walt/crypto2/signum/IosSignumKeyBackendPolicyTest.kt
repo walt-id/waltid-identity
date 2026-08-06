@@ -1,7 +1,10 @@
 package id.walt.crypto2.signum
 
+import at.asitplus.signum.supreme.CFCryptoOperationFailed
+import platform.Security.errSecItemNotFound
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 
 class IosSignumKeyBackendPolicyTest {
     private val backend = IosSignumKeyBackend()
@@ -31,7 +34,12 @@ class IosSignumKeyBackendPolicyTest {
     @Test
     fun `biometric current set requires every-use authentication and Secure Enclave`() {
         val policy = SignumKeyPolicy(
-            authentication = SignumAuthenticationPolicy.BiometricCurrentSet(),
+            authentication = SignumAuthenticationPolicy.UserPresence(
+                biometric = true,
+                allowNewBiometrics = false,
+                deviceCredential = false,
+                timeoutSeconds = 0,
+            ),
         )
 
         assertFailsWith<SignumKeyPolicyMismatchException> {
@@ -56,5 +64,15 @@ class IosSignumKeyBackendPolicyTest {
             needsAuthenticationForEveryUse = true,
             isSecureEnclave = true,
         )
+    }
+
+    @Test
+    fun `keychain item not found maps to a typed Signum missing-key failure`() {
+        val mapped = CFCryptoOperationFailed(
+            thing = "load Signum key",
+            osStatus = errSecItemNotFound,
+        ).mapSignumFailure("missing")
+
+        assertIs<SignumKeyNotFoundException>(mapped)
     }
 }

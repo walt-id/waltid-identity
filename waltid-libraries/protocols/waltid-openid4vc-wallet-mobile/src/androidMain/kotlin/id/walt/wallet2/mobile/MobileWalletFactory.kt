@@ -22,8 +22,8 @@ public actual class MobileWalletFactory(
     /**
      * Creates an Android mobile wallet for [config].
      *
-     * The database is named from [MobileWalletConfig.walletId], and signing keys are created or loaded
-     * through the Android platform key provider.
+     * The database is named from [MobileWalletConfig.walletId]. The factory wires the Android managed-key
+     * provider together with the Crypto2 software-key fallback used for supported unprotected requests.
      */
     public actual suspend fun create(config: MobileWalletConfig): MobileWallet =
         create(config, ClientIdTrustConfiguration())

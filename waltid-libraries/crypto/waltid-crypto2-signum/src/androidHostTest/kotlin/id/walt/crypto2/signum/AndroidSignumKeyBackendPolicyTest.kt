@@ -1,8 +1,20 @@
 package id.walt.crypto2.signum
 
 import android.security.keystore.KeyProperties
+import at.asitplus.signum.indispensable.CryptoPublicKey
+import id.walt.crypto2.algorithms.DigestAlgorithm
+import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toSpkiDer
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class AndroidSignumKeyBackendPolicyTest {
     @Test
@@ -12,7 +24,12 @@ class AndroidSignumKeyBackendPolicyTest {
                 alias = "hardware-required",
                 policy = SignumKeyPolicy(
                     hardware = SignumHardwarePolicy.REQUIRED,
-                    authentication = SignumAuthenticationPolicy.BiometricCurrentSet(),
+                    authentication = SignumAuthenticationPolicy.UserPresence(
+                        biometric = true,
+                        allowNewBiometrics = false,
+                        deviceCredential = false,
+                        timeoutSeconds = 0,
+                    ),
                 ),
                 isInsideSecureHardware = false,
                 securityLevel = KeyProperties.SECURITY_LEVEL_SOFTWARE,
@@ -72,7 +89,12 @@ class AndroidSignumKeyBackendPolicyTest {
     fun `biometric current set rejects missing auth per use`() {
         val policy = SignumKeyPolicy(
             hardware = SignumHardwarePolicy.REQUIRED,
-            authentication = SignumAuthenticationPolicy.BiometricCurrentSet(),
+            authentication = SignumAuthenticationPolicy.UserPresence(
+                biometric = true,
+                allowNewBiometrics = false,
+                deviceCredential = false,
+                timeoutSeconds = 0,
+            ),
         )
 
         assertFailsWith<SignumKeyPolicyMismatchException> {
@@ -119,7 +141,12 @@ class AndroidSignumKeyBackendPolicyTest {
             alias = "biometric",
             policy = SignumKeyPolicy(
                 hardware = SignumHardwarePolicy.REQUIRED,
-                authentication = SignumAuthenticationPolicy.BiometricCurrentSet(),
+                authentication = SignumAuthenticationPolicy.UserPresence(
+                    biometric = true,
+                    allowNewBiometrics = false,
+                    deviceCredential = false,
+                    timeoutSeconds = 0,
+                ),
             ),
             isInsideSecureHardware = true,
             securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
@@ -128,5 +155,38 @@ class AndroidSignumKeyBackendPolicyTest {
             isInvalidatedByBiometricEnrollment = true,
             userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
         )
+    }
+
+    @Test
+    fun `verification uses the cached public key without requesting interaction`() = runTest {
+        val provider = CryptographySoftwareKeyProvider()
+        val spec = KeySpec.Ec(EcCurve.P256)
+        val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)
+        val softwareKey = provider.generate(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("verification-source"),
+                spec = spec,
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            ),
+        )
+        val signer = requireNotNull(softwareKey.capabilities.signer)
+        val publicKey = requireNotNull(softwareKey.capabilities.publicKeyExporter)
+            .exportPublicKey()
+            .toSpkiDer(spec)
+        val nativePublicKey = CryptoPublicKey.decodeFromDer(publicKey.data.toByteArray())
+        val data = "verify without interaction".encodeToByteArray()
+        val signature = signer.sign(data, algorithm)
+        val handle = SignumPlatformKeyHandle(
+            alias = "verification-source",
+            spec = spec,
+            protectionLevel = SignumProtectionLevel.UNKNOWN,
+            attestation = null,
+            authentication = SignumAuthenticationPolicy.UserPresence(),
+            signerFor = { error("verification must not request a signer") },
+            nativePublicKey = nativePublicKey,
+            keyAgreementEnabled = false,
+        )
+
+        assertTrue(handle.verify(data, signature, algorithm))
     }
 }

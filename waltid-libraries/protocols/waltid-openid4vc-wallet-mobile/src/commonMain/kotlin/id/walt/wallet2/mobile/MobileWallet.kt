@@ -221,7 +221,7 @@ public class MobileWallet internal constructor(
     )
 
     /**
-     * Initializes the wallet by creating or reusing platform-backed key material and a DID.
+     * Initializes the wallet by creating or reusing wallet signing key material and a DID.
      *
      * If the wallet already contains persisted DIDs, the first persisted DID and key are reused.
      *

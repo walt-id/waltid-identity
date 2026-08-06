@@ -9,6 +9,9 @@ import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.keys.StorableKey
 import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.keys.Key as StoredKeyMaterial
+import id.walt.crypto2.keys.KeyEncodingFormat
+import id.walt.crypto2.providers.CryptoOperation
+import id.walt.crypto2.providers.CryptoRequirement
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
@@ -26,6 +29,7 @@ import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
 import id.walt.wallet2.persistence.keys.WalletKeyRequirements
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
@@ -79,12 +83,20 @@ public class SqlDelightKeyStore(
     override suspend fun addKey(key: Key): String =
         throw UnsupportedOperationException("Mobile key storage supports storable keys only")
 
-    /** Checks whether an exact key request can be enforced without fallback. */
+    /** Checks whether the wallet can satisfy the request using a managed key or an allowed software key. */
     public suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport =
-        if (requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None) {
-            KeyUseAuthorizationSupport.Supported
-        } else {
-            managedKeyProvider.preflight(requirements)
+        managedKeyProvider.preflight(requirements).let { managedSupport ->
+            if (managedSupport == KeyUseAuthorizationSupport.Supported) {
+                managedSupport
+            } else if (requirements.authorizationPolicy != KeyUseAuthorizationPolicy.None) {
+                managedSupport
+            } else if (supportsSoftware(requirements)) {
+                KeyUseAuthorizationSupport.Supported
+            } else {
+                KeyUseAuthorizationSupport.Unsupported(
+                    KeyUseAuthorizationUnsupportedReason.UnsupportedCombination,
+                )
+            }
         }
 
     /** Generates and persists either a software or managed Crypto2 key. */
@@ -92,17 +104,23 @@ public class SqlDelightKeyStore(
         require(queries.selectByKeyId(request.id.value).executeAsOneOrNull() == null) {
             "Mobile key already exists: ${request.id.value}"
         }
-        val support = managedKeyProvider.preflight(request.requirements)
-        val key = when (support) {
+        val managedSupport = managedKeyProvider.preflight(request.requirements)
+        val key = when (managedSupport) {
             KeyUseAuthorizationSupport.Supported ->
-                managedKeyProvider.generateManagedKey(request)
+                generateManagedKey(request)
                     .withAuthorizationFailureMapping(request.requirements.authorizationPolicy)
 
             is KeyUseAuthorizationSupport.Unsupported -> {
                 if (request.requirements.authorizationPolicy != KeyUseAuthorizationPolicy.None) {
                     throw KeyUseAuthorizationException(
-                        failure = support.reason.toAuthorizationFailure(),
+                        failure = managedSupport.reason.toAuthorizationFailure(),
                         message = "The platform cannot enforce ${request.requirements.authorizationPolicy} for ${request.requirements.spec}",
+                    )
+                }
+                if (!supportsSoftware(request.requirements)) {
+                    throw KeyUseAuthorizationException(
+                        failure = KeyUseAuthorizationFailure.UnsupportedCombination,
+                        message = "The wallet cannot satisfy ${request.requirements.spec} with ${request.requirements.usages}",
                     )
                 }
                 softwareRuntime.generateSoftwareKey(
@@ -128,6 +146,36 @@ public class SqlDelightKeyStore(
         }
         return key
     }
+
+    private suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey = try {
+        managedKeyProvider.generateManagedKey(request)
+    } catch (cause: SignumKeyPolicyMismatchException) {
+        if (request.requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None) {
+            throw cause
+        }
+        throw KeyUseAuthorizationException(
+            failure = KeyUseAuthorizationFailure.UnsupportedCombination,
+            message = "The platform could not enforce ${request.requirements.authorizationPolicy}",
+            cause = cause,
+        )
+    } catch (cause: SignumInteractionContextUnavailableException) {
+        throw KeyUseAuthorizationException(
+            failure = KeyUseAuthorizationFailure.InteractionContextUnavailable,
+            message = "Protected key interaction context is unavailable",
+            cause = cause,
+        )
+    }
+
+    private fun supportsSoftware(requirements: WalletKeyRequirements): Boolean = runCatching {
+        softwareRuntime.resolveSoftwareProvider(
+            CryptoRequirement(
+                operation = CryptoOperation.GENERATE_KEY,
+                spec = requirements.spec,
+                usages = requirements.usages,
+                keyEncoding = KeyEncodingFormat.JWK,
+            )
+        )
+    }.isSuccess
 
     /** Persists a versioned descriptor without exporting it through the legacy key API. */
     override suspend fun addCrypto2Key(key: StoredKeyMaterial): String {

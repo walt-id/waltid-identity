@@ -89,14 +89,16 @@ public class AndroidSignumKeyBackend(
             authentication = policy.authentication,
             signerFor = { algorithm: SignatureAlgorithm ->
                 val interactionContext = policy.authentication.takeIf {
-                    it is SignumAuthenticationPolicy.BiometricCurrentSet
+                    it is SignumAuthenticationPolicy.UserPresence
                 }
                     ?.let { requireInteractionContext(alias) }
                 AndroidKeyStoreProvider.getSignerForKey(alias) {
                     configureSignumOperation(algorithm, policy.authentication)
                     if (interactionContext != null) {
                         unlockPrompt {
-                            allowedAuthenticators = BIOMETRIC_STRONG
+                            if (policy.authentication.isBiometricCurrentSetEveryUse()) {
+                                allowedAuthenticators = BIOMETRIC_STRONG
+                            }
                             activity = interactionContext
                         }
                     }
@@ -104,7 +106,7 @@ public class AndroidSignumKeyBackend(
                     throw failure.mapSignumFailure(alias)
                 }
             },
-            defaultSigner = signer,
+            nativePublicKey = signer.publicKey,
             keyAgreementEnabled = KeyUsage.KEY_AGREEMENT in usages && policy.keyAgreement,
         )
     }
@@ -116,7 +118,7 @@ public class AndroidSignumKeyBackend(
         alias: String,
     ) {
         if (policy.hardware != SignumHardwarePolicy.REQUIRED &&
-            policy.authentication !is SignumAuthenticationPolicy.BiometricCurrentSet
+            !policy.authentication.isBiometricCurrentSetEveryUse()
         ) return
         val androidSigner = signer as? AndroidKeystoreSigner
             ?: throw SignumKeyPolicyMismatchException(alias, "the native signer is not Android Keystore-backed")
@@ -171,7 +173,7 @@ internal fun validateAndroidNativePolicy(
             throw SignumKeyPolicyMismatchException(alias, "the native key is not backed by a hardware security level")
         }
     }
-    if (policy.authentication is SignumAuthenticationPolicy.BiometricCurrentSet) {
+    if (policy.authentication.isBiometricCurrentSetEveryUse()) {
         if (!isUserAuthenticationRequired ||
             userAuthenticationValidityDurationSeconds > 0 ||
             !isInvalidatedByBiometricEnrollment

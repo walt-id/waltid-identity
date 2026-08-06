@@ -19,6 +19,7 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
+import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.DidResult
@@ -189,17 +190,15 @@ class MobileWalletFactoryTest {
                     provider = provider,
                 )
 
-                assertEquals(
-                    KeyUseAuthorizationSupport.Supported,
+                val preflight = if (case.requested == null) {
+                    mobileWallet.keyUseAuthorizationPreflight()
+                } else {
                     mobileWallet.keyUseAuthorizationPreflight(
-                        keyUseAuthorizationPolicy = case.requested ?: case.configured,
-                    ),
-                )
-                assertEquals(
-                    if (case.expected == KeyUseAuthorizationPolicy.None) emptyList()
-                    else listOf(case.expected),
-                    provider.preflightPolicies,
-                )
+                        keyUseAuthorizationPolicy = case.requested,
+                    )
+                }
+                assertEquals(KeyUseAuthorizationSupport.Supported, preflight)
+                assertEquals(listOf(case.expected), provider.preflightPolicies)
             }
 
             database().use { database ->
@@ -242,6 +241,30 @@ class MobileWalletFactoryTest {
             )
             assertEquals(0, provider.generateCount)
             assertTrue(database.queries.selectAll().executeAsList().isEmpty())
+        }
+    }
+
+    @Test
+    fun `protected bootstrap maps authoritative generation policy mismatch`() = runTest {
+        database().use { database ->
+            val provider = FakePlatformManagedKeyProvider().apply {
+                generateFailure = SignumKeyPolicyMismatchException("wallet-key", "hardware policy mismatch")
+            }
+
+            val failure = assertFailsWith<KeyUseAuthorizationException> {
+                wallet(
+                    config = MobileWalletConfig(
+                        defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                    ),
+                    database = database,
+                    provider = provider,
+                ).bootstrap()
+            }
+
+            assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, failure.failure)
+            assertEquals(1, provider.generateCount)
+            assertTrue(database.queries.selectAll().executeAsList().isEmpty())
+            assertTrue(database.queries.selectAllDids().executeAsList().isEmpty())
         }
     }
 
@@ -317,6 +340,7 @@ class MobileWalletFactoryTest {
         private val keys = mutableMapOf<KeyId, SoftwareKey>()
         var generateCount = 0
         var deleteCount = 0
+        var generateFailure: Throwable? = null
         var preflightResult: KeyUseAuthorizationSupport = KeyUseAuthorizationSupport.Supported
         val preflightPolicies = mutableListOf<KeyUseAuthorizationPolicy>()
         val generatedPolicies = mutableListOf<KeyUseAuthorizationPolicy>()
@@ -328,6 +352,7 @@ class MobileWalletFactoryTest {
 
         override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey {
             generateCount++
+            generateFailure?.let { throw it }
             generatedPolicies += request.requirements.authorizationPolicy
             val software = softwareProvider.generate(
                 GenerateSoftwareKeyRequest(request.id, request.requirements.spec, request.requirements.usages)

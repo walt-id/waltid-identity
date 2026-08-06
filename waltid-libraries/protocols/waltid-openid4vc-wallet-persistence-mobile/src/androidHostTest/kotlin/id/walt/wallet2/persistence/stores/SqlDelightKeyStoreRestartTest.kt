@@ -22,6 +22,7 @@ import id.walt.crypto2.signum.SignumStoredKeyMetadataException
 import id.walt.crypto2.signum.SignumUserCancelledException
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
@@ -124,6 +125,50 @@ class SqlDelightKeyStoreRestartTest {
             assertTrue(store.removeKey("software"))
             assertEquals(0, provider.deleteCount)
             assertNull(database.queries.selectByKeyId("software").executeAsOneOrNull())
+        }
+    }
+
+    @Test
+    fun `managed unsupported unprotected request falls back to software storage`() = runTest {
+        database().use { database ->
+            val provider = FakePlatformManagedKeyProvider(
+                preflightResult = KeyUseAuthorizationSupport.Unsupported(
+                    KeyUseAuthorizationUnsupportedReason.UnsupportedCombination,
+                ),
+            )
+            val store = SqlDelightKeyStore(provider, database.queries)
+            val key = store.generateKey(
+                WalletKeyCreationRequest(
+                    id = KeyId("software-fallback"),
+                    requirements = WalletKeyRequirements(
+                        spec = KeySpec.Rsa(2048),
+                        usages = KEY_USAGES,
+                    ),
+                )
+            )
+
+            assertEquals(
+                KeyUseAuthorizationSupport.Supported,
+                store.preflight(
+                    WalletKeyRequirements(
+                        spec = KeySpec.Rsa(2048),
+                        usages = KEY_USAGES,
+                    ),
+                ),
+            )
+
+            assertIs<StoredKey.Software>(StoredKeyCodec.decodeFromString(
+                database.queries.selectByKeyId("software-fallback").executeAsOne().stored_key
+            ))
+            assertEquals(0, provider.generateCount)
+
+            val recreated = SqlDelightKeyStore(provider, database.queries)
+            val restored = assertNotNull(recreated.getCrypto2Key("software-fallback", KEY_USAGES))
+            val message = "software-fallback".encodeToByteArray()
+            val algorithm = SignatureAlgorithm.RsaPkcs1(DigestAlgorithm.SHA_256)
+            val signature = assertNotNull(restored.capabilities.signer).sign(message, algorithm)
+            assertTrue(assertNotNull(restored.capabilities.verifier).verify(message, signature, algorithm))
+            assertEquals(key.id, restored.id)
         }
     }
 
@@ -361,12 +406,14 @@ class SqlDelightKeyStoreRestartTest {
     private class FakePlatformManagedKeyProvider : PlatformManagedKeyProvider {
         constructor(
             authorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+            preflightResult: KeyUseAuthorizationSupport = KeyUseAuthorizationSupport.Supported,
             restoreFailure: Throwable? = null,
             signFailure: Throwable? = null,
             metadataFailure: Throwable? = null,
             deleteFailure: Throwable? = null,
         ) {
             this.authorizationPolicy = authorizationPolicy
+            this.preflightResult = preflightResult
             this.restoreFailure = restoreFailure
             this.signFailure = signFailure
             this.metadataFailure = metadataFailure
@@ -374,17 +421,20 @@ class SqlDelightKeyStoreRestartTest {
         }
 
         private val authorizationPolicy: KeyUseAuthorizationPolicy
+        private val preflightResult: KeyUseAuthorizationSupport
         private val restoreFailure: Throwable?
         private val signFailure: Throwable?
         private val metadataFailure: Throwable?
         private val deleteFailure: Throwable?
         val managedIds = mutableSetOf<KeyId>()
+        var generateCount = 0
         var deleteCount = 0
 
         override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport =
-            KeyUseAuthorizationSupport.Supported
+            preflightResult
 
         override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey {
+            generateCount++
             managedIds += request.id
             return managedKey(descriptor(request.id, request.requirements.spec, request.requirements.usages))
         }

@@ -74,7 +74,7 @@ class IosSignumKeyBackend : SignumPlatformBackend {
             // because without an attestation the backing cannot be proven (see effectiveProtection).
             if (policy.hardware != SignumHardwarePolicy.PREFERRED ||
                 policy.attestationChallenge != null ||
-                policy.authentication is SignumAuthenticationPolicy.BiometricCurrentSet
+                policy.authentication.isBiometricCurrentSetEveryUse()
             ) throw cause
             // Best-effort cleanup of anything the failed attempt left behind; a failure here must not hide `cause`.
             try {
@@ -157,9 +157,11 @@ class IosSignumKeyBackend : SignumPlatformBackend {
             signerFor = { algorithm: SignatureAlgorithm ->
                 IosKeychainProvider.getSignerForKey(alias) {
                     configureSignumOperation(algorithm, policy.authentication)
-                }.getOrThrow()
+                }.getOrElse { failure ->
+                    throw failure.mapSignumFailure(alias)
+                }
             },
-            defaultSigner = signer,
+            nativePublicKey = signer.publicKey,
             keyAgreementEnabled = KeyUsage.KEY_AGREEMENT in usages && policy.keyAgreement,
         )
     }
@@ -171,7 +173,7 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         alias: String,
     ) {
         if (policy.hardware != SignumHardwarePolicy.REQUIRED &&
-            policy.authentication !is SignumAuthenticationPolicy.BiometricCurrentSet
+            !policy.authentication.isBiometricCurrentSetEveryUse()
         ) return
         val iosSigner = signer as? IosSigner
             ?: throw SignumKeyPolicyMismatchException(alias, "the native signer is not Keychain-backed")
@@ -192,7 +194,7 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         if (policy.hardware == SignumHardwarePolicy.REQUIRED && !isSecureEnclave) {
             throw SignumKeyPolicyMismatchException(alias, "the native key is not Secure Enclave-backed")
         }
-        if (policy.authentication is SignumAuthenticationPolicy.BiometricCurrentSet &&
+        if (policy.authentication.isBiometricCurrentSetEveryUse() &&
             (!needsAuthenticationForEveryUse || !isSecureEnclave)
         ) {
             throw SignumKeyPolicyMismatchException(
@@ -275,7 +277,7 @@ class IosSignumKeyBackend : SignumPlatformBackend {
 
         fun release() {
             retainedValues.forEach { CFBridgingRelease(it) }
-            CFBridgingRelease(dictionary)
+            CFRelease(dictionary)
         }
     }
 }
@@ -287,7 +289,7 @@ private val publicKeyTags: List<String> by lazy {
     )
 }
 
-private fun Throwable.mapSignumFailure(alias: String): Throwable {
+internal fun Throwable.mapSignumFailure(alias: String): Throwable {
     val causes = generateSequence(this) { it.cause }.toList()
     return if (causes.filterIsInstance<CFCryptoOperationFailed>().any { it.osStatus == errSecItemNotFound }) {
         SignumKeyNotFoundException(alias, this)
