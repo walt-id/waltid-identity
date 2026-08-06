@@ -229,14 +229,25 @@ public final class DemoBackend {
                 userInfo: [NSLocalizedDescriptionKey: "Public demo verifier2 did not preserve the requested session ID"]
             )
         }
-        let requestURL = response["bootstrapAuthorizationRequestUrl"] as? String
-            ?? response["authorizationRequestUrl"] as? String
-            ?? response["fullAuthorizationRequestUrl"] as? String
-        guard let requestURL, !requestURL.isEmpty else {
+        guard let inlineRequestURL = response["fullAuthorizationRequestUrl"] as? String,
+              let inlineComponents = URLComponents(string: inlineRequestURL),
+              let inlineRequest = inlineComponents.queryItems?.first(where: { $0.name == "request" })?.value,
+              !inlineRequest.isEmpty,
+              inlineComponents.queryItems?.contains(where: { $0.name == "request_uri" }) != true else {
             throw NSError(
                 domain: "WalletE2E",
                 code: 302,
-                userInfo: [NSLocalizedDescriptionKey: "Missing authorization request URL in public demo verifier2 response: \(response)"]
+                userInfo: [NSLocalizedDescriptionKey: "Public demo verifier2 has not deployed the signed inline Request Object contract: fullAuthorizationRequestUrl must contain request and must not contain request_uri. Deploy the verifier2 change before running mobile E2E tests. Response: \(response)"]
+            )
+        }
+        guard let requestURL = response["bootstrapAuthorizationRequestUrl"] as? String,
+              let bootstrapComponents = URLComponents(string: requestURL),
+              bootstrapComponents.queryItems?.contains(where: { $0.name == "request_uri" && !($0.value ?? "").isEmpty }) == true,
+              bootstrapComponents.queryItems?.contains(where: { $0.name == "request_uri_method" && $0.value == "post" }) == true else {
+            throw NSError(
+                domain: "WalletE2E",
+                code: 303,
+                userInfo: [NSLocalizedDescriptionKey: "Public demo verifier2 has not deployed the signed POST bootstrap contract: bootstrapAuthorizationRequestUrl must contain request_uri and request_uri_method=post. Deploy the verifier2 change before running mobile E2E tests. Response: \(response)"]
             )
         }
 
