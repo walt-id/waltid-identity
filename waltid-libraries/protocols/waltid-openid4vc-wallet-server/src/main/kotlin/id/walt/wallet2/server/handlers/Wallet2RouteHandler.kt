@@ -873,9 +873,11 @@ object Wallet2RouteHandler {
                             "Resolves and validates the VP request and returns the authorization request " +
                                     "(display-only), verifier metadata, transaction data, response-encryption " +
                                     "state, and the wallet credentials that satisfy each DCQL query with their " +
-                                    "per-claim selective-disclosure options. Stateless: no preview handle is " +
-                                    "retained. Complete with /build-vp-token + /send-response using the original " +
-                                    "requestUrl (do not echo authorizationRequest), or /reject with requestUrl. " +
+                                    "per-claim selective-disclosure options. Optional request keyId selects the " +
+                                    "signing key for capability checks; Ready responses include that keyId. " +
+                                    "Stateless: no preview handle is retained. Complete with /build-vp-token + " +
+                                    "/send-response using the original requestUrl and the preview keyId " +
+                                    "(do not echo authorizationRequest), or /reject with requestUrl. " +
                                     "If the request is invalid but a response can still be sent, the result has " +
                                     "valid=false and an error."
                         request { pathParameter<String>("walletId"); body<PreviewPresentationRequest>() }

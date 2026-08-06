@@ -149,9 +149,16 @@ data class MatchCredentialsResult(
     val matchedCredentialIds: Map<String, List<String>>
 )
 
+/**
+ * Request for a consent preview of an OpenID4VP authorization request.
+ *
+ * [keyId] selects the signing key used for wallet capability advertisement and format
+ * validation during preview. Defaults to the wallet's default signing key.
+ */
 @Serializable
 data class PreviewPresentationRequest(
-    val requestUrl: Url
+    val requestUrl: Url,
+    val keyId: String? = null,
 )
 
 /** Opaque identifier binding a presentation action to one reviewed request resolution. */
@@ -198,6 +205,7 @@ sealed interface StatelessPreviewPresentationResult {
 
     data class Ready(
         override val authorizationRequest: AuthorizationRequest,
+        val keyId: String,
         val responseEncryption: ResponseEncryption.Metadata?,
         val credentialOptions: List<PresentationCredentialOption>,
         val credentialRequirements: List<PresentationCredentialRequirement>,
@@ -445,7 +453,7 @@ object WalletPresentationHandler {
         // preview all refer to the same key, but only *required* where a key is genuinely needed: a
         // request that fails resolution or client-ID trust validation must report that failure rather
         // than a wallet-local missing-key condition.
-        val executionKey = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)).requiredOnUse()
+        val executionKey = wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN)).requiredOnUse()
         return previewPresentation(
             wallet = wallet,
             request = request,
@@ -465,6 +473,10 @@ object WalletPresentationHandler {
     /**
      * Stateless consent preview for HTTP APIs: same resolution/validation/matching as
      * [previewPresentation], but does not retain a preview handle or server-side session.
+     *
+     * Uses [PreviewPresentationRequest.keyId] (or the wallet default) for capability advertisement
+     * and format validation. The resolved key id is returned on [StatelessPreviewPresentationResult.Ready]
+     * and must be passed to [buildVpToken] as [BuildVpTokenRequest.keyId].
      */
     suspend fun previewPresentationStateless(
         wallet: Wallet,
@@ -472,15 +484,18 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        resolveAuthorizationRequest: (suspend (Url) -> ResolvedAuthorizationRequest)? = null,
     ): StatelessPreviewPresentationResult {
-        // Use default/signing key lazily for format checks (same as stateful preview).
-        val keyMaterial = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)).requiredOnUse()
+        val keyMaterial = wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN)).requiredOnUse()
+        val resolveRequest = resolveAuthorizationRequest ?: { requestUrl ->
+            this@WalletPresentationHandler.resolveAuthorizationRequest(
+                { keyMaterial().presentationCapabilities() },
+                requestUrl,
+                clientIdTrustConfiguration,
+            )
+        }
         onEvent(WalletSessionEvent.presentation_request_parsed)
-        val resolvedAuthorizationRequest = resolveAuthorizationRequest(
-            { keyMaterial().presentationCapabilities() },
-            request.requestUrl,
-            clientIdTrustConfiguration,
-        )
+        val resolvedAuthorizationRequest = resolveRequest(request.requestUrl)
         val authorizationRequest = resolvedAuthorizationRequest.authorizationRequest
         val validation = PresentationRequestValidator.validate(
             resolvedRequest = resolvedAuthorizationRequest,
@@ -543,6 +558,7 @@ object WalletPresentationHandler {
         }
         return StatelessPreviewPresentationResult.Ready(
             authorizationRequest = authorizationRequest,
+            keyId = keyMaterial().keyId,
             responseEncryption = responseEncryption,
             credentialOptions = credentialOptions,
             credentialRequirements = query.requiredCredentialRequirements(),
@@ -897,6 +913,10 @@ object WalletPresentationHandler {
      *
      * Sensitive request fields (DCQL, nonce, transaction data) come from the freshly
      * resolved [AuthorizationRequest], never from a client-echoed copy.
+     *
+     * After a [previewPresentationStateless] Ready result, pass that result's `keyId` as
+     * [BuildVpTokenRequest.keyId] so build validates and signs with the same key used during
+     * preview. Build still re-validates against its effective signing key.
      *
      * Prefer [BuildVpTokenRequest.selectedCredentialOptions] (and optional
      * [BuildVpTokenRequest.selectedDisclosureOptions]) for the consent UI path.
@@ -1455,6 +1475,9 @@ internal fun WalletKeyStoreEntry.presentationCapabilities(): WalletPresentationF
  *
  * Prefer [selectedCredentialOptions] (+ optional [selectedDisclosureOptions]) for consent UIs.
  * [selectedCredentialIds] remains for the legacy resolve → match → build path.
+ *
+ * After a stateless preview, pass the Ready `keyId` here so build uses the same signing key
+ * that preview validated against.
  */
 @Serializable
 data class BuildVpTokenRequest(
@@ -1475,7 +1498,6 @@ data class BuildVpTokenRequest(
      * Used when [selectedCredentialOptions] is empty.
      */
     val selectedCredentialIds: Map<String, List<String>> = emptyMap(),
-    /** Key to use for signing. Defaults to the wallet's default key. */
     val key: DirectSerializedKey? = null,
     val keyId: String? = null,
     /** DID to use as holder binding. Defaults to the wallet's default DID. */

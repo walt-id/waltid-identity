@@ -1,5 +1,7 @@
 package id.walt.wallet2.handlers
 
+import id.walt.credentials.formats.W3C11
+import id.walt.credentials.signatures.JwtCredentialSignature
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto.keys.jwk.JWKKey
@@ -16,10 +18,12 @@ import id.walt.dcql.models.meta.NoMeta
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.data.resolveKeyMaterial
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
+import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
@@ -1016,6 +1020,65 @@ class WalletPresentationHandlerRequirementsTest {
                 )
             }
         }
+    }
+
+    @Test
+    fun statelessPreviewBindsRequestedSigningKey() = runTest {
+        val defaultKey = JWKKey.generate(KeyType.Ed25519)
+        val signingKey = JWKKey.generate(KeyType.secp256r1)
+        val keyStore = InMemoryKeyStore().also {
+            it.addKey(defaultKey)
+            it.addKey(signingKey)
+        }
+        val credentialStore = InMemoryCredentialStore().also {
+            it.addCredential(
+                StoredCredential(
+                    id = "credential",
+                    credential = W3C11(
+                        credentialData = buildJsonObject {
+                            put("credentialSubject", buildJsonObject { put("given_name", "Ada") })
+                        },
+                        issuer = "https://issuer.example",
+                        subject = "did:example:holder",
+                        signature = JwtCredentialSignature(
+                            "signature",
+                            buildJsonObject {},
+                        ),
+                        signed = "issuer.jwt.signature",
+                    ),
+                )
+            )
+        }
+        val wallet = Wallet(
+            id = "wallet-stateless-preview-key",
+            keyStores = listOf(keyStore),
+            credentialStores = listOf(credentialStore),
+        )
+        val authorizationRequest = AuthorizationRequest(
+            clientId = "redirect_uri:https://verifier.example/callback",
+            redirectUri = "https://verifier.example/callback",
+            responseMode = OpenID4VPResponseMode.FRAGMENT,
+            nonce = "nonce",
+            state = "state-123",
+            dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery("pid"))),
+        )
+        val requestUrl = authorizationRequest.toHttpUrl()
+
+        val preview = WalletPresentationHandler.previewPresentationStateless(
+            wallet = wallet,
+            request = PreviewPresentationRequest(
+                requestUrl = requestUrl,
+                keyId = signingKey.getKeyId(),
+            ),
+            transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+            resolveAuthorizationRequest = {
+                ResolvedAuthorizationRequest.Plain(authorizationRequest)
+            },
+        )
+
+        val ready = assertIs<StatelessPreviewPresentationResult.Ready>(preview)
+        assertEquals(signingKey.getKeyId(), ready.keyId)
+        assertEquals("credential", ready.credentialOptions.single().credentialId)
     }
 
     private fun AuthorizationRequest.toHttpUrl(): Url =

@@ -15,7 +15,7 @@ import kotlinx.serialization.json.JsonObject
  *
  * Stateless: no preview handle is retained server-side. [authorizationRequest] is for display /
  * technical details only — do not echo it into `build-vp-token` or `send-response`. Complete the
- * flow by passing the original `requestUrl` to those endpoints, or reject via
+ * flow by passing the original `requestUrl` and Ready [keyId] to those endpoints, or reject via
  * `credentials/present/reject` with the same `requestUrl`.
  *
  * When [valid] is false, the detected [error] can be returned to the verifier via reject.
@@ -24,6 +24,7 @@ import kotlinx.serialization.json.JsonObject
 data class PresentationPreviewResponse(
     val authorizationRequest: AuthorizationRequest,
     val valid: Boolean,
+    val keyId: String? = null,
     val clientId: String? = null,
     val verifier: PreviewVerifierMetadata? = null,
     val responseUri: String? = null,
@@ -126,6 +127,7 @@ fun StatelessPreviewPresentationResult.toPreviewResponse(
     is StatelessPreviewPresentationResult.Ready -> PresentationPreviewResponse(
         authorizationRequest = authorizationRequest,
         valid = true,
+        keyId = keyId,
         clientId = authorizationRequest.clientId,
         verifier = authorizationRequest.clientMetadata?.toPreviewVerifierMetadata(preferredLocales),
         responseUri = authorizationRequest.responseUri,
