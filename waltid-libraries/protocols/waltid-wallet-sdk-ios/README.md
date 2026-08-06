@@ -96,6 +96,14 @@ let presentation = try await wallet.present(
 typed metadata for the app's review UI. `WalletConfiguration` uses
 `Locale.preferredLanguages` by default and also accepts an explicit locale order.
 
+## Protected keys
+
+Set `defaultKeyUseAuthorizationPolicy` to `.biometricCurrentSet` to require a
+strong biometric for every signing operation. This policy is P-256 only, uses
+the Secure Enclave on a physical device, and does not allow passcode fallback.
+The host iOS application must include an `NSFaceIDUsageDescription` entry in
+its `Info.plist`; without it, Face ID authorization cannot be presented.
+
 ## Local persistence
 
 `WalletConfiguration()` uses managed persistence by default. The SDK opens an encrypted SQLDelight database through SQLCipher and manages the per-wallet database key internally in iOS Keychain. Apps using the normal Swift facade do not pass database key material.

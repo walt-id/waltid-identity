@@ -17,6 +17,7 @@ fun walletDemoViewController(
     attestationBearerToken: String = "",
     attestationHostHeader: String = "",
     transactionDataProfilesUrl: String = "",
+    biometricEnabled: Boolean = true,
 ): UIViewController {
     val config = DemoWalletConfig(
         walletId = walletId,
@@ -25,6 +26,7 @@ fun walletDemoViewController(
         attestationBearerToken = attestationBearerToken,
         attestationHostHeader = attestationHostHeader,
         transactionDataProfilesUrl = transactionDataProfilesUrl,
+        biometricEnabled = biometricEnabled,
     )
     val controller = WalletDemoController(
         wallet = createIosDemoWallet(config),

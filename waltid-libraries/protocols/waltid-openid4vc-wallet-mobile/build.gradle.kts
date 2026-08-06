@@ -66,6 +66,7 @@ kotlin {
         }
         if (enableAndroidBuild) {
             androidMain.dependencies {
+                api(identityLibs.androidx.fragment)
                 implementation(identityLibs.ktor.client.android)
             }
             named("androidHostTest") {

@@ -3,6 +3,7 @@
 package id.walt.wallet2.mobile
 
 import android.content.Context
+import androidx.fragment.app.FragmentActivity
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.persistence.encryption.AndroidDatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.AndroidPlatformKeyProvider
@@ -14,12 +15,15 @@ import kotlinx.serialization.ExperimentalSerializationApi
  *
  * @param context Android context used to open the wallet database.
  */
-public actual class MobileWalletFactory(private val context: Context) {
+public actual class MobileWalletFactory(
+    private val context: Context,
+    private val interactionContextProvider: () -> FragmentActivity? = { null },
+) {
     /**
      * Creates an Android mobile wallet for [config].
      *
-     * The database is named from [MobileWalletConfig.walletId], and signing keys are created or loaded
-     * through the Android platform key provider.
+     * The database is named from [MobileWalletConfig.walletId]. The factory wires the Android managed-key
+     * provider together with the Crypto2 software-key fallback used for supported unprotected requests.
      */
     public actual suspend fun create(config: MobileWalletConfig): MobileWallet =
         create(config, ClientIdTrustConfiguration())
@@ -33,12 +37,13 @@ public actual class MobileWalletFactory(private val context: Context) {
         config: MobileWalletConfig,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
     ): MobileWallet {
-        val driverFactory = DriverFactory(context)
+        val applicationContext = context.applicationContext
+        val driverFactory = DriverFactory(applicationContext)
         return createEncryptedSqlDelightMobileWallet(
             config = config,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
-            managedDatabaseKeyProvider = AndroidDatabaseEncryptionKeyProvider(context),
-            platformKeyProvider = AndroidPlatformKeyProvider(),
+            managedDatabaseKeyProvider = AndroidDatabaseEncryptionKeyProvider(applicationContext),
+            platformKeyProvider = AndroidPlatformKeyProvider(context, interactionContextProvider),
             openEncryptedDriver = driverFactory::createEncryptedDriver,
             deleteDatabase = driverFactory::deleteDatabase,
         )

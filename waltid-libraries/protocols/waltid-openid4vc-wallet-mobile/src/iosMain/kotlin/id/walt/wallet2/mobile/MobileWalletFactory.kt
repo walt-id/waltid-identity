@@ -9,7 +9,8 @@ import id.walt.wallet2.persistence.stores.DriverFactory
 import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
- * iOS [MobileWallet] factory backed by Keychain/Secure Enclave and a native SQLDelight database.
+ * iOS [MobileWallet] factory backed by Keychain/Secure Enclave managed keys, the Crypto2 software-key fallback,
+ * and a native SQLDelight database.
  */
 public actual class MobileWalletFactory {
     /**

@@ -67,6 +67,12 @@ public final class id/walt/crypto2/signum/SignumHardwarePolicy$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class id/walt/crypto2/signum/SignumInteractionContextUnavailableException : java/lang/IllegalStateException {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
 public final class id/walt/crypto2/signum/SignumKeyAttestation {
 	public static final field Companion Lid/walt/crypto2/signum/SignumKeyAttestation$Companion;
 	public fun <init> (Ljava/lang/String;Lid/walt/crypto2/serialization/BinaryData;Ljava/util/List;)V
@@ -97,6 +103,18 @@ public final synthetic class id/walt/crypto2/signum/SignumKeyAttestation$$serial
 
 public final class id/walt/crypto2/signum/SignumKeyAttestation$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/signum/SignumKeyInvalidatedException : java/lang/IllegalStateException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAlias ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/signum/SignumKeyNotFoundException : java/lang/IllegalStateException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAlias ()Ljava/lang/String;
 }
 
 public final class id/walt/crypto2/signum/SignumKeyOptions {
@@ -166,6 +184,12 @@ public final class id/walt/crypto2/signum/SignumKeyPolicy$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class id/walt/crypto2/signum/SignumKeyPolicyMismatchException : java/lang/IllegalStateException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAlias ()Ljava/lang/String;
+}
+
 public abstract interface class id/walt/crypto2/signum/SignumManagedKey : id/walt/crypto2/keys/ManagedKey {
 	public abstract fun getAttestation ()Lid/walt/crypto2/signum/SignumKeyAttestation;
 	public abstract fun getProtectionLevel ()Lid/walt/crypto2/signum/SignumProtectionLevel;
@@ -191,6 +215,7 @@ public final class id/walt/crypto2/signum/SignumManagedKeyProvider : id/walt/cry
 	public final fun restoreSignumKey (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun storedKeyForExisting-FO05kzI (Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun storedKeyForExisting-FO05kzI$default (Lid/walt/crypto2/signum/SignumManagedKeyProvider;Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun storedPolicy (Lid/walt/crypto2/keys/StoredKey$Managed;)Lid/walt/crypto2/signum/SignumKeyPolicy;
 }
 
 public final class id/walt/crypto2/signum/SignumManagedKeyProvider$Companion {
@@ -229,6 +254,11 @@ public final class id/walt/crypto2/signum/SignumProtectionLevel : java/lang/Enum
 
 public final class id/walt/crypto2/signum/SignumProtectionLevel$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/signum/SignumStoredKeyMetadataException : java/lang/IllegalArgumentException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 }
 
 public final class id/walt/crypto2/signum/SignumUserCancelledException : java/util/concurrent/CancellationException {
