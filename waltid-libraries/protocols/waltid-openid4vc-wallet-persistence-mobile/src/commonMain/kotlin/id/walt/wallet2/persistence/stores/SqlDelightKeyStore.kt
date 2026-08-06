@@ -5,7 +5,6 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ManagedKey
-import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.keys.StorableKey
 import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.keys.Key as StoredKeyMaterial
@@ -15,12 +14,6 @@ import id.walt.crypto2.providers.CryptoRequirement
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
-import id.walt.crypto2.signum.SignumInteractionContextUnavailableException
-import id.walt.crypto2.signum.SignumKeyInvalidatedException
-import id.walt.crypto2.signum.SignumKeyNotFoundException
-import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
-import id.walt.crypto2.signum.SignumStoredKeyMetadataException
-import id.walt.crypto2.signum.SignumUserCancelledException
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletKeyStoreEntry
@@ -107,8 +100,7 @@ public class SqlDelightKeyStore(
         val managedSupport = managedKeyProvider.preflight(request.requirements)
         val key = when (managedSupport) {
             KeyUseAuthorizationSupport.Supported ->
-                generateManagedKey(request)
-                    .withAuthorizationFailureMapping(request.requirements.authorizationPolicy)
+                managedKeyProvider.generateManagedKey(request)
 
             is KeyUseAuthorizationSupport.Unsupported -> {
                 if (request.requirements.authorizationPolicy != KeyUseAuthorizationPolicy.None) {
@@ -147,25 +139,6 @@ public class SqlDelightKeyStore(
         return key
     }
 
-    private suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey = try {
-        managedKeyProvider.generateManagedKey(request)
-    } catch (cause: SignumKeyPolicyMismatchException) {
-        if (request.requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None) {
-            throw cause
-        }
-        throw KeyUseAuthorizationException(
-            failure = KeyUseAuthorizationFailure.UnsupportedCombination,
-            message = "The platform could not enforce ${request.requirements.authorizationPolicy}",
-            cause = cause,
-        )
-    } catch (cause: SignumInteractionContextUnavailableException) {
-        throw KeyUseAuthorizationException(
-            failure = KeyUseAuthorizationFailure.InteractionContextUnavailable,
-            message = "Protected key interaction context is unavailable",
-            cause = cause,
-        )
-    }
-
     private fun supportsSoftware(requirements: WalletKeyRequirements): Boolean = runCatching {
         softwareRuntime.resolveSoftwareProvider(
             CryptoRequirement(
@@ -198,15 +171,7 @@ public class SqlDelightKeyStore(
     override suspend fun removeKey(keyId: String): Boolean {
         val ref = queries.selectByKeyId(keyId).executeAsOneOrNull() ?: return false
         when (val stored = decodeStoredKey(ref.key_id, ref.stored_key)) {
-            is StoredKey.Managed -> try {
-                managedKeyProvider.deleteManagedKey(stored)
-            } catch (cause: SignumStoredKeyMetadataException) {
-                throw KeyUseAuthorizationException(
-                    KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
-                    "Stored managed key metadata is invalid",
-                    cause,
-                )
-            }
+            is StoredKey.Managed -> managedKeyProvider.deleteManagedKey(stored)
             is StoredKey.Software -> Unit
         }
         queries.deleteByKeyId(keyId)
@@ -230,27 +195,7 @@ public class SqlDelightKeyStore(
 
     private suspend fun restoreStoredKey(stored: StoredKey): StoredKeyMaterial? = when (stored) {
         is StoredKey.Managed -> {
-            val restoration = try {
-                managedKeyProvider.restoreManagedKey(stored)
-            } catch (cause: SignumKeyInvalidatedException) {
-                throw KeyUseAuthorizationException(
-                    KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
-                    "Protected mobile key '${stored.id.value}' is unavailable",
-                    cause,
-                )
-            } catch (cause: SignumKeyPolicyMismatchException) {
-                throw KeyUseAuthorizationException(
-                    KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
-                    "Protected mobile key '${stored.id.value}' is unavailable",
-                    cause,
-                )
-            } catch (cause: SignumStoredKeyMetadataException) {
-                throw KeyUseAuthorizationException(
-                    KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
-                    "Stored managed key metadata is invalid",
-                    cause,
-                )
-            }
+            val restoration = managedKeyProvider.restoreManagedKey(stored)
             when (restoration) {
                 is PlatformManagedKeyRestoration.Missing -> {
                     if (restoration.authorizationPolicy != KeyUseAuthorizationPolicy.None) {
@@ -262,8 +207,7 @@ public class SqlDelightKeyStore(
                     null
                 }
 
-                is PlatformManagedKeyRestoration.Restored ->
-                    restoration.key.withAuthorizationFailureMapping(restoration.authorizationPolicy)
+                is PlatformManagedKeyRestoration.Restored -> restoration.key
             }
         }
         is StoredKey.Software -> try {
@@ -291,46 +235,4 @@ public class SqlDelightKeyStore(
         }
     }
 
-    private fun ManagedKey.withAuthorizationFailureMapping(
-        authorizationPolicy: KeyUseAuthorizationPolicy,
-    ): ManagedKey = if (authorizationPolicy == KeyUseAuthorizationPolicy.None) {
-        this
-    } else {
-        object : ManagedKey {
-            override val storedKey: StoredKey.Managed = this@withAuthorizationFailureMapping.storedKey
-            override val capabilities = this@withAuthorizationFailureMapping.capabilities.copy(
-                signer = this@withAuthorizationFailureMapping.capabilities.signer?.let { signer ->
-                    Signer { data, algorithm ->
-                        try {
-                            signer.sign(data, algorithm)
-                        } catch (cause: SignumUserCancelledException) {
-                            throw KeyUseAuthorizationException(
-                                KeyUseAuthorizationFailure.AuthorizationNotCompleted,
-                                "Protected mobile key authorization was not completed",
-                                cause,
-                            )
-                        } catch (cause: SignumInteractionContextUnavailableException) {
-                            throw KeyUseAuthorizationException(
-                                KeyUseAuthorizationFailure.InteractionContextUnavailable,
-                                "Protected mobile key interaction context is unavailable",
-                                cause,
-                            )
-                        } catch (cause: SignumKeyInvalidatedException) {
-                            throw KeyUseAuthorizationException(
-                                KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
-                                "Protected mobile key '${storedKey.id.value}' is unavailable",
-                                cause,
-                            )
-                        } catch (cause: SignumKeyNotFoundException) {
-                            throw KeyUseAuthorizationException(
-                                KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
-                                "Protected mobile key '${storedKey.id.value}' is unavailable",
-                                cause,
-                            )
-                        }
-                    }
-                },
-            )
-        }
-    }
 }

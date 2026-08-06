@@ -17,10 +17,14 @@ import id.walt.crypto2.signum.SignumHardwarePolicy
 import id.walt.crypto2.signum.SignumKeyPolicy
 import id.walt.crypto2.signum.SignumKeyOptions
 import id.walt.crypto2.signum.SignumKeyNotFoundException
+import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
 import id.walt.crypto2.signum.SignumManagedKeyProvider
 
 /**
  * Managed-key provider backed by Android KeyStore.
+ *
+ * Protected Signum operations resolve a current resumed [FragmentActivity] through
+ * [interactionContextProvider] at operation time; the provider does not retain an activity.
  */
 public class AndroidPlatformKeyProvider(
     context: Context,
@@ -54,26 +58,49 @@ public class AndroidPlatformKeyProvider(
             ?: KeyUseAuthorizationSupport.Supported
     }
 
-    override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey = signumProvider.generate(
-        GenerateManagedKeyRequest(
-            id = request.id,
-            spec = request.requirements.spec,
-            usages = request.requirements.usages,
-            providerOptions = SignumKeyOptions(policy = request.toSignumPolicy()).encode(),
-        )
-    )
+    override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey = try {
+        signumProvider.generate(
+            GenerateManagedKeyRequest(
+                id = request.id,
+                spec = request.requirements.spec,
+                usages = request.requirements.usages,
+                providerOptions = SignumKeyOptions(policy = request.toSignumPolicy()).encode(),
+            )
+        ).withWalletAuthorizationMapping(request.requirements.authorizationPolicy)
+    } catch (cause: Throwable) {
+        if (
+            request.requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None &&
+            cause is SignumKeyPolicyMismatchException
+        ) {
+            throw cause
+        }
+        throw cause.toKeyUseAuthorizationException(request.id.value) ?: cause
+    }
 
     override suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration {
-        val policy = signumProvider.storedPolicy(stored).toWalletPolicy()
+        val policy = try {
+            signumProvider.storedPolicy(stored).toWalletPolicy()
+        } catch (cause: Throwable) {
+            throw cause.toKeyUseAuthorizationException(stored.id.value) ?: cause
+        }
         return try {
-            PlatformManagedKeyRestoration.Restored(signumProvider.restore(stored), policy)
+            PlatformManagedKeyRestoration.Restored(
+                signumProvider.restore(stored).withWalletAuthorizationMapping(policy),
+                policy,
+            )
         } catch (_: SignumKeyNotFoundException) {
             PlatformManagedKeyRestoration.Missing(policy)
+        } catch (cause: Throwable) {
+            throw cause.toKeyUseAuthorizationException(stored.id.value) ?: cause
         }
     }
 
     override suspend fun deleteManagedKey(stored: StoredKey.Managed) {
-        signumProvider.delete(stored, expectedAlias = stored.id.value)
+        try {
+            signumProvider.delete(stored, expectedAlias = stored.id.value)
+        } catch (cause: Throwable) {
+            throw cause.toKeyUseAuthorizationException(stored.id.value) ?: cause
+        }
     }
 
     private fun WalletKeyCreationRequest.toSignumPolicy(): SignumKeyPolicy =
