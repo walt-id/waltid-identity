@@ -3,6 +3,7 @@ package id.walt.dcql.models
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
@@ -26,6 +27,15 @@ data class ClaimsQuery(
 ) {
     init {
         require(path.isNotEmpty()) { "Claims Query path must not be empty" }
+        require(path.all { segment ->
+            when (segment) {
+                JsonNull -> true
+                is JsonPrimitive -> segment.isString || segment.content.toIntOrNull()?.let { it >= 0 } == true
+                else -> false
+            }
+        }) {
+            "Claims Query path elements must be strings, non-negative integers, or null wildcards"
+        }
     }
     constructor(
         id: String? = null,

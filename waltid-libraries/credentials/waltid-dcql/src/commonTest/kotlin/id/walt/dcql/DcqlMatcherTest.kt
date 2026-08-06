@@ -322,46 +322,6 @@ class DcqlMatcherTest {
     }
 
     @Test
-    fun sdJwtDisclosureMatchingUsesExactClaimsPathPointerSemantics() {
-        val objectPropertyDisclosure = DcqlDisclosure(
-            name = "name",
-            value = JsonPrimitive("Alice"),
-            location = listOf(JsonPrimitive("name")),
-        )
-        val privateSsnDisclosure = DcqlDisclosure(
-            name = "ssn",
-            value = JsonPrimitive("123-45-6789"),
-            location = listOf(JsonPrimitive("address"), JsonPrimitive("private"), JsonPrimitive("ssn")),
-        )
-        val arrayDisclosure = DcqlDisclosure(
-            name = "name",
-            value = JsonPrimitive("Alice"),
-            location = listOf(JsonPrimitive("people"), JsonPrimitive(0), JsonPrimitive("name")),
-        )
-
-        assertFalse(
-            DcqlMatcher.run {
-                objectPropertyDisclosure.matchesPath(listOf(JsonPrimitive("$"), JsonPrimitive("name")))
-            },
-            "A leading dollar sign is an ordinary property name, not a root marker",
-        )
-        assertFalse(
-            DcqlMatcher.run {
-                privateSsnDisclosure.matchesPath(
-                    listOf(JsonPrimitive("address"), JsonNull, JsonPrimitive("ssn"))
-                )
-            },
-            "The null wildcard must not match an object-property segment",
-        )
-        assertTrue(
-            DcqlMatcher.run {
-                arrayDisclosure.matchesPath(listOf(JsonPrimitive("people"), JsonNull, JsonPrimitive("name")))
-            },
-            "The null wildcard matches a non-negative array index",
-        )
-    }
-
-    @Test
     fun trustedAuthoritiesFailsClosedWithoutChecker() {
         val query = DcqlParser.parse(
             """

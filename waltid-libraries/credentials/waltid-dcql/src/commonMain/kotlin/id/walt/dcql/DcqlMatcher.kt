@@ -361,7 +361,7 @@ object DcqlMatcher {
     }
 
     /** Match a Claims Path Pointer against the disclosure's complete resolved location. */
-    fun DcqlDisclosure.matchesPath(queryPath: List<JsonElement>): Boolean {
+    private fun DcqlDisclosure.matchesPath(queryPath: List<JsonElement>): Boolean {
         val disclosurePath = location ?: name
             ?.takeIf { queryPath.size == 1 }
             ?.let { listOf(JsonPrimitive(it)) }
