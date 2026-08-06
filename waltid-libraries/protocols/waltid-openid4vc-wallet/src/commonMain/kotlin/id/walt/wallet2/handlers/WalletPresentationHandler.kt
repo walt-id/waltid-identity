@@ -499,6 +499,7 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
         resolveAuthorizationRequest: (suspend (Url) -> ResolvedAuthorizationRequest)? = null,
     ): StatelessPreviewPresentationResult {
         val keyMaterial = resolvePreviewKeyMaterial(wallet, request).requiredOnUse()
@@ -507,6 +508,7 @@ object WalletPresentationHandler {
                 { keyMaterial().presentationCapabilities() },
                 requestUrl,
                 clientIdTrustConfiguration,
+                expectedRequestObjectAudience,
             )
         }
         onEvent(WalletSessionEvent.presentation_request_parsed)
@@ -792,11 +794,13 @@ object WalletPresentationHandler {
         request: RejectPresentationByRequestUrlRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): WalletPresentResult {
         val resolvedAuthorizationRequest = resolveAuthorizationRequest(
             { WalletPresentationFormatRegistry.defaultCapabilities() },
             request.requestUrl,
             clientIdTrustConfiguration,
+            expectedRequestObjectAudience,
         )
         PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedAuthorizationRequest)
         onEvent(WalletSessionEvent.presentation_request_parsed)
@@ -978,11 +982,13 @@ object WalletPresentationHandler {
         request: BuildVpTokenRequest,
         transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
         resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest = { requestUrl ->
             this@WalletPresentationHandler.resolveAuthorizationRequest(
                 { WalletPresentationFormatRegistry.defaultCapabilities() },
                 requestUrl,
                 clientIdTrustConfiguration,
+                expectedRequestObjectAudience,
             )
         },
     ): BuildVpTokenResult {
@@ -1063,11 +1069,13 @@ object WalletPresentationHandler {
         request: SendAuthorizationResponseRequest,
         transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
         resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest = { requestUrl ->
             this@WalletPresentationHandler.resolveAuthorizationRequest(
                 { WalletPresentationFormatRegistry.defaultCapabilities() },
                 requestUrl,
                 clientIdTrustConfiguration,
+                expectedRequestObjectAudience,
             )
         },
     ): WalletPresentResult {
