@@ -121,15 +121,21 @@ public enum WalletKeyUseAuthorizationFailure: Equatable, Sendable {
 
 /// Stable reasons an exact protected-key preflight cannot currently be supported.
 public enum WalletKeyUseAuthorizationUnsupportedReason: Equatable, Sendable {
+    /// The key type or usage set cannot satisfy the selected protected-key policy.
     case unsupportedCombination
+    /// The platform cannot provide the required biometric capability.
     case biometricUnavailable
+    /// No biometric is enrolled on the device.
     case biometricNotEnrolled
+    /// The host application did not provide a usable interaction context.
     case interactionContextUnavailable
 }
 
 /// Result of checking whether an exact protected-key request can be enforced.
 public enum WalletKeyUseAuthorizationPreflight: Equatable, Sendable {
+    /// The exact requested protected-key policy can be enforced.
     case supported
+    /// The exact requested policy cannot currently be enforced; the reason explains why.
     case unsupported(WalletKeyUseAuthorizationUnsupportedReason)
 }
 
