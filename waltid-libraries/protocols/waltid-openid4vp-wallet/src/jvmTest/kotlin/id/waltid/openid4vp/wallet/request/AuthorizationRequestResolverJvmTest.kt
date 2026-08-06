@@ -197,6 +197,26 @@ class AuthorizationRequestResolverJvmTest {
     }
 
     @Test
+    fun `strict plain request rejects non redirect client identifier prefixes`() = runBlocking {
+        listOf("did:jwk:verifier", "did:key:z6Mkverifier").forEach { clientId ->
+            val requestUrl = URLBuilder("openid4vp://authorize").apply {
+                parameters.append("client_id", clientId)
+                parameters.append("response_type", "vp_token")
+                parameters.append("response_mode", "fragment")
+                parameters.append("redirect_uri", "https://verifier.example/callback")
+                parameters.append("nonce", "nonce")
+            }.build()
+
+            assertFailsWith<IllegalArgumentException>("plain $clientId request must be rejected") {
+                AuthorizationRequestResolver.resolve(
+                    requestUrl = requestUrl,
+                    unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+                ) { _, _ -> error("request_uri fetch should not be called") }
+            }
+        }
+    }
+
+    @Test
     fun `request object audience and temporal claims are enforced`() = runBlocking {
         val now = Clock.System.now().epochSeconds
         val cases = listOf(
