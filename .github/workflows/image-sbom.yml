@@ -1,0 +1,207 @@
+name: Image SBOM
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: "Image repository without tag, e.g. waltid/waltid-enterprise-ui"
+        required: true
+        type: string
+      version:
+        description: "Image tag to generate SBOMs for, e.g. 1.2.3"
+        required: true
+        type: string
+    outputs:
+      artifact-prefix:
+        description: |
+          Artifact name prefix shared by every SBOM this workflow uploads.
+          Callers should download with pattern "<artifact-prefix>*" so they pick up
+          only this image's SBOMs, never another image's.
+        value: ${{ jobs.resolve.outputs.artifact-prefix }}
+      platforms:
+        description: |
+          JSON array of the platforms an SBOM was generated for. Each uploaded SBOM
+          records its own platform in the "waltid:image-platform" metadata property.
+        value: ${{ jobs.resolve.outputs.platforms }}
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Image repository without tag, e.g. waltid/waltid-enterprise-ui"
+        required: true
+        type: string
+      version:
+        description: "Image tag to generate SBOMs for, e.g. 1.2.3"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    name: Resolve platforms (${{ inputs.image }}:${{ inputs.version }})
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.resolve.outputs.matrix }}
+      platforms: ${{ steps.resolve.outputs.platforms }}
+      artifact-prefix: ${{ steps.prefix.outputs.artifact-prefix }}
+      slug: ${{ steps.prefix.outputs.slug }}
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Resolve platforms and digests
+        id: resolve
+        env:
+          IMAGE: ${{ inputs.image }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          REF="${IMAGE}:${VERSION}"
+
+          # .Manifest is the top-level descriptor: an OCI/Docker image index for a
+          # multi-platform image (has .manifests), or a single image manifest otherwise.
+          MANIFEST="$(docker buildx imagetools inspect "$REF" --format '{{json .Manifest}}')"
+
+          if jq -e 'has("manifests")' >/dev/null <<<"$MANIFEST"; then
+            # Multi-platform: one SBOM per platform. Attestation manifests carry
+            # platform unknown/unknown and must not be treated as images.
+            MATRIX="$(jq -c '
+              { include: [
+                  .manifests[]
+                  | select((.platform.os // "unknown") != "unknown")
+                  | select((.platform.architecture // "unknown") != "unknown")
+                  | { platform: (
+                        .platform.os + "/" + .platform.architecture
+                        + (if (.platform.variant // "") != "" then "/" + .platform.variant else "" end)
+                      ),
+                      digest: .digest }
+                ] }' <<<"$MANIFEST")"
+          else
+            # Single platform: the manifest descriptor holds the digest, and the
+            # image config holds the platform.
+            DIGEST="$(jq -r '.digest' <<<"$MANIFEST")"
+            CONFIG="$(docker buildx imagetools inspect "$REF" --format '{{json .Image}}')"
+            PLATFORM="$(jq -r '
+              if has("architecture") then
+                (.os // "linux") + "/" + .architecture
+                + (if (.variant // "") != "" then "/" + .variant else "" end)
+              else
+                (keys | .[0])
+              end' <<<"$CONFIG")"
+            MATRIX="$(jq -cn --arg platform "$PLATFORM" --arg digest "$DIGEST" \
+              '{ include: [ { platform: $platform, digest: $digest } ] }')"
+          fi
+
+          COUNT="$(jq '.include | length' <<<"$MATRIX")"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::No image manifests resolved for ${REF}"
+            exit 1
+          fi
+          echo "Resolved ${COUNT} platform(s) for ${REF}:"
+          jq -r '.include[] | "  \(.platform) \(.digest)"' <<<"$MATRIX"
+          echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
+          echo "platforms=$(jq -c '[.include[].platform]' <<<"$MATRIX")" >> "$GITHUB_OUTPUT"
+
+      - name: Publish artifact name prefix
+        id: prefix
+        env:
+          IMAGE: ${{ inputs.image }}
+        run: |
+          set -euo pipefail
+          SLUG="$(printf '%s' "$IMAGE" | tr -c 'A-Za-z0-9._-' '-')"
+          echo "slug=${SLUG}" >> "$GITHUB_OUTPUT"
+          echo "artifact-prefix=sbom-image-${SLUG}-" >> "$GITHUB_OUTPUT"
+
+  image-sbom:
+    name: Image SBOM (${{ inputs.image }} ${{ matrix.platform }})
+    needs: resolve
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.resolve.outputs.matrix) }}
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Download SBOM tools (syft, cyclonedx-cli)
+        run: |
+          set -euo pipefail
+          curl -sSfL -o syft.tar.gz \
+            https://github.com/anchore/syft/releases/download/v1.50.0/syft_1.50.0_linux_amd64.tar.gz
+          echo "bf7b29ff57f06da30918266a0e1c2885a8f99784798d1bdb1628886aa015d788  syft.tar.gz" | sha256sum -c -
+          tar -xzf syft.tar.gz -C "$RUNNER_TEMP" syft && rm syft.tar.gz
+          curl -sSfL -o "$RUNNER_TEMP/cyclonedx" \
+            https://github.com/CycloneDX/cyclonedx-cli/releases/download/v0.33.1/cyclonedx-linux-x64
+          echo "bfc8b2538da86fe239bc53658bbb63c1c8c510a293c1e6891aa5bea5d3c58746  $RUNNER_TEMP/cyclonedx" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/syft" "$RUNNER_TEMP/cyclonedx"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Derive SBOM file name
+        id: names
+        env:
+          SLUG: ${{ needs.resolve.outputs.slug }}
+          ARTIFACT_PREFIX: ${{ needs.resolve.outputs.artifact-prefix }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          # The image slug comes from the resolve job so the artifact prefix it
+          # publishes and these names cannot drift apart.
+          PLATFORM_SLUG="$(printf '%s' "$PLATFORM" | tr -c 'A-Za-z0-9._-' '-')"
+          echo "artifact=${ARTIFACT_PREFIX}${PLATFORM_SLUG}" >> "$GITHUB_OUTPUT"
+          echo "file=${SLUG}-${PLATFORM_SLUG}-image.cdx.json" >> "$GITHUB_OUTPUT"
+
+      - name: Generate image SBOM (Syft, CycloneDX 1.6)
+        env:
+          IMAGE: ${{ inputs.image }}
+          DIGEST: ${{ matrix.digest }}
+          OUT: ${{ steps.names.outputs.file }}
+        run: |
+          set -euo pipefail
+          syft "registry:$IMAGE@$DIGEST" -o "cyclonedx-json@1.6=${OUT}" -q
+      - name: Enrich SBOM metadata
+        env:
+          COMMIT: ${{ github.sha }}
+          BUILD_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          VERSION: ${{ inputs.version }}
+          PLATFORM: ${{ matrix.platform }}
+          OUT: ${{ steps.names.outputs.file }}
+        run: |
+          set -euo pipefail
+          TMP="$(mktemp)"
+          jq --arg supplier "walt.id GmbH" \
+             --arg commit "$COMMIT" \
+             --arg run "$BUILD_RUN" \
+             --arg version "$VERSION" \
+             --arg platform "$PLATFORM" \
+             '
+             .metadata.supplier = { "name": $supplier }
+             | .metadata.component.supplier = { "name": $supplier }
+             | .metadata.properties = ((.metadata.properties // []) + [
+                 {"name":"waltid:git-commit","value":$commit},
+                 {"name":"waltid:build-run","value":$run},
+                 {"name":"waltid:image-version","value":$version},
+                 {"name":"waltid:image-platform","value":$platform}
+               ])' "$OUT" > "$TMP" && mv "$TMP" "$OUT"
+
+      - name: Validate image SBOM
+        env:
+          OUT: ${{ steps.names.outputs.file }}
+        run: |
+          set -euo pipefail
+          cyclonedx validate \
+            --input-file "$OUT" \
+            --input-format json --input-version v1_6 --fail-on-errors
+      - name: Upload image SBOM
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.names.outputs.artifact }}
+          path: ${{ steps.names.outputs.file }}
+          if-no-files-found: error

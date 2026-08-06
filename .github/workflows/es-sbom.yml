@@ -1,0 +1,153 @@
+name: ES SBOM
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Published image tag of ES to generate SBOMs for"
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      version:
+        description: "Published image tag of ES to generate SBOMs for"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  api-sbom:
+    name: SBOM (enterprise-api)
+    uses: ./.github/workflows/image-sbom.yml
+    secrets: inherit
+    with:
+      image: waltid/waltid-enterprise-api
+      version: ${{ inputs.version }}
+
+  ui-image-sbom:
+    name: Image SBOM (enterprise-ui)
+    uses: ./.github/workflows/image-sbom.yml
+    secrets: inherit
+    with:
+      image: waltid/waltid-enterprise-ui
+      version: ${{ inputs.version }}
+
+  ui-sbom:
+    name: SBOM (enterprise-ui)
+    needs: ui-image-sbom
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Download cyclonedx-cli
+        run: |
+          set -euo pipefail
+          curl -sSfL -o "$RUNNER_TEMP/cyclonedx" \
+            https://github.com/CycloneDX/cyclonedx-cli/releases/download/v0.33.1/cyclonedx-linux-x64
+          echo "bfc8b2538da86fe239bc53658bbb63c1c8c510a293c1e6891aa5bea5d3c58746  $RUNNER_TEMP/cyclonedx" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/cyclonedx"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Install enterprise-ui dependencies
+        working-directory: waltid-identity-enterprise/waltid-enterprise-ui
+        run: npm ci --ignore-scripts
+      - name: Build SBOM — enterprise-ui (cyclonedx-npm, npm, production only)
+        working-directory: waltid-identity-enterprise/waltid-enterprise-ui
+        run: |
+          npx -y "@cyclonedx/cyclonedx-npm@6.0.0" \
+            --spec-version 1.6 \
+            --omit dev \
+            -o "${RUNNER_TEMP}/ui-build.cdx.json"
+
+      - name: Import image SBOMs
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ${{ needs.ui-image-sbom.outputs.artifact-prefix }}*
+          merge-multiple: true
+          path: image-sboms
+      - name: Merge image and build SBOMs
+        env:
+          EXPECTED: ${{ needs.ui-image-sbom.outputs.platforms }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          shopt -s nullglob
+          FOUND=0
+          for IMG in image-sboms/*.cdx.json; do
+            PLATFORM="$(jq -r '
+              (.metadata.properties // [])
+              | map(select(.name == "waltid:image-platform"))
+              | first | .value // empty
+              | gsub("[^A-Za-z0-9._-]"; "-")' "$IMG")"
+            if [ -z "$PLATFORM" ]; then
+              echo "::error::$(basename "$IMG") has no waltid:image-platform property"
+              exit 1
+            fi
+            cyclonedx merge \
+              --hierarchical \
+              --name "waltid-enterprise-ui" \
+              --version "$VERSION" \
+              --input-files "$IMG" "${RUNNER_TEMP}/ui-build.cdx.json" \
+              --output-format json --output-version v1_6 \
+              --output-file "out/waltid-enterprise-ui-${PLATFORM}.cdx.json"
+            FOUND=$((FOUND + 1))
+          done
+          WANT="$(jq 'length' <<<"$EXPECTED")"
+          if [ "$FOUND" -ne "$WANT" ]; then
+            echo "::error::Expected ${WANT} image SBOM(s) for platforms ${EXPECTED}, but merged ${FOUND}"
+            exit 1
+          fi
+
+      - name: Enrich SBOM metadata
+        env:
+          COMMIT: ${{ github.sha }}
+          BUILD_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          for OUT in out/*.cdx.json; do
+            PLATFORM="$(basename "$OUT" .cdx.json | sed -n 's/^waltid-enterprise-ui-//p')"
+            if [ -z "$PLATFORM" ]; then
+              echo "::error::Cannot derive platform from merged SBOM file name: $(basename "$OUT")"
+              exit 1
+            fi
+            TMP="$(mktemp)"
+            jq --arg supplier "walt.id GmbH" \
+               --arg commit "$COMMIT" \
+               --arg run "$BUILD_RUN" \
+               --arg version "$VERSION" \
+               '
+               .metadata.supplier = { "name": $supplier }
+               | .metadata.component = (
+                   (.metadata.component // { "type": "application", "name": "waltid-enterprise-ui" })
+                   + { "version": $version, "supplier": { "name": $supplier } }
+                 )
+               | .metadata.properties = ((.metadata.properties // []) + [
+                   {"name":"waltid:git-commit","value":$commit},
+                   {"name":"waltid:build-run","value":$run}
+                 ])' "$OUT" > "$TMP" && mv "$TMP" "$OUT"
+          done
+      - name: Validate merged SBOMs
+        run: |
+          set -euo pipefail
+          for OUT in out/*.cdx.json; do
+            cyclonedx validate \
+              --input-file "$OUT" \
+              --input-format json --input-version v1_6 --fail-on-errors
+          done
+
+      - name: Upload merged SBOMs
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-enterprise-ui
+          path: out/
+          if-no-files-found: error
