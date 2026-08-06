@@ -14,7 +14,8 @@ import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
-import id.walt.wallet2.persistence.keys.PlatformKeyRequest
+import id.walt.wallet2.persistence.keys.PlatformKeyCreationRequest
+import id.walt.wallet2.persistence.keys.PlatformKeyRequirements
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
@@ -179,32 +180,25 @@ internal fun createSqlDelightMobileWallet(
         keyStore = keyStore,
         didStore = didStore,
         credentialStore = credentialStore,
-        generateAndPersistKey = { keyType ->
-            keyStore.generateManagedKey(
-                id = KeyId("wallet_key_${Uuid.random()}"),
-                spec = keyType.toKeySpec(),
-                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-            )
-        },
-        generateAndPersistKeyWithPolicy = { keyType, policy ->
+        generateAndPersistKey = { keyType, policy ->
             keyStore.generateKey(
-                PlatformKeyRequest(
+                PlatformKeyCreationRequest(
                     id = KeyId("wallet_key_${Uuid.random()}"),
-                    spec = keyType.toKeySpec(),
-                    usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-                    authorizationPolicy = policy,
+                    requirements = PlatformKeyRequirements(
+                        spec = keyType.toKeySpec(),
+                        usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                        authorizationPolicy = policy,
+                    ),
                     prompt = config.keyUseAuthorizationPrompt,
                 )
             )
         },
         runKeyUseAuthorizationPreflight = { keyType, policy ->
             keyStore.preflight(
-                PlatformKeyRequest(
-                    id = KeyId("wallet_preflight"),
+                PlatformKeyRequirements(
                     spec = keyType.toKeySpec(),
                     usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
                     authorizationPolicy = policy,
-                    prompt = config.keyUseAuthorizationPrompt,
                 )
             )
         },

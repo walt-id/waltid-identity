@@ -72,7 +72,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
         let value = try Self.successValue(
             result,
-            as: Waltid_openid4vc_wallet_persistence_mobilePlatformKeyPreflight.self,
+            as: WalletBridgeKeyPreflight.self,
             operation: "key authorization preflight"
         )
         return .init(
@@ -291,7 +291,7 @@ private extension WalletConfiguration {
             clientIdTrustConfiguration: clientIDTrustConfiguration.toKMPClientIDTrustConfiguration(),
             defaultKeyUseAuthorizationPolicy: defaultKeyUseAuthorizationPolicy.toKMPAuthorizationPolicy(),
             keyUseAuthorizationPrompt: Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPrompt(
-                message: keyUseAuthorizationPrompt.message,
+                reason: keyUseAuthorizationPrompt.message,
                 cancelText: keyUseAuthorizationPrompt.cancelText
             )
         )
@@ -512,6 +512,17 @@ private extension WalletKeyUseAuthorizationPolicy {
             return .none
         case .biometricCurrentSet:
             return .biometricCurrentSet
+        }
+    }
+}
+
+private extension Waltid_openid4vc_wallet_persistence_mobilePlatformKeyUnsupportedReason {
+    func toSwiftAuthorizationFailure() -> WalletKeyUseAuthorizationFailure {
+        switch self {
+        case .unsupportedCombination: return .unsupportedCombination
+        case .biometricUnavailable: return .biometricUnavailable
+        case .biometricNotEnrolled: return .biometricNotEnrolled
+        case .interactionContextUnavailable: return .interactionContextUnavailable
         }
     }
 }
@@ -907,6 +918,8 @@ private extension WalletBridgeError {
             return .crypto(message)
         case .credentialNotFound:
             return .credentialNotFound(message)
+        case .authorization:
+            return .keyUseAuthorization(authorizationFailure?.toSwiftAuthorizationFailure() ?? .invalidStoredKeyMetadata)
         case .cancelled:
             return .cancelled
         case .internalFailure:

@@ -26,6 +26,8 @@ import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.PlatformKeyRequestSupport
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.ktor.http.URLBuilder
@@ -106,6 +108,7 @@ class MobileWalletTest {
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:unused", document = JsonObject(emptyMap()))),
             credentialStore = RecordingCredentialStore(),
             generateAndPersistKey = unusedKeyGenerator(),
+            runKeyUseAuthorizationPreflight = unusedKeyPreflight(),
         )
 
         val failure = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
@@ -189,6 +192,7 @@ class MobileWalletTest {
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:managed", document = JsonObject(emptyMap()))),
             credentialStore = RecordingCredentialStore(),
             generateAndPersistKey = unusedKeyGenerator(),
+            runKeyUseAuthorizationPreflight = unusedKeyPreflight(),
         )
 
         val bootstrap = wallet.bootstrap()
@@ -207,6 +211,7 @@ class MobileWalletTest {
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:missing", document = JsonObject(emptyMap()))),
             credentialStore = RecordingCredentialStore(),
             generateAndPersistKey = unusedKeyGenerator(),
+            runKeyUseAuthorizationPreflight = unusedKeyPreflight(),
         )
 
         val failure = assertFailsWith<IllegalArgumentException> { wallet.bootstrap() }
@@ -225,6 +230,7 @@ class MobileWalletTest {
             didStore = didStore,
             credentialStore = credentialStore,
             generateAndPersistKey = unusedKeyGenerator(),
+            runKeyUseAuthorizationPreflight = unusedKeyPreflight(),
         )
 
         wallet.deleteWallet()
@@ -415,6 +421,7 @@ class MobileWalletTest {
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
             generateAndPersistKey = unusedKeyGenerator(),
+            runKeyUseAuthorizationPreflight = unusedKeyPreflight(),
         )
 
         val credential = wallet.credentials().single()
@@ -441,9 +448,10 @@ class MobileWalletTest {
             walletId = "custom-wallet",
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
-            credentialStore = credentialStore,
-            generateAndPersistKey = unusedKeyGenerator(),
-        )
+        credentialStore = credentialStore,
+        generateAndPersistKey = unusedKeyGenerator(),
+        runKeyUseAuthorizationPreflight = unusedKeyPreflight(),
+    )
 
         val displayData = displayJson.parseToJsonElement(wallet.credentials().single().credentialDataJson).jsonObject
 
@@ -582,6 +590,7 @@ class MobileWalletTest {
         didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:unused", document = JsonObject(emptyMap()))),
         credentialStore = RecordingCredentialStore(),
         generateAndPersistKey = unusedKeyGenerator(),
+        runKeyUseAuthorizationPreflight = unusedKeyPreflight(),
         clientIdTrustConfiguration = trustConfiguration,
     )
 
@@ -603,8 +612,11 @@ class MobileWalletTest {
         }.buildString()
     }
 
-    private fun unusedKeyGenerator(): suspend (MobileWalletKeyType) -> ManagedKeyMaterial =
-        { error("This test must not bootstrap a new key") }
+    private fun unusedKeyGenerator(): suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> ManagedKeyMaterial =
+        { _, _ -> error("This test must not bootstrap a new key") }
+
+    private fun unusedKeyPreflight(): suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> PlatformKeyRequestSupport =
+        { _, _ -> error("This test must not preflight a new key") }
 
     private val displayJson = kotlinx.serialization.json.Json {
         ignoreUnknownKeys = true

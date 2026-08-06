@@ -73,7 +73,7 @@ class IosSignumKeyBackend : SignumPlatformBackend {
             // because without an attestation the backing cannot be proven (see effectiveProtection).
             if (policy.hardware != SignumHardwarePolicy.PREFERRED ||
                 policy.attestationChallenge != null ||
-                policy.authentication.isBiometricCurrentSet()
+                policy.authentication is SignumAuthenticationPolicy.BiometricCurrentSet
             ) throw cause
             // Best-effort cleanup of anything the failed attempt left behind; a failure here must not hide `cause`.
             try {
@@ -169,7 +169,9 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         policy: SignumKeyPolicy,
         alias: String,
     ) {
-        if (policy.hardware != SignumHardwarePolicy.REQUIRED && !policy.authentication.isBiometricCurrentSet()) return
+        if (policy.hardware != SignumHardwarePolicy.REQUIRED &&
+            policy.authentication !is SignumAuthenticationPolicy.BiometricCurrentSet
+        ) return
         val iosSigner = signer as? IosSigner
             ?: throw SignumKeyPolicyMismatchException(alias, "the native signer is not Keychain-backed")
         validateIosNativePolicy(
@@ -189,7 +191,7 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         if (policy.hardware == SignumHardwarePolicy.REQUIRED && !isSecureEnclave) {
             throw SignumKeyPolicyMismatchException(alias, "the native key is not Secure Enclave-backed")
         }
-        if (policy.authentication.isBiometricCurrentSet() &&
+        if (policy.authentication is SignumAuthenticationPolicy.BiometricCurrentSet &&
             (!needsAuthenticationForEveryUse || !isSecureEnclave)
         ) {
             throw SignumKeyPolicyMismatchException(
@@ -199,7 +201,7 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
+    @Suppress("UNCHECKED_CAST", "DEPRECATION", "DEPRECATION_ERROR")
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
     private fun isSecureEnclaveKey(alias: String): Boolean = memScoped {
         val keyRef = alloc<platform.CoreFoundation.CFTypeRefVar>()
@@ -215,25 +217,42 @@ class IosSignumKeyBackend : SignumPlatformBackend {
             query.addRetained(kSecAttrApplicationTag, tag)
             query.add(kSecReturnRef, kCFBooleanTrue)
             try {
-                if (SecItemCopyMatching(query.dictionary, keyRef.ptr) != errSecSuccess || keyRef.value == null) {
-                    return@any false
-                }
-                val nativeKey = keyRef.value as? SecKeyRef ?: return@any false
-                try {
-                    val attributes = SecKeyCopyAttributes(nativeKey) ?: return@any false
-                    try {
-                        val tokenId = CFDictionaryGetValue(attributes, kSecAttrTokenID)
-                        tokenId != null &&
-                            CFBridgingRelease(CFBridgingRetain(tokenId)) ==
-                            CFBridgingRelease(CFBridgingRetain(kSecAttrTokenIDSecureEnclave))
-                    } finally {
-                        CFRelease(attributes)
+                keyRef.value = null
+                when (val status = SecItemCopyMatching(query.dictionary, keyRef.ptr)) {
+                    errSecItemNotFound -> false
+                    errSecSuccess -> {
+                        val nativeKey = keyRef.value as? SecKeyRef
+                            ?: throw CFCryptoOperationFailed(
+                                thing = "inspect Secure Enclave public key",
+                                osStatus = status,
+                            )
+                        try {
+                            val attributes = SecKeyCopyAttributes(nativeKey)
+                                ?: throw CFCryptoOperationFailed(
+                                    thing = "inspect Secure Enclave public key",
+                                    osStatus = status,
+                                )
+                            try {
+                                val tokenId = CFDictionaryGetValue(attributes, kSecAttrTokenID)
+                                    ?.let { CFBridgingRelease(CFBridgingRetain(it)) as? String }
+                                val secureEnclaveTokenId =
+                                    CFBridgingRelease(CFBridgingRetain(kSecAttrTokenIDSecureEnclave)) as? String
+                                tokenId != null && tokenId == secureEnclaveTokenId
+                            } finally {
+                                CFRelease(attributes)
+                            }
+                        } finally {
+                            CFRelease(nativeKey)
+                            keyRef.value = null
+                        }
                     }
-                } finally {
-                    CFRelease(nativeKey)
-                    keyRef.value = null
+                    else -> throw CFCryptoOperationFailed(
+                        thing = "inspect Secure Enclave public key",
+                        osStatus = status,
+                    )
                 }
             } finally {
+                keyRef.value = null
                 query.release()
             }
         }

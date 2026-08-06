@@ -67,13 +67,13 @@ internal fun PlatformSigningKeyConfigurationBase<*>.configureSignumKey(
             policy.attestationChallenge?.let { challenge ->
                 attestation { this.challenge = challenge.toByteArray() }
             }
-            (policy.authentication as? SignumAuthenticationPolicy.UserPresence)?.let { auth ->
+            (policy.authentication as? SignumAuthenticationPolicy.BiometricCurrentSet)?.let { auth ->
                 protection {
-                    timeout = auth.timeoutSeconds.seconds
+                    timeout = 0.seconds
                     factors {
-                        biometry = auth.biometric
-                        biometryWithNewFactors = auth.allowNewBiometrics
-                        deviceLock = auth.deviceCredential
+                        biometry = true
+                        biometryWithNewFactors = false
+                        deviceLock = false
                     }
                 }
             }
@@ -98,9 +98,9 @@ internal fun PlatformSignerConfigurationBase.configureSignumOperation(
         }
         else -> error("Unsupported Signum signature algorithm: $algorithm")
     }
-    (authentication as? SignumAuthenticationPolicy.UserPresence)?.let { auth ->
+    (authentication as? SignumAuthenticationPolicy.BiometricCurrentSet)?.let { auth ->
         unlockPrompt {
-            message = auth.prompt
+            message = auth.reason
             cancelText = auth.cancelText
         }
     }

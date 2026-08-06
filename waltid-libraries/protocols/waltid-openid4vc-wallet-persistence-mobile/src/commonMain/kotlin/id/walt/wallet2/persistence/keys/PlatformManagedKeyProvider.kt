@@ -7,26 +7,23 @@ import id.walt.crypto2.keys.StoredKey
  * Generation, restoration, and deletion support for managed native platform keys.
  */
 public interface PlatformManagedKeyProvider {
-    /**
-     * Checks whether the exact request can be enforced without a fallback.
-     */
-    public suspend fun preflight(request: PlatformKeyRequest): PlatformKeyPreflight
+    /** Checks whether the exact requirements can be enforced without fallback. */
+    public suspend fun preflight(requirements: PlatformKeyRequirements): PlatformKeyRequestSupport
 
     /** Generates a managed key in the platform key store. */
-    public suspend fun generateManagedKey(request: PlatformKeyRequest): ManagedKey
+    public suspend fun generateManagedKey(request: PlatformKeyCreationRequest): ManagedKey
 
     /**
      * Restores a platform key from its persisted descriptor.
      *
-     * Returns null only when the native alias is known to be absent.
+     * Returns a structured restoration result so persisted authorization policy is available
+     * even when the native key is absent.
      */
-    public suspend fun restoreManagedKey(stored: StoredKey.Managed): ManagedKey?
+    public suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration
 
     /**
      * Deletes a platform key using its descriptor without restoring the alias first.
      */
     public suspend fun deleteManagedKey(stored: StoredKey.Managed)
 
-    /** Reads wallet-facing metadata from a persisted descriptor without loading the native key. */
-    public fun inspectManagedKey(stored: StoredKey.Managed): PlatformManagedKeyInfo
 }

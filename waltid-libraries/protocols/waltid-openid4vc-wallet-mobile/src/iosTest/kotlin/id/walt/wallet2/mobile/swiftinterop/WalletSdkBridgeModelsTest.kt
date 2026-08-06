@@ -3,6 +3,8 @@ package id.walt.wallet2.mobile.swiftinterop
 import id.walt.wallet2.handlers.PreviewSessionException
 import id.walt.wallet2.handlers.PreviewSessionFailureReason
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import kotlinx.coroutines.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,19 +46,29 @@ class WalletSdkBridgeModelsTest {
     }
 
     @Test
+    fun mapsAuthorizationFailuresToDedicatedBridgeCategory() {
+        val error = WalletBridgeError.fromThrowable(
+            KeyUseAuthorizationException(
+                failure = KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
+                message = "Protected key unavailable",
+            )
+        )
+
+        assertEquals(WalletBridgeErrorCategory.authorization, error.category)
+        assertEquals(KeyUseAuthorizationFailure.ProtectedKeyUnavailable, error.authorizationFailure)
+    }
+
+    @Test
     fun resultWrapperCarriesSuccessOrTypedFailure() {
         val success: WalletBridgeResult<List<String>> = WalletBridgeResult.Success(listOf("credential-1"))
         val failure: WalletBridgeResult<List<String>> = WalletBridgeResult.Failure(
-            WalletBridgeError(
-                category = WalletBridgeErrorCategory.network,
-                message = "offline",
-            )
+            WalletBridgeError.fromThrowable(IllegalStateException("offline"))
         )
 
         assertIs<WalletBridgeResult.Success<List<String>>>(success)
         assertEquals(listOf("credential-1"), success.value)
 
         assertIs<WalletBridgeResult.Failure>(failure)
-        assertEquals(WalletBridgeErrorCategory.network, failure.error.category)
+        assertEquals(WalletBridgeErrorCategory.internalFailure, failure.error.category)
     }
 }

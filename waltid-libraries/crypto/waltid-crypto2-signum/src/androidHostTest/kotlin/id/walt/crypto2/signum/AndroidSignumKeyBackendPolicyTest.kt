@@ -68,12 +68,7 @@ class AndroidSignumKeyBackendPolicyTest {
     @Test
     fun `biometric current set rejects missing auth per use`() {
         val policy = SignumKeyPolicy(
-            authentication = SignumAuthenticationPolicy.UserPresence(
-                biometric = true,
-                allowNewBiometrics = false,
-                deviceCredential = false,
-                timeoutSeconds = 0,
-            ),
+            authentication = SignumAuthenticationPolicy.BiometricCurrentSet(),
         )
 
         assertFailsWith<SignumKeyPolicyMismatchException> {
@@ -119,12 +114,7 @@ class AndroidSignumKeyBackendPolicyTest {
         validateAndroidNativePolicy(
             alias = "biometric",
             policy = SignumKeyPolicy(
-                authentication = SignumAuthenticationPolicy.UserPresence(
-                    biometric = true,
-                    allowNewBiometrics = false,
-                    deviceCredential = false,
-                    timeoutSeconds = 0,
-                ),
+                authentication = SignumAuthenticationPolicy.BiometricCurrentSet(),
             ),
             isInsideSecureHardware = true,
             securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,

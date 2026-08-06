@@ -3,7 +3,6 @@ package id.walt.wallet2.persistence.stores
 import id.walt.crypto.keys.Key
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.Signer
@@ -27,8 +26,11 @@ import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.PlatformKeyPreflight
-import id.walt.wallet2.persistence.keys.PlatformKeyRequest
+import id.walt.wallet2.persistence.keys.PlatformKeyCreationRequest
+import id.walt.wallet2.persistence.keys.PlatformKeyRequirements
+import id.walt.wallet2.persistence.keys.PlatformKeyRequestSupport
+import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
+import id.walt.wallet2.persistence.keys.toAuthorizationFailure
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -78,37 +80,39 @@ public class SqlDelightKeyStore(
         throw UnsupportedOperationException("Mobile key storage supports storable keys only")
 
     /** Checks whether an exact key request can be enforced without fallback. */
-    public suspend fun preflight(request: PlatformKeyRequest): PlatformKeyPreflight =
-        if (request.authorizationPolicy == KeyUseAuthorizationPolicy.None) {
-            PlatformKeyPreflight(true)
+    public suspend fun preflight(requirements: PlatformKeyRequirements): PlatformKeyRequestSupport =
+        if (requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None) {
+            PlatformKeyRequestSupport.Supported
         } else {
-            managedKeyProvider.preflight(request)
+            managedKeyProvider.preflight(requirements)
         }
 
     /** Generates and persists either a software or managed Crypto2 key. */
-    public suspend fun generateKey(request: PlatformKeyRequest): StoredKeyMaterial {
+    public suspend fun generateKey(request: PlatformKeyCreationRequest): StoredKeyMaterial {
         require(queries.selectByKeyId(request.id.value).executeAsOneOrNull() == null) {
             "Mobile key already exists: ${request.id.value}"
         }
-        val key = if (request.authorizationPolicy != KeyUseAuthorizationPolicy.None || request.spec.isPlatformManagedSpec()) {
-            if (request.authorizationPolicy != KeyUseAuthorizationPolicy.None) {
-                val preflight = managedKeyProvider.preflight(request)
-                if (!preflight.supported) {
+        val support = managedKeyProvider.preflight(request.requirements)
+        val key = when (support) {
+            PlatformKeyRequestSupport.Supported ->
+                managedKeyProvider.generateManagedKey(request)
+                    .withAuthorizationFailureMapping(request.requirements.authorizationPolicy)
+
+            is PlatformKeyRequestSupport.Unsupported -> {
+                if (request.requirements.authorizationPolicy != KeyUseAuthorizationPolicy.None) {
                     throw KeyUseAuthorizationException(
-                        failure = preflight.failure ?: KeyUseAuthorizationFailure.UnsupportedCombination,
-                        message = "The platform cannot enforce ${request.authorizationPolicy} for ${request.spec}",
+                        failure = support.reason.toAuthorizationFailure(),
+                        message = "The platform cannot enforce ${request.requirements.authorizationPolicy} for ${request.requirements.spec}",
                     )
                 }
-            }
-            managedKeyProvider.generateManagedKey(request).withAuthorizationFailureMapping(request.authorizationPolicy)
-        } else {
-            softwareRuntime.generateSoftwareKey(
-                GenerateSoftwareKeyRequest(
-                    id = request.id,
-                    spec = request.spec,
-                    usages = request.usages,
+                softwareRuntime.generateSoftwareKey(
+                    GenerateSoftwareKeyRequest(
+                        id = request.id,
+                        spec = request.requirements.spec,
+                        usages = request.requirements.usages,
+                    )
                 )
-            )
+            }
         }
         try {
             addCrypto2Key(key)
@@ -124,15 +128,6 @@ public class SqlDelightKeyStore(
         }
         return key
     }
-
-    /** Generates and persists an ordinary managed key for existing callers. */
-    public suspend fun generateManagedKey(
-        id: KeyId,
-        spec: KeySpec,
-        usages: Set<KeyUsage>,
-    ): ManagedKey = generateKey(
-        PlatformKeyRequest(id = id, spec = spec, usages = usages),
-    ) as ManagedKey
 
     /** Persists a versioned descriptor without exporting it through the legacy key API. */
     override suspend fun addCrypto2Key(key: StoredKeyMaterial): String {
@@ -187,7 +182,7 @@ public class SqlDelightKeyStore(
 
     private suspend fun restoreStoredKey(stored: StoredKey): StoredKeyMaterial? = when (stored) {
         is StoredKey.Managed -> {
-            val restored = try {
+            val restoration = try {
                 managedKeyProvider.restoreManagedKey(stored)
             } catch (cause: SignumKeyInvalidatedException) {
                 throw KeyUseAuthorizationException(
@@ -208,24 +203,19 @@ public class SqlDelightKeyStore(
                     cause,
                 )
             }
-            val metadata = runCatching { managedKeyProvider.inspectManagedKey(stored) }
-                .getOrElse { cause ->
-                    throw KeyUseAuthorizationException(
-                        KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
-                        "Stored managed key metadata is invalid",
-                        cause,
-                    )
+            when (restoration) {
+                is PlatformManagedKeyRestoration.Missing -> {
+                    if (restoration.authorizationPolicy != KeyUseAuthorizationPolicy.None) {
+                        throw KeyUseAuthorizationException(
+                            KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
+                            "Protected mobile key '${stored.id.value}' is unavailable",
+                        )
+                    }
+                    null
                 }
-            if (restored == null) {
-                if (metadata.authorizationPolicy != KeyUseAuthorizationPolicy.None) {
-                    throw KeyUseAuthorizationException(
-                        KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
-                        "Protected mobile key '${stored.id.value}' is unavailable",
-                    )
-                }
-                null
-            } else {
-                restored.withAuthorizationFailureMapping(metadata.authorizationPolicy)
+
+                is PlatformManagedKeyRestoration.Restored ->
+                    restoration.key.withAuthorizationFailureMapping(restoration.authorizationPolicy)
             }
         }
         is StoredKey.Software -> try {
@@ -251,12 +241,6 @@ public class SqlDelightKeyStore(
                 )
             }
         }
-    }
-
-    private fun KeySpec.isPlatformManagedSpec(): Boolean = when (this) {
-        is KeySpec.Ec -> curve != id.walt.crypto2.keys.EcCurve.SECP256K1
-        is KeySpec.Rsa -> true
-        else -> false
     }
 
     private fun ManagedKey.withAuthorizationFailureMapping(

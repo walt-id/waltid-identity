@@ -2,6 +2,37 @@ public abstract interface class id/walt/crypto2/signum/SignumAuthenticationPolic
 	public static final field Companion Lid/walt/crypto2/signum/SignumAuthenticationPolicy$Companion;
 }
 
+public final class id/walt/crypto2/signum/SignumAuthenticationPolicy$BiometricCurrentSet : id/walt/crypto2/signum/SignumAuthenticationPolicy {
+	public static final field Companion Lid/walt/crypto2/signum/SignumAuthenticationPolicy$BiometricCurrentSet$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lid/walt/crypto2/signum/SignumAuthenticationPolicy$BiometricCurrentSet;
+	public static synthetic fun copy$default (Lid/walt/crypto2/signum/SignumAuthenticationPolicy$BiometricCurrentSet;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/crypto2/signum/SignumAuthenticationPolicy$BiometricCurrentSet;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCancelText ()Ljava/lang/String;
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/signum/SignumAuthenticationPolicy$BiometricCurrentSet$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/signum/SignumAuthenticationPolicy$BiometricCurrentSet$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/signum/SignumAuthenticationPolicy$BiometricCurrentSet;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/signum/SignumAuthenticationPolicy$BiometricCurrentSet;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/signum/SignumAuthenticationPolicy$BiometricCurrentSet$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class id/walt/crypto2/signum/SignumAuthenticationPolicy$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
@@ -12,45 +43,6 @@ public final class id/walt/crypto2/signum/SignumAuthenticationPolicy$None : id/w
 	public fun hashCode ()I
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 	public fun toString ()Ljava/lang/String;
-}
-
-public final class id/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence : id/walt/crypto2/signum/SignumAuthenticationPolicy {
-	public static final field Companion Lid/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence$Companion;
-	public fun <init> ()V
-	public fun <init> (ZZZILjava/lang/String;Ljava/lang/String;)V
-	public synthetic fun <init> (ZZZILjava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Z
-	public final fun component2 ()Z
-	public final fun component3 ()Z
-	public final fun component4 ()I
-	public final fun component5 ()Ljava/lang/String;
-	public final fun component6 ()Ljava/lang/String;
-	public final fun copy (ZZZILjava/lang/String;Ljava/lang/String;)Lid/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence;
-	public static synthetic fun copy$default (Lid/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence;ZZZILjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAllowNewBiometrics ()Z
-	public final fun getBiometric ()Z
-	public final fun getCancelText ()Ljava/lang/String;
-	public final fun getDeviceCredential ()Z
-	public final fun getPrompt ()Ljava/lang/String;
-	public final fun getTimeoutSeconds ()I
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final synthetic class id/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
-	public static final field INSTANCE Lid/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence$$serializer;
-	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
-	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence;
-	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
-	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
-	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence;)V
-	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
-	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
-}
-
-public final class id/walt/crypto2/signum/SignumAuthenticationPolicy$UserPresence$Companion {
-	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public final class id/walt/crypto2/signum/SignumHardwarePolicy : java/lang/Enum {
@@ -182,10 +174,6 @@ public final synthetic class id/walt/crypto2/signum/SignumKeyPolicy$$serializer 
 
 public final class id/walt/crypto2/signum/SignumKeyPolicy$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class id/walt/crypto2/signum/SignumKeyPolicyKt {
-	public static final fun isBiometricCurrentSet (Lid/walt/crypto2/signum/SignumAuthenticationPolicy;)Z
 }
 
 public final class id/walt/crypto2/signum/SignumKeyPolicyMismatchException : java/lang/IllegalStateException {

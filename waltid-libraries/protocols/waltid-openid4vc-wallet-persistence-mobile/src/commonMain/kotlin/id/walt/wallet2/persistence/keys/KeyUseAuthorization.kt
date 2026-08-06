@@ -3,6 +3,7 @@ package id.walt.wallet2.persistence.keys
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.ManagedKey
 import kotlinx.serialization.Serializable
 
 /** Immutable authorization policy selected when a wallet key is created. */
@@ -15,12 +16,22 @@ public enum class KeyUseAuthorizationPolicy {
     BiometricCurrentSet,
 }
 
-/** Text shown by the operating-system-owned authorization prompt. */
+/**
+ * Text used by operating-system-owned authorization UI.
+ *
+ * @property reason Reason displayed for the signing authorization request.
+ * @property cancelText Cancellation label where platform customization is supported.
+ */
 @Serializable
 public data class KeyUseAuthorizationPrompt(
-    public val message: String = "Please authorize cryptographic signature",
+    public val reason: String = "Please authorize cryptographic signature",
     public val cancelText: String = "Cancel",
-)
+) {
+    init {
+        require(reason.isNotBlank()) { "Authorization reason cannot be blank" }
+        require(cancelText.isNotBlank()) { "Authorization cancel text cannot be blank" }
+    }
+}
 
 /** Stable failure reasons exposed by the mobile wallet boundary. */
 @Serializable
@@ -36,28 +47,87 @@ public enum class KeyUseAuthorizationFailure {
 
 /** A stable wallet failure that does not require platform exception-message parsing. */
 public class KeyUseAuthorizationException(
+    /** Stable wallet-facing reason for the failure. */
     public val failure: KeyUseAuthorizationFailure,
     message: String,
     cause: Throwable? = null,
 ) : Exception(message, cause)
 
-/** Provider-neutral request for one managed native key. */
-public data class PlatformKeyRequest(
-    public val id: KeyId,
+/**
+ * Capabilities required from a wallet key.
+ *
+ * @property spec Cryptographic key specification.
+ * @property usages Operations the key must support.
+ * @property authorizationPolicy Authorization required for private-key use.
+ */
+public data class PlatformKeyRequirements(
     public val spec: KeySpec,
     public val usages: Set<KeyUsage>,
     public val authorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+) {
+    init {
+        require(usages.isNotEmpty()) { "Platform key usages cannot be empty" }
+    }
+}
+
+/**
+ * Request to create one platform-managed key.
+ *
+ * @property id Stable identifier assigned to the generated key.
+ * @property requirements Capabilities the generated key must satisfy.
+ * @property prompt Text used by OS-owned authorization UI.
+ */
+public data class PlatformKeyCreationRequest(
+    public val id: KeyId,
+    public val requirements: PlatformKeyRequirements,
     public val prompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
 )
 
-/** Result of checking whether an exact request can be enforced without fallback. */
-public data class PlatformKeyPreflight(
-    public val supported: Boolean,
-    public val failure: KeyUseAuthorizationFailure? = null,
-)
+/** Result of checking whether exact key requirements can be enforced without fallback. */
+public sealed interface PlatformKeyRequestSupport {
+    /** The platform can enforce every requested capability without fallback. */
+    public data object Supported : PlatformKeyRequestSupport
 
-/** Derived metadata for a persisted managed platform key. */
-public data class PlatformManagedKeyInfo(
-    public val authorizationPolicy: KeyUseAuthorizationPolicy,
-    public val isPlatformBacked: Boolean = true,
-)
+    /** The platform cannot enforce the requested capability set. */
+    public data class Unsupported(
+        /** Reason the exact requirements cannot currently be enforced. */
+        public val reason: PlatformKeyUnsupportedReason,
+    ) : PlatformKeyRequestSupport
+}
+
+/** Reasons an exact key-creation requirement cannot currently be enforced. */
+public enum class PlatformKeyUnsupportedReason {
+    UnsupportedCombination,
+    BiometricUnavailable,
+    BiometricNotEnrolled,
+    InteractionContextUnavailable,
+}
+
+/**
+ * Result of restoring one persisted managed key.
+ *
+ * The result retains the persisted authorization policy even when native key material is missing.
+ */
+public sealed interface PlatformManagedKeyRestoration {
+    /** Authorization policy persisted with the managed key. */
+    public val authorizationPolicy: KeyUseAuthorizationPolicy
+
+    /** Native key material was found and restored. */
+    public data class Restored(
+        /** Restored platform-managed key. */
+        public val key: ManagedKey,
+        override val authorizationPolicy: KeyUseAuthorizationPolicy,
+    ) : PlatformManagedKeyRestoration
+
+    /** Native key material is absent while its persisted policy remains known. */
+    public data class Missing(
+        override val authorizationPolicy: KeyUseAuthorizationPolicy,
+    ) : PlatformManagedKeyRestoration
+}
+
+internal fun PlatformKeyUnsupportedReason.toAuthorizationFailure(): KeyUseAuthorizationFailure = when (this) {
+    PlatformKeyUnsupportedReason.UnsupportedCombination -> KeyUseAuthorizationFailure.UnsupportedCombination
+    PlatformKeyUnsupportedReason.BiometricUnavailable -> KeyUseAuthorizationFailure.BiometricUnavailable
+    PlatformKeyUnsupportedReason.BiometricNotEnrolled -> KeyUseAuthorizationFailure.BiometricNotEnrolled
+    PlatformKeyUnsupportedReason.InteractionContextUnavailable -> KeyUseAuthorizationFailure.InteractionContextUnavailable
+}

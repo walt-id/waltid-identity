@@ -25,10 +25,14 @@ import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.PlatformKeyPreflight
-import id.walt.wallet2.persistence.keys.PlatformKeyRequest
-import id.walt.wallet2.persistence.keys.PlatformManagedKeyInfo
+import id.walt.wallet2.persistence.keys.PlatformKeyCreationRequest
+import id.walt.wallet2.persistence.keys.PlatformKeyRequirements
+import id.walt.wallet2.persistence.keys.PlatformKeyRequestSupport
+import id.walt.wallet2.persistence.keys.PlatformKeyUnsupportedReason
+import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import kotlinx.coroutines.test.runTest
@@ -156,6 +160,63 @@ class MobileWalletFactoryTest {
         }
     }
 
+    @Test
+    fun `bootstrap resolves configured and per-call authorization policies`() = runTest {
+        val cases = listOf(
+            PolicyCase(
+                configured = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                requested = null,
+                expected = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+            ),
+            PolicyCase(
+                configured = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                requested = KeyUseAuthorizationPolicy.None,
+                expected = KeyUseAuthorizationPolicy.None,
+            ),
+        )
+
+        cases.forEach { case ->
+            database().use { database ->
+                val provider = FakePlatformManagedKeyProvider()
+                wallet(
+                    config = MobileWalletConfig(defaultKeyUseAuthorizationPolicy = case.configured),
+                    database = database,
+                    provider = provider,
+                ).bootstrap(keyUseAuthorizationPolicy = case.requested)
+
+                assertEquals(listOf(case.expected), provider.generatedPolicies)
+            }
+        }
+    }
+
+    @Test
+    fun `protected bootstrap fails closed when preflight is unsupported`() = runTest {
+        database().use { database ->
+            val provider = FakePlatformManagedKeyProvider().apply {
+                preflightResult = PlatformKeyRequestSupport.Unsupported(
+                    PlatformKeyUnsupportedReason.BiometricNotEnrolled,
+                )
+            }
+
+            val failure = assertFailsWith<KeyUseAuthorizationException> {
+                wallet(
+                    config = MobileWalletConfig(
+                        defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                    ),
+                    database = database,
+                    provider = provider,
+                ).bootstrap()
+            }
+
+            assertEquals(
+                KeyUseAuthorizationFailure.BiometricNotEnrolled,
+                failure.failure,
+            )
+            assertEquals(0, provider.generateCount)
+            assertTrue(database.queries.selectAll().executeAsList().isEmpty())
+        }
+    }
+
     private fun wallet(
         config: MobileWalletConfig,
         database: TestDatabase,
@@ -208,6 +269,12 @@ class MobileWalletFactoryTest {
         val signatureAlgorithm: SignatureAlgorithm,
     )
 
+    private data class PolicyCase(
+        val configured: KeyUseAuthorizationPolicy,
+        val requested: KeyUseAuthorizationPolicy?,
+        val expected: KeyUseAuthorizationPolicy,
+    )
+
     private class TestDatabase(
         private val driver: JdbcSqliteDriver,
         val database: WalletPersistenceDatabase,
@@ -222,21 +289,27 @@ class MobileWalletFactoryTest {
         private val keys = mutableMapOf<KeyId, SoftwareKey>()
         var generateCount = 0
         var deleteCount = 0
+        var preflightResult: PlatformKeyRequestSupport = PlatformKeyRequestSupport.Supported
+        val generatedPolicies = mutableListOf<KeyUseAuthorizationPolicy>()
 
-        override suspend fun preflight(request: PlatformKeyRequest): PlatformKeyPreflight =
-            PlatformKeyPreflight(true)
+        override suspend fun preflight(requirements: PlatformKeyRequirements): PlatformKeyRequestSupport =
+            preflightResult
 
-        override suspend fun generateManagedKey(request: PlatformKeyRequest): ManagedKey {
+        override suspend fun generateManagedKey(request: PlatformKeyCreationRequest): ManagedKey {
             generateCount++
-            val software = softwareProvider.generate(GenerateSoftwareKeyRequest(request.id, request.spec, request.usages))
+            generatedPolicies += request.requirements.authorizationPolicy
+            val software = softwareProvider.generate(
+                GenerateSoftwareKeyRequest(request.id, request.requirements.spec, request.requirements.usages)
+            )
             keys[request.id] = software
-            val publicKey = assertNotNull(software.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(request.spec)
+            val publicKey = assertNotNull(software.capabilities.publicKeyExporter)
+                .exportPublicKey().toPublicJwk(request.requirements.spec)
             return managedKey(
                 StoredKey.Managed(
                     version = StoredKey.CURRENT_VERSION,
                     id = request.id,
-                    spec = request.spec,
-                    usages = request.usages,
+                    spec = request.requirements.spec,
+                    usages = request.requirements.usages,
                     provider = PROVIDER_ID,
                     providerSchemaVersion = 1,
                     providerData = BinaryData(request.id.value.encodeToByteArray()),
@@ -246,18 +319,20 @@ class MobileWalletFactoryTest {
             )
         }
 
-        override suspend fun restoreManagedKey(stored: StoredKey.Managed): ManagedKey? {
+        override suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration {
             require(stored.provider == PROVIDER_ID)
-            return keys[stored.id]?.let { managedKey(stored, it) }
+            return keys[stored.id]?.let {
+                PlatformManagedKeyRestoration.Restored(
+                    key = managedKey(stored, it),
+                    authorizationPolicy = KeyUseAuthorizationPolicy.None,
+                )
+            } ?: PlatformManagedKeyRestoration.Missing(KeyUseAuthorizationPolicy.None)
         }
 
         override suspend fun deleteManagedKey(stored: StoredKey.Managed) {
             deleteCount++
             keys.remove(stored.id)
         }
-
-        override fun inspectManagedKey(stored: StoredKey.Managed): PlatformManagedKeyInfo =
-            PlatformManagedKeyInfo(KeyUseAuthorizationPolicy.None)
 
         private fun managedKey(stored: StoredKey.Managed, software: SoftwareKey): ManagedKey = object : ManagedKey {
             override val storedKey = stored

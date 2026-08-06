@@ -31,12 +31,7 @@ class IosSignumKeyBackendPolicyTest {
     @Test
     fun `biometric current set requires every-use authentication and Secure Enclave`() {
         val policy = SignumKeyPolicy(
-            authentication = SignumAuthenticationPolicy.UserPresence(
-                biometric = true,
-                allowNewBiometrics = false,
-                deviceCredential = false,
-                timeoutSeconds = 0,
-            ),
+            authentication = SignumAuthenticationPolicy.BiometricCurrentSet(),
         )
 
         assertFailsWith<SignumKeyPolicyMismatchException> {

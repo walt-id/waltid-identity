@@ -13,7 +13,6 @@ import id.walt.crypto2.signum.SignumKeyNotFoundException
 import id.walt.crypto2.signum.SignumKeyOptions
 import id.walt.crypto2.signum.SignumKeyPolicy
 import id.walt.crypto2.signum.SignumManagedKeyProvider
-import id.walt.crypto2.signum.isBiometricCurrentSet
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCObjectVar
@@ -29,66 +28,64 @@ import platform.LocalAuthentication.LAPolicyDeviceOwnerAuthenticationWithBiometr
 
 /** Managed-key provider backed by iOS Keychain and Secure Enclave. */
 public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
-    private val signumProvider = SignumManagedKeyProvider(IosSignumKeyBackend())
+    private val backend = IosSignumKeyBackend()
+    private val signumProvider = SignumManagedKeyProvider(backend)
 
     @OptIn(ExperimentalForeignApi::class)
-    override suspend fun preflight(request: PlatformKeyRequest): PlatformKeyPreflight {
-        if (request.authorizationPolicy == KeyUseAuthorizationPolicy.None) {
-            return PlatformKeyPreflight(true)
+    override suspend fun preflight(requirements: PlatformKeyRequirements): PlatformKeyRequestSupport {
+        val signumPolicy = requirements.authorizationPolicy.toSignumPolicy()
+        if (!backend.supports(requirements.spec, requirements.usages, signumPolicy)) {
+            return PlatformKeyRequestSupport.Unsupported(PlatformKeyUnsupportedReason.UnsupportedCombination)
+        }
+        if (requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None) {
+            return PlatformKeyRequestSupport.Supported
         }
         val failure = when {
-            request.spec != KeySpec.Ec(EcCurve.P256) ||
-                request.usages != setOf(KeyUsage.SIGN, KeyUsage.VERIFY) ->
-                KeyUseAuthorizationFailure.UnsupportedCombination
-            isSimulator -> KeyUseAuthorizationFailure.BiometricUnavailable
+            requirements.spec != KeySpec.Ec(EcCurve.P256) ||
+                requirements.usages != setOf(KeyUsage.SIGN, KeyUsage.VERIFY) ->
+                PlatformKeyUnsupportedReason.UnsupportedCombination
+            isSimulator -> PlatformKeyUnsupportedReason.BiometricUnavailable
             else -> biometricAvailabilityFailure()
         }
-        return PlatformKeyPreflight(failure == null, failure)
+        return failure?.let { PlatformKeyRequestSupport.Unsupported(it) }
+            ?: PlatformKeyRequestSupport.Supported
     }
 
-    override suspend fun generateManagedKey(request: PlatformKeyRequest): ManagedKey = signumProvider.generate(
+    override suspend fun generateManagedKey(request: PlatformKeyCreationRequest): ManagedKey = signumProvider.generate(
         GenerateManagedKeyRequest(
             id = request.id,
-            spec = request.spec,
-            usages = request.usages,
+            spec = request.requirements.spec,
+            usages = request.requirements.usages,
             providerOptions = SignumKeyOptions(policy = request.toSignumPolicy()).encode(),
         )
     )
 
-    override suspend fun restoreManagedKey(stored: StoredKey.Managed): ManagedKey? = try {
-        signumProvider.restore(stored)
-    } catch (_: SignumKeyNotFoundException) {
-        null
+    override suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration {
+        val policy = signumProvider.inspect(stored).policy.toWalletPolicy()
+        return try {
+            PlatformManagedKeyRestoration.Restored(signumProvider.restore(stored), policy)
+        } catch (_: SignumKeyNotFoundException) {
+            PlatformManagedKeyRestoration.Missing(policy)
+        }
     }
 
     override suspend fun deleteManagedKey(stored: StoredKey.Managed) {
         signumProvider.delete(stored, expectedAlias = stored.id.value)
     }
 
-    override fun inspectManagedKey(stored: StoredKey.Managed): PlatformManagedKeyInfo {
-        val info = signumProvider.inspect(stored)
-        return PlatformManagedKeyInfo(
-            authorizationPolicy = info.policy.toWalletPolicy(),
-        )
-    }
-
-    private fun PlatformKeyRequest.toSignumPolicy(): SignumKeyPolicy = when (authorizationPolicy) {
+    private fun PlatformKeyCreationRequest.toSignumPolicy(): SignumKeyPolicy = when (requirements.authorizationPolicy) {
         KeyUseAuthorizationPolicy.None -> SignumKeyPolicy()
         KeyUseAuthorizationPolicy.BiometricCurrentSet -> SignumKeyPolicy(
             hardware = SignumHardwarePolicy.REQUIRED,
-            authentication = SignumAuthenticationPolicy.UserPresence(
-                biometric = true,
-                allowNewBiometrics = false,
-                deviceCredential = false,
-                timeoutSeconds = 0,
-                prompt = prompt.message,
+            authentication = SignumAuthenticationPolicy.BiometricCurrentSet(
+                reason = prompt.reason,
                 cancelText = prompt.cancelText,
             ),
         )
     }
 
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
-    private fun biometricAvailabilityFailure(): KeyUseAuthorizationFailure? = memScoped {
+    private fun biometricAvailabilityFailure(): PlatformKeyUnsupportedReason? = memScoped {
         val error = alloc<ObjCObjectVar<platform.Foundation.NSError?>>()
         val available = LAContext().canEvaluatePolicy(
             LAPolicyDeviceOwnerAuthenticationWithBiometrics,
@@ -96,18 +93,24 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
         )
         if (available) return@memScoped null
         when (error.value?.code) {
-            LAErrorBiometryNotEnrolled -> KeyUseAuthorizationFailure.BiometricNotEnrolled
-            LAErrorBiometryNotAvailable -> KeyUseAuthorizationFailure.BiometricUnavailable
-            else -> KeyUseAuthorizationFailure.BiometricUnavailable
+            LAErrorBiometryNotEnrolled -> PlatformKeyUnsupportedReason.BiometricNotEnrolled
+            LAErrorBiometryNotAvailable -> PlatformKeyUnsupportedReason.BiometricUnavailable
+            else -> PlatformKeyUnsupportedReason.BiometricUnavailable
         }
+    }
+
+    private fun KeyUseAuthorizationPolicy.toSignumPolicy(): SignumKeyPolicy = when (this) {
+        KeyUseAuthorizationPolicy.None -> SignumKeyPolicy()
+        KeyUseAuthorizationPolicy.BiometricCurrentSet -> SignumKeyPolicy(
+            hardware = SignumHardwarePolicy.REQUIRED,
+            authentication = SignumAuthenticationPolicy.BiometricCurrentSet(),
+        )
     }
 }
 
 private fun SignumKeyPolicy.toWalletPolicy(): KeyUseAuthorizationPolicy = when (val authentication = authentication) {
     SignumAuthenticationPolicy.None -> KeyUseAuthorizationPolicy.None
-    is SignumAuthenticationPolicy.UserPresence -> if (
-        authentication.isBiometricCurrentSet() && hardware == SignumHardwarePolicy.REQUIRED
-    ) {
+    is SignumAuthenticationPolicy.BiometricCurrentSet -> if (hardware == SignumHardwarePolicy.REQUIRED) {
         KeyUseAuthorizationPolicy.BiometricCurrentSet
     } else {
         throw KeyUseAuthorizationException(

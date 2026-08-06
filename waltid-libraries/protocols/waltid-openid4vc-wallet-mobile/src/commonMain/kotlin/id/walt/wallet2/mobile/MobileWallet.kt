@@ -14,10 +14,8 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.PlatformKeyPreflight
+import id.walt.wallet2.persistence.keys.PlatformKeyRequestSupport
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.PresentationCredentialOption
 import id.walt.wallet2.handlers.PresentationCredentialRequirement
@@ -185,11 +183,8 @@ public class MobileWallet internal constructor(
     private val keyStore: WalletKeyStore,
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
-    private val generateAndPersistKey: suspend (MobileWalletKeyType) -> Key,
-    private val generateAndPersistKeyWithPolicy: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> Key =
-        { keyType, _ -> generateAndPersistKey(keyType) },
-    private val runKeyUseAuthorizationPreflight: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> PlatformKeyPreflight =
-        { _, _ -> PlatformKeyPreflight(true) },
+    private val generateAndPersistKey: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> Key,
+    private val runKeyUseAuthorizationPreflight: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> PlatformKeyRequestSupport,
     private val didService: Crypto2DidService = Crypto2DidService,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     private val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
@@ -260,13 +255,6 @@ public class MobileWallet internal constructor(
 
         val effectiveKeyType = keyType ?: defaultKeyType
         val effectivePolicy = keyUseAuthorizationPolicy ?: defaultKeyUseAuthorizationPolicy
-        val preflight = runKeyUseAuthorizationPreflight(effectiveKeyType, effectivePolicy)
-        if (!preflight.supported) {
-            throw KeyUseAuthorizationException(
-                preflight.failure ?: KeyUseAuthorizationFailure.UnsupportedCombination,
-                "The requested mobile key authorization policy is unavailable",
-            )
-        }
         return createKeyAndDid(effectiveKeyType, didMethod, effectivePolicy)
     }
 
@@ -274,7 +262,7 @@ public class MobileWallet internal constructor(
     public suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType = defaultKeyType,
         keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy,
-    ): PlatformKeyPreflight = runKeyUseAuthorizationPreflight(keyType, keyUseAuthorizationPolicy)
+    ): PlatformKeyRequestSupport = runKeyUseAuthorizationPreflight(keyType, keyUseAuthorizationPolicy)
 
     private suspend fun createKeyAndDid(
         keyType: MobileWalletKeyType,
@@ -287,7 +275,7 @@ public class MobileWallet internal constructor(
             "jwk" -> DidJwkCreateOptions()
             else -> throw IllegalArgumentException("Mobile bootstrap supports only did:key and did:jwk")
         }
-        val key = generateAndPersistKeyWithPolicy(keyType, keyUseAuthorizationPolicy)
+        val key = generateAndPersistKey(keyType, keyUseAuthorizationPolicy)
         try {
             val didResult = didService.registerByKey(normalizedMethod, key, options)
             didStore.addDid(

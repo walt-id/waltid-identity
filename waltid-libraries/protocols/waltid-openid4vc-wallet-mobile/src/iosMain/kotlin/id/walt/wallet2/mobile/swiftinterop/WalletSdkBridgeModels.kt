@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.credentials.CredentialParser
@@ -21,11 +23,14 @@ import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
+import id.walt.wallet2.persistence.keys.PlatformKeyRequestSupport
+import id.walt.wallet2.persistence.keys.PlatformKeyUnsupportedReason
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import id.walt.x509.CertificateDer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -44,6 +49,8 @@ import kotlin.time.Instant
  * @property preferredLocales Ordered BCP 47 locale preferences used to select display metadata.
  * @property transactionDataProfiles Transaction data profiles this wallet accepts.
  * @property clientIdTrustConfiguration Trust anchors used to authenticate verifier Request Objects.
+ * @property defaultKeyUseAuthorizationPolicy Default authorization policy for newly created wallet keys.
+ * @property keyUseAuthorizationPrompt Prompt text used for protected signing operations.
  */
 public data class WalletBridgeConfiguration(
     public val walletId: String = "default",
@@ -57,6 +64,20 @@ public data class WalletBridgeConfiguration(
     public val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
     public val keyUseAuthorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
 )
+
+/** Swift-friendly result of a key-use authorization preflight. */
+@Serializable
+public data class WalletBridgeKeyPreflight(
+    /** Whether the requested authorization policy can be enforced exactly. */
+    public val supported: Boolean,
+    /** Core preflight reason when the request is unsupported. */
+    public val failure: PlatformKeyUnsupportedReason? = null,
+)
+
+internal fun PlatformKeyRequestSupport.toBridgeModel(): WalletBridgeKeyPreflight = when (this) {
+    PlatformKeyRequestSupport.Supported -> WalletBridgeKeyPreflight(supported = true)
+    is PlatformKeyRequestSupport.Unsupported -> WalletBridgeKeyPreflight(supported = false, failure = reason)
+}
 
 /**
  * Verifier Request Object trust configuration exposed to the Swift wallet bridge.
@@ -350,6 +371,9 @@ public enum class WalletBridgeErrorCategory {
     /** The operation was cancelled. */
     cancelled,
 
+    /** Key-use authorization was unavailable or was not completed. */
+    authorization,
+
     /** Unexpected wallet failure that does not fit a narrower category. */
     internalFailure,
 }
@@ -360,21 +384,24 @@ public enum class WalletBridgeErrorCategory {
  * @property category Coarse failure category.
  * @property message Human-readable failure message.
  * @property causeClass Kotlin exception class name when available.
+ * @property authorizationFailure Stable key-use authorization failure when authorization is the category.
  */
 @Serializable
-public data class WalletBridgeError(
-    val category: WalletBridgeErrorCategory,
-    val message: String,
-    val causeClass: String? = null,
-    val authorizationFailure: KeyUseAuthorizationFailure? = null,
+public class WalletBridgeError internal constructor(
+    public val category: WalletBridgeErrorCategory,
+    public val message: String,
+    public val causeClass: String? = null,
+    public val authorizationFailure: KeyUseAuthorizationFailure? = null,
 ) {
     internal companion object {
         fun fromThrowable(throwable: Throwable): WalletBridgeError {
-            val category = when (throwable) {
-                is CancellationException -> WalletBridgeErrorCategory.cancelled
-                is IllegalArgumentException -> WalletBridgeErrorCategory.invalidInput
-                is PreviewSessionException -> WalletBridgeErrorCategory.invalidInput
-                is WalletPersistenceException -> WalletBridgeErrorCategory.storage
+            val authorizationFailure = (throwable as? KeyUseAuthorizationException)?.failure
+            val category = when {
+                authorizationFailure != null -> WalletBridgeErrorCategory.authorization
+                throwable is CancellationException -> WalletBridgeErrorCategory.cancelled
+                throwable is IllegalArgumentException -> WalletBridgeErrorCategory.invalidInput
+                throwable is PreviewSessionException -> WalletBridgeErrorCategory.invalidInput
+                throwable is WalletPersistenceException -> WalletBridgeErrorCategory.storage
                 else -> WalletBridgeErrorCategory.internalFailure
             }
 
@@ -382,7 +409,7 @@ public data class WalletBridgeError(
                 category = category,
                 message = throwable.message ?: throwable::class.simpleName ?: "Unknown wallet error",
                 causeClass = throwable::class.simpleName,
-                authorizationFailure = (throwable as? KeyUseAuthorizationException)?.failure,
+                authorizationFailure = authorizationFailure,
             )
         }
     }

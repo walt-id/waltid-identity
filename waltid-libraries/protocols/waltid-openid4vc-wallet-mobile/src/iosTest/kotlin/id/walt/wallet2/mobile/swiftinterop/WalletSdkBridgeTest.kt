@@ -36,6 +36,9 @@ import id.walt.wallet2.mobile.MobileWalletTransactionCodeInputMode
 import id.walt.wallet2.mobile.MobileWalletTransactionCodeRequirement
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.wallet2.persistence.keys.PlatformKeyRequestSupport
+import id.walt.wallet2.persistence.keys.PlatformKeyUnsupportedReason
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.x509.CertificateDer
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -102,6 +105,40 @@ class WalletSdkBridgeTest {
         assertEquals("did:jwk:issuer", result.value.did)
         assertEquals(MobileWalletKeyType.secp256r1, operations.bootstrapKeyType)
         assertEquals("jwk", operations.bootstrapDidMethod)
+    }
+
+    @Test
+    fun bridgeBootstrapForwardsAuthorizationPolicy() = runTest {
+        val operations = FakeWalletSdkBridgeOperations()
+        val bridge = WalletSdkBridge.forOperations(operations)
+
+        bridge.bootstrap(
+            keyType = MobileWalletKeyType.secp256r1,
+            keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+        )
+
+        assertEquals(KeyUseAuthorizationPolicy.BiometricCurrentSet, operations.bootstrapAuthorizationPolicy)
+    }
+
+    @Test
+    fun bridgePreflightForwardsArgumentsAndMapsUnsupportedReason() = runTest {
+        val operations = FakeWalletSdkBridgeOperations(
+            preflightResult = PlatformKeyRequestSupport.Unsupported(
+                PlatformKeyUnsupportedReason.BiometricNotEnrolled,
+            ),
+        )
+        val bridge = WalletSdkBridge.forOperations(operations)
+
+        val result = bridge.keyUseAuthorizationPreflight(
+            keyType = MobileWalletKeyType.secp256r1,
+            policy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+        )
+
+        val preflight = assertIs<WalletBridgeResult.Success<WalletBridgeKeyPreflight>>(result).value
+        assertEquals(false, preflight.supported)
+        assertEquals(PlatformKeyUnsupportedReason.BiometricNotEnrolled, preflight.failure)
+        assertEquals(MobileWalletKeyType.secp256r1, operations.preflightKeyType)
+        assertEquals(KeyUseAuthorizationPolicy.BiometricCurrentSet, operations.preflightPolicy)
     }
 
     @Test
@@ -582,10 +619,17 @@ class WalletSdkBridgeTest {
     private class FakeWalletSdkBridgeOperations(
         private val receiveFailure: Throwable? = null,
         private val previewResult: MobileWalletPresentationPreviewResult? = null,
+        private val preflightResult: PlatformKeyRequestSupport = PlatformKeyRequestSupport.Supported,
     ) : WalletSdkBridgeOperations {
         var bootstrapKeyType: MobileWalletKeyType? = null
             private set
         var bootstrapDidMethod: String? = null
+            private set
+        var bootstrapAuthorizationPolicy: KeyUseAuthorizationPolicy? = null
+            private set
+        var preflightKeyType: MobileWalletKeyType? = null
+            private set
+        var preflightPolicy: KeyUseAuthorizationPolicy? = null
             private set
         var resolvedOfferUrl: String? = null
             private set
@@ -618,13 +662,24 @@ class WalletSdkBridgeTest {
         override suspend fun bootstrap(
             keyType: MobileWalletKeyType?,
             didMethod: String,
+            keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy?,
         ): MobileWalletBootstrapResult {
             bootstrapKeyType = keyType
             bootstrapDidMethod = didMethod
+            bootstrapAuthorizationPolicy = keyUseAuthorizationPolicy
             return MobileWalletBootstrapResult(
                 keyId = "key-1",
                 did = "did:jwk:issuer",
             )
+        }
+
+        override suspend fun keyUseAuthorizationPreflight(
+            keyType: MobileWalletKeyType,
+            policy: KeyUseAuthorizationPolicy,
+        ): PlatformKeyRequestSupport {
+            preflightKeyType = keyType
+            preflightPolicy = policy
+            return preflightResult
         }
 
         override suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution {

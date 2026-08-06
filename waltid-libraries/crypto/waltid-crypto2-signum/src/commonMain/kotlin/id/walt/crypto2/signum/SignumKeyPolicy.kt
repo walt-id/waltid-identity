@@ -32,19 +32,12 @@ sealed interface SignumAuthenticationPolicy {
     data object None : SignumAuthenticationPolicy
 
     @Serializable
-    data class UserPresence(
-        val biometric: Boolean = true,
-        val allowNewBiometrics: Boolean = false,
-        val deviceCredential: Boolean = true,
-        val timeoutSeconds: Int = 0,
-        val prompt: String = "Please authorize cryptographic operation",
+    data class BiometricCurrentSet(
+        val reason: String = "Please authorize cryptographic operation",
         val cancelText: String = "Cancel",
     ) : SignumAuthenticationPolicy {
         init {
-            require(biometric || deviceCredential) { "At least one authentication factor must be enabled" }
-            require(biometric || !allowNewBiometrics) { "New biometrics cannot be allowed when biometrics are disabled" }
-            require(timeoutSeconds >= 0) { "Authentication timeout cannot be negative" }
-            require(prompt.isNotBlank()) { "Authentication prompt cannot be blank" }
+            require(reason.isNotBlank()) { "Authentication reason cannot be blank" }
             require(cancelText.isNotBlank()) { "Authentication cancel text cannot be blank" }
         }
     }
@@ -75,11 +68,3 @@ internal fun SignumKeyPolicy.effectiveProtection(attestation: SignumKeyAttestati
     hardware == SignumHardwarePolicy.DISCOURAGED -> SignumProtectionLevel.SOFTWARE
     else -> SignumProtectionLevel.UNKNOWN
 }
-
-/** Whether this policy requires one strong biometric for every private-key operation. */
-public fun SignumAuthenticationPolicy.isBiometricCurrentSet(): Boolean =
-    this is SignumAuthenticationPolicy.UserPresence &&
-        biometric &&
-        !allowNewBiometrics &&
-        !deviceCredential &&
-        timeoutSeconds == 0

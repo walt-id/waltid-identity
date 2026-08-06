@@ -88,7 +88,9 @@ public class AndroidSignumKeyBackend(
             attestation = attestation,
             authentication = policy.authentication,
             signerFor = { algorithm: SignatureAlgorithm ->
-                val interactionContext = policy.authentication.takeIf { it.isBiometricCurrentSet() }
+                val interactionContext = policy.authentication.takeIf {
+                    it is SignumAuthenticationPolicy.BiometricCurrentSet
+                }
                     ?.let { requireInteractionContext(alias) }
                 AndroidKeyStoreProvider.getSignerForKey(alias) {
                     configureSignumOperation(algorithm, policy.authentication)
@@ -113,7 +115,9 @@ public class AndroidSignumKeyBackend(
         policy: SignumKeyPolicy,
         alias: String,
     ) {
-        if (policy.hardware != SignumHardwarePolicy.REQUIRED && !policy.authentication.isBiometricCurrentSet()) return
+        if (policy.hardware != SignumHardwarePolicy.REQUIRED &&
+            policy.authentication !is SignumAuthenticationPolicy.BiometricCurrentSet
+        ) return
         val androidSigner = signer as? AndroidKeystoreSigner
             ?: throw SignumKeyPolicyMismatchException(alias, "the native signer is not Android Keystore-backed")
         val info = androidSigner.keyInfo
@@ -167,7 +171,7 @@ internal fun validateAndroidNativePolicy(
             throw SignumKeyPolicyMismatchException(alias, "the native key is not backed by a hardware security level")
         }
     }
-    if (policy.authentication.isBiometricCurrentSet()) {
+    if (policy.authentication is SignumAuthenticationPolicy.BiometricCurrentSet) {
         if (!isUserAuthenticationRequired ||
             userAuthenticationValidityDurationSeconds > 0 ||
             !isInvalidatedByBiometricEnrollment

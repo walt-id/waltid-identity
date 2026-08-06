@@ -24,9 +24,10 @@ import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
-import id.walt.wallet2.persistence.keys.PlatformKeyPreflight
-import id.walt.wallet2.persistence.keys.PlatformKeyRequest
-import id.walt.wallet2.persistence.keys.PlatformManagedKeyInfo
+import id.walt.wallet2.persistence.keys.PlatformKeyCreationRequest
+import id.walt.wallet2.persistence.keys.PlatformKeyRequirements
+import id.walt.wallet2.persistence.keys.PlatformKeyRequestSupport
+import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -45,7 +46,12 @@ class SqlDelightKeyStoreRestartTest {
         database().use { database ->
             val provider = FakePlatformManagedKeyProvider()
             val store = SqlDelightKeyStore(provider, database.queries)
-            val key = store.generateManagedKey(KeyId("managed"), KeySpec.Ec(EcCurve.P256), KEY_USAGES)
+            val key = store.generateKey(
+                PlatformKeyCreationRequest(
+                    id = KeyId("managed"),
+                    requirements = PlatformKeyRequirements(KeySpec.Ec(EcCurve.P256), KEY_USAGES),
+                )
+            )
 
             val persisted = database.queries.selectByKeyId(key.id.value).executeAsOne()
             assertIs<StoredKey.Managed>(StoredKeyCodec.decodeFromString(persisted.stored_key))
@@ -73,7 +79,12 @@ class SqlDelightKeyStoreRestartTest {
             database.failKeyInserts()
 
             assertFails {
-                store.generateManagedKey(id, KeySpec.Ec(EcCurve.P256), KEY_USAGES)
+                store.generateKey(
+                    PlatformKeyCreationRequest(
+                        id = id,
+                        requirements = PlatformKeyRequirements(KeySpec.Ec(EcCurve.P256), KEY_USAGES),
+                    )
+                )
             }
 
             assertEquals(1, provider.deleteCount)
@@ -248,11 +259,13 @@ class SqlDelightKeyStoreRestartTest {
             )
             val store = SqlDelightKeyStore(provider, database.queries)
             val key = store.generateKey(
-                PlatformKeyRequest(
+                PlatformKeyCreationRequest(
                     id = KeyId("protected-cancelled"),
-                    spec = KeySpec.Ec(EcCurve.P256),
-                    usages = KEY_USAGES,
-                    authorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                    requirements = PlatformKeyRequirements(
+                        spec = KeySpec.Ec(EcCurve.P256),
+                        usages = KEY_USAGES,
+                        authorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                    ),
                 )
             )
 
@@ -274,11 +287,13 @@ class SqlDelightKeyStoreRestartTest {
             )
             val store = SqlDelightKeyStore(provider, database.queries)
             val key = store.generateKey(
-                PlatformKeyRequest(
+                PlatformKeyCreationRequest(
                     id = KeyId("protected-missing-sign"),
-                    spec = KeySpec.Ec(EcCurve.P256),
-                    usages = KEY_USAGES,
-                    authorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                    requirements = PlatformKeyRequirements(
+                        spec = KeySpec.Ec(EcCurve.P256),
+                        usages = KEY_USAGES,
+                        authorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                    ),
                 )
             )
 
@@ -301,7 +316,9 @@ class SqlDelightKeyStoreRestartTest {
                 stored_key = StoredKeyCodec.encodeToString(stored),
             )
             val store = SqlDelightKeyStore(
-                FakePlatformManagedKeyProvider(inspectFailure = IllegalArgumentException("bad policy")),
+                FakePlatformManagedKeyProvider(
+                    inspectFailure = SignumStoredKeyMetadataException("bad policy"),
+                ),
                 database.queries,
             )
 
@@ -364,29 +381,30 @@ class SqlDelightKeyStoreRestartTest {
         val managedIds = mutableSetOf<KeyId>()
         var deleteCount = 0
 
-        override suspend fun preflight(request: PlatformKeyRequest): PlatformKeyPreflight =
-            PlatformKeyPreflight(true)
+        override suspend fun preflight(requirements: PlatformKeyRequirements): PlatformKeyRequestSupport =
+            PlatformKeyRequestSupport.Supported
 
-        override suspend fun generateManagedKey(request: PlatformKeyRequest): ManagedKey {
+        override suspend fun generateManagedKey(request: PlatformKeyCreationRequest): ManagedKey {
             managedIds += request.id
-            return managedKey(descriptor(request.id, request.spec, request.usages))
+            return managedKey(descriptor(request.id, request.requirements.spec, request.requirements.usages))
         }
 
-        override suspend fun restoreManagedKey(stored: StoredKey.Managed): ManagedKey? {
+        override suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration {
             restoreFailure?.let { throw it }
-            if (stored.id !in managedIds) return null
-            return managedKey(stored)
+            inspectFailure?.let { throw it }
+            if (stored.id !in managedIds) {
+                return PlatformManagedKeyRestoration.Missing(authorizationPolicy)
+            }
+            return PlatformManagedKeyRestoration.Restored(
+                key = managedKey(stored),
+                authorizationPolicy = authorizationPolicy,
+            )
         }
 
         override suspend fun deleteManagedKey(stored: StoredKey.Managed) {
             deleteFailure?.let { throw it }
             managedIds -= stored.id
             deleteCount++
-        }
-
-        override fun inspectManagedKey(stored: StoredKey.Managed): PlatformManagedKeyInfo {
-            inspectFailure?.let { throw it }
-            return PlatformManagedKeyInfo(authorizationPolicy)
         }
 
         private fun descriptor(id: KeyId, spec: KeySpec, usages: Set<KeyUsage>) = StoredKey.Managed(
