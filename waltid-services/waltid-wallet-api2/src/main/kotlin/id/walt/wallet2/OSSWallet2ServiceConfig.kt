@@ -1,6 +1,9 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.wallet2
 
 import id.walt.commons.config.WaltConfig
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -26,7 +29,15 @@ data class OSSWallet2ServiceConfig(
     /** Public-facing base URL for this wallet service. */
     val publicBaseUrl: Url,
     val attestationConfig: WalletAttestationConfig? = null,
+    val clientIdTrust: ClientIdTrustConfig = ClientIdTrustConfig(),
 ) : WaltConfig()
+
+@Serializable
+data class ClientIdTrustConfig(
+    val x509TrustAnchors: List<String> = emptyList(),
+    val trustedVerifierAttestationIssuers: Set<String> = emptySet(),
+    val preRegisteredClients: Map<String, ClientMetadata> = emptyMap(),
+)
 
 @Serializable
 data class WalletAttestationConfig(

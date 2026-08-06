@@ -429,15 +429,22 @@ class Issuer2MetadataEndpointTest {
             ?: error("Could not locate waltid-issuer-api2 config directory")
 
     private companion object {
-        const val ISSUER_AUTHORITY_BASE_URL = "http://localhost:7005"
         const val OPENID4VCI_PREFIX = "/openid4vci"
-        const val ISSUER_BASE_URL = "$ISSUER_AUTHORITY_BASE_URL/openid4vci"
+
+        /**
+         * Taken from the config files this test loads rather than hardcoded: the deployed port is owned by
+         * `web.conf`/`issuer-service.conf`, and pinning it here only produced a test failure the next time it
+         * changed.
+         */
+        val ISSUER_AUTHORITY_BASE_URL: String
+            get() = ConfigManager.getConfig<Issuer2ServiceConfig>().baseUrl.trimEnd('/')
+        val ISSUER_BASE_URL: String get() = "$ISSUER_AUTHORITY_BASE_URL$OPENID4VCI_PREFIX"
         const val AUTHORIZATION_SERVER_METADATA_PATH = "/.well-known/oauth-authorization-server/openid4vci"
         const val JWT_VC_ISSUER_METADATA_PATH = "/.well-known/jwt-vc-issuer/openid4vci"
         const val NESTED_JWT_VC_ISSUER_METADATA_PATH = "$OPENID4VCI_PREFIX/.well-known/jwt-vc-issuer"
         const val OPEN_BADGE_CONFIG_ID = "OpenBadgeCredential_jwt_vc_json"
         const val SD_JWT_INTERNAL_CONFIG_ID = "identity_credential"
-        const val INTERNAL_SD_JWT_VCT = "$ISSUER_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
+        val INTERNAL_SD_JWT_VCT: String get() = "$ISSUER_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
 
         val MDOC_CATALOG_CONFIG_IDS = listOf(
             "org.iso.18013.5.1.mDL" to "org.iso.18013.5.1.mDL",

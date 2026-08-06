@@ -1,11 +1,13 @@
 package id.walt.openid4vci.handlers.credential
 
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.cose.CoseKey
-import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
+import id.walt.cose.toCoseKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
-import id.walt.did.dids.DidService
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.exportPublicJwk
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidUtils
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -26,7 +28,13 @@ internal object JwtProofUtils {
                 val holderJwk = requireNotNull(header[JWT_HEADER_JWK]?.jsonObject) {
                     "Proof JWT header contains jwk but it is not a JSON object"
                 }
-                JWKKey.importJWK(holderJwk.toString()).getOrThrow().getCosePublicKey()
+                require(!Jwk.containsPrivateMaterial(holderJwk)) {
+                    "Proof JWT jwk header must be public only"
+                }
+                EncodedKey.Jwk(
+                    data = BinaryData(Json.encodeToString(JsonObject.serializer(), holderJwk).encodeToByteArray()),
+                    privateMaterial = false,
+                ).toCoseKey()
             }
 
             JWT_HEADER_KID in header -> {
@@ -37,8 +45,10 @@ internal object JwtProofUtils {
                     "Proof JWT kid must be a DID URL when using kid-based holder key resolution: $holderKid"
                 }
 
-                val holderKey: Key = DidService.resolveToKey(holderKid.substringBefore("#")).getOrThrow()
-                JWKKey.importJWK(holderKey.exportJWK()).getOrThrow().getCosePublicKey()
+                Crypto2JwtKeyResolver()
+                    .resolveFromDid(holderKid.substringBefore("#"), holderKid)
+                    .exportPublicJwk()
+                    .toCoseKey()
             }
 
             else -> throw IllegalArgumentException("Proof JWT header must contain kid or jwk claim")

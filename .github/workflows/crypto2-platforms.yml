@@ -1,0 +1,66 @@
+name: Crypto2 platform tests
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    steps:
+      - name: Checkout all repositories
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@982301c7176ee6d6abcf785cf1a2c0cac0a559bc
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
+
+      - name: Configure Gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+
+      - name: Run Windows native tests
+        shell: bash
+        run: >-
+          ./gradlew
+          :waltid-libraries:crypto:waltid-crypto2:mingwX64Test
+          :waltid-libraries:crypto:waltid-crypto2-kms:mingwX64Test
+
+  macos-x64:
+    runs-on: macos-15-intel
+    steps:
+      - name: Checkout all repositories
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@982301c7176ee6d6abcf785cf1a2c0cac0a559bc
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
+
+      - name: Configure Gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+
+      - name: Run macOS x64 tests
+        run: >-
+          ./gradlew
+          :waltid-libraries:crypto:waltid-crypto2:macosX64Test
+          :waltid-libraries:crypto:waltid-crypto2-kms:macosX64Test
+
+  macos-arm64-ios:
+    runs-on: macos-26
+    steps:
+      - name: Checkout all repositories
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@982301c7176ee6d6abcf785cf1a2c0cac0a559bc
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
+
+      - name: Configure Gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+
+      - name: Run macOS arm64 and iOS simulator tests
+        run: >-
+          ./gradlew -PenableIosBuild=true
+          :waltid-libraries:crypto:waltid-crypto2:macosArm64Test
+          :waltid-libraries:crypto:waltid-crypto2-kms:macosArm64Test
+          :waltid-libraries:crypto:waltid-crypto2:iosSimulatorArm64Test
+          :waltid-libraries:crypto:waltid-crypto2-kms:iosSimulatorArm64Test
