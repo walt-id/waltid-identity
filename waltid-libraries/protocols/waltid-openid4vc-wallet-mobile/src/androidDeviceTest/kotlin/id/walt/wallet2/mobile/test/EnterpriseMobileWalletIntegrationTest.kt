@@ -6,8 +6,11 @@ import id.walt.mobile.test.backend.EnterpriseMobileAttestationConfig
 import id.walt.mobile.test.backend.EnterpriseMobileFixtureClient
 import id.walt.mobile.test.backend.EnterpriseMobilePlatform
 import id.walt.mobile.test.backend.EnterpriseMobileScenario
+import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import kotlinx.coroutines.runBlocking
@@ -54,7 +57,7 @@ class EnterpriseMobileWalletIntegrationTest {
 
         val wallet1 = createWallet(walletId, offer.attestation)
         val bootstrapResult = wallet1.bootstrap()
-        wallet1.receive(offer.offerUrl, txCode = offer.txCode)
+        wallet1.receiveCredential(offer.offerUrl, offer.txCode)
 
         val wallet2 = createWallet(walletId, offer.attestation)
         val credentials = wallet2.credentials()
@@ -79,7 +82,7 @@ class EnterpriseMobileWalletIntegrationTest {
         )
         wallet.bootstrap()
 
-        val credentialIds = wallet.receive(offer.offerUrl, txCode = offer.txCode)
+        val credentialIds = wallet.receiveCredential(offer.offerUrl, offer.txCode)
 
         assertTrue(
             credentialIds.isNotEmpty(),
@@ -99,7 +102,7 @@ class EnterpriseMobileWalletIntegrationTest {
         )
         val bootstrapResult = wallet.bootstrap()
 
-        val credentialIds = wallet.receive(offer.offerUrl, txCode = offer.txCode)
+        val credentialIds = wallet.receiveCredential(offer.offerUrl, offer.txCode)
         assertTrue(credentialIds.isNotEmpty(), "Should receive ${scenario.displayName}")
 
         val credentials = wallet.credentials()
@@ -147,4 +150,22 @@ class EnterpriseMobileWalletIntegrationTest {
             bearerToken = bearerToken,
             hostHeader = hostHeader,
         )
+
+    private suspend fun MobileWallet.receiveCredential(
+        offerUrl: String,
+        transactionCode: String?,
+    ): List<String> =
+        when (
+            val outcome = continuePreAuthorizedIssuance(
+                sessionId = startIssuance(
+                    MobileWalletIssuanceRequest(offerUrl = offerUrl)
+                ).id,
+                transactionCode = transactionCode,
+            )
+        ) {
+            is WalletIssuanceOutcome.Stored -> outcome.credentialIds
+            is WalletIssuanceOutcome.Deferred -> error("Expected stored credentials, got deferred outcome: $outcome")
+            is WalletIssuanceOutcome.Cancelled -> error("Expected stored credentials, got cancelled outcome")
+            is WalletIssuanceOutcome.Failed -> error("Expected stored credentials, got failed outcome: ${outcome.error.message}")
+        }
 }

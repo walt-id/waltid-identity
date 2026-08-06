@@ -15,6 +15,7 @@ import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
+import id.walt.wallet2.persistence.stores.SqlDelightIssuanceSessionStore
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -166,11 +167,13 @@ internal fun createSqlDelightMobileWallet(
     val keyStore = SqlDelightKeyStore(keyProvider, queries)
     val credentialStore = config.persistence.credentialStore ?: SqlDelightCredentialStore(queries)
     val didStore = config.persistence.didStore ?: SqlDelightDidStore(queries)
+    val issuanceSessionStore = SqlDelightIssuanceSessionStore(queries)
     return MobileWallet(
         walletId = config.walletId,
         keyStore = keyStore,
         didStore = didStore,
         credentialStore = credentialStore,
+        issuanceSessionStore = issuanceSessionStore,
         generateAndPersistKey = { keyType ->
             keyStore.generateManagedKey(
                 id = KeyId("wallet_key_${Uuid.random()}"),
