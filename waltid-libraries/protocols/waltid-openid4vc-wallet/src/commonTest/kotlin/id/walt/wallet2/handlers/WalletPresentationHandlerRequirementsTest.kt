@@ -2,6 +2,7 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.formats.W3C11
 import id.walt.credentials.signatures.JwtCredentialSignature
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto.keys.jwk.JWKKey
@@ -15,7 +16,10 @@ import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.CredentialSetQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.NoMeta
+import id.walt.openid4vp.clientidprefix.ClientIdError
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.StoredCredential
@@ -26,8 +30,10 @@ import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.ktor.http.Url
+import io.ktor.http.URLBuilder
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -1079,6 +1085,120 @@ class WalletPresentationHandlerRequirementsTest {
         val ready = assertIs<StatelessPreviewPresentationResult.Ready>(preview)
         assertEquals(signingKey.getKeyId(), ready.keyId)
         assertEquals("credential", ready.credentialOptions.single().credentialId)
+    }
+
+    @Test
+    fun isolatedPreviewRejectsUnknownPreRegisteredVerifierWithoutTrust() = runTest {
+        val verifierKey = JWKKey.generate(KeyType.Ed25519)
+        val requestUrl = preRegisteredRequestUrl(verifierKey)
+        val wallet = Wallet(id = "wallet-isolated-trust-missing", staticKey = JWKKey.generate(KeyType.Ed25519))
+
+        val failure = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
+            WalletPresentationHandler.previewPresentationStateless(
+                wallet = wallet,
+                request = PreviewPresentationRequest(requestUrl = requestUrl),
+                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                clientIdTrustConfiguration = ClientIdTrustConfiguration(),
+            )
+        }
+
+        assertEquals(ClientIdError.PreRegisteredClientNotFound("verifier2"), failure.clientIdError)
+    }
+
+    @Test
+    fun isolatedFlowUsesConfiguredPreRegisteredClientTrust() = runTest {
+        val verifierKey = JWKKey.generate(KeyType.Ed25519)
+        val requestUrl = preRegisteredRequestUrl(verifierKey)
+        val wallet = Wallet(id = "wallet-isolated-trust", staticKey = JWKKey.generate(KeyType.Ed25519))
+        val trust = ClientIdTrustConfiguration(
+            preRegisteredClients = mapOf(
+                "verifier2" to ClientMetadata(
+                    jwks = ClientMetadata.Jwks(listOf(verifierKey.getPublicKey().exportJWKObject())),
+                ),
+            ),
+        )
+
+        val preview = WalletPresentationHandler.previewPresentationStateless(
+            wallet = wallet,
+            request = PreviewPresentationRequest(requestUrl = requestUrl),
+            transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+            clientIdTrustConfiguration = trust,
+        )
+        val invalid = assertIs<StatelessPreviewPresentationResult.Invalid>(preview)
+        assertEquals("verifier2", invalid.authorizationRequest.clientId)
+
+        val buildWithoutTrust = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
+            WalletPresentationHandler.buildVpToken(
+                wallet = wallet,
+                request = BuildVpTokenRequest(
+                    requestUrl = requestUrl,
+                    selectedCredentialOptions = listOf(
+                        PresentationCredentialSelection(queryId = "pid", credentialId = "missing"),
+                    ),
+                ),
+                clientIdTrustConfiguration = ClientIdTrustConfiguration(),
+            )
+        }
+        assertEquals(ClientIdError.PreRegisteredClientNotFound("verifier2"), buildWithoutTrust.clientIdError)
+
+        val buildWithTrust = assertFailsWith<IllegalStateException> {
+            WalletPresentationHandler.buildVpToken(
+                wallet = wallet,
+                request = BuildVpTokenRequest(
+                    requestUrl = requestUrl,
+                    selectedCredentialOptions = listOf(
+                        PresentationCredentialSelection(queryId = "pid", credentialId = "missing"),
+                    ),
+                ),
+                clientIdTrustConfiguration = trust,
+            )
+        }
+        assertTrue(
+            buildWithTrust.message!!.contains("invalid_request"),
+            "Trusted build should pass client-id checks and fail later on request validation",
+        )
+
+        val rejectWithoutTrust = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
+            WalletPresentationHandler.rejectPresentationByRequestUrl(
+                request = RejectPresentationByRequestUrlRequest(requestUrl = requestUrl),
+                clientIdTrustConfiguration = ClientIdTrustConfiguration(),
+            )
+        }
+        assertEquals(ClientIdError.PreRegisteredClientNotFound("verifier2"), rejectWithoutTrust.clientIdError)
+
+        // Reject with trust passes client-id validation; transmission to response_uri may still fail locally.
+        val rejectWithTrustFailure = runCatching {
+            WalletPresentationHandler.rejectPresentationByRequestUrl(
+                request = RejectPresentationByRequestUrlRequest(
+                    requestUrl = requestUrl,
+                    errorCode = "access_denied",
+                ),
+                clientIdTrustConfiguration = trust,
+            )
+        }.exceptionOrNull()
+        assertFalse(
+            rejectWithTrustFailure is AuthorizationRequestResolver.SignedAuthorizationRequestValidationException &&
+                rejectWithTrustFailure.clientIdError == ClientIdError.PreRegisteredClientNotFound("verifier2"),
+            "Trusted reject must not fail with PreRegisteredClientNotFound",
+        )
+    }
+
+    private suspend fun preRegisteredRequestUrl(verifierKey: Key): Url {
+        val requestObject = verifierKey.signJws(
+            buildJsonObject {
+                put("client_id", "verifier2")
+                put("nonce", "nonce-123")
+                put("response_type", "vp_token")
+                put("response_mode", "direct_post")
+                put("response_uri", "https://verifier.example/direct-post")
+                put("dcql_query", buildJsonObject { put("credentials", buildJsonArray {}) })
+            }.toString().encodeToByteArray(),
+            mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
+        )
+        return URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier2")
+            parameters.append("request", requestObject)
+        }.build()
     }
 
     private fun AuthorizationRequest.toHttpUrl(): Url =

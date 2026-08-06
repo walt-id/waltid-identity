@@ -849,7 +849,13 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<BuildVpTokenRequest>()
-                        call.respond(WalletPresentationHandler.buildVpToken(wallet, req))
+                        call.respond(
+                            WalletPresentationHandler.buildVpToken(
+                                wallet = wallet,
+                                request = req,
+                                clientIdTrustConfiguration = clientIdTrustConfiguration,
+                            )
+                        )
                     }
 
                     post("/send-response", {
@@ -864,7 +870,13 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<SendAuthorizationResponseRequest>()
-                        call.respond(WalletPresentationHandler.sendAuthorizationResponse(wallet, req))
+                        call.respond(
+                            WalletPresentationHandler.sendAuthorizationResponse(
+                                wallet = wallet,
+                                request = req,
+                                clientIdTrustConfiguration = clientIdTrustConfiguration,
+                            )
+                        )
                     }
 
                     post("/preview", {
@@ -889,6 +901,7 @@ object Wallet2RouteHandler {
                             wallet = wallet,
                             request = req,
                             transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                            clientIdTrustConfiguration = clientIdTrustConfiguration,
                         )
                         call.respond(result.toPreviewResponse())
                     }
@@ -902,7 +915,12 @@ object Wallet2RouteHandler {
                         response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
                     }) {
                         val req = call.receive<RejectPresentationByRequestUrlRequest>()
-                        call.respond(WalletPresentationHandler.rejectPresentationByRequestUrl(req))
+                        call.respond(
+                            WalletPresentationHandler.rejectPresentationByRequestUrl(
+                                request = req,
+                                clientIdTrustConfiguration = clientIdTrustConfiguration,
+                            )
+                        )
                     }
                 }
             }
