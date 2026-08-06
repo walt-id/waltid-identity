@@ -3,13 +3,13 @@
 package id.walt.openid4vp.conformance.testplans.plans
 
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.ConformanceVerifierPolicies
 import id.walt.openid4vp.conformance.testplans.runner.req.ExpectedVerifierOutcome
 import id.walt.openid4vp.conformance.testplans.runner.req.TestPlanConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.UrlConfig
-import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.Verification2Session.VerificationSessionRedirects
 import io.ktor.http.Url
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -111,7 +111,7 @@ class MdlX509SanDnsRequestUriSignedDirectPost(
         verificationSessionSetup = CrossDeviceFlowSetup(
             core = GeneralFlowConfig(
                 dcqlQuery = Json.decodeFromString(dcqlQuery),
-                policies = Verification2Session.DefinedVerificationPolicies(),
+                policies = ConformanceVerifierPolicies.withoutMdocIssuerAuth(),
 
                 signedRequest = true,
                 encryptedResponse = false,

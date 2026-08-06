@@ -7,7 +7,6 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.UrlConfig
-import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.Verification2Session.VerificationSessionRedirects
 import io.ktor.http.Url
 import kotlinx.serialization.json.Json
@@ -116,7 +115,7 @@ class MdlX509HashRequestUriSignedDirectPostHaip(
         verificationSessionSetup = CrossDeviceFlowSetup(
             core = GeneralFlowConfig(
                 dcqlQuery = Json.decodeFromString(dcqlQuery),
-                policies = Verification2Session.DefinedVerificationPolicies(),
+                policies = ConformanceVerifierPolicies.withoutMdocIssuerAuth(),
 
                 // HAIP mandatory requirements:
                 signedRequest = true,        // JAR - HAIP §5.1 V-01
