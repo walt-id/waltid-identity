@@ -175,13 +175,22 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         if (policy.hardware != SignumHardwarePolicy.REQUIRED &&
             !policy.authentication.isBiometricCurrentSetEveryUse()
         ) return
-        val iosSigner = signer as? IosSigner
-            ?: throw SignumKeyPolicyMismatchException(alias, "the native signer is not Keychain-backed")
+        val exactAuthentication = policy.authentication.isBiometricCurrentSetEveryUse()
+        val iosSigner = if (exactAuthentication) {
+            signer as? IosSigner
+                ?: throw SignumKeyPolicyMismatchException(alias, "the native signer is not Keychain-backed")
+        } else {
+            null
+        }
         validateIosNativePolicy(
             alias = alias,
             policy = policy,
-            needsAuthenticationForEveryUse = iosSigner.needsAuthenticationForEveryUse,
-            isSecureEnclave = isSecureEnclaveKey(alias),
+            needsAuthenticationForEveryUse = iosSigner?.needsAuthenticationForEveryUse ?: false,
+            isSecureEnclave = if (policy.hardware == SignumHardwarePolicy.REQUIRED) {
+                isSecureEnclaveKey(alias)
+            } else {
+                false
+            },
         )
     }
 

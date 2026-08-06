@@ -74,7 +74,10 @@ public class AndroidPlatformKeyProvider(
         ) {
             throw cause
         }
-        throw cause.toKeyUseAuthorizationException(request.id.value) ?: cause
+        throw cause.toKeyUseAuthorizationException(
+            protectedKeyId = request.id.value,
+            policyMismatchFailure = KeyUseAuthorizationFailure.UnsupportedCombination,
+        ) ?: cause
     }
 
     override suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration {

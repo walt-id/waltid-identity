@@ -15,6 +15,8 @@ import id.walt.crypto2.signum.SignumUserCancelledException
  */
 internal fun Throwable.toKeyUseAuthorizationException(
     protectedKeyId: String? = null,
+    policyMismatchFailure: KeyUseAuthorizationFailure =
+        KeyUseAuthorizationFailure.ProtectedKeyUnavailable,
 ): KeyUseAuthorizationException? = when (this) {
     is SignumInteractionContextUnavailableException ->
         KeyUseAuthorizationException(
@@ -25,8 +27,13 @@ internal fun Throwable.toKeyUseAuthorizationException(
 
     is SignumKeyPolicyMismatchException ->
         KeyUseAuthorizationException(
-            failure = KeyUseAuthorizationFailure.UnsupportedCombination,
-            message = "The platform could not enforce the requested key policy",
+            failure = policyMismatchFailure,
+            message = when (policyMismatchFailure) {
+                KeyUseAuthorizationFailure.UnsupportedCombination ->
+                    "The platform could not enforce the requested key policy"
+                else ->
+                    "Protected key${protectedKeyId?.let { " '$it'" }.orEmpty()} is unavailable"
+            },
             cause = this,
         )
 

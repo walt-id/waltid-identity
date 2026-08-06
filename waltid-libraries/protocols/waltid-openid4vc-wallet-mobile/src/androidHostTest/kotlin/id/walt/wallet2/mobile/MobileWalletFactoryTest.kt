@@ -245,10 +245,14 @@ class MobileWalletFactoryTest {
     }
 
     @Test
-    fun `protected bootstrap maps authoritative generation policy mismatch`() = runTest {
+    fun `protected bootstrap propagates provider generation authorization failure`() = runTest {
         database().use { database ->
             val provider = FakePlatformManagedKeyProvider().apply {
-                generateFailure = SignumKeyPolicyMismatchException("wallet-key", "hardware policy mismatch")
+                generateFailure = KeyUseAuthorizationException(
+                    failure = KeyUseAuthorizationFailure.UnsupportedCombination,
+                    message = "The platform could not enforce the requested key policy",
+                    cause = SignumKeyPolicyMismatchException("wallet-key", "hardware policy mismatch"),
+                )
             }
 
             val failure = assertFailsWith<KeyUseAuthorizationException> {
