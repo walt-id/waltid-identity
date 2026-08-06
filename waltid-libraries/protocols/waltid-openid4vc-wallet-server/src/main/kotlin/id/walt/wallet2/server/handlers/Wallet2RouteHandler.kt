@@ -764,6 +764,7 @@ object Wallet2RouteHandler {
                             WalletPresentationHandler.presentCredentialWithTrust(
                                 wallet = wallet,
                                 request = req,
+                                onEvent = {},
                                 transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )
@@ -781,6 +782,7 @@ object Wallet2RouteHandler {
                             WalletPresentationHandler.presentCredentialIsolatedWithTrust(
                                 wallet = wallet,
                                 request = req,
+                                onEvent = {},
                                 transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )

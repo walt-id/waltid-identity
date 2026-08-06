@@ -77,14 +77,32 @@ fun main(args: Array<String>) {
         var errorCount = 0
 
         // ── Wallets ────────────────────────────────────────────────────────────────
+        //
+        // IMPORTANT: waltid-wallet-api stores wallet and account UUIDs as 16-byte binary
+        // blobs (not text strings).  rs.getString() on a blob returns an unreliable binary
+        // string that does NOT match when used as a setString() parameter in child queries.
+        // We must read blobs with getBytes() and convert to proper UUID strings.
+        //
+        // Child queries (keys / credentials / DIDs) use a queryWithBytes() helper that
+        // passes the raw 16-byte blob as setBytes() — SQLite matches blobs by bytes, not
+        // by text representation.
 
-        val walletIds = sourceConn.query("SELECT id FROM wallets") { rs ->
-            rs.getString("id")
+        val walletEntries = sourceConn.query("SELECT id FROM wallets") { rs ->
+            val bytes = rs.getBytes("id")
+            if (bytes != null && bytes.size == 16) {
+                // waltid-wallet-api stores UUIDs as 16-byte binary blobs (big-endian)
+                val uuid = bytesToUuid(bytes)
+                uuid to WalletIdParam.Blob(bytes)
+            } else {
+                // PostgreSQL / text-based SQLite — ID is already a string
+                val text = rs.getString("id") ?: ""
+                text to WalletIdParam.Text(text)
+            }
         }
 
-        log.info { "Found ${walletIds.size} wallets to migrate" }
+        log.info { "Found ${walletEntries.size} wallets to migrate" }
 
-        for (walletUuid in walletIds) {
+        for ((walletUuid, walletParam) in walletEntries) {
             val keyStoreId  = "wallet-$walletUuid-keys"
             val credStoreId = "wallet-$walletUuid-creds"
             val didStoreId  = "wallet-$walletUuid-dids"
@@ -115,8 +133,8 @@ fun main(args: Array<String>) {
 
             // ── Keys ──────────────────────────────────────────────────────────────
 
-            val keys = sourceConn.queryWith(
-                "SELECT kid, document FROM wallet_keys WHERE wallet = ?", walletUuid
+            val keys = sourceConn.queryWithWalletParam(
+                "SELECT kid, document FROM wallet_keys WHERE wallet = ?", walletParam
             ) { rs -> rs.getString("kid") to rs.getString("document") }
 
             for ((keyId, serializedKey) in keys) {
@@ -142,8 +160,8 @@ fun main(args: Array<String>) {
             // ── Credentials ───────────────────────────────────────────────────────
 
             data class OldCred(val id: String, val document: String, val disclosures: String?)
-            val credentials = sourceConn.queryWith(
-                "SELECT id, document, disclosures FROM credentials WHERE wallet = ?", walletUuid
+            val credentials = sourceConn.queryWithWalletParam(
+                "SELECT id, document, disclosures FROM credentials WHERE wallet = ?", walletParam
             ) { rs -> OldCred(rs.getString("id"), rs.getString("document"), rs.getString("disclosures")) }
 
             for (cred in credentials) {
@@ -171,19 +189,32 @@ fun main(args: Array<String>) {
 
             // ── DIDs ──────────────────────────────────────────────────────────────
 
-            val dids = sourceConn.queryWith(
-                "SELECT did, document FROM wallet_dids WHERE wallet = ?", walletUuid
+            val dids = sourceConn.queryWithWalletParam(
+                "SELECT did, document FROM wallet_dids WHERE wallet = ?", walletParam
             ) { rs -> rs.getString("did") to rs.getString("document") }
 
             for ((did, documentStr) in dids) {
                 runCatching {
-                    Json.parseToJsonElement(documentStr).jsonObject // validate JSON
+                    // The document column normally holds the full DID document JSON.
+                    // However some deployments (e.g. NDID) store only the DID URI string
+                    // for DID types where only the identifier matters, not the document.
+                    // In that case we synthesise a minimal {"id":"<did>"} document so the
+                    // DID is preserved in v2 rather than silently dropped.
+                    val documentJson = runCatching {
+                        Json.parseToJsonElement(documentStr).jsonObject
+                    }.getOrElse {
+                        log.warn {
+                            "DID $did has non-JSON document ('$documentStr') — " +
+                            "storing minimal {\"id\":\"$did\"} placeholder document."
+                        }
+                        Json.parseToJsonElement("""{"id":"$did"}""").jsonObject
+                    }
                     if (!dryRun) {
                         suspendTransaction(targetDb) {
                             Wallet2Tables.Dids.upsert {
                                 it[Wallet2Tables.Dids.storeId]  = didStoreId
                                 it[Wallet2Tables.Dids.did]      = did
-                                it[Wallet2Tables.Dids.document] = documentStr
+                                it[Wallet2Tables.Dids.document] = documentJson.toString()
                             }
                         }
                     }
@@ -199,9 +230,10 @@ fun main(args: Array<String>) {
 
         // Old: account_wallet_mapping(tenant, id UUID, wallet UUID)
         // New: wallet2_account_wallets(account_id TEXT, wallet_id TEXT)
+        // IDs may be 16-byte binary blobs (waltid-wallet-api SQLite) or plain text (PostgreSQL).
         val accountMappings = sourceConn.query(
-            "SELECT CAST(id AS TEXT) AS account_id, CAST(wallet AS TEXT) AS wallet_id FROM account_wallet_mapping"
-        ) { rs -> rs.getString("account_id") to rs.getString("wallet_id") }
+            "SELECT id, wallet FROM account_wallet_mapping"
+        ) { rs -> readWalletId(rs, "id") to readWalletId(rs, "wallet") }
 
         for ((accountId, walletId) in accountMappings) {
             runCatching {
@@ -235,7 +267,27 @@ fun main(args: Array<String>) {
     }
 }
 
-// ── JDBC helpers ───────────────────────────────────────────────────────────────
+/**
+ * Represents a wallet/account UUID parameter for use in JDBC child queries.
+ *
+ * waltid-wallet-api (SQLite) stores UUIDs as 16-byte binary blobs → [Blob].
+ * PostgreSQL and non-blob SQLite store them as text strings → [Text].
+ */
+private sealed class WalletIdParam {
+    data class Blob(val bytes: ByteArray) : WalletIdParam()
+    data class Text(val value: String) : WalletIdParam()
+}
+
+/**
+ * Read a UUID column from [rs] by name, detecting whether it is stored as a 16-byte
+ * binary blob (waltid-wallet-api SQLite) or as a plain text/UUID string (PostgreSQL).
+ * Returns the UUID as a hyphenated string in both cases.
+ */
+private fun readWalletId(rs: ResultSet, columnName: String): String {
+    val bytes = rs.getBytes(columnName)
+    return if (bytes != null && bytes.size == 16) bytesToUuid(bytes)
+    else rs.getString(columnName) ?: ""
+}
 
 /** Execute a SELECT with no parameters and map each row. */
 private fun <T> java.sql.Connection.query(sql: String, mapper: (ResultSet) -> T): List<T> =
@@ -247,10 +299,20 @@ private fun <T> java.sql.Connection.query(sql: String, mapper: (ResultSet) -> T)
         }
     }
 
-/** Execute a SELECT with one String parameter (wallet UUID as TEXT) and map each row. */
-private fun <T> java.sql.Connection.queryWith(sql: String, param: String, mapper: (ResultSet) -> T): List<T> =
+/**
+ * Execute a SELECT with one wallet-UUID parameter, handling both blob (waltid-wallet-api
+ * SQLite) and text (PostgreSQL / plain SQLite) storage formats automatically.
+ */
+private fun <T> java.sql.Connection.queryWithWalletParam(
+    sql: String,
+    param: WalletIdParam,
+    mapper: (ResultSet) -> T,
+): List<T> =
     prepareStatement(sql).use { stmt ->
-        stmt.setString(1, param)
+        when (param) {
+            is WalletIdParam.Blob -> stmt.setBytes(1, param.bytes)
+            is WalletIdParam.Text -> stmt.setString(1, param.value)
+        }
         stmt.executeQuery().use { rs ->
             val out = mutableListOf<T>()
             while (rs.next()) out += mapper(rs)
@@ -258,17 +320,33 @@ private fun <T> java.sql.Connection.queryWith(sql: String, param: String, mapper
         }
     }
 
+/**
+ * Convert a 16-byte binary UUID blob to a standard hyphenated UUID string.
+ * The old wallet stores UUIDs as 16-byte binary (most-significant bytes first).
+ */
+private fun bytesToUuid(bytes: ByteArray?): String {
+    if (bytes == null || bytes.size != 16) return bytes?.toString(Charsets.ISO_8859_1) ?: ""
+    val bb = java.nio.ByteBuffer.wrap(bytes)
+    return java.util.UUID(bb.long, bb.long).toString()
+}
+
 /** Infer the wallet2 key type string from a KeySerialization JSON document. */
-private fun inferKeyType(serializedKey: String): String = runCatching {
+internal fun inferKeyType(serializedKey: String): String = runCatching {
     val json = Json.parseToJsonElement(serializedKey).jsonObject
-    val crv  = json["jwk"]?.jsonObject?.get("crv")?.toString()?.trim('"')
+    val jwk = json["jwk"]?.jsonObject
+    val crv = jwk?.get("crv")?.toString()?.trim('"')
+    val kty = jwk?.get("kty")?.toString()?.trim('"')
     when (crv) {
         "P-256"     -> "secp256r1"
         "P-384"     -> "secp384r1"
         "P-521"     -> "secp521r1"
         "Ed25519"   -> "Ed25519"
         "secp256k1" -> "secp256k1"
-        else        -> json["type"]?.toString()?.trim('"') ?: "unknown"
+        else -> when (kty) {
+            "RSA" -> "RSA"
+            "OKP" -> "Ed25519"   // Ed25519/X25519 without explicit crv — treat as Ed25519
+            else  -> kty ?: "unknown"
+        }
     }
 }.getOrDefault("unknown")
 

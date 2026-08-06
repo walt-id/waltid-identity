@@ -18,6 +18,7 @@ import kotlin.time.Duration.Companion.minutes
 data class CredentialOfferRuntimeOverrides(
     val issuerDid: String? = null,
     val issuerKey: JsonObject? = null,
+    val expectedCredentialProofKeyJwk: JsonObject? = null,
     val credentialData: JsonObject? = null,
     val mapping: JsonObject? = null,
     val selectiveDisclosure: SDMap? = null,
