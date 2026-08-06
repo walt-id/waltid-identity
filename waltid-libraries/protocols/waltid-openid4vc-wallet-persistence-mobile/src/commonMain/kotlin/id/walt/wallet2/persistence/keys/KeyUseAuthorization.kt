@@ -83,12 +83,12 @@ public data class WalletKeyCreationRequest(
     public val prompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
 )
 
-/** Result of checking whether exact key requirements can be enforced without fallback. */
+/** Result of checking whether the wallet can satisfy the requested key and authorization requirements. */
 public sealed interface KeyUseAuthorizationSupport {
     /** The wallet can satisfy the requested key and authorization requirements. */
     public data object Supported : KeyUseAuthorizationSupport
 
-    /** The platform cannot enforce the requested capability set. */
+    /** The wallet cannot satisfy the requested capability set. */
     public data class Unsupported(
         /** Reason the exact requirements cannot currently be enforced. */
         public val reason: KeyUseAuthorizationUnsupportedReason,

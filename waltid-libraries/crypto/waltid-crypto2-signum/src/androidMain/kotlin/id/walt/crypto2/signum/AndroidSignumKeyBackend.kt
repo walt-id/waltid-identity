@@ -14,6 +14,13 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ProviderId
 
+/**
+ * Android-only Signum backend backed by Android KeyStore.
+ *
+ * Android [SignumAuthenticationPolicy.UserPresence] operations resolve a current resumed
+ * [FragmentActivity] at operation time so AndroidX BiometricPrompt can perform interactive
+ * authorization. iOS Signum backends do not require this Android interaction host.
+ */
 public class AndroidSignumKeyBackend(
     private val interactionContextProvider: () -> FragmentActivity? = { null },
 ) : SignumPlatformBackend {

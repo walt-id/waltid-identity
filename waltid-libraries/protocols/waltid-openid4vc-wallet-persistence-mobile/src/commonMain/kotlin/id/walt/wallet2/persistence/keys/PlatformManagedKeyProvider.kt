@@ -4,7 +4,12 @@ import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.StoredKey
 
 /**
- * Generation, restoration, and deletion support for managed native platform keys.
+ * Platform-managed key provider used by mobile wallet persistence.
+ *
+ * Implementations must expose capability and restoration state through the structured result
+ * types below. Known key-use authorization failures must be surfaced as
+ * [KeyUseAuthorizationException]; callers must not need to understand provider-specific
+ * exceptions.
  */
 public interface PlatformManagedKeyProvider {
     /** Checks whether the exact requirements can be enforced without fallback. */

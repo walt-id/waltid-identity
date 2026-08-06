@@ -55,9 +55,10 @@ wallet.bootstrap()
 
 `BiometricCurrentSet` applies only when a new key is created. It is P-256 only,
 uses strong biometrics, rejects device-credential fallback, and invalidates the
-key when the enrolled biometric set changes. Android resolves a current resumed
-`FragmentActivity` for each prompt; do not retain an activity in application
-state. iOS protected keys require a physical Secure Enclave device; simulator
+key when the enrolled biometric set changes. Android Signum `UserPresence`
+operations resolve a current resumed `FragmentActivity` at operation time so
+AndroidX `BiometricPrompt` can perform interactive authorization; do not retain
+an activity in application state. iOS protected keys require a physical Secure Enclave device; simulator
 preflight is expected to report `BiometricUnavailable`. An iOS host app must
 declare `NSFaceIDUsageDescription` in its `Info.plist`. A changed default does
 not retrofit an existing persisted key.

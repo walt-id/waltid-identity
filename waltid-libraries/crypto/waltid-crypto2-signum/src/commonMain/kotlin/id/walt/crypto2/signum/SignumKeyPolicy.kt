@@ -6,10 +6,12 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class SignumKeyPolicy(
+    /** Hardware backing preference; [SignumHardwarePolicy.REQUIRED] requires backend-observed hardware. */
     val hardware: SignumHardwarePolicy = SignumHardwarePolicy.PREFERRED,
     val authentication: SignumAuthenticationPolicy = SignumAuthenticationPolicy.None,
     /** Enables platform ECDH for keys with [KeyUsage.KEY_AGREEMENT] usage. */
     val keyAgreement: Boolean = false,
+    /** Requests attestation evidence in addition to any hardware backing requirement. */
     val attestationChallenge: BinaryData? = null,
 ) {
     init {
