@@ -72,9 +72,9 @@ class IosSignumKeyBackend : SignumPlatformBackend {
             // configuration. PREFERRED has to mean preferred, so fall back to the software keychain. REQUIRED and
             // attested keys keep failing loudly, and the reported protection level stays UNKNOWN either way
             // because without an attestation the backing cannot be proven (see effectiveProtection).
-            if (policy.hardware != SignumHardwarePolicy.PREFERRED ||
-                policy.attestationChallenge != null ||
-                policy.authentication.isBiometricCurrentSetEveryUse()
+            if (
+                policy.hardware != SignumHardwarePolicy.PREFERRED ||
+                policy.attestationChallenge != null
             ) throw cause
             // Best-effort cleanup of anything the failed attempt left behind; a failure here must not hide `cause`.
             try {
@@ -194,12 +194,13 @@ class IosSignumKeyBackend : SignumPlatformBackend {
         if (policy.hardware == SignumHardwarePolicy.REQUIRED && !isSecureEnclave) {
             throw SignumKeyPolicyMismatchException(alias, "the native key is not Secure Enclave-backed")
         }
-        if (policy.authentication.isBiometricCurrentSetEveryUse() &&
-            (!needsAuthenticationForEveryUse || !isSecureEnclave)
+        if (
+            policy.authentication.isBiometricCurrentSetEveryUse() &&
+            !needsAuthenticationForEveryUse
         ) {
             throw SignumKeyPolicyMismatchException(
                 alias,
-                "the native key does not enforce Secure Enclave biometric authentication for every use",
+                "the native key does not enforce biometric authentication for every use",
             )
         }
     }

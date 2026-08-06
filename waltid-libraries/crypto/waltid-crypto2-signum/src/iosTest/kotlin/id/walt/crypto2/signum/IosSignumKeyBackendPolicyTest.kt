@@ -34,6 +34,7 @@ class IosSignumKeyBackendPolicyTest {
     @Test
     fun `biometric current set requires every-use authentication and Secure Enclave`() {
         val policy = SignumKeyPolicy(
+            hardware = SignumHardwarePolicy.REQUIRED,
             authentication = SignumAuthenticationPolicy.UserPresence(
                 biometric = true,
                 allowNewBiometrics = false,
@@ -63,6 +64,24 @@ class IosSignumKeyBackendPolicyTest {
             policy = policy,
             needsAuthenticationForEveryUse = true,
             isSecureEnclave = true,
+        )
+    }
+
+    @Test
+    fun `preferred hardware does not imply Secure Enclave for exact UserPresence`() {
+        backend.validateIosNativePolicy(
+            alias = "preferred-biometric",
+            policy = SignumKeyPolicy(
+                hardware = SignumHardwarePolicy.PREFERRED,
+                authentication = SignumAuthenticationPolicy.UserPresence(
+                    biometric = true,
+                    allowNewBiometrics = false,
+                    deviceCredential = false,
+                    timeoutSeconds = 0,
+                ),
+            ),
+            needsAuthenticationForEveryUse = true,
+            isSecureEnclave = false,
         )
     }
 
