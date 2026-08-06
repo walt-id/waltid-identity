@@ -5,6 +5,7 @@ import at.asitplus.signum.supreme.os.IosSigner
 import at.asitplus.signum.supreme.CFCryptoOperationFailed
 import at.asitplus.signum.supreme.os.PlatformSigningProviderSigner
 import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.signum.corefoundation.waltCfEqual
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
@@ -221,28 +222,22 @@ class IosSignumKeyBackend : SignumPlatformBackend {
                 when (val status = SecItemCopyMatching(query.dictionary, keyRef.ptr)) {
                     errSecItemNotFound -> false
                     errSecSuccess -> {
-                        val nativeKey = keyRef.value as? SecKeyRef
-                            ?: throw CFCryptoOperationFailed(
-                                thing = "inspect Secure Enclave public key",
-                                osStatus = status,
-                            )
+                        val result = keyRef.value
+                            ?: error("Secure Enclave public-key lookup returned success without a result")
                         try {
+                            val nativeKey = result as? SecKeyRef
+                                ?: error("Secure Enclave public-key lookup returned an unexpected result")
                             val attributes = SecKeyCopyAttributes(nativeKey)
-                                ?: throw CFCryptoOperationFailed(
-                                    thing = "inspect Secure Enclave public key",
-                                    osStatus = status,
-                                )
+                                ?: error("Secure Enclave public-key attributes were unavailable")
                             try {
-                                val tokenId = CFDictionaryGetValue(attributes, kSecAttrTokenID)
-                                    ?.let { CFBridgingRelease(CFBridgingRetain(it)) as? String }
-                                val secureEnclaveTokenId =
-                                    CFBridgingRelease(CFBridgingRetain(kSecAttrTokenIDSecureEnclave)) as? String
-                                tokenId != null && tokenId == secureEnclaveTokenId
+                                CFDictionaryGetValue(attributes, kSecAttrTokenID)?.let {
+                                    waltCfEqual(it, kSecAttrTokenIDSecureEnclave)
+                                } == true
                             } finally {
                                 CFRelease(attributes)
                             }
                         } finally {
-                            CFRelease(nativeKey)
+                            CFRelease(result)
                             keyRef.value = null
                         }
                     }

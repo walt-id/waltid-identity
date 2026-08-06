@@ -23,8 +23,8 @@ import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
-import id.walt.wallet2.persistence.keys.PlatformKeyRequestSupport
-import id.walt.wallet2.persistence.keys.PlatformKeyUnsupportedReason
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import id.walt.x509.CertificateDer
 import kotlinx.coroutines.CancellationException
@@ -66,17 +66,24 @@ public data class WalletBridgeConfiguration(
 )
 
 /** Swift-friendly result of a key-use authorization preflight. */
+@ConsistentCopyVisibility
 @Serializable
-public data class WalletBridgeKeyPreflight(
+public data class WalletBridgeKeyPreflight internal constructor(
     /** Whether the requested authorization policy can be enforced exactly. */
     public val supported: Boolean,
     /** Core preflight reason when the request is unsupported. */
-    public val failure: PlatformKeyUnsupportedReason? = null,
-)
+    public val failure: KeyUseAuthorizationUnsupportedReason? = null,
+) {
+    init {
+        require(supported == (failure == null)) {
+            "Wallet bridge preflight must include a failure exactly when unsupported"
+        }
+    }
+}
 
-internal fun PlatformKeyRequestSupport.toBridgeModel(): WalletBridgeKeyPreflight = when (this) {
-    PlatformKeyRequestSupport.Supported -> WalletBridgeKeyPreflight(supported = true)
-    is PlatformKeyRequestSupport.Unsupported -> WalletBridgeKeyPreflight(supported = false, failure = reason)
+internal fun KeyUseAuthorizationSupport.toBridgeModel(): WalletBridgeKeyPreflight = when (this) {
+    KeyUseAuthorizationSupport.Supported -> WalletBridgeKeyPreflight(supported = true)
+    is KeyUseAuthorizationSupport.Unsupported -> WalletBridgeKeyPreflight(supported = false, failure = reason)
 }
 
 /**
@@ -393,6 +400,11 @@ public class WalletBridgeError internal constructor(
     public val causeClass: String? = null,
     public val authorizationFailure: KeyUseAuthorizationFailure? = null,
 ) {
+    init {
+        require((category == WalletBridgeErrorCategory.authorization) == (authorizationFailure != null)) {
+            "Authorization bridge errors must include exactly one authorization failure"
+        }
+    }
     internal companion object {
         fun fromThrowable(throwable: Throwable): WalletBridgeError {
             val authorizationFailure = (throwable as? KeyUseAuthorizationException)?.failure

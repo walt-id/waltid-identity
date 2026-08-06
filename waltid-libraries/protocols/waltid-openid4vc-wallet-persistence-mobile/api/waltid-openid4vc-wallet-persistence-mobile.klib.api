@@ -43,17 +43,17 @@ final enum class id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy : ko
     }
 }
 
-final enum class id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason : kotlin/Enum<id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason> { // id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason|null[0]
-    enum entry BiometricNotEnrolled // id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason.BiometricNotEnrolled|null[0]
-    enum entry BiometricUnavailable // id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason.BiometricUnavailable|null[0]
-    enum entry InteractionContextUnavailable // id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason.InteractionContextUnavailable|null[0]
-    enum entry UnsupportedCombination // id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason.UnsupportedCombination|null[0]
+final enum class id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason : kotlin/Enum<id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason> { // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason|null[0]
+    enum entry BiometricNotEnrolled // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled|null[0]
+    enum entry BiometricUnavailable // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.BiometricUnavailable|null[0]
+    enum entry InteractionContextUnavailable // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.InteractionContextUnavailable|null[0]
+    enum entry UnsupportedCombination // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.UnsupportedCombination|null[0]
 
-    final val entries // id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason> // id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val entries // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason> // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.entries.<get-entries>|<get-entries>#static(){}[0]
 
-    final fun valueOf(kotlin/String): id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason // id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason> // id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason.values|values#static(){}[0]
+    final fun valueOf(kotlin/String): id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason> // id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason.values|values#static(){}[0]
 }
 
 abstract interface id.walt.wallet2.persistence.db/WalletPersistenceDatabase : app.cash.sqldelight/Transacter { // id.walt.wallet2.persistence.db/WalletPersistenceDatabase|null[0]
@@ -75,29 +75,29 @@ abstract interface id.walt.wallet2.persistence.encryption/DatabaseEncryptionKeyP
 
 abstract interface id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider { // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider|null[0]
     abstract suspend fun deleteManagedKey(id.walt.crypto2.keys/StoredKey.Managed) // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.deleteManagedKey|deleteManagedKey(id.walt.crypto2.keys.StoredKey.Managed){}[0]
-    abstract suspend fun generateManagedKey(id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.generateManagedKey|generateManagedKey(id.walt.wallet2.persistence.keys.PlatformKeyCreationRequest){}[0]
-    abstract suspend fun preflight(id.walt.wallet2.persistence.keys/PlatformKeyRequirements): id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.preflight|preflight(id.walt.wallet2.persistence.keys.PlatformKeyRequirements){}[0]
+    abstract suspend fun generateManagedKey(id.walt.wallet2.persistence.keys/WalletKeyCreationRequest): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.generateManagedKey|generateManagedKey(id.walt.wallet2.persistence.keys.WalletKeyCreationRequest){}[0]
+    abstract suspend fun preflight(id.walt.wallet2.persistence.keys/WalletKeyRequirements): id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.preflight|preflight(id.walt.wallet2.persistence.keys.WalletKeyRequirements){}[0]
     abstract suspend fun restoreManagedKey(id.walt.crypto2.keys/StoredKey.Managed): id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.restoreManagedKey|restoreManagedKey(id.walt.crypto2.keys.StoredKey.Managed){}[0]
 }
 
-sealed interface id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport { // id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport|null[0]
-    final class Unsupported : id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport { // id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport.Unsupported|null[0]
-        constructor <init>(id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason) // id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport.Unsupported.<init>|<init>(id.walt.wallet2.persistence.keys.PlatformKeyUnsupportedReason){}[0]
+sealed interface id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport { // id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport|null[0]
+    final class Unsupported : id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport { // id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport.Unsupported|null[0]
+        constructor <init>(id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason) // id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport.Unsupported.<init>|<init>(id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason){}[0]
 
-        final val reason // id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport.Unsupported.reason|{}reason[0]
-            final fun <get-reason>(): id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason // id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport.Unsupported.reason.<get-reason>|<get-reason>(){}[0]
+        final val reason // id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport.Unsupported.reason|{}reason[0]
+            final fun <get-reason>(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason // id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport.Unsupported.reason.<get-reason>|<get-reason>(){}[0]
 
-        final fun component1(): id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason // id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport.Unsupported.component1|component1(){}[0]
-        final fun copy(id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason = ...): id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport.Unsupported // id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport.Unsupported.copy|copy(id.walt.wallet2.persistence.keys.PlatformKeyUnsupportedReason){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport.Unsupported.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport.Unsupported.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport.Unsupported.toString|toString(){}[0]
+        final fun component1(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason // id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport.Unsupported.component1|component1(){}[0]
+        final fun copy(id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason = ...): id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport.Unsupported // id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport.Unsupported.copy|copy(id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport.Unsupported.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport.Unsupported.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport.Unsupported.toString|toString(){}[0]
     }
 
-    final object Supported : id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport { // id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport.Supported|null[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport.Supported.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport.Supported.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport.Supported.toString|toString(){}[0]
+    final object Supported : id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport { // id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport.Supported|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport.Supported.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport.Supported.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport.Supported.toString|toString(){}[0]
     }
 }
 
@@ -245,8 +245,8 @@ final class id.walt.wallet2.persistence.keys/IosPlatformKeyProvider : id.walt.wa
     constructor <init>() // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.<init>|<init>(){}[0]
 
     final suspend fun deleteManagedKey(id.walt.crypto2.keys/StoredKey.Managed) // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.deleteManagedKey|deleteManagedKey(id.walt.crypto2.keys.StoredKey.Managed){}[0]
-    final suspend fun generateManagedKey(id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.generateManagedKey|generateManagedKey(id.walt.wallet2.persistence.keys.PlatformKeyCreationRequest){}[0]
-    final suspend fun preflight(id.walt.wallet2.persistence.keys/PlatformKeyRequirements): id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.preflight|preflight(id.walt.wallet2.persistence.keys.PlatformKeyRequirements){}[0]
+    final suspend fun generateManagedKey(id.walt.wallet2.persistence.keys/WalletKeyCreationRequest): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.generateManagedKey|generateManagedKey(id.walt.wallet2.persistence.keys.WalletKeyCreationRequest){}[0]
+    final suspend fun preflight(id.walt.wallet2.persistence.keys/WalletKeyRequirements): id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.preflight|preflight(id.walt.wallet2.persistence.keys.WalletKeyRequirements){}[0]
     final suspend fun restoreManagedKey(id.walt.crypto2.keys/StoredKey.Managed): id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.restoreManagedKey|restoreManagedKey(id.walt.crypto2.keys.StoredKey.Managed){}[0]
 }
 
@@ -286,42 +286,42 @@ final class id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt { // id.w
     }
 }
 
-final class id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest { // id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest|null[0]
-    constructor <init>(id.walt.crypto2.keys/KeyId, id.walt.wallet2.persistence.keys/PlatformKeyRequirements, id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt = ...) // id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest.<init>|<init>(id.walt.crypto2.keys.KeyId;id.walt.wallet2.persistence.keys.PlatformKeyRequirements;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt){}[0]
+final class id.walt.wallet2.persistence.keys/WalletKeyCreationRequest { // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest|null[0]
+    constructor <init>(id.walt.crypto2.keys/KeyId, id.walt.wallet2.persistence.keys/WalletKeyRequirements, id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt = ...) // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.<init>|<init>(id.walt.crypto2.keys.KeyId;id.walt.wallet2.persistence.keys.WalletKeyRequirements;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt){}[0]
 
-    final val id // id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest.id|{}id[0]
-        final fun <get-id>(): id.walt.crypto2.keys/KeyId // id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest.id.<get-id>|<get-id>(){}[0]
-    final val prompt // id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest.prompt|{}prompt[0]
-        final fun <get-prompt>(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt // id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest.prompt.<get-prompt>|<get-prompt>(){}[0]
-    final val requirements // id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest.requirements|{}requirements[0]
-        final fun <get-requirements>(): id.walt.wallet2.persistence.keys/PlatformKeyRequirements // id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest.requirements.<get-requirements>|<get-requirements>(){}[0]
+    final val id // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.id|{}id[0]
+        final fun <get-id>(): id.walt.crypto2.keys/KeyId // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.id.<get-id>|<get-id>(){}[0]
+    final val prompt // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.prompt|{}prompt[0]
+        final fun <get-prompt>(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.prompt.<get-prompt>|<get-prompt>(){}[0]
+    final val requirements // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.requirements|{}requirements[0]
+        final fun <get-requirements>(): id.walt.wallet2.persistence.keys/WalletKeyRequirements // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.requirements.<get-requirements>|<get-requirements>(){}[0]
 
-    final fun component1(): id.walt.crypto2.keys/KeyId // id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest.component1|component1(){}[0]
-    final fun component2(): id.walt.wallet2.persistence.keys/PlatformKeyRequirements // id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest.component2|component2(){}[0]
-    final fun component3(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt // id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest.component3|component3(){}[0]
-    final fun copy(id.walt.crypto2.keys/KeyId = ..., id.walt.wallet2.persistence.keys/PlatformKeyRequirements = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt = ...): id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest // id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest.copy|copy(id.walt.crypto2.keys.KeyId;id.walt.wallet2.persistence.keys.PlatformKeyRequirements;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest.toString|toString(){}[0]
+    final fun component1(): id.walt.crypto2.keys/KeyId // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.component1|component1(){}[0]
+    final fun component2(): id.walt.wallet2.persistence.keys/WalletKeyRequirements // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.component2|component2(){}[0]
+    final fun component3(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.component3|component3(){}[0]
+    final fun copy(id.walt.crypto2.keys/KeyId = ..., id.walt.wallet2.persistence.keys/WalletKeyRequirements = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt = ...): id.walt.wallet2.persistence.keys/WalletKeyCreationRequest // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.copy|copy(id.walt.crypto2.keys.KeyId;id.walt.wallet2.persistence.keys.WalletKeyRequirements;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.toString|toString(){}[0]
 }
 
-final class id.walt.wallet2.persistence.keys/PlatformKeyRequirements { // id.walt.wallet2.persistence.keys/PlatformKeyRequirements|null[0]
-    constructor <init>(id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy = ...) // id.walt.wallet2.persistence.keys/PlatformKeyRequirements.<init>|<init>(id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy){}[0]
+final class id.walt.wallet2.persistence.keys/WalletKeyRequirements { // id.walt.wallet2.persistence.keys/WalletKeyRequirements|null[0]
+    constructor <init>(id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy = ...) // id.walt.wallet2.persistence.keys/WalletKeyRequirements.<init>|<init>(id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy){}[0]
 
-    final val authorizationPolicy // id.walt.wallet2.persistence.keys/PlatformKeyRequirements.authorizationPolicy|{}authorizationPolicy[0]
-        final fun <get-authorizationPolicy>(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/PlatformKeyRequirements.authorizationPolicy.<get-authorizationPolicy>|<get-authorizationPolicy>(){}[0]
-    final val spec // id.walt.wallet2.persistence.keys/PlatformKeyRequirements.spec|{}spec[0]
-        final fun <get-spec>(): id.walt.crypto2.keys/KeySpec // id.walt.wallet2.persistence.keys/PlatformKeyRequirements.spec.<get-spec>|<get-spec>(){}[0]
-    final val usages // id.walt.wallet2.persistence.keys/PlatformKeyRequirements.usages|{}usages[0]
-        final fun <get-usages>(): kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage> // id.walt.wallet2.persistence.keys/PlatformKeyRequirements.usages.<get-usages>|<get-usages>(){}[0]
+    final val authorizationPolicy // id.walt.wallet2.persistence.keys/WalletKeyRequirements.authorizationPolicy|{}authorizationPolicy[0]
+        final fun <get-authorizationPolicy>(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/WalletKeyRequirements.authorizationPolicy.<get-authorizationPolicy>|<get-authorizationPolicy>(){}[0]
+    final val spec // id.walt.wallet2.persistence.keys/WalletKeyRequirements.spec|{}spec[0]
+        final fun <get-spec>(): id.walt.crypto2.keys/KeySpec // id.walt.wallet2.persistence.keys/WalletKeyRequirements.spec.<get-spec>|<get-spec>(){}[0]
+    final val usages // id.walt.wallet2.persistence.keys/WalletKeyRequirements.usages|{}usages[0]
+        final fun <get-usages>(): kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage> // id.walt.wallet2.persistence.keys/WalletKeyRequirements.usages.<get-usages>|<get-usages>(){}[0]
 
-    final fun component1(): id.walt.crypto2.keys/KeySpec // id.walt.wallet2.persistence.keys/PlatformKeyRequirements.component1|component1(){}[0]
-    final fun component2(): kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage> // id.walt.wallet2.persistence.keys/PlatformKeyRequirements.component2|component2(){}[0]
-    final fun component3(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/PlatformKeyRequirements.component3|component3(){}[0]
-    final fun copy(id.walt.crypto2.keys/KeySpec = ..., kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage> = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy = ...): id.walt.wallet2.persistence.keys/PlatformKeyRequirements // id.walt.wallet2.persistence.keys/PlatformKeyRequirements.copy|copy(id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.keys/PlatformKeyRequirements.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.keys/PlatformKeyRequirements.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // id.walt.wallet2.persistence.keys/PlatformKeyRequirements.toString|toString(){}[0]
+    final fun component1(): id.walt.crypto2.keys/KeySpec // id.walt.wallet2.persistence.keys/WalletKeyRequirements.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage> // id.walt.wallet2.persistence.keys/WalletKeyRequirements.component2|component2(){}[0]
+    final fun component3(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/WalletKeyRequirements.component3|component3(){}[0]
+    final fun copy(id.walt.crypto2.keys/KeySpec = ..., kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage> = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy = ...): id.walt.wallet2.persistence.keys/WalletKeyRequirements // id.walt.wallet2.persistence.keys/WalletKeyRequirements.copy|copy(id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.keys/WalletKeyRequirements.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.keys/WalletKeyRequirements.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.persistence.keys/WalletKeyRequirements.toString|toString(){}[0]
 }
 
 final class id.walt.wallet2.persistence.stores/DriverFactory { // id.walt.wallet2.persistence.stores/DriverFactory|null[0]
@@ -354,12 +354,12 @@ final class id.walt.wallet2.persistence.stores/SqlDelightKeyStore : id.walt.wall
 
     final suspend fun addCrypto2Key(id.walt.crypto2.keys/Key): kotlin/String // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.addCrypto2Key|addCrypto2Key(id.walt.crypto2.keys.Key){}[0]
     final suspend fun addKey(id.walt.crypto.keys/Key): kotlin/String // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.addKey|addKey(id.walt.crypto.keys.Key){}[0]
-    final suspend fun generateKey(id.walt.wallet2.persistence.keys/PlatformKeyCreationRequest): id.walt.crypto2.keys/Key // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.generateKey|generateKey(id.walt.wallet2.persistence.keys.PlatformKeyCreationRequest){}[0]
+    final suspend fun generateKey(id.walt.wallet2.persistence.keys/WalletKeyCreationRequest): id.walt.crypto2.keys/Key // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.generateKey|generateKey(id.walt.wallet2.persistence.keys.WalletKeyCreationRequest){}[0]
     final suspend fun getCrypto2Key(kotlin/String, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>): id.walt.crypto2.keys/Key? // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.getCrypto2Key|getCrypto2Key(kotlin.String;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>){}[0]
     final suspend fun getKey(kotlin/String): id.walt.crypto.keys/Key? // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.getKey|getKey(kotlin.String){}[0]
     final suspend fun getKeyMaterial(kotlin/String, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>): id.walt.wallet2.data/WalletKeyStoreEntry? // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.getKeyMaterial|getKeyMaterial(kotlin.String;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>){}[0]
     final suspend fun listKeys(): kotlinx.coroutines.flow/Flow<id.walt.wallet2.data/WalletKeyInfo> // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.listKeys|listKeys(){}[0]
-    final suspend fun preflight(id.walt.wallet2.persistence.keys/PlatformKeyRequirements): id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.preflight|preflight(id.walt.wallet2.persistence.keys.PlatformKeyRequirements){}[0]
+    final suspend fun preflight(id.walt.wallet2.persistence.keys/WalletKeyRequirements): id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.preflight|preflight(id.walt.wallet2.persistence.keys.WalletKeyRequirements){}[0]
     final suspend fun removeKey(kotlin/String): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.removeKey|removeKey(kotlin.String){}[0]
 }
 

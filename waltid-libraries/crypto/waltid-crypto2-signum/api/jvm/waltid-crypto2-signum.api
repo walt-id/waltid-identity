@@ -204,11 +204,11 @@ public final class id/walt/crypto2/signum/SignumManagedKeyProvider : id/walt/cry
 	public fun generate (Lid/walt/crypto2/providers/GenerateManagedKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun generateSignumKey (Lid/walt/crypto2/providers/GenerateManagedKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getId-v1VkqW4 ()Ljava/lang/String;
-	public final fun inspect (Lid/walt/crypto2/keys/StoredKey$Managed;)Lid/walt/crypto2/signum/SignumStoredKeyInfo;
 	public fun restore (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun restoreSignumKey (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun storedKeyForExisting-FO05kzI (Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun storedKeyForExisting-FO05kzI$default (Lid/walt/crypto2/signum/SignumManagedKeyProvider;Ljava/lang/String;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun storedPolicy (Lid/walt/crypto2/keys/StoredKey$Managed;)Lid/walt/crypto2/signum/SignumKeyPolicy;
 }
 
 public final class id/walt/crypto2/signum/SignumManagedKeyProvider$Companion {
@@ -247,23 +247,6 @@ public final class id/walt/crypto2/signum/SignumProtectionLevel : java/lang/Enum
 
 public final class id/walt/crypto2/signum/SignumProtectionLevel$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
-}
-
-public final class id/walt/crypto2/signum/SignumStoredKeyInfo {
-	public fun <init> (Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;Lid/walt/crypto2/signum/SignumProtectionLevel;Lid/walt/crypto2/signum/SignumKeyAttestation;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Lid/walt/crypto2/signum/SignumKeyPolicy;
-	public final fun component3 ()Lid/walt/crypto2/signum/SignumProtectionLevel;
-	public final fun component4 ()Lid/walt/crypto2/signum/SignumKeyAttestation;
-	public final fun copy (Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;Lid/walt/crypto2/signum/SignumProtectionLevel;Lid/walt/crypto2/signum/SignumKeyAttestation;)Lid/walt/crypto2/signum/SignumStoredKeyInfo;
-	public static synthetic fun copy$default (Lid/walt/crypto2/signum/SignumStoredKeyInfo;Ljava/lang/String;Lid/walt/crypto2/signum/SignumKeyPolicy;Lid/walt/crypto2/signum/SignumProtectionLevel;Lid/walt/crypto2/signum/SignumKeyAttestation;ILjava/lang/Object;)Lid/walt/crypto2/signum/SignumStoredKeyInfo;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAlias ()Ljava/lang/String;
-	public final fun getAttestation ()Lid/walt/crypto2/signum/SignumKeyAttestation;
-	public final fun getPolicy ()Lid/walt/crypto2/signum/SignumKeyPolicy;
-	public final fun getProtectionLevel ()Lid/walt/crypto2/signum/SignumProtectionLevel;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
 }
 
 public final class id/walt/crypto2/signum/SignumStoredKeyMetadataException : java/lang/IllegalArgumentException {

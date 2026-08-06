@@ -26,9 +26,9 @@ import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.PlatformKeyCreationRequest
-import id.walt.wallet2.persistence.keys.PlatformKeyRequirements
-import id.walt.wallet2.persistence.keys.PlatformKeyRequestSupport
+import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
+import id.walt.wallet2.persistence.keys.WalletKeyRequirements
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
 import id.walt.wallet2.persistence.keys.toAuthorizationFailure
 import kotlinx.coroutines.NonCancellable
@@ -80,25 +80,25 @@ public class SqlDelightKeyStore(
         throw UnsupportedOperationException("Mobile key storage supports storable keys only")
 
     /** Checks whether an exact key request can be enforced without fallback. */
-    public suspend fun preflight(requirements: PlatformKeyRequirements): PlatformKeyRequestSupport =
+    public suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport =
         if (requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None) {
-            PlatformKeyRequestSupport.Supported
+            KeyUseAuthorizationSupport.Supported
         } else {
             managedKeyProvider.preflight(requirements)
         }
 
     /** Generates and persists either a software or managed Crypto2 key. */
-    public suspend fun generateKey(request: PlatformKeyCreationRequest): StoredKeyMaterial {
+    public suspend fun generateKey(request: WalletKeyCreationRequest): StoredKeyMaterial {
         require(queries.selectByKeyId(request.id.value).executeAsOneOrNull() == null) {
             "Mobile key already exists: ${request.id.value}"
         }
         val support = managedKeyProvider.preflight(request.requirements)
         val key = when (support) {
-            PlatformKeyRequestSupport.Supported ->
+            KeyUseAuthorizationSupport.Supported ->
                 managedKeyProvider.generateManagedKey(request)
                     .withAuthorizationFailureMapping(request.requirements.authorizationPolicy)
 
-            is PlatformKeyRequestSupport.Unsupported -> {
+            is KeyUseAuthorizationSupport.Unsupported -> {
                 if (request.requirements.authorizationPolicy != KeyUseAuthorizationPolicy.None) {
                     throw KeyUseAuthorizationException(
                         failure = support.reason.toAuthorizationFailure(),

@@ -31,7 +31,7 @@ fun createAndroidDemoWallet(
                         KeyUseAuthorizationPolicy.None
                     },
                     keyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(
-                        message = "Authorize wallet signing",
+                        reason = "Authorize wallet signing",
                         cancelText = "Cancel",
                     ),
                 )

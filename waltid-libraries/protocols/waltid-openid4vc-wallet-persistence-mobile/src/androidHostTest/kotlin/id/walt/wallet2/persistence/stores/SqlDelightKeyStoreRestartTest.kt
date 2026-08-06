@@ -24,9 +24,9 @@ import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
-import id.walt.wallet2.persistence.keys.PlatformKeyCreationRequest
-import id.walt.wallet2.persistence.keys.PlatformKeyRequirements
-import id.walt.wallet2.persistence.keys.PlatformKeyRequestSupport
+import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
+import id.walt.wallet2.persistence.keys.WalletKeyRequirements
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import kotlinx.coroutines.test.runTest
@@ -47,9 +47,9 @@ class SqlDelightKeyStoreRestartTest {
             val provider = FakePlatformManagedKeyProvider()
             val store = SqlDelightKeyStore(provider, database.queries)
             val key = store.generateKey(
-                PlatformKeyCreationRequest(
+                WalletKeyCreationRequest(
                     id = KeyId("managed"),
-                    requirements = PlatformKeyRequirements(KeySpec.Ec(EcCurve.P256), KEY_USAGES),
+                    requirements = WalletKeyRequirements(KeySpec.Ec(EcCurve.P256), KEY_USAGES),
                 )
             )
 
@@ -80,9 +80,9 @@ class SqlDelightKeyStoreRestartTest {
 
             assertFails {
                 store.generateKey(
-                    PlatformKeyCreationRequest(
+                    WalletKeyCreationRequest(
                         id = id,
-                        requirements = PlatformKeyRequirements(KeySpec.Ec(EcCurve.P256), KEY_USAGES),
+                        requirements = WalletKeyRequirements(KeySpec.Ec(EcCurve.P256), KEY_USAGES),
                     )
                 )
             }
@@ -259,9 +259,9 @@ class SqlDelightKeyStoreRestartTest {
             )
             val store = SqlDelightKeyStore(provider, database.queries)
             val key = store.generateKey(
-                PlatformKeyCreationRequest(
+                WalletKeyCreationRequest(
                     id = KeyId("protected-cancelled"),
-                    requirements = PlatformKeyRequirements(
+                    requirements = WalletKeyRequirements(
                         spec = KeySpec.Ec(EcCurve.P256),
                         usages = KEY_USAGES,
                         authorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
@@ -287,9 +287,9 @@ class SqlDelightKeyStoreRestartTest {
             )
             val store = SqlDelightKeyStore(provider, database.queries)
             val key = store.generateKey(
-                PlatformKeyCreationRequest(
+                WalletKeyCreationRequest(
                     id = KeyId("protected-missing-sign"),
-                    requirements = PlatformKeyRequirements(
+                    requirements = WalletKeyRequirements(
                         spec = KeySpec.Ec(EcCurve.P256),
                         usages = KEY_USAGES,
                         authorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
@@ -307,7 +307,7 @@ class SqlDelightKeyStoreRestartTest {
     }
 
     @Test
-    fun `managed metadata inspection failures are stable invalid metadata failures`() = runTest {
+    fun `managed metadata decoding failures are stable invalid metadata failures`() = runTest {
         database().use { database ->
             val stored = storedDescriptor("invalid-inspection")
             database.queries.insert(
@@ -317,7 +317,7 @@ class SqlDelightKeyStoreRestartTest {
             )
             val store = SqlDelightKeyStore(
                 FakePlatformManagedKeyProvider(
-                    inspectFailure = SignumStoredKeyMetadataException("bad policy"),
+                    metadataFailure = SignumStoredKeyMetadataException("bad policy"),
                 ),
                 database.queries,
             )
@@ -363,35 +363,35 @@ class SqlDelightKeyStoreRestartTest {
             authorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
             restoreFailure: Throwable? = null,
             signFailure: Throwable? = null,
-            inspectFailure: Throwable? = null,
+            metadataFailure: Throwable? = null,
             deleteFailure: Throwable? = null,
         ) {
             this.authorizationPolicy = authorizationPolicy
             this.restoreFailure = restoreFailure
             this.signFailure = signFailure
-            this.inspectFailure = inspectFailure
+            this.metadataFailure = metadataFailure
             this.deleteFailure = deleteFailure
         }
 
         private val authorizationPolicy: KeyUseAuthorizationPolicy
         private val restoreFailure: Throwable?
         private val signFailure: Throwable?
-        private val inspectFailure: Throwable?
+        private val metadataFailure: Throwable?
         private val deleteFailure: Throwable?
         val managedIds = mutableSetOf<KeyId>()
         var deleteCount = 0
 
-        override suspend fun preflight(requirements: PlatformKeyRequirements): PlatformKeyRequestSupport =
-            PlatformKeyRequestSupport.Supported
+        override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport =
+            KeyUseAuthorizationSupport.Supported
 
-        override suspend fun generateManagedKey(request: PlatformKeyCreationRequest): ManagedKey {
+        override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey {
             managedIds += request.id
             return managedKey(descriptor(request.id, request.requirements.spec, request.requirements.usages))
         }
 
         override suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration {
             restoreFailure?.let { throw it }
-            inspectFailure?.let { throw it }
+            metadataFailure?.let { throw it }
             if (stored.id !in managedIds) {
                 return PlatformManagedKeyRestoration.Missing(authorizationPolicy)
             }

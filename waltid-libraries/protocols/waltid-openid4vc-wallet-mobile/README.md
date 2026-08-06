@@ -44,7 +44,7 @@ val wallet = MobileWalletFactory(context, interactionContextProvider = { current
         walletId = "consumer-wallet",
         defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
         keyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(
-            message = "Authorize wallet signing",
+            reason = "Authorize wallet signing",
             cancelText = "Cancel",
         ),
     )

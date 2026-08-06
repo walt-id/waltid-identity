@@ -37,8 +37,8 @@ import id.walt.wallet2.mobile.MobileWalletTransactionCodeRequirement
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.PlatformKeyRequestSupport
-import id.walt.wallet2.persistence.keys.PlatformKeyUnsupportedReason
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.x509.CertificateDer
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -98,6 +98,7 @@ class WalletSdkBridgeTest {
         val result = bridge.bootstrap(
             keyType = MobileWalletKeyType.secp256r1,
             didMethod = "jwk",
+            keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
         )
 
         assertIs<WalletBridgeResult.Success<MobileWalletBootstrapResult>>(result)
@@ -105,26 +106,14 @@ class WalletSdkBridgeTest {
         assertEquals("did:jwk:issuer", result.value.did)
         assertEquals(MobileWalletKeyType.secp256r1, operations.bootstrapKeyType)
         assertEquals("jwk", operations.bootstrapDidMethod)
-    }
-
-    @Test
-    fun bridgeBootstrapForwardsAuthorizationPolicy() = runTest {
-        val operations = FakeWalletSdkBridgeOperations()
-        val bridge = WalletSdkBridge.forOperations(operations)
-
-        bridge.bootstrap(
-            keyType = MobileWalletKeyType.secp256r1,
-            keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-        )
-
         assertEquals(KeyUseAuthorizationPolicy.BiometricCurrentSet, operations.bootstrapAuthorizationPolicy)
     }
 
     @Test
     fun bridgePreflightForwardsArgumentsAndMapsUnsupportedReason() = runTest {
         val operations = FakeWalletSdkBridgeOperations(
-            preflightResult = PlatformKeyRequestSupport.Unsupported(
-                PlatformKeyUnsupportedReason.BiometricNotEnrolled,
+            preflightResult = KeyUseAuthorizationSupport.Unsupported(
+                KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled,
             ),
         )
         val bridge = WalletSdkBridge.forOperations(operations)
@@ -136,7 +125,7 @@ class WalletSdkBridgeTest {
 
         val preflight = assertIs<WalletBridgeResult.Success<WalletBridgeKeyPreflight>>(result).value
         assertEquals(false, preflight.supported)
-        assertEquals(PlatformKeyUnsupportedReason.BiometricNotEnrolled, preflight.failure)
+        assertEquals(KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled, preflight.failure)
         assertEquals(MobileWalletKeyType.secp256r1, operations.preflightKeyType)
         assertEquals(KeyUseAuthorizationPolicy.BiometricCurrentSet, operations.preflightPolicy)
     }
@@ -619,7 +608,7 @@ class WalletSdkBridgeTest {
     private class FakeWalletSdkBridgeOperations(
         private val receiveFailure: Throwable? = null,
         private val previewResult: MobileWalletPresentationPreviewResult? = null,
-        private val preflightResult: PlatformKeyRequestSupport = PlatformKeyRequestSupport.Supported,
+        private val preflightResult: KeyUseAuthorizationSupport = KeyUseAuthorizationSupport.Supported,
     ) : WalletSdkBridgeOperations {
         var bootstrapKeyType: MobileWalletKeyType? = null
             private set
@@ -676,7 +665,7 @@ class WalletSdkBridgeTest {
         override suspend fun keyUseAuthorizationPreflight(
             keyType: MobileWalletKeyType,
             policy: KeyUseAuthorizationPolicy,
-        ): PlatformKeyRequestSupport {
+        ): KeyUseAuthorizationSupport {
             preflightKeyType = keyType
             preflightPolicy = policy
             return preflightResult

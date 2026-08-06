@@ -6,7 +6,7 @@ import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.PlatformKeyRequestSupport
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.mobile.MobileWalletIssuancePreviewHandle
 import id.walt.wallet2.mobile.MobileWalletOfferResolution
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
@@ -219,7 +219,7 @@ internal interface WalletSdkBridgeOperations {
     suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType,
         policy: KeyUseAuthorizationPolicy,
-    ): PlatformKeyRequestSupport
+    ): KeyUseAuthorizationSupport
 
     suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution
 
@@ -285,7 +285,7 @@ internal class MobileWalletSdkBridgeOperations(
     override suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType,
         policy: KeyUseAuthorizationPolicy,
-    ): PlatformKeyRequestSupport = wallet.keyUseAuthorizationPreflight(keyType, policy)
+    ): KeyUseAuthorizationSupport = wallet.keyUseAuthorizationPreflight(keyType, policy)
 
     override suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution =
         wallet.resolveOffer(offerUrl = offerUrl)

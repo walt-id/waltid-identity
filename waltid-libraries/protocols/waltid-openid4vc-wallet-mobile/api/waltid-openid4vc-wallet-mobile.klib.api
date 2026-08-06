@@ -457,16 +457,13 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeError { // id.walt.w
 }
 
 final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight|null[0]
-    constructor <init>(kotlin/Boolean, id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason? = ...) // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.<init>|<init>(kotlin.Boolean;id.walt.wallet2.persistence.keys.PlatformKeyUnsupportedReason?){}[0]
-
     final val failure // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.failure|{}failure[0]
-        final fun <get-failure>(): id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.failure.<get-failure>|<get-failure>(){}[0]
+        final fun <get-failure>(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.failure.<get-failure>|<get-failure>(){}[0]
     final val supported // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.supported|{}supported[0]
         final fun <get-supported>(): kotlin/Boolean // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.supported.<get-supported>|<get-supported>(){}[0]
 
     final fun component1(): kotlin/Boolean // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.component1|component1(){}[0]
-    final fun component2(): id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.component2|component2(){}[0]
-    final fun copy(kotlin/Boolean = ..., id.walt.wallet2.persistence.keys/PlatformKeyUnsupportedReason? = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.copy|copy(kotlin.Boolean;id.walt.wallet2.persistence.keys.PlatformKeyUnsupportedReason?){}[0]
+    final fun component2(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationUnsupportedReason? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.component2|component2(){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyPreflight.toString|toString(){}[0]
@@ -583,7 +580,7 @@ final class id.walt.wallet2.mobile/MobileWallet { // id.walt.wallet2.mobile/Mobi
     final suspend fun deleteWallet() // id.walt.wallet2.mobile/MobileWallet.deleteWallet|deleteWallet(){}[0]
     final suspend fun discardIssuancePreview(id.walt.wallet2.mobile/MobileWalletIssuancePreviewHandle) // id.walt.wallet2.mobile/MobileWallet.discardIssuancePreview|discardIssuancePreview(id.walt.wallet2.mobile.MobileWalletIssuancePreviewHandle){}[0]
     final suspend fun discardPresentationPreview(id.walt.wallet2.mobile/MobileWalletPresentationPreviewHandle) // id.walt.wallet2.mobile/MobileWallet.discardPresentationPreview|discardPresentationPreview(id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle){}[0]
-    final suspend fun keyUseAuthorizationPreflight(id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy = ...): id.walt.wallet2.persistence.keys/PlatformKeyRequestSupport // id.walt.wallet2.mobile/MobileWallet.keyUseAuthorizationPreflight|keyUseAuthorizationPreflight(id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy){}[0]
+    final suspend fun keyUseAuthorizationPreflight(id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPolicy = ...): id.walt.wallet2.persistence.keys/KeyUseAuthorizationSupport // id.walt.wallet2.mobile/MobileWallet.keyUseAuthorizationPreflight|keyUseAuthorizationPreflight(id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy){}[0]
     final suspend fun present(kotlin/String, kotlin/String? = ..., kotlin/Boolean? = ...): id.walt.wallet2.mobile/MobileWalletPresentationResult // id.walt.wallet2.mobile/MobileWallet.present|present(kotlin.String;kotlin.String?;kotlin.Boolean?){}[0]
     final suspend fun previewPresentation(kotlin/String): id.walt.wallet2.mobile/MobileWalletPresentationPreviewResult // id.walt.wallet2.mobile/MobileWallet.previewPresentation|previewPresentation(kotlin.String){}[0]
     final suspend fun receive(id.walt.wallet2.mobile/MobileWalletIssuancePreviewHandle, kotlin/String? = ..., kotlin/String = ...): kotlin.collections/List<kotlin/String> // id.walt.wallet2.mobile/MobileWallet.receive|receive(id.walt.wallet2.mobile.MobileWalletIssuancePreviewHandle;kotlin.String?;kotlin.String){}[0]

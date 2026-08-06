@@ -119,22 +119,18 @@ public enum WalletKeyUseAuthorizationFailure: Equatable, Sendable {
     case invalidStoredKeyMetadata
 }
 
-/// Result of checking whether an exact protected-key request can be enforced.
-public struct WalletKeyUseAuthorizationPreflight: Equatable, Sendable {
-    /// Whether the requested policy can be enforced exactly.
-    public let supported: Bool
-    /// The stable reason the request is unsupported, when applicable.
-    public let failure: WalletKeyUseAuthorizationFailure?
+/// Stable reasons an exact protected-key preflight cannot currently be supported.
+public enum WalletKeyUseAuthorizationUnsupportedReason: Equatable, Sendable {
+    case unsupportedCombination
+    case biometricUnavailable
+    case biometricNotEnrolled
+    case interactionContextUnavailable
+}
 
-    /// Creates a preflight result.
-    ///
-    /// - Parameters:
-    ///   - supported: Whether the request can be enforced exactly.
-    ///   - failure: Stable failure reason when `supported` is false.
-    public init(supported: Bool, failure: WalletKeyUseAuthorizationFailure? = nil) {
-        self.supported = supported
-        self.failure = failure
-    }
+/// Result of checking whether an exact protected-key request can be enforced.
+public enum WalletKeyUseAuthorizationPreflight: Equatable, Sendable {
+    case supported
+    case unsupported(WalletKeyUseAuthorizationUnsupportedReason)
 }
 
 /// Trust configuration used to authenticate verifier Request Objects.

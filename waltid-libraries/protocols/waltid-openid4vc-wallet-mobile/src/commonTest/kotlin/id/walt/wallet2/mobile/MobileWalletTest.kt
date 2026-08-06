@@ -27,7 +27,7 @@ import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.PlatformKeyRequestSupport
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.ktor.http.URLBuilder
@@ -615,7 +615,7 @@ class MobileWalletTest {
     private fun unusedKeyGenerator(): suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> ManagedKeyMaterial =
         { _, _ -> error("This test must not bootstrap a new key") }
 
-    private fun unusedKeyPreflight(): suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> PlatformKeyRequestSupport =
+    private fun unusedKeyPreflight(): suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> KeyUseAuthorizationSupport =
         { _, _ -> error("This test must not preflight a new key") }
 
     private val displayJson = kotlinx.serialization.json.Json {

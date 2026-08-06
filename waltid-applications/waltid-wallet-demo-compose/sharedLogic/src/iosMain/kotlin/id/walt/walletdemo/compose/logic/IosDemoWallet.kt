@@ -26,7 +26,7 @@ fun createIosDemoWallet(
                         KeyUseAuthorizationPolicy.None
                     },
                     keyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(
-                        message = "Authorize wallet signing",
+                        reason = "Authorize wallet signing",
                         cancelText = "Cancel",
                     ),
                 )

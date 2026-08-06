@@ -75,10 +75,14 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             as: WalletBridgeKeyPreflight.self,
             operation: "key authorization preflight"
         )
-        return .init(
-            supported: value.supported,
-            failure: value.failure?.toSwiftAuthorizationFailure()
-        )
+        switch (value.supported, value.failure) {
+        case (true, nil):
+            return .supported
+        case (false, let failure?):
+            return .unsupported(failure.toSwiftAuthorizationUnsupportedReason())
+        default:
+            throw WalletError.internalFailure("Invalid key authorization preflight result")
+        }
     }
 
     func resolveOffer(offer: URL) async throws -> OfferResolution {
@@ -516,8 +520,8 @@ private extension WalletKeyUseAuthorizationPolicy {
     }
 }
 
-private extension Waltid_openid4vc_wallet_persistence_mobilePlatformKeyUnsupportedReason {
-    func toSwiftAuthorizationFailure() -> WalletKeyUseAuthorizationFailure {
+private extension Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationUnsupportedReason {
+    func toSwiftAuthorizationUnsupportedReason() -> WalletKeyUseAuthorizationUnsupportedReason {
         switch self {
         case .unsupportedCombination: return .unsupportedCombination
         case .biometricUnavailable: return .biometricUnavailable
@@ -900,9 +904,6 @@ private extension MobileWalletEvent {
 
 private extension WalletBridgeError {
     func toSwiftWalletError() -> WalletError {
-        if let authorizationFailure {
-            return .keyUseAuthorization(authorizationFailure.toSwiftAuthorizationFailure())
-        }
         switch category {
         case .invalidInput:
             return .invalidInput(message)
@@ -919,7 +920,10 @@ private extension WalletBridgeError {
         case .credentialNotFound:
             return .credentialNotFound(message)
         case .authorization:
-            return .keyUseAuthorization(authorizationFailure?.toSwiftAuthorizationFailure() ?? .invalidStoredKeyMetadata)
+            guard let authorizationFailure else {
+                return .internalFailure("Authorization error did not include a failure reason")
+            }
+            return .keyUseAuthorization(authorizationFailure.toSwiftAuthorizationFailure())
         case .cancelled:
             return .cancelled
         case .internalFailure:

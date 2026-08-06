@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
@@ -12,6 +13,7 @@ import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.providers.GenerateManagedKeyRequest
 import id.walt.crypto2.signum.AndroidSignumKeyBackend
 import id.walt.crypto2.signum.SignumAuthenticationPolicy
+import id.walt.crypto2.signum.SignumHardwarePolicy
 import id.walt.crypto2.signum.SignumKeyPolicy
 import id.walt.crypto2.signum.SignumKeyOptions
 import id.walt.crypto2.signum.SignumKeyNotFoundException
@@ -28,31 +30,31 @@ public class AndroidPlatformKeyProvider(
     private val backend = AndroidSignumKeyBackend(interactionContextProvider)
     private val signumProvider = SignumManagedKeyProvider(backend)
 
-    override suspend fun preflight(requirements: PlatformKeyRequirements): PlatformKeyRequestSupport {
+    override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport {
         val signumPolicy = requirements.authorizationPolicy.toSignumPolicy()
         if (!backend.supports(requirements.spec, requirements.usages, signumPolicy)) {
-            return PlatformKeyRequestSupport.Unsupported(PlatformKeyUnsupportedReason.UnsupportedCombination)
+            return KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
         }
         if (requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None) {
-            return PlatformKeyRequestSupport.Supported
+            return KeyUseAuthorizationSupport.Supported
         }
         val failure = when {
             requirements.spec != KeySpec.Ec(EcCurve.P256) ||
                 requirements.usages != setOf(KeyUsage.SIGN, KeyUsage.VERIFY) ->
-                PlatformKeyUnsupportedReason.UnsupportedCombination
+                KeyUseAuthorizationUnsupportedReason.UnsupportedCombination
             !hasResumedActivity(interactionContextProvider) ->
-                PlatformKeyUnsupportedReason.InteractionContextUnavailable
+                KeyUseAuthorizationUnsupportedReason.InteractionContextUnavailable
             else -> when (BiometricManager.from(applicationContext).canAuthenticate(BIOMETRIC_STRONG)) {
                 BiometricManager.BIOMETRIC_SUCCESS -> null
-                BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> PlatformKeyUnsupportedReason.BiometricNotEnrolled
-                else -> PlatformKeyUnsupportedReason.BiometricUnavailable
+                BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled
+                else -> KeyUseAuthorizationUnsupportedReason.BiometricUnavailable
             }
         }
-        return failure?.let { PlatformKeyRequestSupport.Unsupported(it) }
-            ?: PlatformKeyRequestSupport.Supported
+        return failure?.let { KeyUseAuthorizationSupport.Unsupported(it) }
+            ?: KeyUseAuthorizationSupport.Supported
     }
 
-    override suspend fun generateManagedKey(request: PlatformKeyCreationRequest): ManagedKey = signumProvider.generate(
+    override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey = signumProvider.generate(
         GenerateManagedKeyRequest(
             id = request.id,
             spec = request.requirements.spec,
@@ -62,7 +64,7 @@ public class AndroidPlatformKeyProvider(
     )
 
     override suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration {
-        val policy = signumProvider.inspect(stored).policy.toWalletPolicy()
+        val policy = signumProvider.storedPolicy(stored).toWalletPolicy()
         return try {
             PlatformManagedKeyRestoration.Restored(signumProvider.restore(stored), policy)
         } catch (_: SignumKeyNotFoundException) {
@@ -74,9 +76,10 @@ public class AndroidPlatformKeyProvider(
         signumProvider.delete(stored, expectedAlias = stored.id.value)
     }
 
-    private fun PlatformKeyCreationRequest.toSignumPolicy(): SignumKeyPolicy = when (requirements.authorizationPolicy) {
+    private fun WalletKeyCreationRequest.toSignumPolicy(): SignumKeyPolicy = when (requirements.authorizationPolicy) {
         KeyUseAuthorizationPolicy.None -> SignumKeyPolicy()
         KeyUseAuthorizationPolicy.BiometricCurrentSet -> SignumKeyPolicy(
+            hardware = SignumHardwarePolicy.REQUIRED,
             authentication = SignumAuthenticationPolicy.BiometricCurrentSet(
                 reason = prompt.reason,
                 cancelText = prompt.cancelText,
@@ -87,6 +90,7 @@ public class AndroidPlatformKeyProvider(
     private fun KeyUseAuthorizationPolicy.toSignumPolicy(): SignumKeyPolicy = when (this) {
         KeyUseAuthorizationPolicy.None -> SignumKeyPolicy()
         KeyUseAuthorizationPolicy.BiometricCurrentSet -> SignumKeyPolicy(
+            hardware = SignumHardwarePolicy.REQUIRED,
             authentication = SignumAuthenticationPolicy.BiometricCurrentSet(),
         )
     }
@@ -95,12 +99,17 @@ public class AndroidPlatformKeyProvider(
 private fun hasResumedActivity(provider: () -> FragmentActivity?): Boolean {
     val activity = provider() ?: return false
     return !activity.isFinishing && !activity.isDestroyed && !activity.isChangingConfigurations &&
-        activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
 }
 
 private fun SignumKeyPolicy.toWalletPolicy(): KeyUseAuthorizationPolicy = when (val authentication = authentication) {
     SignumAuthenticationPolicy.None -> KeyUseAuthorizationPolicy.None
     is SignumAuthenticationPolicy.BiometricCurrentSet -> {
-        KeyUseAuthorizationPolicy.BiometricCurrentSet
+        if (hardware == SignumHardwarePolicy.REQUIRED) KeyUseAuthorizationPolicy.BiometricCurrentSet else {
+            throw KeyUseAuthorizationException(
+                KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
+                "Stored Signum key uses an unsupported Android authentication policy",
+            )
+        }
     }
 }

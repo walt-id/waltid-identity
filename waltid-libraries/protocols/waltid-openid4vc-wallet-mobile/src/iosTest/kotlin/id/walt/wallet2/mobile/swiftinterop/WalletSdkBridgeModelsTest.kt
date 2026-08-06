@@ -5,9 +5,11 @@ import id.walt.wallet2.handlers.PreviewSessionFailureReason
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 import kotlinx.coroutines.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 class WalletSdkBridgeModelsTest {
@@ -70,5 +72,29 @@ class WalletSdkBridgeModelsTest {
 
         assertIs<WalletBridgeResult.Failure>(failure)
         assertEquals(WalletBridgeErrorCategory.internalFailure, failure.error.category)
+    }
+
+    @Test
+    fun bridgePreflightRequiresFailureExactlyWhenUnsupported() {
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeKeyPreflight(supported = true, failure = KeyUseAuthorizationUnsupportedReason.BiometricUnavailable)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeKeyPreflight(supported = false)
+        }
+    }
+
+    @Test
+    fun bridgeErrorRequiresAuthorizationFailureExactlyForAuthorizationCategory() {
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeError(WalletBridgeErrorCategory.authorization, "missing failure")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeError(
+                WalletBridgeErrorCategory.internalFailure,
+                "unexpected failure field",
+                authorizationFailure = KeyUseAuthorizationFailure.AuthorizationNotCompleted,
+            )
+        }
     }
 }

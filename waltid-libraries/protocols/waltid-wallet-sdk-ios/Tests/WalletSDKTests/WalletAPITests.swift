@@ -133,6 +133,16 @@ final class WalletAPITests: XCTestCase {
 
     }
 
+    func testKeyUseAuthorizationPreflightPreservesUnsupportedReason() {
+        let preflight = WalletKeyUseAuthorizationPreflight.unsupported(.biometricNotEnrolled)
+
+        XCTAssertEqual(
+            preflight,
+            .unsupported(.biometricNotEnrolled)
+        )
+        acceptsSendable(preflight)
+    }
+
     func testPresentationPreviewModelsAreValueTypesAndEquatable() {
         let preview = PresentationPreview(
             previewHandle: PresentationPreviewHandle(value: "presentation-preview-1"),
@@ -760,7 +770,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         policy: WalletKeyUseAuthorizationPolicy
     ) async throws -> WalletKeyUseAuthorizationPreflight {
         if let error { throw error }
-        return WalletKeyUseAuthorizationPreflight(supported: true)
+        return .supported
     }
 
     func resolveOffer(offer: URL) async throws -> OfferResolution {

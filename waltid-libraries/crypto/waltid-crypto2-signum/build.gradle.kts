@@ -2,6 +2,7 @@
 
 import org.jetbrains.kotlin.gradle.dsl.abi.BinariesSource
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
     id("waltid.full.library")
@@ -11,6 +12,17 @@ plugins {
 group = "id.walt.crypto2"
 
 kotlin {
+    if (enableIosBuild) {
+        targets.withType<KotlinNativeTarget>().configureEach {
+            compilations.getByName("main").cinterops {
+                create("CoreFoundationEqual") {
+                    defFile(project.file("src/iosMain/cinterop/CoreFoundationEqual.def"))
+                    compilerOpts("-I${project.file("src/iosMain/cinterop").absolutePath}")
+                }
+            }
+        }
+    }
+
     abiValidation {
         binariesSource.set(BinariesSource.MAIN_COMPILATION)
     }

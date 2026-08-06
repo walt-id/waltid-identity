@@ -14,8 +14,8 @@ import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
-import id.walt.wallet2.persistence.keys.PlatformKeyCreationRequest
-import id.walt.wallet2.persistence.keys.PlatformKeyRequirements
+import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
+import id.walt.wallet2.persistence.keys.WalletKeyRequirements
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
@@ -182,9 +182,9 @@ internal fun createSqlDelightMobileWallet(
         credentialStore = credentialStore,
         generateAndPersistKey = { keyType, policy ->
             keyStore.generateKey(
-                PlatformKeyCreationRequest(
+                WalletKeyCreationRequest(
                     id = KeyId("wallet_key_${Uuid.random()}"),
-                    requirements = PlatformKeyRequirements(
+                    requirements = WalletKeyRequirements(
                         spec = keyType.toKeySpec(),
                         usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
                         authorizationPolicy = policy,
@@ -195,7 +195,7 @@ internal fun createSqlDelightMobileWallet(
         },
         runKeyUseAuthorizationPreflight = { keyType, policy ->
             keyStore.preflight(
-                PlatformKeyRequirements(
+                WalletKeyRequirements(
                     spec = keyType.toKeySpec(),
                     usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
                     authorizationPolicy = policy,

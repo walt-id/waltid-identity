@@ -32,26 +32,26 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
     private val signumProvider = SignumManagedKeyProvider(backend)
 
     @OptIn(ExperimentalForeignApi::class)
-    override suspend fun preflight(requirements: PlatformKeyRequirements): PlatformKeyRequestSupport {
+    override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport {
         val signumPolicy = requirements.authorizationPolicy.toSignumPolicy()
         if (!backend.supports(requirements.spec, requirements.usages, signumPolicy)) {
-            return PlatformKeyRequestSupport.Unsupported(PlatformKeyUnsupportedReason.UnsupportedCombination)
+            return KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
         }
         if (requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None) {
-            return PlatformKeyRequestSupport.Supported
+            return KeyUseAuthorizationSupport.Supported
         }
         val failure = when {
             requirements.spec != KeySpec.Ec(EcCurve.P256) ||
                 requirements.usages != setOf(KeyUsage.SIGN, KeyUsage.VERIFY) ->
-                PlatformKeyUnsupportedReason.UnsupportedCombination
-            isSimulator -> PlatformKeyUnsupportedReason.BiometricUnavailable
+                KeyUseAuthorizationUnsupportedReason.UnsupportedCombination
+            isSimulator -> KeyUseAuthorizationUnsupportedReason.BiometricUnavailable
             else -> biometricAvailabilityFailure()
         }
-        return failure?.let { PlatformKeyRequestSupport.Unsupported(it) }
-            ?: PlatformKeyRequestSupport.Supported
+        return failure?.let { KeyUseAuthorizationSupport.Unsupported(it) }
+            ?: KeyUseAuthorizationSupport.Supported
     }
 
-    override suspend fun generateManagedKey(request: PlatformKeyCreationRequest): ManagedKey = signumProvider.generate(
+    override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey = signumProvider.generate(
         GenerateManagedKeyRequest(
             id = request.id,
             spec = request.requirements.spec,
@@ -61,7 +61,7 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
     )
 
     override suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration {
-        val policy = signumProvider.inspect(stored).policy.toWalletPolicy()
+        val policy = signumProvider.storedPolicy(stored).toWalletPolicy()
         return try {
             PlatformManagedKeyRestoration.Restored(signumProvider.restore(stored), policy)
         } catch (_: SignumKeyNotFoundException) {
@@ -73,7 +73,7 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
         signumProvider.delete(stored, expectedAlias = stored.id.value)
     }
 
-    private fun PlatformKeyCreationRequest.toSignumPolicy(): SignumKeyPolicy = when (requirements.authorizationPolicy) {
+    private fun WalletKeyCreationRequest.toSignumPolicy(): SignumKeyPolicy = when (requirements.authorizationPolicy) {
         KeyUseAuthorizationPolicy.None -> SignumKeyPolicy()
         KeyUseAuthorizationPolicy.BiometricCurrentSet -> SignumKeyPolicy(
             hardware = SignumHardwarePolicy.REQUIRED,
@@ -85,7 +85,7 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
     }
 
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
-    private fun biometricAvailabilityFailure(): PlatformKeyUnsupportedReason? = memScoped {
+    private fun biometricAvailabilityFailure(): KeyUseAuthorizationUnsupportedReason? = memScoped {
         val error = alloc<ObjCObjectVar<platform.Foundation.NSError?>>()
         val available = LAContext().canEvaluatePolicy(
             LAPolicyDeviceOwnerAuthenticationWithBiometrics,
@@ -93,9 +93,9 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
         )
         if (available) return@memScoped null
         when (error.value?.code) {
-            LAErrorBiometryNotEnrolled -> PlatformKeyUnsupportedReason.BiometricNotEnrolled
-            LAErrorBiometryNotAvailable -> PlatformKeyUnsupportedReason.BiometricUnavailable
-            else -> PlatformKeyUnsupportedReason.BiometricUnavailable
+            LAErrorBiometryNotEnrolled -> KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled
+            LAErrorBiometryNotAvailable -> KeyUseAuthorizationUnsupportedReason.BiometricUnavailable
+            else -> KeyUseAuthorizationUnsupportedReason.BiometricUnavailable
         }
     }
 

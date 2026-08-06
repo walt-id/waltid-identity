@@ -151,8 +151,8 @@ class SignumManagedKeyProvider(
         return KeyDeletionResult.Deleted
     }
 
-    /** Reads the immutable Signum metadata without loading the native key. */
-    fun inspect(stored: StoredKey.Managed): SignumStoredKeyInfo {
+    /** Reads the persisted Signum authorization policy without loading the native key. */
+    fun storedPolicy(stored: StoredKey.Managed): SignumKeyPolicy {
         return storedMetadata("Stored Signum key metadata is invalid") {
             require(stored.provider == id) { "Stored key belongs to a different provider" }
             require(stored.providerSchemaVersion == PROVIDER_SCHEMA_VERSION) {
@@ -160,7 +160,7 @@ class SignumManagedKeyProvider(
             }
             val data = SignumStoredKeyData.decode(stored.providerData)
             require(data.alias.isNotBlank()) { "Stored Signum key alias cannot be blank" }
-            SignumStoredKeyInfo(data.alias, data.policy, data.protectionLevel, data.attestation)
+            data.policy
         }
     }
 
@@ -289,14 +289,6 @@ interface SignumManagedKey : ManagedKey {
     val protectionLevel: SignumProtectionLevel
     val attestation: SignumKeyAttestation?
 }
-
-/** Immutable native metadata stored inside a managed Crypto2 key descriptor. */
-public data class SignumStoredKeyInfo(
-    val alias: String,
-    val policy: SignumKeyPolicy,
-    val protectionLevel: SignumProtectionLevel,
-    val attestation: SignumKeyAttestation?,
-)
 
 @Serializable
 private data class SignumStoredKeyData(

@@ -1,6 +1,5 @@
 // Klib ABI Dump
-// Targets: [iosArm64, iosSimulatorArm64, js]
-// Alias: ios => [iosArm64, iosSimulatorArm64]
+// Targets: [js]
 // Rendering settings:
 // - Signature version: 2
 // - Show manifest properties: true
@@ -257,7 +256,7 @@ final class id.walt.crypto2.signum/SignumManagedKeyProvider : id.walt.crypto2.pr
     final val id // id.walt.crypto2.signum/SignumManagedKeyProvider.id|{}id[0]
         final fun <get-id>(): id.walt.crypto2.keys/ProviderId // id.walt.crypto2.signum/SignumManagedKeyProvider.id.<get-id>|<get-id>(){}[0]
 
-    final fun inspect(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.signum/SignumStoredKeyInfo // id.walt.crypto2.signum/SignumManagedKeyProvider.inspect|inspect(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+    final fun storedPolicy(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.signum/SignumKeyPolicy // id.walt.crypto2.signum/SignumManagedKeyProvider.storedPolicy|storedPolicy(id.walt.crypto2.keys.StoredKey.Managed){}[0]
     final suspend fun delete(id.walt.crypto2.keys/StoredKey.Managed, kotlin/String? = ...): id.walt.crypto2.keys/KeyDeletionResult // id.walt.crypto2.signum/SignumManagedKeyProvider.delete|delete(id.walt.crypto2.keys.StoredKey.Managed;kotlin.String?){}[0]
     final suspend fun generate(id.walt.crypto2.providers/GenerateManagedKeyRequest): id.walt.crypto2.keys/ManagedKey // id.walt.crypto2.signum/SignumManagedKeyProvider.generate|generate(id.walt.crypto2.providers.GenerateManagedKeyRequest){}[0]
     final suspend fun generateSignumKey(id.walt.crypto2.providers/GenerateManagedKeyRequest): id.walt.crypto2.signum/SignumManagedKey // id.walt.crypto2.signum/SignumManagedKeyProvider.generateSignumKey|generateSignumKey(id.walt.crypto2.providers.GenerateManagedKeyRequest){}[0]
@@ -266,28 +265,6 @@ final class id.walt.crypto2.signum/SignumManagedKeyProvider : id.walt.crypto2.pr
     final suspend fun storedKeyForExisting(id.walt.crypto2.keys/KeyId, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, kotlin/String, id.walt.crypto2.signum/SignumKeyPolicy = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ...): id.walt.crypto2.keys/StoredKey.Managed // id.walt.crypto2.signum/SignumManagedKeyProvider.storedKeyForExisting|storedKeyForExisting(id.walt.crypto2.keys.KeyId;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;kotlin.String;id.walt.crypto2.signum.SignumKeyPolicy;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
 
     final object Companion // id.walt.crypto2.signum/SignumManagedKeyProvider.Companion|null[0]
-}
-
-final class id.walt.crypto2.signum/SignumStoredKeyInfo { // id.walt.crypto2.signum/SignumStoredKeyInfo|null[0]
-    constructor <init>(kotlin/String, id.walt.crypto2.signum/SignumKeyPolicy, id.walt.crypto2.signum/SignumProtectionLevel, id.walt.crypto2.signum/SignumKeyAttestation?) // id.walt.crypto2.signum/SignumStoredKeyInfo.<init>|<init>(kotlin.String;id.walt.crypto2.signum.SignumKeyPolicy;id.walt.crypto2.signum.SignumProtectionLevel;id.walt.crypto2.signum.SignumKeyAttestation?){}[0]
-
-    final val alias // id.walt.crypto2.signum/SignumStoredKeyInfo.alias|{}alias[0]
-        final fun <get-alias>(): kotlin/String // id.walt.crypto2.signum/SignumStoredKeyInfo.alias.<get-alias>|<get-alias>(){}[0]
-    final val attestation // id.walt.crypto2.signum/SignumStoredKeyInfo.attestation|{}attestation[0]
-        final fun <get-attestation>(): id.walt.crypto2.signum/SignumKeyAttestation? // id.walt.crypto2.signum/SignumStoredKeyInfo.attestation.<get-attestation>|<get-attestation>(){}[0]
-    final val policy // id.walt.crypto2.signum/SignumStoredKeyInfo.policy|{}policy[0]
-        final fun <get-policy>(): id.walt.crypto2.signum/SignumKeyPolicy // id.walt.crypto2.signum/SignumStoredKeyInfo.policy.<get-policy>|<get-policy>(){}[0]
-    final val protectionLevel // id.walt.crypto2.signum/SignumStoredKeyInfo.protectionLevel|{}protectionLevel[0]
-        final fun <get-protectionLevel>(): id.walt.crypto2.signum/SignumProtectionLevel // id.walt.crypto2.signum/SignumStoredKeyInfo.protectionLevel.<get-protectionLevel>|<get-protectionLevel>(){}[0]
-
-    final fun component1(): kotlin/String // id.walt.crypto2.signum/SignumStoredKeyInfo.component1|component1(){}[0]
-    final fun component2(): id.walt.crypto2.signum/SignumKeyPolicy // id.walt.crypto2.signum/SignumStoredKeyInfo.component2|component2(){}[0]
-    final fun component3(): id.walt.crypto2.signum/SignumProtectionLevel // id.walt.crypto2.signum/SignumStoredKeyInfo.component3|component3(){}[0]
-    final fun component4(): id.walt.crypto2.signum/SignumKeyAttestation? // id.walt.crypto2.signum/SignumStoredKeyInfo.component4|component4(){}[0]
-    final fun copy(kotlin/String = ..., id.walt.crypto2.signum/SignumKeyPolicy = ..., id.walt.crypto2.signum/SignumProtectionLevel = ..., id.walt.crypto2.signum/SignumKeyAttestation? = ...): id.walt.crypto2.signum/SignumStoredKeyInfo // id.walt.crypto2.signum/SignumStoredKeyInfo.copy|copy(kotlin.String;id.walt.crypto2.signum.SignumKeyPolicy;id.walt.crypto2.signum.SignumProtectionLevel;id.walt.crypto2.signum.SignumKeyAttestation?){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.signum/SignumStoredKeyInfo.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // id.walt.crypto2.signum/SignumStoredKeyInfo.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // id.walt.crypto2.signum/SignumStoredKeyInfo.toString|toString(){}[0]
 }
 
 final class id.walt.crypto2.signum/SignumStoredKeyMetadataException : kotlin/IllegalArgumentException { // id.walt.crypto2.signum/SignumStoredKeyMetadataException|null[0]
@@ -299,17 +276,4 @@ final class id.walt.crypto2.signum/SignumUserCancelledException : kotlin.corouti
 
     final val reason // id.walt.crypto2.signum/SignumUserCancelledException.reason|{}reason[0]
         final fun <get-reason>(): kotlin/Throwable // id.walt.crypto2.signum/SignumUserCancelledException.reason.<get-reason>|<get-reason>(){}[0]
-}
-
-// Targets: [ios]
-final class id.walt.crypto2.signum/IosSignumKeyBackend : id.walt.crypto2.signum/SignumPlatformBackend { // id.walt.crypto2.signum/IosSignumKeyBackend|null[0]
-    constructor <init>() // id.walt.crypto2.signum/IosSignumKeyBackend.<init>|<init>(){}[0]
-
-    final val id // id.walt.crypto2.signum/IosSignumKeyBackend.id|{}id[0]
-        final fun <get-id>(): id.walt.crypto2.keys/ProviderId // id.walt.crypto2.signum/IosSignumKeyBackend.id.<get-id>|<get-id>(){}[0]
-
-    final fun supports(id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.signum/SignumKeyPolicy): kotlin/Boolean // id.walt.crypto2.signum/IosSignumKeyBackend.supports|supports(id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.signum.SignumKeyPolicy){}[0]
-    final suspend fun create(kotlin/String, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.signum/SignumKeyPolicy): id.walt.crypto2.signum/SignumPlatformKey // id.walt.crypto2.signum/IosSignumKeyBackend.create|create(kotlin.String;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.signum.SignumKeyPolicy){}[0]
-    final suspend fun delete(kotlin/String) // id.walt.crypto2.signum/IosSignumKeyBackend.delete|delete(kotlin.String){}[0]
-    final suspend fun load(kotlin/String, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.signum/SignumKeyPolicy): id.walt.crypto2.signum/SignumPlatformKey? // id.walt.crypto2.signum/IosSignumKeyBackend.load|load(kotlin.String;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.signum.SignumKeyPolicy){}[0]
 }

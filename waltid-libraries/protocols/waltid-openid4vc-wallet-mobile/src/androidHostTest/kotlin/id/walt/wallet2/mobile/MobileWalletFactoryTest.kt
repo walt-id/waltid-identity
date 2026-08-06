@@ -28,10 +28,10 @@ import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.PlatformKeyCreationRequest
-import id.walt.wallet2.persistence.keys.PlatformKeyRequirements
-import id.walt.wallet2.persistence.keys.PlatformKeyRequestSupport
-import id.walt.wallet2.persistence.keys.PlatformKeyUnsupportedReason
+import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
+import id.walt.wallet2.persistence.keys.WalletKeyRequirements
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
@@ -161,7 +161,7 @@ class MobileWalletFactoryTest {
     }
 
     @Test
-    fun `bootstrap resolves configured and per-call authorization policies`() = runTest {
+    fun `preflight and bootstrap resolve configured and per-call authorization policies`() = runTest {
         val cases = listOf(
             PolicyCase(
                 configured = KeyUseAuthorizationPolicy.BiometricCurrentSet,
@@ -173,9 +173,35 @@ class MobileWalletFactoryTest {
                 requested = KeyUseAuthorizationPolicy.None,
                 expected = KeyUseAuthorizationPolicy.None,
             ),
+            PolicyCase(
+                configured = KeyUseAuthorizationPolicy.None,
+                requested = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                expected = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+            ),
         )
 
         cases.forEach { case ->
+            database().use { database ->
+                val provider = FakePlatformManagedKeyProvider()
+                val mobileWallet = wallet(
+                    config = MobileWalletConfig(defaultKeyUseAuthorizationPolicy = case.configured),
+                    database = database,
+                    provider = provider,
+                )
+
+                assertEquals(
+                    KeyUseAuthorizationSupport.Supported,
+                    mobileWallet.keyUseAuthorizationPreflight(
+                        keyUseAuthorizationPolicy = case.requested ?: case.configured,
+                    ),
+                )
+                assertEquals(
+                    if (case.expected == KeyUseAuthorizationPolicy.None) emptyList()
+                    else listOf(case.expected),
+                    provider.preflightPolicies,
+                )
+            }
+
             database().use { database ->
                 val provider = FakePlatformManagedKeyProvider()
                 wallet(
@@ -184,7 +210,9 @@ class MobileWalletFactoryTest {
                     provider = provider,
                 ).bootstrap(keyUseAuthorizationPolicy = case.requested)
 
-                assertEquals(listOf(case.expected), provider.generatedPolicies)
+                val expectedManagedCalls = listOf(case.expected)
+                assertEquals(expectedManagedCalls, provider.generatedPolicies)
+                assertEquals(listOf(case.expected), provider.preflightPolicies)
             }
         }
     }
@@ -193,8 +221,8 @@ class MobileWalletFactoryTest {
     fun `protected bootstrap fails closed when preflight is unsupported`() = runTest {
         database().use { database ->
             val provider = FakePlatformManagedKeyProvider().apply {
-                preflightResult = PlatformKeyRequestSupport.Unsupported(
-                    PlatformKeyUnsupportedReason.BiometricNotEnrolled,
+                preflightResult = KeyUseAuthorizationSupport.Unsupported(
+                    KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled,
                 )
             }
 
@@ -289,13 +317,16 @@ class MobileWalletFactoryTest {
         private val keys = mutableMapOf<KeyId, SoftwareKey>()
         var generateCount = 0
         var deleteCount = 0
-        var preflightResult: PlatformKeyRequestSupport = PlatformKeyRequestSupport.Supported
+        var preflightResult: KeyUseAuthorizationSupport = KeyUseAuthorizationSupport.Supported
+        val preflightPolicies = mutableListOf<KeyUseAuthorizationPolicy>()
         val generatedPolicies = mutableListOf<KeyUseAuthorizationPolicy>()
 
-        override suspend fun preflight(requirements: PlatformKeyRequirements): PlatformKeyRequestSupport =
-            preflightResult
+        override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport {
+            preflightPolicies += requirements.authorizationPolicy
+            return preflightResult
+        }
 
-        override suspend fun generateManagedKey(request: PlatformKeyCreationRequest): ManagedKey {
+        override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey {
             generateCount++
             generatedPolicies += request.requirements.authorizationPolicy
             val software = softwareProvider.generate(

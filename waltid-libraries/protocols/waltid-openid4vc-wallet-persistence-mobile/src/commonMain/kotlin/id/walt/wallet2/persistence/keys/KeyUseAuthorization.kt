@@ -60,7 +60,7 @@ public class KeyUseAuthorizationException(
  * @property usages Operations the key must support.
  * @property authorizationPolicy Authorization required for private-key use.
  */
-public data class PlatformKeyRequirements(
+public data class WalletKeyRequirements(
     public val spec: KeySpec,
     public val usages: Set<KeyUsage>,
     public val authorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
@@ -77,26 +77,26 @@ public data class PlatformKeyRequirements(
  * @property requirements Capabilities the generated key must satisfy.
  * @property prompt Text used by OS-owned authorization UI.
  */
-public data class PlatformKeyCreationRequest(
+public data class WalletKeyCreationRequest(
     public val id: KeyId,
-    public val requirements: PlatformKeyRequirements,
+    public val requirements: WalletKeyRequirements,
     public val prompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
 )
 
 /** Result of checking whether exact key requirements can be enforced without fallback. */
-public sealed interface PlatformKeyRequestSupport {
+public sealed interface KeyUseAuthorizationSupport {
     /** The platform can enforce every requested capability without fallback. */
-    public data object Supported : PlatformKeyRequestSupport
+    public data object Supported : KeyUseAuthorizationSupport
 
     /** The platform cannot enforce the requested capability set. */
     public data class Unsupported(
         /** Reason the exact requirements cannot currently be enforced. */
-        public val reason: PlatformKeyUnsupportedReason,
-    ) : PlatformKeyRequestSupport
+        public val reason: KeyUseAuthorizationUnsupportedReason,
+    ) : KeyUseAuthorizationSupport
 }
 
 /** Reasons an exact key-creation requirement cannot currently be enforced. */
-public enum class PlatformKeyUnsupportedReason {
+public enum class KeyUseAuthorizationUnsupportedReason {
     UnsupportedCombination,
     BiometricUnavailable,
     BiometricNotEnrolled,
@@ -125,9 +125,9 @@ public sealed interface PlatformManagedKeyRestoration {
     ) : PlatformManagedKeyRestoration
 }
 
-internal fun PlatformKeyUnsupportedReason.toAuthorizationFailure(): KeyUseAuthorizationFailure = when (this) {
-    PlatformKeyUnsupportedReason.UnsupportedCombination -> KeyUseAuthorizationFailure.UnsupportedCombination
-    PlatformKeyUnsupportedReason.BiometricUnavailable -> KeyUseAuthorizationFailure.BiometricUnavailable
-    PlatformKeyUnsupportedReason.BiometricNotEnrolled -> KeyUseAuthorizationFailure.BiometricNotEnrolled
-    PlatformKeyUnsupportedReason.InteractionContextUnavailable -> KeyUseAuthorizationFailure.InteractionContextUnavailable
+internal fun KeyUseAuthorizationUnsupportedReason.toAuthorizationFailure(): KeyUseAuthorizationFailure = when (this) {
+    KeyUseAuthorizationUnsupportedReason.UnsupportedCombination -> KeyUseAuthorizationFailure.UnsupportedCombination
+    KeyUseAuthorizationUnsupportedReason.BiometricUnavailable -> KeyUseAuthorizationFailure.BiometricUnavailable
+    KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled -> KeyUseAuthorizationFailure.BiometricNotEnrolled
+    KeyUseAuthorizationUnsupportedReason.InteractionContextUnavailable -> KeyUseAuthorizationFailure.InteractionContextUnavailable
 }

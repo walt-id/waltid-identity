@@ -8,10 +8,10 @@ import id.walt.crypto2.keys.StoredKey
  */
 public interface PlatformManagedKeyProvider {
     /** Checks whether the exact requirements can be enforced without fallback. */
-    public suspend fun preflight(requirements: PlatformKeyRequirements): PlatformKeyRequestSupport
+    public suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport
 
     /** Generates a managed key in the platform key store. */
-    public suspend fun generateManagedKey(request: PlatformKeyCreationRequest): ManagedKey
+    public suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey
 
     /**
      * Restores a platform key from its persisted descriptor.
