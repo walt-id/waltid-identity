@@ -1,17 +1,23 @@
 package id.walt.certificate.x509
 
 import id.walt.certificate.x509.bouncycastle.BouncyPublicKeyInfo
-import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.Key
 import kotlinx.io.bytestring.ByteString
 import org.bouncycastle.asn1.ASN1InputStream
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
 import kotlin.io.encoding.Base64
+import id.walt.crypto.keys.Key as Crypto1Key
 
 object BouncyPublicKeyInfoUtil {
 
     suspend fun publicKeyInfoOfKey(keyPair: Key): PublicKeyInfo {
+        keyPair.spec
+        TODO()
+    }
+
+    suspend fun publicKeyInfoOfKey(keyPair: Crypto1Key): PublicKeyInfo {
         // publicKey.getPublicKeyRepresentation() doesn't work for EC keys
         // so we use the PEM to get to the key bytes
         val publicKey = keyPair.getPublicKey()

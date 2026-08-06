@@ -1,17 +1,14 @@
 package id.walt.certificate.x509.bouncycastle
 
-import id.walt.certificate.x509.BouncyPublicKeyInfoUtil
+import id.walt.certificate.x509.*
 import id.walt.certificate.x509.BouncyPublicKeyInfoUtil.bouncyCastleSubjectPublicKeyInfo
-import id.walt.certificate.x509.Pkcs10CertificateSigningRequest
-import id.walt.certificate.x509.SignatureValidator
 import id.walt.certificate.x509.X509Certificate
-import id.walt.certificate.x509.X509CertificateSigner
 import id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension
-import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.Key
 import kotlinx.io.bytestring.isNotEmpty
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x500.X500Name
@@ -26,6 +23,7 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest
 import java.math.BigInteger
 import java.security.Security
 import java.util.*
+import id.walt.crypto.keys.Key as Crypto1Key
 
 
 class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
@@ -43,13 +41,43 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
         issuerKey: Key,
         builder: X509CertificateDataBuilder
     ): X509Certificate {
-        val serial = BigInteger(builder.serialNumberRaw.toByteArray())
-        var issuer: X500Name? = null
-        val notBefore = Date(builder.validity.notBefore.toEpochMilliseconds())
-        val notAfter = Date(builder.validity.notAfter.toEpochMilliseconds())
-        val subject = X500Name(builder.subjectDn)
-
         val issuerPublicKeyInfo = BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(issuerKey)
+        val subject = X500Name(builder.subjectDn)
+        var issuer: X500Name? = null
+
+        val subjectPublicKeyInfo =
+            (builder.subjectPublicKeyInfo as WaltIdKeySubjectPublicKeyInfoBuilder).let { subjectKeyBuilder ->
+                if (subjectKeyBuilder.selfSigned) {
+                    issuer = subject
+                    issuerPublicKeyInfo
+                } else {
+                    val issuerDnRaw = builder.issuerDnRaw
+                    require(issuerDnRaw.isNotEmpty()) { "Issuer DN must be set for non-self-signed certificates" }
+                    issuer = X500Name.getInstance(issuerDnRaw.toByteArray())
+                    checkNotNull(subjectKeyBuilder.key) { "Certificate subject public key missing" }
+                    BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(subjectKeyBuilder.key)
+                }
+            }
+
+        val bouncyBuilder = buildCertificateTbs(
+            builder,
+            issuer,
+            subject,
+            issuerPublicKeyInfo,
+            subjectPublicKeyInfo
+        )
+        val signed = bouncyBuilder.build(BouncyContentSigner(issuerKey))
+        return BouncyX509Certificate(signed)
+    }
+
+    override suspend fun signCertificate(
+        issuerKey: Crypto1Key,
+        builder: X509CertificateDataBuilder
+    ): X509Certificate {
+        val issuerPublicKeyInfo = BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(issuerKey)
+        val subject = X500Name(builder.subjectDn)
+        var issuer: X500Name? = null
+
         val subjectPublicKeyInfo =
             (builder.subjectPublicKeyInfo as WaltIdKeySubjectPublicKeyInfoBuilder).let { subjectKeyBuilder ->
                 if (subjectKeyBuilder.selfSigned) {
@@ -60,41 +88,19 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
                     require(issuerDnRaw.isNotEmpty()) { "Issuer DN must be set for non-self-signed certificates" }
                     issuer = X500Name.getInstance(issuerDnRaw.toByteArray())
 
-                    checkNotNull(subjectKeyBuilder.key) { "Certificate subject public key missing" }
-                    BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(subjectKeyBuilder.key)
+                    checkNotNull(subjectKeyBuilder.crypto1key) { "Certificate subject public key missing" }
+                    BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(subjectKeyBuilder.crypto1key)
                 }
             }
-        check(issuer != null)
-        val bouncyBuilder = X509v3CertificateBuilder(
+
+        val bouncyBuilder = buildCertificateTbs(
+            builder,
             issuer,
-            serial,
-            notBefore,
-            notAfter,
             subject,
-            subjectPublicKeyInfo.bouncyCastleSubjectPublicKeyInfo
+            issuerPublicKeyInfo,
+            subjectPublicKeyInfo
         )
-
-        builder.extensions.values.forEach {
-            if (it is SubjectKeyIdentifierExtension) {
-                bouncyBuilder.addExtension(
-                    BouncyExtensionFactory.createSubjectKeyIdentifierExtension(
-                        it,
-                        subjectPublicKeyInfo
-                    )
-                )
-            } else if (it is AuthorityKeyIdentifierExtension) {
-                bouncyBuilder.addExtension(
-                    BouncyExtensionFactory.createAuthorityKeyIdentifierExtension(
-                        it,
-                        issuerPublicKeyInfo
-                    )
-                )
-            } else {
-                bouncyBuilder.addExtension(BouncyExtensionFactory.createExtension(it))
-            }
-        }
-
-        val signed = bouncyBuilder.build(BouncyContentSigner(issuerKey))
+        val signed = bouncyBuilder.build(BouncyCrypto1ContentSigner(issuerKey))
         return BouncyX509Certificate(signed)
     }
 
@@ -140,5 +146,49 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
 
         // Cryptographically validate the signature
         return bouncyCsr.isSignatureValid(verifierProvider)
+    }
+
+    private fun buildCertificateTbs(
+        builder: X509CertificateDataBuilder,
+        issuer: X500Name?,
+        subject: X500Name,
+        issuerPublicKeyInfo: PublicKeyInfo,
+        subjectPublicKeyInfo: PublicKeyInfo
+    ): X509v3CertificateBuilder {
+        val serial = BigInteger(builder.serialNumberRaw.toByteArray())
+        val notBefore = Date(builder.validity.notBefore.toEpochMilliseconds())
+        val notAfter = Date(builder.validity.notAfter.toEpochMilliseconds())
+
+        check(issuer != null)
+        val bouncyBuilder = X509v3CertificateBuilder(
+            issuer,
+            serial,
+            notBefore,
+            notAfter,
+            subject,
+            subjectPublicKeyInfo.bouncyCastleSubjectPublicKeyInfo
+        )
+
+        builder.extensions.values.forEach {
+            if (it is SubjectKeyIdentifierExtension) {
+                bouncyBuilder.addExtension(
+                    BouncyExtensionFactory.createSubjectKeyIdentifierExtension(
+                        it,
+                        subjectPublicKeyInfo
+                    )
+                )
+            } else if (it is AuthorityKeyIdentifierExtension) {
+                bouncyBuilder.addExtension(
+                    BouncyExtensionFactory.createAuthorityKeyIdentifierExtension(
+                        it,
+                        issuerPublicKeyInfo
+                    )
+                )
+            } else {
+                bouncyBuilder.addExtension(BouncyExtensionFactory.createExtension(it))
+            }
+        }
+
+        return bouncyBuilder
     }
 }

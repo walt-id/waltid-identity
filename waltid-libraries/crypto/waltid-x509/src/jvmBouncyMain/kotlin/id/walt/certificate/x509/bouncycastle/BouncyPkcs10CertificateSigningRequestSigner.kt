@@ -34,7 +34,7 @@ class BouncyPkcs10CertificateSigningRequestSigner : Pkcs10CertificateSigningRequ
             PKCSObjectIdentifiers.pkcs_9_at_extensionRequest,
             extGen.generate()
         )
-        val signed = bouncyBuilder.build(BouncyContentSigner(holderKey))
+        val signed = bouncyBuilder.build(BouncyCrypto1ContentSigner(holderKey))
         return BouncyPkcs10CertificateSigningRequest(signed)
     }
 

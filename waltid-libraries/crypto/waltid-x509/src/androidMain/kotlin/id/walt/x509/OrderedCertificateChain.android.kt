@@ -9,6 +9,22 @@ internal actual class PlatformX509Certificate {
         get() = TODO("Not yet implemented")
     actual val subjectAlternativeDnsNames: List<String>
         get() = TODO("Not yet implemented")
+    actual val isCertificateAuthority: Boolean
+        get() = TODO("Not yet implemented")
+    actual val pathLengthConstraint: Int?
+        get() = TODO("Not yet implemented")
+    actual val canSignCertificates: Boolean
+        get() = TODO("Not yet implemented")
+    actual val canSignData: Boolean
+        get() = TODO("Not yet implemented")
+    actual val extendedKeyUsageOids: Set<String>?
+        get() = TODO("Not yet implemented")
+    actual val basicConstraintsCritical: Boolean
+        get() = TODO("Not yet implemented")
+    actual val keyUsageCritical: Boolean
+        get() = TODO("Not yet implemented")
+    actual val criticalExtensionOids: Set<String>
+        get() = TODO("Not yet implemented")
 
     actual fun hasIssuerNameMatching(issuer: PlatformX509Certificate): Boolean {
         TODO("Not yet implemented")

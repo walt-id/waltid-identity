@@ -1,5 +1,7 @@
 package id.walt.x509
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
@@ -21,13 +23,21 @@ class CertificateIssuerConstraintsTest {
     @Test
     fun `end entity certificate cannot act as intermediate`() = runTest {
         val rootKey = key("root")
+        val rootCert = X509CertificateUtil.createSelfSignedCertificate(rootKey) {
+            subjectDn = "CN=Root CA"
+            extensionBasicConstraints {
+                cA = true
+                pathLenConstraint = 1
+            }
+        }
+
         val rootName = X509DistinguishedName(commonName = "Root CA")
         val root = certificate(
             subjectName = rootName,
             subjectKey = rootKey,
             signingKey = rootKey,
-            isCa = true,
-            pathLengthConstraint = 1,
+            isCa = false,
+            //pathLengthConstraint = 100,
         )
         val intermediateKey = key("intermediate")
         val intermediateName = X509DistinguishedName(commonName = "Not a CA")

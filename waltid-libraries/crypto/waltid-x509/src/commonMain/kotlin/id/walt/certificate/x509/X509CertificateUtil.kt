@@ -8,7 +8,8 @@ import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.X509CertificateChainValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
-import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.Key
+import id.walt.crypto.keys.Key as Crypt1Key
 import kotlinx.io.bytestring.ByteString
 
 sealed class X509CertificateUtil(val services: X509CertificateServices) {
@@ -25,7 +26,7 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         services.certificateParser.parseCertificateDerEncoded(derEncoded)
 
     suspend fun createCsr(
-        holderKey: Key,
+        holderKey: Crypt1Key,
         block: suspend Pkcs10CertificateSigningRequestBuilder.() -> Unit
     ): Pkcs10CertificateSigningRequest {
         val builder = Pkcs10CertificateSigningRequestBuilder("DN=client, O=Walt.id")
@@ -43,12 +44,29 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
             subjectDn = "OU=CA,DC=test,O=Walt.id",
         )
         block.invoke(builder)
+        builder.issuerDnRaw = ByteString()
         builder.extensionAuthorityKeyIdentifier()
         return services.certificateSigner.signCertificate(issuerKey, builder)
     }
 
+    suspend fun createSelfSignedCertificate(
+        issuerKey: Crypt1Key,
+        block: suspend X509CertificateDataBuilder.() -> Unit
+    ): X509Certificate {
+        val builder = X509CertificateDataBuilder(
+            serialNumberGenerator = services.serialNumberGenerator,
+            issuerDnRaw = ByteString(),
+            subjectDn = "OU=CA,DC=test,O=Walt.id",
+        )
+        block.invoke(builder)
+        builder.issuerDnRaw = ByteString()
+        builder.extensionAuthorityKeyIdentifier()
+        return services.certificateSigner.signCertificate(issuerKey, builder)
+    }
+
+
     suspend fun createCertificate(
-        issuerKey: Key,
+        issuerKey: Crypt1Key,
         issuerCert: X509Certificate,
         block: suspend X509CertificateDataBuilder.() -> Unit
     ): X509Certificate {
@@ -58,7 +76,7 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
             subjectDn = "OU=issuer, DC=test, O=Walt.id"
         )
         block.invoke(builder)
-        requireNotNull((builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder).key) {
+        requireNotNull((builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder).crypto1key) {
             "Certificate subject public key missing"
         }
         builder.extensionAuthorityKeyIdentifier()

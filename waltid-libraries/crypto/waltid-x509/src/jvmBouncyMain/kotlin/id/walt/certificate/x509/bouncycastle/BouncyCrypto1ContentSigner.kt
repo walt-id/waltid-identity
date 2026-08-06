@@ -1,7 +1,7 @@
 package id.walt.certificate.x509.bouncycastle
 
 import id.walt.certificate.x509.X509SigningAlgorithmInfo
-import id.walt.crypto2.keys.Key
+import id.walt.crypto.keys.Key
 import kotlinx.coroutines.runBlocking
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier
@@ -9,11 +9,9 @@ import org.bouncycastle.operator.ContentSigner
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 
-class BouncyContentSigner(val signingKey: Key) : ContentSigner {
+class BouncyCrypto1ContentSigner(val signingKey: Key) : ContentSigner {
 
-    val info: X509SigningAlgorithmInfo
-        get() = TODO()
-
+    val info = X509SigningAlgorithmInfo.ofKey(signingKey)
     private val buffer: ByteArrayOutputStream = ByteArrayOutputStream()
 
     override fun getAlgorithmIdentifier(): AlgorithmIdentifier =
@@ -21,5 +19,7 @@ class BouncyContentSigner(val signingKey: Key) : ContentSigner {
 
     override fun getOutputStream(): OutputStream = buffer
 
-    override fun getSignature(): ByteArray = TODO()
+    override fun getSignature(): ByteArray = runBlocking {
+        signingKey.signRaw(buffer.toByteArray()) as ByteArray
+    }
 }
