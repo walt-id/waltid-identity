@@ -66,29 +66,19 @@ let wallet = try await Wallet(
 ``WalletDatabaseKey`` descriptions redact raw key material, but apps should still
 avoid logging, serializing, or otherwise exposing the `material` bytes.
 
-Use ``WalletStores`` when an app owns credential, DID, or signing-key
-durability. Omitted credential and DID stores use the encrypted local database,
-while an omitted key store uses platform signing-key persistence and generation.
-Store overrides are independent except for signing keys: ``WalletKeys`` keeps
-the ``WalletKeyStore`` and its generator together so newly generated keys are
-persisted into the same app-owned key domain. This example assumes app-defined
-store types that implement the corresponding protocols.
+Use ``WalletPersistence/credentialStore`` or ``WalletPersistence/didStore`` when an app owns credential or DID durability. Omitted
+stores use the encrypted local database. Signing keys are always
+platform-managed and remain in the iOS Keychain. This example assumes
+app-defined store types that implement the corresponding protocols.
 
 <!-- doc-snippet:start swift-full-store-overrides -->
 ```swift
-let keyStore = AppKeyStore()
-
 let wallet = try await Wallet(
     configuration: WalletConfiguration(
         walletID: "consumer-wallet",
         persistence: WalletPersistence(
-            stores: WalletStores(
-                credentials: AppCredentialStore(),
-                dids: AppDidStore(),
-                keys: WalletKeys(store: keyStore) { keyType in
-                    try await keyStore.generateKey(type: keyType)
-                }
-            )
+            credentialStore: AppCredentialStore(),
+            didStore: AppDidStore()
         )
     )
 )
@@ -96,9 +86,7 @@ let wallet = try await Wallet(
 <!-- doc-snippet:end swift-full-store-overrides -->
 
 Provided database keys and custom stores can be combined when an app owns both
-database-key recovery and wallet-record durability. ``StoredKey`` carries
-walt.id serialized key JSON and may contain private signing material, so apps
-should keep it in app-owned secure storage and avoid logging it.
+database-key recovery and wallet-record durability.
 
 Use ``Wallet/deleteLocalData()`` to reset local data for the wallet.
 This removes wallet records, platform signing keys referenced by the wallet,
@@ -125,11 +113,8 @@ reset; plaintext-to-encrypted migration is not performed.
 - ``WalletDatabaseKeyConfiguration``
 - ``WalletDatabaseKeyProvider``
 - ``WalletDatabaseKey``
-- ``WalletStores``
 - ``WalletCredentialStore``
 - ``WalletDidStore``
-- ``WalletKeyStore``
-- ``WalletKeys``
 - ``WalletAttestationConfiguration``
 
 ### Wallet Data
@@ -137,8 +122,6 @@ reset; plaintext-to-encrypted migration is not performed.
 - ``Credential``
 - ``StoredCredential``
 - ``StoredDid``
-- ``StoredKey``
-- ``WalletKeyInfo``
 - ``WalletBootstrapResult``
 - ``PresentationResult``
 

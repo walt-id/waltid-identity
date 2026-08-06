@@ -1,6 +1,9 @@
 package id.walt.x509.iso.documentsigner.builder
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.x509.CertificateDer
+import id.walt.x509.buildCrypto2DocumentSignerCertificateDer
 import id.walt.x509.iso.blockingBridge
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
@@ -34,6 +37,7 @@ class DocumentSignerCertificateBuilder {
      * any milliseconds or nanoseconds in the input are discarded. The decoded
      * certificate returned by this builder exposes the truncated values.
      */
+    @Deprecated("Use buildDer with crypto2 keys and Crypto2IACASignerSpecification.")
     suspend fun build(
         profileData: DocumentSignerCertificateProfileData,
         publicKey: Key,
@@ -52,9 +56,30 @@ class DocumentSignerCertificateBuilder {
         )
     }
 
+    /** Build a Document Signer certificate directly with crypto2 keys. */
+    suspend fun buildDer(
+        profileData: DocumentSignerCertificateProfileData,
+        publicKey: Crypto2Key,
+        iacaSignerSpec: Crypto2IACASignerSpecification,
+    ): CertificateDer {
+        dsValidator.validateDocumentSignerProfileData(profileData)
+        dsValidator.validateProfileDataAgainstIACAProfileData(
+            dsProfileData = profileData,
+            iacaProfileData = iacaSignerSpec.profileData,
+        )
+        return buildCrypto2DocumentSignerCertificateDer(
+            profileData = profileData,
+            subjectPublicKey = publicKey,
+            iacaProfileData = iacaSignerSpec.profileData,
+            signingKey = iacaSignerSpec.signingKey,
+            signatureAlgorithm = iacaSignerSpec.signatureAlgorithm,
+        )
+    }
+
     /**
      * Blocking variant of [build].
      */
+    @Deprecated("Use buildDer with crypto2 keys and Crypto2IACASignerSpecification.")
     fun buildBlocking(
         profileData: DocumentSignerCertificateProfileData,
         publicKey: Key,

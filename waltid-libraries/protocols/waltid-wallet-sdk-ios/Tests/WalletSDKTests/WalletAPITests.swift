@@ -20,9 +20,8 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(configuration.walletID, "default")
         XCTAssertEqual(configuration.defaultKeyType, .secp256r1)
         XCTAssertTrue(configuration.persistence.databaseKey.isManaged)
-        XCTAssertNil(configuration.persistence.stores.credentials)
-        XCTAssertNil(configuration.persistence.stores.dids)
-        XCTAssertNil(configuration.persistence.stores.keys)
+        XCTAssertNil(configuration.persistence.credentialStore)
+        XCTAssertNil(configuration.persistence.didStore)
         XCTAssertNil(configuration.attestation)
         XCTAssertTrue(configuration.transactionDataProfiles.isEmpty)
         XCTAssertEqual(configuration.preferredLocales, Locale.preferredLanguages)
@@ -48,11 +47,11 @@ final class WalletAPITests: XCTestCase {
     func testPublicPersistenceConfigurationAcceptsCustomCredentialStore() {
         let store = FakeCredentialStore()
         let configuration = WalletConfiguration(
-            persistence: WalletPersistence(stores: WalletStores(credentials: store))
+            persistence: WalletPersistence(credentialStore: store)
         )
 
         acceptsSendable(configuration.persistence)
-        XCTAssertNotNil(configuration.persistence.stores.credentials)
+        XCTAssertNotNil(configuration.persistence.credentialStore)
     }
 
     func testPublicPersistenceConfigurationCombinesProvidedDatabaseKeyAndCustomCredentialStore() {
@@ -61,37 +60,26 @@ final class WalletAPITests: XCTestCase {
         let configuration = WalletConfiguration(
             persistence: WalletPersistence(
                 databaseKey: .provided(provider),
-                stores: WalletStores(credentials: store)
+                credentialStore: store
             )
         )
 
         acceptsSendable(configuration.persistence)
         XCTAssertTrue(configuration.persistence.databaseKey.isProvided)
-        XCTAssertNotNil(configuration.persistence.stores.credentials)
+        XCTAssertNotNil(configuration.persistence.credentialStore)
     }
 
-    func testPublicWalletStoresExposeCredentialDidAndKeyOverrides() {
+    func testPublicPersistenceExposesCredentialAndDidOverrides() {
         let credentialStore = FakeCredentialStore()
         let didStore = FakeDidStore()
-        let keyStore = FakeKeyStore()
-        let keys = WalletKeys(store: keyStore) { keyType in
-            StoredKey(
-                keyID: "generated-\(keyType)",
-                keyType: keyType,
-                algorithm: nil,
-                serializedKeyJSON: #"{"type":"jwk","jwk":{"kid":"generated"}}"#
-            )
-        }
-        let stores = WalletStores(
-            credentials: credentialStore,
-            dids: didStore,
-            keys: keys
+        let persistence = WalletPersistence(
+            credentialStore: credentialStore,
+            didStore: didStore
         )
 
-        acceptsSendable(stores)
-        XCTAssertNotNil(stores.credentials)
-        XCTAssertNotNil(stores.dids)
-        XCTAssertNotNil(stores.keys)
+        acceptsSendable(persistence)
+        XCTAssertNotNil(persistence.credentialStore)
+        XCTAssertNotNil(persistence.didStore)
     }
 
     func testWalletDatabaseKeyDescriptionRedactsMaterial() {
@@ -107,23 +95,6 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(String(reflecting: key), String(describing: key))
         XCTAssertFalse(String(describing: key).contains("1 bytes"))
         XCTAssertFalse(String(describing: key).contains("4 bytes"))
-    }
-
-    func testStoredKeyDescriptionRedactsSerializedKeyJSON() {
-        let key = StoredKey(
-            keyID: "key-1",
-            keyType: .secp256r1,
-            algorithm: "ES256",
-            serializedKeyJSON: #"{"type":"jwk","jwk":{"kid":"key-1","d":"secret"}}"#
-        )
-
-        XCTAssertEqual(
-            String(describing: key),
-            "StoredKey(keyID: key-1, keyType: secp256r1, algorithm: ES256, serializedKeyJSON: <redacted>)"
-        )
-        XCTAssertEqual(String(reflecting: key), String(describing: key))
-        XCTAssertFalse(String(describing: key).contains("secret"))
-        XCTAssertFalse(String(reflecting: key).contains("secret"))
     }
 
     func testPublicModelsAreValueTypesAndEquatable() {
@@ -160,15 +131,6 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(storedDid.id, "did:key:wallet")
         XCTAssertEqual(storedDid, storedDid)
 
-        let storedKey = StoredKey(
-            keyID: "key-1",
-            keyType: .secp256r1,
-            algorithm: "ES256",
-            serializedKeyJSON: #"{"type":"jwk","jwk":{"kid":"key-1"}}"#
-        )
-        acceptsSendable(storedKey)
-        XCTAssertEqual(storedKey.id, "key-1")
-        XCTAssertEqual(storedKey, storedKey)
     }
 
     func testPresentationPreviewModelsAreValueTypesAndEquatable() {
@@ -696,30 +658,6 @@ private final class FakeDidStore: WalletDidStore, @unchecked Sendable {
     }
 
     func removeDid(id: String) async throws -> Bool {
-        let originalCount = entries.count
-        entries.removeAll { $0.id == id }
-        return entries.count != originalCount
-    }
-}
-
-private final class FakeKeyStore: WalletKeyStore, @unchecked Sendable {
-    private var entries: [StoredKey] = []
-
-    func key(id: String) async throws -> StoredKey? {
-        entries.first { $0.id == id }
-    }
-
-    func keys() async throws -> [WalletKeyInfo] {
-        entries.map { WalletKeyInfo(keyID: $0.keyID, keyType: $0.keyType, algorithm: $0.algorithm) }
-    }
-
-    func addKey(_ key: StoredKey) async throws -> String {
-        entries.removeAll { $0.id == key.id }
-        entries.append(key)
-        return key.keyID
-    }
-
-    func removeKey(id: String) async throws -> Bool {
         let originalCount = entries.count
         entries.removeAll { $0.id == id }
         return entries.count != originalCount

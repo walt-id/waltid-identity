@@ -14,15 +14,20 @@ import kotlin.test.assertTrue
 
 
 /**
- * Enable this test by providing valid credentials for accessKeyId and secretAccessKey below.
+ * Enable this test by exporting `WALTID_TEST_AWS_ACCESS_KEY_ID`, `WALTID_TEST_AWS_SECRET_ACCESS_KEY`
+ * and optionally `WALTID_TEST_AWS_REGION`.
+ *
+ * Credentials are never read from source: a hardcoded field ends up in the repository history the
+ * first time someone forgets to remove it. The dedicated variable names keep the test inert on
+ * machines that merely have ambient `AWS_*` credentials for unrelated work.
  */
 class AWSKeyTest {
 
 
     private object Config {
-        val accessKeyId = ""
-        val secretAccessKey = ""
-        val region = "eu-central-1"
+        val accessKeyId: String = System.getenv("WALTID_TEST_AWS_ACCESS_KEY_ID").orEmpty()
+        val secretAccessKey: String = System.getenv("WALTID_TEST_AWS_SECRET_ACCESS_KEY").orEmpty()
+        val region: String = System.getenv("WALTID_TEST_AWS_REGION")?.takeIf(String::isNotBlank) ?: "eu-central-1"
 
         val payloadJWS = JsonObject(
             mapOf(

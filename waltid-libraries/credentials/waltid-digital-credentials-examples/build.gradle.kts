@@ -12,7 +12,7 @@ group = "id.walt.credentials"
 
 
 kotlin {
-    js(IR) {
+    js {
         outputModuleName.set("digital-credentials-examples")
     }
 

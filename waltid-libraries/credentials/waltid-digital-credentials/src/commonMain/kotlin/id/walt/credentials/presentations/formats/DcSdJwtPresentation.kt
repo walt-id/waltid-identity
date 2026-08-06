@@ -10,10 +10,13 @@ import id.walt.credentials.presentations.PresentationFormat
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequire
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequireNotNull
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequireSuccess
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.ShaUtils
 import id.walt.dcql.DcqlMatcher.resolveClaimPath
 import id.walt.dcql.models.ClaimsQuery
+import id.walt.w3c.schemes.JwsSignatureScheme
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -60,16 +63,36 @@ data class DcSdJwtPresentation(
         expectedAudience: String?,
         expectedNonce: String,
         originalClaimsQuery: List<ClaimsQuery>?,
+    ) = presentationVerification(
+        expectedAudience,
+        expectedNonce,
+        originalClaimsQuery,
+        DEFAULT_ALLOWED_JWS_ALGORITHMS,
+    )
+
+    suspend fun presentationVerification(
+        expectedAudience: String?,
+        expectedNonce: String,
+        originalClaimsQuery: List<ClaimsQuery>?,
+        allowedJwsAlgorithms: Set<JwsAlgorithm>,
     ) {
         // Validate Key Binding JWT
 
+        require(allowedJwsAlgorithms.isNotEmpty()) { "KB-JWT algorithm allowlist must not be empty" }
+        val algorithm = CompactJws.decodeUnverified(keyBindingJwt).algorithm
+        require(algorithm in allowedJwsAlgorithms) { "KB-JWT algorithm is not allowed: ${algorithm.identifier}" }
+
         // Resolve holder's public key
-        val holderKey = credential.getHolderKey()
+        val holderKey = credential.getHolderCrypto2Key()
         presentationRequireNotNull(holderKey, DcSdJwtPresentationValidationError.MISSING_CNF)
 
 
         // Verify the KB-JWT's signature with the holder's key
-        val kbJwtVerificationResult = holderKey.verifyJws(keyBindingJwt)
+        val kbJwtVerificationResult = JwsSignatureScheme().verifyCrypto2(
+            keyBindingJwt,
+            holderKey,
+            allowedJwsAlgorithms,
+        )
         presentationRequireSuccess(kbJwtVerificationResult, DcSdJwtPresentationValidationError.SIGNATURE_VERIFICATION_FAILED)
 
         // Validate SD-JWT Core + Disclosures
@@ -125,6 +148,8 @@ data class DcSdJwtPresentation(
     }
 
     companion object {
+        val DEFAULT_ALLOWED_JWS_ALGORITHMS: Set<JwsAlgorithm> = JwsAlgorithm.fullySpecified.toSet()
+
         suspend fun parse(sdJwtPresentationString: String): Result<DcSdJwtPresentation> {
             // 1. Split the presentation string by '~'
             val parts = sdJwtPresentationString.split('~')

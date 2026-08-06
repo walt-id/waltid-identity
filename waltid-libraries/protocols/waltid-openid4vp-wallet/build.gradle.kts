@@ -34,15 +34,22 @@ kotlin {
              * walt.id:
              */
             implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
-            implementation(project(":waltid-libraries:protocols:waltid-openid4vp-clientidprefix"))
+            api(project(":waltid-libraries:protocols:waltid-openid4vp-clientidprefix"))
             implementation(project(":waltid-libraries:credentials:waltid-dcql"))
             implementation(project(":waltid-libraries:credentials:waltid-verification-policies2"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
             implementation(project(":waltid-libraries:web:waltid-ktor-notifications-core"))
             implementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
+            implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+            implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
+            implementation(project(":waltid-libraries:crypto:waltid-jose"))
         }
         commonTest.dependencies {
             implementation(identityLibs.bundles.waltid.ktortesting)
+            implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
+        }
+        jvmTest.dependencies {
+            implementation(identityLibs.nimbus.jose.jwt)
         }
     }
 }

@@ -35,11 +35,18 @@ sealed interface PresentationRequestValidationResult {
  * client-bound redirect URI. Failures that prevent a safe response remain local exceptions.
  */
 object PresentationRequestValidator {
+    /**
+     * @param formatCapabilities resolved lazily, and only for the format/algorithm decision below.
+     *   Establishing them can require resolving the wallet's signing key, and a request that is already
+     *   invalid for a key-independent reason must report that reason rather than a wallet-local
+     *   key-resolution failure.
+     */
     fun validate(
         resolvedRequest: ResolvedAuthorizationRequest,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
-        formatCapabilities: WalletPresentationFormatRegistry.RuntimeCapabilities =
-            WalletPresentationFormatRegistry.defaultCapabilities(),
+        formatCapabilities: () -> WalletPresentationFormatRegistry.RuntimeCapabilities = {
+            WalletPresentationFormatRegistry.defaultCapabilities()
+        },
     ): PresentationRequestValidationResult {
         val request = resolvedRequest.authorizationRequest
         requireUsableResponse(request)
@@ -86,12 +93,13 @@ object PresentationRequestValidator {
         val requestedFormats = query.credentials
             .mapNotNull { credentialQuery -> WalletPresentationFormatRegistry.resolve(credentialQuery.format.id.first()) }
             .toSet()
+        val capabilities = formatCapabilities()
         val verifierFormats = request.clientMetadata?.vpFormatsSupported
-        val walletSupportsRequestedFormat = requestedFormats.any(formatCapabilities.supportedFormats::contains)
+        val walletSupportsRequestedFormat = requestedFormats.any(capabilities.supportedFormats::contains)
         val verifierSupportsRequestedFormat = verifierFormats?.let {
             WalletPresentationFormatRegistry.supportsAny(
                 verifierFormats = it,
-                capabilities = formatCapabilities,
+                capabilities = capabilities,
                 requestedFormats = requestedFormats,
             )
         } ?: true

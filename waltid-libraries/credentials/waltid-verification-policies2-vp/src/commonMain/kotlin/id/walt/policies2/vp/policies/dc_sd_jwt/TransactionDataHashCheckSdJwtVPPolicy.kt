@@ -71,6 +71,12 @@ class TransactionDataHashCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
         return success()
     }
 
+    internal suspend fun verifyCanonical(
+        context: VPPolicyRunContext,
+        presentation: DcSdJwtPresentation,
+        verificationContext: VerificationSessionContext?,
+    ): Result<Unit> = with(context) { verifySdJwtPolicy(presentation, verificationContext) }
+
     private fun validate(
         expectedTransactionData: List<String>?,
         transactionDataHashes: List<String>?,
@@ -78,6 +84,7 @@ class TransactionDataHashCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
     ) {
         val expectedItems = expectedTransactionData.orEmpty()
         if (expectedItems.isEmpty()) {
+            // No transaction_data in the request - reject even empty transaction claims rather than treating them as omitted.
             requireValidation(transactionDataHashes == null, ValidationErrorReason.HASHES_MISMATCH) {
                 "transaction_data_hashes must be omitted when transaction_data is not requested"
             }
@@ -88,6 +95,8 @@ class TransactionDataHashCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
         }
 
         val decodedExpectedItems = decodeList(expectedItems)
+        // SHA-256 is the mandatory default. If request items explicitly advertise algorithms,
+        // transaction_data_hashes_alg must be present and supported for every applicable item.
         val expectedAlgorithm = normalizeHashAlgorithm(transactionDataHashesAlg ?: DEFAULT_HASH_ALGORITHM)
 
         requireValidation(expectedAlgorithm == DEFAULT_HASH_ALGORITHM, HASH_ALGORITHM_MISMATCH) {
@@ -103,10 +112,12 @@ class TransactionDataHashCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
         }
         val actualTransactionDataHashes = transactionDataHashes!!
 
+        // The number and order of hashes must match the query-filtered transaction_data items.
         requireValidation(actualTransactionDataHashes.size == expectedItems.size, ValidationErrorReason.HASHES_MISMATCH) {
             "transaction_data_hashes must contain one entry per transaction_data item"
         }
 
+        // Hash each raw base64url request string exactly as received, without decoding it first.
         val expectedHashes = calculateTransactionDataHashes(expectedItems, expectedAlgorithm)
         requireValidation(actualTransactionDataHashes == expectedHashes, ValidationErrorReason.HASHES_MISMATCH) {
             "transaction_data_hashes do not match the requested transaction_data"

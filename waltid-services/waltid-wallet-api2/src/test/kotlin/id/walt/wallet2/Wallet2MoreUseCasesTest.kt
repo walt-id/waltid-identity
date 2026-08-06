@@ -197,7 +197,6 @@ class Wallet2MoreUseCasesTest {
                     call.response.header(HttpHeaders.CacheControl, "no-store")
                     call.respond(buildJsonObject {
                         put("c_nonce", nonce.nonce)
-                        put("c_nonce_expires_in", nonce.expiresInSeconds)
                     })
                 }
                 post("/token") {
@@ -207,8 +206,7 @@ class Wallet2MoreUseCasesTest {
                     if (tr !is AccessTokenRequestResult.Success) return@post call.respond(HttpStatusCode.BadRequest, buildJsonObject { put("error","invalid_grant") })
                     val resp = provider.createAccessTokenResponse(tr.request.withIssuer(issuerBase))
                     if (resp !is AccessTokenResponseResult.Success) return@post call.respond(HttpStatusCode.InternalServerError, buildJsonObject { put("error","server_error") })
-                    val nonce = proofSupport.issueNonce()
-                    call.respond(buildJsonObject { put("access_token", resp.response.accessToken); put("token_type", "Bearer"); put("c_nonce", nonce.nonce); put("c_nonce_expires_in", nonce.expiresInSeconds) })
+                    call.respond(buildJsonObject { put("access_token", resp.response.accessToken); put("token_type", "Bearer") })
                 }
                 post("/credential") {
                     val body = json.parseToJsonElement(call.receiveText()).jsonObject
@@ -764,7 +762,7 @@ class Wallet2MoreUseCasesTest {
 
         try {
             // Give this test its own fresh store so it doesn't pollute other tests
-            OSSWallet2Service.walletStore = id.walt.wallet2.stores.inmemory.InMemoryWalletStore()
+            OSSWallet2Service.configureInMemory()
 
             // Run 1: create a wallet, verify it exists
             E2ETest(host, port, failEarly = true).testBlock(
@@ -782,7 +780,7 @@ class Wallet2MoreUseCasesTest {
             }
 
             // Reset the store (simulates a fresh service start without persistence)
-            OSSWallet2Service.walletStore = id.walt.wallet2.stores.inmemory.InMemoryWalletStore()
+            OSSWallet2Service.configureInMemory()
 
             // Run 2: different port, same service config — store is clean
             E2ETest(host, port + 1, failEarly = true).testBlock(
@@ -800,7 +798,7 @@ class Wallet2MoreUseCasesTest {
             }
         } finally {
             // Always restore the original store so other tests are unaffected
-            OSSWallet2Service.walletStore = originalStore
+            OSSWallet2Service.configureInMemory(originalStore)
         }
     }
 }

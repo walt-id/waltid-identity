@@ -21,12 +21,6 @@ android {
         }
     }
 
-    configurations {
-        all {
-            exclude(group = "org.bouncycastle", module = "bcprov-lts8on")
-        }
-    }
-
     buildTypes {
         release {
             isMinifyEnabled = false

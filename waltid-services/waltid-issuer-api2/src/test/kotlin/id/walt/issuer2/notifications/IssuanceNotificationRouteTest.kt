@@ -21,6 +21,7 @@ import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
+import id.waltid.openid4vci.wallet.proof.ProofKeyBinding
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -154,11 +155,11 @@ class IssuanceNotificationRouteTest {
         val holderDid = DidJwkRegistrar()
             .registerByKey(proofKey, DidJwkCreateOptions(KeyType.secp256r1))
             .did
-        val proofs = JwtProofBuilder().buildJwtProof(
+        val proofs = JwtProofBuilder().buildProof(
             key = proofKey,
             audience = issuerMetadata.credentialIssuer,
             nonce = nonce,
-            keyId = "$holderDid#0",
+            binding = ProofKeyBinding.KeyId("$holderDid#0"),
         )
 
         val credentialResponse = post("/openid4vci/credential") {

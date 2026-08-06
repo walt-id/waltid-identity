@@ -1,13 +1,9 @@
 package id.walt.wallet2.mobile
 
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.data.WalletKeyInfo
-import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import kotlinx.coroutines.flow.Flow
@@ -15,7 +11,6 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 
 class MobileWalletPersistenceSnippetsTest {
@@ -63,47 +58,38 @@ class MobileWalletPersistenceSnippetsTest {
         val config = MobileWalletConfig(
             walletId = "consumer-wallet",
             persistence = MobileWalletPersistence(
-                stores = MobileWalletStores(
-                    credentials = appCredentialStore
-                )
+                credentialStore = appCredentialStore
             )
         )
         // doc-snippet:end kotlin-custom-credential-store
 
-        assertSame(appCredentialStore, config.persistence.stores.credentials)
+        assertSame(appCredentialStore, config.persistence.credentialStore)
     }
 
     @Test
-    fun fullStoreOverridesSnippetCompiles() {
-        // doc-snippet:start kotlin-full-store-overrides
+    fun credentialAndDidStoreOverridesSnippetCompiles() {
+        // doc-snippet:start kotlin-store-overrides
         val config = MobileWalletConfig(
             walletId = "consumer-wallet",
             persistence = MobileWalletPersistence(
-                stores = MobileWalletStores(
-                    credentials = appCredentialStore,
-                    dids = appDidStore,
-                    keys = MobileWalletKeys(
-                        store = appKeyStore,
-                        generate = { keyType -> appKeyProvider.generateKey(keyType) }
-                    )
-                )
+                credentialStore = appCredentialStore,
+                didStore = appDidStore,
             )
         )
-        // doc-snippet:end kotlin-full-store-overrides
+        // doc-snippet:end kotlin-store-overrides
 
-        assertSame(appCredentialStore, config.persistence.stores.credentials)
-        assertSame(appDidStore, config.persistence.stores.dids)
-        assertNotNull(config.persistence.stores.keys)
+        assertSame(appCredentialStore, config.persistence.credentialStore)
+        assertSame(appDidStore, config.persistence.didStore)
     }
 }
 
-private suspend fun loadOrCreateKeyBytes(walletId: String, databaseName: String): ByteArray {
+private fun loadOrCreateKeyBytes(walletId: String, databaseName: String): ByteArray {
     require(walletId.isNotBlank())
     require(databaseName.isNotBlank())
     return ByteArray(32)
 }
 
-private suspend fun deleteKeyBytes(walletId: String, databaseName: String) {
+private fun deleteKeyBytes(walletId: String, databaseName: String) {
     require(walletId.isNotBlank())
     require(databaseName.isNotBlank())
 }
@@ -126,20 +112,4 @@ private val appDidStore = object : WalletDidStore {
     override suspend fun addDid(entry: WalletDidEntry) = Unit
 
     override suspend fun removeDid(did: String): Boolean = false
-}
-
-private val appKeyStore = object : WalletKeyStore {
-    override suspend fun getKey(keyId: String): Key? = null
-
-    override suspend fun listKeys(): Flow<WalletKeyInfo> = emptyFlow()
-
-    override suspend fun addKey(key: Key): String = key.getKeyId()
-
-    override suspend fun removeKey(keyId: String): Boolean = false
-}
-
-private object appKeyProvider {
-    suspend fun generateKey(keyType: KeyType): Key {
-        error("Replace with app-owned key generation for $keyType")
-    }
 }

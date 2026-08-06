@@ -113,8 +113,8 @@ class ByteStringWrapperSerializer<T>(private val dataSerializer: KSerializer<T>)
     override val descriptor: SerialDescriptor = dataSerializer.descriptor
 
     override fun serialize(encoder: Encoder, value: ByteStringWrapper<T>) {
-        val bytes =
-            (if (encoder is CborEncoder) encoder.cbor else coseCompliantCbor)
+        val bytes = value.serialized.takeIf { it.isNotEmpty() }
+            ?: (if (encoder is CborEncoder) encoder.cbor else coseCompliantCbor)
                 .encodeToByteArray(dataSerializer, value.value)
         encoder.encodeSerializableValue(ByteArraySerializer(), bytes)
     }
