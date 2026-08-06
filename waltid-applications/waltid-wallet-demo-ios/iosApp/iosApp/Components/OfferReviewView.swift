@@ -9,6 +9,8 @@ struct OfferReviewView: View {
     let onTxCodeChange: (String) -> Void
     let onAccept: () -> Void
     let onDecline: () -> Void
+    var showsActions = true
+    @State private var credentialPage = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -33,12 +35,22 @@ struct OfferReviewView: View {
                     title: "Offered credentials",
                     titleAccessibilityIdentifier: WalletAccessibilityID.offerCredentialsSection
                 ) {
-                    ForEach(Array(preview.offeredCredentials.enumerated()), id: \.offset) { index, credential in
-                        if index > 0 {
-                            Divider()
+                    TabView(selection: $credentialPage) {
+                        ForEach(Array(preview.offeredCredentials.enumerated()), id: \.offset) { index, credential in
+                            ScrollView {
+                                OfferedCredentialView(credential: credential)
+                            }
+                            .tag(index)
                         }
-                        OfferedCredentialView(credential: credential)
                     }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .frame(minHeight: 280, idealHeight: 360, maxHeight: 440)
+
+                    CarouselControls(
+                        page: $credentialPage,
+                        pageCount: preview.offeredCredentials.count,
+                        itemName: "credential"
+                    )
                 }
             }
 
@@ -76,17 +88,57 @@ struct OfferReviewView: View {
                 }
             }
 
-            HStack(spacing: 8) {
-                Button("Accept", action: onAccept)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.waltBlue)
-                    .disabled(!isAcceptEnabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.offerAcceptButton)
+            if showsActions {
+                OfferReviewActionsView(
+                    isAcceptEnabled: isAcceptEnabled,
+                    isReviewEnabled: isReviewEnabled,
+                    onAccept: onAccept,
+                    onDecline: onDecline
+                )
+            }
+        }
+    }
+}
 
-                Button("Decline", action: onDecline)
-                    .buttonStyle(.bordered)
-                    .disabled(!isReviewEnabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.offerDeclineButton)
+struct OfferReviewActionsView: View {
+    let isAcceptEnabled: Bool
+    let isReviewEnabled: Bool
+    let onAccept: () -> Void
+    let onDecline: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button("Add credential", action: onAccept)
+                .buttonStyle(.borderedProminent)
+                .tint(.waltBlue)
+                .disabled(!isAcceptEnabled)
+                .accessibilityIdentifier(WalletAccessibilityID.offerAcceptButton)
+
+            Button("Decline offer", action: onDecline)
+                .buttonStyle(.bordered)
+                .disabled(!isReviewEnabled)
+                .accessibilityIdentifier(WalletAccessibilityID.offerDeclineButton)
+        }
+    }
+}
+
+struct CarouselControls: View {
+    @Binding var page: Int
+    let pageCount: Int
+    let itemName: String
+
+    var body: some View {
+        if pageCount > 1 {
+            HStack {
+                Button("Previous") { page -= 1 }
+                    .disabled(page == 0)
+                Spacer()
+                Text("\(page + 1) of \(pageCount) \(itemName) options")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Next") { page += 1 }
+                    .disabled(page == pageCount - 1)
             }
         }
     }
@@ -107,8 +159,11 @@ private struct OfferedCredentialView: View {
                 supportingText: credential.display?.description
             )
             let details = [
+                MetadataDetailItem(label: "Configuration ID", value: credential.configurationID),
                 MetadataDetailItem(label: "Format", value: credential.format),
-                MetadataDetailItem(label: "Type", value: credential.vct ?? credential.doctype),
+                MetadataDetailItem(label: "Authorization scope", value: credential.scope),
+                MetadataDetailItem(label: "SD-JWT VC type", value: credential.vct),
+                MetadataDetailItem(label: "mdoc doctype", value: credential.doctype),
             ].filter(\.isVisible)
             if !details.isEmpty {
                 Divider()

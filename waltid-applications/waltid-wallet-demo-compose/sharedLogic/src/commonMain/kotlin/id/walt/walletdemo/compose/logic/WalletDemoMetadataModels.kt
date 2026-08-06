@@ -31,6 +31,7 @@ data class WalletDemoCredentialClaimDisplayGroup(
 data class WalletDemoOfferedCredentialMetadata(
     val configurationId: String,
     val format: String,
+    val scope: String?,
     val vct: String?,
     val doctype: String?,
     val display: WalletDemoMetadataDisplay?,

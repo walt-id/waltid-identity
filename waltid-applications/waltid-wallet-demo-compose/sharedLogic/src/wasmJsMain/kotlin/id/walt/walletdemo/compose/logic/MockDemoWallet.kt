@@ -28,6 +28,7 @@ private class MockDemoWallet : DemoWallet {
                 WalletDemoOfferedCredentialMetadata(
                     configurationId = "MockCredential",
                     format = "jwt_vc_json",
+                    scope = "mock_credential",
                     vct = null,
                     doctype = null,
                     display = WalletDemoMetadataDisplay(

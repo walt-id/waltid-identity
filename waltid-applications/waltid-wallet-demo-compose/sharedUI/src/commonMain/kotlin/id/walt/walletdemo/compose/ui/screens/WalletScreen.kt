@@ -2,34 +2,31 @@ package id.walt.walletdemo.compose.ui.screens
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
-import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
 import id.walt.walletdemo.compose.logic.WalletDemoController
-import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletInteractionKind
 import id.walt.walletdemo.compose.logic.WalletSessionState
-import id.walt.walletdemo.compose.logic.receivedCredentials
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.WalletRoute
+import id.walt.walletdemo.compose.ui.components.WalletInteractionSheet
 
 @Composable
 internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState) {
     val ready = state.session as? WalletSessionState.Ready
     val credentials = ready?.credentials.orEmpty()
-    val credentialsBackStack = remember { mutableStateListOf<WalletRoute>(WalletRoute.Root) }
-    val receiveBackStack = remember { mutableStateListOf<WalletRoute>(WalletRoute.Root) }
-    val presentBackStack = remember { mutableStateListOf<WalletRoute>(WalletRoute.Root) }
-
-    LaunchedEffect(state.receiveNavigationResetKey) {
-        receiveBackStack.resetToRoot()
-    }
-    LaunchedEffect(state.presentationNavigationResetKey) {
-        presentBackStack.resetToRoot()
-    }
+    val backStack = remember { mutableStateListOf<WalletRoute>(WalletRoute.Root) }
+    val details = (
+        credentials.map { it.toCredentialDetails() } +
+            state.presentationPreview?.credentialOptions.orEmpty().map { it.toCredentialDetails() }
+        ).distinctBy { it.summary.id }
 
     Scaffold(
         topBar = {
@@ -39,79 +36,49 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
                 onLock = controller::lock,
             )
         },
-        bottomBar = {
-            WalletBottomBar(
-                selectedTab = state.selectedTab,
-                onSelectedTab = controller::selectTab,
-            )
-        },
     ) { contentPadding ->
-        val modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding)
-
-        when (state.selectedTab) {
-            WalletDemoTab.Credentials -> WalletTabNavDisplay(
-                backStack = credentialsBackStack,
-                details = credentials.map { it.toCredentialDetails() },
-                modifier = modifier,
-                root = {
-                    CredentialsTab(
-                        credentials = credentials,
-                        onCredentialClick = { detailsId -> credentialsBackStack.pushDetails(detailsId) },
-                    )
-                },
-            )
-            WalletDemoTab.Receive -> {
-                val receivedDetails = state.receivedCredentials()
-                    .map { it.toCredentialDetails() }
-
-                WalletTabNavDisplay(
-                    backStack = receiveBackStack,
-                    details = receivedDetails,
-                    modifier = modifier,
-                    root = {
-                        ReceiveTab(
-                            state = state,
-                            requestDrafts = state.requestDrafts,
-                            onOfferUrlChange = controller::updateOfferUrl,
-                            onTxCodeChange = controller::updateTxCode,
-                            onPreviewOffer = controller::previewOffer,
-                            onAcceptOffer = controller::acceptOffer,
-                            onDeclineOffer = controller::declineOffer,
-                            onStartNew = controller::startNewReceiveFlow,
-                            onCredentialClick = { detailsId -> receiveBackStack.pushDetails(detailsId) },
-                        )
-                    },
+        WalletTabNavDisplay(
+            backStack = backStack,
+            details = details,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(contentPadding),
+            root = {
+                WalletHomeScreen(
+                    credentials = credentials,
+                    onReceive = controller::startReceiveCapture,
+                    onPresent = controller::startPresentCapture,
+                    onCredentialClick = { backStack.pushDetails(it) },
                 )
-            }
-            WalletDemoTab.Present -> {
-                val presentationDetails = state.presentationPreview
-                    ?.credentialOptions
-                    .orEmpty()
-                    .map { it.toCredentialDetails() }
+            },
+        )
+    }
 
-                WalletTabNavDisplay(
-                    backStack = presentBackStack,
-                    details = presentationDetails.ifEmpty { credentials.map { it.toCredentialDetails() } },
-                    modifier = modifier,
-                    root = {
-                        PresentTab(
-                            state = state,
-                            requestDrafts = state.requestDrafts,
-                            onPresentationRequestUrlChange = controller::updatePresentationRequestUrl,
-                            onPreview = controller::previewPresentation,
-                            onStartNew = controller::startNewPresentationFlow,
-                            onToggleCredential = controller::togglePresentationCredential,
-                            onToggleDisclosure = controller::togglePresentationDisclosure,
-                            onCredentialClick = { detailsId -> presentBackStack.pushDetails(detailsId) },
-                            onSubmit = controller::submitPresentation,
-                            onReject = controller::rejectPresentation,
-                            onCancel = controller::cancelPresentationReview,
-                        )
-                    },
+    WalletInteractionSheet(
+        controller = controller,
+        state = state,
+        onCredentialClick = { backStack.pushDetails(it) },
+    )
+
+    state.replacementRequest?.let { replacement ->
+        AlertDialog(
+            onDismissRequest = controller::keepCurrentRequest,
+            title = { Text("Replace current request?") },
+            text = {
+                Text(
+                    if (replacement.kind == WalletInteractionKind.Receive) {
+                        "A new credential offer arrived. Replacing the current interaction will cancel it locally."
+                    } else {
+                        "A new presentation request arrived. Replacing the current interaction will cancel it locally."
+                    }
                 )
-            }
-        }
+            },
+            confirmButton = {
+                TextButton(onClick = controller::replaceCurrentRequest) { Text("Replace") }
+            },
+            dismissButton = {
+                TextButton(onClick = controller::keepCurrentRequest) { Text("Keep current") }
+            },
+        )
     }
 }

@@ -110,7 +110,7 @@ sealed class IosKey : Key() {
         }
 
         override suspend fun getPublicKey(): Key = Platform(options, hasPrivateKey = false)
-        override suspend fun getPublicKeyRepresentation(): ByteArray = signer().publicKey.encodeToTlv().derEncoded
+        override suspend fun getPublicKeyRepresentation(): ByteArray = signer().publicKey.iosEncoded
         override suspend fun getMeta(): KeyMeta = JwkKeyMeta(getKeyId())
         override suspend fun deleteKey(): Boolean = runCatching {
             IosKeychainProvider.deleteSigningKey(options.kid).getOrThrow()
