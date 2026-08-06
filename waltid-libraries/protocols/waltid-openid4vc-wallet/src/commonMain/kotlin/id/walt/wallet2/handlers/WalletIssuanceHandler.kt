@@ -114,9 +114,8 @@ data class ReceiveCredentialRequest(
      * Inline key to use for proof-of-possession.
      *
      * When provided, this serialized key is used directly and takes precedence over [keyId]
-     * and the wallet's stores. This supports store-less / referenced-elsewhere callers that
-     * supply the key material inline (e.g. the Enterprise resolving a `keyReference` Target to a
-     * concrete key before delegating).
+     * and the wallet's stores. Prefer [keyId] for store-backed / crypto2 keys so the wallet can
+     * resolve a signing-capable [WalletKeyStoreEntry] (e.g. Enterprise `keyReference.path`).
      */
     val key: DirectSerializedKey? = null,
 
@@ -1488,6 +1487,11 @@ object WalletIssuanceHandler {
      *   3. [receiveCredentialAuthCodeFlow] - exchange code + issue credentials
      *
      * This function handles step 3 only, continuing from an authorization code.
+     *
+     * Key selection: [key] (explicit override) else [keyReference] via
+     * `wallet.resolveKeyMaterial(keyReference, SIGN)`, else the wallet default signing key.
+     * Pass store-backed key ids (e.g. Enterprise `keyReference.path`) as [keyReference] so
+     * crypto2-only backends remain usable; do not convert referenced keys into [DirectSerializedKey].
      */
     fun receiveCredentialAuthCodeFlow(
         wallet: Wallet,
@@ -1499,10 +1503,12 @@ object WalletIssuanceHandler {
         nonceEndpoint: String? = null,
         clientId: String = DEFAULT_CLIENT_ID,
         redirectUri: Url = Url("openid://"),
-        /** Inline key for proof-of-possession; takes precedence over the wallet's stores. */
-        inlineKey: DirectSerializedKey? = null,
+        /** Inline key for proof-of-possession; takes precedence over [keyReference] and wallet stores. */
+        key: DirectSerializedKey? = null,
+        /** Store key id for proof-of-possession; ignored when [key] is provided. */
+        keyReference: String? = null,
         /** Inline DID for holder binding; defaults to the wallet's default DID. */
-        inlineDid: String? = null,
+        did: String? = null,
         /** Optional sidecar metadata merged with resolved issuer display when storing. */
         metadata: JsonObject? = null,
         /** Optional credential label override; otherwise derived from credential configuration display. */
@@ -1511,10 +1517,10 @@ object WalletIssuanceHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         httpClient: HttpClient = WalletIssuanceHandler.httpClient
     ): Flow<StoredCredential> = channelFlow {
-        val keyMaterial = inlineKey?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
-            ?: wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
+        val keyMaterial = key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
+            ?: wallet.resolveKeyMaterial(keyReference, setOf(KeyUsage.SIGN))
             ?: error("No key available for proof-of-possession")
-        val did = inlineDid ?: wallet.defaultDid()
+        val holderDid = did ?: wallet.defaultDid()
 
         // Exchange code for token
         val exchangeRequest = ExchangeCodeRequest(
@@ -1561,7 +1567,7 @@ object WalletIssuanceHandler {
                     keyMaterial = keyMaterial,
                     audience = credentialIssuerBaseUrl,
                     nonce = nonce,
-                    did = did,
+                    did = holderDid,
                     acceptedAlgorithms = jwtProofAlgorithms,
                 ).jwt?.firstOrNull()
             },
