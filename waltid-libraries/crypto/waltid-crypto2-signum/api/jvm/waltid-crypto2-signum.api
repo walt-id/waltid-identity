@@ -192,7 +192,6 @@ public final class id/walt/crypto2/signum/SignumKeyPolicyMismatchException : jav
 
 public abstract interface class id/walt/crypto2/signum/SignumManagedKey : id/walt/crypto2/keys/ManagedKey {
 	public abstract fun getAttestation ()Lid/walt/crypto2/signum/SignumKeyAttestation;
-	public abstract fun getPolicy ()Lid/walt/crypto2/signum/SignumKeyPolicy;
 	public abstract fun getProtectionLevel ()Lid/walt/crypto2/signum/SignumProtectionLevel;
 }
 

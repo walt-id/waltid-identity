@@ -43,8 +43,6 @@ final enum class id.walt.crypto2.signum/SignumProtectionLevel : kotlin/Enum<id.w
 abstract interface id.walt.crypto2.signum/SignumManagedKey : id.walt.crypto2.keys/ManagedKey { // id.walt.crypto2.signum/SignumManagedKey|null[0]
     abstract val attestation // id.walt.crypto2.signum/SignumManagedKey.attestation|{}attestation[0]
         abstract fun <get-attestation>(): id.walt.crypto2.signum/SignumKeyAttestation? // id.walt.crypto2.signum/SignumManagedKey.attestation.<get-attestation>|<get-attestation>(){}[0]
-    abstract val policy // id.walt.crypto2.signum/SignumManagedKey.policy|{}policy[0]
-        abstract fun <get-policy>(): id.walt.crypto2.signum/SignumKeyPolicy // id.walt.crypto2.signum/SignumManagedKey.policy.<get-policy>|<get-policy>(){}[0]
     abstract val protectionLevel // id.walt.crypto2.signum/SignumManagedKey.protectionLevel|{}protectionLevel[0]
         abstract fun <get-protectionLevel>(): id.walt.crypto2.signum/SignumProtectionLevel // id.walt.crypto2.signum/SignumManagedKey.protectionLevel.<get-protectionLevel>|<get-protectionLevel>(){}[0]
 }

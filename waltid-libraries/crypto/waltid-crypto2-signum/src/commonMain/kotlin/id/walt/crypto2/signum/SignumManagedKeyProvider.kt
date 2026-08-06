@@ -175,7 +175,6 @@ class SignumManagedKeyProvider(
         private val providerData: SignumStoredKeyData,
         private val handle: SignumPlatformKey,
     ) : SignumManagedKey {
-        override val policy: SignumKeyPolicy = providerData.policy
         override val protectionLevel: SignumProtectionLevel = providerData.protectionLevel
         override val attestation: SignumKeyAttestation? = providerData.attestation
         private val signatureAlgorithms = handle.signatureAlgorithms.expandEcdsaEncodings()
@@ -284,8 +283,6 @@ class SignumManagedKeyProvider(
 }
 
 interface SignumManagedKey : ManagedKey {
-    /** Immutable policy enforced by the native platform key. */
-    val policy: SignumKeyPolicy
     val protectionLevel: SignumProtectionLevel
     val attestation: SignumKeyAttestation?
 }
