@@ -34,6 +34,8 @@ kotlin {
 
             // Crypto for key operations and proof signing
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+            implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
+            implementation(project(":waltid-libraries:crypto:waltid-jose"))
         }
         commonTest.dependencies {
             implementation(identityLibs.bundles.waltid.ktortesting)

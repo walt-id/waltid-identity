@@ -11,7 +11,7 @@ plugins {
 group = "id.walt.crypto"
 
 kotlin {
-    js(IR) {
+    js {
         outputModuleName = "cose"
     }
 
@@ -28,9 +28,7 @@ kotlin {
 
             // Waltid
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
-
-            // Hashing
-            implementation(identityLibs.kotlincrypto.macs.hmac.sha2)
+            api(project(":waltid-libraries:crypto:waltid-crypto2"))
 
             implementation(identityLibs.kotlinx.coroutines.core)
         }

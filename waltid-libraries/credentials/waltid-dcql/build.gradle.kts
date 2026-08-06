@@ -7,7 +7,7 @@ plugins {
 group = "id.walt.dcql"
 
 kotlin {
-    js(IR) {
+    js {
         outputModuleName = "dcql"
     }
 

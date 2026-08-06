@@ -9,12 +9,15 @@ import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.did.dids.DidService
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -45,12 +48,21 @@ data class SdJwtCredential(
     override val format: String = "dc+sd-jwt"
 
     // TODO: issuer should move into signature, just use credential.signerKey from superclass
+    @Deprecated("Use getSignerCrypto2Key()")
     override suspend fun getSignerKey(): Key? =
         when (signature) {
             null -> null
             is JwtBasedSignature -> signature.getJwtBasedIssuer(credentialData)
             else -> throw NotImplementedError("Not yet implemented: Retrieve issuer key from SdJwtCredential with ${signature::class.simpleName} signature")
         }
+
+    override suspend fun getSignerCrypto2Key(): Crypto2Key? = when (signature) {
+        null -> null
+        is JwtBasedSignature -> JwsSignatureScheme().getIssuerCrypto2KeyInfo(
+            requireNotNull(signed) { "Cannot resolve signer key for unsigned credential" }
+        ).resolved.key
+        else -> throw UnsupportedOperationException("Crypto2 signer-key resolution is not implemented for ${signature::class.simpleName}")
+    }
 
     override suspend fun getHolderKey(): Key? {
         val cnf = credentialData["cnf"]?.jsonObject
@@ -82,10 +94,13 @@ data class SdJwtCredential(
         return key
     }
 
+    override suspend fun getHolderCrypto2Key(): Crypto2Key? = credentialData.resolveHolderCrypto2Key()
+
     init {
         selfCheck()
     }
 
+    @Deprecated("Use verifyCrypto2(publicKey, allowedAlgorithms)")
     override suspend fun verify(publicKey: Key) =
         when (signature) {
             is JwtCredentialSignature, is SdJwtCredentialSignature -> {
@@ -97,4 +112,22 @@ data class SdJwtCredential(
             is DataIntegrityProofCredentialSignature -> throw UnsupportedOperationException("Data Integrity Proof (LDP) signature verification for SD-JWT credentials is not yet implemented")
             null -> throw IllegalArgumentException("Credential contains no signature, cannot verify")
         }
+
+    override suspend fun verifyCrypto2(
+        publicKey: Crypto2Key,
+        allowedAlgorithms: Crypto2VerificationAlgorithms,
+    ): Result<JsonElement> = when (signature) {
+        is JwtCredentialSignature, is SdJwtCredentialSignature -> {
+            require(signed != null) { "Cannot verify unsigned credential" }
+            require(allowedAlgorithms.jws.isNotEmpty()) { "SD-JWT verification requires an explicit JWS allowlist" }
+            JwsSignatureScheme().verifyCrypto2(signed, publicKey, allowedAlgorithms.jws)
+        }
+        is CoseCredentialSignature -> Result.failure(
+            UnsupportedOperationException("COSE verification is not supported for SD-JWT credentials")
+        )
+        is DataIntegrityProofCredentialSignature -> Result.failure(
+            UnsupportedOperationException("Data Integrity Proof verification is not implemented")
+        )
+        null -> Result.failure(IllegalArgumentException("Credential contains no signature, cannot verify"))
+    }
 }

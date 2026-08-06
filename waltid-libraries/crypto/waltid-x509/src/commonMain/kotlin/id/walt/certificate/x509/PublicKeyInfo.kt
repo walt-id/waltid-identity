@@ -2,6 +2,7 @@ package id.walt.certificate.x509
 
 import id.walt.certificate.der.ByteArrayUtil
 import id.walt.certificate.der.ByteArrayUtil.byteStringToBase64Pem
+import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.ShaUtils
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.toHexString
@@ -43,4 +44,9 @@ interface PublicKeyInfo {
 
     val encodedPem: String
         get() = byteStringToBase64Pem(encodedDer, "PUBLIC KEY")
+
+    companion object
 }
+
+
+expect suspend fun PublicKeyInfo.Companion.ofKey(key: Key): PublicKeyInfo

@@ -24,6 +24,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            api(project(":waltid-libraries:crypto:waltid-crypto2"))
             api(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.io.core)
@@ -31,6 +32,8 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.whyoleg.cryptography.random)
 
+            implementation(identityLibs.signum.indispensable) //TODO: get rid of it here
+            implementation(identityLibs.signum.indispensable.josef) //TODO: get rid of it here
         }
         commonTest.dependencies {
             implementation(identityLibs.kotlin.test)

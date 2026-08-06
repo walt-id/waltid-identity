@@ -1,6 +1,7 @@
 package id.walt.openid4vci.handlers.credential
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
@@ -17,6 +18,7 @@ import id.walt.sdjwt.SDMap
 import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.coroutines.CancellationException
 import kotlin.time.Instant
 
 
@@ -94,6 +96,8 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
                     credentials = listOf(IssuedCredential(credential = JsonPrimitive(issued))),
                 )
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             CredentialResponseResult.Failure(e.toCredentialHandlerError())
         }
@@ -106,14 +110,14 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
     protected open suspend fun extractHolderKey(
         request: CredentialRequest,
         verifiedProofs: List<VerifiedCredentialProof>,
-    ): Key? = verifiedProofs.firstOrNull()?.holderKey
+    ): Crypto2Key? = verifiedProofs.firstOrNull()?.holderKey
 
     /**
      * Perform the actual mdoc CBOR/COSE signing.
      *
      * @param docType the document type (e.g. `"org.iso.18013.5.1.mDL"`)
      * @param namespaceData map of namespace → { elementIdentifier: value }
-     * @param holderKey the holder's public key for device key binding
+     * @param holderKey the holder's public crypto2 key for device key binding
      * @param issuerKey the issuer's signing key
      * @param x5Chain optional certificate chain for the issuer key
      * @param validityDays validity period in days
@@ -122,7 +126,7 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
     abstract suspend fun issueMdoc(
         docType: String,
         namespaceData: Map<String, JsonObject>,
-        holderKey: Key,
+        holderKey: Crypto2Key,
         issuerKey: Key,
         x5Chain: List<CertificateDer>?,
         validityDays: Int,

@@ -1,0 +1,259 @@
+// Klib ABI Dump
+// Targets: [js]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <id.walt.crypto2:waltid-crypto2-signum>
+final enum class id.walt.crypto2.signum/SignumHardwarePolicy : kotlin/Enum<id.walt.crypto2.signum/SignumHardwarePolicy> { // id.walt.crypto2.signum/SignumHardwarePolicy|null[0]
+    enum entry DISCOURAGED // id.walt.crypto2.signum/SignumHardwarePolicy.DISCOURAGED|null[0]
+    enum entry PREFERRED // id.walt.crypto2.signum/SignumHardwarePolicy.PREFERRED|null[0]
+    enum entry REQUIRED // id.walt.crypto2.signum/SignumHardwarePolicy.REQUIRED|null[0]
+
+    final val entries // id.walt.crypto2.signum/SignumHardwarePolicy.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.crypto2.signum/SignumHardwarePolicy> // id.walt.crypto2.signum/SignumHardwarePolicy.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.crypto2.signum/SignumHardwarePolicy // id.walt.crypto2.signum/SignumHardwarePolicy.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.crypto2.signum/SignumHardwarePolicy> // id.walt.crypto2.signum/SignumHardwarePolicy.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.crypto2.signum/SignumHardwarePolicy.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.signum/SignumHardwarePolicy> // id.walt.crypto2.signum/SignumHardwarePolicy.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.crypto2.signum/SignumHardwarePolicy.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class id.walt.crypto2.signum/SignumProtectionLevel : kotlin/Enum<id.walt.crypto2.signum/SignumProtectionLevel> { // id.walt.crypto2.signum/SignumProtectionLevel|null[0]
+    enum entry HARDWARE // id.walt.crypto2.signum/SignumProtectionLevel.HARDWARE|null[0]
+    enum entry SOFTWARE // id.walt.crypto2.signum/SignumProtectionLevel.SOFTWARE|null[0]
+    enum entry UNKNOWN // id.walt.crypto2.signum/SignumProtectionLevel.UNKNOWN|null[0]
+
+    final val entries // id.walt.crypto2.signum/SignumProtectionLevel.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.crypto2.signum/SignumProtectionLevel> // id.walt.crypto2.signum/SignumProtectionLevel.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.crypto2.signum/SignumProtectionLevel // id.walt.crypto2.signum/SignumProtectionLevel.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.crypto2.signum/SignumProtectionLevel> // id.walt.crypto2.signum/SignumProtectionLevel.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.crypto2.signum/SignumProtectionLevel.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.signum/SignumProtectionLevel> // id.walt.crypto2.signum/SignumProtectionLevel.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.crypto2.signum/SignumProtectionLevel.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+abstract interface id.walt.crypto2.signum/SignumManagedKey : id.walt.crypto2.keys/ManagedKey { // id.walt.crypto2.signum/SignumManagedKey|null[0]
+    abstract val attestation // id.walt.crypto2.signum/SignumManagedKey.attestation|{}attestation[0]
+        abstract fun <get-attestation>(): id.walt.crypto2.signum/SignumKeyAttestation? // id.walt.crypto2.signum/SignumManagedKey.attestation.<get-attestation>|<get-attestation>(){}[0]
+    abstract val protectionLevel // id.walt.crypto2.signum/SignumManagedKey.protectionLevel|{}protectionLevel[0]
+        abstract fun <get-protectionLevel>(): id.walt.crypto2.signum/SignumProtectionLevel // id.walt.crypto2.signum/SignumManagedKey.protectionLevel.<get-protectionLevel>|<get-protectionLevel>(){}[0]
+}
+
+abstract interface id.walt.crypto2.signum/SignumPlatformBackend { // id.walt.crypto2.signum/SignumPlatformBackend|null[0]
+    abstract val id // id.walt.crypto2.signum/SignumPlatformBackend.id|{}id[0]
+        abstract fun <get-id>(): id.walt.crypto2.keys/ProviderId // id.walt.crypto2.signum/SignumPlatformBackend.id.<get-id>|<get-id>(){}[0]
+
+    abstract fun supports(id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.signum/SignumKeyPolicy): kotlin/Boolean // id.walt.crypto2.signum/SignumPlatformBackend.supports|supports(id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.signum.SignumKeyPolicy){}[0]
+    abstract suspend fun create(kotlin/String, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.signum/SignumKeyPolicy): id.walt.crypto2.signum/SignumPlatformKey // id.walt.crypto2.signum/SignumPlatformBackend.create|create(kotlin.String;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.signum.SignumKeyPolicy){}[0]
+    abstract suspend fun delete(kotlin/String) // id.walt.crypto2.signum/SignumPlatformBackend.delete|delete(kotlin.String){}[0]
+    abstract suspend fun load(kotlin/String, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.signum/SignumKeyPolicy): id.walt.crypto2.signum/SignumPlatformKey? // id.walt.crypto2.signum/SignumPlatformBackend.load|load(kotlin.String;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.signum.SignumKeyPolicy){}[0]
+}
+
+abstract interface id.walt.crypto2.signum/SignumPlatformKey { // id.walt.crypto2.signum/SignumPlatformKey|null[0]
+    abstract val alias // id.walt.crypto2.signum/SignumPlatformKey.alias|{}alias[0]
+        abstract fun <get-alias>(): kotlin/String // id.walt.crypto2.signum/SignumPlatformKey.alias.<get-alias>|<get-alias>(){}[0]
+    abstract val attestation // id.walt.crypto2.signum/SignumPlatformKey.attestation|{}attestation[0]
+        abstract fun <get-attestation>(): id.walt.crypto2.signum/SignumKeyAttestation? // id.walt.crypto2.signum/SignumPlatformKey.attestation.<get-attestation>|<get-attestation>(){}[0]
+    abstract val keyAgreementAlgorithms // id.walt.crypto2.signum/SignumPlatformKey.keyAgreementAlgorithms|{}keyAgreementAlgorithms[0]
+        abstract fun <get-keyAgreementAlgorithms>(): kotlin.collections/Set<id.walt.crypto2.algorithms/KeyAgreementAlgorithm> // id.walt.crypto2.signum/SignumPlatformKey.keyAgreementAlgorithms.<get-keyAgreementAlgorithms>|<get-keyAgreementAlgorithms>(){}[0]
+    abstract val protectionLevel // id.walt.crypto2.signum/SignumPlatformKey.protectionLevel|{}protectionLevel[0]
+        abstract fun <get-protectionLevel>(): id.walt.crypto2.signum/SignumProtectionLevel // id.walt.crypto2.signum/SignumPlatformKey.protectionLevel.<get-protectionLevel>|<get-protectionLevel>(){}[0]
+    abstract val publicKey // id.walt.crypto2.signum/SignumPlatformKey.publicKey|{}publicKey[0]
+        abstract fun <get-publicKey>(): id.walt.crypto2.keys/EncodedKey.SpkiDer // id.walt.crypto2.signum/SignumPlatformKey.publicKey.<get-publicKey>|<get-publicKey>(){}[0]
+    abstract val signatureAlgorithms // id.walt.crypto2.signum/SignumPlatformKey.signatureAlgorithms|{}signatureAlgorithms[0]
+        abstract fun <get-signatureAlgorithms>(): kotlin.collections/Set<id.walt.crypto2.algorithms/SignatureAlgorithm> // id.walt.crypto2.signum/SignumPlatformKey.signatureAlgorithms.<get-signatureAlgorithms>|<get-signatureAlgorithms>(){}[0]
+    abstract val spec // id.walt.crypto2.signum/SignumPlatformKey.spec|{}spec[0]
+        abstract fun <get-spec>(): id.walt.crypto2.keys/KeySpec // id.walt.crypto2.signum/SignumPlatformKey.spec.<get-spec>|<get-spec>(){}[0]
+
+    abstract suspend fun generateSharedSecret(id.walt.crypto2.keys/EncodedKey, id.walt.crypto2.algorithms/KeyAgreementAlgorithm): id.walt.crypto2.serialization/BinaryData // id.walt.crypto2.signum/SignumPlatformKey.generateSharedSecret|generateSharedSecret(id.walt.crypto2.keys.EncodedKey;id.walt.crypto2.algorithms.KeyAgreementAlgorithm){}[0]
+    abstract suspend fun sign(kotlin/ByteArray, id.walt.crypto2.algorithms/SignatureAlgorithm): kotlin/ByteArray // id.walt.crypto2.signum/SignumPlatformKey.sign|sign(kotlin.ByteArray;id.walt.crypto2.algorithms.SignatureAlgorithm){}[0]
+    abstract suspend fun verify(kotlin/ByteArray, kotlin/ByteArray, id.walt.crypto2.algorithms/SignatureAlgorithm): kotlin/Boolean // id.walt.crypto2.signum/SignumPlatformKey.verify|verify(kotlin.ByteArray;kotlin.ByteArray;id.walt.crypto2.algorithms.SignatureAlgorithm){}[0]
+}
+
+sealed interface id.walt.crypto2.signum/SignumAuthenticationPolicy { // id.walt.crypto2.signum/SignumAuthenticationPolicy|null[0]
+    final class UserPresence : id.walt.crypto2.signum/SignumAuthenticationPolicy { // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence|null[0]
+        constructor <init>(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/String = ..., kotlin/String = ...) // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Int;kotlin.String;kotlin.String){}[0]
+
+        final val allowNewBiometrics // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.allowNewBiometrics|{}allowNewBiometrics[0]
+            final fun <get-allowNewBiometrics>(): kotlin/Boolean // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.allowNewBiometrics.<get-allowNewBiometrics>|<get-allowNewBiometrics>(){}[0]
+        final val biometric // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.biometric|{}biometric[0]
+            final fun <get-biometric>(): kotlin/Boolean // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.biometric.<get-biometric>|<get-biometric>(){}[0]
+        final val cancelText // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.cancelText|{}cancelText[0]
+            final fun <get-cancelText>(): kotlin/String // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.cancelText.<get-cancelText>|<get-cancelText>(){}[0]
+        final val deviceCredential // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.deviceCredential|{}deviceCredential[0]
+            final fun <get-deviceCredential>(): kotlin/Boolean // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.deviceCredential.<get-deviceCredential>|<get-deviceCredential>(){}[0]
+        final val prompt // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.prompt|{}prompt[0]
+            final fun <get-prompt>(): kotlin/String // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.prompt.<get-prompt>|<get-prompt>(){}[0]
+        final val timeoutSeconds // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.timeoutSeconds|{}timeoutSeconds[0]
+            final fun <get-timeoutSeconds>(): kotlin/Int // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.timeoutSeconds.<get-timeoutSeconds>|<get-timeoutSeconds>(){}[0]
+
+        final fun component1(): kotlin/Boolean // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.component1|component1(){}[0]
+        final fun component2(): kotlin/Boolean // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.component2|component2(){}[0]
+        final fun component3(): kotlin/Boolean // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.component3|component3(){}[0]
+        final fun component4(): kotlin/Int // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.component4|component4(){}[0]
+        final fun component5(): kotlin/String // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.component5|component5(){}[0]
+        final fun component6(): kotlin/String // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.component6|component6(){}[0]
+        final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/String = ..., kotlin/String = ...): id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.copy|copy(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Int;kotlin.String;kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence> { // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.$serializer|null[0]
+            final val descriptor // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence) // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.crypto2.signum.SignumAuthenticationPolicy.UserPresence){}[0]
+        }
+
+        final object Companion { // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence> // id.walt.crypto2.signum/SignumAuthenticationPolicy.UserPresence.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.crypto2.signum/SignumAuthenticationPolicy.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.signum/SignumAuthenticationPolicy> // id.walt.crypto2.signum/SignumAuthenticationPolicy.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.crypto2.signum/SignumAuthenticationPolicy.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+
+    final object None : id.walt.crypto2.signum/SignumAuthenticationPolicy, kotlinx.serialization.internal/SerializerFactory { // id.walt.crypto2.signum/SignumAuthenticationPolicy.None|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.signum/SignumAuthenticationPolicy.None.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.crypto2.signum/SignumAuthenticationPolicy.None.hashCode|hashCode(){}[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.signum/SignumAuthenticationPolicy.None> // id.walt.crypto2.signum/SignumAuthenticationPolicy.None.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.crypto2.signum/SignumAuthenticationPolicy.None.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+        final fun toString(): kotlin/String // id.walt.crypto2.signum/SignumAuthenticationPolicy.None.toString|toString(){}[0]
+    }
+}
+
+final class id.walt.crypto2.signum/SignumKeyAttestation { // id.walt.crypto2.signum/SignumKeyAttestation|null[0]
+    constructor <init>(kotlin/String, id.walt.crypto2.serialization/BinaryData, kotlin.collections/List<id.walt.crypto2.serialization/BinaryData> = ...) // id.walt.crypto2.signum/SignumKeyAttestation.<init>|<init>(kotlin.String;id.walt.crypto2.serialization.BinaryData;kotlin.collections.List<id.walt.crypto2.serialization.BinaryData>){}[0]
+
+    final val certificateChain // id.walt.crypto2.signum/SignumKeyAttestation.certificateChain|{}certificateChain[0]
+        final fun <get-certificateChain>(): kotlin.collections/List<id.walt.crypto2.serialization/BinaryData> // id.walt.crypto2.signum/SignumKeyAttestation.certificateChain.<get-certificateChain>|<get-certificateChain>(){}[0]
+    final val format // id.walt.crypto2.signum/SignumKeyAttestation.format|{}format[0]
+        final fun <get-format>(): kotlin/String // id.walt.crypto2.signum/SignumKeyAttestation.format.<get-format>|<get-format>(){}[0]
+    final val statement // id.walt.crypto2.signum/SignumKeyAttestation.statement|{}statement[0]
+        final fun <get-statement>(): id.walt.crypto2.serialization/BinaryData // id.walt.crypto2.signum/SignumKeyAttestation.statement.<get-statement>|<get-statement>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.crypto2.signum/SignumKeyAttestation.component1|component1(){}[0]
+    final fun component2(): id.walt.crypto2.serialization/BinaryData // id.walt.crypto2.signum/SignumKeyAttestation.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<id.walt.crypto2.serialization/BinaryData> // id.walt.crypto2.signum/SignumKeyAttestation.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., id.walt.crypto2.serialization/BinaryData = ..., kotlin.collections/List<id.walt.crypto2.serialization/BinaryData> = ...): id.walt.crypto2.signum/SignumKeyAttestation // id.walt.crypto2.signum/SignumKeyAttestation.copy|copy(kotlin.String;id.walt.crypto2.serialization.BinaryData;kotlin.collections.List<id.walt.crypto2.serialization.BinaryData>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.signum/SignumKeyAttestation.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.signum/SignumKeyAttestation.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.signum/SignumKeyAttestation.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.crypto2.signum/SignumKeyAttestation> { // id.walt.crypto2.signum/SignumKeyAttestation.$serializer|null[0]
+        final val descriptor // id.walt.crypto2.signum/SignumKeyAttestation.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.crypto2.signum/SignumKeyAttestation.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.crypto2.signum/SignumKeyAttestation.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.crypto2.signum/SignumKeyAttestation // id.walt.crypto2.signum/SignumKeyAttestation.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.crypto2.signum/SignumKeyAttestation) // id.walt.crypto2.signum/SignumKeyAttestation.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.crypto2.signum.SignumKeyAttestation){}[0]
+    }
+
+    final object Companion { // id.walt.crypto2.signum/SignumKeyAttestation.Companion|null[0]
+        final val $childSerializers // id.walt.crypto2.signum/SignumKeyAttestation.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.signum/SignumKeyAttestation> // id.walt.crypto2.signum/SignumKeyAttestation.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class id.walt.crypto2.signum/SignumKeyOptions { // id.walt.crypto2.signum/SignumKeyOptions|null[0]
+    constructor <init>(kotlin/String? = ..., id.walt.crypto2.signum/SignumKeyPolicy = ...) // id.walt.crypto2.signum/SignumKeyOptions.<init>|<init>(kotlin.String?;id.walt.crypto2.signum.SignumKeyPolicy){}[0]
+
+    final val alias // id.walt.crypto2.signum/SignumKeyOptions.alias|{}alias[0]
+        final fun <get-alias>(): kotlin/String? // id.walt.crypto2.signum/SignumKeyOptions.alias.<get-alias>|<get-alias>(){}[0]
+    final val policy // id.walt.crypto2.signum/SignumKeyOptions.policy|{}policy[0]
+        final fun <get-policy>(): id.walt.crypto2.signum/SignumKeyPolicy // id.walt.crypto2.signum/SignumKeyOptions.policy.<get-policy>|<get-policy>(){}[0]
+
+    final fun component1(): kotlin/String? // id.walt.crypto2.signum/SignumKeyOptions.component1|component1(){}[0]
+    final fun component2(): id.walt.crypto2.signum/SignumKeyPolicy // id.walt.crypto2.signum/SignumKeyOptions.component2|component2(){}[0]
+    final fun copy(kotlin/String? = ..., id.walt.crypto2.signum/SignumKeyPolicy = ...): id.walt.crypto2.signum/SignumKeyOptions // id.walt.crypto2.signum/SignumKeyOptions.copy|copy(kotlin.String?;id.walt.crypto2.signum.SignumKeyPolicy){}[0]
+    final fun encode(): id.walt.crypto2.serialization/BinaryData // id.walt.crypto2.signum/SignumKeyOptions.encode|encode(){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.signum/SignumKeyOptions.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.signum/SignumKeyOptions.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.signum/SignumKeyOptions.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.crypto2.signum/SignumKeyOptions> { // id.walt.crypto2.signum/SignumKeyOptions.$serializer|null[0]
+        final val descriptor // id.walt.crypto2.signum/SignumKeyOptions.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.crypto2.signum/SignumKeyOptions.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.crypto2.signum/SignumKeyOptions.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.crypto2.signum/SignumKeyOptions // id.walt.crypto2.signum/SignumKeyOptions.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.crypto2.signum/SignumKeyOptions) // id.walt.crypto2.signum/SignumKeyOptions.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.crypto2.signum.SignumKeyOptions){}[0]
+    }
+
+    final object Companion { // id.walt.crypto2.signum/SignumKeyOptions.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.signum/SignumKeyOptions> // id.walt.crypto2.signum/SignumKeyOptions.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class id.walt.crypto2.signum/SignumKeyPolicy { // id.walt.crypto2.signum/SignumKeyPolicy|null[0]
+    constructor <init>(id.walt.crypto2.signum/SignumHardwarePolicy = ..., id.walt.crypto2.signum/SignumAuthenticationPolicy = ..., kotlin/Boolean = ..., id.walt.crypto2.serialization/BinaryData? = ...) // id.walt.crypto2.signum/SignumKeyPolicy.<init>|<init>(id.walt.crypto2.signum.SignumHardwarePolicy;id.walt.crypto2.signum.SignumAuthenticationPolicy;kotlin.Boolean;id.walt.crypto2.serialization.BinaryData?){}[0]
+
+    final val attestationChallenge // id.walt.crypto2.signum/SignumKeyPolicy.attestationChallenge|{}attestationChallenge[0]
+        final fun <get-attestationChallenge>(): id.walt.crypto2.serialization/BinaryData? // id.walt.crypto2.signum/SignumKeyPolicy.attestationChallenge.<get-attestationChallenge>|<get-attestationChallenge>(){}[0]
+    final val authentication // id.walt.crypto2.signum/SignumKeyPolicy.authentication|{}authentication[0]
+        final fun <get-authentication>(): id.walt.crypto2.signum/SignumAuthenticationPolicy // id.walt.crypto2.signum/SignumKeyPolicy.authentication.<get-authentication>|<get-authentication>(){}[0]
+    final val hardware // id.walt.crypto2.signum/SignumKeyPolicy.hardware|{}hardware[0]
+        final fun <get-hardware>(): id.walt.crypto2.signum/SignumHardwarePolicy // id.walt.crypto2.signum/SignumKeyPolicy.hardware.<get-hardware>|<get-hardware>(){}[0]
+    final val keyAgreement // id.walt.crypto2.signum/SignumKeyPolicy.keyAgreement|{}keyAgreement[0]
+        final fun <get-keyAgreement>(): kotlin/Boolean // id.walt.crypto2.signum/SignumKeyPolicy.keyAgreement.<get-keyAgreement>|<get-keyAgreement>(){}[0]
+
+    final fun component1(): id.walt.crypto2.signum/SignumHardwarePolicy // id.walt.crypto2.signum/SignumKeyPolicy.component1|component1(){}[0]
+    final fun component2(): id.walt.crypto2.signum/SignumAuthenticationPolicy // id.walt.crypto2.signum/SignumKeyPolicy.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // id.walt.crypto2.signum/SignumKeyPolicy.component3|component3(){}[0]
+    final fun component4(): id.walt.crypto2.serialization/BinaryData? // id.walt.crypto2.signum/SignumKeyPolicy.component4|component4(){}[0]
+    final fun copy(id.walt.crypto2.signum/SignumHardwarePolicy = ..., id.walt.crypto2.signum/SignumAuthenticationPolicy = ..., kotlin/Boolean = ..., id.walt.crypto2.serialization/BinaryData? = ...): id.walt.crypto2.signum/SignumKeyPolicy // id.walt.crypto2.signum/SignumKeyPolicy.copy|copy(id.walt.crypto2.signum.SignumHardwarePolicy;id.walt.crypto2.signum.SignumAuthenticationPolicy;kotlin.Boolean;id.walt.crypto2.serialization.BinaryData?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.signum/SignumKeyPolicy.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.signum/SignumKeyPolicy.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.signum/SignumKeyPolicy.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.crypto2.signum/SignumKeyPolicy> { // id.walt.crypto2.signum/SignumKeyPolicy.$serializer|null[0]
+        final val descriptor // id.walt.crypto2.signum/SignumKeyPolicy.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.crypto2.signum/SignumKeyPolicy.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.crypto2.signum/SignumKeyPolicy.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.crypto2.signum/SignumKeyPolicy // id.walt.crypto2.signum/SignumKeyPolicy.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.crypto2.signum/SignumKeyPolicy) // id.walt.crypto2.signum/SignumKeyPolicy.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.crypto2.signum.SignumKeyPolicy){}[0]
+    }
+
+    final object Companion { // id.walt.crypto2.signum/SignumKeyPolicy.Companion|null[0]
+        final val $childSerializers // id.walt.crypto2.signum/SignumKeyPolicy.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.signum/SignumKeyPolicy> // id.walt.crypto2.signum/SignumKeyPolicy.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class id.walt.crypto2.signum/SignumManagedKeyProvider : id.walt.crypto2.providers/ManagedKeyProvider { // id.walt.crypto2.signum/SignumManagedKeyProvider|null[0]
+    constructor <init>(id.walt.crypto2.signum/SignumPlatformBackend) // id.walt.crypto2.signum/SignumManagedKeyProvider.<init>|<init>(id.walt.crypto2.signum.SignumPlatformBackend){}[0]
+
+    final val id // id.walt.crypto2.signum/SignumManagedKeyProvider.id|{}id[0]
+        final fun <get-id>(): id.walt.crypto2.keys/ProviderId // id.walt.crypto2.signum/SignumManagedKeyProvider.id.<get-id>|<get-id>(){}[0]
+
+    final suspend fun delete(id.walt.crypto2.keys/StoredKey.Managed, kotlin/String? = ...): id.walt.crypto2.keys/KeyDeletionResult // id.walt.crypto2.signum/SignumManagedKeyProvider.delete|delete(id.walt.crypto2.keys.StoredKey.Managed;kotlin.String?){}[0]
+    final suspend fun generate(id.walt.crypto2.providers/GenerateManagedKeyRequest): id.walt.crypto2.keys/ManagedKey // id.walt.crypto2.signum/SignumManagedKeyProvider.generate|generate(id.walt.crypto2.providers.GenerateManagedKeyRequest){}[0]
+    final suspend fun generateSignumKey(id.walt.crypto2.providers/GenerateManagedKeyRequest): id.walt.crypto2.signum/SignumManagedKey // id.walt.crypto2.signum/SignumManagedKeyProvider.generateSignumKey|generateSignumKey(id.walt.crypto2.providers.GenerateManagedKeyRequest){}[0]
+    final suspend fun restore(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.keys/ManagedKey // id.walt.crypto2.signum/SignumManagedKeyProvider.restore|restore(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+    final suspend fun restoreSignumKey(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.signum/SignumManagedKey // id.walt.crypto2.signum/SignumManagedKeyProvider.restoreSignumKey|restoreSignumKey(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+    final suspend fun storedKeyForExisting(id.walt.crypto2.keys/KeyId, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, kotlin/String, id.walt.crypto2.signum/SignumKeyPolicy = ..., kotlin.collections/Map<kotlin/String, kotlin/String> = ...): id.walt.crypto2.keys/StoredKey.Managed // id.walt.crypto2.signum/SignumManagedKeyProvider.storedKeyForExisting|storedKeyForExisting(id.walt.crypto2.keys.KeyId;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;kotlin.String;id.walt.crypto2.signum.SignumKeyPolicy;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
+
+    final object Companion // id.walt.crypto2.signum/SignumManagedKeyProvider.Companion|null[0]
+}
+
+final class id.walt.crypto2.signum/SignumUserCancelledException : kotlin.coroutines.cancellation/CancellationException { // id.walt.crypto2.signum/SignumUserCancelledException|null[0]
+    constructor <init>(kotlin/Throwable) // id.walt.crypto2.signum/SignumUserCancelledException.<init>|<init>(kotlin.Throwable){}[0]
+
+    final val reason // id.walt.crypto2.signum/SignumUserCancelledException.reason|{}reason[0]
+        final fun <get-reason>(): kotlin/Throwable // id.walt.crypto2.signum/SignumUserCancelledException.reason.<get-reason>|<get-reason>(){}[0]
+}

@@ -1,7 +1,7 @@
 package id.walt.certificate.x509
 
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.Key as Crypto1Key
+import id.walt.crypto.keys.KeyType as Crypto1KeyType
 
 interface X509SigningAlgorithmInfo {
     val signingAlgorithmName: String
@@ -25,10 +25,10 @@ interface X509SigningAlgorithmInfo {
         const val KEY_ALG_NAME_EC = "id-ecPublicKey"
         const val KEY_ALG_NAME_RSA = "rsaEncryption"
 
-        fun ofKey(key: Key): X509SigningAlgorithmInfo =
+        fun ofKey(key: Crypto1Key): X509SigningAlgorithmInfo =
             ofKeyType(key.keyType)
 
-        fun ofKeyType(keyType: KeyType): X509SigningAlgorithmInfo =
+        fun ofKeyType(keyType: Crypto1KeyType): X509SigningAlgorithmInfo =
             signingAlgorithmInfoMap.get(keyType) ?: error("Unknown key type: $keyType")
 
         fun algorithmNameByOid(oid: String): String =
@@ -36,7 +36,7 @@ interface X509SigningAlgorithmInfo {
 
 
         private val signingAlgorithmInfoMap = mapOf(
-            KeyType.Ed25519 to Info(
+            Crypto1KeyType.Ed25519 to Info(
                 signingAlgorithmName = "id-Ed25519",
                 signingAlgorithmOid = "1.3.101.112",
                 keyAlgorithmName = "id-Ed25519",
@@ -44,7 +44,7 @@ interface X509SigningAlgorithmInfo {
                 keyEllipticCurveOid = null
             ),
 
-            KeyType.secp256k1 to Info(
+            Crypto1KeyType.secp256k1 to Info(
                 signingAlgorithmName = "ecdsa-with-SHA256",
                 signingAlgorithmOid = "1.2.840.10045.4.3.2",
                 keyAlgorithmName = KEY_ALG_NAME_EC,
@@ -52,7 +52,7 @@ interface X509SigningAlgorithmInfo {
                 keyEllipticCurveOid = "1.3.132.0.10"
             ),
 
-            KeyType.secp256r1 to Info(
+            Crypto1KeyType.secp256r1 to Info(
                 signingAlgorithmName = "ecdsa-with-SHA256",
                 signingAlgorithmOid = "1.2.840.10045.4.3.2",
                 keyAlgorithmName = KEY_ALG_NAME_EC,
@@ -60,7 +60,7 @@ interface X509SigningAlgorithmInfo {
                 keyEllipticCurveOid = "1.2.840.10045.3.1.7"
             ),
 
-            KeyType.secp384r1 to Info(
+            Crypto1KeyType.secp384r1 to Info(
                 signingAlgorithmName = "ecdsa-with-SHA384",
                 signingAlgorithmOid = "1.2.840.10045.4.3.3",
                 keyAlgorithmName = KEY_ALG_NAME_EC,
@@ -68,7 +68,7 @@ interface X509SigningAlgorithmInfo {
                 keyEllipticCurveOid = "1.3.132.0.34"
             ),
 
-            KeyType.secp521r1 to Info(
+            Crypto1KeyType.secp521r1 to Info(
                 signingAlgorithmName = "ecdsa-with-SHA512",
                 signingAlgorithmOid = "1.2.840.10045.4.3.4",
                 keyAlgorithmName = KEY_ALG_NAME_EC,
@@ -76,7 +76,7 @@ interface X509SigningAlgorithmInfo {
                 keyEllipticCurveOid = "1.3.132.0.35"
             ),
 
-            KeyType.RSA to Info(
+            Crypto1KeyType.RSA to Info(
                 signingAlgorithmName = "sha256WithRSAEncryption",
                 signingAlgorithmOid = "1.2.840.113549.1.1.11",
                 keyAlgorithmName = KEY_ALG_NAME_RSA,
@@ -84,14 +84,14 @@ interface X509SigningAlgorithmInfo {
                 keyEllipticCurveOid = null
             ),
 
-            KeyType.RSA3072 to Info(
+            Crypto1KeyType.RSA3072 to Info(
                 signingAlgorithmName = "sha384WithRSAEncryption",
                 signingAlgorithmOid = "1.2.840.113549.1.1.12",
                 keyAlgorithmName = KEY_ALG_NAME_RSA,
                 keyAlgorithmOid = "1.2.840.113549.1.1.1",
                 keyEllipticCurveOid = null
             ),
-            KeyType.RSA4096 to Info(
+            Crypto1KeyType.RSA4096 to Info(
                 signingAlgorithmName = "sha512WithRSAEncryption",
                 signingAlgorithmOid = "1.2.840.113549.1.1.13",
                 keyAlgorithmName = KEY_ALG_NAME_RSA,

@@ -39,6 +39,15 @@ val modules = listOfNotNull(
         "waltid-crypto-aws",
         "waltid-crypto-azure",
         "waltid-crypto2",
+        "waltid-crypto2-examples",
+        "waltid-crypto2-java",
+        "waltid-crypto2-kms",
+        "waltid-crypto2-kms-aws-sdk",
+        "waltid-crypto2-kms-azure-identity",
+        "waltid-crypto2-signum",
+        "waltid-crypto2-pkcs11",
+        "waltid-crypto2-migration-v1",
+        "waltid-jose",
         "waltid-cose",
         "waltid-x509",
     ),
@@ -101,6 +110,7 @@ val modules = listOfNotNull(
     "$libraries:waltid-did",
     "$libraries:waltid-java-compat",
     "$libraries:waltid-library-commons",
+    "$libraries:waltid-usage-examples",
 
     // Service commons
     "$services:waltid-service-commons",

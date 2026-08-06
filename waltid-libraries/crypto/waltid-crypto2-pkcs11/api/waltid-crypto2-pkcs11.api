@@ -1,0 +1,65 @@
+public final class id/walt/crypto2/pkcs11/Pkcs11KeyProvider : id/walt/crypto2/providers/ManagedKeyProvider {
+	public static final field Companion Lid/walt/crypto2/pkcs11/Pkcs11KeyProvider$Companion;
+	public fun <init> (Lid/walt/crypto2/pkcs11/Pkcs11PinResolver;)V
+	public fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun generate (Lid/walt/crypto2/providers/GenerateManagedKeyRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getId-v1VkqW4 ()Ljava/lang/String;
+	public fun restore (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun storedKeyForExisting-OjfoBKg (Ljava/lang/String;Ljava/util/Set;Lid/walt/crypto2/pkcs11/Pkcs11Options;Ljava/util/Map;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun storedKeyForExisting-OjfoBKg$default (Lid/walt/crypto2/pkcs11/Pkcs11KeyProvider;Ljava/lang/String;Ljava/util/Set;Lid/walt/crypto2/pkcs11/Pkcs11Options;Ljava/util/Map;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class id/walt/crypto2/pkcs11/Pkcs11KeyProvider$Companion {
+	public final fun getID-v1VkqW4 ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/pkcs11/Pkcs11Options {
+	public static final field Companion Lid/walt/crypto2/pkcs11/Pkcs11Options$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/Long;
+	public final fun component4 ()Ljava/lang/Integer;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;Ljava/util/List;)Lid/walt/crypto2/pkcs11/Pkcs11Options;
+	public static synthetic fun copy$default (Lid/walt/crypto2/pkcs11/Pkcs11Options;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Integer;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lid/walt/crypto2/pkcs11/Pkcs11Options;
+	public final fun encode ()Lid/walt/crypto2/serialization/BinaryData;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlias ()Ljava/lang/String;
+	public final fun getLibraryPath ()Ljava/lang/String;
+	public final fun getPinReference ()Ljava/lang/String;
+	public final fun getProviderConfigurationLines ()Ljava/util/List;
+	public final fun getSlotId ()Ljava/lang/Long;
+	public final fun getSlotListIndex ()Ljava/lang/Integer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/pkcs11/Pkcs11Options$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/pkcs11/Pkcs11Options$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/pkcs11/Pkcs11Options;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/pkcs11/Pkcs11Options;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/pkcs11/Pkcs11Options$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/pkcs11/Pkcs11Pin : javax/security/auth/Destroyable {
+	public fun <init> ([C)V
+	public fun destroy ()V
+	public fun isDestroyed ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class id/walt/crypto2/pkcs11/Pkcs11PinResolver {
+	public abstract fun resolve (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+

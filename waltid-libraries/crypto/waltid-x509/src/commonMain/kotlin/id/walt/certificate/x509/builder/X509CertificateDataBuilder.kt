@@ -5,10 +5,11 @@ import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateSerialNumberGenerator
 import id.walt.certificate.x509.extension.Extension
 import id.walt.certificate.x509.extension.MutableExtensionContainer
-import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.Key
 import kotlinx.io.bytestring.ByteString
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import id.walt.crypto.keys.Key as Crypto1Key
 
 open class X509CertificateDataBuilder(
     private val serialNumberGenerator: X509CertificateSerialNumberGenerator,
@@ -35,17 +36,19 @@ open class X509CertificateDataBuilder(
         subjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder()
     }
 
-    fun subjectPublicKey(key: Key): Unit {
+    fun subjectPublicKey(key: Crypto1Key): Unit {
         subjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder(key)
     }
 
     class WaltIdKeySubjectPublicKeyInfoBuilder private constructor(
         val selfSigned: Boolean,
+        val crypto1key: Crypto1Key?,
         val key: Key?
     ) : X509Certificate.SubjectPublicKeyInfo {
 
-        constructor(key: Key) : this(false, key)
-        constructor() : this(true, null)
+        constructor(crypto1key: Crypto1Key) : this(false, crypto1key, null)
+        constructor(key: Key) : this(false, null, key)
+        constructor() : this(true, null, null)
 
         override val algorithmName: String
             get() = error("needs to be taken from issuer key")

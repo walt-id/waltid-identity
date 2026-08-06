@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 @SerialName("oci")
+@Deprecated("Legacy v1 OCI SDK adapter; use OciKmsKeyProvider for new integrations")
 expect class OCIKey(
     id: String,
     config: OCIsdkMetadata,
