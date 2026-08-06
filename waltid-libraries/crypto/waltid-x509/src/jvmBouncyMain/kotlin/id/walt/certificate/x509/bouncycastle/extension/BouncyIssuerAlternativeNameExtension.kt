@@ -1,4 +1,4 @@
-package id.walt.x509.id.walt.certificate.x509.bouncycastle.extension
+package id.walt.certificate.x509.bouncycastle.extension
 
 import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension
 import org.bouncycastle.asn1.ASN1Object

@@ -1,9 +1,9 @@
-package id.walt.x509.id.walt.certificate.x509.bouncycastle
+package id.walt.certificate.x509.bouncycastle
 
 import id.walt.certificate.x509.Pkcs10CertificateSigningRequest
 import id.walt.certificate.x509.X509SigningAlgorithmInfo
 import id.walt.certificate.x509.extension.Extension
-import id.walt.x509.id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory
+import id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory
 import kotlinx.io.bytestring.ByteString
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.pkcs.PKCS10CertificationRequest

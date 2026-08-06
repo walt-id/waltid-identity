@@ -1,4 +1,4 @@
-package id.walt.x509.id.walt.certificate.x509.bouncycastle
+package id.walt.certificate.x509.bouncycastle
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateParser

@@ -1,9 +1,9 @@
-package id.walt.x509.id.walt.certificate.x509.bouncycastle.extension
+package id.walt.certificate.x509.bouncycastle.extension
 
+import id.walt.certificate.x509.bouncycastle.BouncyGeneralNameUtil.toBouncyCastleGeneralNames
+import id.walt.certificate.x509.bouncycastle.BouncyGeneralNameUtil.toGeneralNamesList
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension
 import id.walt.certificate.x509.model.GeneralName
-import id.walt.x509.id.walt.certificate.x509.bouncycastle.BouncyGeneralNameUtil.toBouncyCastleGeneralNames
-import id.walt.x509.id.walt.certificate.x509.bouncycastle.BouncyGeneralNameUtil.toGeneralNamesList
 import org.bouncycastle.asn1.ASN1Object
 import org.bouncycastle.asn1.x500.RDN
 import org.bouncycastle.asn1.x500.X500Name

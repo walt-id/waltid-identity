@@ -1,12 +1,12 @@
-package id.walt.x509.id.walt.certificate.x509.bouncycastle
+package id.walt.certificate.x509.bouncycastle
 
 import id.walt.certificate.x509.BouncyPublicKeyInfoUtil
 import id.walt.certificate.x509.BouncyPublicKeyInfoUtil.bouncyCastleSubjectPublicKeyInfo
 import id.walt.certificate.x509.Pkcs10CertificateSigningRequest
 import id.walt.certificate.x509.Pkcs10CertificateSigningRequestSigner
+import id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory
 import id.walt.certificate.x509.builder.Pkcs10CertificateSigningRequestBuilder
 import id.walt.crypto.keys.Key
-import id.walt.x509.id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.ExtensionsGenerator

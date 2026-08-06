@@ -3,6 +3,7 @@ package id.walt.certificate.x509
 import id.walt.certificate.x509.builder.Pkcs10CertificateSigningRequestBuilder
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
+import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.X509CertificateChainValidator
@@ -57,9 +58,16 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
             subjectDn = "OU=issuer, DC=test, O=Walt.id"
         )
         block.invoke(builder)
-        requireNotNull((builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder).key)
-        { "Certificate subject public key missing" }
+        requireNotNull((builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder).key) {
+            "Certificate subject public key missing"
+        }
         builder.extensionAuthorityKeyIdentifier()
+        issuerCert.data.extensionSubjectKeyIdentifier?.let { subjectKeyId ->
+            val issuerPublicKeyInfo = PublicKeyInfo.ofKey(issuerKey)
+            require(subjectKeyId.keyIdentifier == issuerPublicKeyInfo.keyId) {
+                "Issuer certificate is not signed by issuer key. Subject key identifier does not match issuer public key identifier."
+            }
+        }
         return services.certificateSigner.signCertificate(issuerKey, builder)
     }
 
