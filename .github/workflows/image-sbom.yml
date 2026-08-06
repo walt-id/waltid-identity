@@ -11,13 +11,21 @@ on:
         description: "Image tag to generate SBOMs for, e.g. 1.2.3"
         required: true
         type: string
+      name:
+        description: |
+          Short component name used in artifact and SBOM file names, e.g. enterprise-ui.
+          Must not contain the registry namespace: GitHub redacts job outputs whose value
+          contains a secret, and the namespace matches DOCKER_USERNAME, so anything derived
+          from `image` reaches the caller empty.
+        required: true
+        type: string
     outputs:
       artifact-prefix:
         description: |
           Artifact name prefix shared by every SBOM this workflow uploads.
           Callers should download with pattern "<artifact-prefix>*" so they pick up
           only this image's SBOMs, never another image's.
-        value: ${{ jobs.resolve.outputs.artifact-prefix }}
+        value: sbom-image-${{ inputs.name }}-
       platforms:
         description: |
           JSON array of the platforms an SBOM was generated for. Each uploaded SBOM
@@ -33,6 +41,10 @@ on:
         description: "Image tag to generate SBOMs for, e.g. 1.2.3"
         required: true
         type: string
+      name:
+        description: "Short component name used in artifact and SBOM file names, e.g. enterprise-ui"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -44,8 +56,6 @@ jobs:
     outputs:
       matrix: ${{ steps.resolve.outputs.matrix }}
       platforms: ${{ steps.resolve.outputs.platforms }}
-      artifact-prefix: ${{ steps.prefix.outputs.artifact-prefix }}
-      slug: ${{ steps.prefix.outputs.slug }}
     steps:
       - name: Login to Docker Hub
         uses: docker/login-action@v4
@@ -108,16 +118,6 @@ jobs:
           echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
           echo "platforms=$(jq -c '[.include[].platform]' <<<"$MATRIX")" >> "$GITHUB_OUTPUT"
 
-      - name: Publish artifact name prefix
-        id: prefix
-        env:
-          IMAGE: ${{ inputs.image }}
-        run: |
-          set -euo pipefail
-          SLUG="$(printf '%s' "$IMAGE" | tr -c 'A-Za-z0-9._-' '-')"
-          echo "slug=${SLUG}" >> "$GITHUB_OUTPUT"
-          echo "artifact-prefix=sbom-image-${SLUG}-" >> "$GITHUB_OUTPUT"
-
   image-sbom:
     name: Image SBOM (${{ inputs.image }} ${{ matrix.platform }})
     needs: resolve
@@ -147,16 +147,16 @@ jobs:
       - name: Derive SBOM file name
         id: names
         env:
-          SLUG: ${{ needs.resolve.outputs.slug }}
-          ARTIFACT_PREFIX: ${{ needs.resolve.outputs.artifact-prefix }}
+          NAME: ${{ inputs.name }}
           PLATFORM: ${{ matrix.platform }}
         run: |
           set -euo pipefail
-          # The image slug comes from the resolve job so the artifact prefix it
-          # publishes and these names cannot drift apart.
+          # Names are built from inputs.name, never from inputs.image: the registry
+          # namespace matches DOCKER_USERNAME, and GitHub redacts any job output
+          # containing a secret, which would silently empty these values.
           PLATFORM_SLUG="$(printf '%s' "$PLATFORM" | tr -c 'A-Za-z0-9._-' '-')"
-          echo "artifact=${ARTIFACT_PREFIX}${PLATFORM_SLUG}" >> "$GITHUB_OUTPUT"
-          echo "file=${SLUG}-${PLATFORM_SLUG}-image.cdx.json" >> "$GITHUB_OUTPUT"
+          echo "artifact=sbom-image-${NAME}-${PLATFORM_SLUG}" >> "$GITHUB_OUTPUT"
+          echo "file=${NAME}-${PLATFORM_SLUG}-image.cdx.json" >> "$GITHUB_OUTPUT"
 
       - name: Generate image SBOM (Syft, CycloneDX 1.6)
         env:

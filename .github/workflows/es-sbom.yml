@@ -24,6 +24,7 @@ jobs:
     secrets: inherit
     with:
       image: waltid/waltid-enterprise-api
+      name: enterprise-api
       version: ${{ inputs.version }}
 
   ui-image-sbom:
@@ -32,6 +33,7 @@ jobs:
     secrets: inherit
     with:
       image: waltid/waltid-enterprise-ui
+      name: enterprise-ui
       version: ${{ inputs.version }}
 
   ui-sbom:
