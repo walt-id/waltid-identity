@@ -9,6 +9,12 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.OutgoingContent
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.utils.io.ByteChannel
+import io.ktor.utils.io.writeString
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -16,6 +22,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class TokenRequestBuilderTest {
@@ -429,6 +436,80 @@ class TokenRequestBuilderTest {
 
         assertEquals("access", response.access_token)
         assertEquals(2, callCount)
+    }
+
+    @Test
+    fun testTransportFailureOnSameOriginRedirectIsTyped() = runTest {
+        var callCount = 0
+        val client = createMockClient { _ ->
+            callCount += 1
+            if (callCount == 1) {
+                respond(
+                    content = "",
+                    status = HttpStatusCode.TemporaryRedirect,
+                    headers = headersOf(HttpHeaders.Location, "https://auth.example.com/other-token"),
+                )
+            } else {
+                error("redirected transport failure")
+            }
+        }
+
+        val error = assertFailsWith<TokenRequestException> {
+            TokenRequestBuilder(clientConfig, client).exchangePreAuthorizedCode(
+                tokenEndpoint = tokenEndpoint,
+                preAuthorizedCode = "pre-auth-code",
+            )
+        }
+
+        assertEquals(0, error.statusCode)
+        assertNotNull(error.cause)
+        assertEquals(2, callCount)
+    }
+
+    @Test
+    fun testDpopProofFailureIsNotConvertedIntoTransportFailure() = runTest {
+        var callCount = 0
+        val client = createMockClient {
+            callCount += 1
+            error("DPoP proof must fail before HTTP")
+        }
+
+        val error = assertFailsWith<IllegalStateException> {
+            TokenRequestBuilder(clientConfig, client).exchangePreAuthorizedCode(
+                tokenEndpoint = tokenEndpoint,
+                preAuthorizedCode = "pre-auth-code",
+                dpopProofFactory = { _, _ -> throw IllegalStateException("unsupported DPoP algorithm") },
+            )
+        }
+
+        assertEquals("unsupported DPoP algorithm", error.message)
+        assertEquals(0, callCount)
+    }
+
+    @Test
+    fun testOAuthErrorParsingPreservesCancellation() = runTest {
+        val bodyReady = CompletableDeferred<Unit>()
+        val body = ByteChannel()
+        val client = createMockClient {
+            body.writeString("{\"error\":")
+            bodyReady.complete(Unit)
+            respond(
+                content = body,
+                status = HttpStatusCode.BadRequest,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        val request = async(start = CoroutineStart.UNDISPATCHED) {
+            TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
+                tokenEndpoint = tokenEndpoint,
+                code = "auth-code",
+            )
+        }
+        bodyReady.await()
+        request.cancel()
+
+        assertFailsWith<CancellationException> { request.await() }
     }
 
     @Test

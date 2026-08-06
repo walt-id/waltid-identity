@@ -77,13 +77,13 @@ import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
 
-private fun TokenRequestException.toWebException(): WebException {
+internal fun TokenRequestException.toWebException(): WebException {
     val status = if (statusCode in 400..499) {
         HttpStatusCode.fromValue(statusCode)
     } else {
         HttpStatusCode.BadGateway
     }
-    return WebException(status.value, message ?: "Token request failed").also { it.initCause(this) }
+    return WebException(status.value, oauthError ?: "token_request_failed").also { it.initCause(this) }
 }
 
 // ---------------------------------------------------------------------------

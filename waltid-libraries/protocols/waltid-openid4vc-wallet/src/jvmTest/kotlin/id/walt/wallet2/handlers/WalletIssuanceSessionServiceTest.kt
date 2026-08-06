@@ -1040,6 +1040,36 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
+    fun unsupportedDpopKeyInPreAuthorizedGrantFailsAsCryptoBeforeTokenRequest() = runTest {
+        var tokenCalls = 0
+        val service = WalletIssuanceSessionService(
+            Wallet("test", staticKey = JWKKey.generate(KeyType.Ed25519)),
+            httpClient = client { request ->
+                when (request.url.toString()) {
+                    ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                    AS_METADATA -> jsonResponse(
+                        authorizationServerMetadata(
+                            dpop = true,
+                            authorizationCode = false,
+                            dpopAlgorithms = listOf("RS256"),
+                        )
+                    )
+                    TOKEN_ENDPOINT -> {
+                        tokenCalls += 1
+                        jsonResponse("{\"access_token\":\"access\",\"token_type\":\"DPoP\"}")
+                    }
+                    else -> respondError(HttpStatusCode.NotFound)
+                }
+            },
+        )
+
+        val result = service.continuePreAuthorized(service.start(preAuthorizedRequest()).id)
+
+        assertEquals(WalletIssuanceErrorCode.CRYPTO, assertIs<WalletIssuanceOutcome.Failed>(result).error.code)
+        assertEquals(0, tokenCalls)
+    }
+
+    @Test
     fun rejectedTransactionCodeDoesNotConsumeTheSession() = runTest {
         var tokenCalls = 0
         val service = service { request ->

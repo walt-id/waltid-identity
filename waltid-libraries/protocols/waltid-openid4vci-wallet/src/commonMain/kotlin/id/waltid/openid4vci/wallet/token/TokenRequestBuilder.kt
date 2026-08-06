@@ -344,20 +344,20 @@ class TokenRequestBuilder(
     ): HttpResponse {
         suspend fun send(endpoint: String): HttpResponse {
             val dpopProof = dpopProofFactory?.invoke(endpoint, dpopNonce)
-            return httpClient.post(endpoint) {
-                contentType(ContentType.Application.FormUrlEncoded)
-                setBody(parameters.formUrlEncode())
-                appendTokenRequestHeaders(additionalHeaders, attestationHeaders, dpopProof)
+            return try {
+                httpClient.post(endpoint) {
+                    contentType(ContentType.Application.FormUrlEncoded)
+                    setBody(parameters.formUrlEncode())
+                    appendTokenRequestHeaders(additionalHeaders, attestationHeaders, dpopProof)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                throw TokenRequestException(statusCode = 0, cause = e)
             }
         }
 
-        val initialResponse = try {
-            send(tokenEndpoint)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            throw TokenRequestException(statusCode = 0, cause = e)
-        }
+        val initialResponse = send(tokenEndpoint)
         if (initialResponse.status.value !in REDIRECT_STATUS_CODES) return initialResponse
 
         val location = initialResponse.headers[HttpHeaders.Location] ?: return initialResponse
@@ -371,9 +371,13 @@ class TokenRequestBuilder(
         if (headers[HttpHeaders.WWWAuthenticate]?.contains(USE_DPOP_NONCE, ignoreCase = true) == true) {
             return USE_DPOP_NONCE
         }
-        return runCatching {
+        return try {
             Json.parseToJsonElement(bodyAsText()).jsonObject["error"]?.jsonPrimitive?.contentOrNull
-        }.getOrNull()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun isSameOrigin(source: String, target: String): Boolean {

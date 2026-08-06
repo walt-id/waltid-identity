@@ -795,14 +795,20 @@ class WalletIssuanceSessionService(
     private fun ActiveSession.dpopFactory(): DPoPProofFactory? =
         dpopAlgorithms()?.let { algorithms ->
             { endpoint: String, nonce: String? ->
-                val crypto2Key = keyMaterial.requireCrypto2SigningKey()
-                DPoPProofBuilder().buildProof(
-                    key = crypto2Key,
-                    httpMethod = "POST",
-                    targetUri = endpoint,
-                    nonce = nonce,
-                    supportedAlgorithms = algorithms,
-                )
+                try {
+                    val crypto2Key = keyMaterial.requireCrypto2SigningKey()
+                    DPoPProofBuilder().buildProof(
+                        key = crypto2Key,
+                        httpMethod = "POST",
+                        targetUri = endpoint,
+                        nonce = nonce,
+                        supportedAlgorithms = algorithms,
+                    )
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    throw IssuanceStageException(WalletIssuanceErrorCode.CRYPTO, error)
+                }
             }
         }
 
