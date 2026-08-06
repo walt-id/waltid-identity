@@ -13,14 +13,16 @@ group = "id.walt.crypto2"
 
 kotlin {
     if (enableIosBuild) {
-        targets.withType<KotlinNativeTarget>().configureEach {
-            compilations.getByName("main").cinterops {
-                create("CoreFoundationEqual") {
+        listOf("iosArm64", "iosSimulatorArm64").forEach { targetName ->
+            (targets.getByName(targetName) as KotlinNativeTarget)
+                .compilations
+                .getByName("main")
+                .cinterops
+                .create("CoreFoundationEqual") {
                     defFile(project.file("src/iosMain/cinterop/CoreFoundationEqual.def"))
                     compilerOpts("-I${project.file("src/iosMain/cinterop").absolutePath}")
                 }
             }
-        }
     }
 
     abiValidation {
