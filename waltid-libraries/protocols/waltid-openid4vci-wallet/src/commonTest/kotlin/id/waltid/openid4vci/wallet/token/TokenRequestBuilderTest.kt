@@ -162,6 +162,58 @@ class TokenRequestBuilderTest {
     }
 
     @Test
+    fun testSuccessfulTokenResponseBodyReadFailureIsTyped() = runTest {
+        val body = ByteChannel()
+        body.cancel(IllegalStateException("response stream failed"))
+
+        val client = createMockClient {
+            respond(
+                content = body,
+                status = HttpStatusCode.OK,
+                headers = headersOf(
+                    HttpHeaders.ContentType,
+                    ContentType.Application.Json.toString(),
+                ),
+            )
+        }
+
+        val error = assertFailsWith<TokenRequestException> {
+            TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
+                tokenEndpoint = tokenEndpoint,
+                code = "auth-code",
+            )
+        }
+
+        assertEquals(0, error.statusCode)
+        assertEquals(null, error.oauthError)
+        assertNotNull(error.cause)
+    }
+
+    @Test
+    fun testMalformedSuccessfulTokenResponseIsTyped() = runTest {
+        val client = createMockClient {
+            respond(
+                content = """{"access_token":""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(
+                    HttpHeaders.ContentType,
+                    ContentType.Application.Json.toString(),
+                ),
+            )
+        }
+
+        val error = assertFailsWith<TokenRequestException> {
+            TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
+                tokenEndpoint = tokenEndpoint,
+                code = "auth-code",
+            )
+        }
+
+        assertEquals(HttpStatusCode.OK.value, error.statusCode)
+        assertEquals(null, error.oauthError)
+    }
+
+    @Test
     fun testExchangePreAuthorizedCodeForwardsAdditionalHeaders() = runTest {
         val client = createMockClient { request ->
             assertEquals("Bearer abc", request.headers[HttpHeaders.Authorization])

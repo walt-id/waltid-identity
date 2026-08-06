@@ -316,22 +316,36 @@ class TokenRequestBuilder(
                 throw TokenRequestException(response.status.value, oauthError)
             }
 
-            val responseBody = response.bodyAsText()
-            return try {
-                tokenResponseJson.decodeFromString<TokenResponse>(responseBody).also { tokenResponse ->
-                    log.info {
-                        "Successfully obtained access token - " +
-                            "Type: ${tokenResponse.token_type}, " +
-                            "Expires in: ${tokenResponse.expires_in ?: "not specified"} seconds, " +
-                            "Refresh token: ${if (tokenResponse.refresh_token != null) "provided" else "none"}"
-                    }
+            return response.decodeTokenResponse().also { tokenResponse ->
+                log.info {
+                    "Successfully obtained access token - " +
+                        "Type: ${tokenResponse.token_type}, " +
+                        "Expires in: ${tokenResponse.expires_in ?: "not specified"} seconds, " +
+                        "Refresh token: ${if (tokenResponse.refresh_token != null) "provided" else "none"}"
                 }
-            } catch (_: Exception) {
-                log.error { "Failed to parse token response" }
-                throw TokenRequestException(response.status.value)
             }
         }
         error("DPoP nonce retry exhausted")
+    }
+
+    private suspend fun HttpResponse.decodeTokenResponse(): TokenResponse {
+        val responseBody = try {
+            bodyAsText()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            throw TokenRequestException(
+                statusCode = 0,
+                cause = error,
+            )
+        }
+
+        return try {
+            tokenResponseJson.decodeFromString<TokenResponse>(responseBody)
+        } catch (_: Exception) {
+            log.error { "Failed to parse token response" }
+            throw TokenRequestException(statusCode = status.value)
+        }
     }
 
     private suspend fun sendTokenRequestFollowingRedirects(
