@@ -7,11 +7,12 @@ class JwkKeyImportTest {
 
     @Test
     fun shouldImportRsaPrivateKeyPem() = runTest {
-        val result = JWKKey.importPEM(rsaPrivateKeyPem)
-        if (result.isFailure) {
-            throw result.exceptionOrNull()!!
-        }
-        assertTrue(result.isSuccess)
+        val key = JWKKey.importPEM(rsaPrivateKeyPem).getOrThrow()
+        assertTrue(key.hasPrivateKey)
+
+        val payload = "private-pem-import".encodeToByteArray()
+        val signature = key.signRaw(payload) as ByteArray
+        assertTrue(key.getPublicKey().verifyRaw(signature, payload).isSuccess)
     }
 
     companion object {

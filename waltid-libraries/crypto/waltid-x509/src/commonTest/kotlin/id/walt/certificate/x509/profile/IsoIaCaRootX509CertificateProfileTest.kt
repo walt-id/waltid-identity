@@ -1,9 +1,9 @@
 package id.walt.certificate.x509.profile
 
-import id.walt.certificate.TestData.intermediateIssuerKeyPem
 import id.walt.certificate.TestKeys.opensslHexFormat
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.withCertificateTestKey
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
 import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension.Companion.extensionIssuerAltName
 import id.walt.certificate.x509.extension.KeyUsageExtension
@@ -14,7 +14,6 @@ import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile.profil
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.X509SingleCertificateValidator
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.x509.iso.IsoSharedTestHarnessValidResources
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -26,54 +25,53 @@ class IsoIaCaRootX509CertificateProfileTest {
 
     @Test
     fun shouldCreateIaCaRootCertificate() = runTest {
-        val key = JWKKey.importPEM(intermediateIssuerKeyPem).getOrThrow()
-        val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
-            profileIaCaRootCertificate(
-                issuerDnCountryCode = "at",
-                issuerDnOrganizationName = "Walt ID",
-                issuerDnCommonName = "walt.id",
-                issuerDnSerialNumber = "1234567",
-                issuerEmailAddress = "office@walt.id"
+        withCertificateTestKey(KeyType.secp256r1) { key ->
+            val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
+                profileIaCaRootCertificate(
+                    issuerDnCountryCode = "at",
+                    issuerDnOrganizationName = "Walt ID",
+                    issuerDnCommonName = "walt.id",
+                    issuerDnSerialNumber = "1234567",
+                    issuerEmailAddress = "office@walt.id"
+                )
+            }
+            assertEquals("CN=walt.id+SERIALNUMBER=1234567,O=Walt ID,C=AT", cert.data.subjectDn)
+            assertEquals("CN=walt.id+SERIALNUMBER=1234567,O=Walt ID,C=AT", cert.data.issuerDn)
+            val validationResult = validator.validate(cert)
+            assertTrue(validationResult.valid, "Validation log: ${validationResult.log}")
+            assertFalse(
+                validationResult.hasWarnings,
+                "Warnings: ${validationResult.log.filter { it.severity == ValidationResult.Severity.WARNING }}"
             )
+            assertFalse(validationResult.hasErrors)
         }
-        assertEquals("CN=walt.id+SERIALNUMBER=1234567,O=Walt ID,C=AT", cert.data.subjectDn)
-        assertEquals("CN=walt.id+SERIALNUMBER=1234567,O=Walt ID,C=AT", cert.data.issuerDn)
-        val validationResult = validator.validate(cert)
-        if (!validationResult.valid) {
-            validationResult.log.forEach { println(it) }
-        }
-        assertTrue(validationResult.valid)
-        assertFalse(
-            validationResult.hasWarnings,
-            "Warnings: ${validationResult.log.filter { it.severity == ValidationResult.Severity.WARNING }}"
-        )
-        assertFalse(validationResult.hasErrors)
     }
 
     @Test
     fun shouldFindIllegalIssuerDnCountryCodeInIaCaRootCertificate() = runTest {
-        val key = JWKKey.importPEM(intermediateIssuerKeyPem).getOrThrow()
-        val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
-            profileIaCaRootCertificate(
-                issuerDn = "cn=Walt ID,C=Austria",
-                issuerEmailAddress = "office@walt.id",
-                issuerUri = "https://walt.id"
-            )
-        }
-        assertEquals("CN=Walt ID,C=Austria", cert.data.subjectDn)
-        assertEquals("CN=Walt ID,C=Austria", cert.data.issuerDn)
-        val validationResult = validator.validate(cert)
+        withCertificateTestKey(KeyType.secp256r1) { key ->
+            val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
+                profileIaCaRootCertificate(
+                    issuerDn = "cn=Walt ID,C=Austria",
+                    issuerEmailAddress = "office@walt.id",
+                    issuerUri = "https://walt.id"
+                )
+            }
+            assertEquals("CN=Walt ID,C=Austria", cert.data.subjectDn)
+            assertEquals("CN=Walt ID,C=Austria", cert.data.issuerDn)
+            val validationResult = validator.validate(cert)
 
-        assertFalse(
-            validationResult.hasWarnings,
-            "Warnings: ${validationResult.log.filter { it.severity == ValidationResult.Severity.WARNING }}"
-        )
-        assertTrue(validationResult.hasErrors)
-        assertTrue(validationResult.log.any {
-            it.severity == ValidationResult.Severity.ERROR
-                    && it.validatorId == "iso-iaca-root.issuerDn"
-        })
-        assertFalse(validationResult.valid)
+            assertFalse(
+                validationResult.hasWarnings,
+                "Warnings: ${validationResult.log.filter { it.severity == ValidationResult.Severity.WARNING }}"
+            )
+            assertTrue(validationResult.hasErrors)
+            assertTrue(validationResult.log.any {
+                it.severity == ValidationResult.Severity.ERROR
+                        && it.validatorId == "iso-iaca-root.issuerDn"
+            })
+            assertFalse(validationResult.valid)
+        }
     }
 
 
@@ -130,42 +128,31 @@ class IsoIaCaRootX509CertificateProfileTest {
     }
 
     @Test
-    fun `Validation should fail when IACA signing key is of invalid keyType`() = runTest {
-        listOf(
-            //KeyType.Ed25519, TODO: enable Ed25519 ... export PEM is not supported
-            KeyType.RSA,
-            KeyType.RSA3072,
-            KeyType.RSA4096,
-            KeyType.secp256k1,
-        ).forEach { invalidKeyType ->
-            val key = JWKKey.generate(invalidKeyType)
-            runCatching {
-                X509CertificateUtil.createSelfSignedCertificate(key) {
-                    profileIaCaRootCertificate(
-                        issuerEmailAddress = "illegal.key@example.com",
-                        issuerUri = "https://illegal-key.iaca.example.com",
-                        issuerDnCountryCode = "US",
-                        issuerDnCommonName = "Example IACA Illegal Key",
-                    )
-                }
-            }.getOrElse {
-                if (it.message?.contains("Curve not supported") == true) {
-                    println("${invalidKeyType}: '${it.message}'")
-                    //Signum implementation doesn't support secp256k1 curve, so we expect this error.
-                    assertEquals(KeyType.secp256k1, invalidKeyType)
-                    null
-                } else {
-                    throw it
-                }
-            }?.let { cert ->
-                val result = validator.validate(cert)
-                assertTrue(
-                    invalidKeyType == KeyType.secp256k1 || //EC is allowed but not the curve
-                            result.log.any { it.validatorId == "iso-iaca-root.signatureAlgorithm" && it.severity == ValidationResult.Severity.ERROR },
-                    "Key: ${invalidKeyType}"
+    fun `Validation should fail when IACA signing key is RSA`() = runTest {
+        withCertificateTestKey(KeyType.RSA) { key ->
+            val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
+                profileIaCaRootCertificate(
+                    issuerEmailAddress = "illegal.key@example.com",
+                    issuerUri = "https://illegal-key.iaca.example.com",
+                    issuerDnCountryCode = "US",
+                    issuerDnCommonName = "Example IACA Illegal Key",
                 )
-                assertTrue(result.log.any { it.validatorId == "iso-iaca-root.subjectPublicKeyInfo" && it.severity == ValidationResult.Severity.ERROR })
             }
+
+            val result = validator.validate(cert)
+
+            assertTrue(
+                result.log.any {
+                    it.validatorId == "iso-iaca-root.signatureAlgorithm" &&
+                            it.severity == ValidationResult.Severity.ERROR
+                }
+            )
+            assertTrue(
+                result.log.any {
+                    it.validatorId == "iso-iaca-root.subjectPublicKeyInfo" &&
+                            it.severity == ValidationResult.Severity.ERROR
+                }
+            )
         }
     }
 

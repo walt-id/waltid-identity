@@ -18,8 +18,6 @@ class X509CertificateParserTest {
         val issuerCert = X509CertificateUtil.parseCertificateDerEncoded(X509TestCertificates.issuerCertificate)
         val leafCert = X509CertificateUtil.parseCertificateDerEncoded(X509TestCertificates.leafCertificate)
 
-        println(issuerCert.encodedPem)
-
         val issuerSubjectKeyId =
             assertNotNull(issuerCert.data.extensionSubjectKeyIdentifier?.keyIdentifier, "issuerSubjectKeyId is null")
         val leafAuthKeyId =

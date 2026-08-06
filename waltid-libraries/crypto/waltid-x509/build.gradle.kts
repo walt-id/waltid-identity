@@ -65,10 +65,8 @@ kotlin {
         }
 
         val jvmIosMain by creating {
-            dependsOn(commonMain.get())
+            dependsOn(signumMain)
             dependencies {
-                implementation(project(":waltid-libraries:crypto:waltid-crypto"))
-                implementation(identityLibs.signum.indispensable)
                 implementation(identityLibs.signum.supreme)
             }
         }
@@ -76,7 +74,6 @@ kotlin {
         jvmMain {
             dependsOn(jvmCommon)
             dependsOn(jvmBouncyMain)
-            dependsOn(signumMain)
             dependsOn(jvmIosMain)
             dependencies {
                 implementation(identityLibs.nimbus.jose.jwt)
@@ -105,9 +102,6 @@ kotlin {
 
         jsMain {
             dependsOn(signumMain)
-            dependencies {
-                implementation(identityLibs.signum.indispensable)
-            }
         }
 
         jsTest {
@@ -127,10 +121,6 @@ kotlin {
         if (enableIosBuild) {
             iosMain {
                 dependsOn(jvmIosMain)
-                dependsOn(signumMain)
-                dependencies {
-                    implementation(identityLibs.signum.supreme)
-                }
             }
         }
     }

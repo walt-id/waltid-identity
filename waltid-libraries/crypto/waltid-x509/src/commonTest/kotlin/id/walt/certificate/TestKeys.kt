@@ -70,15 +70,20 @@ object TestKeys {
         -----END PUBLIC KEY-----
     """.trimIndent()
 
-    val ecP256KeyPem = """
+    val ecP256PrivateKeyPem = """
         -----BEGIN PRIVATE KEY-----
         MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgpCx4+BY+9c+2CRpO
         b1r1KiBXU2WwyN85svFYSaH9O8WhRANCAATj3KZxtouhG7C7t3wrAkdDY9W/ppM0
         7WfhnOH8Uz7oL2AYyKf49GR6yQsrD4WsMeZ/rdpF+aOA7Di8/nYwlJyY
         -----END PRIVATE KEY-----
+    """.trimIndent()
+
+    val ecP256PublicKeyPem = """
         -----BEGIN PUBLIC KEY-----
         MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE49ymcbaLoRuwu7d8KwJHQ2PVv6aT
         NO1n4Zzh/FM+6C9gGMin+PRkeskLKw+FrDHmf63aRfmjgOw4vP52MJScmA==
         -----END PUBLIC KEY-----
     """.trimIndent()
+
+    val ecP256KeyPem = "$ecP256PrivateKeyPem\n$ecP256PublicKeyPem"
 }

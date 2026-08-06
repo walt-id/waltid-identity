@@ -1,7 +1,5 @@
 package id.walt.certificate.x509
 
-import id.walt.certificate.TestData.caIssuerPrivateKey
-import id.walt.certificate.TestData.intermediateIssuerKeyPem
 import id.walt.certificate.TestData.intermediateIssuerPublicKeyIdHex
 import id.walt.certificate.TestData.intermediateIssuerPublicKeyValueHex
 import id.walt.certificate.TestKeys
@@ -15,6 +13,7 @@ import id.walt.certificate.x509.extension.KeyUsageExtension
 import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.model.GeneralName
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.bytestring.toHexString
@@ -24,30 +23,27 @@ class X509CertificateSigningTest {
 
     @Test
     fun shouldSignSelfSignedCertificate() = runTest {
-        val key = JWKKey.importPEM(caIssuerPrivateKey).getOrThrow()
+        val certificate = withCertificateTestKey(KeyType.RSA) { key ->
+            X509CertificateUtil.createSelfSignedCertificate(key) {
+                subjectDn = "OU=waltid"
 
-        val certificate = X509CertificateUtil.createSelfSignedCertificate(key) {
-            subjectDn = "OU=waltid"
+                extensionBasicConstraints {
+                    cA = true
+                    pathLenConstraint = 5
+                }
 
-            extensionBasicConstraints {
-                cA = true
-                pathLenConstraint = 5
+                extensionKeyUsage {
+                    critical = true
+                    addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign)
+                }
+
+                extensionIssuerAltName {
+                    addEmail("issuer@walt.id")
+                }
+
+                extensionSubjectKeyIdentifier()
             }
-
-            extensionKeyUsage {
-                critical = true
-                addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign)
-            }
-
-            extensionIssuerAltName {
-                addEmail("issuer@walt.id")
-            }
-
-            extensionSubjectKeyIdentifier()
         }
-
-        println("Cert: ${certificate.fingerprintSha256Hex}")
-        println(certificate.encodedPem)
 
         assertNotNull(certificate.data.extensionBasicConstraints) { constraints ->
             assertFalse(constraints.critical)
@@ -68,14 +64,9 @@ class X509CertificateSigningTest {
             assertEquals(GeneralName.NameType.rfc822Name, email.type)
         }
 
-        assertNotNull(certificate.data.extensionSubjectKeyIdentifier) { keyIdentifier ->
-            assertEquals("bf1a4ae1c79b2c5b2e3c021661ebad0f4696bf02", keyIdentifier.keyIdentifier.toHexString())
-        }
-
-        assertNotNull(certificate.data.extensionAuthorityKeyIdentifier) { keyIdentifier ->
-            assertEquals("bf1a4ae1c79b2c5b2e3c021661ebad0f4696bf02", keyIdentifier.keyIdentifier?.toHexString())
-        }
-
+        val subjectKeyId = assertNotNull(certificate.data.extensionSubjectKeyIdentifier).keyIdentifier
+        val authorityKeyId = assertNotNull(certificate.data.extensionAuthorityKeyIdentifier).keyIdentifier
+        assertEquals(subjectKeyId, authorityKeyId)
 
         val certPem = certificate.encodedPem
         assertEquals("OU=waltid", certificate.data.subjectDn)
@@ -83,18 +74,19 @@ class X509CertificateSigningTest {
         verifyPemChain(certPem, certPem)
     }
 
-
     @Test
     fun buildGenericSelfSignedCertificate() = runTest {
-        val key = JWKKey.importPEM(TestKeys.ecP256KeyPem).getOrThrow()
-        val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
-            subjectDn = "CN=Example CA, C=US"
-            extensionBasicConstraints {
-                cA = true
+        val (cert, expectedPublicPem) = withCertificateTestKey(KeyType.secp256r1) { key ->
+            val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
+                subjectDn = "CN=Example CA, C=US"
+                extensionBasicConstraints {
+                    cA = true
+                }
+                extensionKeyUsage {
+                    addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign, KeyUsageExtension.KeyUsage.cRLSign)
+                }
             }
-            extensionKeyUsage {
-                addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign, KeyUsageExtension.KeyUsage.cRLSign)
-            }
+            cert to key.getPublicKey().exportPEM()
         }
 
         val pem = cert.encodedPem
@@ -104,6 +96,9 @@ class X509CertificateSigningTest {
 
         assertEquals("CN=Example CA,C=US", cert.data.subjectDn)
         assertEquals("CN=Example CA,C=US", cert.data.issuerDn)
+        assertNotNull(cert.data.subjectPublicKeyInfo) { publicKeyInfo ->
+            assertEquals(normalizePem(expectedPublicPem), normalizePem(publicKeyInfo.encodedPem))
+        }
         assertNotNull(cert.data.extensionBasicConstraints) { bc ->
             assertEquals(true, bc.cA)
             assertNull(bc.pathLenConstraint)
@@ -117,46 +112,50 @@ class X509CertificateSigningTest {
 
     @Test
     fun shouldSignLeafCertificate() = runTest {
-        val caKey = JWKKey.importPEM(caIssuerPrivateKey).getOrThrow()
-        val intermediateKey = JWKKey.importPEM(intermediateIssuerKeyPem).getOrThrow()
+        withCertificateTestKey(KeyType.secp256r1) { caKey ->
+            val intermediateKey = JWKKey.importPEM(TestKeys.ecP256PublicKeyPem).getOrThrow()
+            val expectedPublicPem = intermediateKey.exportPEM()
 
-        println("Keys imported")
-
-        val caCert = X509CertificateUtil.createSelfSignedCertificate(caKey) {
-            subjectDn = "OU=waltid"
-        }
-
-        val intermediateCert = X509CertificateUtil.createCertificate(caKey, caCert) {
-            subjectDn = "OU=test, CN=UnitTests"
-            subjectPublicKey(intermediateKey)
-
-            extensionExtendedKeyUsage {
-                addKeyUsage(
-                    ExtendedKeyUsageExtension.KeyUsage.clientAuth,
-                    ExtendedKeyUsageExtension.KeyUsage.serverAuth
-                )
+            val caCert = X509CertificateUtil.createSelfSignedCertificate(caKey) {
+                subjectDn = "OU=waltid"
             }
 
-            extensionSubjectKeyIdentifier()
-        }
+            val intermediateCert = X509CertificateUtil.createCertificate(caKey, caCert) {
+                subjectDn = "OU=test, CN=UnitTests"
+                subjectPublicKey(intermediateKey)
 
-        assertNotNull(intermediateCert.data.extensionExtendedKeyUsage) {
-            assertTrue(it.keyPurposeList.contains(ExtendedKeyUsageExtension.KeyUsage.clientAuth))
-            assertTrue(it.keyPurposeList.contains(ExtendedKeyUsageExtension.KeyUsage.serverAuth))
-            assertFalse(it.keyPurposeList.contains(ExtendedKeyUsageExtension.KeyUsage.eapOverLAN))
-            assertFalse(it.keyPurposeList.contains(ExtendedKeyUsageExtension.KeyUsage.anyExtendedKeyUsage))
-        }
+                extensionExtendedKeyUsage {
+                    addKeyUsage(
+                        ExtendedKeyUsageExtension.KeyUsage.clientAuth,
+                        ExtendedKeyUsageExtension.KeyUsage.serverAuth
+                    )
+                }
 
-        assertNotNull(intermediateCert.data.subjectPublicKeyInfo) { keyInfo ->
-            assertEquals("1.2.840.10045.2.1", keyInfo.algorithmOid)
-            assertEquals("id-ecPublicKey", keyInfo.algorithmName)
-            assertEquals(intermediateIssuerPublicKeyValueHex, keyInfo.keyValueHex)
-        }
+                extensionSubjectKeyIdentifier()
+            }
 
-        assertNotNull(intermediateCert.data.extensionSubjectKeyIdentifier) { keyIdentifier ->
-            assertEquals(intermediateIssuerPublicKeyIdHex, keyIdentifier.keyIdentifier.toHexString())
-        }
+            assertNotNull(intermediateCert.data.extensionExtendedKeyUsage) {
+                assertTrue(it.keyPurposeList.contains(ExtendedKeyUsageExtension.KeyUsage.clientAuth))
+                assertTrue(it.keyPurposeList.contains(ExtendedKeyUsageExtension.KeyUsage.serverAuth))
+                assertFalse(it.keyPurposeList.contains(ExtendedKeyUsageExtension.KeyUsage.eapOverLAN))
+                assertFalse(it.keyPurposeList.contains(ExtendedKeyUsageExtension.KeyUsage.anyExtendedKeyUsage))
+            }
 
-        verifyPemChain(intermediateCert.encodedPem, caCert.encodedPem)
+            assertNotNull(intermediateCert.data.subjectPublicKeyInfo) { keyInfo ->
+                assertEquals("1.2.840.10045.2.1", keyInfo.algorithmOid)
+                assertEquals("id-ecPublicKey", keyInfo.algorithmName)
+                assertEquals(intermediateIssuerPublicKeyValueHex, keyInfo.keyValueHex)
+                assertEquals(normalizePem(expectedPublicPem), normalizePem(keyInfo.encodedPem))
+                assertFalse(normalizePem(keyInfo.encodedPem) == normalizePem(caCert.data.subjectPublicKeyInfo.encodedPem))
+            }
+
+            assertEquals(caCert.data.subjectDn, intermediateCert.data.issuerDn)
+
+            assertNotNull(intermediateCert.data.extensionSubjectKeyIdentifier) { keyIdentifier ->
+                assertEquals(intermediateIssuerPublicKeyIdHex, keyIdentifier.keyIdentifier.toHexString())
+            }
+
+            verifyPemChain(intermediateCert.encodedPem, caCert.encodedPem)
+        }
     }
 }
