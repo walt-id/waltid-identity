@@ -978,12 +978,13 @@ object WalletIssuanceHandler {
                 "Credential configuration '${request.credentialConfigurationId}' " +
                     "does not advertise JWT proof types"
             )
+        val preferJwkBinding = shouldPreferJwkBinding(configuration.cryptographicBindingMethodsSupported)
         val proofs = buildJwtProof(
             proofBuilder = JwtProofBuilder(),
             keyMaterial = keyMaterial,
             audience = issuerMetadata.credentialIssuer,
             nonce = request.nonce,
-            did = request.did,
+            did = request.did?.takeUnless { preferJwkBinding },
             acceptedAlgorithms = acceptedAlgorithms,
         )
         return SignProofResult(proofJwt = proofs.jwt?.firstOrNull() ?: error("Proof signing produced no JWT"))
@@ -1548,10 +1549,9 @@ object WalletIssuanceHandler {
             }
         }
         val proofBuilder = JwtProofBuilder()
+        val credentialConfiguration = issuerMetadata.credentialConfigurationsSupported[credentialConfigurationId]
         // The proof must use an algorithm the issuer advertises for this configuration.
-        val jwtProofAlgorithms = supportedJwtProofAlgorithms(
-            issuerMetadata.credentialConfigurationsSupported[credentialConfigurationId]?.proofTypesSupported
-        )
+        val jwtProofAlgorithms = supportedJwtProofAlgorithms(credentialConfiguration?.proofTypesSupported)
         val credentialResponse = requestCredentialWithNonceRetry(
             request = FetchCredentialRequest(
                 credentialEndpoint = credentialEndpoint,
@@ -1562,12 +1562,15 @@ object WalletIssuanceHandler {
             nonceEndpoint = issuerMetadata.nonceEndpoint,
             httpClient = httpClient,
             buildProof = { nonce ->
+                val preferJwkBinding = shouldPreferJwkBinding(
+                    credentialConfiguration?.cryptographicBindingMethodsSupported
+                )
                 buildJwtProof(
                     proofBuilder = proofBuilder,
                     keyMaterial = keyMaterial,
                     audience = credentialIssuerBaseUrl,
                     nonce = nonce,
-                    did = holderDid,
+                    did = holderDid?.takeUnless { preferJwkBinding },
                     acceptedAlgorithms = jwtProofAlgorithms,
                 ).jwt?.firstOrNull()
             },
