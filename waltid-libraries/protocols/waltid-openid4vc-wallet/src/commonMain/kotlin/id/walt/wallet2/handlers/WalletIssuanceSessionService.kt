@@ -98,6 +98,10 @@ import kotlin.uuid.Uuid
 private val log = KotlinLogging.logger {}
 private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
+private class RetryablePushedAuthorizationRequestException(
+    val statusCode: Int,
+) : Exception("Pushed authorization request failed with HTTP $statusCode")
+
 /** Grant selected for a resolved issuance session. */
 @Serializable
 enum class WalletIssuanceGrant {
@@ -854,8 +858,21 @@ class WalletIssuanceSessionService(
                     header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, headers.popJwt)
                 }
             }
-            require(response.status == HttpStatusCode.Created) {
-                "Pushed authorization request must return HTTP 201"
+            when {
+                response.status == HttpStatusCode.Created -> Unit
+
+                response.status == HttpStatusCode.TooManyRequests ||
+                    response.status.value >= 500 -> {
+                    throw RetryablePushedAuthorizationRequestException(
+                        statusCode = response.status.value,
+                    )
+                }
+
+                else -> {
+                    throw IllegalArgumentException(
+                        "Pushed authorization request failed with HTTP ${response.status.value}"
+                    )
+                }
             }
             val par = json.decodeFromString<PushedAuthorizationResponse>(response.bodyAsText())
             val browserUrl = URLBuilder(endpoint).apply {

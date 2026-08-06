@@ -1159,6 +1159,68 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
+    fun transientParFailuresRestoreSessionForRetry() = runTest {
+        val responses = ArrayDeque(
+            listOf(
+                HttpStatusCode.TooManyRequests,
+                HttpStatusCode.ServiceUnavailable,
+                HttpStatusCode.Created,
+            )
+        )
+        var parCalls = 0
+
+        val service = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA ->
+                    jsonResponse(issuerMetadata(proofRequired = false))
+
+                AS_METADATA ->
+                    jsonResponse(
+                        """
+                        {
+                          "issuer":"$ISSUER",
+                          "authorization_endpoint":"$AUTHORIZATION_ENDPOINT",
+                          "token_endpoint":"$TOKEN_ENDPOINT",
+                          "pushed_authorization_request_endpoint":"$PAR_ENDPOINT",
+                          "response_types_supported":["code"]
+                        }
+                        """.trimIndent()
+                    )
+
+                PAR_ENDPOINT -> {
+                    parCalls += 1
+                    when (val status = responses.removeFirst()) {
+                        HttpStatusCode.Created ->
+                            jsonResponse(
+                                """{"request_uri":"urn:example:par:retry","expires_in":60}""",
+                                status,
+                            )
+
+                        else ->
+                            jsonResponse("""{"error":"temporarily_unavailable"}""", status)
+                    }
+                }
+
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+
+        val session = service.start(authRequest())
+
+        assertFailsWith<Exception> {
+            service.beginAuthorization(session.id)
+        }
+        assertFailsWith<Exception> {
+            service.beginAuthorization(session.id)
+        }
+
+        val authorization = service.beginAuthorization(session.id)
+
+        assertTrue(authorization.pushedAuthorizationRequestUsed)
+        assertEquals(3, parCalls)
+    }
+
+    @Test
     fun parRequiresCreatedResponseAndPositiveExpiry() = runTest {
         var parBody = """{"request_uri":"urn:example:par:invalid-status","expires_in":60}"""
         var parStatus = HttpStatusCode.OK
@@ -1174,11 +1236,18 @@ class WalletIssuanceSessionServiceTest {
         }
         val session = service.start(authRequest())
         assertFailsWith<Exception> { service.beginAuthorization(session.id) }
+        assertFailsWith<IllegalStateException> { service.beginAuthorization(session.id) }
 
         parBody = """{"request_uri":"urn:example:par:invalid-expiry","expires_in":0}"""
         parStatus = HttpStatusCode.Created
         val second = service.start(authRequest())
         assertFailsWith<Exception> { service.beginAuthorization(second.id) }
+        assertFailsWith<IllegalStateException> { service.beginAuthorization(second.id) }
+
+        parBody = """{"request_uri":"""
+        val third = service.start(authRequest())
+        assertFailsWith<Exception> { service.beginAuthorization(third.id) }
+        assertFailsWith<IllegalStateException> { service.beginAuthorization(third.id) }
     }
 
     @Test
