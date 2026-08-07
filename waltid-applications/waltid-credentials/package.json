@@ -12,7 +12,7 @@
     "@nuxt/devtools": "^2.6.2",
     "@unocss/nuxt": "^66.4.2",
     "nuxt": "^3.10.0",
-    "@nuxt/icon": "^1.11.0",
+    "@nuxt/icon": "^2.4.1",
     "nuxt-security": "2.3.0",
     "tailwindcss": "^4.1.11",
     "vue-router": "^4.5.1"
