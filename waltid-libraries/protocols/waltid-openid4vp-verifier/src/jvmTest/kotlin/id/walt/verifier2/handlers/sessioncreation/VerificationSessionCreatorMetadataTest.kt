@@ -6,10 +6,13 @@ import id.walt.cose.Cose
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.NoMeta
+import id.walt.did.dids.DidService
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import kotlinx.coroutines.test.runTest
@@ -27,8 +30,10 @@ class VerificationSessionCreatorMetadataTest {
 
     @Test
     fun `signed cross-device session exposes an inline authenticated request object`() = runTest {
+        DidService.minimalInit()
         val verifierKey = JWKKey.generate(KeyType.secp256r1)
-        val clientId = "decentralized_identifier:did:jwk:${verifierKey.getKeyId()}"
+        val did = DidService.registerByKey("jwk", verifierKey).did
+        val clientId = "decentralized_identifier:$did"
         val session = VerificationSessionCreator.createVerificationSession(
             setup = CrossDeviceFlowSetup(
                 core = GeneralFlowConfig(
@@ -53,7 +58,6 @@ class VerificationSessionCreatorMetadataTest {
         assertNull(fullUrl.parameters["request_uri"])
         assertEquals(clientId, fullUrl.parameters["client_id"])
 
-        verifierKey.getPublicKey().verifyJws(requestObject).getOrThrow()
         val jwtParts = requestObject.split('.')
         val header = Json.parseToJsonElement(
             java.util.Base64.getUrlDecoder().decode(jwtParts[0]).decodeToString()
@@ -61,6 +65,16 @@ class VerificationSessionCreatorMetadataTest {
         val payload = Json.parseToJsonElement(
             java.util.Base64.getUrlDecoder().decode(jwtParts[1]).decodeToString()
         ).jsonObject
+        val kid = assertNotNull(header["kid"]?.jsonPrimitive?.content)
+        val verificationKey = assertNotNull(
+            DidService.resolveToCrypto2Keys(did).getOrThrow().find { it.id.value == kid }
+        )
+        CompactJws.verify(
+            requestObject,
+            verificationKey,
+            JwsAlgorithm.parse(assertNotNull(header["alg"]?.jsonPrimitive?.content)),
+        )
+
         assertEquals("oauth-authz-req+jwt", header["typ"]?.jsonPrimitive?.content)
         assertEquals("https://self-issued.me/v2", payload["aud"]?.jsonPrimitive?.content)
         assertEquals(clientId, payload["client_id"]?.jsonPrimitive?.content)
