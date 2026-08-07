@@ -1,9 +1,11 @@
 package id.waltid.openid4vp.wallet
 
 import id.walt.cose.coseCompliantCbor
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.mdoc.objects.handover.OpenID4VPDCAPIHandoverInfo
 import id.walt.mdoc.objects.sha256
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import kotlinx.coroutines.test.runTest
@@ -18,6 +20,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -57,8 +60,17 @@ class DcApiWalletTest {
     }
 
     @Test
-    fun `only the unencrypted dc api response mode is accepted`() {
-        listOf(OpenID4VPResponseMode.DIRECT_POST, OpenID4VPResponseMode.DC_API_JWT).forEach { responseMode ->
+    fun `only the two dc api response modes are accepted`() {
+        listOf(OpenID4VPResponseMode.DC_API, OpenID4VPResponseMode.DC_API_JWT).forEach { responseMode ->
+            DcApiWallet.validateAuthorizationRequest(
+                authorizationRequest(responseMode = responseMode, clientMetadata = encryptionClientMetadata()),
+            )
+        }
+        listOf(
+            OpenID4VPResponseMode.DIRECT_POST,
+            OpenID4VPResponseMode.DIRECT_POST_JWT,
+            OpenID4VPResponseMode.FRAGMENT,
+        ).forEach { responseMode ->
             assertFailsWith<IllegalArgumentException>("response_mode '$responseMode' must be rejected") {
                 DcApiWallet.validateAuthorizationRequest(authorizationRequest(responseMode = responseMode))
             }
@@ -66,21 +78,7 @@ class DcApiWalletTest {
     }
 
     @Test
-    fun `an encrypted response mode is rejected before the user is asked to consent`() {
-        assertFailsWith<IllegalArgumentException> {
-            DcApiWallet.resolveRequest(
-                protocol = "openid4vp-v1-unsigned",
-                data = JsonObject(
-                    unsignedRequestData().toMutableMap()
-                        .apply { this["response_mode"] = JsonPrimitive("dc_api.jwt") },
-                ),
-                origin = "https://verifier.example",
-            )
-        }
-    }
-
-    @Test
-    fun `cleartext response is returned to the platform without transport`() {
+    fun `cleartext response is returned to the platform without transport`() = runTest {
         val request = ResolvedDcApiRequest(
             protocol = DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
             origin = "https://verifier.example",
@@ -102,7 +100,7 @@ class DcApiWalletTest {
     }
 
     @Test
-    fun `dc api ignores parameters that are not defined by appendix A`() {
+    fun `dc api ignores parameters that are not defined by appendix A`() = runTest {
         val authorizationRequest = authorizationRequest(
             state = "state-123",
             redirectUri = "https://verifier.example/redirect",
@@ -122,14 +120,65 @@ class DcApiWalletTest {
         assertEquals(setOf("vp_token"), response.data.keys)
     }
 
+    /**
+     * Under `dc_api.jwt` the operating system and the website that called `getCredential` both relay
+     * the response, so the disclosed claims must not be readable by either. Asserting on the member
+     * set - `response` present, `vp_token` absent - is what pins that: a builder that emitted both
+     * would encrypt nothing in practice while still looking encrypted.
+     */
     @Test
-    fun `an encrypted response mode cannot reach the response builder`() {
+    fun `an encrypted response mode wraps the members in a jwe the platform cannot read`() = runTest {
+        val response = DcApiWallet.buildResponse(
+            request = ResolvedDcApiRequest(
+                protocol = DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
+                origin = "https://verifier.example",
+                authorizationRequest = authorizationRequest(
+                    responseMode = OpenID4VPResponseMode.DC_API_JWT,
+                    clientMetadata = encryptionClientMetadata(),
+                ),
+            ),
+            vpToken = """{"pid":["presentation"]}""",
+        )
+
+        assertEquals(setOf("response"), response.data.keys)
+        val jwe = assertNotNull(response.data["response"]?.jsonPrimitive?.content)
+        // Compact JWE: five base64url segments, and the disclosed claim appears in none of them.
+        assertEquals(5, jwe.split('.').size, "response is not a compact JWE")
+        assertFalse(jwe.contains("presentation"), "the vp_token leaked into the JWE in cleartext")
+        assertEquals(
+            VERIFIER_KEY_ID,
+            Json.parseToJsonElement(jwe.substringBefore('.').decodeBase64Url())
+                .jsonObject["kid"]?.jsonPrimitive?.content,
+            "the JWE protected header must name the verifier key the wallet encrypted to",
+        )
+    }
+
+    /**
+     * `dc_api.jwt` without usable `client_metadata` keys must fail rather than silently degrade to a
+     * cleartext response the verifier would still accept as an answer to its encrypted request.
+     */
+    @Test
+    fun `an encrypted response mode without verifier encryption keys fails closed`() = runTest {
         assertFailsWith<IllegalArgumentException> {
             DcApiWallet.buildResponse(
                 request = ResolvedDcApiRequest(
                     protocol = DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
                     origin = "https://verifier.example",
                     authorizationRequest = authorizationRequest(responseMode = OpenID4VPResponseMode.DC_API_JWT),
+                ),
+                vpToken = "{}",
+            )
+        }
+    }
+
+    @Test
+    fun `a non dc api response mode cannot reach the response builder`() = runTest {
+        assertFailsWith<IllegalArgumentException> {
+            DcApiWallet.buildResponse(
+                request = ResolvedDcApiRequest(
+                    protocol = DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
+                    origin = "https://verifier.example",
+                    authorizationRequest = authorizationRequest(responseMode = OpenID4VPResponseMode.DIRECT_POST),
                 ),
                 vpToken = "{}",
             )
@@ -288,6 +337,7 @@ class DcApiWalletTest {
         state: String? = null,
         redirectUri: String? = null,
         responseUri: String? = null,
+        clientMetadata: ClientMetadata? = null,
     ): AuthorizationRequest = json.decodeFromJsonElement(
         AuthorizationRequest.serializer(),
         unsignedRequestData().toMutableMap().apply {
@@ -296,8 +346,34 @@ class DcApiWalletTest {
             redirectUri?.let { this["redirect_uri"] = JsonPrimitive(it) }
             responseUri?.let { this["response_uri"] = JsonPrimitive(it) }
         }.let(::JsonObject),
+    ).copy(clientMetadata = clientMetadata)
+
+    /** Verifier response-encryption metadata in the shape `ResponseEncryption.resolveCrypto2` needs. */
+    private fun encryptionClientMetadata(): ClientMetadata = ClientMetadata(
+        jwks = ClientMetadata.Jwks(
+            listOf(
+                Json.parseToJsonElement(
+                    """{
+                        "kty":"EC",
+                        "crv":"P-256",
+                        "x":"y4ajD4aIXGiLGqiF81nN5HvBFvBEvrZcgFsp5VIJO30",
+                        "y":"jyrZRfxKz113LQNg2x5f7Nu4fwW5Ov5gCzhPaTZuTCg",
+                        "use":"enc",
+                        "kid":"$VERIFIER_KEY_ID",
+                        "alg":"ECDH-ES"
+                    }""",
+                ).jsonObject,
+            ),
+        ),
+        encryptedResponseEncValuesSupported = listOf("A256GCM"),
     )
 
     private fun OpenID4VPResponseMode.serialized(): String =
         Json.encodeToString(OpenID4VPResponseMode.serializer(), this).trim('"')
+
+    private fun String.decodeBase64Url(): String = decodeFromBase64Url().decodeToString()
+
+    private companion object {
+        private const val VERIFIER_KEY_ID = "enc-key"
+    }
 }

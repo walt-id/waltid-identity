@@ -64,7 +64,12 @@ public class AndroidDigitalCredentialRegistry(
                             MobileWalletDigitalCredentialFormat.SD_JWT_VC,
                         ),
                         requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.UNSIGNED),
-                        responseProtection = listOf(MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED),
+                        // response_mode=dc_api and dc_api.jwt respectively. The verifier chooses; both
+                        // are implemented, so both are advertised.
+                        responseProtection = listOf(
+                            MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
+                            MobileWalletDigitalCredentialResponseProtection.JWE,
+                        ),
                         supported = runtimeAvailable,
                         unsupportedReason = unavailableReason,
                     ),

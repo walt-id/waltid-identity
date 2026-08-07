@@ -2,6 +2,7 @@ package id.waltid.openid4vp.wallet
 
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.ktor.http.URLBuilder
 import io.ktor.http.URLProtocol
 import io.ktor.http.Url
@@ -91,23 +92,47 @@ public object DcApiWallet {
 
     /**
      * Builds the successful DigitalCredential payload. No network transport is performed.
+     *
+     * For `response_mode=dc_api.jwt` the members are wrapped in a single `response` JWE encrypted to
+     * the verifier's `client_metadata` key, so the platform and the calling website relay ciphertext
+     * they cannot read. For `dc_api` they are returned in the clear.
      */
-    public fun buildResponse(
+    public suspend fun buildResponse(
         request: ResolvedDcApiRequest,
         vpToken: String,
         idToken: String? = null,
     ): DcApiCredentialResponse {
-        val responseMode = request.authorizationRequest.responseMode
-        require(responseMode == OpenID4VPResponseMode.DC_API) {
-            "DC API response builder cannot handle response_mode=$responseMode"
+        val authorizationRequest = request.authorizationRequest
+        val members = buildJsonObject {
+            put("vp_token", Json.parseToJsonElement(vpToken))
+            idToken?.let { put("id_token", JsonPrimitive(it)) }
         }
-        return DcApiCredentialResponse(
-            protocol = request.protocol.value,
-            data = buildJsonObject {
-                put("vp_token", Json.parseToJsonElement(vpToken))
-                idToken?.let { put("id_token", JsonPrimitive(it)) }
-            },
-        )
+        val data = when (val responseMode = authorizationRequest.responseMode) {
+            OpenID4VPResponseMode.DC_API -> members
+            OpenID4VPResponseMode.DC_API_JWT -> {
+                // The same encryption metadata the mdoc session transcript was thumbprinted with, so
+                // the verifier reconstructs a transcript matching the key it decrypts with.
+                val encryption = requireNotNull(ResponseEncryption.resolveCrypto2(authorizationRequest)) {
+                    "response_mode=dc_api.jwt requires client_metadata response-encryption keys"
+                }
+                buildJsonObject {
+                    put(
+                        "response",
+                        JsonPrimitive(
+                            WalletPresentFunctionality2.encryptDirectPostResponse(
+                                payload = members,
+                                recipientPublicKey = encryption.recipientPublicKey,
+                                contentEncryption = encryption.contentEncryption,
+                            ),
+                        ),
+                    )
+                }
+            }
+            else -> throw IllegalArgumentException(
+                "DC API response builder cannot handle response_mode=$responseMode",
+            )
+        }
+        return DcApiCredentialResponse(protocol = request.protocol.value, data = data)
     }
 
     /** OpenID4VP protocol errors are fulfilled DC API responses, not transport failures. */
@@ -178,10 +203,8 @@ public object DcApiWallet {
         require(request.responseType?.responseType?.contains("vp_token") == true) {
             "DC API Authorization Request must request vp_token"
         }
-        // Encrypted responses (response_mode=dc_api.jwt) are not implemented; reject them at
-        // resolution time rather than after the user has already consented to disclosure.
-        require(request.responseMode == OpenID4VPResponseMode.DC_API) {
-            "DC API Authorization Request response_mode must be dc_api"
+        require(request.responseMode in OpenID4VPResponseMode.DC_API_RESPONSES) {
+            "DC API Authorization Request response_mode must be dc_api or dc_api.jwt"
         }
         require(!request.nonce.isNullOrBlank()) { "DC API Authorization Request nonce is required" }
         require(request.dcqlQuery != null) { "DC API Authorization Request must contain dcql_query" }

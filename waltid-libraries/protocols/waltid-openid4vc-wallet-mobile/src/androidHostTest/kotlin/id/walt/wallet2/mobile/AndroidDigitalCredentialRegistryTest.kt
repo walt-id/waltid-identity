@@ -20,7 +20,7 @@ class AndroidDigitalCredentialRegistryTest {
     private val registry = AndroidDigitalCredentialRegistry(RuntimeEnvironment.getApplication())
 
     @Test
-    fun capabilityMatrixReportsOnlyUnsignedUnencryptedOpenId4VpAsSupportable() {
+    fun capabilityMatrixReportsOnlyUnsignedOpenId4VpAsSupportable() {
         val capabilities = registry.capabilities
 
         assertTrue(capabilities.platformAvailable)
@@ -31,8 +31,12 @@ class AndroidDigitalCredentialRegistryTest {
         // Unsupported here only because registration has not run; the combination itself is implemented.
         assertFalse(unsigned.supported)
         assertTrue(unsigned.unsupportedReason?.contains("registration") == true)
+        // Both DC API response modes: dc_api and dc_api.jwt.
         assertEquals(
-            listOf(MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED),
+            listOf(
+                MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
+                MobileWalletDigitalCredentialResponseProtection.JWE,
+            ),
             unsigned.responseProtection,
         )
         val signed = capabilities.capabilities.single {
@@ -45,11 +49,14 @@ class AndroidDigitalCredentialRegistryTest {
         }
         assertFalse(multisigned.supported)
         assertTrue(multisigned.unsupportedReason?.contains("JWS JSON Serialization") == true)
+        // A capability that is not implemented must not be advertised as available on any protocol,
+        // whatever this wallet does implement elsewhere.
         assertTrue(
-            capabilities.capabilities.none {
-                MobileWalletDigitalCredentialResponseProtection.JWE in it.responseProtection
+            capabilities.capabilities.filter { it.supported }.none { capability ->
+                MobileWalletDigitalCredentialRequestProtection.SIGNED in capability.requestProtection ||
+                    MobileWalletDigitalCredentialRequestProtection.MULTISIGNED in capability.requestProtection
             },
-            "encrypted dc_api.jwt responses must not be advertised",
+            "a signed request protection must never be advertised as supported",
         )
     }
 
