@@ -1076,6 +1076,9 @@ internal fun AuthorizationRequest.toMobileRequestInfo(
         },
         responseEncryption = responseEncryption.toMobileResponseEncryption(),
         transactionData = transactionData,
+        responseMode = responseMode?.let { mode ->
+            Json.encodeToString(OpenID4VPResponseMode.serializer(), mode).trim('"')
+        },
     )
 }
 
