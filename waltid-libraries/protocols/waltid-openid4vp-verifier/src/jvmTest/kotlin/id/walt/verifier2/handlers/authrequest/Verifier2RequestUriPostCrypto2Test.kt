@@ -1,5 +1,6 @@
 package id.walt.verifier2.handlers.authrequest
 
+import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -10,11 +11,11 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.migration.v1.V1KeyMigration
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.NoMeta
+import id.walt.did.dids.DidService
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.Verification2Session
@@ -40,8 +41,10 @@ class Verifier2RequestUriPostCrypto2Test {
 
     @Test
     fun `signed request URI POST returns a nonce-bound request object`() = runTest {
+        DidService.minimalInit()
         val verifierKey = JWKKey.generate(KeyType.secp256r1)
-        val clientId = "decentralized_identifier:did:jwk:${verifierKey.getKeyId()}"
+        val did = DidService.registerByKey("jwk", verifierKey).did
+        val clientId = "decentralized_identifier:$did"
         val session = VerificationSessionCreator.createVerificationSession(
             setup = CrossDeviceFlowSetup(
                 core = GeneralFlowConfig(
@@ -63,6 +66,10 @@ class Verifier2RequestUriPostCrypto2Test {
 
         val bootstrapUrl = assertNotNull(session.bootstrapAuthorizationRequestUrl)
         assertEquals("post", bootstrapUrl.parameters["request_uri_method"])
+        val originalRequestObject = assertNotNull(session.signedAuthorizationRequestJwt)
+        val originalKid = assertNotNull(
+            CompactJws.decodeUnverified(originalRequestObject).protectedHeader["kid"]?.jsonPrimitive?.content
+        )
 
         testApplication {
             application {
@@ -86,11 +93,14 @@ class Verifier2RequestUriPostCrypto2Test {
             assertEquals(200, response.status.value)
             assertEquals("application/oauth-authz-req+jwt", response.contentType()?.withoutParameters()?.toString())
             val jwt = response.bodyAsText()
-            assertEquals(3, jwt.split('.').size)
-            verifierKey.getPublicKey().verifyJws(jwt).getOrThrow()
-            val payload = Json.parseToJsonElement(
-                java.util.Base64.getUrlDecoder().decode(jwt.split('.')[1]).decodeToString()
-            ).jsonObject
+            val decoded = CompactJws.decodeUnverified(jwt)
+            val kid = assertNotNull(decoded.protectedHeader["kid"]?.jsonPrimitive?.content)
+            assertEquals(originalKid, kid)
+            val verificationKey = assertNotNull(
+                DidService.resolveToCrypto2Keys(did).getOrThrow().find { it.id.value == kid }
+            )
+            val verified = CompactJws.verify(jwt, verificationKey, decoded.algorithm)
+            val payload = Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject
             assertEquals("wallet-nonce", payload["wallet_nonce"]?.jsonPrimitive?.content)
         }
 
@@ -186,26 +196,6 @@ class Verifier2RequestUriPostCrypto2Test {
                 },
             )
         }
-    }
-
-    @Test
-    fun `re-signing preserves kid and signature verification selects the actual key`() = runTest {
-        val originalKey = JWKKey.generate(KeyType.secp256r1)
-        val replacementKey = JWKKey.generate(KeyType.secp256r1)
-
-        val resigned = Verifier2RequestUriPostHandler.signRequestObject(
-            signingKey = replacementKey,
-            payload = buildJsonObject { put("wallet_nonce", "nonce") },
-            headers = buildJsonObject {
-                put("alg", "ES256")
-                put("kid", originalKey.getKeyId())
-            },
-        )
-
-        assertFailsWith<IllegalArgumentException> {
-            Verifier2RequestUriPostHandler.verifyExistingRequestObject(resigned, originalKey)
-        }
-        Verifier2RequestUriPostHandler.verifyExistingRequestObject(resigned, replacementKey)
     }
 
     @Test
