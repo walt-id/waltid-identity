@@ -11,6 +11,8 @@ import at.asitplus.signum.indispensable.asn1.encoding.parse
 import at.asitplus.signum.indispensable.pki.X509Certificate
 import kotlin.time.Instant
 
+actual val platformSupportsPkixCertificatePathValidation: Boolean = false
+
 internal actual class PlatformX509Certificate private constructor(
     private val der: CertificateDer,
     private val certificate: X509Certificate,

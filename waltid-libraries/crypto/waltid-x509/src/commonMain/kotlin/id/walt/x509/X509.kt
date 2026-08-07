@@ -93,4 +93,7 @@ expect fun validateCertificateChain(
     enableRevocation: Boolean = false
 )
 
+/** Whether this target provides complete PKIX certificate-path validation. */
+expect val platformSupportsPkixCertificatePathValidation: Boolean
+
 class X509ValidationException(message: String, cause: Throwable? = null) : Exception(message, cause)

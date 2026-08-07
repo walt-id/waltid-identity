@@ -37,8 +37,270 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.time.Clock
 
 class AuthorizationRequestResolverJvmTest {
+
+    @Test
+    fun `legacy resolver keeps unprefixed plain client ids compatible`() = runBlocking {
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "legacy-verifier")
+            parameters.append("response_type", "vp_token")
+            parameters.append("response_mode", "fragment")
+            parameters.append("redirect_uri", "https://verifier.example/callback")
+            parameters.append("nonce", "legacy-nonce")
+        }.build()
+
+        val resolved = AuthorizationRequestResolver.resolve(
+            requestUrl = requestUrl,
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            enforceFinalRequestObject = false,
+        ) { _, _ -> error("request_uri fetch should not be called") }
+
+        assertEquals("legacy-verifier", resolved.authorizationRequest.clientId)
+    }
+
+    @Test
+    fun `strict resolver rejects the legacy unprefixed plain client id`() = runBlocking {
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "legacy-verifier")
+            parameters.append("response_type", "vp_token")
+            parameters.append("response_mode", "fragment")
+            parameters.append("redirect_uri", "https://verifier.example/callback")
+            parameters.append("nonce", "strict-nonce")
+        }.build()
+
+        assertFailsWith<IllegalArgumentException> {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = requestUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            ) { _, _ -> error("request_uri fetch should not be called") }
+        }
+    }
+
+    @Test
+    fun `legacy resolver preserves unsigned JSON request uri POST behavior`() = runBlocking {
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "legacy-verifier")
+            parameters.append("request_uri", "https://verifier.example/request")
+            parameters.append("request_uri_method", "post")
+        }.build()
+
+        val resolved = AuthorizationRequestResolver.resolve(
+            requestUrl = requestUrl,
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            enforceFinalRequestObject = false,
+        ) { _, _ ->
+            AuthorizationRequestResolver.RequestUriFetchResponse(
+                status = io.ktor.http.HttpStatusCode.OK,
+                contentType = ContentType.Application.Json,
+                body = "{\"client_id\":\"legacy-verifier\",\"nonce\":\"legacy-nonce\"}",
+                walletNonce = null,
+            )
+        }
+
+        assertIs<ResolvedAuthorizationRequest.Plain>(resolved)
+        assertEquals("legacy-verifier", resolved.authorizationRequest.clientId)
+    }
+
+    @Test
+    fun `strict resolver requires a nonce-bound signed POST response`() = runBlocking {
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "redirect_uri:https://verifier.example/callback")
+            parameters.append("request_uri", "https://verifier.example/request")
+            parameters.append("request_uri_method", "post")
+        }.build()
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = requestUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            ) { _, _ ->
+                AuthorizationRequestResolver.RequestUriFetchResponse(
+                    status = io.ktor.http.HttpStatusCode.OK,
+                    contentType = ContentType.Application.Json,
+                    body = "{}",
+                    walletNonce = null,
+                )
+            }
+        }
+
+        assertEquals("request_uri_method=post response is missing the wallet_nonce binding", error.message)
+    }
+
+    @Test
+    fun `strict resolver rejects request and request uri together`() = runBlocking {
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier2")
+            parameters.append("request", unsignedJwt("{\"client_id\":\"verifier2\",\"nonce\":\"n\"}"))
+            parameters.append("request_uri", "https://verifier.example/request")
+        }.build()
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = requestUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            ) { _, _ -> error("request_uri fetch must not be called") }
+        }
+        assertEquals("Authorization Request must not contain both request and request_uri", error.message)
+    }
+
+    @Test
+    fun `strict resolver rejects request uri method without request uri`() = runBlocking {
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "redirect_uri:https://verifier.example/callback")
+            parameters.append("request_uri_method", "post")
+        }.build()
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = requestUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            ) { _, _ -> error("request_uri fetch must not be called") }
+        }
+        assertEquals("request_uri_method must not be present without request_uri", error.message)
+    }
+
+    @Test
+    fun `strict plain request binds redirect uri client id`() = runBlocking {
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "redirect_uri:https://verifier.example/callback")
+            parameters.append("response_type", "vp_token")
+            parameters.append("response_mode", "fragment")
+            parameters.append("redirect_uri", "https://verifier.example/callback")
+            parameters.append("nonce", "nonce")
+        }.build()
+
+        val resolved = AuthorizationRequestResolver.resolve(
+            requestUrl = requestUrl,
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+        ) { _, _ -> error("request_uri fetch should not be called") }
+        assertEquals("https://verifier.example/callback", resolved.authorizationRequest.redirectUri)
+    }
+
+    @Test
+    fun `strict plain request rejects redirect uri mismatch`() = runBlocking {
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "redirect_uri:https://verifier.example/callback")
+            parameters.append("response_type", "vp_token")
+            parameters.append("response_mode", "fragment")
+            parameters.append("redirect_uri", "https://attacker.example/callback")
+            parameters.append("nonce", "nonce")
+        }.build()
+
+        assertFailsWith<IllegalArgumentException> {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = requestUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            ) { _, _ -> error("request_uri fetch should not be called") }
+        }
+    }
+
+    @Test
+    fun `strict plain request rejects non redirect client identifier prefixes`() = runBlocking {
+        listOf("did:jwk:verifier", "did:key:z6Mkverifier").forEach { clientId ->
+            val requestUrl = URLBuilder("openid4vp://authorize").apply {
+                parameters.append("client_id", clientId)
+                parameters.append("response_type", "vp_token")
+                parameters.append("response_mode", "fragment")
+                parameters.append("redirect_uri", "https://verifier.example/callback")
+                parameters.append("nonce", "nonce")
+            }.build()
+
+            assertFailsWith<IllegalArgumentException>("plain $clientId request must be rejected") {
+                AuthorizationRequestResolver.resolve(
+                    requestUrl = requestUrl,
+                    unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+                ) { _, _ -> error("request_uri fetch should not be called") }
+            }
+        }
+    }
+
+    @Test
+    fun `request object audience and temporal claims are enforced`() = runBlocking {
+        val now = Clock.System.now().epochSeconds
+        val cases = listOf(
+            "wrong audience" to "{\"client_id\":\"verifier2\",\"nonce\":\"n\",\"aud\":\"https://other.example\"}",
+            "expired" to "{\"client_id\":\"verifier2\",\"nonce\":\"n\",\"aud\":\"https://self-issued.me/v2\",\"exp\":${now - 3600}}",
+            "future nbf" to "{\"client_id\":\"verifier2\",\"nonce\":\"n\",\"aud\":\"https://self-issued.me/v2\",\"nbf\":${now + 3600}}",
+            "malformed exp" to "{\"client_id\":\"verifier2\",\"nonce\":\"n\",\"aud\":\"https://self-issued.me/v2\",\"exp\":\"soon\"}",
+        )
+        cases.forEach { (_, payload) ->
+            val requestUrl = URLBuilder("openid4vp://authorize").apply {
+                parameters.append("client_id", "verifier2")
+                parameters.append("request", unsignedJwt(payload))
+            }.build()
+            assertFailsWith<IllegalArgumentException> {
+                AuthorizationRequestResolver.resolve(
+                    requestUrl = requestUrl,
+                    unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                ) { _, _ -> error("request_uri fetch should not be called") }
+            }
+        }
+    }
+
+    @Test
+    fun `request object accepts a configured audience`() = runBlocking {
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier2")
+            parameters.append(
+                "request",
+                unsignedJwt("{\"client_id\":\"verifier2\",\"nonce\":\"n\",\"aud\":\"https://audience.example\"}"),
+            )
+        }.build()
+
+        val resolved = AuthorizationRequestResolver.resolve(
+            requestUrl = requestUrl,
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            expectedRequestObjectAudience = "https://audience.example",
+            fetchRequestUri = { _, _ -> error("request_uri fetch should not be called") },
+            trustConfiguration = ClientIdTrustConfiguration(),
+        )
+        assertEquals("verifier2", resolved.authorizationRequest.clientId)
+    }
+
+    @Test
+    fun `strict POST rejects unsigned JSON response and mismatched wallet nonce`() = runBlocking {
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier2")
+            parameters.append("request_uri", "https://verifier.example/request")
+            parameters.append("request_uri_method", "post")
+        }.build()
+
+        val unsignedJsonError = assertFailsWith<IllegalArgumentException> {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = requestUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            ) { _, _ ->
+                AuthorizationRequestResolver.RequestUriFetchResponse(
+                    status = io.ktor.http.HttpStatusCode.OK,
+                    contentType = ContentType.Application.Json,
+                    body = "{\"client_id\":\"verifier2\",\"nonce\":\"n\"}",
+                    walletNonce = "wallet-nonce",
+                )
+            }
+        }
+        assertEquals(
+            "Unsigned authorization request not allowed: received application/json from request_uri " +
+                "but wallet policy requires signed requests (application/oauth-authz-req+jwt)",
+            unsignedJsonError.message,
+        )
+
+        val nonceError = assertFailsWith<IllegalArgumentException> {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = requestUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            ) { _, _ ->
+                AuthorizationRequestResolver.RequestUriFetchResponse(
+                    status = io.ktor.http.HttpStatusCode.OK,
+                    contentType = ContentType.parse("application/oauth-authz-req+jwt"),
+                    body = unsignedJwt("{\"client_id\":\"verifier2\",\"nonce\":\"n\",\"aud\":\"https://self-issued.me/v2\",\"wallet_nonce\":\"other\"}"),
+                    walletNonce = "wallet-nonce",
+                )
+            }
+        }
+        assertEquals("AuthorizationRequest object wallet_nonce mismatch for request_uri_method=post", nonceError.message)
+    }
 
     @Test
     fun `request uri post wallet metadata declares supported response and client id capabilities`() {
@@ -132,7 +394,8 @@ class AuthorizationRequestResolverJvmTest {
             """
             {
               "client_id":"verifier2",
-              "nonce":"nonce-123"
+              "nonce":"nonce-123",
+              "aud":"https://self-issued.me/v2"
             }
             """.trimIndent(),
         )
@@ -159,7 +422,8 @@ class AuthorizationRequestResolverJvmTest {
             """
             {
               "client_id":"verifier2",
-              "nonce":"nonce-123"
+              "nonce":"nonce-123",
+              "aud":"https://self-issued.me/v2"
             }
             """.trimIndent(),
         )
@@ -299,6 +563,7 @@ class AuthorizationRequestResolverJvmTest {
         buildJsonObject {
             put("client_id", "verifier2")
             put("nonce", "nonce-123")
+            put("aud", "https://self-issued.me/v2")
         }.toString().encodeToByteArray(),
         mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
     )
