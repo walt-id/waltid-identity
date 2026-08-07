@@ -6,10 +6,13 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
+import id.walt.openid4vp.conformance.report.ConformanceCiFlags
+import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.plans.MdlX509SanDnsRequestUriSignedDirectPost
 import id.walt.openid4vp.conformance.testplans.plans.SdJwtVcX509SanDnsRequestUriSignedDirectPostJwt
 import id.walt.openid4vp.conformance.testplans.plans.TestPlan
+import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.runner.TestPlanRunner
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
@@ -67,16 +70,37 @@ class ConformanceTestRunner(
                 conformanceVersion
             }
 
+            val results = mutableListOf<TestPlanResult>()
             testPlans.forEach { plan ->
                 val planName = plan::class.simpleName ?: plan::class.jvmName
-
-                test(planName) {
-                    val result = TestPlanRunner(plan.config, http, conformanceHost, conformancePort).test()
-                    println("Plan $planName completed: ${result.conformanceTestId}")
-                    println("  conformance=${result.conformanceResult}, verifier=${result.verifierStatus}")
-                    result
+                println("\nRunning verifier plan: $planName")
+                val result = runCatching {
+                    TestPlanRunner(plan.config, http, conformanceHost, conformancePort, planName).test()
+                }.getOrElse { error ->
+                    println("Plan $planName failed: ${error.message}")
+                    TestPlanResult(
+                        testName = planName,
+                        conformanceTestId = "N/A",
+                        conformanceResult = "ERROR",
+                        errorMessage = error.message,
+                    )
                 }
+                println("Plan $planName completed: ${result.conformanceTestId}")
+                println("  conformance=${result.conformanceResult}, verifier=${result.verifierStatus}")
+                results += result
             }
+
+            ConformanceReportWriter.writeTestPlanResults(
+                role = ConformanceReportWriter.Role.VP_VERIFIER,
+                results = results,
+                conformanceHost = conformanceHost,
+                conformancePort = conformancePort,
+            )
+            ConformanceReportWriter.failIfNeededFromTestPlanResults(
+                role = ConformanceReportWriter.Role.VP_VERIFIER,
+                results = results,
+                allowFailure = ConformanceCiFlags.allowFailure(),
+            )
         }
     }
 }
