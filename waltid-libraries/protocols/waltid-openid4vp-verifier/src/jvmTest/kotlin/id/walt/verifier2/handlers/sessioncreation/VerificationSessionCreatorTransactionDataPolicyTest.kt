@@ -4,7 +4,10 @@ package id.walt.verifier2.handlers.sessioncreation
 
 import id.walt.cose.Cose
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeyMeta
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
@@ -31,6 +34,7 @@ import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -164,6 +168,35 @@ class VerificationSessionCreatorTransactionDataPolicyTest {
 
         assertEquals(clientId, payload["client_id"]?.jsonPrimitive?.content)
         assertEquals(clientId, payload["iss"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `signed authorization request creation fails when signing fails`() = runTest {
+        val exception = assertFailsWith<IllegalStateException> {
+            VerificationSessionCreator.createVerificationSession(
+                setup = CrossDeviceFlowSetup(
+                    core = GeneralFlowConfig(
+                        dcqlQuery = DcqlQuery(
+                            credentials = listOf(
+                                CredentialQuery(
+                                    id = "pid",
+                                    format = CredentialFormat.DC_SD_JWT,
+                                    meta = NoMeta,
+                                )
+                            )
+                        ),
+                        signedRequest = true,
+                        clientId = "x509_san_dns:verifier.example.com",
+                    )
+                ),
+                clientId = "x509_san_dns:verifier.example.com",
+                urlPrefix = "https://verifier.example.com/verification-session",
+                urlHost = "openid4vp://authorize",
+                key = ThrowingSigningKey(),
+            )
+        }
+
+        assertEquals("key not accessible", exception.message)
     }
 
     @Test
@@ -352,4 +385,29 @@ class VerificationSessionCreatorTransactionDataPolicyTest {
             """{"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}"""
         )
     )
+}
+
+private class ThrowingSigningKey : Key() {
+    override val keyType: KeyType = KeyType.secp256r1
+    override val hasPrivateKey: Boolean = true
+
+    override suspend fun getKeyId(): String = "throwing-kid"
+    override suspend fun getThumbprint(): String = "throwing-thumbprint"
+    override suspend fun exportJWK(): String = """{"kty":"EC","crv":"P-256","x":"x","y":"y"}"""
+    override suspend fun exportJWKObject(): JsonObject = JsonObject(emptyMap())
+    override suspend fun getPublicKey(): Key = this
+    override suspend fun getMeta(): KeyMeta = throw NotImplementedError()
+    override suspend fun deleteKey(): Boolean = true
+    override suspend fun exportPEM(): String = ""
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): Any = byteArrayOf()
+    override suspend fun verifyRaw(
+        signed: ByteArray,
+        detachedPlaintext: ByteArray?,
+        customSignatureAlgorithm: String?
+    ): Result<ByteArray> = Result.success(byteArrayOf())
+    override suspend fun verifyJws(signedJws: String): Result<JsonElement> = Result.success(JsonObject(emptyMap()))
+    override suspend fun getPublicKeyRepresentation(): ByteArray = byteArrayOf()
+    override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
+        throw IllegalStateException("key not accessible")
+    }
 }
