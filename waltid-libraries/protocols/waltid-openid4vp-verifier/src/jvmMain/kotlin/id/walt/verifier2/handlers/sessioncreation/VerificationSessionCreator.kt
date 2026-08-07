@@ -460,16 +460,12 @@ object VerificationSessionCreator {
         )
         log.trace { "Constructed AuthorizationRequest: $authorizationRequest" }
 
-        val authorizationRequestUrl = authorizationRequest.toHttpUrl(URLBuilder(urlHost))
-        val bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequest?.toHttpUrl(URLBuilder(urlHost))
-
         val now = Clock.System.now()
         val expiration = setup.core.expirationDate
         val retentionDate = now.plus(10, DateTimeUnit.YEAR, TimeZone.UTC)
 
         val signedAuthorizationRequest = if (isSignedRequest) {
             val requestSigningKey = requireNotNull(signingKey)
-
             val headers = hashMapOf<String, JsonElement>(
                 "typ" to JsonPrimitive("oauth-authz-req+jwt"),
                 "kid" to JsonPrimitive(getKid(effectiveClientId, requestSigningKey))
@@ -495,6 +491,20 @@ object VerificationSessionCreator {
                 "Signed authorization request could not be created although signedRequest=true"
             }
         }
+
+        // A signed cross-device session exposes a self-contained full URL. The bootstrap URL
+        // remains the request_uri entry point for wallets that need nonce-bound POST retrieval.
+        // DC API keeps request_uri-based authorizationRequestUrl construction.
+        val authorizationRequestUrl = if (signedAuthorizationRequest != null && isCrossDevice) {
+            authorizationRequest.copy(
+                request = signedAuthorizationRequest,
+                requestUri = null,
+                requestUriMethod = null,
+            ).toHttpUrl(URLBuilder(urlHost))
+        } else {
+            authorizationRequest.toHttpUrl(URLBuilder(urlHost))
+        }
+        val bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequest?.toHttpUrl(URLBuilder(urlHost))
 
         val effectiveVpPolicies = (setup.core.policies.vp_policies ?: defaultVpPolicies())
             .withMandatoryTransactionDataPolicies(transactionDataFormats)
