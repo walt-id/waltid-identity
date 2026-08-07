@@ -840,8 +840,15 @@ object Wallet2RouteHandler {
                         request { pathParameter<String>("walletId"); body<ResolveVpRequestRequest>() }
                         response { HttpStatusCode.OK to { body<ResolveVpRequestResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ResolveVpRequestRequest>()
-                        call.respond(WalletPresentationHandler.resolveRequest(req))
+                        call.respond(
+                            WalletPresentationHandler.resolveRequestWithTrust(
+                                wallet = wallet,
+                                request = req,
+                                clientIdTrustConfiguration = clientIdTrustConfiguration,
+                            )
+                        )
                     }
 
                     post("/match-credentials", {
