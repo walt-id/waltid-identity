@@ -339,7 +339,37 @@ jobs:
             echo
             echo "> This matrix runs in strict mode. A non-accepted selected variant fails this job."
             echo
-            echo "Download [\`$ARTIFACT_NAME\`]($ARTIFACTS_URL) for \`results.json\`, \`matrix.json\`, \`summary.md\`, and Issuer2/Cloudflare logs."
+            echo "Full diagnostics: download [\`$ARTIFACT_NAME\`]($ARTIFACTS_URL) for \`results.json\`, \`matrix.json\`, \`summary.md\`, and Issuer2/Cloudflare logs. Each failed module below links to its exact suite log."
+            echo "Suite results are also available at [conformance.waltid.cloud](https://conformance.waltid.cloud/logs.html)."
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          {
+            echo "### Failed Modules"
+            results_found=0
+            failures_found=0
+            while IFS= read -r -d '' results; do
+              results_found=$((results_found + 1))
+              while IFS= read -r failure; do
+                failures_found=$((failures_found + 1))
+                echo "$failure"
+              done < <(jq -r '
+                def compact: gsub("[\\r\\n|]"; " ");
+                .[] | (.modules // [])[]
+                | select(.accepted == false)
+                | "- `\(.testModule)` (status=`\(.status // "unknown")`, result=`\(.result // "unknown")`)" +
+                  (if .error then " - \(.error | compact)" else "" end) +
+                  (if .logUrl then " - [Suite log](\(.logUrl))" else "" end)
+              ' "$results")
+            done < <(find . \
+              -path '*/build/reports/openid-conformance/vci-issuer/results.json' \
+              -print0 2>/dev/null)
+
+            if [ "$results_found" -eq 0 ]; then
+              echo "_No \`results.json\` file was produced; download the artifact for Issuer2 and Cloudflare logs._"
+            elif [ "$failures_found" -eq 0 ]; then
+              echo "_No non-accepted modules were reported._"
+            fi
             echo
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -512,7 +542,37 @@ jobs:
             echo
             echo "> This matrix runs in strict mode and excludes dedicated FAPI modules. A non-accepted selected variant fails this job."
             echo
-            echo "Download [\`$ARTIFACT_NAME\`]($ARTIFACTS_URL) for \`results.json\`, \`matrix.json\`, \`summary.md\`, and Issuer2/Cloudflare logs."
+            echo "Full diagnostics: download [\`$ARTIFACT_NAME\`]($ARTIFACTS_URL) for \`results.json\`, \`matrix.json\`, \`summary.md\`, and Issuer2/Cloudflare logs. Each failed module below links to its exact suite log."
+            echo "Suite results are also available at [conformance.waltid.cloud](https://conformance.waltid.cloud/logs.html)."
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          {
+            echo "### Failed Modules"
+            results_found=0
+            failures_found=0
+            while IFS= read -r -d '' results; do
+              results_found=$((results_found + 1))
+              while IFS= read -r failure; do
+                failures_found=$((failures_found + 1))
+                echo "$failure"
+              done < <(jq -r '
+                def compact: gsub("[\\r\\n|]"; " ");
+                .[] | (.modules // [])[]
+                | select(.accepted == false)
+                | "- `\(.testModule)` (status=`\(.status // "unknown")`, result=`\(.result // "unknown")`)" +
+                  (if .error then " - \(.error | compact)" else "" end) +
+                  (if .logUrl then " - [Suite log](\(.logUrl))" else "" end)
+              ' "$results")
+            done < <(find . \
+              -path '*/build/reports/openid-conformance/vci-issuer/results.json' \
+              -print0 2>/dev/null)
+
+            if [ "$results_found" -eq 0 ]; then
+              echo "_No \`results.json\` file was produced; download the artifact for Issuer2 and Cloudflare logs._"
+            elif [ "$failures_found" -eq 0 ]; then
+              echo "_No non-accepted modules were reported._"
+            fi
             echo
           } >> "$GITHUB_STEP_SUMMARY"
 
