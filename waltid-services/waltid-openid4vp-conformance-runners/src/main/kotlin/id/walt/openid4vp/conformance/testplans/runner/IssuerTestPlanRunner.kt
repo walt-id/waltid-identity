@@ -273,6 +273,7 @@ class IssuerTestPlanRunner(
             "user interaction" in message ||
             "oauth login" in message ||
             "credential offer" in message ||
+            "cloudflare quick tunnel" in message ||
             "timeout" in message
     }
 

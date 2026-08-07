@@ -354,9 +354,11 @@ jobs:
                 failures_found=$((failures_found + 1))
                 echo "$failure"
               done < <(jq -r '
-                def compact: gsub("[\\r\\n|]"; " ");
+                def compact:
+                  gsub("[\\r\\n|]"; " ") as $error
+                  | if ($error | length) > 500 then "\($error[0:500])..." else $error end;
                 .[] | (.modules // [])[]
-                | select(.accepted == false)
+                | select(.accepted != true)
                 | "- `\(.testModule)` (status=`\(.status // "unknown")`, result=`\(.result // "unknown")`)" +
                   (if .error then " - \(.error | compact)" else "" end) +
                   (if .logUrl then " - [Suite log](\(.logUrl))" else "" end)
@@ -557,9 +559,11 @@ jobs:
                 failures_found=$((failures_found + 1))
                 echo "$failure"
               done < <(jq -r '
-                def compact: gsub("[\\r\\n|]"; " ");
+                def compact:
+                  gsub("[\\r\\n|]"; " ") as $error
+                  | if ($error | length) > 500 then "\($error[0:500])..." else $error end;
                 .[] | (.modules // [])[]
-                | select(.accepted == false)
+                | select(.accepted != true)
                 | "- `\(.testModule)` (status=`\(.status // "unknown")`, result=`\(.result // "unknown")`)" +
                   (if .error then " - \(.error | compact)" else "" end) +
                   (if .logUrl then " - [Suite log](\(.logUrl))" else "" end)
