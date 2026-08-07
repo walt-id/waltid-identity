@@ -33,7 +33,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -53,11 +52,12 @@ import org.junit.runner.RunWith
  *   behaviour only. Verifier changes on this branch are not covered here.
  * - Chrome must be allowlisted in `privileged_apps.json` and past its first-run screens.
  *
- * ## Why this is @Ignore'd
+ * ## This test is expected to FAIL, and that is the point
  *
- * It cannot pass today, and the reason is not in the wallet. The whole browser flow works: Chrome
- * calls Credential Manager, the wallet asserts the web origin, and the page posts the response. The
- * verifier then rejects it with
+ * It is deliberately left enabled so the blocker stays visible instead of sitting behind an
+ * `@Ignore` nobody reads. It cannot pass today, and the reason is not in the wallet: the whole
+ * browser flow works - Chrome calls Credential Manager, the wallet asserts the web origin, and the
+ * page posts the response. The verifier then rejects it with
  * `Failed VP policies: mdl/mso_mdoc/issuer_auth`, because `issuer2.demo.walt.id` signs its mDLs with
  * an X.509 **v1** document-signer certificate carrying no `keyUsage` and no EKU `1.0.18013.5.1.2` -
  * see `DeployedIssuerDocumentSignerTest`, which pins that certificate.
@@ -69,10 +69,6 @@ import org.junit.runner.RunWith
  * conformant document signer, not on any wallet change - and it should not be made to pass by
  * narrowing `vp_policies` to exclude `issuer_auth`, which is what an earlier version of it did.
  */
-@Ignore(
-    "Blocked on issuer2.demo.walt.id issuing an X.509 v1 document signer without the ISO 18013-5 " +
-        "usage extensions, which this deployment correctly rejects - see the class KDoc.",
-)
 @RunWith(AndroidJUnit4::class)
 class DigitalCredentialBrowserSharingE2ETest {
 
