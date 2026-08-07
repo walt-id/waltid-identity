@@ -57,27 +57,34 @@ fun exceptionMap(cause: Throwable, status: HttpStatusCode): JsonObject =
     if (cause is SerializableWebException) {
         Json.encodeToJsonElement(cause).jsonObject
     } else {
+        val bodyError = humanizeRequestBodyError(cause)
         JsonObject(
-            mutableMapOf(
+            mutableMapOf<String, JsonElement>(
                 "exception" to JsonPrimitive(true),
                 "id" to JsonPrimitive(cause::class.simpleName ?: cause::class.jvmName),
                 "status" to JsonPrimitive(status.description),
                 "code" to JsonPrimitive(status.value.toString()),
-                "message" to JsonPrimitive(cause.message)
+                "message" to JsonPrimitive(bodyError?.message ?: cause.message)
             ).apply {
-                var underlyingCause = cause.cause
-                var errorCounter = 1
-
-                while (underlyingCause != null) {
-                    put(
-                        "cause${errorCounter}_exception",
-                        JsonPrimitive(underlyingCause::class.simpleName ?: underlyingCause::class.jvmName)
-                    )
-                    if (cause.cause != null && logger.isTraceEnabled()) {
-                        put("cause${errorCounter}_message", JsonPrimitive(underlyingCause.message))
+                if (bodyError != null) {
+                    if (bodyError.details.isNotEmpty()) {
+                        put("details", bodyError.detailsJsonObject())
                     }
-                    underlyingCause = underlyingCause.cause
-                    errorCounter++
+                } else {
+                    var underlyingCause = cause.cause
+                    var errorCounter = 1
+
+                    while (underlyingCause != null) {
+                        put(
+                            "cause${errorCounter}_exception",
+                            JsonPrimitive(underlyingCause::class.simpleName ?: underlyingCause::class.jvmName)
+                        )
+                        if (logger.isTraceEnabled()) {
+                            put("cause${errorCounter}_message", JsonPrimitive(underlyingCause.message))
+                        }
+                        underlyingCause = underlyingCause.cause
+                        errorCounter++
+                    }
                 }
             })
     }
