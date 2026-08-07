@@ -7,6 +7,7 @@ import kotlinx.coroutines.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertFailsWith
 
 class WalletSdkBridgeModelsTest {
 
@@ -58,5 +59,20 @@ class WalletSdkBridgeModelsTest {
 
         assertIs<WalletBridgeResult.Failure>(failure)
         assertEquals(WalletBridgeErrorCategory.network, failure.error.category)
+    }
+
+    @Test
+    fun bridgeRequiresCompleteCrossProcessConfiguration() {
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeConfiguration(appGroupIdentifier = "group.example").toMobileWalletConfig()
+        }
+
+        val config = WalletBridgeConfiguration(
+            appGroupIdentifier = "group.example",
+            keychainAccessGroup = "TEAM.example",
+        ).toMobileWalletConfig()
+
+        assertEquals("group.example", config.crossProcessAccess?.appGroupIdentifier)
+        assertEquals("TEAM.example", config.crossProcessAccess?.keychainAccessGroup)
     }
 }

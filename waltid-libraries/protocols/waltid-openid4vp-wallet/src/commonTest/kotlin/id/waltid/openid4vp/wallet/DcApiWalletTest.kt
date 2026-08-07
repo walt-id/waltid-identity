@@ -1,0 +1,277 @@
+package id.waltid.openid4vp.wallet
+
+import id.walt.cose.coseCompliantCbor
+import id.walt.mdoc.objects.handover.OpenID4VPDCAPIHandoverInfo
+import id.walt.mdoc.objects.sha256
+import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.waltid.openid4vp.wallet.presentation.MdocPresenter
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class DcApiWalletTest {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    @Test
+    fun `unsigned request ignores client id and expected origins`() {
+        val request = DcApiWallet.resolveRequest(
+            protocol = "openid4vp-v1-unsigned",
+            data = unsignedRequestData(
+                extra = """
+                    "client_id": "attacker-supplied",
+                    "expected_origins": ["https://attacker.example"],
+                """.trimIndent(),
+            ),
+            origin = "https://verifier.example",
+        )
+
+        assertEquals(DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED, request.protocol)
+        assertNull(request.authorizationRequest.clientId)
+        assertNull(request.authorizationRequest.expectedOrigins)
+        assertEquals("origin:https://verifier.example", request.holderBindingAudience)
+    }
+
+    @Test
+    fun `only the unsigned protocol is accepted`() {
+        listOf("openid4vp-v1-signed", "openid4vp-v1-multisigned", "org-iso-mdoc", "").forEach { protocol ->
+            assertFailsWith<UnsupportedDcApiProtocolException>("protocol '$protocol' must be rejected") {
+                DcApiWallet.resolveRequest(
+                    protocol = protocol,
+                    data = unsignedRequestData(),
+                    origin = "https://verifier.example",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `only the unencrypted dc api response mode is accepted`() {
+        listOf(OpenID4VPResponseMode.DIRECT_POST, OpenID4VPResponseMode.DC_API_JWT).forEach { responseMode ->
+            assertFailsWith<IllegalArgumentException>("response_mode '$responseMode' must be rejected") {
+                DcApiWallet.validateAuthorizationRequest(authorizationRequest(responseMode = responseMode))
+            }
+        }
+    }
+
+    @Test
+    fun `an encrypted response mode is rejected before the user is asked to consent`() {
+        assertFailsWith<IllegalArgumentException> {
+            DcApiWallet.resolveRequest(
+                protocol = "openid4vp-v1-unsigned",
+                data = JsonObject(
+                    unsignedRequestData().toMutableMap()
+                        .apply { this["response_mode"] = JsonPrimitive("dc_api.jwt") },
+                ),
+                origin = "https://verifier.example",
+            )
+        }
+    }
+
+    @Test
+    fun `cleartext response is returned to the platform without transport`() {
+        val request = ResolvedDcApiRequest(
+            protocol = DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
+            origin = "https://verifier.example",
+            authorizationRequest = authorizationRequest(),
+        )
+
+        val response = DcApiWallet.buildResponse(
+            request = request,
+            vpToken = """{"pid":["presentation"]}""",
+        )
+
+        assertEquals("openid4vp-v1-unsigned", response.protocol)
+        assertEquals(
+            "presentation",
+            response.data["vp_token"]?.jsonObject?.get("pid")?.jsonArray?.single()?.jsonPrimitive?.content,
+        )
+        assertTrue(response.data.containsKey("vp_token"))
+        assertFalse(response.data.containsKey("response"))
+    }
+
+    @Test
+    fun `dc api ignores parameters that are not defined by appendix A`() {
+        val authorizationRequest = authorizationRequest(
+            state = "state-123",
+            redirectUri = "https://verifier.example/redirect",
+            responseUri = "https://verifier.example/direct-post",
+        )
+        DcApiWallet.validateAuthorizationRequest(authorizationRequest)
+        val response = DcApiWallet.buildResponse(
+            request = ResolvedDcApiRequest(
+                protocol = DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
+                origin = "https://verifier.example",
+                authorizationRequest = authorizationRequest,
+            ),
+            vpToken = "{}",
+        )
+
+        assertFalse(response.data.containsKey("state"))
+        assertEquals(setOf("vp_token"), response.data.keys)
+    }
+
+    @Test
+    fun `an encrypted response mode cannot reach the response builder`() {
+        assertFailsWith<IllegalArgumentException> {
+            DcApiWallet.buildResponse(
+                request = ResolvedDcApiRequest(
+                    protocol = DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
+                    origin = "https://verifier.example",
+                    authorizationRequest = authorizationRequest(responseMode = OpenID4VPResponseMode.DC_API_JWT),
+                ),
+                vpToken = "{}",
+            )
+        }
+    }
+
+    @Test
+    fun `protocol error response has only the error member`() {
+        val response = DcApiWallet.buildErrorResponse(
+            DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
+            WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST,
+        )
+
+        assertEquals("openid4vp-v1-unsigned", response.protocol)
+        assertEquals(setOf("error"), response.data.keys)
+        assertEquals("invalid_request", response.data["error"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `platform origin rejects complex or insecure web values and accepts Android app origins`() {
+        assertEquals(
+            "android:apk-key-hash:abc123",
+            DcApiWallet.validatePlatformOrigin("android:apk-key-hash:abc123"),
+        )
+        assertFailsWith<IllegalArgumentException> {
+            DcApiWallet.validatePlatformOrigin("https://verifier.example/path")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            DcApiWallet.validatePlatformOrigin("http://verifier.example")
+        }
+        assertEquals("http://localhost:8080", DcApiWallet.validatePlatformOrigin("http://localhost:8080"))
+    }
+
+    @Test
+    fun `a request object is rejected for the unsigned protocol`() = runTest {
+        assertFailsWith<IllegalArgumentException> {
+            DcApiWallet.resolveRequest(
+                protocol = "openid4vp-v1-unsigned",
+                data = JsonObject(mapOf("request" to JsonPrimitive("a.b.c"))),
+                origin = "https://verifier.example",
+            )
+        }
+    }
+
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @Test
+    fun `mdoc DC API handover binds raw origin nonce and encryption thumbprint`() {
+        val origin = "https://verifier.example"
+        val nonce = "nonce-123"
+        val thumbprint = "AQIDBA"
+        val transcript = MdocPresenter.buildDcApiSessionTranscript(origin, nonce, thumbprint)
+        val expectedInfo = OpenID4VPDCAPIHandoverInfo(
+            origin = origin,
+            nonce = nonce,
+            jwkThumbprint = byteArrayOf(1, 2, 3, 4),
+        )
+
+        assertEquals("OpenID4VPDCAPIHandover", transcript.oid4VPHandover?.identifier)
+        assertTrue(
+            transcript.oid4VPHandover?.infoHash?.contentEquals(
+                coseCompliantCbor.encodeToByteArray(expectedInfo).sha256(),
+            ) == true,
+        )
+    }
+
+    /**
+     * Pins `OpenID4VPDCAPIHandoverInfo` to its OID4VP 1.0 Appendix B.2.6.2 wire bytes.
+     *
+     * The expected values are hand-derived from the spec rather than produced by
+     * [coseCompliantCbor], so a serializer change that alters the encoding — field order, a map
+     * instead of an array, a tag on the thumbprint — fails here instead of silently producing a
+     * transcript no verifier can reproduce.
+     */
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @Test
+    fun `DC API handover info matches the spec CBOR encoding byte for byte`() {
+        val origin = "https://verifier.example"
+        val nonce = "nonce-123"
+
+        // 83                              array(3)
+        //   78 18 "https://verifier.example"  text(24)
+        //   69 "nonce-123"                    text(9)
+        //   44 01020304                       bytes(4)
+        val encrypted = coseCompliantCbor.encodeToByteArray(
+            OpenID4VPDCAPIHandoverInfo(origin, nonce, jwkThumbprint = byteArrayOf(1, 2, 3, 4)),
+        )
+        assertEquals(
+            "83781868747470733a2f2f76657269666965722e6578616d706c65696e6f6e63652d3132334401020304",
+            encrypted.toHexString(),
+        )
+
+        // Same, with the thumbprint absent: f6 (null) rather than an omitted element, because the
+        // array arity is fixed at 3.
+        val unencrypted = coseCompliantCbor.encodeToByteArray(
+            OpenID4VPDCAPIHandoverInfo(origin, nonce, jwkThumbprint = null),
+        )
+        assertEquals(
+            "83781868747470733a2f2f76657269666965722e6578616d706c65696e6f6e63652d313233f6",
+            unencrypted.toHexString(),
+        )
+
+        // The handover the transcript carries is [ "OpenID4VPDCAPIHandover", sha256(handoverInfo) ].
+        val transcript = MdocPresenter.buildDcApiSessionTranscript(origin, nonce, "AQIDBA")
+        assertEquals(
+            "206b7a9625010915900a6fd3a3ef28b0ece0ec15c4207ad74f731f6ed03f73e5",
+            transcript.oid4VPHandover?.infoHash?.toHexString(),
+        )
+    }
+
+    private fun unsignedRequestData(extra: String = ""): JsonObject = json.parseToJsonElement(
+        """
+        {
+          $extra
+          "response_type": "vp_token",
+          "response_mode": "dc_api",
+          "nonce": "nonce-123",
+          "dcql_query": {
+            "credentials": [{
+              "id": "pid",
+              "format": "mso_mdoc",
+              "meta": {"doctype_value": "eu.europa.ec.eudi.pid.1"}
+            }]
+          }
+        }
+        """.trimIndent(),
+    ).jsonObject
+
+    private fun authorizationRequest(
+        responseMode: OpenID4VPResponseMode = OpenID4VPResponseMode.DC_API,
+        state: String? = null,
+        redirectUri: String? = null,
+        responseUri: String? = null,
+    ): AuthorizationRequest = json.decodeFromJsonElement(
+        AuthorizationRequest.serializer(),
+        unsignedRequestData().toMutableMap().apply {
+            this["response_mode"] = Json.parseToJsonElement("\"${responseMode.serialized()}\"")
+            state?.let { this["state"] = JsonPrimitive(it) }
+            redirectUri?.let { this["redirect_uri"] = JsonPrimitive(it) }
+            responseUri?.let { this["response_uri"] = JsonPrimitive(it) }
+        }.let(::JsonObject),
+    )
+
+    private fun OpenID4VPResponseMode.serialized(): String =
+        Json.encodeToString(OpenID4VPResponseMode.serializer(), this).trim('"')
+}

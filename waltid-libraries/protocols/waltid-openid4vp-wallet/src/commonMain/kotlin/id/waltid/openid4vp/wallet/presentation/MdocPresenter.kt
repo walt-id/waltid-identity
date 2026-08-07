@@ -33,6 +33,7 @@ import id.walt.mdoc.objects.elements.DeviceSignedItem
 import id.walt.mdoc.objects.elements.DeviceSignedItemList
 import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.handover.OpenID4VPHandover
+import id.walt.mdoc.objects.handover.OpenID4VPDCAPIHandoverInfo
 import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
@@ -154,6 +155,30 @@ object MdocPresenter {
         return sessionTranscript
     }
 
+    /**
+     * Builds the OpenID4VP DC API session transcript (OID4VP 1.0 Appendix B.2.6.2).
+     *
+     * Unlike [buildSessionTranscript], the handover binds the platform-asserted [origin] instead of
+     * a `response_uri`: DC API has no wallet-observable response endpoint.
+     */
+    fun buildDcApiSessionTranscript(
+        origin: String,
+        nonce: String,
+        encryptionKeyThumbprint: String?,
+    ): SessionTranscript {
+        val handoverInfo = OpenID4VPDCAPIHandoverInfo(
+            origin = origin,
+            nonce = nonce,
+            jwkThumbprint = encryptionKeyThumbprint?.decodeFromBase64Url(),
+        )
+        val handoverInfoCbor = coseCompliantCbor.encodeToByteArray(handoverInfo)
+        val handover = OpenID4VPHandover(
+            identifier = "OpenID4VPDCAPIHandover",
+            infoHash = handoverInfoCbor.sha256(),
+        )
+        return SessionTranscript.forOpenId(handover)
+    }
+
     @Deprecated("Use the Crypto2Key overload")
     suspend fun buildDeviceAuth(
         sessionTranscript: SessionTranscript,
@@ -254,6 +279,7 @@ object MdocPresenter {
         holderKey: Crypto2Key,
         typeRegistry: TransactionDataTypeRegistry,
         verifierJwkThumbprint: String? = null,
+        dcApiOrigin: String? = null,
     ): JsonPrimitive = presentMdocWithKey(
         digitalCredential,
         matchResult,
@@ -262,6 +288,7 @@ object MdocPresenter {
         typeRegistry,
         verifierJwkThumbprint,
         holderKey,
+        dcApiOrigin,
     )
 
     @Deprecated("Use the Crypto2Key overload")
@@ -273,6 +300,7 @@ object MdocPresenter {
         typeRegistry: TransactionDataTypeRegistry,
         verifierJwkThumbprint: String?,
         holderCrypto2Key: Crypto2Key?,
+        dcApiOrigin: String? = null,
     ): JsonPrimitive = presentMdocWithKey(
         digitalCredential,
         matchResult,
@@ -281,6 +309,7 @@ object MdocPresenter {
         typeRegistry,
         verifierJwkThumbprint,
         holderCrypto2Key,
+        dcApiOrigin,
     )
 
     private suspend fun presentMdocWithKey(
@@ -291,6 +320,7 @@ object MdocPresenter {
         typeRegistry: TransactionDataTypeRegistry,
         verifierJwkThumbprint: String?,
         holderCrypto2Key: Crypto2Key?,
+        dcApiOrigin: String? = null,
     ): JsonPrimitive {
         log.debug { "Handling mso_mdoc credential" }
 
@@ -298,8 +328,9 @@ object MdocPresenter {
         val responseUri = when (authorizationRequest.responseMode) {
             OpenID4VPResponseMode.DIRECT_POST, OpenID4VPResponseMode.DIRECT_POST_JWT ->
                 authorizationRequest.responseUri
+            OpenID4VPResponseMode.DC_API, OpenID4VPResponseMode.DC_API_JWT -> null
             else -> authorizationRequest.redirectUri
-        } ?: throw IllegalArgumentException("A response_uri or redirect_uri is required for mso_mdoc presentation")
+        }
 
         val document: Document = mdocsCredential.document
         val issuerSigned: IssuerSigned = document.issuerSigned
@@ -322,9 +353,21 @@ object MdocPresenter {
         )?.mapTo(mutableSetOf(), String::toInt)
 
         // Build OpenID4VPHandover (OID4VP Appendix B.2.6.1) without ISO-specific wallet nonce
-        val sessionTranscript = verifierJwkThumbprint
-            ?.let { buildSessionTranscript(authorizationRequest, responseUri, it) }
-            ?: buildSessionTranscript(authorizationRequest, responseUri)
+        val sessionTranscript = if (authorizationRequest.responseMode in OpenID4VPResponseMode.DC_API_RESPONSES) {
+            // DC API replaces the response_uri handover with the platform-asserted origin.
+            buildDcApiSessionTranscript(
+                origin = requireNotNull(dcApiOrigin) { "A platform-asserted origin is required for a DC API mdoc presentation" },
+                nonce = requireNotNull(authorizationRequest.nonce),
+                encryptionKeyThumbprint = verifierJwkThumbprint,
+            )
+        } else {
+            val uri = requireNotNull(responseUri) {
+                "A response_uri or redirect_uri is required for mso_mdoc presentation"
+            }
+            verifierJwkThumbprint
+                ?.let { buildSessionTranscript(authorizationRequest, uri, it) }
+                ?: buildSessionTranscript(authorizationRequest, uri)
+        }
 
         // Determine which namespaces and elements to disclose based on the DCQL match
         val disclosedDeviceNamespaces = buildTransactionDataNamespaces(
@@ -415,6 +458,80 @@ object MdocPresenter {
         // 6. CBOR-encode and base64url-encode the response string
         val deviceResponseBytes = coseCompliantCbor.encodeToByteArray(deviceResponse)
         return JsonPrimitive(deviceResponseBytes.encodeToBase64Url())
+    }
+
+    /**
+     * Builds one selectively disclosed Annex C document using the same device-authentication
+     * implementation as OpenID4VP. The native platform adapter never handles signing or claims.
+     */
+    @Deprecated("Use the Crypto2Key overload")
+    suspend fun buildAnnexCDocument(
+        digitalCredential: DigitalCredential,
+        requestedElements: Map<String, List<String>>,
+        sessionTranscript: SessionTranscript,
+        holderKey: Key,
+    ): Document = buildAnnexCDocumentWithKey(
+        digitalCredential,
+        requestedElements,
+        sessionTranscript,
+        holderKey,
+        null,
+    )
+
+    /**
+     * Builds one selectively disclosed Annex C document using the same device-authentication
+     * implementation as OpenID4VP. The native platform adapter never handles signing or claims.
+     */
+    suspend fun buildAnnexCDocument(
+        digitalCredential: DigitalCredential,
+        requestedElements: Map<String, List<String>>,
+        sessionTranscript: SessionTranscript,
+        holderKey: Crypto2Key,
+    ): Document = buildAnnexCDocumentWithKey(
+        digitalCredential,
+        requestedElements,
+        sessionTranscript,
+        null,
+        holderKey,
+    )
+
+    private suspend fun buildAnnexCDocumentWithKey(
+        digitalCredential: DigitalCredential,
+        requestedElements: Map<String, List<String>>,
+        sessionTranscript: SessionTranscript,
+        holderKey: Key?,
+        holderCrypto2Key: Crypto2Key?,
+    ): Document {
+        val credential = digitalCredential as? MdocsCredential
+            ?: throw IllegalArgumentException("ISO 18013-7 Annex C requires an mdoc credential")
+        val issuerSigned = credential.document.issuerSigned
+        val selectedItems = requestedElements
+            .filterValues { it.isNotEmpty() }
+            .mapValues { (namespace, elementNames) ->
+                val available = issuerSigned.namespaces?.get(namespace)
+                    ?: throw IllegalArgumentException("Requested mdoc namespace is unavailable: $namespace")
+                elementNames.distinct().map { elementName ->
+                    available.entries.firstOrNull { it.value.elementIdentifier == elementName }?.value
+                        ?: throw IllegalArgumentException("Requested mdoc element is unavailable: $namespace.$elementName")
+                }
+            }
+        val disclosedDeviceNamespaces = DeviceNameSpaces(emptyMap())
+        val deviceAuth = buildDeviceAuthWithKey(
+            sessionTranscript = sessionTranscript,
+            credential = credential,
+            disclosedDeviceNamespaces = disclosedDeviceNamespaces,
+            holderKey = holderKey,
+            allowedAlgorithms = null,
+            holderCrypto2Key = holderCrypto2Key,
+        )
+        return Document(
+            docType = credential.docType,
+            issuerSigned = IssuerSigned.fromIssuerSignedItems(
+                namespacedItems = selectedItems,
+                issuerAuth = issuerSigned.issuerAuth,
+            ),
+            deviceSigned = DeviceSigned(ByteStringWrapper(disclosedDeviceNamespaces), deviceAuth),
+        )
     }
 
     private fun buildTransactionDataNamespaces(

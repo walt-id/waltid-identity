@@ -197,7 +197,8 @@ class WalletViewModel: ObservableObject {
                 bearerToken: attestationBearerToken,
                 hostHeader: attestationHostHeader
             ),
-            transactionDataProfiles: transactionDataProfiles.profiles
+            transactionDataProfiles: transactionDataProfiles.profiles,
+            crossProcessAccess: Self.crossProcessAccessConfiguration()
         )
         self.walletClient = walletClient ?? SDKWalletClient(configuration: configuration)
         transactionDataProfilesWarning = transactionDataProfiles.warning
@@ -576,6 +577,9 @@ class WalletViewModel: ObservableObject {
         }
 
         credentials = refreshedCredentials
+        if #available(iOS 26.0, *) {
+            try await IdentityDocumentRegistrationCoordinator.update()
+        }
         issuanceSession = nil
         offerPreview = nil
         authorizationRequestURL = nil
@@ -599,6 +603,9 @@ class WalletViewModel: ObservableObject {
                 case let .stored(_, credentialIDs):
                     let refreshedCredentials = try await walletClient.credentials()
                     credentials = refreshedCredentials
+                    if #available(iOS 26.0, *) {
+                        try await IdentityDocumentRegistrationCoordinator.update()
+                    }
                     deferredCredentials.removeAll { $0.id == credential.id }
                     lastReceivedCredentialIDs = credentialIDs
                     receiveCompleted = !credentialIDs.isEmpty
@@ -949,6 +956,9 @@ class WalletViewModel: ObservableObject {
 
                 did = result.did
                 credentials = list
+                if #available(iOS 26.0, *) {
+                    try await IdentityDocumentRegistrationCoordinator.update()
+                }
                 isReady = true
                 setSuccess(WalletStatusText.walletReady)
                 logE2E("Bootstrap: completed successfully, wallet is ready")
@@ -975,6 +985,15 @@ class WalletViewModel: ObservableObject {
             attesterPath: attesterPath ?? "",
             bearerToken: bearerToken ?? "",
             hostHeader: hostHeader ?? ""
+        )
+    }
+
+    private static func crossProcessAccessConfiguration() -> WalletCrossProcessAccess? {
+        guard let keychainAccessGroup = IdentityDocumentSharedConfiguration.keychainAccessGroup,
+              !keychainAccessGroup.isEmpty else { return nil }
+        return WalletCrossProcessAccess(
+            appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier,
+            keychainAccessGroup: keychainAccessGroup
         )
     }
 
