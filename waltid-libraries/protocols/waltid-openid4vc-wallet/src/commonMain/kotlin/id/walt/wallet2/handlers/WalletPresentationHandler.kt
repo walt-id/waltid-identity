@@ -13,6 +13,7 @@ import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
+import id.walt.dcql.RequiredCredentialUnavailableException
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
@@ -440,6 +441,7 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
         beforeCredentialsUsed: suspend (Int) -> Unit = {},
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): WalletPresentResult {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
@@ -471,6 +473,7 @@ object WalletPresentationHandler {
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
             beforeCredentialsUsed = beforeCredentialsUsed,
+            expectedRequestObjectAudience = expectedRequestObjectAudience,
         )
 
         return result.emitPresentationOutcome(onEvent)
@@ -533,6 +536,7 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
         beforeCredentialsUsed: suspend (Int) -> Unit = {},
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): WalletPresentResult {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
@@ -560,6 +564,7 @@ object WalletPresentationHandler {
             clientIdTrustConfiguration = clientIdTrustConfiguration,
             beforeCredentialsUsed = beforeCredentialsUsed,
             isolatedCredentialsById = isolatedCredentialsById,
+            expectedRequestObjectAudience = expectedRequestObjectAudience,
         )
 
         return result.emitPresentationOutcome(onEvent)
@@ -584,6 +589,7 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): PreviewPresentationResult {
         // Selected once up front so advertised wallet metadata, request validation and the retained
         // preview all refer to the same key, but only *required* where a key is genuinely needed: a
@@ -601,6 +607,7 @@ object WalletPresentationHandler {
                     { executionKey().presentationCapabilities() },
                     requestUrl,
                     clientIdTrustConfiguration,
+                    expectedRequestObjectAudience,
                 )
             },
         )
@@ -620,6 +627,7 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
         resolveAuthorizationRequest: (suspend (Url) -> ResolvedAuthorizationRequest)? = null,
     ): StatelessPreviewPresentationResult {
         val keyMaterial = resolvePreviewKeyMaterial(wallet, request).requiredOnUse()
@@ -628,6 +636,7 @@ object WalletPresentationHandler {
                 { keyMaterial().presentationCapabilities() },
                 requestUrl,
                 clientIdTrustConfiguration,
+                expectedRequestObjectAudience,
             )
         }
         onEvent(WalletSessionEvent.presentation_request_parsed)
@@ -1035,11 +1044,13 @@ object WalletPresentationHandler {
         request: RejectPresentationByRequestUrlRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): WalletPresentResult {
         val resolvedAuthorizationRequest = resolveAuthorizationRequest(
             { WalletPresentationFormatRegistry.defaultCapabilities() },
             request.requestUrl,
             clientIdTrustConfiguration,
+            expectedRequestObjectAudience,
         )
         PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedAuthorizationRequest)
         onEvent(WalletSessionEvent.presentation_request_parsed)
@@ -1089,6 +1100,7 @@ object WalletPresentationHandler {
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
         beforeCredentialsUsed: suspend (Int) -> Unit = {},
         isolatedCredentialsById: Map<String, StoredCredential> = emptyMap(),
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): Result<WalletPresentResult> = memoizedSelection(selectCredentialsForQuery).let { selectOnce ->
         keyMaterial.crypto2Key?.let { crypto2Key ->
         WalletPresentFunctionality2.walletPresentHandling(
@@ -1103,6 +1115,7 @@ object WalletPresentationHandler {
             clientIdTrustConfiguration = clientIdTrustConfiguration,
             beforeCredentialsUsed = beforeCredentialsUsed,
             mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(isolatedCredentialsById),
+            expectedRequestObjectAudience = expectedRequestObjectAudience,
         )
     } ?: WalletPresentFunctionality2.walletPresentHandling(
         holderKey = requireNotNull(keyMaterial.legacyKey) {
@@ -1119,6 +1132,7 @@ object WalletPresentationHandler {
         clientIdTrustConfiguration = clientIdTrustConfiguration,
         beforeCredentialsUsed = beforeCredentialsUsed,
         mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(isolatedCredentialsById),
+        expectedRequestObjectAudience = expectedRequestObjectAudience,
     )
     }
 
@@ -1210,8 +1224,27 @@ object WalletPresentationHandler {
      * [previewPresentation], which performs full request-object resolution and
      * verifier validation through [AuthorizationRequestResolver].
      */
-    suspend fun resolveRequest(request: ResolveVpRequestRequest): ResolveVpRequestResult {
-        val authRequest = WalletPresentFunctionality2.resolveAuthorizationRequest(request.requestUrl)
+    suspend fun resolveRequestWithTrust(
+        wallet: Wallet,
+        request: ResolveVpRequestRequest,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+    ): ResolveVpRequestResult {
+        val keyMaterial = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
+            ?: error("No key available: wallet has no keyStores and no staticKey")
+        val authRequest = WalletPresentFunctionality2.resolveAuthorizationRequest(
+            presentationRequestUrl = request.requestUrl,
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            legacyFallbackCallback = null,
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
+            expectedRequestObjectAudience = expectedRequestObjectAudience,
+            requestUriPostWalletMetadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                vpFormatsSupported = WalletPresentationFormatRegistry.buildVpFormatsSupported(
+                    keyMaterial.presentationCapabilities(),
+                ),
+                trustConfiguration = clientIdTrustConfiguration,
+            ),
+        )
 
         return ResolveVpRequestResult(
             authorizationRequest = authRequest,
@@ -1311,11 +1344,13 @@ object WalletPresentationHandler {
         request: BuildVpTokenRequest,
         transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
         resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest = { requestUrl ->
             this@WalletPresentationHandler.resolveAuthorizationRequest(
                 { WalletPresentationFormatRegistry.defaultCapabilities() },
                 requestUrl,
                 clientIdTrustConfiguration,
+                expectedRequestObjectAudience,
             )
         },
     ): BuildVpTokenResult {
@@ -1400,11 +1435,13 @@ object WalletPresentationHandler {
         request: SendAuthorizationResponseRequest,
         transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
         resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest = { requestUrl ->
             this@WalletPresentationHandler.resolveAuthorizationRequest(
                 { WalletPresentationFormatRegistry.defaultCapabilities() },
                 requestUrl,
                 clientIdTrustConfiguration,
+                expectedRequestObjectAudience,
             )
         },
     ): WalletPresentResult {
@@ -1763,12 +1800,14 @@ object WalletPresentationHandler {
         capabilities: () -> WalletPresentationFormatRegistry.RuntimeCapabilities,
         requestUrl: Url,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): ResolvedAuthorizationRequest {
         val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
         return AuthorizationRequestResolver.resolve(
             requestUrl = requestUrl,
             unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
             trustConfiguration = clientIdTrustConfiguration,
+            expectedRequestObjectAudience = expectedRequestObjectAudience,
             fetchRequestUri = { requestUri, requestUriMethod ->
                 AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
                     webResolveAuthReq = fetcher,
@@ -1988,7 +2027,7 @@ object WalletPresentationHandler {
             format = format,
             data = credentialData,
             originalCredential = this,
-            disclosures = sdvc?.disclosures?.map { DcqlDisclosure(it.name, it.value) }
+            disclosures = sdvc?.disclosures?.map { DcqlDisclosure(it.name, it.value, it.location) }
         )
     }
 }
@@ -2024,7 +2063,6 @@ internal fun WalletKeyStoreEntry.presentationCapabilities(): WalletPresentationF
         keys = listOfNotNull(crypto2Key),
         fallbackKeyTypes = setOfNotNull(legacyKey?.keyType?.takeIf { crypto2Key == null }),
     )
-
 // ---------------------------------------------------------------------------
 // Isolated-step request / response types for the manual presentation flow
 // ---------------------------------------------------------------------------
