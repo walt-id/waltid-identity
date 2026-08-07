@@ -4,6 +4,7 @@ import id.walt.x509.X509KeyUsage
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import kotlinx.io.bytestring.ByteString
+import kotlinx.io.bytestring.toHexString
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -55,19 +56,3 @@ fun assertIACABuilderDataEqualsCertificateData(
     )
 }
 
-val ByteString.bitLength
-    get() = this.size * 8
-
-fun assertBuildersSerialNoCompliance(
-    serialNo: ByteString,
-) {
-
-    assertTrue(isBigIntegerPositive(serialNo), "Serial number must be positive")
-
-    assertFalse(isBigIntegerZero(serialNo), "Serial number must not be zero")
-
-    assertTrue(serialNo.bitLength <= 160, "Serial number must not exceed 20 bytes (160 bits)")
-
-    assertTrue(serialNo.bitLength >= 63, "Serial number must contain at least 63 bits of entropy")
-
-}
