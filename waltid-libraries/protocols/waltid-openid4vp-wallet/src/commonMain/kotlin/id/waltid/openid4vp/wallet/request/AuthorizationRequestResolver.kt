@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.waltid.openid4vp.wallet.request
 
 import id.walt.credentials.utils.JwtUtils.isJwt
@@ -10,6 +12,8 @@ import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
 import id.walt.openid4vp.clientidprefix.ClientIdPrefixParser
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
+import id.walt.openid4vp.clientidprefix.prefixes.RedirectUri
+import id.walt.x509.platformSupportsPkixCertificatePathValidation
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
@@ -29,10 +33,14 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
+import kotlin.time.Clock
 
 object AuthorizationRequestResolver {
     private val log = KotlinLogging.logger { }
     private const val REQUEST_OBJECT_TYPE = "oauth-authz-req+jwt"
+    const val DEFAULT_REQUEST_OBJECT_AUDIENCE = "https://self-issued.me/v2"
+    private const val CLOCK_SKEW_SECONDS = 60L
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -96,7 +104,7 @@ object AuthorizationRequestResolver {
                 put("response_types_supported", responseTypesSupported.toJsonArray())
                 put("response_modes_supported", responseModesSupported.toJsonArray())
                 val unsupported = unsupportedClientIdPrefixes + buildSet {
-                    if (trustConfiguration.x509TrustAnchors.isEmpty()) {
+                    if (trustConfiguration.x509TrustAnchors.isEmpty() || !platformSupportsPkixCertificatePathValidation) {
                         add(ClientIdPrefix.X509_SAN_DNS)
                         add(ClientIdPrefix.X509_HASH)
                     }
@@ -106,6 +114,11 @@ object AuthorizationRequestResolver {
                 }
                 put("client_id_prefixes_supported", (ClientIdPrefix.entries - unsupported).map { it.value }.toJsonArray())
                 put("vp_formats_supported", vpFormatsSupported)
+                put("authorization_encryption_alg_values_supported", JsonArray(listOf(JsonPrimitive("ECDH-ES"))))
+                put(
+                    "authorization_encryption_enc_values_supported",
+                    JsonArray(listOf(JsonPrimitive("A128GCM"), JsonPrimitive("A256GCM"))),
+                )
             },
         )
 
@@ -191,8 +204,19 @@ object AuthorizationRequestResolver {
         enforceFinalRequestObject: Boolean = true,
         fetchRequestUri: suspend (requestUri: String, requestUriMethod: RequestUriHttpMethod?) -> RequestUriFetchResponse,
         trustConfiguration: ClientIdTrustConfiguration,
+        expectedRequestObjectAudience: String = DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): ResolvedAuthorizationRequest {
+        val strictFinalValidation = enforceFinalRequestObject
         val requestUri = requestUrl.parameters["request_uri"]
+        val requestObject = requestUrl.parameters["request"]
+        if (strictFinalValidation) {
+            require(requestUri == null || requestObject == null) {
+                "Authorization Request must not contain both request and request_uri"
+            }
+            require(requestUri != null || requestUrl.parameters["request_uri_method"] == null) {
+                "request_uri_method must not be present without request_uri"
+            }
+        }
         if (requestUri != null) {
             return resolveFromRequestUri(
                 requestUri = requestUri,
@@ -202,19 +226,23 @@ object AuthorizationRequestResolver {
                 unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                 fetchRequestUri = fetchRequestUri,
                 trustConfiguration = trustConfiguration,
+                expectedRequestObjectAudience = expectedRequestObjectAudience,
             )
         }
 
-        val requestObject = requestUrl.parameters["request"]
         if (requestObject != null) return resolveFromRequestObject(
             requestObject = requestObject,
             outerClientId = requestUrl.parameters["client_id"],
             enforceFinalRequestObject = enforceFinalRequestObject,
             unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
             trustConfiguration = trustConfiguration,
+            expectedRequestObjectAudience = expectedRequestObjectAudience,
         )
 
-        return ResolvedAuthorizationRequest.Plain(parseParameters(requestUrl.parameters))
+        return ResolvedAuthorizationRequest.Plain(
+            if (strictFinalValidation) parsePlainRequest(requestUrl.parameters)
+            else parseParametersLegacy(requestUrl.parameters),
+        )
     }
 
     fun parseParameters(parameters: Parameters): AuthorizationRequest {
@@ -231,8 +259,53 @@ object AuthorizationRequestResolver {
                         )
                     }
             },
-        )
+        ).also { it.dcqlQuery?.precheck() }
     }
+
+    /**
+     * Plain requests are authenticated only by the redirect_uri client identifier. Other client
+     * identifier prefixes require a signed Request Object or a configured registration.
+     */
+    private fun parsePlainRequest(parameters: Parameters): AuthorizationRequest {
+        val clientId = requireNotNull(parameters["client_id"]) {
+            "client_id is required in an Authorization Request"
+        }
+        val client = ClientIdPrefixParser.parse(clientId).getOrElse { error ->
+            throw IllegalArgumentException("Could not parse client_id prefix: $clientId", error)
+        }
+        require(client is RedirectUri) {
+            "Client Identifier '$clientId' cannot be authenticated as a plain request"
+        }
+
+        val embeddedUri = client.rawValue.substringAfter(':')
+        val responseMode = parameters["response_mode"]
+        val deliveryParameter = if (responseMode in setOf("direct_post", "direct_post.jwt")) {
+            "response_uri"
+        } else {
+            "redirect_uri"
+        }
+        parameters[deliveryParameter]?.let { explicitUri ->
+            require(explicitUri == embeddedUri) {
+                "$deliveryParameter must exactly match the URI encoded in client_id"
+            }
+        }
+        return parseParameters(Parameters.build {
+            appendAll(parameters)
+            if (parameters[deliveryParameter] == null) append(deliveryParameter, embeddedUri)
+        })
+    }
+
+    private fun parseParametersLegacy(parameters: Parameters): AuthorizationRequest =
+        json.decodeFromJsonElement(
+            AuthorizationRequest.serializer(),
+            buildJsonObject {
+                parameters.entries()
+                    .mapNotNull { (key, values) -> values.lastOrNull()?.let { key to it } }
+                    .forEach { (key, value) ->
+                        put(key, AuthorizationRequestParameterCodec.parse(json, value))
+                    }
+            },
+        )
 
     private suspend fun resolveFromRequestUri(
         requestUri: String,
@@ -242,6 +315,7 @@ object AuthorizationRequestResolver {
         unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
         fetchRequestUri: suspend (requestUri: String, requestUriMethod: RequestUriHttpMethod?) -> RequestUriFetchResponse,
         trustConfiguration: ClientIdTrustConfiguration,
+        expectedRequestObjectAudience: String,
     ): ResolvedAuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest via request_uri" }
 
@@ -250,20 +324,39 @@ object AuthorizationRequestResolver {
         val response = fetchRequestUri(requestUri, requestUriMethod)
         response.status.run { check(isSuccess()) { "AuthorizationRequest cannot be retrieved ($this) from $requestUri: ${response.body}" } }
 
+        if (enforceFinalRequestObject && requestUriMethod == RequestUriHttpMethod.POST) {
+            requireNotNull(response.walletNonce) {
+                "request_uri_method=post response is missing the wallet_nonce binding"
+            }
+        }
+
         val contentType = requireNotNull(response.contentType) { "AuthorizationRequest response does not define a content type" }
         log.trace { "Resolved AuthorizationRequest response with content type $contentType" }
+        val requestObjectPolicy = if (enforceFinalRequestObject && requestUriMethod == RequestUriHttpMethod.POST) {
+            UnsignedRequestObjectPolicy.REQUIRE_SIGNED
+        } else {
+            unsignedRequestObjectPolicy
+        }
 
         return when {
             contentType.match("application/oauth-authz-req+jwt") -> resolveFromRequestObject(
                 requestObject = response.body,
                 outerClientId = outerClientId,
                 enforceFinalRequestObject = enforceFinalRequestObject,
-                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+                unsignedRequestObjectPolicy = requestObjectPolicy,
                 expectedWalletNonce = response.walletNonce,
                 trustConfiguration = trustConfiguration,
+                expectedRequestObjectAudience = expectedRequestObjectAudience,
             )
             contentType.match(ContentType.Application.Json) -> {
+                if (requestObjectPolicy == UnsignedRequestObjectPolicy.REQUIRE_SIGNED) {
+                    throw IllegalArgumentException(
+                        "Unsigned authorization request not allowed: received application/json from request_uri " +
+                            "but wallet policy requires signed requests (application/oauth-authz-req+jwt)"
+                    )
+                }
                 val authorizationRequest = json.decodeFromString<AuthorizationRequest>(response.body)
+                    .also { if (enforceFinalRequestObject) it.dcqlQuery?.precheck() }
                 if (enforceFinalRequestObject) requireMatchingClientId(outerClientId, authorizationRequest.clientId)
                 ResolvedAuthorizationRequest.Plain(authorizationRequest)
             }
@@ -278,6 +371,7 @@ object AuthorizationRequestResolver {
         unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
         expectedWalletNonce: String? = null,
         trustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = DEFAULT_REQUEST_OBJECT_AUDIENCE,
     ): ResolvedAuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest via inline request object" }
         require(requestObject.isJwt()) { "AuthorizationRequest object must be a JWT" }
@@ -291,6 +385,10 @@ object AuthorizationRequestResolver {
                 outerClientId = outerClientId,
                 innerClientId = authReqJws.payload["client_id"]?.jsonPrimitive?.contentOrNull,
             )
+            validateCommonRequestObjectClaims(
+                payload = authReqJws.payload,
+                expectedAudience = expectedRequestObjectAudience,
+            )
         }
         expectedWalletNonce?.let { nonce ->
             val walletNonceClaim = authReqJws.payload["wallet_nonce"]?.jsonPrimitive?.contentOrNull
@@ -300,7 +398,14 @@ object AuthorizationRequestResolver {
         }
         val jwtAlg = authReqJws.header["alg"]?.jsonPrimitive?.contentOrNull
         if (jwtAlg.equals("none", ignoreCase = true)) {
-            if (unsignedRequestObjectPolicy != UnsignedRequestObjectPolicy.ALLOW_UNSIGNED) {
+            val clientId = authReqJws.payload["client_id"]?.jsonPrimitive?.contentOrNull
+            val signedOnlyPrefix = clientId?.substringBefore(':') in setOf(
+                ClientIdPrefix.X509_HASH.value,
+                ClientIdPrefix.X509_SAN_DNS.value,
+                ClientIdPrefix.DECENTRALIZED_IDENTIFIER.value,
+                ClientIdPrefix.VERIFIER_ATTESTATION.value,
+            )
+            if (unsignedRequestObjectPolicy != UnsignedRequestObjectPolicy.ALLOW_UNSIGNED || signedOnlyPrefix) {
                 throw UnsignedAuthorizationRequestNotAllowedException()
             }
         } else {
@@ -312,9 +417,41 @@ object AuthorizationRequestResolver {
             authorizationRequest = json.decodeFromJsonElement(
                 deserializer = AuthorizationRequest.serializer(),
                 element = authReqJws.payload,
-            ),
+            ).also { if (enforceFinalRequestObject) it.dcqlQuery?.precheck() },
             requestObject = requestObject,
         )
+    }
+
+    private fun validateCommonRequestObjectClaims(
+        payload: JsonObject,
+        expectedAudience: String,
+    ) {
+        val audience = payload["aud"]?.let { element ->
+            when (element) {
+                is JsonPrimitive -> listOfNotNull(element.contentOrNull)
+                is JsonArray -> element.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                else -> emptyList()
+            }
+        }.orEmpty()
+        require(expectedAudience in audience) {
+            "Authorization Request Object aud must contain '$expectedAudience'"
+        }
+
+        val now = Clock.System.now().epochSeconds
+        payload["exp"]?.let { element ->
+            val expiration = (element as? JsonPrimitive)?.longOrNull
+                ?: throw IllegalArgumentException("Authorization Request Object exp must be a NumericDate")
+            require(expiration >= now - CLOCK_SKEW_SECONDS) {
+                "Authorization Request Object is expired (exp=$expiration, now=$now)"
+            }
+        }
+        payload["nbf"]?.let { element ->
+            val notBefore = (element as? JsonPrimitive)?.longOrNull
+                ?: throw IllegalArgumentException("Authorization Request Object nbf must be a NumericDate")
+            require(notBefore <= now + CLOCK_SKEW_SECONDS) {
+                "Authorization Request Object is not yet valid (nbf=$notBefore, now=$now)"
+            }
+        }
     }
 
     @OptIn(ExperimentalSerializationApi::class)

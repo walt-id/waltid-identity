@@ -3,6 +3,7 @@ package id.walt.dcql.models
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
@@ -14,7 +15,7 @@ data class ClaimsQuery(
     /** Required if claim_sets is present in parent CredentialQuery */
     val id: String? = null,
 
-    /** Path to the claim (format-specific interpretation) */
+    /** Required non-empty path to the claim (format-specific interpretation). */
     val path: List<JsonElement>,
 
     /** Optional specific values to match */
@@ -24,6 +25,18 @@ data class ClaimsQuery(
     @SerialName("intent_to_retain")
     val intentToRetain: Boolean? = null
 ) {
+    init {
+        require(path.isNotEmpty()) { "Claims Query path must not be empty" }
+        require(path.all { segment ->
+            when (segment) {
+                JsonNull -> true
+                is JsonPrimitive -> segment.isString || segment.content.toIntOrNull()?.let { it >= 0 } == true
+                else -> false
+            }
+        }) {
+            "Claims Query path elements must be strings, non-negative integers, or null wildcards"
+        }
+    }
     constructor(
         id: String? = null,
         pathStrings: List<String>,
