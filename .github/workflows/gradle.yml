@@ -316,35 +316,30 @@ jobs:
             kill "$pid" 2>/dev/null || true
           done
 
-      - name: Upload OpenID4VCI Issuer2 conformance artifacts
+      - name: Upload OpenID4VCI 1.0 conformance results and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: openid4vci-issuer2-conformance
+          name: openid4vci1.0-conformance-test-results
           if-no-files-found: warn
           path: |
             waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/build/reports/openid-conformance/vci-issuer/
             ${{ runner.temp }}/issuer2.log
             ${{ runner.temp }}/cloudflared-issuer2.log
 
-      - name: Publish OpenID4VCI conformance test report
-        uses: mikepenz/action-junit-report@v6
-        if: always()
-        with:
-          update_check: true
-          job_name: ${{ inputs.report-check-name }} / openid4vci-conformance
-          report_paths: '**/build/test-results/**/*.xml'
-          detailed_summary: true
-          include_passed: false
-          include_skipped: false
-
-      - name: Publish OpenID4VCI conformance summary
+      - name: Show OpenID4VCI 1.0 conformance results
         if: always()
         run: |
+          ARTIFACT_NAME="openid4vci1.0-conformance-test-results"
+          ARTIFACTS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
+          echo "OpenID4VCI 1.0 results and logs: $ARTIFACTS_URL (artifact: $ARTIFACT_NAME)"
+
           {
-            echo "## OpenID4VCI Conformance Results"
+            echo "## OpenID4VCI 1.0 Conformance Results"
             echo
             echo "> This matrix runs in strict mode. A non-accepted selected variant fails this job."
+            echo
+            echo "Download [\`$ARTIFACT_NAME\`]($ARTIFACTS_URL) for \`results.json\`, \`matrix.json\`, \`summary.md\`, and Issuer2/Cloudflare logs."
             echo
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -361,9 +356,9 @@ jobs:
             -print0 2>/dev/null)
 
           if [ "$found" -eq 0 ]; then
-            echo "_No OpenID4VCI conformance summary was produced._" >> "$GITHUB_STEP_SUMMARY"
+            echo "_No OpenID4VCI 1.0 conformance summary was produced._" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "Appended $found OpenID4VCI conformance summary file(s) to the job summary."
+            echo "Appended $found OpenID4VCI 1.0 conformance summary file(s) to the job summary."
           fi
 
   openid4vc-haip-conformance:
@@ -494,35 +489,30 @@ jobs:
             kill "$pid" 2>/dev/null || true
           done
 
-      - name: Upload OpenID4VCI HAIP Issuer2 conformance artifacts
+      - name: Upload OpenID4VC HAIP 1.0 conformance results and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: openid4vci-haip-issuer2-conformance
+          name: openid4vc-haip1.0-conformance-test-results
           if-no-files-found: warn
           path: |
             waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/build/reports/openid-conformance/vci-issuer/
             ${{ runner.temp }}/issuer2-haip.log
             ${{ runner.temp }}/cloudflared-issuer2-haip.log
 
-      - name: Publish OpenID4VCI HAIP conformance test report
-        uses: mikepenz/action-junit-report@v6
-        if: always()
-        with:
-          update_check: true
-          job_name: ${{ inputs.report-check-name }} / openid4vc-haip-conformance
-          report_paths: '**/build/test-results/**/*.xml'
-          detailed_summary: true
-          include_passed: false
-          include_skipped: false
-
-      - name: Publish OpenID4VCI HAIP conformance summary
+      - name: Show OpenID4VC HAIP 1.0 conformance results
         if: always()
         run: |
+          ARTIFACT_NAME="openid4vc-haip1.0-conformance-test-results"
+          ARTIFACTS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
+          echo "OpenID4VC HAIP 1.0 results and logs: $ARTIFACTS_URL (artifact: $ARTIFACT_NAME)"
+
           {
-            echo "## OpenID4VCI HAIP Conformance Results"
+            echo "## OpenID4VC HAIP 1.0 Conformance Results"
             echo
             echo "> This matrix runs in strict mode and excludes dedicated FAPI modules. A non-accepted selected variant fails this job."
+            echo
+            echo "Download [\`$ARTIFACT_NAME\`]($ARTIFACTS_URL) for \`results.json\`, \`matrix.json\`, \`summary.md\`, and Issuer2/Cloudflare logs."
             echo
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -539,7 +529,7 @@ jobs:
             -print0 2>/dev/null)
 
           if [ "$found" -eq 0 ]; then
-            echo "_No OpenID4VCI HAIP conformance summary was produced._" >> "$GITHUB_STEP_SUMMARY"
+            echo "_No OpenID4VC HAIP 1.0 conformance summary was produced._" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "Appended $found OpenID4VCI HAIP conformance summary file(s) to the job summary."
+            echo "Appended $found OpenID4VC HAIP 1.0 conformance summary file(s) to the job summary."
           fi
