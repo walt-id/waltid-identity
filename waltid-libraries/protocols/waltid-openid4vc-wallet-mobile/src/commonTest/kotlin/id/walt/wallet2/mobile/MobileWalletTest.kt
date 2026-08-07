@@ -2,18 +2,28 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.cose.toCoseVerifier
 import id.walt.credentials.CredentialDetectorTypes
 import id.walt.credentials.CredentialParser
+import id.walt.credentials.examples.MdocsExamples
 import id.walt.credentials.examples.SdJwtExamples
+import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.formats.SdJwtCredential
+import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
+import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
+import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -49,12 +59,16 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import id.walt.crypto2.keys.Key as ManagedKeyMaterial
@@ -529,6 +543,370 @@ class MobileWalletTest {
         assertEquals(listOf(listOf("pid")), preview.credentialRequirements.single().options)
     }
 
+    @Test
+    fun digitalCredentialRegistryUsesStableOpaqueMetadataAndExcludesSdJwtInfrastructureClaims() = runTest {
+        val registry = RecordingMetadataRegistry()
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "credential-sensitive-local-id",
+                credential = SdJwtCredential(
+                    dmtype = CredentialDetectorTypes.SDJWTVCSubType.sdjwtvc,
+                    credentialData = buildJsonObject {
+                        put("vct", "https://credentials.example/pid")
+                        put("iss", "https://issuer.example")
+                        put("given_name", "Ada")
+                    },
+                    issuer = "https://issuer.example",
+                    subject = "did:key:subject",
+                    signature = null,
+                    signed = null,
+                ),
+                label = "PID",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "registry-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            generateAndPersistKey = { error("Registry refresh must not generate keys") },
+            credentialRegistry = registry,
+        )
+
+        wallet.refreshDigitalCredentialRegistration()
+        wallet.refreshDigitalCredentialRegistration()
+
+        assertEquals(2, registry.replacements.size)
+        assertEquals(registry.replacements[0], registry.replacements[1])
+        val record = registry.replacements.last().second.single()
+        assertFalse(record.registryEntryId.contains("credential-sensitive-local-id"))
+        assertEquals("https://credentials.example/pid", record.type)
+        assertEquals(listOf(listOf("given_name")), record.fields.map { it.path })
+        assertFalse(record.fields.any { it.path.singleOrNull() == "iss" })
+        assertFalse(record.fields.single().selectivelyDisclosable)
+    }
+
+    @Test
+    fun digitalCredentialRegistryMarksOnlySdJwtDisclosureLocationsAsSelectable() = runTest {
+        val registry = RecordingMetadataRegistry()
+        val (_, credential) = CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2)
+        val sdJwt = assertIs<SdJwtCredential>(credential)
+        val selectivelyDisclosablePaths = requireNotNull(sdJwt.disclosures)
+            .mapNotNull { disclosure ->
+                disclosure.location?.mapNotNull { component -> component.jsonPrimitive.contentOrNull }
+            }
+            .toSet()
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "pid-1",
+                credential = credential,
+                label = "PID",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "registry-disclosures-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            generateAndPersistKey = { error("Registry refresh must not generate keys") },
+            credentialRegistry = registry,
+        )
+
+        wallet.refreshDigitalCredentialRegistration()
+
+        val fields = registry.replacements.single().second.single().fields
+        assertTrue(fields.any { it.selectivelyDisclosable })
+        fields.forEach { field ->
+            assertEquals(field.path in selectivelyDisclosablePaths, field.selectivelyDisclosable)
+        }
+        // Every claim this fixture carries beyond the infrastructure claims is disclosable, so the
+        // presence of a non-disclosable field would mean an infrastructure claim leaked through.
+        assertEquals(
+            setOf(listOf("sub"), listOf("given_name"), listOf("family_name"), listOf("birthdate")),
+            fields.map { it.path }.toSet(),
+        )
+    }
+
+    @Test
+    fun digitalCredentialRegistryExcludesSdJwtHashAlgorithmDeclaration() = runTest {
+        val registry = RecordingMetadataRegistry()
+        val (_, credential) = CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2)
+        // Disclosure resolution strips `_sd` but not its sibling `_sd_alg`, so the raw claims still
+        // carry it and the registry has to exclude it explicitly.
+        assertTrue(assertIs<SdJwtCredential>(credential).credentialData.containsKey("_sd_alg"))
+        val wallet = MobileWallet(
+            walletId = "registry-sd-alg-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = RecordingCredentialStore(
+                StoredCredential(id = "pid-1", credential = credential, label = "PID"),
+            ),
+            generateAndPersistKey = { error("Registry refresh must not generate keys") },
+            credentialRegistry = registry,
+        )
+
+        wallet.refreshDigitalCredentialRegistration()
+
+        val fields = registry.replacements.single().second.single().fields
+        assertFalse(fields.any { "_sd_alg" in it.path || "_sd" in it.path })
+    }
+
+    @Test
+    fun digitalCredentialRegistryMarksArrayDisclosuresAtTheirContainingClaimPath() = runTest {
+        val registry = RecordingMetadataRegistry()
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "pid-1",
+                credential = SdJwtCredential(
+                    dmtype = CredentialDetectorTypes.SDJWTVCSubType.sdjwtvc,
+                    credentialData = buildJsonObject {
+                        put("vct", "https://credentials.example/pid")
+                        put("given_name", "Ada")
+                        put("nationalities", buildJsonArray { add(JsonPrimitive("AT")) })
+                    },
+                    disclosures = listOf(
+                        SdJwtSelectiveDisclosure(
+                            salt = "c2FsdA",
+                            name = null,
+                            value = JsonPrimitive("AT"),
+                            location = listOf(JsonPrimitive("nationalities"), JsonPrimitive(0)),
+                        ),
+                    ),
+                    // A disclosable array element is carried as `{"...": digest}` inside the array
+                    // rather than in an `_sd` array, so no `disclosables` entry describes it.
+                    disclosables = emptyMap(),
+                    originalCredentialData = buildJsonObject {
+                        put("vct", "https://credentials.example/pid")
+                        put("given_name", "Ada")
+                        put("nationalities", buildJsonArray {
+                            add(buildJsonObject { put("...", "kGVzdGRpZ2VzdA") })
+                        })
+                    },
+                    issuer = "https://issuer.example",
+                    subject = "did:key:subject",
+                    signature = null,
+                    signed = null,
+                ),
+                label = "PID",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "registry-array-disclosure-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            generateAndPersistKey = { error("Registry refresh must not generate keys") },
+            credentialRegistry = registry,
+        )
+
+        wallet.refreshDigitalCredentialRegistration()
+
+        // The array is registered as one leaf, so an index-addressed disclosure must mark that leaf
+        // rather than a shortened path that matches nothing.
+        val fields = registry.replacements.single().second.single().fields
+        assertEquals(
+            mapOf(listOf("given_name") to false, listOf("nationalities") to true),
+            fields.associate { it.path to it.selectivelyDisclosable },
+        )
+    }
+
+    @Test
+    fun digitalCredentialRegistryKeepsStructuredMdocElementsAtNamespaceElementPaths() = runTest {
+        val registry = RecordingMetadataRegistry()
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "mdl-1",
+                credential = MdocsCredential(
+                    credentialData = buildJsonObject {
+                        put("org.iso.18013.5.1", buildJsonObject {
+                            put("given_name", "Ada")
+                            put("driving_privileges", buildJsonArray {
+                                add(buildJsonObject {
+                                    put("vehicle_category_code", "B")
+                                })
+                            })
+                        })
+                    },
+                    signed = null,
+                    docType = "org.iso.18013.5.1.mDL",
+                ),
+                label = "mDL",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "mdoc-registry-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            generateAndPersistKey = { error("Registry refresh must not generate keys") },
+            credentialRegistry = registry,
+        )
+
+        wallet.refreshDigitalCredentialRegistration()
+
+        val fields = registry.replacements.single().second.single().fields
+        assertEquals(
+            listOf(
+                listOf("org.iso.18013.5.1", "given_name"),
+                listOf("org.iso.18013.5.1", "driving_privileges"),
+            ),
+            fields.map { it.path },
+        )
+        assertTrue(fields.all { it.path.size == 2 })
+    }
+
+    @Test
+    fun annexCParserNormalizesNamespacesAndPreviewRejectsParsedRawMismatchBeforeConsent() = runTest {
+        val wallet = MobileWallet(
+            walletId = "annex-c-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = RecordingCredentialStore(),
+            generateAndPersistKey = { error("Parsing must not generate keys") },
+        )
+        val raw = DeviceRequest(
+            docType = "org.iso.18013.5.1.mDL",
+            requestedElements = mapOf("org.iso.18013.5.1" to listOf("given_name", "family_name")),
+        ).encodeToBase64Url()
+
+        val parsed = wallet.parseAnnexCDeviceRequest(raw)
+
+        assertEquals("org.iso.18013.5.1.mDL", parsed.documents.single().docType)
+        assertEquals(listOf("family_name", "given_name"), parsed.documents.single().namespaces.values.single())
+        assertFailsWith<IllegalArgumentException> {
+            wallet.previewAnnexCPresentation(
+                MobileWalletAnnexCRequest(
+                    parsedRequest = MobileWalletAnnexCParsedRequest(
+                        listOf(MobileWalletAnnexCDocumentRequest("eu.europa.ec.eudi.pid.1", emptyMap()))
+                    ),
+                    verifiedOrigin = "https://verifier.example",
+                    deviceRequestBase64Url = raw,
+                    encryptionInfoBase64Url = "not-reached",
+                )
+            )
+        }
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    @Test
+    fun annexCReaderAuthenticationUsesVerifierTranscriptBuildsResponseAndRejectsTampering() = runTest {
+        val origin = "https://verifier.example"
+        val namespace = "org.iso.18013.5.1"
+        val docType = "org.iso.18013.5.1.mDL"
+        val readerCertificate = Base64.decode(READER_CERTIFICATE_BASE64)
+        // The pre-signed request avoids platform-specific private-key imports; the assertion below prevents fixture drift.
+        val signedRequest = DeviceRequest.decodeFromBase64Url(SIGNED_READER_REQUEST)
+        val signature = requireNotNull(signedRequest.docRequests.single().readerAuth)
+        val readerKey = JWKKey.importFromDerCertificate(readerCertificate).getOrThrow()
+        assertTrue(
+            signature.verifyDetached(
+                readerKey.toCoseVerifier(),
+                ReaderAuthenticationPayloads.forDocument(
+                    sessionTranscript = AnnexCTranscriptBuilder.buildSessionTranscript(READER_ENCRYPTION_INFO, origin),
+                    itemsRequest = signedRequest.docRequests.single().itemsRequest,
+                ),
+            ),
+            "Fixture must use the verifier's exact ISO 18013-7 Annex C transcript",
+        )
+        // A managed crypto2 key, not an imported private JWK: Android's software provider only
+        // accepts RSA private JWK material, so importing this Ed25519 key would fail there.
+        val holderSigner = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("holder-key"),
+                spec = KeySpec.Edwards(EdwardsCurve.ED25519),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        val holderKeyId = holderSigner.id.value
+        val wallet = MobileWallet(
+            walletId = "annex-c-reader-auth-wallet",
+            keyStore = PreloadedKeyStore(
+                WalletKeyInfo(keyId = holderKeyId, keyType = "Ed25519"),
+                managedKey = holderSigner,
+            ),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = RecordingCredentialStore(
+                StoredCredential(
+                    id = "mdl-1",
+                    credential = MdocsCredential(
+                        credentialData = buildJsonObject {
+                            put(namespace, buildJsonObject { put("given_name", "Ada") })
+                        },
+                        signed = MdocsExamples.mdocsExampleBase64Url,
+                        docType = docType,
+                    ),
+                    label = "mDL",
+                )
+            ),
+            generateAndPersistKey = { error("Reader-authentication preview must not generate keys") },
+            readerTrustEvaluator = MobileWalletReaderTrustEvaluator { chain ->
+                assertEquals(1, chain.size)
+                assertContentEquals(readerCertificate, chain.single())
+                MobileWalletReaderTrust.Trusted("CN=Example")
+            },
+        )
+        val parsedRequest = wallet.parseAnnexCDeviceRequest(signedRequest.encodeToBase64Url())
+
+        val preview = wallet.previewAnnexCPresentation(
+            MobileWalletAnnexCRequest(
+                parsedRequest = parsedRequest,
+                verifiedOrigin = origin,
+                deviceRequestBase64Url = SIGNED_READER_REQUEST,
+                encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+            )
+        )
+
+        assertEquals(MobileWalletReaderTrust.Trusted("CN=Example"), preview.readerTrust)
+        val submission = MobileWalletAnnexCSubmission(
+            requestId = preview.requestId,
+            verifiedOrigin = origin,
+            deviceRequestBase64Url = SIGNED_READER_REQUEST,
+            encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+            selectedCredentialOptions = preview.credentialOptions.map {
+                MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
+            },
+        )
+        assertFailsWith<IllegalArgumentException> {
+            wallet.submitAnnexCPresentation(submission.copy(verifiedOrigin = "https://other.example"))
+        }
+        val response = wallet.submitAnnexCPresentation(
+            submission
+        )
+        assertEquals(MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C, response.protocol)
+        assertTrue(
+            displayJson.parseToJsonElement(response.dataJson).jsonObject["response"]
+                ?.jsonPrimitive?.content?.isNotBlank() == true
+        )
+
+        val tamperedSignature = signature.copy(
+            signature = signature.signature.copyOf().also { bytes ->
+                bytes[0] = (bytes[0].toInt() xor 1).toByte()
+            }
+        )
+        val tamperedRequest = signedRequest.copy(
+            docRequests = listOf(signedRequest.docRequests.single().copy(readerAuth = tamperedSignature)),
+        )
+        assertFailsWith<IllegalArgumentException> {
+            wallet.previewAnnexCPresentation(
+                MobileWalletAnnexCRequest(
+                    parsedRequest = parsedRequest,
+                    verifiedOrigin = origin,
+                    deviceRequestBase64Url = tamperedRequest.encodeToBase64Url(),
+                    encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+                )
+            )
+        }
+    }
+
+    @Test
+    fun capabilityModelsFailClosedByDefault() = runTest {
+        assertFalse(UnavailableMobileWalletCredentialRegistry.capabilities.platformAvailable)
+        assertFalse(UnavailableMobileWalletCredentialRegistry.capabilities.registrationAvailable)
+        assertIs<MobileWalletReaderTrust.Unverified>(
+            UnconfiguredMobileWalletReaderTrustEvaluator.evaluate(emptyList())
+        )
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun mobileWalletEventStreamDoesNotBackpressureSlowCollectors() = runTest {
@@ -632,11 +1010,33 @@ class MobileWalletTest {
         isLenient = true
     }
 
+    private companion object {
+        const val READER_CERTIFICATE_BASE64 =
+            "MIIBsTCCAVegAwIBAgIUJklaRrIjkEZlDdPk2+qPneHHD6kwCgYIKoZIzj0EAwIwLjEQMA4GA1UEAwwHRXhhbXBsZTENMAsGA1UECgwEVGVzdDELMAkGA1UEBhMCVVMwHhcNMjYwMzMxMDkwNDMwWhcNMjcwMzMxMDkwNDMwWjAuMRAwDgYDVQQDDAdFeGFtcGxlMQ0wCwYDVQQKDARUZXN0MQswCQYDVQQGEwJVUzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABM4ukI9BoHfMYjKmokWc5GMiN7DJBQAPPZBHXHhwmuQE+JyeRcamM+uCS1N+naE0itVbs7fQ/5xbujSSK9pYdb6jUzBRMB0GA1UdDgQWBBSwjqgulcWH4AqTJwPjBGj3VGIAsTAfBgNVHSMEGDAWgBSwjqgulcWH4AqTJwPjBGj3VGIAsTAPBgNVHRMBAf8EBTADAQH/MAoGCCqGSM49BAMCA0gAMEUCIQCoWAleGRqR+kb+5SeRt/scogZPiQiM7wJ69tadEPPJwQIgdygIZSMQSXlxXbZ10QKtN6qSjggqFVUV4/Z2/pnBUBk="
+        const val READER_ENCRYPTION_INFO =
+            "gmVkY2FwaaJlbm9uY2VQAQIDBAUGBwgJCgsMDQ4PEHJyZWNpcGllbnRQdWJsaWNLZXmkAQIgASFYIM4ukI9BoHfMYjKmokWc5GMiN7DJBQAPPZBHXHhwmuQEIlgg-JyeRcamM-uCS1N-naE0itVbs7fQ_5xbujSSK9pYdb4"
+        const val SIGNED_READER_REQUEST =
+            "omd2ZXJzaW9uYzEuMGtkb2NSZXF1ZXN0c4GibGl0ZW1zUmVxdWVzdNgYWEqiZ2RvY1R5cGV1b3JnLmlzby4xODAxMy41LjEubURMam5hbWVTcGFjZXOhcW9yZy5pc28uMTgwMTMuNS4xoWpnaXZlbl9uYW1l9GpyZWFkZXJBdXRohEOhASahGCFZAbUwggGxMIIBV6ADAgECAhQmSVpGsiOQRmUN0-Tb6o-d4ccPqTAKBggqhkjOPQQDAjAuMRAwDgYDVQQDDAdFeGFtcGxlMQ0wCwYDVQQKDARUZXN0MQswCQYDVQQGEwJVUzAeFw0yNjAzMzEwOTA0MzBaFw0yNzAzMzEwOTA0MzBaMC4xEDAOBgNVBAMMB0V4YW1wbGUxDTALBgNVBAoMBFRlc3QxCzAJBgNVBAYTAlVTMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEzi6Qj0Ggd8xiMqaiRZzkYyI3sMkFAA89kEdceHCa5AT4nJ5FxqYz64JLU36doTSK1Vuzt9D_nFu6NJIr2lh1vqNTMFEwHQYDVR0OBBYEFLCOqC6VxYfgCpMnA-MEaPdUYgCxMB8GA1UdIwQYMBaAFLCOqC6VxYfgCpMnA-MEaPdUYgCxMA8GA1UdEwEB_wQFMAMBAf8wCgYIKoZIzj0EAwIDSAAwRQIhAKhYCV4ZGpH6Rv7lJ5G3-xyiBk-JCIzvAnr21p0Q88nBAiB3KAhlIxBJeXFdtnXRAq03qpKOCCoVVRXj9nb-mcFQGfZYQE524YTazDQiCCYBcZRzZHc0GfcMBDJVNIRZ1Svd3hXLG7pj8eTefRllnxRtj4nGQO-MQIJoRqPaDiMuIh1BLVU"
+    }
+
     private class RecordingDatabaseKeyProvider : DatabaseEncryptionKeyProvider {
         override suspend fun getOrCreateKey(walletId: String, databaseName: String): DatabaseEncryptionKey =
             DatabaseEncryptionKey("$walletId:$databaseName", ByteArray(32))
 
         override suspend fun deleteKey(walletId: String, databaseName: String) = Unit
+    }
+
+    private class RecordingMetadataRegistry : MobileWalletCredentialRegistry {
+        val replacements = mutableListOf<Pair<String, List<MobileWalletCredentialRegistryRecord>>>()
+        override val capabilities = UnavailableMobileWalletCredentialRegistry.capabilities
+
+        override suspend fun replace(
+            registryId: String,
+            records: List<MobileWalletCredentialRegistryRecord>,
+        ): MobileWalletCredentialRegistrationResult {
+            replacements += registryId to records
+            return MobileWalletCredentialRegistrationResult(true, records.size)
+        }
     }
 
     private class PreloadedKeyStore(
@@ -698,7 +1098,7 @@ class MobileWalletTest {
     ) : WalletCredentialStore {
         val removedCredentialIds = mutableListOf<String>()
 
-        override suspend fun getCredential(id: String): StoredCredential? = null
+        override suspend fun getCredential(id: String): StoredCredential? = credentials.firstOrNull { it.id == id }
 
         override suspend fun listCredentials(): Flow<StoredCredential> =
             credentials.toList().asFlow()

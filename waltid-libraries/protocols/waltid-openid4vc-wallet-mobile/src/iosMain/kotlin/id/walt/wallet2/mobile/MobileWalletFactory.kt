@@ -27,11 +27,22 @@ public actual class MobileWalletFactory {
         config: MobileWalletConfig,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
     ): MobileWallet {
-        val driverFactory = DriverFactory()
+        val sharedAccess = config.crossProcessAccess
+        val driverFactory = DriverFactory().apply {
+            sharedAccess?.let { useAppGroup(it.appGroupIdentifier) }
+        }
+        val platformConfig = if (config.credentialRegistry === UnavailableMobileWalletCredentialRegistry) {
+            config.copy(
+                credentialRegistry = IosIdentityDocumentRegistry(sharedAccess?.appGroupIdentifier),
+            )
+        } else config
         return createEncryptedSqlDelightMobileWallet(
-            config = config,
+            config = platformConfig,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
-            managedDatabaseKeyProvider = IosDatabaseEncryptionKeyProvider(),
+            managedDatabaseKeyProvider = IosDatabaseEncryptionKeyProvider(sharedAccess?.keychainAccessGroup),
+            // Signum's IosKeychainProvider does not expose kSecAttrAccessGroup, so signing keys land
+            // in the app's default access group — the first `keychain-access-groups` entitlement entry.
+            // Cross-process sharing is configured there, not here; see MobileWalletCrossProcessAccess.
             platformKeyProvider = IosPlatformKeyProvider(),
             openEncryptedDriver = driverFactory::createEncryptedDriver,
             deleteDatabase = driverFactory::deleteDatabase,
