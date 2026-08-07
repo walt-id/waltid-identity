@@ -66,42 +66,49 @@ jobs:
 
       - name: Start tunnel and get URL
         id: tunnel
+        env:
+          CLOUDFLARED_VERSION: "2026.7.3"
         run: |
           # Start tunnel on port 7003
-          wget -q -O cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          wget -q -O cloudflared "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
           chmod +x cloudflared
           ./cloudflared tunnel --url http://localhost:7003 > lt_output.txt 2>&1 &
+          CF_PID=$!
 
-          # Wait for tunnel to initialize
-          sleep 5
-
-          # Extract the tunnel URL from output
-          TUNNEL_URL=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' lt_output.txt | head -n 1)
+          TUNNEL_URL=""
+          for i in $(seq 1 60); do
+            TUNNEL_URL=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' lt_output.txt | head -n 1)
+            [ -n "$TUNNEL_URL" ] && break
+            kill -0 "$CF_PID" 2>/dev/null || { echo "❌ cloudflared exited before printing a URL"; break; }
+            sleep 1
+          done
 
           if [ -z "$TUNNEL_URL" ]; then
-            echo "❌ Failed to get tunnel URL"
+            echo "❌ Failed to get tunnel URL after ${i}s"
             cat lt_output.txt
-            TUNNEL_URL=""
-          else
-            echo "✅ Tunnel URL: $TUNNEL_URL"
+            exit 1
           fi
 
-          echo "url=$TUNNEL_URL" >> $GITHUB_OUTPUT
-#      - name: Replace URLs in Kotlin test
-#        if: ${{ steps.tunnel.outputs.url != '' }}
-#        run: |
-#          FILE="./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/kotlin/id/walt/openid4vp/conformance/ConformanceTests.kt"
-#          sed -i \
-#            -e "s#https://verifier2.localhost/verification-session#${{ steps.tunnel.outputs.url }}/verification-session#g" \
-#            -e "s#localhost.emobix.co.uk#conformance.waltid.cloud#g" \
-#            -e "s#8443#443#g" \
-#            "$FILE"
+          echo "✅ Tunnel URL: $TUNNEL_URL (ready after ${i}s)"
+          echo "url=$TUNNEL_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Replace URLs in Kotlin test
+        if: ${{ steps.tunnel.outputs.url != '' }}
+        run: |
+          FILE="./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/kotlin/id/walt/openid4vp/conformance/ConformanceTests.kt"
+          sed -i \
+            -e "s#https://verifier2.localhost/verification-session#${{ steps.tunnel.outputs.url }}/verification-session#g" \
+            -e "s#localhost.emobix.co.uk#conformance.waltid.cloud#g" \
+            -e "s#8443#443#g" \
+            "$FILE"
 
       - name: Clean and build with all tests
         run: ./gradlew clean cleanAllTests build allTests --rerun-tasks --no-daemon --continue --console=plain --warning-mode=summary
         env:
           CI: "true"
           PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
+          CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
+          OPENID4VCI_CONFORMANCE_STRICT: ${{ vars.CONFORMANCE_ALLOW_FAILURE == 'false' }}
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 
@@ -115,6 +122,55 @@ jobs:
           detailed_summary: true
           include_passed: false
           include_skipped: false
+
+      - name: Publish OpenID conformance summary
+        if: always()
+        env:
+          CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
+        run: |
+          {
+            echo "## OpenID Conformance Results"
+            echo
+            if [ -z "${CONFORMANCE_ALLOW_FAILURE}" ] || [ "${CONFORMANCE_ALLOW_FAILURE}" = "true" ]; then
+              echo "> Soft-fail enabled (\`CONFORMANCE_ALLOW_FAILURE\` unset/true). Failed conformance tests are reported below but do not fail this job."
+            else
+              echo "> Soft-fail disabled (\`CONFORMANCE_ALLOW_FAILURE=false\`). Failed conformance tests fail this job."
+            fi
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          found=0
+          while IFS= read -r -d '' summary; do
+            found=$((found + 1))
+            {
+              echo
+              cat "$summary"
+              echo
+            } >> "$GITHUB_STEP_SUMMARY"
+          done < <(find . \
+            -path '*/build/reports/openid-conformance/*/summary.md' \
+            -print0 2>/dev/null)
+
+          # Legacy issuer matrix path (local runs / older artifacts)
+          while IFS= read -r -d '' summary; do
+            found=$((found + 1))
+            {
+              echo
+              cat "$summary"
+              echo
+            } >> "$GITHUB_STEP_SUMMARY"
+          done < <(find . \
+            -path '*/build/reports/openid4vci-issuer-matrix/summary.md' \
+            -print0 2>/dev/null)
+
+          if [ "$found" -eq 0 ]; then
+            {
+              echo
+              echo "_No OpenID conformance suite summaries were produced (suites skipped or unavailable)._"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Appended $found OpenID conformance summary file(s) to the job summary."
+          fi
 
       - name: Set version
         if: ${{ inputs.version != '' && runner.os == 'linux' }}

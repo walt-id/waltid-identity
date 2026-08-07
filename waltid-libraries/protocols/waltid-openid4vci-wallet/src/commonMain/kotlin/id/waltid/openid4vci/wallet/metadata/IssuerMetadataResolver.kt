@@ -42,27 +42,29 @@ class IssuerMetadataResolver(
         log.trace { "Credential issuer URL: $credentialIssuerUrl" }
 
         val urlsToTry = if (credentialIssuerUrl.contains(CREDENTIAL_ISSUER_WELL_KNOWN_PATH)) {
-            mutableListOf(credentialIssuerUrl)
+            listOf(credentialIssuerUrl)
         } else {
-            mutableListOf(buildMetadataUrl(credentialIssuerUrl, CREDENTIAL_ISSUER_WELL_KNOWN_PATH))
-        }
+            listOf(buildMetadataUrl(credentialIssuerUrl, CREDENTIAL_ISSUER_WELL_KNOWN_PATH))
+        }.distinct()
 
         log.debug { "Attempting to fetch metadata from ${urlsToTry.size} well-known endpoints" }
         log.trace { "Metadata URLs to try: ${urlsToTry.joinToString()}" }
 
-        for ((index, metadataUrl) in urlsToTry.distinct().withIndex()) {
-            log.debug { "Attempt ${index + 1}/${urlsToTry.distinct().size}: Fetching from $metadataUrl" }
+        val failures = mutableListOf<ResolveFailure>()
+        for ((index, metadataUrl) in urlsToTry.withIndex()) {
+            log.debug { "Attempt ${index + 1}/${urlsToTry.size}: Fetching from $metadataUrl" }
 
             val response: HttpResponse = try {
                 httpClient.get(metadataUrl)
             } catch (e: Exception) {
                 log.warn(e) { "Network error fetching credential issuer metadata from: $metadataUrl" }
+                failures += ResolveFailure.Network(metadataUrl, e)
                 continue
             }
 
             if (response.status.isSuccess()) {
                 log.trace { "Received successful response (${response.status.value}), parsing metadata" }
-                return try {
+                try {
                     val metadata = response.body<CredentialIssuerMetadata>()
                     log.info {
                         "Successfully resolved credential issuer metadata - " +
@@ -70,30 +72,37 @@ class IssuerMetadataResolver(
                                 "Configurations: ${metadata.credentialConfigurationsSupported.size}"
                     }
                     log.trace { "Supported credential configurations: ${metadata.credentialConfigurationsSupported.keys.joinToString()}" }
-                    metadata
+                    return metadata
                 } catch (e: Exception) {
-                    val responseBody = response.bodyAsText()
+                    val responseBody = runCatching { response.bodyAsText() }.getOrDefault("")
                     log.error(e) {
                         "Failed to parse credential issuer metadata from $metadataUrl - " +
-                                "Body preview: ${responseBody.take(200)}${if (responseBody.length > 200) "..." else ""}"
+                                "Body preview: ${bodyPreview(responseBody)}"
                     }
+                    failures += ResolveFailure.Parse(metadataUrl, e, bodyPreview(responseBody))
                     continue
                 }
             } else {
-                val errorBody = response.bodyAsText()
+                val errorBody = runCatching { response.bodyAsText() }.getOrDefault("")
                 log.debug {
                     "Failed to fetch credential issuer metadata from $metadataUrl - " +
                             "Status: ${response.status.value} ${response.status.description}"
                 }
                 log.trace { "Error body: $errorBody" }
+                failures += ResolveFailure.HttpStatus(metadataUrl, response.status, bodyPreview(errorBody))
             }
         }
 
         log.error {
             "Failed to resolve credential issuer metadata for issuer: $credentialIssuerUrl - " +
-                    "Tried ${urlsToTry.distinct().size} endpoints"
+                    "Tried ${urlsToTry.size} endpoints"
         }
-        throw Exception("Failed to resolve credential issuer metadata for $credentialIssuerUrl from any of: $urlsToTry")
+        throw resolutionException(
+            "credential issuer metadata",
+            credentialIssuerUrl,
+            urlsToTry,
+            failures,
+        )
     }
 
     /**
@@ -107,36 +116,45 @@ class IssuerMetadataResolver(
         require(authorizationServerUrl.isNotBlank()) { "Authorization server URL cannot be blank" }
 
         val urlsToTry = if (authorizationServerUrl.contains(OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH)) {
-            mutableListOf(authorizationServerUrl)
+            listOf(authorizationServerUrl)
         } else {
-            mutableListOf(buildMetadataUrl(authorizationServerUrl, OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH))
-        }
+            listOf(buildMetadataUrl(authorizationServerUrl, OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH))
+        }.distinct()
 
-        for (metadataUrl in urlsToTry.distinct()) {
+        val failures = mutableListOf<ResolveFailure>()
+        for (metadataUrl in urlsToTry) {
             log.debug { "Fetching authorization server metadata from: $metadataUrl" }
             val response: HttpResponse = try {
                 httpClient.get(metadataUrl)
             } catch (e: Exception) {
                 log.warn(e) { "Network error fetching authorization server metadata from: $metadataUrl" }
+                failures += ResolveFailure.Network(metadataUrl, e)
                 continue
             }
 
             if (response.status.isSuccess()) {
-                return try {
-                    response.body<AuthorizationServerMetadata>()
+                try {
+                    return response.body<AuthorizationServerMetadata>()
                 } catch (e: Exception) {
-                    val responseBody = response.bodyAsText()
+                    val responseBody = runCatching { response.bodyAsText() }.getOrDefault("")
                     log.error(e) { "Failed to parse authorization server metadata from $metadataUrl. Body: $responseBody" }
+                    failures += ResolveFailure.Parse(metadataUrl, e, bodyPreview(responseBody))
                     continue
                 }
             } else {
-                val errorBody = response.bodyAsText()
+                val errorBody = runCatching { response.bodyAsText() }.getOrDefault("")
                 log.debug { "Failed to fetch authorization server metadata from $metadataUrl. Status: ${response.status}" }
                 log.trace { "Error body: $errorBody" }
+                failures += ResolveFailure.HttpStatus(metadataUrl, response.status, bodyPreview(errorBody))
             }
         }
 
-        throw Exception("Failed to resolve authorization server metadata for $authorizationServerUrl from any of: $urlsToTry")
+        throw resolutionException(
+            "authorization server metadata",
+            authorizationServerUrl,
+            urlsToTry,
+            failures,
+        )
     }
 
     /**
@@ -151,36 +169,45 @@ class IssuerMetadataResolver(
         require(providerUrl.isNotBlank()) { "Provider URL cannot be blank" }
 
         val urlsToTry = if (providerUrl.contains(OPENID_CONFIGURATION_WELL_KNOWN_PATH)) {
-            mutableListOf(providerUrl)
+            listOf(providerUrl)
         } else {
-            mutableListOf(buildMetadataUrl(providerUrl, OPENID_CONFIGURATION_WELL_KNOWN_PATH))
-        }
+            listOf(buildMetadataUrl(providerUrl, OPENID_CONFIGURATION_WELL_KNOWN_PATH))
+        }.distinct()
 
-        for (metadataUrl in urlsToTry.distinct()) {
+        val failures = mutableListOf<ResolveFailure>()
+        for (metadataUrl in urlsToTry) {
             log.debug { "Fetching OpenID provider metadata from: $metadataUrl" }
             val response: HttpResponse = try {
                 httpClient.get(metadataUrl)
             } catch (e: Exception) {
                 log.warn(e) { "Network error fetching OpenID provider metadata from: $metadataUrl" }
+                failures += ResolveFailure.Network(metadataUrl, e)
                 continue
             }
 
             if (response.status.isSuccess()) {
-                return try {
-                    response.body<OpenIDProviderMetadata>()
+                try {
+                    return response.body<OpenIDProviderMetadata>()
                 } catch (e: Exception) {
-                    val responseBody = response.bodyAsText()
+                    val responseBody = runCatching { response.bodyAsText() }.getOrDefault("")
                     log.error(e) { "Failed to parse OpenID provider metadata from $metadataUrl. Body: $responseBody" }
+                    failures += ResolveFailure.Parse(metadataUrl, e, bodyPreview(responseBody))
                     continue
                 }
             } else {
-                val errorBody = response.bodyAsText()
+                val errorBody = runCatching { response.bodyAsText() }.getOrDefault("")
                 log.debug { "Failed to fetch OpenID provider metadata from $metadataUrl. Status: ${response.status}" }
                 log.trace { "Error body: $errorBody" }
+                failures += ResolveFailure.HttpStatus(metadataUrl, response.status, bodyPreview(errorBody))
             }
         }
 
-        throw Exception("Failed to resolve OpenID provider metadata for $providerUrl from any of: $urlsToTry")
+        throw resolutionException(
+            "OpenID provider metadata",
+            providerUrl,
+            urlsToTry,
+            failures,
+        )
     }
 
     /**
@@ -202,18 +229,105 @@ class IssuerMetadataResolver(
     }
 
     /**
-     * Builds a full metadata URL from a base URL and well-known path
      */
-    private fun buildMetadataUrl(baseUrl: String, wellKnownSuffix: String): String {
+    internal fun buildMetadataUrl(baseUrl: String, wellKnownSuffix: String): String {
         val url = Url(baseUrl)
         val pathSuffix = url.encodedPath.trimEnd('/').takeIf { it.isNotEmpty() && it != "/" } ?: ""
+        val hostAndPort = if (url.specifiedPort != DEFAULT_PORT && url.specifiedPort != url.protocol.defaultPort) {
+            "${url.host}:${url.specifiedPort}"
+        } else {
+            url.host
+        }
 
         return buildString {
             append(url.protocol.name)
             append("://")
-            append(url.hostWithPort)
+            append(hostAndPort)
             append(wellKnownSuffix)
             append(pathSuffix)
         }
     }
+}
+
+/**
+ * Per-URL failure captured while iterating candidate well-known endpoints. Used to build the
+ * final resolution error so wallet integrators can distinguish HTTP status, network, and
+ * parse failures at a glance instead of only seeing the URL list.
+ */
+private sealed class ResolveFailure {
+    abstract val url: String
+    abstract fun describe(): String
+    abstract val throwable: Throwable?
+
+    data class Network(override val url: String, val error: Throwable) : ResolveFailure() {
+        override val throwable: Throwable get() = error
+        override fun describe(): String {
+            val name = error::class.simpleName ?: "Exception"
+            val message = error.message?.takeIf { it.isNotBlank() } ?: "no message"
+            return "$url → network error: $name: $message"
+        }
+    }
+
+    data class HttpStatus(
+        override val url: String,
+        val status: HttpStatusCode,
+        val bodyPreview: String,
+    ) : ResolveFailure() {
+        override val throwable: Throwable? = null
+        override fun describe(): String {
+            val bodySuffix = if (bodyPreview.isNotBlank()) " body: $bodyPreview" else ""
+            return "$url → HTTP ${status.value} ${status.description};$bodySuffix"
+        }
+    }
+
+    data class Parse(
+        override val url: String,
+        val error: Throwable,
+        val bodyPreview: String,
+    ) : ResolveFailure() {
+        override val throwable: Throwable get() = error
+        override fun describe(): String {
+            val name = error::class.simpleName ?: "Exception"
+            val message = error.message?.takeIf { it.isNotBlank() } ?: "no message"
+            val bodySuffix = if (bodyPreview.isNotBlank()) " body: $bodyPreview" else ""
+            return "$url → parse error: $name: $message;$bodySuffix"
+        }
+    }
+}
+
+private const val BODY_PREVIEW_LIMIT = 500
+
+private fun bodyPreview(body: String): String =
+    if (body.length <= BODY_PREVIEW_LIMIT) body else body.take(BODY_PREVIEW_LIMIT) + "…"
+
+/**
+ * Builds a final resolution [Exception] whose message names each attempted URL, the outcome for
+ * each, and which chains the first underlying [Throwable] as `cause` for full-stack diagnostics
+ * (parse errors are the common case for external issuers that ship spec-non-compliant metadata).
+ */
+private fun resolutionException(
+    what: String,
+    target: String,
+    urlsToTry: List<String>,
+    failures: List<ResolveFailure>,
+): Exception {
+    val summary = buildString {
+        append("Failed to resolve ")
+        append(what)
+        append(" for ")
+        append(target)
+        append(". Tried ${urlsToTry.size} endpoint(s):")
+        if (failures.isEmpty()) {
+            append(" ")
+            append(urlsToTry.joinToString())
+        } else {
+            failures.forEach { failure ->
+                append('\n')
+                append("  - ")
+                append(failure.describe())
+            }
+        }
+    }
+    val cause = failures.firstNotNullOfOrNull { it.throwable }
+    return Exception(summary, cause)
 }
