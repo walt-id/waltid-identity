@@ -18,8 +18,10 @@ internal object SignProofTestSupport {
     fun issuerMetadataClient(
         configurationId: String = CONFIG_ID,
         proofAlgorithms: Set<String> = setOf("ES256", "EdDSA"),
+        bindingMethods: Set<String> = setOf("jwk"),
     ): HttpClient {
         val algorithmsJson = proofAlgorithms.joinToString(",") { "\"$it\"" }
+        val bindingMethodsJson = bindingMethods.joinToString(",") { "\"$it\"" }
         val body = """
             {
               "credential_issuer":"$ISSUER",
@@ -27,7 +29,7 @@ internal object SignProofTestSupport {
               "credential_configurations_supported":{
                 "$configurationId":{
                   "format":"jwt_vc_json",
-                  "cryptographic_binding_methods_supported":["jwk"],
+                  "cryptographic_binding_methods_supported":[$bindingMethodsJson],
                   "proof_types_supported":{
                     "jwt":{"proof_signing_alg_values_supported":[$algorithmsJson]}
                   }

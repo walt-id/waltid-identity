@@ -145,13 +145,37 @@ class WalletIssuanceCrypto2ProofJvmTest {
                 nonce = "nonce",
                 did = did,
             ),
-            httpClient = issuerMetadataClient(proofAlgorithms = setOf("ES256", "EdDSA")),
+            httpClient = issuerMetadataClient(
+                proofAlgorithms = setOf("ES256", "EdDSA"),
+                bindingMethods = setOf("did:key"),
+            ),
         ).proofJwt
 
         assertEquals(
             "$did#${did.removePrefix("did:key:")}",
             CompactJws.decodeUnverified(proof).protectedHeader["kid"]?.jsonPrimitive?.content,
         )
+    }
+
+    @Test
+    fun `wallet drops caller-supplied DID when issuer only advertises JWK binding`() = runTest {
+        DidService.minimalInit()
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val did = DidService.registerByKey("key", key).did
+        val proof = WalletIssuanceHandler.signProof(
+            wallet = Wallet(id = "wallet", staticKey = key),
+            request = SignProofRequest(
+                issuerUrl = Url(ISSUER),
+                credentialConfigurationId = CONFIG_ID,
+                nonce = "nonce",
+                did = did,
+            ),
+            httpClient = issuerMetadataClient(proofAlgorithms = setOf("ES256", "EdDSA")),
+        ).proofJwt
+
+        val header = CompactJws.decodeUnverified(proof).protectedHeader
+        assertNotNull(header["jwk"], "JWK-only issuers require an inline jwk header")
+        assertFalse("kid" in header, "Wallet must not send did:...#kid to a JWK-only issuer")
     }
 
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
