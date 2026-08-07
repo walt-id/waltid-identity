@@ -84,16 +84,9 @@ object VerificationSessionCreator {
     ): List<Policy> =
         if (!shouldInclude || any { it.id == policy.id || it.id in equivalentPolicyIds }) this else this + policy
 
-    private suspend fun getKid(clientId: String?, key: VerifierSigningKey): String {
-        val keyId = when (key) {
-            is VerifierSigningKey.Legacy -> key.key.getKeyId()
-            is VerifierSigningKey.Crypto2 -> key.key.id.value
-        }
-        val prefix = "decentralized_identifier:"
-        return clientId
-            ?.takeIf { it.startsWith(prefix) && it.substringAfter(prefix).isNotBlank() }
-            ?.let { "${it.substringAfter(prefix)}#$keyId" }
-            ?: keyId
+    private suspend fun getKid(clientId: String?, key: VerifierSigningKey): String = when (key) {
+        is VerifierSigningKey.Legacy -> requestObjectKid(clientId, key.key)
+        is VerifierSigningKey.Crypto2 -> requestObjectKid(clientId, key.key)
     }
 
     @Deprecated("Use the crypto2 Key overload with explicit JWS and COSE algorithms for signed sessions")
@@ -435,16 +428,12 @@ object VerificationSessionCreator {
         )
         log.trace { "Constructed AuthorizationRequest: $authorizationRequest" }
 
-        val authorizationRequestUrl = authorizationRequest.toHttpUrl(URLBuilder(urlHost))
-        val bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequest?.toHttpUrl(URLBuilder(urlHost))
-
         val now = Clock.System.now()
         val expiration = setup.core.expirationDate
         val retentionDate = now.plus(10, DateTimeUnit.YEAR, TimeZone.UTC)
 
         val signedAuthorizationRequest = if (isSignedRequest) {
             val requestSigningKey = requireNotNull(signingKey)
-
             val headers = hashMapOf<String, JsonElement>(
                 "typ" to JsonPrimitive("oauth-authz-req+jwt"),
                 "kid" to JsonPrimitive(getKid(clientId, requestSigningKey))
@@ -464,6 +453,19 @@ object VerificationSessionCreator {
 
             requestSigningKey.signJws(Json.encodeToString(payloadWithAud).encodeToByteArray(), headers)
         } else null
+
+        // A signed cross-device session exposes a self-contained full URL. The bootstrap URL
+        // remains the request_uri entry point for wallets that need nonce-bound POST retrieval.
+        val authorizationRequestUrl = if (signedAuthorizationRequest != null) {
+            authorizationRequest.copy(
+                request = signedAuthorizationRequest,
+                requestUri = null,
+                requestUriMethod = null,
+            ).toHttpUrl(URLBuilder(urlHost))
+        } else {
+            authorizationRequest.toHttpUrl(URLBuilder(urlHost))
+        }
+        val bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequest?.toHttpUrl(URLBuilder(urlHost))
 
         val effectiveVpPolicies = (setup.core.policies.vp_policies ?: defaultVpPolicies())
             .withMandatoryTransactionDataPolicies(transactionDataFormats)
