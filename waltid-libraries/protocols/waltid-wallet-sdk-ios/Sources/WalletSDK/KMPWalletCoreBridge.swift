@@ -1681,6 +1681,7 @@ private extension MobileWalletPresentationRequestInfo {
             state: state,
             nonce: nonce,
             responseEncryption: responseEncryption.toSwiftResponseEncryption(),
+            responseMode: responseMode,
             transactionData: swiftArray(transactionData, of: MobileWalletTransactionDataItem.self)
                 .map { $0.toSwiftTransactionData() }
         )

@@ -74,6 +74,32 @@ class ResponseEncryptionTest {
         assertTrue(error.message.orEmpty().contains("private material"))
     }
 
+    @Test
+    fun `selects the same key independent of verifier jwks order`() = runTest {
+        val keyZ = JsonObject(publicKey + ("kid" to JsonPrimitive("z-key")))
+        val keyA = JsonObject(publicKey + ("kid" to JsonPrimitive("a-key")))
+
+        val forward = requireNotNull(ResponseEncryption.resolveCrypto2(requestWithKeys(listOf(keyZ, keyA))))
+        val reverse = requireNotNull(ResponseEncryption.resolveCrypto2(requestWithKeys(listOf(keyA, keyZ))))
+
+        assertEquals("a-key", forward.metadata().verifierKeyId)
+        assertEquals(forward.thumbprint(), reverse.thumbprint())
+        assertEquals(forward.metadata().verifierKeyId, reverse.metadata().verifierKeyId)
+    }
+
+    @Test
+    fun `rejects duplicate key ids and unsupported key metadata`() = runTest {
+        val duplicateKid = JsonObject(publicKey + ("kid" to JsonPrimitive("enc-key")))
+        assertFailsWith<IllegalArgumentException> {
+            ResponseEncryption.resolveCrypto2(requestWithKeys(listOf(publicKey, duplicateKid)))
+        }
+
+        val signingKey = JsonObject(publicKey + ("use" to JsonPrimitive("sig")))
+        assertFailsWith<IllegalArgumentException> {
+            ResponseEncryption.resolveCrypto2(request(signingKey))
+        }
+    }
+
     @Suppress("DEPRECATION")
     @Test
     fun `legacy config remains public only`() = runTest {
@@ -89,6 +115,16 @@ class ResponseEncryptionTest {
         responseMode = OpenID4VPResponseMode.DIRECT_POST_JWT,
         clientMetadata = ClientMetadata(
             jwks = ClientMetadata.Jwks(listOf(key)),
+            encryptedResponseEncValuesSupported = listOf("A256GCM"),
+        ),
+    )
+
+    private fun requestWithKeys(keys: List<JsonObject>) = AuthorizationRequest(
+        clientId = "x509_hash:test",
+        responseUri = "https://verifier.example/response",
+        responseMode = OpenID4VPResponseMode.DIRECT_POST_JWT,
+        clientMetadata = ClientMetadata(
+            jwks = ClientMetadata.Jwks(keys),
             encryptedResponseEncValuesSupported = listOf("A256GCM"),
         ),
     )
