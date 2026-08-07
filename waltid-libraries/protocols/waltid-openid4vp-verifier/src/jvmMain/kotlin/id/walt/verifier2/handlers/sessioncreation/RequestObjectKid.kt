@@ -8,6 +8,7 @@ import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidService
 import id.walt.did.dids.document.MultibasePublicKeys
 import id.walt.did.utils.KeyMaterial
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -61,9 +62,13 @@ private suspend fun JsonObject.publicJwkOrNull(): EncodedKey.Jwk? =
         ?: (this["publicKeyMultibase"] as? JsonPrimitive)
             ?.contentOrNull
             ?.let { MultibasePublicKeys.decode(it).jwk }
-        ?: runCatching {
+        ?: try {
             KeyMaterial.get(this).getOrThrow().getPublicKey().exportJWKObject().toEncodedPublicJwk()
-        }.getOrNull()
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: Exception) {
+            null
+        }
 
 private fun JsonObject.toEncodedPublicJwk(): EncodedKey.Jwk = EncodedKey.Jwk(
     data = BinaryData(Json.encodeToString(this).encodeToByteArray()),
