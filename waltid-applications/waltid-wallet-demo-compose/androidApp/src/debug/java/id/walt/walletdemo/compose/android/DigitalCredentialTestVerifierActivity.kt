@@ -37,11 +37,21 @@ class DigitalCredentialTestVerifierActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Test-side handoff for [DigitalCredentialTestVerifierActivity].
+ *
+ * The request is injected rather than hardcoded: the nonce must be the one a real verifier issued,
+ * otherwise nothing about the response can be verified.
+ */
 internal object DigitalCredentialTestVerifier {
     private var result = CompletableDeferred<Result<GetCredentialResponse>>()
 
-    fun reset() {
+    lateinit var requestJson: String
+        private set
+
+    fun reset(requestJson: String) {
         result = CompletableDeferred()
+        this.requestJson = requestJson
     }
 
     fun complete(value: Result<GetCredentialResponse>) {
@@ -49,34 +59,4 @@ internal object DigitalCredentialTestVerifier {
     }
 
     suspend fun await(): Result<GetCredentialResponse> = result.await()
-
-    val requestJson: String =
-        """
-        {
-          "requests": [
-            {
-              "protocol": "openid4vp-v1-unsigned",
-              "data": {
-                "response_type": "vp_token",
-                "response_mode": "dc_api",
-                "nonce": "android-dc-api-e2e-nonce",
-                "dcql_query": {
-                  "credentials": [
-                    {
-                      "id": "mdl",
-                      "format": "mso_mdoc",
-                      "meta": { "doctype_value": "org.iso.18013.5.1.mDL" },
-                      "claims": [
-                        { "path": ["org.iso.18013.5.1", "family_name"] },
-                        { "path": ["org.iso.18013.5.1", "given_name"] },
-                        { "path": ["org.iso.18013.5.1", "age_over_21"] }
-                      ]
-                    }
-                  ]
-                }
-              }
-            }
-          ]
-        }
-        """.trimIndent()
 }

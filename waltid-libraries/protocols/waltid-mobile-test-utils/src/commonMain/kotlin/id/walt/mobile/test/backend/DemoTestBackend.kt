@@ -31,6 +31,38 @@ object DemoTestBackend {
 
     private const val ISSUER_BASE_URL = "https://issuer2.demo.walt.id"
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
+
+    /**
+     * A second, independently deployed verifier2 - the one the portal's DC API page is wired to.
+     *
+     * Present so a test can hold the wallet, the issuer and the credential fixed and vary only the
+     * verifier build. See [DcApiDeployment].
+     */
+    const val PORTAL_VERIFIER_BASE_URL = "https://verifier2.portal.test.waltid.cloud"
+
+    /**
+     * The two deployed spellings of the DC API session-create payload.
+     *
+     * The same OpenAPI example title (`[openid4vp-dc_api][iso mdl] unsigned & unencrypted`) is served
+     * with incompatible request shapes by the two live verifier2 builds, and each rejects the other's
+     * with HTTP 400 `Failed to convert request body`:
+     *
+     * - [DEMO] - `verifier2.demo.walt.id` (`0.23.0`), and what this branch's
+     *   `DcApiAnnexDFlowSetup` serializes.
+     * - [PORTAL] - `verifier2.portal.test.waltid.cloud` (`1.0.2608051216-feat-portal2-dcapi`).
+     *
+     * This is modelled as an explicit choice rather than a try-both fallback so that a test names the
+     * shape it expects: a deployment that changes spelling should fail a test, not be absorbed.
+     */
+    enum class DcApiDeployment(
+        val verifierBaseUrl: String,
+        internal val flowType: String,
+        internal val coreKey: String,
+    ) {
+        DEMO(VERIFIER_BASE_URL, flowType = "dc_api", coreKey = "core"),
+        PORTAL(PORTAL_VERIFIER_BASE_URL, flowType = "dc_api_openid4vp", coreKey = "core_flow"),
+    }
+
     const val TRANSACTION_DATA_PROFILES_URL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
     private const val EUDI_PID_SD_JWT_VCT = "$ISSUER_BASE_URL/openid4vci/urn:eudi:pid:1"
     private const val PAYMENT_AUTHORIZATION_TYPE = "org.waltid.transaction-data.payment-authorization"
@@ -112,6 +144,12 @@ object DemoTestBackend {
     data class GeneratedOffer(val offerUrl: String, val txCode: String?)
 
     data class VerifierSession(val sessionId: String, val authorizationRequestUri: String)
+
+    /**
+     * A Digital Credentials API session. Unlike the cross-device flow there is no authorization
+     * request URL: [requestJson] is the object the browser or OS hands to the wallet verbatim.
+     */
+    data class DcApiVerifierSession(val sessionId: String, val requestJson: String)
 
     suspend fun createOffer(
         scenario: CredentialScenario,
@@ -242,6 +280,93 @@ object DemoTestBackend {
         return VerifierSession(sessionId, authorizationRequestUri)
     }
 
+    /**
+     * Creates an Annex D (Digital Credentials API) session and fetches its request object.
+     *
+     * [expectedOrigins] is not cosmetic: the verifier hashes its first entry into the mdoc session
+     * transcript, and the wallet hashes the origin the OS asserted for the calling app. If the two
+     * disagree, `mso_mdoc/device-auth` fails with a signature error that never mentions the origin.
+     * So the caller must pass the origin the platform will actually report - for a native caller
+     * that is `android:apk-key-hash:<base64url-sha256-of-signing-cert>`.
+     */
+    suspend fun createDcApiVerifierSession(
+        scenario: CredentialScenario,
+        expectedOrigins: List<String>,
+        deployment: DcApiDeployment = DcApiDeployment.DEMO,
+    ): DcApiVerifierSession {
+        require(expectedOrigins.isNotEmpty()) { "DC API sessions require at least one expected origin" }
+
+        val payload = buildJsonObject {
+            // "dc_api" is the @SerialName of DcApiAnnexDFlowSetup; unlike cross_device this flow
+            // spells its core config "core", and it takes no url_config. The deployed portal build
+            // spells both differently - see DcApiDeployment.
+            put("flow_type", deployment.flowType)
+            putJsonObject(deployment.coreKey) {
+                putJsonObject("dcql_query") {
+                    putJsonArray("credentials") {
+                        add(scenario.verifierCredentialQuery)
+                    }
+                }
+            }
+            // No vp_policies override: the verifier applies its full default mdoc policy set, which
+            // is what makes a policy regression visible here instead of silently skipped.
+            putJsonArray("expectedOrigins") {
+                expectedOrigins.forEach { add(JsonPrimitive(it)) }
+            }
+        }
+
+        val response = requestJson(
+            url = "${deployment.verifierBaseUrl}/verification-session/create",
+            body = payload,
+        )
+        val sessionId = response["sessionId"]?.jsonPrimitive?.contentOrNull
+            ?: error("Missing sessionId in verifier2 DC API response from ${deployment.verifierBaseUrl}: $response")
+
+        return DcApiVerifierSession(
+            sessionId = sessionId,
+            requestJson = dcApiRequestJson(sessionId, deployment),
+        )
+    }
+
+    /**
+     * The `digital` member of the verifier's request object - i.e. exactly the argument a browser
+     * would pass to `navigator.credentials.get({ digital: ... })`, and what Credential Manager
+     * expects as its request JSON.
+     */
+    private suspend fun dcApiRequestJson(
+        sessionId: String,
+        deployment: DcApiDeployment = DcApiDeployment.DEMO,
+    ): String {
+        val response = client.get("${deployment.verifierBaseUrl}/verification-session/$sessionId/request") {
+            accept(ContentType.Application.Json)
+        }
+        val body = response.bodyAsText()
+        if (!response.status.isSuccess()) {
+            error("HTTP ${response.status.value} from verifier2 DC API request for $sessionId: $body")
+        }
+        val digital = json.parseToJsonElement(body).jsonObject["digital"]
+            ?: error("Missing 'digital' member in public demo verifier2 DC API request object: $body")
+        return digital.toString()
+    }
+
+    /** Posts a wallet's `{protocol, data}` DC API response to the verifier for real verification. */
+    suspend fun submitDcApiResponse(
+        sessionId: String,
+        responseJson: String,
+        deployment: DcApiDeployment = DcApiDeployment.DEMO,
+    ): String {
+        val response = client.post("${deployment.verifierBaseUrl}/verification-session/$sessionId/response") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            setBody(responseJson)
+        }
+        val body = response.bodyAsText()
+        if (!response.status.isSuccess()) {
+            error("HTTP ${response.status.value} from verifier2 DC API response for $sessionId: $body")
+        }
+        return body
+    }
+
     private fun paymentAuthorizationTransactionData(
         credentialId: String,
         fields: Set<String>,
@@ -259,13 +384,16 @@ object DemoTestBackend {
         putProfileField(fields, "payee", "ACME Corp")
     }
 
-    suspend fun verifierSessionInfo(sessionId: String): JsonObject {
-        val response = client.get("$VERIFIER_BASE_URL/verification-session/$sessionId/info") {
+    suspend fun verifierSessionInfo(
+        sessionId: String,
+        deployment: DcApiDeployment = DcApiDeployment.DEMO,
+    ): JsonObject {
+        val response = client.get("${deployment.verifierBaseUrl}/verification-session/$sessionId/info") {
             accept(ContentType.Application.Json)
         }
         val body = response.bodyAsText()
         if (!response.status.isSuccess()) {
-            error("HTTP ${response.status.value} from public demo verifier2 session info for $sessionId: $body")
+            error("HTTP ${response.status.value} from verifier2 session info for $sessionId: $body")
         }
         return json.parseToJsonElement(body).jsonObject
     }
