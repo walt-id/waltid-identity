@@ -17,10 +17,20 @@ import id.walt.openid4vci.metadata.issuer.ProofType
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.handlers.SignProofTestSupport.CONFIG_ID
+import id.walt.wallet2.handlers.SignProofTestSupport.ISSUER
+import id.walt.wallet2.handlers.SignProofTestSupport.issuerMetadataClient
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respondError
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -43,10 +53,12 @@ class WalletIssuanceCrypto2ProofTest {
         val proof = WalletIssuanceHandler.signProof(
             wallet = wallet,
             request = SignProofRequest(
-                issuerUrl = Url("https://issuer.example"),
+                issuerUrl = Url(ISSUER),
+                credentialConfigurationId = CONFIG_ID,
                 nonce = "nonce",
                 keyId = "enterprise.resource.key",
             ),
+            httpClient = issuerMetadataClient(),
         ).proofJwt
 
         assertEquals(
@@ -65,7 +77,12 @@ class WalletIssuanceCrypto2ProofTest {
 
         val proof = WalletIssuanceHandler.signProof(
             wallet = Wallet(id = "wallet", keyStores = listOf(store)),
-            request = SignProofRequest(issuerUrl = Url("https://issuer.example"), nonce = "nonce"),
+            request = SignProofRequest(
+                issuerUrl = Url(ISSUER),
+                credentialConfigurationId = CONFIG_ID,
+                nonce = "nonce",
+            ),
+            httpClient = issuerMetadataClient(),
         ).proofJwt
 
         assertEquals(
@@ -77,10 +94,62 @@ class WalletIssuanceCrypto2ProofTest {
     }
 
     @Test
+    fun `sign-proof rejects unknown credential configuration ids`() = runTest {
+        val key = FakeSigningKey(KeyId("crypto2-key"))
+        val store = Crypto2BackedStore("enterprise.resource.key", key)
+
+        assertFailsWith<IllegalStateException> {
+            WalletIssuanceHandler.signProof(
+                wallet = Wallet(id = "wallet", keyStores = listOf(store)),
+                request = SignProofRequest(
+                    issuerUrl = Url(ISSUER),
+                    credentialConfigurationId = "missing-config",
+                    nonce = "nonce",
+                    keyId = "enterprise.resource.key",
+                ),
+                httpClient = issuerMetadataClient(),
+            )
+        }
+    }
+
+    @Test
     fun `non-JWT proof metadata is rejected instead of sending JWT`() {
         assertFailsWith<IllegalArgumentException> {
             supportedJwtProofAlgorithms(mapOf("attestation" to ProofType(setOf("ES256"))))
         }
+    }
+
+    @Test
+    fun `auth-code flow resolves referenced key through crypto2 resolveKeyMaterial`() = runTest {
+        val key = FakeSigningKey(KeyId("crypto2-only-auth-code"))
+        val store = Crypto2BackedStore("enterprise.resource.key", key)
+        val wallet = Wallet(id = "wallet", keyStores = listOf(store))
+
+        // Fail at the first HTTP call so the test only exercises the key-resolution branch.
+        val httpClient = HttpClient(MockEngine) {
+            engine {
+                addHandler { respondError(HttpStatusCode.ServiceUnavailable) }
+            }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+
+        assertFailsWith<Throwable> {
+            WalletIssuanceHandler.receiveCredentialAuthCodeFlow(
+                wallet = wallet,
+                code = "auth-code",
+                codeVerifier = null,
+                credentialIssuerBaseUrl = ISSUER,
+                credentialEndpoint = Url("$ISSUER/credential"),
+                credentialConfigurationId = CONFIG_ID,
+                keyReference = "enterprise.resource.key",
+                httpClient = httpClient,
+            ).toList()
+        }
+
+        // Referenced key must be resolved via crypto2 with SIGN usages, not converted to a
+        // legacy DirectSerializedKey.
+        assertEquals(setOf(KeyUsage.SIGN), store.requestedUsages)
+        assertEquals("enterprise.resource.key", store.lastRequestedKeyId)
     }
 
     private class FakeSigningKey(
@@ -113,11 +182,13 @@ class WalletIssuanceCrypto2ProofTest {
         private val crypto2Key: Crypto2Key,
     ) : WalletKeyStore {
         var requestedUsages: Set<KeyUsage>? = null
+        var lastRequestedKeyId: String? = null
 
         override suspend fun getKey(keyId: String): LegacyKey? = null
 
         override suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage>): Crypto2Key? {
             requestedUsages = usages
+            lastRequestedKeyId = keyId
             return crypto2Key.takeIf { keyId == storeKeyId }
         }
 

@@ -27,7 +27,9 @@ fun CredentialDetails.toCardDisplayData(): CredentialCardDisplayData {
         title = summary.label,
         credentialType = allItems.firstCredentialTypeText(),
         format = summary.format,
-        issuer = summary.issuer?.takeIf { it.isNotBlank() } ?: CredentialDisplayText.Unknown,
+        issuer = issuerDisplay?.name?.takeIf { it.isNotBlank() }
+            ?: summary.issuer?.takeIf { it.isNotBlank() }
+            ?: CredentialDisplayText.Unknown,
         holderName = holderName,
         validity = expiryDate?.let { CredentialDisplayText.expires(it) }
             ?: fallbackAddedDate?.let { CredentialDisplayText.added(it) },

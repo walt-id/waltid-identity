@@ -9,14 +9,11 @@ import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletEventPhase
 import id.walt.wallet2.mobile.MobileWalletEventStatus
 import id.walt.wallet2.mobile.MobileWalletKeyType
-import id.walt.wallet2.mobile.MobileWalletIssuancePreviewHandle
-import id.walt.wallet2.mobile.MobileWalletOfferResolution
+import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
-import id.walt.wallet2.mobile.MobileWalletIssuerMetadata
 import id.walt.wallet2.mobile.MobileWalletMetadataDisplay
-import id.walt.wallet2.mobile.MobileWalletOfferedCredentialMetadata
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialOption
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialRequirement
@@ -32,10 +29,10 @@ import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
-import id.walt.wallet2.mobile.MobileWalletTransactionCodeInputMode
-import id.walt.wallet2.mobile.MobileWalletTransactionCodeRequirement
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
+import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.x509.CertificateDer
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -105,15 +102,15 @@ class WalletSdkBridgeTest {
     }
 
     @Test
-    fun bridgeResolvesCredentialOffers() = runTest {
+    fun bridgeCancelsIssuanceSessionsThroughTypedResults() = runTest {
         val operations = FakeWalletSdkBridgeOperations()
         val bridge = WalletSdkBridge.forOperations(operations)
 
-        val result = bridge.resolveOffer("openid-credential-offer://issuer.example")
+        val result = bridge.cancelIssuance("issuance-session")
 
-        assertIs<WalletBridgeResult.Success<MobileWalletOfferResolution>>(result)
-        assertEquals(MobileWalletTransactionCodeInputMode.Numeric, result.value.transactionCode?.inputMode)
-        assertEquals("openid-credential-offer://issuer.example", operations.resolvedOfferUrl)
+        assertIs<WalletBridgeResult.Success<WalletIssuanceOutcome>>(result)
+        assertEquals(WalletIssuanceOutcome.Cancelled("issuance-session"), result.value)
+        assertEquals("issuance-session", operations.cancelledIssuanceSessionId)
     }
 
     @Test
@@ -274,20 +271,6 @@ class WalletSdkBridgeTest {
         assertEquals(handle, operations.rejectedPreviewHandle)
         assertNull(operations.rejectedErrorCode)
         assertNull(operations.rejectedErrorDescription)
-    }
-
-    @Test
-    fun bridgeMethodsReturnTypedFailures() = runTest {
-        val operations = FakeWalletSdkBridgeOperations(
-            receiveFailure = IllegalArgumentException("bad offer"),
-        )
-        val bridge = WalletSdkBridge.forOperations(operations)
-
-        val result = bridge.receive(offerUrl = "not-a-url")
-
-        assertIs<WalletBridgeResult.Failure>(result)
-        assertEquals(WalletBridgeErrorCategory.invalidInput, result.error.category)
-        assertEquals("bad offer", result.error.message)
     }
 
     @Test
@@ -580,14 +563,11 @@ class WalletSdkBridgeTest {
     }
 
     private class FakeWalletSdkBridgeOperations(
-        private val receiveFailure: Throwable? = null,
         private val previewResult: MobileWalletPresentationPreviewResult? = null,
     ) : WalletSdkBridgeOperations {
         var bootstrapKeyType: MobileWalletKeyType? = null
             private set
         var bootstrapDidMethod: String? = null
-            private set
-        var resolvedOfferUrl: String? = null
             private set
         var presentationRequestUrl: String? = null
             private set
@@ -615,6 +595,8 @@ class WalletSdkBridgeTest {
             private set
         var rejectedErrorDescription: String? = null
             private set
+        var cancelledIssuanceSessionId: String? = null
+            private set
         override suspend fun bootstrap(
             keyType: MobileWalletKeyType?,
             didMethod: String,
@@ -627,49 +609,29 @@ class WalletSdkBridgeTest {
             )
         }
 
-        override suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution {
-            resolvedOfferUrl = offerUrl
-            return MobileWalletOfferResolution(
-                previewHandle = MobileWalletIssuancePreviewHandle("issuance-preview"),
-                issuer = MobileWalletIssuerMetadata(
-                    credentialIssuer = "https://issuer.example",
-                    display = null,
-                ),
-                offeredCredentials = listOf(
-                    MobileWalletOfferedCredentialMetadata(
-                        configurationId = "ExampleCredential",
-                        format = "vc+sd-jwt",
-                        scope = null,
-                        vct = "ExampleCredential",
-                        doctype = null,
-                        display = null,
-                        claims = emptyList(),
-                    )
-                ),
-                transactionCode = MobileWalletTransactionCodeRequirement(
-                    inputMode = MobileWalletTransactionCodeInputMode.Numeric,
-                    length = 6,
-                    description = "Enter the six-digit code",
-                ),
-            )
+        override suspend fun startIssuance(request: MobileWalletIssuanceRequest) =
+            error("Not used by this test fake")
+
+        override suspend fun beginAuthorizationIssuance(sessionId: String): WalletIssuanceAuthorization =
+            error("Not used by this test fake")
+
+        override suspend fun continuePreAuthorizedIssuance(
+            sessionId: String,
+            transactionCode: String?,
+        ) = error("Not used by this test fake")
+
+        override suspend fun continueAuthorizationIssuance(
+            sessionId: String,
+            callbackUri: String,
+        ) = error("Not used by this test fake")
+
+        override suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome {
+            cancelledIssuanceSessionId = sessionId
+            return WalletIssuanceOutcome.Cancelled(sessionId)
         }
 
-        override suspend fun receive(
-            offerUrl: String,
-            txCode: String?,
-            clientId: String,
-        ): List<String> {
-            receiveFailure?.let { throw it }
-            return listOf("credential-1")
-        }
-
-        override suspend fun receivePreviewed(
-            previewHandle: MobileWalletIssuancePreviewHandle,
-            txCode: String?,
-            clientId: String,
-        ): List<String> = listOf("credential-1")
-
-        override suspend fun discardIssuancePreview(previewHandle: MobileWalletIssuancePreviewHandle) = Unit
+        override suspend fun resumeDeferredIssuance(deferredCredentialId: String) =
+            error("Not used by this test fake")
 
         override suspend fun credentials(): List<MobileWalletCredential> =
             listOf(

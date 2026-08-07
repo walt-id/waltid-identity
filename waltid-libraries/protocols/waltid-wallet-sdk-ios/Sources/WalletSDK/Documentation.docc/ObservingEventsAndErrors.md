@@ -35,7 +35,13 @@ without depending on generated Kotlin exception types.
 
 ```swift
 do {
-    _ = try await wallet.receive(offer: credentialOfferURL)
+    let session = try await wallet.startIssuance(
+        IssuanceRequest(
+            offer: credentialOfferURL,
+            redirectURI: URL(string: "openid://")!
+        )
+    )
+    _ = try await wallet.continuePreAuthorizedIssuance(sessionID: session.id)
 } catch let error as WalletError {
     showWalletError(error.localizedDescription)
 } catch {

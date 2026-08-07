@@ -3,6 +3,8 @@ package id.walt.walletdemo.compose.logic
 data class CredentialDetails(
     val summary: CredentialSummary,
     val groups: List<ClaimGroup>,
+    /** Issuer display from stored sidecar metadata (`issuerDisplay`), when available. */
+    val issuerDisplay: WalletDemoMetadataDisplay? = null,
 )
 
 data class ClaimGroup(
