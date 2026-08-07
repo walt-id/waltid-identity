@@ -11,6 +11,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 
 class IssuerMetadataResolverTest {
 
@@ -60,10 +61,28 @@ class IssuerMetadataResolverTest {
         }
 
         val resolver = IssuerMetadataResolver(client)
-        val metadata = resolver.resolveCredentialIssuerMetadata(issuerUrl)
+        val metadata = resolver.resolveCredentialIssuerMetadata(issuerUrl).metadata
 
         assertEquals(issuerUrl, metadata.credentialIssuer)
         assertEquals(1, metadata.credentialConfigurationsSupported?.size)
+    }
+
+    @Test
+    fun jsonMetadataProducesUnsignedResolutionWithoutAdvertisingJwtSupport() = runTest {
+        val issuerUrl = "https://example.com"
+        val client = createMockClient { request ->
+            assertEquals("application/json", request.headers[HttpHeaders.Accept])
+            respond(
+                content = """{"credential_issuer":"$issuerUrl","credential_endpoint":"$issuerUrl/credential","credential_configurations_supported":{}}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+
+        val resolved = IssuerMetadataResolver(client).resolveCredentialIssuerMetadata(issuerUrl)
+
+        assertIs<ResolvedCredentialIssuerMetadata.Unsigned>(resolved)
+        assertEquals(issuerUrl, resolved.metadata.credentialIssuer)
     }
     @Test
     fun testResolveCredentialIssuerMetadataWithIssuerPath() = runTest {
@@ -96,7 +115,7 @@ class IssuerMetadataResolverTest {
         }
 
         val resolver = IssuerMetadataResolver(client)
-        val metadata = resolver.resolveCredentialIssuerMetadata(issuerUrl)
+        val metadata = resolver.resolveCredentialIssuerMetadata(issuerUrl).metadata
 
         assertEquals(issuerUrl, metadata.credentialIssuer)
         assertEquals("$issuerUrl/credential", metadata.credentialEndpoint)

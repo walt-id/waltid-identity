@@ -17,6 +17,7 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -29,6 +30,8 @@ import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.ktor.http.URLBuilder
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
+import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -57,6 +60,67 @@ import kotlin.time.Duration.Companion.milliseconds
 import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 
 class MobileWalletTest {
+
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @Test
+    fun signedRequestObjectProvenanceRetainsExactJwtHeaderAndClientIdPrefix() {
+        val requestObject = listOf(
+            """{"alg":"ES256","kid":"verifier-key-1"}""".encodeToByteArray().encodeToBase64Url(),
+            "{}".encodeToByteArray().encodeToBase64Url(),
+            "signature".encodeToByteArray().encodeToBase64Url(),
+        ).joinToString(".")
+        val authorizationRequest = AuthorizationRequest(
+            clientId = "x509_san_dns:https://verifier.example",
+            nonce = "nonce-1",
+        )
+
+        val info = authorizationRequest.toMobileRequestInfo(
+            preferredLocales = emptyList(),
+            resolvedAuthorizationRequest = ResolvedAuthorizationRequest.WithRequestObject(
+                authorizationRequest = authorizationRequest,
+                requestObject = requestObject,
+            ),
+        )
+
+        assertEquals(
+            MobileWalletVerifierMetadataProvenance.SignedRequest(
+                compactRequestObject = requestObject,
+                algorithm = "ES256",
+                keyId = "verifier-key-1",
+                clientIdPrefix = "x509_san_dns",
+            ),
+            info.verifierMetadataProvenance,
+        )
+    }
+
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @Test
+    fun signedInvalidRequestContextRetainsRequestObjectProvenance() {
+        val requestObject = listOf(
+            """{"alg":"ES256","kid":"verifier-key-1"}""".encodeToByteArray().encodeToBase64Url(),
+            "{}".encodeToByteArray().encodeToBase64Url(),
+            "signature".encodeToByteArray().encodeToBase64Url(),
+        ).joinToString(".")
+        val authorizationRequest = AuthorizationRequest(clientId = "x509_san_dns:https://verifier.example")
+
+        val context = authorizationRequest.toMobileRequestContext(
+            preferredLocales = emptyList(),
+            resolvedAuthorizationRequest = ResolvedAuthorizationRequest.WithRequestObject(
+                authorizationRequest = authorizationRequest,
+                requestObject = requestObject,
+            ),
+        )
+
+        assertEquals(
+            MobileWalletVerifierMetadataProvenance.SignedRequest(
+                compactRequestObject = requestObject,
+                algorithm = "ES256",
+                keyId = "verifier-key-1",
+                clientIdPrefix = "x509_san_dns",
+            ),
+            context.verifierMetadataProvenance,
+        )
+    }
 
     @Test
     fun presentationErrorCodesMatchOAuthAndOpenId4VpValues() {
@@ -310,6 +374,7 @@ class MobileWalletTest {
             MobileWalletPresentationRequestContext(
                 clientId = " ",
                 verifierMetadata = null,
+                verifierMetadataProvenance = MobileWalletVerifierMetadataProvenance.UnsignedRequest,
                 responseUri = null,
                 state = null,
                 nonce = null,
@@ -320,6 +385,7 @@ class MobileWalletTest {
         val context = MobileWalletPresentationRequestContext(
             clientId = "https://verifier.example",
             verifierMetadata = null,
+            verifierMetadataProvenance = MobileWalletVerifierMetadataProvenance.UnsignedRequest,
             responseUri = null,
             state = null,
             nonce = null,
@@ -470,6 +536,7 @@ class MobileWalletTest {
                     policyUri = null,
                     termsOfServiceUri = null,
                 ),
+                verifierMetadataProvenance = MobileWalletVerifierMetadataProvenance.UnsignedRequest,
                 responseUri = "https://verifier.example/direct-post",
                 state = "state-1",
                 nonce = "nonce-1",
@@ -545,6 +612,7 @@ class MobileWalletTest {
             policyUri = null,
             termsOfServiceUri = null,
         ),
+        verifierMetadataProvenance = MobileWalletVerifierMetadataProvenance.UnsignedRequest,
         responseUri = "https://verifier.example/direct-post",
         state = null,
         nonce = nonce,

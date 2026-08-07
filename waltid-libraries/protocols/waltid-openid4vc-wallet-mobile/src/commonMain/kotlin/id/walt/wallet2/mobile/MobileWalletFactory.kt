@@ -19,6 +19,7 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.uuid.Uuid
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 
 /**
  * Configuration for creating a [MobileWallet].
@@ -31,6 +32,7 @@ import kotlin.uuid.Uuid
  * @property preferredLocales Ordered BCP 47 locale preferences used for progressive language-tag lookup.
  * When no preference matches, selection falls back to an unlocalized entry and then the first entry.
  * @property transactionDataProfiles Transaction data profiles this mobile wallet accepts in OpenID4VP requests.
+ * @property credentialIssuerMetadataTrustResolver Optional verifier and authority policy for signed Credential Issuer Metadata.
  */
 public data class MobileWalletConfig(
     public val walletId: String = "default",
@@ -40,6 +42,7 @@ public data class MobileWalletConfig(
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    public val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
 )
 
 /**
@@ -184,6 +187,7 @@ internal fun createSqlDelightMobileWallet(
         preferredLocales = config.preferredLocales,
         transactionDataProfiles = config.transactionDataProfiles,
         clientIdTrustConfiguration = clientIdTrustConfiguration,
+        credentialIssuerMetadataTrustResolver = config.credentialIssuerMetadataTrustResolver,
         onEvent = config.onEvent,
         deleteLocalPersistence = deleteLocalPersistence,
     )

@@ -25,6 +25,35 @@ let presentation = try await wallet.present(
 )
 ```
 
+### Signed Issuer Metadata
+
+Apps that accept signed Credential Issuer Metadata provide an
+``IssuerMetadataTrustResolver``. The resolver must verify the compact JWS and
+establish signer authority for the requested issuer; wallet core does not read
+metadata claims until it returns successfully. Resolved offers retain the exact
+JWT and signer provenance in ``IssuerMetadata/provenance``. Without a resolver,
+the wallet requests ordinary JSON metadata only.
+
+```swift
+struct AppIssuerMetadataTrustResolver: IssuerMetadataTrustResolver {
+    func verify(compactJWT: String, expectedCredentialIssuer: String) async throws -> IssuerMetadataSigner {
+        try await verifyIssuerMetadataJWS(compactJWT, issuer: expectedCredentialIssuer)
+        return IssuerMetadataSigner(
+            keyID: "issuer-signing-key",
+            algorithm: "ES256",
+            trustType: .trustedIssuer
+        )
+    }
+}
+
+let wallet = try await Wallet(
+    configuration: WalletConfiguration(
+        walletID: "consumer-wallet",
+        issuerMetadataTrustResolver: AppIssuerMetadataTrustResolver()
+    )
+)
+```
+
 The public API intentionally exposes Swift actors, structs, enums, and typed
 errors. Kotlin Multiplatform and bridge implementation details stay behind this
 module boundary.
@@ -116,6 +145,8 @@ reset; plaintext-to-encrypted migration is not performed.
 - ``WalletCredentialStore``
 - ``WalletDidStore``
 - ``WalletAttestationConfiguration``
+- ``IssuerMetadataTrustResolver``
+- ``IssuerMetadataSigner``
 
 ### Wallet Data
 

@@ -31,7 +31,11 @@ import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
+import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
@@ -47,6 +51,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 private object MobileDidSupport {
     private val initializationMutex = Mutex()
@@ -188,6 +193,7 @@ public class MobileWallet internal constructor(
     private val preferredLocales: List<String> = emptyList(),
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     private val clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+    private val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {
@@ -297,6 +303,7 @@ public class MobileWallet internal constructor(
         WalletIssuanceHandler.previewOffer(
             wallet = wallet,
             request = ResolveOfferRequest(offerUrl = Url(offerUrl.trim())),
+            metadataTrustResolver = credentialIssuerMetadataTrustResolver,
         ).toMobileOfferResolution(preferredLocales)
 
     /**
@@ -314,17 +321,17 @@ public class MobileWallet internal constructor(
         offerUrl: String,
         txCode: String? = null,
         clientId: String = "wallet-client",
-    ): List<String> =
-        WalletIssuanceHandler.receiveCredential(
-            wallet = wallet,
-            request = ReceiveCredentialRequest(
-                offerUrl = Url(offerUrl.trim()),
-                txCode = txCode?.ifBlank { null },
-                clientId = clientId,
-            ),
-            attestationAssembler = attestationAssembler,
-            onEvent = ::emitSessionEvent,
-        ).credentialIds
+    ): List<String> = WalletIssuanceHandler.receiveCredential(
+        wallet = wallet,
+        request = ReceiveCredentialRequest(
+            offerUrl = Url(offerUrl.trim()),
+            txCode = txCode?.ifBlank { null },
+            clientId = clientId,
+        ),
+        attestationAssembler = attestationAssembler,
+        onEvent = ::emitSessionEvent,
+        metadataTrustResolver = credentialIssuerMetadataTrustResolver,
+    ).credentialIds
 
     /** Receives credentials using exactly one reviewed offer preview. */
     public suspend fun receive(
@@ -423,7 +430,10 @@ public class MobileWallet internal constructor(
             is PreviewPresentationResult.Invalid ->
                 MobileWalletPresentationPreviewResult.Invalid(
                     previewHandle = MobileWalletPresentationPreviewHandle(result.handle.value),
-                    request = result.authorizationRequest.toMobileRequestContext(preferredLocales),
+                    request = result.authorizationRequest.toMobileRequestContext(
+                        preferredLocales = preferredLocales,
+                        resolvedAuthorizationRequest = result.resolvedAuthorizationRequest,
+                    ),
                     errorCode = result.error.code.toMobileErrorCode(),
                     message = result.error.message,
                 )
@@ -446,6 +456,7 @@ public class MobileWallet internal constructor(
                         previewHandle = MobileWalletPresentationPreviewHandle(result.handle.value),
                         request = result.authorizationRequest.toMobileRequestInfo(
                             preferredLocales = preferredLocales,
+                            resolvedAuthorizationRequest = result.resolvedAuthorizationRequest,
                             responseEncryption = result.responseEncryption,
                             transactionData = transactionData,
                         ),
@@ -618,16 +629,19 @@ internal fun WalletPresentResult.toMobilePresentationResult(): MobileWalletPrese
         }
     }
 
-private fun AuthorizationRequest.toMobileRequestInfo(
+internal fun AuthorizationRequest.toMobileRequestInfo(
     preferredLocales: List<String>,
+    resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
     responseEncryption: ResponseEncryption.Metadata? = null,
     transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
 ): MobileWalletPresentationRequestInfo {
+    val verifiedClientId = requireNotNull(clientId) {
+        "A validated presentation request must contain client_id."
+    }
     return MobileWalletPresentationRequestInfo(
-        clientId = requireNotNull(clientId) {
-            "A validated presentation request must contain client_id."
-        },
+        clientId = verifiedClientId,
         verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
+        verifierMetadataProvenance = resolvedAuthorizationRequest.toMobileVerifierMetadataProvenance(verifiedClientId),
         responseUri = responseUri,
         state = state,
         nonce = requireNotNull(nonce) {
@@ -638,19 +652,39 @@ private fun AuthorizationRequest.toMobileRequestInfo(
     )
 }
 
-private fun AuthorizationRequest.toMobileRequestContext(
+internal fun AuthorizationRequest.toMobileRequestContext(
     preferredLocales: List<String>,
+    resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
 ): MobileWalletPresentationRequestContext =
-    MobileWalletPresentationRequestContext(
-        clientId = requireNotNull(clientId) {
+    run {
+        val verifiedClientId = requireNotNull(clientId) {
             "A reportable invalid presentation request must contain client_id."
-        },
-        verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
-        responseUri = responseUri,
-        state = state,
-        nonce = nonce,
-        responseEncryption = null.toMobileResponseEncryption(),
-    )
+        }
+        MobileWalletPresentationRequestContext(
+            clientId = verifiedClientId,
+            verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
+            verifierMetadataProvenance = resolvedAuthorizationRequest.toMobileVerifierMetadataProvenance(verifiedClientId),
+            responseUri = responseUri,
+            state = state,
+            nonce = nonce,
+            responseEncryption = null.toMobileResponseEncryption(),
+        )
+    }
+
+internal fun ResolvedAuthorizationRequest.toMobileVerifierMetadataProvenance(
+    clientId: String,
+): MobileWalletVerifierMetadataProvenance = when (this) {
+    is ResolvedAuthorizationRequest.WithRequestObject -> {
+        val header = requestObject.decodeJws().header
+        MobileWalletVerifierMetadataProvenance.SignedRequest(
+            compactRequestObject = requestObject,
+            algorithm = requireNotNull(header[JwtHeaderParams.ALGORITHM]?.jsonPrimitive?.contentOrNull),
+            keyId = header[JwtHeaderParams.KEY_ID]?.jsonPrimitive?.contentOrNull,
+            clientIdPrefix = clientId.substringBefore(':'),
+        )
+    }
+    is ResolvedAuthorizationRequest.Plain -> MobileWalletVerifierMetadataProvenance.UnsignedRequest
+}
 
 private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {
     WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED -> MobileWalletPresentationErrorCode.accessDenied
