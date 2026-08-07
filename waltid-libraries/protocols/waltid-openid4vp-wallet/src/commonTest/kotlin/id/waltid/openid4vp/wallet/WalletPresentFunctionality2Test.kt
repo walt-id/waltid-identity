@@ -1,9 +1,13 @@
 package id.waltid.openid4vp.wallet
 
+import id.walt.credentials.formats.W3C11
+import id.walt.credentials.signatures.JwtCredentialSignature
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
@@ -13,7 +17,10 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
+import id.walt.dcql.RawDcqlCredential
+import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.models.meta.NoMeta
+import id.walt.did.dids.DidService
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -25,10 +32,11 @@ import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -140,6 +148,70 @@ class WalletPresentFunctionality2Test {
     }
 
     @Test
+    fun crypto2OnlyKeyCompletesVpPresentationWithoutLegacyKeyMaterial() = runTest {
+        DidService.minimalInit()
+        val did = DidService.registerByKey("key", JWKKey.generate(KeyType.Ed25519)).did
+        val holderKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("crypto2-only-full-presentation"),
+                spec = KeySpec.Edwards(EdwardsCurve.ED25519),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        val credential = W3C11(
+            credentialData = buildJsonObject {
+                put("credentialSubject", buildJsonObject { put("given_name", "Ada") })
+            },
+            issuer = "https://issuer.example",
+            subject = did,
+            signature = JwtCredentialSignature("signature", buildJsonObject {}),
+            signed = "issuer.jwt.signature",
+        )
+        val query = CredentialQuery(
+            id = "pid",
+            format = CredentialFormat.JWT_VC_JSON,
+            meta = NoMeta,
+        )
+        val request = AuthorizationRequest(
+            clientId = "redirect_uri:https://wallet.example/callback",
+            responseType = OpenID4VPResponseType.VP_TOKEN,
+            responseMode = OpenID4VPResponseMode.FRAGMENT,
+            redirectUri = "https://wallet.example/callback",
+            nonce = "nonce",
+            dcqlQuery = DcqlQuery(credentials = listOf(query)),
+        )
+        val raw = RawDcqlCredential(
+            id = "credential",
+            format = credential.format,
+            data = credential.credentialData,
+            originalCredential = credential,
+        )
+        val result = WalletPresentFunctionality2.walletPresentHandling(
+            holderKey = holderKey,
+            holderDid = did,
+            presentationRequestUrl = Url("openid4vp://authorize"),
+            resolvedAuthorizationRequest = ResolvedAuthorizationRequest.Plain(request),
+            selectCredentialsForQuery = {
+                mapOf(
+                    "pid" to listOf(
+                        DcqlMatcher.DcqlMatchResult(raw, selectedDisclosures = null, originalQuery = query)
+                    )
+                )
+            },
+            holderPoliciesToRun = null,
+            runPolicies = null,
+            transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+        ).getOrThrow()
+
+        val vpToken = parseQueryString(requireNotNull(result.getUrl).substringAfter('#'))
+            .get("vp_token")
+            ?: error("presentation response did not contain vp_token")
+        val vpJwt = Json.parseToJsonElement(vpToken).jsonObject.getValue("pid").jsonArray.single().jsonPrimitive.content
+        val verified = CompactJws.verify(vpJwt, holderKey, JwsAlgorithm.ED25519)
+        assertEquals(did, Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject["iss"]?.jsonPrimitive?.content)
+    }
+
+    @Test
     fun securityValidationErrorsNeverInvokeLegacyFallback() = runTest {
         var fallbackInvocations = 0
         val fallback: suspend (Url) -> Result<JsonElement> = {
@@ -185,6 +257,7 @@ class WalletPresentFunctionality2Test {
             buildJsonObject {
                 put("client_id", "verifier")
                 put("nonce", "nonce")
+                put("aud", "https://self-issued.me/v2")
             }.toString().encodeToByteArray(),
             mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
         )
@@ -241,6 +314,7 @@ class WalletPresentFunctionality2Test {
             buildJsonObject {
                 put("client_id", "verifier")
                 put("nonce", "nonce")
+                put("aud", "https://self-issued.me/v2")
             }.toString().encodeToByteArray(),
             mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
         )
@@ -299,7 +373,7 @@ class WalletPresentFunctionality2Test {
 
     private fun unsignedRequestObject(clientId: String, type: String): String {
         val header = """{"alg":"none","typ":"$type"}"""
-        val payload = """{"client_id":"$clientId","nonce":"nonce"}"""
+        val payload = """{"client_id":"$clientId","nonce":"nonce","aud":"https://self-issued.me/v2"}"""
         return listOf(header, payload).joinToString(".") {
             Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL).encode(it.encodeToByteArray())
         } + "."

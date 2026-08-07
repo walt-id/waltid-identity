@@ -1517,6 +1517,9 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     /// Response-encryption state selected for this request.
     public let responseEncryption: PresentationResponseEncryption
 
+    /// Serialized OpenID4VP response mode requested by the verifier.
+    public let responseMode: String?
+
     /// Decoded transaction data attached to the request.
     public let transactionData: [PresentationTransactionData]
 
@@ -1530,6 +1533,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     ///   - state: OpenID state value from the request.
     ///   - nonce: OpenID nonce value from the request.
     ///   - responseEncryption: Response-encryption state selected for the request.
+    ///   - responseMode: Serialized OpenID4VP response mode requested by the verifier.
     ///   - transactionData: Decoded transaction data attached to the request.
     public init(
         clientID: String,
@@ -1539,6 +1543,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
         state: String? = nil,
         nonce: String,
         responseEncryption: PresentationResponseEncryption,
+        responseMode: String? = nil,
         transactionData: [PresentationTransactionData] = []
     ) {
         precondition(
@@ -1552,6 +1557,7 @@ public struct PresentationRequestInfo: Equatable, Sendable {
         self.state = state
         self.nonce = nonce
         self.responseEncryption = responseEncryption
+        self.responseMode = responseMode
         self.transactionData = transactionData
     }
 

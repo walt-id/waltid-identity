@@ -21,6 +21,7 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.Url
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
@@ -480,10 +481,34 @@ object DemoTestBackend {
         check(requestedSessionId == null || requestedSessionId == sessionId) {
             "Public demo verifier2 did not preserve the requested session ID"
         }
+        val inlineRequestUrl = response["fullAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
+            ?: error("Public demo verifier2 response is missing fullAuthorizationRequestUrl: $response")
+        val inlineParameters = Url(inlineRequestUrl).parameters
         val authorizationRequestUri = response["bootstrapAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
-            ?: response["authorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
-            ?: response["fullAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
-            ?: error("Missing authorization request URL in public demo verifier2 response: $response")
+            ?: error("Public demo verifier2 response is missing bootstrapAuthorizationRequestUrl: $response")
+        val bootstrapParameters = Url(authorizationRequestUri).parameters
+
+        if (bindClientIdToResponseUri) {
+            val expectedResponseUri = "$VERIFIER_BASE_URL/verification-session/$sessionId/response"
+            check(inlineParameters["client_id"] == "redirect_uri:$expectedResponseUri") {
+                "Public demo verifier2 response-bound client_id does not match the response URI. Response: $response"
+            }
+            check(inlineParameters["response_uri"] == expectedResponseUri) {
+                "Public demo verifier2 response_uri is not bound to the requested session. Response: $response"
+            }
+            check(!bootstrapParameters["request_uri"].isNullOrBlank()) {
+                "Public demo verifier2 response-bound bootstrap URL is missing request_uri. Response: $response"
+            }
+        } else if (signedRequest) {
+            check(!inlineParameters["request"].isNullOrBlank() && inlineParameters["request_uri"] == null) {
+                "Public demo verifier2 has not deployed the signed inline Request Object contract: " +
+                    "fullAuthorizationRequestUrl must contain request and must not contain request_uri. Response: $response"
+            }
+            check(!bootstrapParameters["request_uri"].isNullOrBlank() && bootstrapParameters["request_uri_method"] == "post") {
+                "Public demo verifier2 has not deployed the signed POST bootstrap contract: " +
+                    "bootstrapAuthorizationRequestUrl must contain request_uri and request_uri_method=post. Response: $response"
+            }
+        }
 
         return VerifierSession(sessionId, authorizationRequestUri)
     }
