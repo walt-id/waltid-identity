@@ -84,12 +84,9 @@ object VerificationSessionCreator {
     ): List<Policy> =
         if (!shouldInclude || any { it.id == policy.id || it.id in equivalentPolicyIds }) this else this + policy
 
-    private suspend fun getKid(clientId: String?, key: VerifierSigningKey): String {
-        val keyId = when (key) {
-            is VerifierSigningKey.Legacy -> key.key.getKeyId()
-            is VerifierSigningKey.Crypto2 -> key.key.id.value
-        }
-        return requestObjectKid(clientId, keyId)
+    private suspend fun getKid(clientId: String?, key: VerifierSigningKey): String = when (key) {
+        is VerifierSigningKey.Legacy -> requestObjectKid(clientId, key.key)
+        is VerifierSigningKey.Crypto2 -> requestObjectKid(clientId, key.key)
     }
 
     @Deprecated("Use the crypto2 Key overload with explicit JWS and COSE algorithms for signed sessions")
@@ -437,7 +434,6 @@ object VerificationSessionCreator {
 
         val signedAuthorizationRequest = if (isSignedRequest) {
             val requestSigningKey = requireNotNull(signingKey)
-
             val headers = hashMapOf<String, JsonElement>(
                 "typ" to JsonPrimitive("oauth-authz-req+jwt"),
                 "kid" to JsonPrimitive(getKid(clientId, requestSigningKey))
