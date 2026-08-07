@@ -104,6 +104,46 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     // MARK: - Tests (mirror Android MobileWalletIntegrationTest.kt)
 
+    func testAppHostedWalletValidatesSignedRequestObjectCertificateChain() async throws {
+        let wallet = try await Wallet(
+            configuration: WalletConfiguration(
+                walletID: testWalletId,
+                clientIDTrustConfiguration: WalletClientIDTrustConfiguration(
+                    x509TrustAnchorsPEM: [X509RequestObjectFixture.trustAnchorPEM]
+                )
+            )
+        )
+        _ = try await wallet.bootstrap()
+
+        let result = try await wallet.previewPresentation(request: X509RequestObjectFixture.authorizationRequestURL)
+        guard case let .ready(preview) = result else {
+            XCTFail("The pinned X.509 Request Object should authenticate and produce a preview: \(result)")
+            return
+        }
+        XCTAssertTrue(preview.credentialOptions.isEmpty)
+        XCTAssertTrue(preview.credentialRequirements.isEmpty)
+    }
+
+    func testAppHostedWalletRejectsUntrustedSignedRequestObjectCertificateChain() async throws {
+        let wallet = try await Wallet(
+            configuration: WalletConfiguration(
+                walletID: testWalletId,
+                clientIDTrustConfiguration: WalletClientIDTrustConfiguration(
+                    x509TrustAnchorsPEM: [EudiTestBackend.verifierTrustAnchorPEM]
+                )
+            )
+        )
+
+        do {
+            _ = try await wallet.previewPresentation(request: X509RequestObjectFixture.authorizationRequestURL)
+            XCTFail("Expected the signed Request Object to be rejected without the pinned trust anchor")
+        } catch {
+            let description = String(describing: error)
+            XCTAssertFalse(description.contains("No matches found for required credential queries"), description)
+            XCTAssertTrue(description.contains("InvalidSignature"), description)
+        }
+    }
+
     func testBootstrapCreatesKeyAndDid() async throws {
         let wallet = try await makeWallet()
 
