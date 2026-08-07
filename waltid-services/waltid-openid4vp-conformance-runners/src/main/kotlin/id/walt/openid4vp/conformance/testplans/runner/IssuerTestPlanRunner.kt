@@ -570,7 +570,6 @@ internal data class IssuerModuleSelection(
         private val metadataModules = setOf(
             "oid4vci-1_0-issuer-metadata-test",
             "oid4vci-1_0-issuer-metadata-test-signed",
-            "fapi2-security-profile-final-discovery-end-point-verification",
         )
 
         private val positiveModules = setOf(
