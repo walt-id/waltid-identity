@@ -20,4 +20,12 @@ class IssuerModuleSelectionTest {
         assertNotNull(selection.exclusionReason(module))
         assertEquals(null, selection.exclusionReason("oid4vci-1_0-issuer-happy-flow"))
     }
+
+    @Test
+    fun metadataGroupDoesNotSelectFapiDiscoveryModule() {
+        val module = "fapi2-security-profile-final-discovery-end-point-verification"
+
+        assertTrue(!IssuerModuleSelection(groups = setOf("metadata")).matches(module))
+        assertTrue(IssuerModuleSelection(groups = setOf("fapi")).matches(module))
+    }
 }
