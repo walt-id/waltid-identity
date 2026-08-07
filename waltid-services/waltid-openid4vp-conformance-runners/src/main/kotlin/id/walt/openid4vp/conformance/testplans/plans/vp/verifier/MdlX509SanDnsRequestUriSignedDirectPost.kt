@@ -7,7 +7,6 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.UrlConfig
-import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.Verification2Session.VerificationSessionRedirects
 import io.ktor.http.Url
 import kotlinx.serialization.json.Json
@@ -109,7 +108,7 @@ class MdlX509SanDnsRequestUriSignedDirectPost(
         verificationSessionSetup = CrossDeviceFlowSetup(
             core = GeneralFlowConfig(
                 dcqlQuery = Json.decodeFromString(dcqlQuery),
-                policies = Verification2Session.DefinedVerificationPolicies(),
+                policies = ConformanceVerifierPolicies.withoutMdocIssuerAuth(),
 
                 signedRequest = true,        // JAR - signed authorization requests
                 encryptedResponse = false,   // plain_vp - unencrypted responses
