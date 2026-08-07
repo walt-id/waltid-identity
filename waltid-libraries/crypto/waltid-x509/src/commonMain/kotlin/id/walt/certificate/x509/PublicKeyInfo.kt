@@ -2,8 +2,9 @@ package id.walt.certificate.x509
 
 import id.walt.certificate.der.ByteArrayUtil
 import id.walt.certificate.der.ByteArrayUtil.byteStringToBase64Pem
-import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.Key as Crypto1Key
 import id.walt.crypto.utils.ShaUtils
+import id.walt.crypto2.keys.Key
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.toHexString
 
@@ -48,5 +49,7 @@ interface PublicKeyInfo {
     companion object
 }
 
+
+expect suspend fun PublicKeyInfo.Companion.ofKey(key: Crypto1Key): PublicKeyInfo
 
 expect suspend fun PublicKeyInfo.Companion.ofKey(key: Key): PublicKeyInfo

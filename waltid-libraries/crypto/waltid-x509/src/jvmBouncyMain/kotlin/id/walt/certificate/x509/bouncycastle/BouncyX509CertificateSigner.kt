@@ -8,6 +8,7 @@ import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension
+import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.Key
 import kotlinx.io.bytestring.isNotEmpty
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
@@ -39,6 +40,7 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
 
     override suspend fun signCertificate(
         issuerKey: Key,
+        signatureAlgorithm: SignatureAlgorithm,
         builder: X509CertificateDataBuilder
     ): X509Certificate {
         val issuerPublicKeyInfo = BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(issuerKey)
@@ -66,7 +68,7 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
             issuerPublicKeyInfo,
             subjectPublicKeyInfo
         )
-        val signed = bouncyBuilder.build(BouncyContentSigner(issuerKey))
+        val signed = bouncyBuilder.build(BouncyContentSigner(issuerKey, signatureAlgorithm))
         return BouncyX509Certificate(signed)
     }
 

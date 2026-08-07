@@ -44,6 +44,7 @@ kotlin {
         val jvmBouncyMain by creating {
             dependsOn(commonMain.get())
             dependencies {
+                implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 compileOnly(identityLibs.bouncycastle.prov)
                 compileOnly(identityLibs.bouncycastle.pkix)
@@ -58,6 +59,7 @@ kotlin {
         val signumMain by creating {
             dependsOn(commonMain.get())
             dependencies {
+                implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
                 implementation(project(":waltid-libraries:crypto:waltid-crypto"))
                 implementation(identityLibs.signum.indispensable)
             }

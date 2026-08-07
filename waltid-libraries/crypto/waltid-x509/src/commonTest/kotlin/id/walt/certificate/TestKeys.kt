@@ -58,7 +58,7 @@ object TestKeys {
         zSK/te3HyJJnviiDKPGvFFWY8E/4xJgj576jaK5QYzzVNxr7fWtQ+v7IJLgDYhno
         4YEfz9+NgPSQVnq6rSnKpIG5WUQ9Bd+zwnX4OLOOmbPen/sGK78Hd7WGuma3wqSw
         VaosD6JIoEgsp+v+PZ7QkZCcvMlzbac=
-        -----END PRIVATE KEY-----        
+        -----END PRIVATE KEY-----
     """.trimIndent()
 
     val ed25519KeyPem = """

@@ -36,6 +36,10 @@ open class X509CertificateDataBuilder(
         subjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder()
     }
 
+    fun subjectPublicKey(key: Key): Unit {
+        subjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder(key)
+    }
+
     fun subjectPublicKey(key: Crypto1Key): Unit {
         subjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder(key)
     }

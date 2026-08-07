@@ -8,9 +8,11 @@ import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.X509CertificateChainValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
+import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
+import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.Key
-import id.walt.crypto.keys.Key as Crypt1Key
 import kotlinx.io.bytestring.ByteString
+import id.walt.crypto.keys.Key as Crypt1Key
 
 sealed class X509CertificateUtil(val services: X509CertificateServices) {
 
@@ -36,8 +38,12 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
 
     suspend fun createSelfSignedCertificate(
         issuerKey: Key,
+        signatureAlgorithm: SignatureAlgorithm,
         block: suspend X509CertificateDataBuilder.() -> Unit
     ): X509Certificate {
+        if (signatureAlgorithm is SignatureAlgorithm.Ecdsa) {
+            require(signatureAlgorithm.encoding == EcdsaSignatureEncoding.DER) { "Certificates must use signature DER encoding" }
+        }
         val builder = X509CertificateDataBuilder(
             serialNumberGenerator = services.serialNumberGenerator,
             issuerDnRaw = ByteString(),
@@ -46,7 +52,7 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         block.invoke(builder)
         builder.issuerDnRaw = ByteString()
         builder.extensionAuthorityKeyIdentifier()
-        return services.certificateSigner.signCertificate(issuerKey, builder)
+        return services.certificateSigner.signCertificate(issuerKey, signatureAlgorithm, builder)
     }
 
     suspend fun createSelfSignedCertificate(
@@ -62,6 +68,31 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         builder.issuerDnRaw = ByteString()
         builder.extensionAuthorityKeyIdentifier()
         return services.certificateSigner.signCertificate(issuerKey, builder)
+    }
+
+    suspend fun createCertificate(
+        issuerKey: Key,
+        issuerCert: X509Certificate,
+        signatureAlgorithm: SignatureAlgorithm,
+        block: suspend X509CertificateDataBuilder.() -> Unit
+    ): X509Certificate {
+        val builder = X509CertificateDataBuilder(
+            serialNumberGenerator = services.serialNumberGenerator,
+            issuerDnRaw = issuerCert.data.subjectDnRaw,
+            subjectDn = "OU=issuer, DC=test, O=Walt.id"
+        )
+        block.invoke(builder)
+        requireNotNull((builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder).key) {
+            "Certificate subject public key missing"
+        }
+        builder.extensionAuthorityKeyIdentifier()
+        issuerCert.data.extensionSubjectKeyIdentifier?.let { subjectKeyId ->
+            val issuerPublicKeyInfo = PublicKeyInfo.ofKey(issuerKey)
+            require(subjectKeyId.keyIdentifier == issuerPublicKeyInfo.keyId) {
+                "Issuer certificate is not signed by issuer key. Subject key identifier does not match issuer public key identifier."
+            }
+        }
+        return services.certificateSigner.signCertificate(issuerKey, signatureAlgorithm, builder)
     }
 
 
@@ -81,10 +112,11 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         }
         builder.extensionAuthorityKeyIdentifier()
         issuerCert.data.extensionSubjectKeyIdentifier?.let { subjectKeyId ->
-            val issuerPublicKeyInfo = PublicKeyInfo.ofKey(issuerKey)
-            require(subjectKeyId.keyIdentifier == issuerPublicKeyInfo.keyId) {
-                "Issuer certificate is not signed by issuer key. Subject key identifier does not match issuer public key identifier."
-            }
+            // TODO: check key ids
+            //val issuerPublicKeyInfo = PublicKeyInfo.ofKey(issuerKey)
+            //require(subjectKeyId.keyIdentifier == issuerPublicKeyInfo.keyId) {
+            //    "Issuer certificate is not signed by issuer key. Subject key identifier does not match issuer public key identifier."
+            //}
         }
         return services.certificateSigner.signCertificate(issuerKey, builder)
     }

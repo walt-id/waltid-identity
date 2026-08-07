@@ -18,6 +18,7 @@ import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension
 import id.walt.certificate.x509.signum.SignumSignatureAlgorithmUtil.toSignatureAlgorithm
 import id.walt.certificate.x509.signum.dn.toSignumDn
 import id.walt.certificate.x509.signum.extension.SignumExtensionFactory
+import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.Key
 import kotlinx.io.bytestring.isNotEmpty
 import at.asitplus.signum.indispensable.X509SignatureAlgorithm as SigX509SignatureAlgorithm
@@ -29,6 +30,7 @@ class SignumCertificateSigner : X509CertificateSigner {
 
     override suspend fun signCertificate(
         issuerKey: Key,
+        signatureAlgorithm: SignatureAlgorithm,
         builder: X509CertificateDataBuilder
     ): X509Certificate {
         TODO("Not yet implemented")
