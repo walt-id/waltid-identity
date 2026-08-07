@@ -3,7 +3,18 @@ package id.walt.verifier2.handlers.sessioncreation
 import id.walt.crypto.keys.Key
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.exportPublicJwk
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidService
+import id.walt.did.dids.document.MultibasePublicKeys
+import id.walt.did.utils.KeyMaterial
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import id.walt.crypto2.keys.Key as Crypto2Key
 
 private const val DECENTRALIZED_IDENTIFIER_PREFIX = "decentralized_identifier:"
@@ -16,29 +27,48 @@ private const val DECENTRALIZED_IDENTIFIER_PREFIX = "decentralized_identifier:"
  * KMS/Crypto2 key identifiers are therefore not suitable substitutes for DID verification-method
  * IDs. For other Client Identifier Prefixes, the existing key-ID behavior is preserved.
  */
-@Suppress("DEPRECATION")
 internal suspend fun requestObjectKid(clientId: String?, signingKey: Key): String {
     val did = clientId.decentralizedIdentifierOrNull() ?: return signingKey.getKeyId()
-    val signingKeyThumbprint = signingKey.getPublicKey().getThumbprint()
-    val matchingMethodIds = DidService.resolveToKeys(did).getOrThrow()
-        .filter { resolvedKey -> resolvedKey.getPublicKey().getThumbprint() == signingKeyThumbprint }
-        .map { resolvedKey -> resolvedKey.getKeyId() }
-        .distinct()
-
-    return requireSingleVerificationMethod(did, matchingMethodIds)
+    val publicJwk = signingKey.getPublicKey().exportJWKObject().toEncodedPublicJwk()
+    return resolveVerificationMethodId(did, publicJwk)
 }
 
 /** Crypto2 equivalent of [requestObjectKid]. */
 internal suspend fun requestObjectKid(clientId: String?, signingKey: Crypto2Key): String {
     val did = clientId.decentralizedIdentifierOrNull() ?: return signingKey.id.value
-    val signingKeyThumbprint = Jwk.sha256Thumbprint(signingKey.exportPublicJwk())
-    val matchingMethodIds = DidService.resolveToCrypto2Keys(did).getOrThrow()
-        .filter { resolvedKey -> Jwk.sha256Thumbprint(resolvedKey.exportPublicJwk()) == signingKeyThumbprint }
-        .map { resolvedKey -> resolvedKey.id.value }
-        .distinct()
+    return resolveVerificationMethodId(did, signingKey.exportPublicJwk())
+}
+
+private suspend fun resolveVerificationMethodId(did: String, signingKey: EncodedKey.Jwk): String {
+    val signingKeyThumbprint = Jwk.sha256Thumbprint(signingKey)
+    val document = DidService.resolve(did).getOrThrow()
+    val methods = document["verificationMethod"] as? JsonArray
+        ?: throw IllegalArgumentException("DID document has no verification methods: $did")
+
+    val matchingMethodIds = methods.mapNotNull { element ->
+        val method = element as? JsonObject ?: return@mapNotNull null
+        val methodId = method["id"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+            ?: throw IllegalArgumentException("DID verification method has no ID: $did")
+        val publicJwk = method.publicJwkOrNull() ?: return@mapNotNull null
+        methodId.takeIf { Jwk.sha256Thumbprint(publicJwk) == signingKeyThumbprint }
+    }.distinct()
 
     return requireSingleVerificationMethod(did, matchingMethodIds)
 }
+
+private suspend fun JsonObject.publicJwkOrNull(): EncodedKey.Jwk? =
+    (this["publicKeyJwk"] as? JsonObject)?.toEncodedPublicJwk()
+        ?: (this["publicKeyMultibase"] as? JsonPrimitive)
+            ?.contentOrNull
+            ?.let { MultibasePublicKeys.decode(it).jwk }
+        ?: runCatching {
+            KeyMaterial.get(this).getOrThrow().getPublicKey().exportJWKObject().toEncodedPublicJwk()
+        }.getOrNull()
+
+private fun JsonObject.toEncodedPublicJwk(): EncodedKey.Jwk = EncodedKey.Jwk(
+    data = BinaryData(Json.encodeToString(this).encodeToByteArray()),
+    privateMaterial = false,
+)
 
 private fun String?.decentralizedIdentifierOrNull(): String? {
     if (this == null || !startsWith(DECENTRALIZED_IDENTIFIER_PREFIX)) return null
