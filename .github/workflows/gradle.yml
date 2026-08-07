@@ -473,8 +473,8 @@ jobs:
           OPENID4VCI_CONFORMANCE_SUITE_PORT: "443"
           OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID: identity_credential_haip
           OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID: org.iso.18013.5.1.mDL.haip
-          OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE: waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem
-          OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE: waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem
+          OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem
+          OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem
           OPENID4VCI_CONFORMANCE_FILTER_FAPI_PROFILES: vci_haip
           OPENID4VCI_CONFORMANCE_FILTER_FORMATS: sd_jwt_vc,mdoc
           OPENID4VCI_CONFORMANCE_FILTER_GRANT_TYPES: authorization_code
