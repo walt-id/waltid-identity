@@ -30,13 +30,49 @@ public data class AndroidDigitalCredentialProviderInput(
     public val providerRequest: ProviderGetCredentialRequest,
 )
 
+/**
+ * One platform matcher selection, decomposed into the protocol request it belongs to.
+ *
+ * @property requestIndex Leading index of the `requests` entry the matcher attributed the selection
+ *   to, or null when the platform returned an opaque identifier.
+ * @property protocol Protocol the matcher attributed the selection to, or null when opaque.
+ * @property registryEntryId Registry entry identifier the wallet registered.
+ */
+internal data class MatcherCredentialSelection(
+    val requestIndex: Int?,
+    val protocol: String?,
+    val registryEntryId: String,
+)
+
 /** Android framework boundary for official holder Activity request and response handling. */
 @OptIn(ExperimentalDigitalCredentialApi::class)
 public object AndroidDigitalCredentialProvider {
     /**
-     * Extracts exactly one Digital Credentials request and derives its origin from authenticated
-     * Credential Manager caller data. A populated privileged origin is rejected unless the caller
-     * package and signing certificate match [privilegedAppsJson].
+     * Protocols this wallet serves, most preferred first.
+     *
+     * The signed variants are deliberately absent rather than ranked last: an envelope offering only
+     * signed protocols must be rejected outright, not served through a partial path.
+     */
+    private val servedProtocols = listOf(
+        MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+        MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
+    )
+
+    /**
+     * Every protocol identifier a matcher may name, including the unsupported ones, so that a
+     * `<index> <protocol> <id>` envelope is recognised as such even when the protocol is refused.
+     */
+    private val matcherProtocols = setOf(
+        MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+        MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
+        MobileWalletDigitalCredentialProtocols.OPENID4VP_MULTISIGNED,
+        MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
+    )
+
+    /**
+     * Selects one supported Digital Credentials protocol request and derives its origin from
+     * authenticated Credential Manager caller data. A populated privileged origin is rejected unless
+     * the caller package and signing certificate match [privilegedAppsJson].
      */
     public fun extract(
         intent: Intent,
@@ -67,38 +103,61 @@ public object AndroidDigitalCredentialProvider {
         val request = parseProtocolRequest(
             requestJson = options.single().requestJson,
             verifiedOrigin = verifiedOrigin,
-            selectedRegistryEntryIds = providerRequest.selectedCredentialSet?.credentials.orEmpty().map {
-                normalizeMatcherCredentialId(it.credentialId)
+            selections = providerRequest.selectedCredentialSet?.credentials.orEmpty().map {
+                parseMatcherCredentialId(it.credentialId)
             },
         )
 
         return AndroidDigitalCredentialProviderInput(request = request, providerRequest = providerRequest)
     }
 
+    /**
+     * Picks the one protocol request this wallet will answer out of a Digital Credentials envelope.
+     *
+     * A verifier may offer the same presentation over several alternative protocols
+     * (OpenID4VP 1.0 Appendix A `requests`); the wallet answers exactly one of them. Preference order
+     * is [servedProtocols], so the choice does not depend on the order the verifier happened to list.
+     *
+     * The matcher's selections are filtered to the chosen entry rather than passed through wholesale.
+     * A `<index> <protocol> <id>` selection names the `requests` entry it belongs to, and an entry
+     * selected for a protocol we did not choose is not a valid selection for the one we did - keeping
+     * it would resolve a registry entry against the wrong protocol request.
+     */
     internal fun parseProtocolRequest(
         requestJson: String,
         verifiedOrigin: String,
-        selectedRegistryEntryIds: List<String> = emptyList(),
+        selections: List<MatcherCredentialSelection> = emptyList(),
     ): MobileWalletDigitalCredentialRequest {
         val requestObject = Json.parseToJsonElement(requestJson).jsonObject
         val requests = requestObject["requests"] as? JsonArray
-        val protocolRequest = when {
+        val protocolRequests = when {
             requests != null -> {
-                require(requests.size == 1) { "Exactly one protocol request is required" }
-                requests.single().jsonObject
+                require(requests.isNotEmpty()) { "At least one protocol request is required" }
+                requests.map { it.jsonObject }
             }
-            requestObject["protocol"] != null -> requestObject
+            requestObject["protocol"] != null -> listOf(requestObject)
             else -> throw IllegalArgumentException("Digital credential request has no protocol request")
         }
-        val protocol = protocolRequest["protocol"]?.jsonPrimitive?.content
-            ?: throw IllegalArgumentException("Digital credential request protocol is required")
-        val data = protocolRequest["data"] as? JsonObject
+        val offered = protocolRequests.mapIndexed { index, protocolRequest ->
+            index to (
+                protocolRequest["protocol"]?.jsonPrimitive?.content
+                    ?: throw IllegalArgumentException("Digital credential request protocol is required")
+                )
+        }
+        val (chosenIndex, protocol) = servedProtocols.firstNotNullOfOrNull { served ->
+            offered.firstOrNull { it.second == served }
+        } ?: throw IllegalArgumentException(
+            "No offered Digital Credentials protocol is supported: ${offered.map { it.second }}",
+        )
+        val data = protocolRequests[chosenIndex]["data"] as? JsonObject
             ?: throw IllegalArgumentException("Digital credential request data must be an object")
         return MobileWalletDigitalCredentialRequest(
             protocol = protocol,
             dataJson = Json.encodeToString(JsonObject.serializer(), data),
             verifiedOrigin = verifiedOrigin,
-            selectedRegistryEntryIds = selectedRegistryEntryIds,
+            selectedRegistryEntryIds = selections
+                .filter { it.matches(chosenIndex, protocol) }
+                .map { it.registryEntryId },
         )
     }
 
@@ -144,19 +203,29 @@ public object AndroidDigitalCredentialProvider {
         "android:apk-key-hash:${Base64.encodeToString(MessageDigest.getInstance("SHA-256").digest(signingCertificate), Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)}"
 
     /**
-     * Matcher-backed registries return `<set-index> <protocol> <document-id>` while the AndroidX
-     * OpenID registry returns the document id directly. Normalize only known protocol envelopes.
+     * Matcher-backed registries return `<request-index> <protocol> <document-id>` while the AndroidX
+     * OpenID registry returns the document id directly. The index and protocol identify which
+     * `requests` entry the matcher matched, so they are retained rather than stripped; an opaque
+     * identifier yields nulls, which [MatcherCredentialSelection.matches] treats as unattributed.
      */
-    internal fun normalizeMatcherCredentialId(value: String): String {
+    internal fun parseMatcherCredentialId(value: String): MatcherCredentialSelection {
         val parts = value.split(' ', limit = 3)
-        val matcherProtocols = setOf(
-            MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
-            MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
-            MobileWalletDigitalCredentialProtocols.OPENID4VP_MULTISIGNED,
-            MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
-        )
-        return if (parts.size == 3 && parts[0].toIntOrNull() != null && parts[1] in matcherProtocols) {
-            parts[2]
-        } else value
+        val requestIndex = parts.getOrNull(0)?.toIntOrNull()
+        return if (parts.size == 3 && requestIndex != null && parts[1] in matcherProtocols) {
+            MatcherCredentialSelection(requestIndex, parts[1], parts[2])
+        } else {
+            MatcherCredentialSelection(requestIndex = null, protocol = null, registryEntryId = value)
+        }
     }
+
+    /**
+     * Whether this selection applies to the chosen protocol request.
+     *
+     * An unattributed selection applies, because the AndroidX OpenID registry returns bare entry ids
+     * and dropping those would discard every selection it makes. An attributed one must name both the
+     * chosen protocol and the chosen `requests` entry, since the index the matcher emits is the index
+     * into the same array this function chose from.
+     */
+    private fun MatcherCredentialSelection.matches(chosenIndex: Int, chosenProtocol: String): Boolean =
+        protocol == null || (protocol == chosenProtocol && requestIndex == chosenIndex)
 }

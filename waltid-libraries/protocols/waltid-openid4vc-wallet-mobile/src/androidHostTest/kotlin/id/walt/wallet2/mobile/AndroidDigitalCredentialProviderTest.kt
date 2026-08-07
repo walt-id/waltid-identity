@@ -154,7 +154,7 @@ class AndroidDigitalCredentialProviderTest {
         val request = AndroidDigitalCredentialProvider.parseProtocolRequest(
             requestJson = """{"requests":[{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}]}""",
             verifiedOrigin = "https://verifier.example",
-            selectedRegistryEntryIds = listOf("opaque-entry"),
+            selections = listOf(AndroidDigitalCredentialProvider.parseMatcherCredentialId("opaque-entry")),
         )
 
         assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, request.protocol)
@@ -162,8 +162,89 @@ class AndroidDigitalCredentialProviderTest {
         assertEquals(listOf("opaque-entry"), request.selectedRegistryEntryIds)
     }
 
+    /**
+     * A verifier may offer the same presentation over several protocols. The wallet must answer the
+     * one it supports regardless of where the verifier listed it, and must not be pushed onto a
+     * signed protocol by having it listed first.
+     */
     @Test
-    fun rejectsAmbiguousOrMalformedProtocolRequests() {
+    fun choosesTheSupportedProtocolFromAMultiProtocolEnvelope() {
+        val request = AndroidDigitalCredentialProvider.parseProtocolRequest(
+            requestJson = """
+                {"requests":[
+                  {"protocol":"openid4vp-v1-signed","data":{"request":"a.b.c"}},
+                  {"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}
+                ]}
+            """.trimIndent(),
+            verifiedOrigin = "https://verifier.example",
+        )
+
+        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, request.protocol)
+        assertEquals("n", Json.parseToJsonElement(request.dataJson).jsonObject["nonce"].toString().trim('"'))
+    }
+
+    /** Preference is the wallet's own order, not the verifier's, so the choice is deterministic. */
+    @Test
+    fun prefersOpenId4VpOverAnnexCWhateverOrderTheVerifierOffers() {
+        listOf(
+            """{"requests":[{"protocol":"org-iso-mdoc","data":{"deviceRequest":"d"}},{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}]}""",
+            """{"requests":[{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}},{"protocol":"org-iso-mdoc","data":{"deviceRequest":"d"}}]}""",
+        ).forEach { requestJson ->
+            assertEquals(
+                MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+                AndroidDigitalCredentialProvider.parseProtocolRequest(
+                    requestJson = requestJson,
+                    verifiedOrigin = "https://verifier.example",
+                ).protocol,
+                "wrong protocol chosen for $requestJson",
+            )
+        }
+    }
+
+    /**
+     * The matcher attributes each selection to a `requests` entry. A selection made for a protocol
+     * request the wallet did not answer must be dropped, because resolving that registry entry
+     * against the chosen request would bind a credential picked for a different query.
+     */
+    @Test
+    fun keepsOnlyMatcherSelectionsBelongingToTheChosenProtocolRequest() {
+        val request = AndroidDigitalCredentialProvider.parseProtocolRequest(
+            requestJson = """
+                {"requests":[
+                  {"protocol":"org-iso-mdoc","data":{"deviceRequest":"d"}},
+                  {"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}
+                ]}
+            """.trimIndent(),
+            verifiedOrigin = "https://verifier.example",
+            selections = listOf(
+                "0 org-iso-mdoc annex-c-entry",
+                "1 openid4vp-v1-unsigned oid4vp-entry",
+                "opaque-entry",
+            ).map(AndroidDigitalCredentialProvider::parseMatcherCredentialId),
+        )
+
+        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, request.protocol)
+        assertEquals(listOf("oid4vp-entry", "opaque-entry"), request.selectedRegistryEntryIds)
+    }
+
+    /** Signed variants stay unsupported: an envelope offering only those must fail closed. */
+    @Test
+    fun rejectsAnEnvelopeThatOffersOnlyUnsupportedProtocols() {
+        assertFailsWith<IllegalArgumentException> {
+            AndroidDigitalCredentialProvider.parseProtocolRequest(
+                requestJson = """
+                    {"requests":[
+                      {"protocol":"openid4vp-v1-signed","data":{"request":"a.b.c"}},
+                      {"protocol":"openid4vp-v1-multisigned","data":{"request":{}}}
+                    ]}
+                """.trimIndent(),
+                verifiedOrigin = "https://verifier.example",
+            )
+        }
+    }
+
+    @Test
+    fun rejectsEmptyOrMalformedProtocolRequests() {
         assertFailsWith<IllegalArgumentException> {
             AndroidDigitalCredentialProvider.parseProtocolRequest(
                 requestJson = """{"requests":[]}""",
@@ -173,6 +254,14 @@ class AndroidDigitalCredentialProviderTest {
         assertFailsWith<IllegalArgumentException> {
             AndroidDigitalCredentialProvider.parseProtocolRequest(
                 requestJson = """{"protocol":"openid4vp-v1-unsigned","data":"secret"}""",
+                verifiedOrigin = "https://verifier.example",
+            )
+        }
+        // A protocol-less entry is malformed even when a sibling entry is servable, because the
+        // envelope no longer describes what the verifier is asking for.
+        assertFailsWith<IllegalArgumentException> {
+            AndroidDigitalCredentialProvider.parseProtocolRequest(
+                requestJson = """{"requests":[{"data":{"nonce":"n"}},{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}]}""",
                 verifiedOrigin = "https://verifier.example",
             )
         }
@@ -214,18 +303,22 @@ class AndroidDigitalCredentialProviderTest {
     }
 
     @Test
-    fun normalizesMatcherCredentialIdsWithoutRewritingOpaqueAndroidXIds() {
+    fun parsesMatcherCredentialIdsWithoutRewritingOpaqueAndroidXIds() {
         assertEquals(
-            "dc-opaque",
-            AndroidDigitalCredentialProvider.normalizeMatcherCredentialId("0 org-iso-mdoc dc-opaque"),
+            MatcherCredentialSelection(requestIndex = 0, protocol = "org-iso-mdoc", registryEntryId = "dc-opaque"),
+            AndroidDigitalCredentialProvider.parseMatcherCredentialId("0 org-iso-mdoc dc-opaque"),
         )
         assertEquals(
-            "opaque-entry",
-            AndroidDigitalCredentialProvider.normalizeMatcherCredentialId("opaque-entry"),
+            MatcherCredentialSelection(requestIndex = null, protocol = null, registryEntryId = "opaque-entry"),
+            AndroidDigitalCredentialProvider.parseMatcherCredentialId("opaque-entry"),
         )
         assertEquals(
-            "not a recognized-envelope",
-            AndroidDigitalCredentialProvider.normalizeMatcherCredentialId("not a recognized-envelope"),
+            MatcherCredentialSelection(
+                requestIndex = null,
+                protocol = null,
+                registryEntryId = "not a recognized-envelope",
+            ),
+            AndroidDigitalCredentialProvider.parseMatcherCredentialId("not a recognized-envelope"),
         )
     }
 }
