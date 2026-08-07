@@ -151,7 +151,7 @@ internal class MobileWalletAnnexCEngine(
      * encryption metadata is never validated, or vice versa.
      */
     private suspend fun validate(request: MobileWalletAnnexCRequest): ValidatedRequest {
-        val origin = DcApiWallet.validatePlatformOrigin(request.verifiedOrigin)
+        val origin = DcApiWallet.canonicalizePlatformOrigin(request.verifiedOrigin)
         require((request.deviceRequestBase64Url == null) == (request.encryptionInfoBase64Url == null)) {
             "Raw Annex C deviceRequest and encryptionInfo must be supplied together"
         }
@@ -219,7 +219,7 @@ internal class MobileWalletAnnexCEngine(
         submission: MobileWalletAnnexCSubmission,
         retained: RetainedRequest,
     ): ConfirmedRequest {
-        val origin = DcApiWallet.validatePlatformOrigin(submission.verifiedOrigin)
+        val origin = DcApiWallet.canonicalizePlatformOrigin(submission.verifiedOrigin)
         require(origin == retained.verifiedOrigin) { "Annex C origin changed after consent" }
         if (retained.encryptionInfoBase64Url != null) {
             require(submission.encryptionInfoBase64Url == retained.encryptionInfoBase64Url) {

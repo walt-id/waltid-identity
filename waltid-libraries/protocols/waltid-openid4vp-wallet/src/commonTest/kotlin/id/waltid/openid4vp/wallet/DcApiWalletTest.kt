@@ -152,15 +152,41 @@ class DcApiWalletTest {
     fun `platform origin rejects complex or insecure web values and accepts Android app origins`() {
         assertEquals(
             "android:apk-key-hash:abc123",
-            DcApiWallet.validatePlatformOrigin("android:apk-key-hash:abc123"),
+            DcApiWallet.canonicalizePlatformOrigin("android:apk-key-hash:abc123"),
         )
         assertFailsWith<IllegalArgumentException> {
-            DcApiWallet.validatePlatformOrigin("https://verifier.example/path")
+            DcApiWallet.canonicalizePlatformOrigin("https://verifier.example/path")
         }
         assertFailsWith<IllegalArgumentException> {
-            DcApiWallet.validatePlatformOrigin("http://verifier.example")
+            DcApiWallet.canonicalizePlatformOrigin("http://verifier.example")
         }
-        assertEquals("http://localhost:8080", DcApiWallet.validatePlatformOrigin("http://localhost:8080"))
+        assertEquals("http://localhost:8080", DcApiWallet.canonicalizePlatformOrigin("http://localhost:8080"))
+    }
+
+    /**
+     * This is the sole origin canonicalizer, because its output is hashed into the mdoc session
+     * transcript that the verifier reconstructs from `expected_origins` without ever seeing the
+     * wallet's copy. Both cases below are ones where a second, platform-local implementation
+     * previously disagreed with this one, each yielding an unreproducible device signature:
+     *
+     * - an uppercase host was returned as-is here but lowercased by the Android adapter
+     * - `[::1]` was accepted by the Android adapter but rejected here, because the loopback check
+     *   compared against a bare `::1` while ktor reports the brackets
+     */
+    @Test
+    fun `platform origin canonicalization normalizes host case and bracketed loopback`() {
+        assertEquals("https://verifier.example", DcApiWallet.canonicalizePlatformOrigin("https://VERIFIER.example"))
+        assertEquals("https://verifier.example", DcApiWallet.canonicalizePlatformOrigin("https://verifier.example:443"))
+        assertEquals("https://verifier.example:8443", DcApiWallet.canonicalizePlatformOrigin("https://verifier.example:8443"))
+        assertEquals("http://[::1]:8080", DcApiWallet.canonicalizePlatformOrigin("http://[::1]:8080"))
+        assertEquals("http://127.0.0.1:9000", DcApiWallet.canonicalizePlatformOrigin("http://127.0.0.1:9000"))
+
+        // A canonical result is idempotent - re-canonicalizing must not change it, which is what
+        // lets an adapter pass its output on without the value drifting.
+        listOf("https://VERIFIER.example:443/", "http://[::1]:8080", "android:apk-key-hash:abc123").forEach { raw ->
+            val once = DcApiWallet.canonicalizePlatformOrigin(raw)
+            assertEquals(once, DcApiWallet.canonicalizePlatformOrigin(once), "not idempotent for '$raw'")
+        }
     }
 
     @Test

@@ -179,15 +179,38 @@ class AndroidDigitalCredentialProviderTest {
     }
 
     @Test
-    fun canonicalizesOnlyOriginShapedHttpsValuesAndBindsNativeCallerCertificates() {
-        assertEquals(
-            "https://verifier.example",
-            with(AndroidDigitalCredentialProvider) { "https://VERIFIER.example:443/".canonicalWebOrigin() },
-        )
-        assertFailsWith<IllegalArgumentException> {
-            with(AndroidDigitalCredentialProvider) { "https://verifier.example/path".canonicalWebOrigin() }
-        }
+    fun bindsTheNativeCallerSigningCertificateIntoTheOrigin() {
         assertTrue(AndroidDigitalCredentialProvider.nativeAppOrigin(byteArrayOf(1, 2, 3)).startsWith("android:apk-key-hash:"))
+    }
+
+    /**
+     * The adapter must not canonicalize; it delegates to `DcApiWallet.canonicalizePlatformOrigin`,
+     * which also feeds the mdoc session transcript. Asserting through `extract` rather than on a
+     * helper is deliberate: a reintroduced private normalizer would still satisfy a helper-level
+     * test while producing a transcript the verifier cannot reproduce.
+     */
+    @OptIn(ExperimentalDigitalCredentialApi::class)
+    @Config(sdk = [35])
+    @Test
+    fun canonicalizesAnAllowlistedBrowserOriginThroughTheSharedProtocolRule() {
+        val signature = Signature(byteArrayOf(9, 9, 9, 9))
+        val digest = java.security.MessageDigest.getInstance("SHA-256").digest(signature.toByteArray())
+        val fingerprint = digest.joinToString(":") { byte -> "%02X".format(byte) }
+        val intent = providerIntent(
+            requestJson = """{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}""",
+            packageName = "id.walt.browser",
+            signingInfo = signingInfo(signature),
+            // Uppercase host and an explicit default port: the two cases where the deleted adapter
+            // copy and the protocol rule used to disagree.
+            origin = "https://VERIFIER.example:443",
+        )
+
+        val input = AndroidDigitalCredentialProvider.extract(
+            intent,
+            """{"apps":[{"type":"android","info":{"package_name":"id.walt.browser","signatures":[{"build":"release","cert_fingerprint_sha256":"$fingerprint"}]}}]}""",
+        )
+
+        assertEquals("https://verifier.example", input.request.verifiedOrigin)
     }
 
     @Test

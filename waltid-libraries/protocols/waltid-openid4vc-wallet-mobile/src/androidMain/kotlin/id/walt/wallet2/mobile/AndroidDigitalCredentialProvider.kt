@@ -11,13 +11,13 @@ import androidx.credentials.exceptions.GetCredentialUnknownException
 import androidx.credentials.provider.PendingIntentHandler
 import androidx.credentials.provider.ProviderGetCredentialRequest
 import androidx.credentials.registry.provider.selectedCredentialSet
+import id.waltid.openid4vp.wallet.DcApiWallet
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.security.MessageDigest
-import java.net.URI
 
 /**
  * Verified Android Credential Manager input after caller and selected-entry extraction.
@@ -54,11 +54,15 @@ public object AndroidDigitalCredentialProvider {
                 "Privileged caller is not present in the configured browser allowlist"
             }
         }
-        val verifiedOrigin = privilegedOrigin?.canonicalWebOrigin()
+        // Canonicalization belongs to DcApiWallet, which is also what the mdoc session transcript is
+        // built from. Normalizing here as well would let the two drift; this only decides *which*
+        // origin flavour the platform asserted.
+        val assertedOrigin = privilegedOrigin
             ?: callingApp.signingInfoCompat.signingCertificateHistory.firstOrNull()?.toByteArray()?.let {
                 nativeAppOrigin(it)
             }
             ?: throw IllegalArgumentException("Calling application has no signing certificate")
+        val verifiedOrigin = DcApiWallet.canonicalizePlatformOrigin(assertedOrigin)
 
         val request = parseProtocolRequest(
             requestJson = options.single().requestJson,
@@ -138,26 +142,6 @@ public object AndroidDigitalCredentialProvider {
 
     internal fun nativeAppOrigin(signingCertificate: ByteArray): String =
         "android:apk-key-hash:${Base64.encodeToString(MessageDigest.getInstance("SHA-256").digest(signingCertificate), Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)}"
-
-    internal fun String.canonicalWebOrigin(): String {
-        val uri = URI(this)
-        require(uri.scheme == "https" || (uri.scheme == "http" && uri.host in setOf("localhost", "127.0.0.1", "[::1]"))) {
-            "Credential Manager supplied an insecure browser origin"
-        }
-        require(uri.host != null && uri.userInfo == null && uri.rawQuery == null && uri.rawFragment == null) {
-            "Credential Manager supplied an invalid browser origin"
-        }
-        require(uri.rawPath.isNullOrEmpty() || uri.rawPath == "/") {
-            "Credential Manager supplied a browser URL instead of an origin"
-        }
-        val port = when {
-            uri.port == -1 -> ""
-            uri.scheme == "https" && uri.port == 443 -> ""
-            uri.scheme == "http" && uri.port == 80 -> ""
-            else -> ":${uri.port}"
-        }
-        return "${uri.scheme}://${uri.host.lowercase()}$port"
-    }
 
     /**
      * Matcher-backed registries return `<set-index> <protocol> <document-id>` while the AndroidX
