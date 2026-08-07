@@ -191,6 +191,7 @@ jobs:
         run: ./gradlew publish --no-daemon
 
   openid4vci-conformance:
+    name: openid4vci1.0-conformance-tests
     if: ${{ inputs.run-issuer-conformance }}
     runs-on: ubuntu-22.04
     steps:
@@ -210,18 +211,17 @@ jobs:
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
 
-      - name: Build Issuer2 conformance runtime
-        run: ./gradlew :waltid-services:waltid-issuer-api2:buildFatJar --no-daemon --console=plain --warning-mode=summary
-        env:
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-
-      - name: Start Issuer2 conformance tunnel
+      - name: Prepare Issuer2 conformance runtime
         id: issuer-tunnel
         env:
           CLOUDFLARED_VERSION: "2026.7.3"
+          PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
         run: |
           set -euo pipefail
+
+          ./gradlew :waltid-services:waltid-issuer-api2:buildFatJar --no-daemon --console=plain --warning-mode=summary
 
           CLOUDFLARED="$RUNNER_TEMP/cloudflared"
           TUNNEL_LOG="$RUNNER_TEMP/cloudflared-issuer2.log"
@@ -271,12 +271,7 @@ jobs:
           echo "Issuer2 conformance tunnel: $TUNNEL_URL"
           echo "url=$TUNNEL_URL" >> "$GITHUB_OUTPUT"
 
-      - name: Install Playwright for Issuer2 conformance
-        run: ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers --no-daemon --console=plain --warning-mode=summary
-        env:
-          PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers --no-daemon --console=plain --warning-mode=summary
 
       - name: Run OpenID4VCI Issuer2 conformance
         run: >-
@@ -371,7 +366,8 @@ jobs:
             echo "Appended $found OpenID4VCI conformance summary file(s) to the job summary."
           fi
 
-  openid4vci-haip-conformance:
+  openid4vc-haip-conformance:
+    name: openid4vc-haip1.0-conformance-tests
     if: ${{ inputs.run-haip-conformance }}
     runs-on: ubuntu-22.04
     steps:
@@ -391,18 +387,17 @@ jobs:
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
 
-      - name: Build Issuer2 HAIP conformance runtime
-        run: ./gradlew :waltid-services:waltid-issuer-api2:buildFatJar --no-daemon --console=plain --warning-mode=summary
-        env:
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-
-      - name: Start Issuer2 HAIP conformance tunnel
+      - name: Prepare Issuer2 HAIP conformance runtime
         id: issuer-tunnel
         env:
           CLOUDFLARED_VERSION: "2026.7.3"
+          PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
         run: |
           set -euo pipefail
+
+          ./gradlew :waltid-services:waltid-issuer-api2:buildFatJar --no-daemon --console=plain --warning-mode=summary
 
           CLOUDFLARED="$RUNNER_TEMP/cloudflared"
           TUNNEL_LOG="$RUNNER_TEMP/cloudflared-issuer2-haip.log"
@@ -452,12 +447,7 @@ jobs:
           echo "Issuer2 HAIP conformance tunnel: $TUNNEL_URL"
           echo "url=$TUNNEL_URL" >> "$GITHUB_OUTPUT"
 
-      - name: Install Playwright for Issuer2 HAIP conformance
-        run: ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers --no-daemon --console=plain --warning-mode=summary
-        env:
-          PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers --no-daemon --console=plain --warning-mode=summary
 
       - name: Run OpenID4VCI HAIP Issuer2 conformance
         run: >-
@@ -520,7 +510,7 @@ jobs:
         if: always()
         with:
           update_check: true
-          job_name: ${{ inputs.report-check-name }} / openid4vci-haip-conformance
+          job_name: ${{ inputs.report-check-name }} / openid4vc-haip-conformance
           report_paths: '**/build/test-results/**/*.xml'
           detailed_summary: true
           include_passed: false
