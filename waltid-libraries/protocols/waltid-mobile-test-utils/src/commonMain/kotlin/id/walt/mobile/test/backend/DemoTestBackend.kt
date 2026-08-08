@@ -420,6 +420,13 @@ object DemoTestBackend {
         putJsonArray("transaction_data_hashes_alg") {
             add(JsonPrimitive("sha-256"))
         }
+        // Not a profile field, and not optional on Android: AndroidX's default OpenID4VP matcher
+        // treats a single transaction_data item as a payment unconditionally, and for a type it does
+        // not recognise it reads `merchant_name` and hands it to Credential Manager, which rejects a
+        // null one ("Merchant name should not be null") and then produces no candidate at all. The
+        // item is what the verifier sends, so this is where the field belongs; it reaches consent as
+        // a decoded detail like any other non-standard member.
+        put("merchant_name", JsonPrimitive("ACME Corp"))
         putProfileField(fields, "amount", "42.00")
         putProfileField(fields, "currency", "EUR")
         putProfileField(fields, "payee", "ACME Corp")
