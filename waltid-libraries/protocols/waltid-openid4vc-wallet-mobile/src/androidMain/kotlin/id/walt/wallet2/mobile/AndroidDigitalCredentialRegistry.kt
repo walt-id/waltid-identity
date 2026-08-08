@@ -135,7 +135,16 @@ public class AndroidDigitalCredentialRegistry(
         }
         val entries = records.map { it.toAndroidEntry() }
         return runCatching {
-            registryManager.registerCredentials(OpenId4VpRegistry(entries, registryId))
+            // Registering only the unsigned protocol makes Credential Manager ignore signed and
+            // multisigned requests rather than route them here to be rejected. The library default
+            // advertises all three.
+            registryManager.registerCredentials(
+                OpenId4VpRegistry(
+                    credentialEntries = entries,
+                    id = registryId,
+                    supportedProtocols = listOf(OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_UNSIGNED),
+                )
+            )
             registryManager.registerCredentials(
                 AndroidAnnexCRegistry(
                     id = "$registryId-annex-c",

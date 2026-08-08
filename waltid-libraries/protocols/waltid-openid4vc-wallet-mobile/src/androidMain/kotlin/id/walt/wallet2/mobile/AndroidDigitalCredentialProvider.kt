@@ -98,10 +98,17 @@ public object AndroidDigitalCredentialProvider {
         )
     }
 
-    /** Writes the official Credential Manager result payload to [resultIntent]. */
+    /**
+     * Writes the official Credential Manager result payload to [resultIntent].
+     *
+     * [providerRequest] is the request this response answers, taken from
+     * [AndroidDigitalCredentialProviderInput]. Credential Manager needs it to hand back a response
+     * larger than the intent extra limit, which an mdoc carrying a portrait can reach.
+     */
     public fun setResponse(
         resultIntent: Intent,
         response: MobileWalletDigitalCredentialResponse,
+        providerRequest: ProviderGetCredentialRequest,
     ) {
         val responseJson = Json.encodeToString(
             JsonObject.serializer(),
@@ -115,6 +122,7 @@ public object AndroidDigitalCredentialProvider {
         PendingIntentHandler.setGetCredentialResponse(
             resultIntent,
             GetCredentialResponse(DigitalCredential(responseJson)),
+            providerRequest,
         )
     }
 

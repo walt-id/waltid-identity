@@ -70,6 +70,16 @@ class AndroidDigitalCredentialProviderTest {
     @Config(sdk = [35])
     @Test
     fun writesOfficialCredentialManagerResponsesCancellationAndFailures() {
+        // Credential Manager needs the answered request to return a response too large for an
+        // intent extra, so the response is written against a genuinely extracted one.
+        val providerRequest = AndroidDigitalCredentialProvider.extract(
+            providerIntent(
+                requestJson = """{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}""",
+                packageName = "id.walt.caller",
+                signingInfo = signingInfo(Signature(byteArrayOf(1, 2, 3, 4))),
+            ),
+            """{"apps":[]}""",
+        ).providerRequest
         val responseIntent = Intent()
         AndroidDigitalCredentialProvider.setResponse(
             responseIntent,
@@ -77,6 +87,7 @@ class AndroidDigitalCredentialProviderTest {
                 protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
                 dataJson = """{"vp_token":{"pid":["presentation"]}}""",
             ),
+            providerRequest,
         )
 
         val response = assertNotNull(PendingIntentHandler.retrieveGetCredentialResponse(responseIntent))

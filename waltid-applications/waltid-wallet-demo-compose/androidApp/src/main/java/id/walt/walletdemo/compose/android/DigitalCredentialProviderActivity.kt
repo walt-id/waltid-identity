@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.credentials.provider.ProviderGetCredentialRequest
 import id.walt.wallet2.mobile.AndroidDigitalCredentialProvider
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletAnnexCPreview
@@ -68,12 +69,13 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
                             encryptionInfo,
                             selections,
                             selectedOptions,
+                            input.providerRequest,
                         )
                     }
                 } else {
                     val preview = wallet.previewDigitalCredentialPresentation(input.request)
                     selectCredentials(preview.credentialOptions) { selections, selectedOptions ->
-                        showConsent(wallet, preview, selections, selectedOptions)
+                        showConsent(wallet, preview, selections, selectedOptions, input.providerRequest)
                     }
                 }
             }.onFailure {
@@ -89,6 +91,7 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
         encryptionInfo: String,
         selections: List<MobileWalletPresentationCredentialSelection>,
         selectedOptions: List<MobileWalletPresentationCredentialOption>,
+        providerRequest: ProviderGetCredentialRequest,
     ) {
         val trust = when (val value = preview.readerTrust) {
             is id.walt.wallet2.mobile.MobileWalletReaderTrust.Trusted -> "Trusted reader: ${value.certificateSubject}"
@@ -129,7 +132,7 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
                             )
                         )
                     }.onSuccess { response ->
-                        AndroidDigitalCredentialProvider.setResponse(resultIntent, response)
+                        AndroidDigitalCredentialProvider.setResponse(resultIntent, response, providerRequest)
                         finishProviderResult()
                     }.onFailure {
                         reportFailure(it)
@@ -144,6 +147,7 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
         preview: MobileWalletDigitalCredentialPreview,
         selections: List<MobileWalletPresentationCredentialSelection>,
         selectedOptions: List<MobileWalletPresentationCredentialOption>,
+        providerRequest: ProviderGetCredentialRequest,
     ) {
         AlertDialog.Builder(this)
             .setTitle("Share digital credential?")
@@ -153,7 +157,9 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
                 AndroidDigitalCredentialProvider.setCancellation(resultIntent)
                 finishProviderResult()
             }
-            .setPositiveButton("Share") { _, _ -> submitAfterConsent(wallet, preview, selections) }
+            .setPositiveButton("Share") { _, _ ->
+                submitAfterConsent(wallet, preview, selections, providerRequest)
+            }
             .show()
     }
 
@@ -161,6 +167,7 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
         wallet: MobileWallet,
         preview: MobileWalletDigitalCredentialPreview,
         selections: List<MobileWalletPresentationCredentialSelection>,
+        providerRequest: ProviderGetCredentialRequest,
     ) {
         scope.launch {
             runCatching {
@@ -170,7 +177,7 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
                     selectedDisclosureOptions = emptyList(),
                 )
             }.onSuccess { response ->
-                AndroidDigitalCredentialProvider.setResponse(resultIntent, response)
+                AndroidDigitalCredentialProvider.setResponse(resultIntent, response, providerRequest)
                 finishProviderResult()
             }.onFailure {
                 reportFailure(it)
