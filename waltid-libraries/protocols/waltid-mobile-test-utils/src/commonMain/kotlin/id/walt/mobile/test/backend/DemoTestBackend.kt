@@ -420,6 +420,13 @@ object DemoTestBackend {
         putJsonArray("transaction_data_hashes_alg") {
             add(JsonPrimitive("sha-256"))
         }
+        // TODO: remove this member, and switch PAYMENT_AUTHORIZATION_TYPE to `payment_details` with
+        //  the `payee_name`/`payment_amount`/`payment_currency` field names, once the
+        //  `payment_details` profile is deployed to wallet.demo.walt.id and verifier2.demo.walt.id.
+        //  The profile is already committed to the four transaction-data-profiles.conf files, and the
+        //  switch is verified to pass against a local stack serving it; this workaround exists only
+        //  because the item is resolved from the deployed profile list at run time.
+        //
         // Not a profile field, and not optional on Android: AndroidX's default OpenID4VP matcher
         // treats a single transaction_data item as a payment unconditionally, and for a type it does
         // not recognise it reads `merchant_name` and hands it to Credential Manager, which rejects a
