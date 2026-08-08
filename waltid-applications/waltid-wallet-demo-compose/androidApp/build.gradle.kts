@@ -77,4 +77,11 @@ dependencies {
     androidTestImplementation(identityLibs.androidx.test.uiautomator)
     androidTestImplementation(identityLibs.ktor.client.android)
     androidTestImplementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
+    // The Annex C E2E is its own reader, because Annex C has no back-channel: the encrypted
+    // DeviceResponse returns through the OS to whoever called getCredential. It builds the request
+    // and decrypts the response with the same shared code the deployed verifier runs.
+    androidTestImplementation(project(":waltid-libraries:protocols:waltid-18013-7-verifier"))
+    androidTestImplementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
+    androidTestImplementation(project(":waltid-libraries:crypto:waltid-crypto2"))
+    androidTestImplementation(project(":waltid-libraries:crypto:waltid-cose"))
 }
