@@ -11,6 +11,7 @@ import androidx.credentials.ExperimentalDigitalCredentialApi
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
@@ -232,32 +233,41 @@ class DigitalCredentialSharingE2ETest {
     }
 
     /**
-     * Two alternatives in one request envelope - `openid4vp-v1-unsigned` for the SD-JWT PID at index
-     * 0, `org-iso-mdoc` for the mDL at index 1 - with the Annex C one selected.
+     * Two alternatives in one request envelope - a protocol this wallet does not support at index 0,
+     * `org-iso-mdoc` for the mDL at index 1 - with the Annex C one selected.
      *
      * This is the case a wallet that picks a protocol itself gets wrong. The user chooses an
      * alternative in the picker and the wallet must answer *that* one; answering index 0 because it
-     * happens to be first, or because OpenID4VP is preferred, answers a request the user never saw.
-     * Selecting the non-zero, non-OpenID4VP alternative is therefore the whole point, and Multipaz's
-     * Annex C matcher attributes its selection by protocol rather than by request index, so this also
-     * covers the attribution path that carries no index at all.
+     * happens to be first answers a request the user never saw. Selecting the non-zero alternative is
+     * therefore the whole point, and Multipaz's Annex C matcher attributes its selection by protocol
+     * rather than by request index, so this also covers the attribution path that carries no index at
+     * all.
+     *
+     * Index 0 is `preview` - the legacy Digital Credentials protocol identifier - rather than an
+     * OpenID4VP alternative, and that is a platform constraint rather than a preference. Two
+     * independent behaviours of the registered matcher pair make an OpenID4VP alternative and an Annex
+     * C one mutually exclusive on Android today, in either order:
+     *
+     * 1. Multipaz's Annex C matcher iterates `requests[]` and stops at the first entry whose
+     *    `protocol` it recognises - and it recognises all three `openid4vp-v1-*` values as well as
+     *    `org-iso-mdoc`. An OpenID4VP entry ahead of the Annex C one therefore ends its scan before it
+     *    reaches Annex C, whether or not that entry matches anything. An unrecognised protocol is
+     *    skipped, which is what makes this envelope work.
+     * 2. When both registries produce a candidate for the same request, only the OpenID4VP registry's
+     *    candidates reach the picker, so an Annex C entry ahead of a *matchable* OpenID4VP one is
+     *    matched and then dropped.
+     *
+     * Neither is wallet behaviour and neither is reachable from wallet code: the AndroidX OpenID4VP
+     * matcher is embedded in `androidx.credentials.registry` and `OpenId4VpRegistry` accepts no
+     * replacement. The wallet's own selection across a mixed OpenID4VP/Annex C envelope is covered by
+     * host tests instead, which is where it can be exercised without the platform picker.
      */
     @Test
     fun selectsNonZeroAnnexCAlternativeFromMultiProtocolRequest() = runBlocking {
         val fixture = start() ?: return@runBlocking
-        val sdJwtScenario = DemoTestBackend.presentationScenarios.first { it.id == "eudi-pid-sdjwt" }
         val mdlScenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
-        fixture.issue(sdJwtScenario)
         fixture.issue(mdlScenario)
 
-        // Both alternatives are real requests from the party that would issue them: the OpenID4VP one
-        // comes from a verifier2 session, the Annex C one from the shared verifier-side builder. Only
-        // the envelope that offers them together is assembled here, because no single verifier session
-        // naturally produces one.
-        val openId4VpSession = DemoTestBackend.createDcApiVerifierSession(
-            scenario = sdJwtScenario,
-            expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
-        )
         val readerKey = annexCReaderKey()
         val annexCRequest = AnnexCRequestBuilder.build(
             docType = MDL_DOC_TYPE,
@@ -271,20 +281,15 @@ class DigitalCredentialSharingE2ETest {
                 put(
                     "requests",
                     buildJsonArray {
-                        add(
-                            requireNotNull(
-                                Json.parseToJsonElement(openId4VpSession.requestJson)
-                                    .jsonObject["requests"]?.jsonArray?.singleOrNull(),
-                            ) { "Verifier2 DC API request is not a single-alternative envelope" },
-                        )
+                        add(unsupportedProtocolRequestEntry())
                         add(annexCRequestEntry(annexCRequest))
                     },
                 )
             },
         )
 
-        // The mDL can only have come from the Annex C alternative: requests[0] asks for an SD-JWT PID,
-        // so the OpenID4VP matcher cannot surface an mdoc for it.
+        // The mDL can only have come from requests[1]: requests[0] is a protocol no registered matcher
+        // claims, so nothing it contains can produce a candidate.
         val credential = fixture.share(envelope, candidateText = MDL_DOC_TYPE, clickCandidate = true)
         val responseJson = Json.parseToJsonElement(credential.credentialJson).jsonObject
         assertEquals("org-iso-mdoc", responseJson["protocol"]?.jsonPrimitive?.content)
@@ -390,6 +395,10 @@ class DigitalCredentialSharingE2ETest {
         beforeShare: (UiDevice) -> Unit = {},
     ): DigitalCredential {
         DigitalCredentialTestVerifier.reset(requestJson)
+        // The previous test's picker window can still be up, and it showed candidate text too. A node
+        // bound from it goes stale the moment it tears down, so wait it out before looking at all -
+        // otherwise the candidate found below may belong to a request that is already over.
+        device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT)
         context.startActivity(
             Intent(context, DigitalCredentialTestVerifierActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -397,7 +406,14 @@ class DigitalCredentialSharingE2ETest {
 
         val candidate = device.wait(Until.findObject(By.textContains(candidateText)), UI_ELEMENT_TIMEOUT)
         assertNotNull("Credential Manager did not surface a '$candidateText' candidate", candidate)
-        if (clickCandidate) (candidate!!.clickableAncestorOrSelf() ?: candidate).click()
+        // Re-resolved rather than reused: between the wait above and this click the picker may have
+        // recomposed, and a stale node throws instead of failing an assertion.
+        if (clickCandidate) {
+            assertTrue(
+                "Could not click the '$candidateText' candidate",
+                device.clickCandidate(candidateText),
+            )
+        }
 
         // The picker only asks for confirmation when it has something to confirm; after an explicit
         // candidate click some builds go straight to the provider. A missing consent step that was
@@ -484,6 +500,16 @@ class DigitalCredentialSharingE2ETest {
         requireNotNull(capabilities.publicKeyExporter) { "Reader recipient key does not export its public key" }
             .exportPublicKey().toPublicJwk(spec).toCoseKey()
 
+    /**
+     * An alternative no registered matcher claims. `preview` is the legacy Digital Credentials
+     * protocol identifier, so this is a value a real verifier could offer for backwards compatibility
+     * rather than one invented for the test - and one this wallet reports as unsupported.
+     */
+    private fun unsupportedProtocolRequestEntry(): JsonObject = buildJsonObject {
+        put("protocol", JsonPrimitive("preview"))
+        put("data", buildJsonObject { put("selector", buildJsonObject { }) })
+    }
+
     /** One `requests[]` entry as Credential Manager routes it, by `protocol`. */
     private fun annexCRequestEntry(request: AnnexCRequest): JsonObject = buildJsonObject {
         put("protocol", JsonPrimitive("org-iso-mdoc"))
@@ -560,6 +586,29 @@ class DigitalCredentialSharingE2ETest {
         walk(this@executedPolicyIds)
     }
 
+    /**
+     * Clicks the candidate whose text contains [candidateText], retrying while the picker is still
+     * settling.
+     *
+     * The node is looked up inside the retry rather than passed in: walking to a clickable ancestor
+     * touches the accessibility tree several times, and any of those touches throws
+     * [StaleObjectException] if the window recomposed in between. Retrying the whole lookup is what
+     * makes that recoverable; reusing a node is what made it fatal.
+     */
+    private fun UiDevice.clickCandidate(candidateText: String): Boolean {
+        repeat(CANDIDATE_CLICK_ATTEMPTS) {
+            val clicked = runCatching {
+                val candidate = wait(Until.findObject(By.textContains(candidateText)), UI_ELEMENT_TIMEOUT)
+                    ?: return@runCatching false
+                (candidate.clickableAncestorOrSelf() ?: candidate).click()
+                true
+            }
+            clicked.getOrNull()?.let { if (it) return true }
+            if (clicked.exceptionOrNull() !is StaleObjectException) return false
+        }
+        return false
+    }
+
     private fun UiObject2.clickableAncestorOrSelf(): UiObject2? {
         var node: UiObject2? = this
         while (node != null) {
@@ -577,6 +626,10 @@ class DigitalCredentialSharingE2ETest {
         private const val MDL_NAMESPACE = "org.iso.18013.5.1"
         private val REQUESTED_MDL_ELEMENTS = listOf("family_name", "given_name")
         private const val PAYMENT_AUTHORIZATION_DISPLAY_NAME = "Payment Authorization"
+
+        /** Owns `CredentialSelectorActivity`, i.e. the picker window these tests drive. */
+        private const val CREDENTIAL_SELECTOR_PACKAGE = "com.google.android.gms"
+        private const val CANDIDATE_CLICK_ATTEMPTS = 3
 
         /**
          * The policy ids verifier2 reports for its default mdoc set, restricted to the two that must
