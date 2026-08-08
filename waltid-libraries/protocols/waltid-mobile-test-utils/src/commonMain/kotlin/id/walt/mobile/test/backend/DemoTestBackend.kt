@@ -203,16 +203,26 @@ object DemoTestBackend {
 
     suspend fun createTransactionDataVerifierSession(
         scenario: CredentialScenario = transactionDataPresentationScenario,
-    ): VerifierSession {
-        val paymentAuthorizationFields = transactionDataProfileFields(PAYMENT_AUTHORIZATION_TYPE)
-        check(paymentAuthorizationFields.containsAll(requiredPaymentAuthorizationFields)) {
+    ): VerifierSession = createVerifierSession(
+        credentialQuery = scenario.verifierCredentialQuery,
+        transactionData = listOf(paymentAuthorizationTransactionData("pid")),
+    )
+
+    /**
+     * One `payment-authorization` transaction data item bound to [credentialId], with the fields the
+     * deployed profile actually declares.
+     *
+     * The profile is fetched rather than assumed so a deployment that stops declaring `amount`,
+     * `currency` or `payee` fails here, instead of producing an item whose fields a test then cannot
+     * find on screen for a reason it would misattribute to the wallet.
+     */
+    suspend fun paymentAuthorizationTransactionData(credentialId: String): JsonObject {
+        val fields = transactionDataProfileFields(PAYMENT_AUTHORIZATION_TYPE)
+        check(fields.containsAll(requiredPaymentAuthorizationFields)) {
             "Public demo transaction data profile '$PAYMENT_AUTHORIZATION_TYPE' is missing required fields: " +
-                (requiredPaymentAuthorizationFields - paymentAuthorizationFields).joinToString()
+                (requiredPaymentAuthorizationFields - fields).joinToString()
         }
-        return createVerifierSession(
-            credentialQuery = scenario.verifierCredentialQuery,
-            transactionData = listOf(paymentAuthorizationTransactionData("pid", paymentAuthorizationFields)),
-        )
+        return paymentAuthorizationTransactionData(credentialId, fields)
     }
 
     suspend fun transactionDataProfileFields(type: String): Set<String> {
@@ -293,8 +303,31 @@ object DemoTestBackend {
         scenario: CredentialScenario,
         expectedOrigins: List<String>,
         deployment: DcApiDeployment = DcApiDeployment.DEMO,
+    ): DcApiVerifierSession = createDcApiVerifierSession(
+        credentialQueries = listOf(scenario.verifierCredentialQuery),
+        expectedOrigins = expectedOrigins,
+        deployment = deployment,
+    )
+
+    /**
+     * As above, for the cases a single [CredentialScenario] cannot express.
+     *
+     * [encryptedResponse] switches the session to `response_mode=dc_api.jwt`, which also makes the
+     * verifier derive the mdoc session transcript from its own encryption key's JWK thumbprint - so
+     * this flag changes what a correct wallet response looks like, not just how it is wrapped.
+     *
+     * [transactionData] is passed through verbatim so a test can assert on the exact fields the
+     * wallet displayed and hashed; see [paymentAuthorizationTransactionData].
+     */
+    suspend fun createDcApiVerifierSession(
+        credentialQueries: List<JsonObject>,
+        expectedOrigins: List<String>,
+        encryptedResponse: Boolean = false,
+        transactionData: List<JsonObject> = emptyList(),
+        deployment: DcApiDeployment = DcApiDeployment.DEMO,
     ): DcApiVerifierSession {
         require(expectedOrigins.isNotEmpty()) { "DC API sessions require at least one expected origin" }
+        require(credentialQueries.isNotEmpty()) { "DC API sessions require at least one DCQL credential query" }
 
         val payload = buildJsonObject {
             // "dc_api" is the @SerialName of DcApiAnnexDFlowSetup; unlike cross_device this flow
@@ -304,7 +337,15 @@ object DemoTestBackend {
             putJsonObject(deployment.coreKey) {
                 putJsonObject("dcql_query") {
                     putJsonArray("credentials") {
-                        add(scenario.verifierCredentialQuery)
+                        credentialQueries.forEach { add(it) }
+                    }
+                }
+                if (encryptedResponse) put("encrypted_response", JsonPrimitive(true))
+            }
+            if (transactionData.isNotEmpty()) {
+                putJsonObject("openid") {
+                    putJsonArray("transactionData") {
+                        transactionData.forEach { add(it) }
                     }
                 }
             }
