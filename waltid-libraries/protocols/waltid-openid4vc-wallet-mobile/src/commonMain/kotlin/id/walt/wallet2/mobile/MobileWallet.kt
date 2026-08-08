@@ -46,6 +46,7 @@ import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import id.waltid.openid4vp.wallet.DcApiCredentialResponse
 import id.waltid.openid4vp.wallet.DcApiWallet
+import io.ktor.client.HttpClient
 import io.ktor.http.Url
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
@@ -198,6 +199,8 @@ public class MobileWallet internal constructor(
     private val readerTrustEvaluator: MobileWalletReaderTrustEvaluator = UnconfiguredMobileWalletReaderTrustEvaluator,
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
+    /** Issuance transport override. Only tests set this; production uses the configured engine. */
+    issuanceHttpClient: HttpClient? = null,
 ) {
     private val eventStream = MobileWalletEventStream()
     /**
@@ -235,6 +238,7 @@ public class MobileWallet internal constructor(
         attestationAssembler = attestationAssembler,
         onEvent = ::emitSessionEvent,
         sessionStore = issuanceSessionStore,
+        httpClient = issuanceHttpClient,
     )
 
     /**

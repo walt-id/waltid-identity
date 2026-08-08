@@ -64,6 +64,9 @@ kotlin {
             implementation(project(":waltid-libraries:protocols:waltid-18013-7-verifier"))
             implementation(identityLibs.kotlinx.coroutines.test)
             implementation(identityLibs.ktor.client.core)
+            implementation(identityLibs.ktor.client.mock)
+            implementation(identityLibs.ktor.client.content.negotiation)
+            implementation(identityLibs.ktor.serialization.kotlinx.json)
             implementation(identityLibs.kotlinx.serialization.json)
         }
         if (enableAndroidBuild) {

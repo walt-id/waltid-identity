@@ -30,6 +30,7 @@ import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
+import id.walt.openid4vci.offers.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -40,14 +41,29 @@ import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecordKind
 import id.walt.wallet2.handlers.WalletIssuanceSessionStore
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
+import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
+import id.walt.wallet2.stores.inmemory.InMemoryDidStore
+import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.MockRequestHandleScope
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.respondError
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLBuilder
+import io.ktor.http.headersOf
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -793,6 +809,52 @@ class MobileWalletTest {
         assertEquals(2, registry.replaceCalls)
     }
 
+    /**
+     * The issuance counterpart of the deletion case above.
+     *
+     * Issuance stores the credential first and projects it into the platform registry afterwards, so
+     * a registry that rejects the projection must not be able to reach back and turn an issued
+     * credential into [WalletIssuanceOutcome.Failed]. The wallet would then hold a credential the
+     * application was told it never received.
+     */
+    @Test
+    fun failedRegistrySynchronizationDoesNotTurnStoredIssuanceIntoFailedIssuance() = runTest {
+        val registry = FailingMetadataRegistry(IllegalStateException("Credential Manager rejected the registry"))
+        val holderKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("issuance-holder-key"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        val credentialStore = InMemoryCredentialStore()
+        val wallet = MobileWallet(
+            walletId = "issuance-registry-failure-wallet",
+            keyStore = InMemoryKeyStore().also { it.addCrypto2Key(holderKey) },
+            didStore = InMemoryDidStore().also {
+                it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
+            },
+            credentialStore = credentialStore,
+            generateAndPersistKey = { error("Issuance must not generate keys") },
+            credentialRegistry = registry,
+            issuanceHttpClient = mockIssuer(),
+        )
+
+        val session = wallet.startIssuance(MobileWalletIssuanceRequest(offerUrl = preAuthorizedOfferUrl()))
+        val outcome = assertIs<WalletIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(session.id))
+
+        // The credential is in the wallet and reported as issued, both of which the registry cannot revoke.
+        val storedId = outcome.credentialIds.single()
+        assertNotNull(credentialStore.getCredential(storedId))
+        assertEquals(listOf(storedId), wallet.credentials().map { it.id })
+
+        // The projection failure is observable, but only where a stale projection is reported.
+        assertEquals(1, registry.replaceCalls)
+        val reported = assertNotNull(wallet.digitalCredentialRegistration.value)
+        assertFalse(reported.available)
+        assertEquals("Credential Manager rejected the registry", reported.reason)
+    }
+
     @Test
     fun unavailableRegistrySurfacesItsReasonWithoutThrowing() = runTest {
         val registry = FailingMetadataRegistry()
@@ -1374,6 +1436,88 @@ class MobileWalletTest {
     private fun unusedKeyGenerator(): suspend (MobileWalletKeyType) -> ManagedKeyMaterial =
         { error("This test must not bootstrap a new key") }
 
+    /**
+     * A pre-authorized offer carried inline, so resolving it needs no offer fetch of its own.
+     *
+     * [MobileWalletIssuanceRequest] accepts only a URL, which is the shape the wallet receives from a
+     * QR code or a deep link.
+     */
+    private fun preAuthorizedOfferUrl(): String = URLBuilder(CROSS_DEVICE_CREDENTIAL_OFFER_URL).apply {
+        parameters.append(
+            "credential_offer",
+            buildJsonObject {
+                put("credential_issuer", MOCK_ISSUER)
+                put("credential_configuration_ids", buildJsonArray { add(JsonPrimitive(MOCK_CONFIGURATION_ID)) })
+                put("grants", buildJsonObject {
+                    put(
+                        "urn:ietf:params:oauth:grant-type:pre-authorized_code",
+                        buildJsonObject { put("pre-authorized_code", "pre-code") },
+                    )
+                })
+            }.toString(),
+        )
+    }.buildString()
+
+    /**
+     * The smallest OpenID4VCI issuer that answers one pre-authorized request with one credential.
+     *
+     * Nothing beyond the four endpoints the flow reaches is served, so a request the wallet should
+     * not make surfaces as a 404 rather than being silently absorbed.
+     */
+    private fun mockIssuer(): HttpClient = HttpClient(MockEngine) {
+        engine {
+            addHandler { request ->
+                when (request.url.toString()) {
+                    "$MOCK_ISSUER/.well-known/openid-credential-issuer" -> jsonResponse(
+                        """
+                        {
+                          "credential_issuer":"$MOCK_ISSUER",
+                          "credential_endpoint":"$MOCK_ISSUER/credential",
+                          "credential_configurations_supported":{
+                            "$MOCK_CONFIGURATION_ID":{
+                              "format":"dc+sd-jwt",
+                              "vct":"urn:eu.europa.ec.eudi:pid:1"
+                            }
+                          }
+                        }
+                        """.trimIndent()
+                    )
+
+                    "$MOCK_ISSUER/.well-known/oauth-authorization-server" -> jsonResponse(
+                        """
+                        {
+                          "issuer":"$MOCK_ISSUER",
+                          "token_endpoint":"$MOCK_ISSUER/token",
+                          "response_types_supported":["code"],
+                          "grant_types_supported":["urn:ietf:params:oauth:grant-type:pre-authorized_code"]
+                        }
+                        """.trimIndent()
+                    )
+
+                    "$MOCK_ISSUER/token" ->
+                        jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+
+                    "$MOCK_ISSUER/credential" -> jsonResponse(
+                        buildJsonObject {
+                            put("credentials", buildJsonArray {
+                                add(buildJsonObject { put("credential", SdJwtExamples.sdJwtVcSignedExample2) })
+                            })
+                        }.toString()
+                    )
+
+                    else -> respondError(HttpStatusCode.NotFound)
+                }
+            }
+        }
+        install(ContentNegotiation) { json(displayJson) }
+    }
+
+    private fun MockRequestHandleScope.jsonResponse(content: String) = respond(
+        content = content,
+        status = HttpStatusCode.OK,
+        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+    )
+
     /** A wallet holding one mDL, for Annex C tests that must reach reader-authentication checks. */
     private fun annexCWalletWithMdl(walletId: String): MobileWallet = MobileWallet(
         walletId = walletId,
@@ -1415,6 +1559,8 @@ class MobileWalletTest {
     }
 
     private companion object {
+        const val MOCK_ISSUER = "https://issuer.example"
+        const val MOCK_CONFIGURATION_ID = "test-credential"
         const val READER_CERTIFICATE_BASE64 =
             "MIIBsTCCAVegAwIBAgIUJklaRrIjkEZlDdPk2+qPneHHD6kwCgYIKoZIzj0EAwIwLjEQMA4GA1UEAwwHRXhhbXBsZTENMAsGA1UECgwEVGVzdDELMAkGA1UEBhMCVVMwHhcNMjYwMzMxMDkwNDMwWhcNMjcwMzMxMDkwNDMwWjAuMRAwDgYDVQQDDAdFeGFtcGxlMQ0wCwYDVQQKDARUZXN0MQswCQYDVQQGEwJVUzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABM4ukI9BoHfMYjKmokWc5GMiN7DJBQAPPZBHXHhwmuQE+JyeRcamM+uCS1N+naE0itVbs7fQ/5xbujSSK9pYdb6jUzBRMB0GA1UdDgQWBBSwjqgulcWH4AqTJwPjBGj3VGIAsTAfBgNVHSMEGDAWgBSwjqgulcWH4AqTJwPjBGj3VGIAsTAPBgNVHRMBAf8EBTADAQH/MAoGCCqGSM49BAMCA0gAMEUCIQCoWAleGRqR+kb+5SeRt/scogZPiQiM7wJ69tadEPPJwQIgdygIZSMQSXlxXbZ10QKtN6qSjggqFVUV4/Z2/pnBUBk="
         const val READER_ENCRYPTION_INFO =
