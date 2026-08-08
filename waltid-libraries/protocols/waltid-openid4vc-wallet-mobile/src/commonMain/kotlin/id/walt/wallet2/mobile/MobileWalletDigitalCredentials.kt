@@ -76,13 +76,17 @@ public data class MobileWalletDigitalCredentialCapabilities(
 )
 
 /**
- * Minimal, non-secret metadata supplied to a platform credential registry.
+ * Matcher-visible credential metadata supplied to a platform credential registry.
+ *
+ * This is not the credential: no issuer-signed payload, proof, or key material is included. The
+ * claim values it does carry are the user's personal data, because the platform matcher runs out of
+ * process and cannot ask the wallet for a value it was not given.
  *
  * @property registryEntryId Stable platform registry entry identifier.
  * @property credentialId Wallet-local credential identifier.
  * @property format Credential format represented by the entry.
  * @property type Credential type or mdoc document type.
- * @property fields Matcher-visible, non-secret credential fields.
+ * @property fields Matcher-visible credential fields, which may contain personal data.
  * @property displayName Human-readable entry label.
  */
 public data class MobileWalletCredentialRegistryRecord(
@@ -108,7 +112,11 @@ public data class MobileWalletCredentialRegistryField(
 )
 
 /**
- * Result of replacing the platform registry with the current wallet credential metadata.
+ * Outcome of synchronizing the platform registry with the current wallet credential metadata.
+ *
+ * A result with [available] false means the platform projection is now out of date, not that the
+ * wallet operation which triggered the synchronization failed. Callers that care about the
+ * projection should surface the [reason] and retry [MobileWalletCredentialRegistry.replace].
  *
  * @property available Whether registration is available after the attempt.
  * @property registeredEntryCount Number of registered entries.
@@ -125,7 +133,16 @@ public interface MobileWalletCredentialRegistry {
     /** Current platform capability and registration state. */
     public val capabilities: MobileWalletDigitalCredentialCapabilities
 
-    /** Replaces the registry atomically. Reusing [registryId] must overwrite stale entries. */
+    /**
+     * Synchronizes the platform registry named [registryId] to exactly [records].
+     *
+     * Reusing [registryId] must replace that registry's previous entries rather than add to them,
+     * so a credential the wallet no longer holds stops being offered. Implementations are not
+     * required to be atomic - a platform may take several operations to publish one desired state,
+     * and an interrupted call can leave the registry holding neither the old nor the new set. What
+     * they must do is report the outcome instead of throwing, since the wallet state this projects
+     * has already been committed.
+     */
     public suspend fun replace(
         registryId: String,
         records: List<MobileWalletCredentialRegistryRecord>,

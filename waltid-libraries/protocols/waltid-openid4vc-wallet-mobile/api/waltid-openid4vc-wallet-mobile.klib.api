@@ -644,6 +644,8 @@ final class id.walt.wallet2.mobile/IosIdentityDocumentRegistry : id.walt.wallet2
 }
 
 final class id.walt.wallet2.mobile/MobileWallet { // id.walt.wallet2.mobile/MobileWallet|null[0]
+    final val digitalCredentialRegistration // id.walt.wallet2.mobile/MobileWallet.digitalCredentialRegistration|{}digitalCredentialRegistration[0]
+        final fun <get-digitalCredentialRegistration>(): kotlinx.coroutines.flow/StateFlow<id.walt.wallet2.mobile/MobileWalletCredentialRegistrationResult?> // id.walt.wallet2.mobile/MobileWallet.digitalCredentialRegistration.<get-digitalCredentialRegistration>|<get-digitalCredentialRegistration>(){}[0]
     final val events // id.walt.wallet2.mobile/MobileWallet.events|{}events[0]
         final fun <get-events>(): kotlinx.coroutines.flow/Flow<id.walt.wallet2.mobile/MobileWalletEvent> // id.walt.wallet2.mobile/MobileWallet.events.<get-events>|<get-events>(){}[0]
 

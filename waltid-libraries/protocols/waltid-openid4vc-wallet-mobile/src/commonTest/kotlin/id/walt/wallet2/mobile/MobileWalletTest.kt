@@ -67,6 +67,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -756,6 +757,57 @@ class MobileWalletTest {
     }
 
     @Test
+    fun failedRegistrySynchronizationIsReportedWithoutFailingTheCommittedWalletOperation() = runTest {
+        val registry = FailingMetadataRegistry(IllegalStateException("Credential Manager rejected the registry"))
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "pid-1",
+                credential = CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2).second,
+                label = "PID",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "registry-failure-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            generateAndPersistKey = { error("Registry failure must not generate keys") },
+            credentialRegistry = registry,
+        )
+
+        // The store removed the credential, so the deletion stands even though the projection of it did not.
+        assertTrue(wallet.deleteCredential("pid-1"))
+        assertEquals(listOf("pid-1"), credentialStore.removedCredentialIds)
+        val reported = assertNotNull(wallet.digitalCredentialRegistration.value)
+        assertFalse(reported.available)
+        assertEquals("Credential Manager rejected the registry", reported.reason)
+
+        // Retrying re-publishes current wallet state rather than requiring another wallet operation.
+        val retried = wallet.refreshDigitalCredentialRegistration()
+        assertFalse(retried.available)
+        assertEquals(2, registry.replaceCalls)
+    }
+
+    @Test
+    fun unavailableRegistrySurfacesItsReasonWithoutThrowing() = runTest {
+        val registry = FailingMetadataRegistry()
+        val wallet = MobileWallet(
+            walletId = "registry-unavailable-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = RecordingCredentialStore(),
+            generateAndPersistKey = { error("Registry refresh must not generate keys") },
+            credentialRegistry = registry,
+        )
+
+        val result = wallet.refreshDigitalCredentialRegistration()
+
+        assertFalse(result.available)
+        assertEquals("Registry is unavailable", result.reason)
+        assertEquals(result, wallet.digitalCredentialRegistration.value)
+    }
+
+    @Test
     fun annexCParserNormalizesNamespacesAndPreviewRejectsParsedRawMismatchBeforeConsent() = runTest {
         val wallet = MobileWallet(
             walletId = "annex-c-wallet",
@@ -1036,6 +1088,25 @@ class MobileWalletTest {
         ): MobileWalletCredentialRegistrationResult {
             replacements += registryId to records
             return MobileWalletCredentialRegistrationResult(true, records.size)
+        }
+    }
+
+    /** Registry standing in for a platform whose registration call fails after the store committed. */
+    private class FailingMetadataRegistry(private val failure: Throwable? = null) : MobileWalletCredentialRegistry {
+        var replaceCalls = 0
+        override val capabilities = UnavailableMobileWalletCredentialRegistry.capabilities
+
+        override suspend fun replace(
+            registryId: String,
+            records: List<MobileWalletCredentialRegistryRecord>,
+        ): MobileWalletCredentialRegistrationResult {
+            replaceCalls++
+            failure?.let { throw it }
+            return MobileWalletCredentialRegistrationResult(
+                available = false,
+                registeredEntryCount = 0,
+                reason = "Registry is unavailable",
+            )
         }
     }
 
