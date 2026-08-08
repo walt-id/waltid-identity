@@ -150,6 +150,12 @@ ISO/IEC 18013-7 Annex C (DC API / Apple Wallet) verifier support. Provides HPKE 
 
 **Use when:** You need to verify mdoc credentials via the Digital Credentials API (browser-based flows, Apple Wallet integration).
 
+### [🟢 waltid-relying-party-certificate](./waltid-relying-party-certificate)
+
+EUDI Wallet-Relying Party Registration Certificate (WRPRC / `rc-wrp+jwt`) library, per ETSI TS 119 475. Provides issuance and signing of registration certificates, and wallet-side verification plus DCQL matching to check whether a Verifier's request is covered by its registration.
+
+**Use when:** You're issuing Wallet-Relying Party Registration Certificates, or building a wallet that needs to validate a Verifier's OpenID4VP request against one.
+
 ## Protocol Versions
 
 - **Draft Implementations**: Use [waltid-openid4vc](./waltid-openid4vc) for OID4VCI Draft 11/13 and OID4VP Draft 14/20

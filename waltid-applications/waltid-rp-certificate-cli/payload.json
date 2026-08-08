@@ -1,0 +1,22 @@
+{
+  "name": "Example Bank AG",
+  "sub": "EUID:ATU12345678",
+  "country": "AT",
+  "registry_uri": "https://registry.example.at",
+  "srv_description": [[{"lang": "en", "content": "Account opening identification"}]],
+  "entitlements": ["Service_Provider"],
+  "privacy_policy": "https://bank.example.com/privacy",
+  "supervisory_authority": {"email": "office@dsb.gv.at"},
+  "iat": 1780000000,
+  "purpose": [{"lang": "en", "content": "Identify customers for account opening"}],
+  "credentials": [
+    {
+      "format": "mso_mdoc",
+      "meta": {"doctype_value": "eu.europa.ec.eudi.pid.1"},
+      "claim": [
+        {"path": ["eu.europa.ec.eudi.pid.1", "given_name"]},
+        {"path": ["eu.europa.ec.eudi.pid.1", "family_name"]}
+      ]
+    }
+  ]
+}
