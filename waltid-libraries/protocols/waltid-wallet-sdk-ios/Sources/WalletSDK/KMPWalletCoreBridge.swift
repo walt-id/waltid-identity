@@ -735,9 +735,11 @@ private extension MobileWalletDigitalCredentialCapabilities {
             capabilities: swiftArray(capabilities, of: MobileWalletDigitalCredentialCapability.self).map {
                 DigitalCredentialCapability(
                     protocolIdentifier: $0.protocol,
-                    credentialFormats: swiftArray($0.credentialFormats, of: MobileWalletDigitalCredentialFormat.self).map { String(describing: $0) },
-                    requestProtection: swiftArray($0.requestProtection, of: MobileWalletDigitalCredentialRequestProtection.self).map { String(describing: $0) },
-                    responseProtection: swiftArray($0.responseProtection, of: MobileWalletDigitalCredentialResponseProtection.self).map { String(describing: $0) },
+                    // `identifier`, not String(describing:): SKIE renders these as Swift enums, so
+                    // describing them would publish compiler-derived case names as API.
+                    credentialFormats: swiftArray($0.credentialFormats, of: MobileWalletDigitalCredentialFormat.self).map(\.identifier),
+                    requestProtection: swiftArray($0.requestProtection, of: MobileWalletDigitalCredentialRequestProtection.self).map(\.identifier),
+                    responseProtection: swiftArray($0.responseProtection, of: MobileWalletDigitalCredentialResponseProtection.self).map(\.identifier),
                     supported: $0.supported,
                     unsupportedReason: $0.unsupportedReason
                 )
@@ -765,9 +767,13 @@ private extension MobileWalletAnnexCPreview {
 private extension MobileWalletReaderTrust {
     func toSwiftReaderTrust() -> ReaderTrust {
         if self is MobileWalletReaderTrustNotApplicable { return .notApplicable }
-        if let value = self as? MobileWalletReaderTrustUnverified { return .unverified(reason: value.reason) }
+        if self is MobileWalletReaderTrustNotAuthenticated { return .notAuthenticated }
+        if self is MobileWalletReaderTrustPendingRawRequest { return .pendingRawRequest }
+        if let value = self as? MobileWalletReaderTrustUntrusted { return .untrusted(reason: value.reason) }
         if let value = self as? MobileWalletReaderTrustTrusted { return .trusted(certificateSubject: value.certificateSubject) }
-        return .unverified(reason: "Unknown reader trust state")
+        // A state this SDK build does not know about cannot be reported as identifying the reader,
+        // and the reason string says so rather than implying a rejected trust policy.
+        return .untrusted(reason: "Unrecognized reader trust state")
     }
 }
 

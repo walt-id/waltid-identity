@@ -32,17 +32,19 @@ class AnnexCHpkeIosTest {
             plaintext = plaintext,
             info = info,
         )
-        assertEquals(65, encrypted.enc.size)
-        assertEquals(plaintext.size + 16, encrypted.cipherText.size)
-        assertFalse(plaintext.contentEquals(encrypted.cipherText.copyOfRange(0, plaintext.size)))
+        val enc = encrypted.encapsulatedKey.toByteArray()
+        val cipherText = encrypted.ciphertext.toByteArray()
+        assertEquals(65, enc.size)
+        assertEquals(plaintext.size + 16, cipherText.size)
+        assertFalse(plaintext.contentEquals(cipherText.copyOfRange(0, plaintext.size)))
         assertContentEquals(
             plaintext,
             hpke.OpenBase(
-                enc = encrypted.enc,
+                enc = enc,
                 skR = recipient.sk,
                 info = info,
                 aad = byteArrayOf(),
-                ct = encrypted.cipherText,
+                ct = cipherText,
             ),
         )
     }

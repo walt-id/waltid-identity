@@ -1,9 +1,18 @@
 package id.waltid.openid4vp.wallet
 
 import id.walt.cose.coseCompliantCbor
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJwe
+import id.walt.crypto2.jose.JweContentEncryption
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.migration.v1.V1KeyMigration
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.objects.handover.OpenID4VPDCAPIHandoverInfo
 import id.walt.mdoc.objects.sha256
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import kotlinx.coroutines.test.runTest
@@ -11,13 +20,16 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -57,8 +69,17 @@ class DcApiWalletTest {
     }
 
     @Test
-    fun `only the unencrypted dc api response mode is accepted`() {
-        listOf(OpenID4VPResponseMode.DIRECT_POST, OpenID4VPResponseMode.DC_API_JWT).forEach { responseMode ->
+    fun `only the two dc api response modes are accepted`() {
+        listOf(OpenID4VPResponseMode.DC_API, OpenID4VPResponseMode.DC_API_JWT).forEach { responseMode ->
+            DcApiWallet.validateAuthorizationRequest(
+                authorizationRequest(responseMode = responseMode, clientMetadata = encryptionClientMetadata()),
+            )
+        }
+        listOf(
+            OpenID4VPResponseMode.DIRECT_POST,
+            OpenID4VPResponseMode.DIRECT_POST_JWT,
+            OpenID4VPResponseMode.FRAGMENT,
+        ).forEach { responseMode ->
             assertFailsWith<IllegalArgumentException>("response_mode '$responseMode' must be rejected") {
                 DcApiWallet.validateAuthorizationRequest(authorizationRequest(responseMode = responseMode))
             }
@@ -66,21 +87,7 @@ class DcApiWalletTest {
     }
 
     @Test
-    fun `an encrypted response mode is rejected before the user is asked to consent`() {
-        assertFailsWith<IllegalArgumentException> {
-            DcApiWallet.resolveRequest(
-                protocol = "openid4vp-v1-unsigned",
-                data = JsonObject(
-                    unsignedRequestData().toMutableMap()
-                        .apply { this["response_mode"] = JsonPrimitive("dc_api.jwt") },
-                ),
-                origin = "https://verifier.example",
-            )
-        }
-    }
-
-    @Test
-    fun `cleartext response is returned to the platform without transport`() {
+    fun `cleartext response is returned to the platform without transport`() = runTest {
         val request = ResolvedDcApiRequest(
             protocol = DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
             origin = "https://verifier.example",
@@ -102,7 +109,7 @@ class DcApiWalletTest {
     }
 
     @Test
-    fun `dc api ignores parameters that are not defined by appendix A`() {
+    fun `dc api ignores parameters that are not defined by appendix A`() = runTest {
         val authorizationRequest = authorizationRequest(
             state = "state-123",
             redirectUri = "https://verifier.example/redirect",
@@ -122,14 +129,113 @@ class DcApiWalletTest {
         assertEquals(setOf("vp_token"), response.data.keys)
     }
 
+    /**
+     * Under `dc_api.jwt` the operating system and the website that called `getCredential` both relay
+     * the response, so the disclosed claims must not be readable by either. Asserting on the member
+     * set - `response` present, `vp_token` absent - is what pins that: a builder that emitted both
+     * would encrypt nothing in practice while still looking encrypted.
+     */
     @Test
-    fun `an encrypted response mode cannot reach the response builder`() {
+    fun `an encrypted response mode wraps the members in a jwe the platform cannot read`() = runTest {
+        val response = DcApiWallet.buildResponse(
+            request = ResolvedDcApiRequest(
+                protocol = DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
+                origin = "https://verifier.example",
+                authorizationRequest = authorizationRequest(
+                    responseMode = OpenID4VPResponseMode.DC_API_JWT,
+                    clientMetadata = encryptionClientMetadata(),
+                ),
+            ),
+            vpToken = """{"pid":["presentation"]}""",
+        )
+
+        assertEquals(setOf("response"), response.data.keys)
+        val jwe = assertNotNull(response.data["response"]?.jsonPrimitive?.content)
+        // Compact JWE: five base64url segments, and the disclosed claim appears in none of them.
+        assertEquals(5, jwe.split('.').size, "response is not a compact JWE")
+        assertFalse(jwe.contains("presentation"), "the vp_token leaked into the JWE in cleartext")
+        assertEquals(
+            VERIFIER_KEY_ID,
+            Json.parseToJsonElement(jwe.substringBefore('.').decodeBase64Url())
+                .jsonObject["kid"]?.jsonPrimitive?.content,
+            "the JWE protected header must name the verifier key the wallet encrypted to",
+        )
+    }
+
+    /**
+     * The test above proves the response *looks* encrypted; this proves the verifier can actually read
+     * it. The key pair is fixed rather than generated, so the assertion is on the protocol producing a
+     * decryptable JWE for a published `client_metadata` key, not on a round trip through key material
+     * this test also chose - a wallet that encrypted to the wrong key would still round-trip if both
+     * halves came from the same freshly generated key.
+     */
+    @Test
+    fun `the verifier decrypts the encrypted response back to the vp token it asked for`() = runTest {
+        val vpToken = """{"pid":["presentation"]}"""
+        val response = DcApiWallet.buildResponse(
+            request = ResolvedDcApiRequest(
+                protocol = DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
+                origin = "https://verifier.example",
+                authorizationRequest = authorizationRequest(
+                    responseMode = OpenID4VPResponseMode.DC_API_JWT,
+                    clientMetadata = ClientMetadata(
+                        jwks = ClientMetadata.Jwks(listOf(json.parseToJsonElement(DECRYPTABLE_PUBLIC_JWK).jsonObject)),
+                        encryptedResponseEncValuesSupported = listOf("A256GCM"),
+                    ),
+                ),
+            ),
+            vpToken = vpToken,
+        )
+
+        val recipientKey = CryptoRuntime(defaultSoftwareKeyProviders()).restore(
+            V1KeyMigration().migrate(
+                recordId = KeyId("verifier-response-key"),
+                serialized = buildJsonObject {
+                    put("type", "jwk")
+                    put("jwk", json.parseToJsonElement(DECRYPTABLE_PRIVATE_JWK).jsonObject)
+                },
+                usages = setOf(KeyUsage.KEY_AGREEMENT),
+            )
+        )
+        val decrypted = CompactJwe.decrypt(
+            compactJwe = assertNotNull(response.data["response"]?.jsonPrimitive?.content),
+            recipientKey = recipientKey,
+            allowedContentEncryptions = setOf(JweContentEncryption.A256GCM),
+        )
+
+        assertEquals("A256GCM", decrypted.protectedHeader["enc"]?.jsonPrimitive?.content)
+        assertEquals(
+            buildJsonObject { put("vp_token", json.parseToJsonElement(vpToken)) },
+            Json.parseToJsonElement(decrypted.plaintext.decodeToString()),
+        )
+    }
+
+    /**
+     * `dc_api.jwt` without usable `client_metadata` keys must fail rather than silently degrade to a
+     * cleartext response the verifier would still accept as an answer to its encrypted request.
+     */
+    @Test
+    fun `an encrypted response mode without verifier encryption keys fails closed`() = runTest {
         assertFailsWith<IllegalArgumentException> {
             DcApiWallet.buildResponse(
                 request = ResolvedDcApiRequest(
                     protocol = DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
                     origin = "https://verifier.example",
                     authorizationRequest = authorizationRequest(responseMode = OpenID4VPResponseMode.DC_API_JWT),
+                ),
+                vpToken = "{}",
+            )
+        }
+    }
+
+    @Test
+    fun `a non dc api response mode cannot reach the response builder`() = runTest {
+        assertFailsWith<IllegalArgumentException> {
+            DcApiWallet.buildResponse(
+                request = ResolvedDcApiRequest(
+                    protocol = DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
+                    origin = "https://verifier.example",
+                    authorizationRequest = authorizationRequest(responseMode = OpenID4VPResponseMode.DIRECT_POST),
                 ),
                 vpToken = "{}",
             )
@@ -148,19 +254,91 @@ class DcApiWalletTest {
         assertEquals("invalid_request", response.data["error"]?.jsonPrimitive?.content)
     }
 
+    /**
+     * The full accepted matrix, as a table, because this is the sole origin canonicalizer and its
+     * output is hashed into the mdoc session transcript that the verifier reconstructs from
+     * `expected_origins` without ever seeing the wallet's copy. Every normalization below is a place
+     * where a second, platform-local implementation could disagree by one character and produce a
+     * device signature no verifier can reproduce - which surfaces only as an opaque `device-auth`
+     * rejection, so it is asserted here rather than left to a device test to discover.
+     *
+     * Two entries are regressions: an uppercase host was once returned as-is here but lowercased by
+     * the Android adapter, and `[::1]` was accepted by that adapter but rejected here, because the
+     * loopback check compared against a bare `::1` while ktor reports the brackets.
+     */
     @Test
-    fun `platform origin rejects complex or insecure web values and accepts Android app origins`() {
-        assertEquals(
-            "android:apk-key-hash:abc123",
-            DcApiWallet.validatePlatformOrigin("android:apk-key-hash:abc123"),
-        )
-        assertFailsWith<IllegalArgumentException> {
-            DcApiWallet.validatePlatformOrigin("https://verifier.example/path")
+    fun `platform origin canonicalization accepts and normalizes every supported origin shape`() {
+        mapOf(
+            // An Android app origin is opaque and passes through verbatim - there is nothing in it to
+            // normalize, and altering it would break the verifier's exact match.
+            "android:apk-key-hash:abc123" to "android:apk-key-hash:abc123",
+            "https://verifier.example" to "https://verifier.example",
+            // Scheme and host are case-insensitive per RFC 3986, so both are folded down.
+            "HTTPS://verifier.example" to "https://verifier.example",
+            "https://VERIFIER.example" to "https://verifier.example",
+            "https://Verifier.Example:8443" to "https://verifier.example:8443",
+            // A default port is dropped and a non-default one kept, for both schemes, because
+            // `https://x` and `https://x:443` are the same origin and must hash identically.
+            "https://verifier.example:443" to "https://verifier.example",
+            "https://verifier.example:8443" to "https://verifier.example:8443",
+            "http://localhost" to "http://localhost",
+            "http://localhost:80" to "http://localhost",
+            "http://localhost:8080" to "http://localhost:8080",
+            // A trailing empty path is not part of an origin.
+            "https://verifier.example/" to "https://verifier.example",
+            // The loopback forms a browser treats as a secure context, so a local verifier works.
+            "http://127.0.0.1:9000" to "http://127.0.0.1:9000",
+            "http://[::1]:8080" to "http://[::1]:8080",
+            "http://verifier.localhost:8080" to "http://verifier.localhost:8080",
+        ).forEach { (raw, expected) ->
+            assertEquals(expected, DcApiWallet.canonicalizePlatformOrigin(raw), "canonicalizing '$raw'")
+            // A canonical result is idempotent - re-canonicalizing must not change it, which is what
+            // lets an adapter pass this output on without the value drifting.
+            assertEquals(expected, DcApiWallet.canonicalizePlatformOrigin(expected), "not idempotent for '$raw'")
         }
-        assertFailsWith<IllegalArgumentException> {
-            DcApiWallet.validatePlatformOrigin("http://verifier.example")
+    }
+
+    /**
+     * The rejected matrix. Each entry carries something an origin cannot: a component beyond
+     * scheme/host/port, or a transport that is not a secure context. Accepting any of them would let
+     * two different requesters canonicalize to the same origin, or let a plaintext caller be treated
+     * as the authenticated party the session transcript then binds.
+     */
+    @Test
+    fun `platform origin canonicalization rejects anything that is not scheme host and port`() {
+        listOf(
+            // Non-loopback HTTP: the OS cannot attest a plaintext caller's identity.
+            "http://verifier.example",
+            "http://verifier.example:8080",
+            // `localhost` as a *suffix* is a different registrable domain, not loopback.
+            "http://notlocalhost",
+            "http://localhost.example",
+            // Components an origin does not have. A path, query or fragment would otherwise be
+            // silently dropped, making two distinct URLs canonicalize to one origin.
+            "https://verifier.example/path",
+            "https://verifier.example/?a=b",
+            "https://verifier.example?a=b",
+            "https://verifier.example/#fragment",
+            "https://verifier.example#fragment",
+            // Credentials in the authority: `user@host` is attacker-controlled text that reads as the
+            // host in a UI, and it is not part of the origin either.
+            "https://user@verifier.example",
+            "https://user:password@verifier.example",
+            // Neither a web origin nor the Android app form.
+            "verifier.example",
+            "ftp://verifier.example",
+            "android:apk-key-hash:not+base64url",
+            "android:apk-key-hash:",
+            // Blank or untrimmed: whitespace would change the hash while looking identical.
+            "",
+            "   ",
+            " https://verifier.example",
+            "https://verifier.example ",
+        ).forEach { raw ->
+            assertFailsWith<IllegalArgumentException>("should have rejected '$raw'") {
+                DcApiWallet.canonicalizePlatformOrigin(raw)
+            }
         }
-        assertEquals("http://localhost:8080", DcApiWallet.validatePlatformOrigin("http://localhost:8080"))
     }
 
     @Test
@@ -262,6 +440,7 @@ class DcApiWalletTest {
         state: String? = null,
         redirectUri: String? = null,
         responseUri: String? = null,
+        clientMetadata: ClientMetadata? = null,
     ): AuthorizationRequest = json.decodeFromJsonElement(
         AuthorizationRequest.serializer(),
         unsignedRequestData().toMutableMap().apply {
@@ -270,8 +449,59 @@ class DcApiWalletTest {
             redirectUri?.let { this["redirect_uri"] = JsonPrimitive(it) }
             responseUri?.let { this["response_uri"] = JsonPrimitive(it) }
         }.let(::JsonObject),
+    ).copy(clientMetadata = clientMetadata)
+
+    /** Verifier response-encryption metadata in the shape `ResponseEncryption.resolveCrypto2` needs. */
+    private fun encryptionClientMetadata(): ClientMetadata = ClientMetadata(
+        jwks = ClientMetadata.Jwks(
+            listOf(
+                Json.parseToJsonElement(
+                    """{
+                        "kty":"EC",
+                        "crv":"P-256",
+                        "x":"y4ajD4aIXGiLGqiF81nN5HvBFvBEvrZcgFsp5VIJO30",
+                        "y":"jyrZRfxKz113LQNg2x5f7Nu4fwW5Ov5gCzhPaTZuTCg",
+                        "use":"enc",
+                        "kid":"$VERIFIER_KEY_ID",
+                        "alg":"ECDH-ES"
+                    }""",
+                ).jsonObject,
+            ),
+        ),
+        encryptedResponseEncValuesSupported = listOf("A256GCM"),
     )
 
     private fun OpenID4VPResponseMode.serialized(): String =
         Json.encodeToString(OpenID4VPResponseMode.serializer(), this).trim('"')
+
+    private fun String.decodeBase64Url(): String = decodeFromBase64Url().decodeToString()
+
+    private companion object {
+        private const val VERIFIER_KEY_ID = "enc-key"
+
+        /**
+         * A fixed P-256 key pair standing in for the verifier's published response-encryption key. The
+         * public half goes into `client_metadata`; the private half only ever decrypts in the test.
+         */
+        private const val DECRYPTABLE_PUBLIC_JWK = """{
+            "kty":"EC",
+            "crv":"P-256",
+            "x":"i5_Mav2at_Apor6AD8pFLoEZIy5YVxzZLD8PyvGZCo4",
+            "y":"8KWjGEMdQu0tnKqvZ2lQJUsbz9nLskFuIjcv9FV0kvA",
+            "use":"enc",
+            "kid":"verifier-response-key",
+            "alg":"ECDH-ES"
+        }"""
+
+        private const val DECRYPTABLE_PRIVATE_JWK = """{
+            "kty":"EC",
+            "crv":"P-256",
+            "x":"i5_Mav2at_Apor6AD8pFLoEZIy5YVxzZLD8PyvGZCo4",
+            "y":"8KWjGEMdQu0tnKqvZ2lQJUsbz9nLskFuIjcv9FV0kvA",
+            "d":"cTw-m-LcAE7LbpHLTipjpm6Pr91liLjUubeoVACq29I",
+            "use":"enc",
+            "kid":"verifier-response-key",
+            "alg":"ECDH-ES"
+        }"""
+    }
 }

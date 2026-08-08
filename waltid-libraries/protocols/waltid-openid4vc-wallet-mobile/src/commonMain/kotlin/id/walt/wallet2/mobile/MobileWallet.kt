@@ -46,11 +46,16 @@ import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import id.waltid.openid4vp.wallet.DcApiCredentialResponse
 import id.waltid.openid4vp.wallet.DcApiWallet
+import io.ktor.client.HttpClient
 import io.ktor.http.Url
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -194,12 +199,16 @@ public class MobileWallet internal constructor(
     private val readerTrustEvaluator: MobileWalletReaderTrustEvaluator = UnconfiguredMobileWalletReaderTrustEvaluator,
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
+    /** Issuance transport override. Only tests set this; production uses the configured engine. */
+    issuanceHttpClient: HttpClient? = null,
 ) {
     private val eventStream = MobileWalletEventStream()
     /**
      * Buffered stream of recent issuance and presentation events emitted by this wallet.
      */
     public val events: Flow<MobileWalletEvent> = eventStream.events
+
+    private val lastRegistrationResult = MutableStateFlow<MobileWalletCredentialRegistrationResult?>(null)
 
     private val attestationAssembler: ClientAttestationAssembler? = attestationConfig?.let { config ->
         ClientAttestationAssembler(
@@ -229,6 +238,7 @@ public class MobileWallet internal constructor(
         attestationAssembler = attestationAssembler,
         onEvent = ::emitSessionEvent,
         sessionStore = issuanceSessionStore,
+        httpClient = issuanceHttpClient,
     )
 
     /**
@@ -258,7 +268,7 @@ public class MobileWallet internal constructor(
             require(keyAvailable) {
                 "Wallet '${wallet.id}' persisted key '${existingKey.keyId}' is unavailable"
             }
-            refreshDigitalCredentialRegistration()
+            syncDigitalCredentialRegistration()
             return MobileWalletBootstrapResult(
                 keyId = existingKey.keyId,
                 did = existingDids.first().did,
@@ -267,7 +277,7 @@ public class MobileWallet internal constructor(
 
         val effectiveKeyType = keyType ?: defaultKeyType
         return createKeyAndDid(effectiveKeyType, didMethod)
-            .also { refreshDigitalCredentialRegistration() }
+            .also { syncDigitalCredentialRegistration() }
     }
 
     private suspend fun createKeyAndDid(
@@ -372,6 +382,9 @@ public class MobileWallet internal constructor(
      *
      * [WalletIssuanceOutcome.Deferred] and [WalletIssuanceOutcome.Failed] are both included because
      * either can report credentials that were already stored before the session stopped advancing.
+     *
+     * The outcome is returned unchanged: a credential that was stored has been issued, so a platform
+     * registry that could not be updated afterwards must not present itself as an issuance failure.
      */
     private suspend fun WalletIssuanceOutcome.alsoRefreshDigitalCredentialRegistration(): WalletIssuanceOutcome =
         also {
@@ -381,7 +394,7 @@ public class MobileWallet internal constructor(
                 is WalletIssuanceOutcome.Failed -> it.storedCredentialIds
                 is WalletIssuanceOutcome.Cancelled -> emptyList()
             }
-            if (storedCredentialIds.isNotEmpty()) refreshDigitalCredentialRegistration()
+            if (storedCredentialIds.isNotEmpty()) syncDigitalCredentialRegistration()
         }
 
     private suspend fun newIssuanceRequest(
@@ -428,23 +441,72 @@ public class MobileWallet internal constructor(
         credentialRegistry.capabilities
 
     /**
-     * Replaces platform credential metadata with a minimal view of the current wallet state.
+     * Outcome of the most recent platform registry synchronization, or null before the first one.
+     *
+     * A wallet operation that stores or removes a credential synchronizes the registry afterwards
+     * and does not fail if that synchronization does not succeed, so this is where an application
+     * learns that the platform projection is stale. Recover by calling
+     * [refreshDigitalCredentialRegistration] again; the wallet store it projects is unaffected.
+     */
+    public val digitalCredentialRegistration: StateFlow<MobileWalletCredentialRegistrationResult?> =
+        lastRegistrationResult.asStateFlow()
+
+    /**
+     * Synchronizes platform credential metadata to a minimal view of the current wallet state.
      *
      * Raw credentials, issuer-signed payloads, and private keys are never registered, and neither
      * are the SD-JWT VC infrastructure claims listed in [SD_JWT_INFRASTRUCTURE_CLAIMS]. Every
      * remaining decoded claim value is registered, because the platform matcher runs out of process
      * and cannot ask the wallet for a value it was not given.
+     *
+     * This is the retry entry point: it is safe to call at any time, and calling it again after a
+     * failure re-publishes the current wallet state. It reports an adapter failure through the
+     * returned result and [digitalCredentialRegistration], and only propagates an exception if
+     * reading the wallet's own credentials failed.
      */
-    public suspend fun refreshDigitalCredentialRegistration(): MobileWalletCredentialRegistrationResult =
-        credentialRegistry.replace(
-            registryId = digitalCredentialRegistryId(),
-            records = registryRecords(),
-        )
+    public suspend fun refreshDigitalCredentialRegistration(): MobileWalletCredentialRegistrationResult {
+        val records = registryRecords()
+        val result = runCatching {
+            credentialRegistry.replace(registryId = digitalCredentialRegistryId(), records = records)
+        }.getOrElse { failure ->
+            if (failure is CancellationException) throw failure
+            MobileWalletCredentialRegistrationResult(
+                available = false,
+                registeredEntryCount = 0,
+                reason = failure.message ?: failure::class.simpleName ?: "Credential registration failed",
+            )
+        }
+        lastRegistrationResult.value = result
+        return result
+    }
 
-    /** Removes one credential and immediately overwrites the native registry to reject stale selections. */
+    /**
+     * Synchronizes the platform registry after the wallet store has already changed.
+     *
+     * The store is authoritative and the change is committed by the time this runs, so a registry
+     * that cannot be updated must not turn a completed operation into a failed one. The outcome is
+     * reported through [digitalCredentialRegistration] instead.
+     */
+    private suspend fun syncDigitalCredentialRegistration() {
+        runCatching { refreshDigitalCredentialRegistration() }.onFailure { failure ->
+            if (failure is CancellationException) throw failure
+            lastRegistrationResult.value = MobileWalletCredentialRegistrationResult(
+                available = false,
+                registeredEntryCount = 0,
+                reason = failure.message ?: failure::class.simpleName ?: "Credential registration failed",
+            )
+        }
+    }
+
+    /**
+     * Removes one credential and re-publishes the native registry to reject stale selections.
+     *
+     * The removal is authoritative: the returned value reports whether the credential store removed
+     * the credential, regardless of whether the platform registry could be updated afterwards.
+     */
     public suspend fun deleteCredential(credentialId: String): Boolean {
         val removed = credentialStore.removeCredential(credentialId)
-        refreshDigitalCredentialRegistration()
+        syncDigitalCredentialRegistration()
         return removed
     }
 
@@ -473,6 +535,11 @@ public class MobileWallet internal constructor(
                 protocol = request.protocol,
                 data = Json.parseToJsonElement(request.dataJson).jsonObject,
                 origin = request.verifiedOrigin,
+                // An empty selection means "the platform restricted nothing" - iOS asserts no
+                // selection at all, and DCQL then matches over the whole store. It must never be
+                // reachable from a *malformed* platform selection, which would silently widen the
+                // candidate set; keeping that impossible is the platform adapter's job, and
+                // AndroidDigitalCredentialProvider refuses a selection it cannot resolve to entries.
                 eligibleCredentialIds = selectedCredentialIds.ifEmpty { null },
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
@@ -717,7 +784,9 @@ public class MobileWallet internal constructor(
         didStore.listDids().toList().forEach { did ->
             didStore.removeDid(did.did)
         }
-        refreshDigitalCredentialRegistration()
+        // The wallet material is already gone, so an unreachable registry must not abort the
+        // deletion and leave the local database behind.
+        syncDigitalCredentialRegistration()
         deleteLocalPersistence()
     }
 

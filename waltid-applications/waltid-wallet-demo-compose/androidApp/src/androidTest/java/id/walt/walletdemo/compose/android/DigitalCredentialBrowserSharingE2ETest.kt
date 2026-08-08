@@ -68,6 +68,12 @@ import org.junit.runner.RunWith
  * fixed and varying only the deployment. So this test is blocked on the issuer reissuing a
  * conformant document signer, not on any wallet change - and it should not be made to pass by
  * narrowing `vp_policies` to exclude `issuer_auth`, which is what an earlier version of it did.
+ *
+ * That standing red is only worth keeping if it means what it says. The preconditions below skip
+ * rather than fail when the browser or the network cannot get as far as the wallet, because a red
+ * that is sometimes `issuer_auth` and sometimes an unhealthy emulator carries no information at all:
+ * telling the two apart needed the CI artifact downloaded. A skip says the run proved nothing; the
+ * failure now says the issuer is still non-conformant.
  */
 @RunWith(AndroidJUnit4::class)
 class DigitalCredentialBrowserSharingE2ETest {
@@ -164,6 +170,15 @@ class DigitalCredentialBrowserSharingE2ETest {
         )
     }
 
+    /**
+     * Gets the harness page to a driveable state, or skips the test.
+     *
+     * Everything here is a precondition on Chrome and the network, all of it upstream of the wallet:
+     * the page has to render, and it has to have fetched its examples from the deployed verifier's
+     * OpenAPI document. A failure at this point means the run never reached the wallet, so it cannot
+     * speak to the `issuer_auth` blocker the class KDoc describes - which is the whole reason this
+     * test stays enabled. [assumeTrue] keeps that signal legible by not competing with it.
+     */
     private fun openTestPage(context: android.content.Context, device: UiDevice) {
         context.startActivity(
             Intent(Intent.ACTION_VIEW, Uri.parse(PAGE_URL))
@@ -177,15 +192,20 @@ class DigitalCredentialBrowserSharingE2ETest {
             Until.findObject(By.res("payload-input")),
             CREDENTIAL_OPERATION_TIMEOUT,
         )
-        assertNotNull(
-            "DC API test page did not load. Chrome may be showing a first-run screen.",
-            loaded,
+        assumeTrue(
+            "Chrome did not render the DC API test page - a first-run screen, no network, or an " +
+                "unhealthy emulator. Nothing wallet-side was exercised.",
+            loaded != null,
         )
         val ready = device.wait(
             Until.findObject(By.res("example-select").textContains("dc_api")),
             CREDENTIAL_OPERATION_TIMEOUT,
         )
-        assertNotNull("DC API test page did not load its Swagger examples", ready)
+        assumeTrue(
+            "The DC API test page did not fetch its Swagger examples from the deployed verifier, " +
+                "so there is no request to send. Nothing wallet-side was exercised.",
+            ready != null,
+        )
     }
 
     /**

@@ -51,10 +51,16 @@ class IosIdentityDocumentRegistryTest {
             assertFalse(registry.capabilities.platformAvailable)
             assertFalse(registry.capabilities.registrationAvailable)
 
-            defaults.setObject("notSupported", forKey = IosIdentityDocumentRegistry.REGISTRATION_STATUS_KEY)
+            IosIdentityDocumentRegistry.reportRegistrationStatus(
+                appGroupIdentifier = suite,
+                status = IosIdentityDocumentRegistrationStatus.NOT_SUPPORTED,
+            )
             assertFalse(registry.capabilities.platformAvailable)
 
-            defaults.setObject("authorized", forKey = IosIdentityDocumentRegistry.REGISTRATION_STATUS_KEY)
+            IosIdentityDocumentRegistry.reportRegistrationStatus(
+                appGroupIdentifier = suite,
+                status = IosIdentityDocumentRegistrationStatus.AUTHORIZED,
+            )
             assertTrue(registry.capabilities.platformAvailable)
             assertTrue(registry.capabilities.registrationAvailable)
             assertTrue(
@@ -71,7 +77,10 @@ class IosIdentityDocumentRegistryTest {
     fun registrationStoresOnlyDistinctMdocDocumentTypesInTheAppGroup() = runTest {
         val suite = "id.walt.wallet.registry-test.${NSUUID().UUIDString}"
         val defaults = NSUserDefaults(suiteName = suite)
-        defaults.setObject("authorized", forKey = IosIdentityDocumentRegistry.REGISTRATION_STATUS_KEY)
+        IosIdentityDocumentRegistry.reportRegistrationStatus(
+            appGroupIdentifier = suite,
+            status = IosIdentityDocumentRegistrationStatus.AUTHORIZED,
+        )
         val registry = IosIdentityDocumentRegistry(suite)
         val records = listOf(
             registryRecord("mdoc-1", MobileWalletDigitalCredentialFormat.MDOC, "org.iso.18013.5.1.mDL"),

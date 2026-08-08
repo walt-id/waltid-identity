@@ -18,25 +18,41 @@ public object MobileWalletDigitalCredentialProtocols {
     public const val ISO_MDOC_ANNEX_C: String = "org-iso-mdoc"
 }
 
-/** Credential formats exposed through the platform Digital Credentials integration. */
-public enum class MobileWalletDigitalCredentialFormat {
-    MDOC,
-    SD_JWT_VC,
+/**
+ * Credential formats exposed through the platform Digital Credentials integration.
+ *
+ * [identifier] is the credential format identifier this entry represents. Capability metadata is
+ * reported to host applications through it rather than through the enum-entry name, so renaming an
+ * entry cannot silently change what the wallet advertises.
+ *
+ * @property identifier Stable credential format identifier.
+ */
+public enum class MobileWalletDigitalCredentialFormat(public val identifier: String) {
+    MDOC("mso_mdoc"),
+    SD_JWT_VC("dc+sd-jwt"),
 }
 
-/** Authentication applied to a Digital Credentials request. */
-public enum class MobileWalletDigitalCredentialRequestProtection {
-    UNSIGNED,
-    SIGNED,
-    MULTISIGNED,
-    READER_AUTHENTICATED,
+/**
+ * Authentication applied to a Digital Credentials request.
+ *
+ * @property identifier Stable identifier reported in capability metadata.
+ */
+public enum class MobileWalletDigitalCredentialRequestProtection(public val identifier: String) {
+    UNSIGNED("unsigned"),
+    SIGNED("signed"),
+    MULTISIGNED("multisigned"),
+    READER_AUTHENTICATED("reader_authenticated"),
 }
 
-/** Protection applied to the response returned to the requesting platform. */
-public enum class MobileWalletDigitalCredentialResponseProtection {
-    UNENCRYPTED,
-    JWE,
-    HPKE,
+/**
+ * Protection applied to the response returned to the requesting platform.
+ *
+ * @property identifier Stable identifier reported in capability metadata.
+ */
+public enum class MobileWalletDigitalCredentialResponseProtection(public val identifier: String) {
+    UNENCRYPTED("unencrypted"),
+    JWE("jwe"),
+    HPKE("hpke"),
 }
 
 /**
@@ -76,13 +92,17 @@ public data class MobileWalletDigitalCredentialCapabilities(
 )
 
 /**
- * Minimal, non-secret metadata supplied to a platform credential registry.
+ * Matcher-visible credential metadata supplied to a platform credential registry.
+ *
+ * This is not the credential: no issuer-signed payload, proof, or key material is included. The
+ * claim values it does carry are the user's personal data, because the platform matcher runs out of
+ * process and cannot ask the wallet for a value it was not given.
  *
  * @property registryEntryId Stable platform registry entry identifier.
  * @property credentialId Wallet-local credential identifier.
  * @property format Credential format represented by the entry.
  * @property type Credential type or mdoc document type.
- * @property fields Matcher-visible, non-secret credential fields.
+ * @property fields Matcher-visible credential fields, which may contain personal data.
  * @property displayName Human-readable entry label.
  */
 public data class MobileWalletCredentialRegistryRecord(
@@ -108,7 +128,11 @@ public data class MobileWalletCredentialRegistryField(
 )
 
 /**
- * Result of replacing the platform registry with the current wallet credential metadata.
+ * Outcome of synchronizing the platform registry with the current wallet credential metadata.
+ *
+ * A result with [available] false means the platform projection is now out of date, not that the
+ * wallet operation which triggered the synchronization failed. Callers that care about the
+ * projection should surface the [reason] and retry [MobileWalletCredentialRegistry.replace].
  *
  * @property available Whether registration is available after the attempt.
  * @property registeredEntryCount Number of registered entries.
@@ -125,7 +149,16 @@ public interface MobileWalletCredentialRegistry {
     /** Current platform capability and registration state. */
     public val capabilities: MobileWalletDigitalCredentialCapabilities
 
-    /** Replaces the registry atomically. Reusing [registryId] must overwrite stale entries. */
+    /**
+     * Synchronizes the platform registry named [registryId] to exactly [records].
+     *
+     * Reusing [registryId] must replace that registry's previous entries rather than add to them,
+     * so a credential the wallet no longer holds stops being offered. Implementations are not
+     * required to be atomic - a platform may take several operations to publish one desired state,
+     * and an interrupted call can leave the registry holding neither the old nor the new set. What
+     * they must do is report the outcome instead of throwing, since the wallet state this projects
+     * has already been committed.
+     */
     public suspend fun replace(
         registryId: String,
         records: List<MobileWalletCredentialRegistryRecord>,
@@ -220,23 +253,60 @@ public data class MobileWalletDigitalCredentialPreview(
     public val readerTrust: MobileWalletReaderTrust,
 )
 
-/** Reader authentication state. Unknown or unverifiable readers are never represented as trusted. */
+/**
+ * Reader authentication state. Only [MobileWalletReaderTrust.Trusted] means a reader was identified,
+ * and reaching it requires both a valid signature and an accepting application trust policy.
+ *
+ * A request whose reader authentication fails cryptographic verification never produces a state at
+ * all: it is rejected, and no preview is returned. So every state here describes a request that is
+ * still processable, and the four non-trusted states say something different about why the reader is
+ * not identified. Distinguishing them matters because they call for different consent copy: an
+ * absent signature is a reader that declined to identify itself, while a valid signature no policy
+ * accepts is a reader the wallet simply cannot vouch for.
+ */
 public sealed interface MobileWalletReaderTrust {
-    /** No reader authentication applies to this request. */
+    /** The protocol carries no reader authentication, as with the OpenID4VP Digital Credentials API. */
     public data object NotApplicable : MobileWalletReaderTrust
+
+    /** The request supports reader authentication but carried none, so the reader is anonymous. */
+    public data object NotAuthenticated : MobileWalletReaderTrust
+
     /**
-     * Reader authentication was not accepted by the configured trust policy.
+     * Reader authentication has not been checked yet because the platform withholds the raw request
+     * until the user consents.
      *
-     * @property reason Reason the reader was not trusted.
+     * Apple's IdentityDocumentServices exposes only a parsed request before consent. The signature
+     * is verified, and a bad one rejects the request, before any credential data is released - but
+     * that happens at submission, so a consent dialog cannot yet name the reader.
      */
-    public data class Unverified(public val reason: String) : MobileWalletReaderTrust
+    public data object PendingRawRequest : MobileWalletReaderTrust
+
     /**
-     * Reader authentication was accepted by the configured trust policy.
+     * The reader's signature is cryptographically valid, but no application trust policy accepts it.
+     *
+     * This is not a verification failure: the chain verified and the signature checked out. It means
+     * the wallet has no basis for telling the user who the reader is - which is also the state the
+     * default [UnconfiguredMobileWalletReaderTrustEvaluator] always reports.
+     *
+     * @property reason Reason the trust policy did not accept the reader.
+     */
+    public data class Untrusted(public val reason: String) : MobileWalletReaderTrustDecision
+
+    /**
+     * Reader authentication is cryptographically valid and an application trust policy accepted it.
      *
      * @property certificateSubject Subject from the trusted reader certificate.
      */
-    public data class Trusted(public val certificateSubject: String) : MobileWalletReaderTrust
+    public data class Trusted(public val certificateSubject: String) : MobileWalletReaderTrustDecision
 }
+
+/**
+ * The two outcomes an application trust policy may return.
+ *
+ * Narrower than [MobileWalletReaderTrust] on purpose: a policy is only ever consulted for a reader
+ * whose signature already verified, so it cannot report that authentication was absent or deferred.
+ */
+public sealed interface MobileWalletReaderTrustDecision : MobileWalletReaderTrust
 
 /**
  * OS-mediated response. [dataJson] is returned to the platform and is never direct-posted over HTTP.
@@ -248,9 +318,6 @@ public data class MobileWalletDigitalCredentialResponse(
     public val protocol: String,
     public val dataJson: String,
 )
-
-/** Explicit user cancellation; adapters must map this to the platform cancellation contract. */
-public class MobileWalletDigitalCredentialCancellationException : Exception("Digital credential presentation cancelled")
 
 /**
  * Selected platform registry entry no longer maps to a current wallet credential.
@@ -331,15 +398,26 @@ public data class MobileWalletAnnexCSubmission(
     public val selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
 )
 
-/** Application trust policy for a cryptographically verified Annex C reader certificate chain. */
+/**
+ * Application trust policy for a cryptographically verified Annex C reader certificate chain.
+ *
+ * The wallet has already verified the chain's internal signatures and the reader's COSE signature
+ * over the session-bound payload before calling this; a request that failed either is rejected and
+ * never reaches a policy. What remains is the question this answers: does the application recognise
+ * this reader as one it is willing to name to the user? The wallet has no basis for deciding that,
+ * which is why an unconfigured wallet answers [MobileWalletReaderTrust.Untrusted] rather than
+ * treating a valid signature as identification.
+ */
 public fun interface MobileWalletReaderTrustEvaluator {
-    /** Evaluates the validated reader certificate chain against the application's trust policy. */
-    public suspend fun evaluate(readerCertificateChainDer: List<ByteArray>): MobileWalletReaderTrust
+    /** Evaluates the cryptographically verified reader certificate chain against the trust policy. */
+    public suspend fun evaluate(readerCertificateChainDer: List<ByteArray>): MobileWalletReaderTrustDecision
 }
 
 /** Secure default: a valid signature alone does not establish that a reader is trusted. */
 public object UnconfiguredMobileWalletReaderTrustEvaluator : MobileWalletReaderTrustEvaluator {
-    /** Reports the reader as unverified because no application trust policy was configured. */
-    override suspend fun evaluate(readerCertificateChainDer: List<ByteArray>): MobileWalletReaderTrust =
-        MobileWalletReaderTrust.Unverified("Reader signature is valid, but no reader trust policy is configured")
+    /** Reports the verified reader as untrusted because no application trust policy was configured. */
+    override suspend fun evaluate(readerCertificateChainDer: List<ByteArray>): MobileWalletReaderTrustDecision =
+        MobileWalletReaderTrust.Untrusted(
+            "Reader authentication is cryptographically valid, but no reader trust policy is configured"
+        )
 }

@@ -13,6 +13,7 @@ import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier.openid.transactiondata.decodeList
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
@@ -727,6 +728,22 @@ object WalletPresentationHandler {
             typeRegistry = transactionDataTypeRegistry,
             credentialQueriesById = query.credentials.associateBy { it.id },
         )
+        // response_mode=dc_api.jwt is unanswerable without usable verifier encryption metadata, and
+        // the mdoc session transcript is thumbprinted from the same key. Resolving it here rather
+        // than at response-build time means an unusable configuration is rejected before any
+        // credential is read, so a verifier cannot get a consent dialog - and the disclosure of what
+        // the wallet holds that comes with it - for a request it could never have received an answer
+        // to. The value is not retained: submission re-resolves it from the same immutable retained
+        // Authorization Request, so there is nothing to keep in sync.
+        if (authorizationRequest.responseMode == OpenID4VPResponseMode.DC_API_JWT) {
+            val encryption = requireNotNull(ResponseEncryption.resolveCrypto2(authorizationRequest)) {
+                "response_mode=dc_api.jwt requires client_metadata response-encryption keys"
+            }
+            // Thumbprinting is what canonicalizes the published coordinates, and it is the same value
+            // the mdoc session transcript binds to, so taking it here rejects key material that is
+            // well-formed enough to be selected but cannot actually be encrypted to.
+            encryption.thumbprint()
+        }
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
         val matched = selectFromStores(wallet, query, useWalletCredentialIds = true)
         onEvent(WalletSessionEvent.presentation_credentials_selected)

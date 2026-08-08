@@ -9,30 +9,26 @@ import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toEncodedJwk
 import id.walt.cose.verifyDetached
-import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.hpke.Hpke
-import id.walt.crypto2.jose.Jwk
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.crypto2.keys.HpkeCiphertext
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
-import id.walt.mdoc.objects.dcapi.DCAPIHandover
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
-import id.walt.mdoc.objects.sha256
+import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.handover.AnnexCDcapiHandoverInfo
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.handlers.PreviewSessionStore
 import id.waltid.openid4vp.wallet.DcApiWallet
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import id.walt.x509.CertificateDer
-import id.walt.x509.crypto2PublicJwk
+import id.walt.x509.crypto2VerificationKey
 import id.walt.x509.verifyOrderedCertificateChainSignatures
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
@@ -48,13 +44,6 @@ import kotlinx.serialization.json.jsonObject
 
 @Serializable
 @CborObjectAsArray
-private data class AnnexCDcApiInfo(
-    val encryptionInfoBase64Url: String,
-    val serializedOrigin: String,
-)
-
-@Serializable
-@CborObjectAsArray
 private data class AnnexCEncryptedResponse(
     val type: String,
     val response: AnnexCEncryptedResponseData,
@@ -64,11 +53,6 @@ private data class AnnexCEncryptedResponse(
 private data class AnnexCEncryptedResponseData(
     @ByteString val enc: ByteArray,
     @ByteString val cipherText: ByteArray,
-)
-
-internal data class AnnexCHpkeCiphertext(
-    val enc: ByteArray,
-    val cipherText: ByteArray,
 )
 
 /**
@@ -82,28 +66,47 @@ internal suspend fun encryptAnnexCHpke(
     recipientPublicKey: CoseKey,
     plaintext: ByteArray,
     info: ByteArray,
-): AnnexCHpkeCiphertext {
-    val sealed = Hpke.sealBase(
-        recipientPublicKey = recipientPublicKey.toEncodedJwk(),
-        plaintext = plaintext,
-        info = info,
-    )
-    return AnnexCHpkeCiphertext(
-        enc = sealed.encapsulatedKey.toByteArray(),
-        cipherText = sealed.ciphertext.toByteArray(),
-    )
-}
+): HpkeCiphertext = Hpke.sealBase(
+    recipientPublicKey = recipientPublicKey.toEncodedJwk(),
+    plaintext = plaintext,
+    info = info,
+)
 
+/**
+ * The whole ISO 18013-7 Annex C presentation flow, in one place.
+ *
+ * The two entry points read as the sequence they perform. [preview] validates the request, matches
+ * available wallet documents, evaluates reader trust and retains the consent state. [submit] verifies
+ * that the post-consent request is immutably the one consented to, builds the selected documents, and
+ * HPKE-encrypts the `DeviceResponse`. Each step is a private method rather than a class: the steps
+ * are not independently useful, they share the wallet and the session transcript, and splitting them
+ * across types would hide the ordering that makes the flow safe.
+ */
 internal class MobileWalletAnnexCEngine(
     private val wallet: Wallet,
     private val readerTrustEvaluator: MobileWalletReaderTrustEvaluator,
     private val registryRecords: suspend () -> List<MobileWalletCredentialRegistryRecord>,
 ) {
+    /** A request that passed validation, with everything later steps need already decoded. */
+    private data class ValidatedRequest(
+        val parsedRequest: MobileWalletAnnexCParsedRequest,
+        val origin: String,
+        val deviceRequest: DeviceRequest?,
+        val encryptionInfoBase64Url: String?,
+        val selectedRegistryEntryIds: List<String>,
+    )
+
     private data class RetainedRequest(
         val parsedRequest: MobileWalletAnnexCParsedRequest,
         val verifiedOrigin: String,
         val encryptionInfoBase64Url: String?,
         val allowedCredentialIds: Set<String>,
+    )
+
+    /** The post-consent request, re-derived from bytes that were proven identical to the preview's. */
+    private data class ConfirmedRequest(
+        val transcript: SessionTranscript,
+        val encryptionInfo: DCAPIEncryptionInfo,
     )
 
     private val retainedRequests = PreviewSessionStore<RetainedRequest>(sessionName = "Annex C presentation")
@@ -112,25 +115,75 @@ internal class MobileWalletAnnexCEngine(
         decodeAndValidateDeviceRequest(base64Url).toParsedRequest()
 
     suspend fun preview(request: MobileWalletAnnexCRequest): MobileWalletAnnexCPreview {
-        val origin = DcApiWallet.validatePlatformOrigin(request.verifiedOrigin)
-        val rawRequest = request.deviceRequestBase64Url?.let(::decodeAndValidateDeviceRequest)
-        rawRequest?.let {
-            require(it.toParsedRequest() == request.parsedRequest.normalized()) {
-                "Parsed and raw Annex C requests are inconsistent"
-            }
+        val validated = validate(request)
+        val options = matchWalletDocuments(validated)
+        val readerTrust = evaluateReaderTrust(validated)
+        val requestId = retainedRequests.create(
+            walletId = wallet.id,
+            value = RetainedRequest(
+                parsedRequest = validated.parsedRequest,
+                verifiedOrigin = validated.origin,
+                encryptionInfoBase64Url = validated.encryptionInfoBase64Url,
+                allowedCredentialIds = options.mapTo(mutableSetOf()) { it.credentialId },
+            ),
+        )
+        return MobileWalletAnnexCPreview(
+            requestId = requestId,
+            verifiedOrigin = validated.origin,
+            parsedRequest = validated.parsedRequest,
+            credentialOptions = options,
+            readerTrust = readerTrust,
+        )
+    }
+
+    suspend fun submit(submission: MobileWalletAnnexCSubmission): MobileWalletDigitalCredentialResponse =
+        retainedRequests.useRetainingOnFailure(wallet.id, submission.requestId) { retained ->
+            val confirmed = confirmRequestUnchangedAfterConsent(submission, retained)
+            val documents = buildSelectedDocuments(submission, retained, confirmed.transcript)
+            encryptDeviceResponse(documents, confirmed)
         }
-        request.encryptionInfoBase64Url?.let(::decodeAndValidateEncryptionInfo)
+
+    /**
+     * Checks everything that can be decided from the request alone, before any wallet data is read.
+     *
+     * The raw `deviceRequest`/`encryptionInfo` pair is optional because Apple withholds it until
+     * consent, but it is all-or-nothing: a caller must not be able to supply a raw request whose
+     * encryption metadata is never validated, or vice versa.
+     */
+    private suspend fun validate(request: MobileWalletAnnexCRequest): ValidatedRequest {
+        val origin = DcApiWallet.canonicalizePlatformOrigin(request.verifiedOrigin)
         require((request.deviceRequestBase64Url == null) == (request.encryptionInfoBase64Url == null)) {
             "Raw Annex C deviceRequest and encryptionInfo must be supplied together"
         }
+        val parsedRequest = request.parsedRequest.normalized()
+        val deviceRequest = request.deviceRequestBase64Url?.let(::decodeAndValidateDeviceRequest)
+        require(deviceRequest == null || deviceRequest.toParsedRequest() == parsedRequest) {
+            "Parsed and raw Annex C requests are inconsistent"
+        }
+        request.encryptionInfoBase64Url?.let { decodeAndValidateEncryptionInfo(it) }
+        return ValidatedRequest(
+            parsedRequest = parsedRequest,
+            origin = origin,
+            deviceRequest = deviceRequest,
+            encryptionInfoBase64Url = request.encryptionInfoBase64Url,
+            selectedRegistryEntryIds = request.selectedRegistryEntryIds,
+        )
+    }
 
-        val records = registryRecords()
-        val credentialIdsByRegistryId = records.associate { it.registryEntryId to it.credentialId }
+    /**
+     * Finds the wallet documents that can satisfy each requested document, and rejects the request if
+     * any goes unsatisfied - offering partial consent for a request the wallet cannot answer would
+     * disclose data for nothing.
+     */
+    private suspend fun matchWalletDocuments(
+        request: ValidatedRequest,
+    ): List<MobileWalletPresentationCredentialOption> {
+        val credentialIdsByRegistryId = registryRecords().associate { it.registryEntryId to it.credentialId }
         val selectedCredentialIds = request.selectedRegistryEntryIds.map { registryId ->
             credentialIdsByRegistryId[registryId] ?: throw MobileWalletStaleRegistryEntryException(registryId)
         }.toSet()
         val storedCredentials = wallet.streamAllCredentials().toList()
-        val options = request.parsedRequest.normalized().documents.flatMapIndexed { index, documentRequest ->
+        val options = request.parsedRequest.documents.flatMapIndexed { index, documentRequest ->
             storedCredentials.mapNotNull { stored ->
                 stored.toAnnexCOption(index, documentRequest, selectedCredentialIds)
             }
@@ -140,100 +193,117 @@ internal class MobileWalletAnnexCEngine(
                 "No current mdoc credential satisfies requested document type ${documentRequest.docType}"
             }
         }
-        val readerTrust = if (rawRequest == null) {
-            MobileWalletReaderTrust.Unverified("Raw reader authentication is only available after user consent")
-        } else {
-            verifyReaderAuthentication(
-                deviceRequest = rawRequest,
-                transcript = buildSessionTranscript(requireNotNull(request.encryptionInfoBase64Url), origin),
-            )
-        }
-        val requestId = retainedRequests.create(
-            walletId = wallet.id,
-            value = RetainedRequest(
-                parsedRequest = request.parsedRequest.normalized(),
-                verifiedOrigin = origin,
-                encryptionInfoBase64Url = request.encryptionInfoBase64Url,
-                allowedCredentialIds = options.mapTo(mutableSetOf()) { it.credentialId },
-            ),
-        )
-        return MobileWalletAnnexCPreview(
-            requestId = requestId,
-            verifiedOrigin = origin,
-            parsedRequest = request.parsedRequest.normalized(),
-            credentialOptions = options,
-            readerTrust = readerTrust,
-        )
+        return options
     }
 
-    suspend fun submit(submission: MobileWalletAnnexCSubmission): MobileWalletDigitalCredentialResponse {
-        return retainedRequests.useRetainingOnFailure(wallet.id, submission.requestId) { retained ->
-            val origin = DcApiWallet.validatePlatformOrigin(submission.verifiedOrigin)
-            require(origin == retained.verifiedOrigin) { "Annex C origin changed after consent" }
-            if (retained.encryptionInfoBase64Url != null) {
-                require(submission.encryptionInfoBase64Url == retained.encryptionInfoBase64Url) {
-                    "Annex C encryptionInfo changed after consent"
-                }
-            }
-            val deviceRequest = decodeAndValidateDeviceRequest(submission.deviceRequestBase64Url)
-            require(deviceRequest.toParsedRequest() == retained.parsedRequest) {
-                "Parsed and raw Annex C requests are inconsistent"
-            }
-            val encryptionInfo = decodeAndValidateEncryptionInfo(submission.encryptionInfoBase64Url)
-            val transcript = buildSessionTranscript(submission.encryptionInfoBase64Url, origin)
-            verifyReaderAuthentication(deviceRequest, transcript)
+    private suspend fun evaluateReaderTrust(request: ValidatedRequest): MobileWalletReaderTrust =
+        if (request.deviceRequest == null) MobileWalletReaderTrust.PendingRawRequest
+        else verifyReaderAuthentication(
+            deviceRequest = request.deviceRequest,
+            transcript = AnnexCDcapiHandoverInfo.sessionTranscript(
+                base64EncryptionInfo = requireNotNull(request.encryptionInfoBase64Url),
+                origin = request.origin,
+            ),
+        )
 
-            val selectionsByQuery = submission.selectedCredentialOptions.associateBy { it.queryId }
-            require(selectionsByQuery.size == retained.parsedRequest.documents.size) {
-                "Exactly one credential must be selected for every Annex C document request"
+    /**
+     * Proves the post-consent request is the one the user consented to, then re-derives the session
+     * transcript and encryption metadata from its bytes.
+     *
+     * Reader authentication is verified again here for its *rejection*, not its verdict: the trust
+     * state already informed the consent that was given, but a signature that does not verify must
+     * stop the response. On Apple's deferred path this is the only point where the raw request exists
+     * at all, so it is the only point where that signature can be checked.
+     */
+    private suspend fun confirmRequestUnchangedAfterConsent(
+        submission: MobileWalletAnnexCSubmission,
+        retained: RetainedRequest,
+    ): ConfirmedRequest {
+        val origin = DcApiWallet.canonicalizePlatformOrigin(submission.verifiedOrigin)
+        require(origin == retained.verifiedOrigin) { "Annex C origin changed after consent" }
+        if (retained.encryptionInfoBase64Url != null) {
+            require(submission.encryptionInfoBase64Url == retained.encryptionInfoBase64Url) {
+                "Annex C encryptionInfo changed after consent"
             }
-            require(selectionsByQuery.values.all { it.credentialId in retained.allowedCredentialIds }) {
-                "An Annex C credential selection was not offered by the consent preview"
+        }
+        val deviceRequest = decodeAndValidateDeviceRequest(submission.deviceRequestBase64Url)
+        require(deviceRequest.toParsedRequest() == retained.parsedRequest) {
+            "Parsed and raw Annex C requests are inconsistent"
+        }
+        val encryptionInfo = decodeAndValidateEncryptionInfo(submission.encryptionInfoBase64Url)
+        val transcript = AnnexCDcapiHandoverInfo.sessionTranscript(
+            base64EncryptionInfo = submission.encryptionInfoBase64Url,
+            origin = origin,
+        )
+        verifyReaderAuthentication(deviceRequest, transcript)
+        return ConfirmedRequest(transcript = transcript, encryptionInfo = encryptionInfo)
+    }
+
+    /** Builds one signed mdoc per requested document from the credentials the user selected. */
+    private suspend fun buildSelectedDocuments(
+        submission: MobileWalletAnnexCSubmission,
+        retained: RetainedRequest,
+        transcript: SessionTranscript,
+    ): List<Document> {
+        val selectionsByQuery = submission.selectedCredentialOptions.associateBy { it.queryId }
+        require(selectionsByQuery.size == retained.parsedRequest.documents.size) {
+            "Exactly one credential must be selected for every Annex C document request"
+        }
+        require(selectionsByQuery.values.all { it.credentialId in retained.allowedCredentialIds }) {
+            "An Annex C credential selection was not offered by the consent preview"
+        }
+        // Mobile keys are always platform-managed, so this path is crypto2-only and carries no
+        // fallback for exportable JWK material.
+        val holderKey = wallet.resolveCrypto2Key(usages = setOf(KeyUsage.SIGN))
+            ?: throw IllegalStateException("No crypto2 wallet signing key is available")
+        return retained.parsedRequest.documents.mapIndexed { index, requested ->
+            val queryId = annexCQueryId(index, requested.docType)
+            val selection = selectionsByQuery[queryId]
+                ?: throw IllegalArgumentException("Missing credential selection for $queryId")
+            // Identified by query rather than by credential: MobileWalletStaleRegistryEntryException
+            // carries an opaque platform registry id, and this id is wallet-local.
+            val stored = wallet.findCredential(selection.credentialId)
+                ?: throw IllegalArgumentException("Selected credential for $queryId no longer exists")
+            require((stored.credential as? MdocsCredential)?.docType == requested.docType) {
+                "Selected credential no longer matches the Annex C document request"
             }
-            // Mobile keys are always platform-managed, so this path is crypto2-only and carries no
-            // fallback for exportable JWK material.
-            val holderKey = wallet.resolveCrypto2Key(usages = setOf(KeyUsage.SIGN))
-                ?: throw IllegalStateException("No crypto2 wallet signing key is available")
-            val documents = retained.parsedRequest.documents.mapIndexed { index, requested ->
-                val queryId = annexCQueryId(index, requested.docType)
-                val selection = selectionsByQuery[queryId]
-                    ?: throw IllegalArgumentException("Missing credential selection for $queryId")
-                // Identified by query rather than by credential: MobileWalletStaleRegistryEntryException
-                // carries an opaque platform registry id, and this id is wallet-local.
-                val stored = wallet.findCredential(selection.credentialId)
-                    ?: throw IllegalArgumentException("Selected credential for $queryId no longer exists")
-                require((stored.credential as? MdocsCredential)?.docType == requested.docType) {
-                    "Selected credential no longer matches the Annex C document request"
-                }
-                MdocPresenter.buildAnnexCDocument(
-                    digitalCredential = stored.credential,
-                    requestedElements = requested.namespaces,
-                    sessionTranscript = transcript,
-                    holderKey = holderKey,
-                )
-            }
-            val plaintext = coseCompliantCbor.encodeToByteArray(
-                DeviceResponse.serializer(),
-                DeviceResponse(version = "1.0", documents = documents.toTypedArray(), status = 0u),
-            )
-            val hpkeInfo = coseCompliantCbor.encodeToByteArray(SessionTranscript.serializer(), transcript)
-            val ciphertext = encryptAnnexCHpke(
-                recipientPublicKey = encryptionInfo.encryptionParameters.recipientPublicKey,
-                plaintext = plaintext,
-                info = hpkeInfo,
-            )
-            val responseBase64Url = coseCompliantCbor.encodeToByteArray(
-                AnnexCEncryptedResponse.serializer(),
-                AnnexCEncryptedResponse(
-                    type = "dcapi",
-                    response = AnnexCEncryptedResponseData(ciphertext.enc, ciphertext.cipherText),
-                ),
-            ).encodeToBase64Url()
-            MobileWalletDigitalCredentialResponse(
-                protocol = MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
-                dataJson = buildJsonObject { put("response", JsonPrimitive(responseBase64Url)) }.toString(),
+            MdocPresenter.buildAnnexCDocument(
+                digitalCredential = stored.credential,
+                requestedElements = requested.namespaces,
+                sessionTranscript = transcript,
+                holderKey = holderKey,
             )
         }
+    }
+
+    /** HPKE-seals the `DeviceResponse` to the reader's recipient key and wraps it for the platform. */
+    private suspend fun encryptDeviceResponse(
+        documents: List<Document>,
+        confirmed: ConfirmedRequest,
+    ): MobileWalletDigitalCredentialResponse {
+        val plaintext = coseCompliantCbor.encodeToByteArray(
+            DeviceResponse.serializer(),
+            DeviceResponse(version = "1.0", documents = documents.toTypedArray(), status = 0u),
+        )
+        val ciphertext = encryptAnnexCHpke(
+            recipientPublicKey = confirmed.encryptionInfo.encryptionParameters.recipientPublicKey,
+            plaintext = plaintext,
+            info = coseCompliantCbor.encodeToByteArray(SessionTranscript.serializer(), confirmed.transcript),
+        )
+        val responseBase64Url = coseCompliantCbor.encodeToByteArray(
+            AnnexCEncryptedResponse.serializer(),
+            AnnexCEncryptedResponse(
+                type = "dcapi",
+                response = AnnexCEncryptedResponseData(
+                    enc = ciphertext.encapsulatedKey.toByteArray(),
+                    cipherText = ciphertext.ciphertext.toByteArray(),
+                ),
+            ),
+        ).encodeToBase64Url()
+        return MobileWalletDigitalCredentialResponse(
+            protocol = MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
+            dataJson = buildJsonObject { put("response", JsonPrimitive(responseBase64Url)) }.toString(),
+        )
     }
 
     private fun decodeAndValidateDeviceRequest(base64Url: String): DeviceRequest =
@@ -244,28 +314,31 @@ internal class MobileWalletAnnexCEngine(
             require(request.docRequests.isNotEmpty()) { "Annex C DeviceRequest has no document requests" }
         }
 
-    private fun decodeAndValidateEncryptionInfo(base64Url: String): DCAPIEncryptionInfo =
+    /**
+     * Decodes `encryptionInfo` and rejects a recipient key the response could never be sealed to.
+     *
+     * The key-shape rules are crypto2's, so the wallet cannot drift from what [Hpke.sealBase] will
+     * accept; the check runs here rather than at submission because a reader that sent unusable
+     * encryption metadata must not reach the consent dialog.
+     */
+    private suspend fun decodeAndValidateEncryptionInfo(base64Url: String): DCAPIEncryptionInfo =
         coseCompliantCbor.decodeFromByteArray(
             DCAPIEncryptionInfo.serializer(),
             base64Url.decodeFromBase64Url(),
         ).also { info ->
-            val key = info.encryptionParameters.recipientPublicKey
-            require(key.kty == Cose.KeyTypes.EC2 && key.crv == Cose.EllipticCurves.P_256) {
-                "Annex C HPKE currently requires a P-256 recipient key"
-            }
-            require(key.x?.size == 32 && key.y?.size == 32 && key.d == null) {
-                "Annex C encryptionInfo contains an invalid recipient public key"
-            }
+            Hpke.validateRecipientPublicKey(info.encryptionParameters.recipientPublicKey.toEncodedJwk())
         }
 
-    private fun buildSessionTranscript(encryptionInfoBase64Url: String, origin: String): SessionTranscript {
-        val infoHash = coseCompliantCbor.encodeToByteArray(
-            AnnexCDcApiInfo.serializer(),
-            AnnexCDcApiInfo(encryptionInfoBase64Url, origin),
-        ).sha256()
-        return SessionTranscript.forDcApi(DCAPIHandover(DCAPIHandover.HandoverType.dcapi, infoHash))
-    }
-
+    /**
+     * Verifies reader authentication if the request carries any, then asks the application's trust
+     * policy whether the verified reader is one it recognises.
+     *
+     * Reader authentication is optional in Annex C, so its absence is reported as
+     * [MobileWalletReaderTrust.NotAuthenticated] and the request stays processable - an anonymous
+     * reader is a reader the user can still decline. A signature that is *present but does not
+     * verify* is different in kind: it means the request was tampered with or replayed, so every
+     * such case throws and the request never reaches consent or a response.
+     */
     private suspend fun verifyReaderAuthentication(
         deviceRequest: DeviceRequest,
         transcript: SessionTranscript,
@@ -273,7 +346,7 @@ internal class MobileWalletAnnexCEngine(
         val authenticatedRequests = deviceRequest.docRequests.filter { it.readerAuth != null }
         val readerAuthAll = deviceRequest.readerAuthAll.orEmpty()
         if (authenticatedRequests.isEmpty() && readerAuthAll.isEmpty()) {
-            return MobileWalletReaderTrust.Unverified("The Annex C request contains no reader authentication")
+            return MobileWalletReaderTrust.NotAuthenticated
         }
         require(readerAuthAll.isNotEmpty() || authenticatedRequests.size == deviceRequest.docRequests.size) {
             "Mixed authenticated and unauthenticated Annex C document requests are rejected"
@@ -294,16 +367,9 @@ internal class MobileWalletAnnexCEngine(
             ) {
                 "Annex C reader authentication signatures use different certificate chains"
             }
-            val readerPublicJwk = CertificateDer(chain.first()).crypto2PublicJwk()
-            val readerKey = crypto2Runtime.restore(
-                readerPublicJwk.toStoredSoftwareKey(
-                    KeyId(Jwk.sha256Thumbprint(readerPublicJwk)),
-                    setOf(KeyUsage.VERIFY),
-                )
-            )
             require(
                 signature.verifyDetached(
-                    key = readerKey,
+                    key = CertificateDer(chain.first()).crypto2VerificationKey(),
                     detachedPayload = detachedPayload,
                     allowedAlgorithms = READER_AUTHENTICATION_COSE_ALGORITHMS,
                 )
@@ -415,8 +481,6 @@ internal class MobileWalletAnnexCEngine(
         (this as? JsonPrimitive)?.contentOrNull ?: toString()
 
     private companion object {
-        private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
-
         /**
          * COSE algorithms accepted for ISO 18013-5 reader authentication.
          *

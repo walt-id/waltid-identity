@@ -251,7 +251,9 @@ private struct AnnexCConsentView: View {
     private func readerTrustDescription(_ trust: ReaderTrust) -> String {
         switch trust {
         case .notApplicable: return "Not applicable"
-        case .unverified(let reason): return "Unverified: \(reason)"
+        case .notAuthenticated: return "Reader did not identify itself"
+        case .pendingRawRequest: return "Reader identity is checked when the response is built"
+        case .untrusted(let reason): return "Reader not recognized: \(reason)"
         case .trusted(let subject): return "Trusted: \(subject)"
         }
     }

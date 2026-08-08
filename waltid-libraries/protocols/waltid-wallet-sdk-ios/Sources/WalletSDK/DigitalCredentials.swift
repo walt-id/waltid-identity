@@ -2,36 +2,48 @@ import Foundation
 #if os(iOS)
 import IdentityDocumentServices
 #endif
+#if canImport(WalletCore) && os(iOS)
+import WalletCore
+#endif
 
 /// Shared runtime-status bridge used by the SDK and an IdentityDocument provider extension.
+///
+/// Only Swift can query `IdentityDocumentProviderRegistrationStore`, and only the wallet core knows
+/// how the status is stored. So this translates Apple's status into the wallet core's status type and
+/// hands it over; neither the App Group key nor the stored spelling of a status is written here.
 public enum DigitalCredentialRegistrationStorage {
-    /// App Group user-defaults key containing the latest provider-registration status.
-    public static let registrationStatusKey = "id.walt.wallet.identity-document-registration-status"
+    #if canImport(WalletCore) && os(iOS)
+    /// App Group key the wallet core publishes the registered mdoc document types under.
+    public static var documentTypesKey: String { IosIdentityDocumentRegistry.companion.DOCUMENT_TYPES_KEY }
 
-    #if os(iOS)
+    /// App Group key the wallet core publishes the current logical registry identifier under.
+    public static var registryIDKey: String { IosIdentityDocumentRegistry.companion.REGISTRY_ID_KEY }
+
     @available(iOS 26.0, *)
     public static func persist(
         status: IdentityDocumentProviderRegistrationStore.Status,
         appGroupIdentifier: String
     ) {
-        UserDefaults(suiteName: appGroupIdentifier)?.set(
-            status.walletStorageValue,
-            forKey: registrationStatusKey
+        IosIdentityDocumentRegistry.companion.reportRegistrationStatus(
+            appGroupIdentifier: appGroupIdentifier,
+            status: status.walletRegistrationStatus
         )
     }
     #endif
 }
 
-#if os(iOS)
+#if canImport(WalletCore) && os(iOS)
 @available(iOS 26.0, *)
 private extension IdentityDocumentProviderRegistrationStore.Status {
-    var walletStorageValue: String {
+    /// An unrecognized future status is reported as unsupported: the conservative choice, since
+    /// registration proceeds only for `.authorized`.
+    var walletRegistrationStatus: IosIdentityDocumentRegistrationStatus {
         switch self {
-        case .authorized: "authorized"
-        case .notDetermined: "notDetermined"
-        case .notAuthorized: "notAuthorized"
-        case .notSupported: "notSupported"
-        @unknown default: "notSupported"
+        case .authorized: .authorized
+        case .notDetermined: .notDetermined
+        case .notAuthorized: .notAuthorized
+        case .notSupported: .notSupported
+        @unknown default: .notSupported
         }
     }
 }
@@ -99,12 +111,27 @@ public struct AnnexCDocumentRequest: Equatable, Sendable {
 }
 
 /// Reader-authentication trust result for an Annex C presentation request.
+///
+/// Only ``trusted(certificateSubject:)`` means the reader was identified, and it requires both a
+/// valid signature and an accepting application trust policy. A request whose reader authentication
+/// fails cryptographic verification produces no result at all - it is rejected - so every case here
+/// describes a request that is still processable, differing in why the reader is not identified.
 public enum ReaderTrust: Equatable, Sendable {
-    /// Reader authentication does not apply to this request.
+    /// The protocol carries no reader authentication, as with the OpenID4VP Digital Credentials API.
     case notApplicable
-    /// Reader authentication could not be verified.
-    case unverified(reason: String)
-    /// Reader authentication was verified against the configured trust policy.
+    /// The request supports reader authentication but carried none, so the reader is anonymous.
+    case notAuthenticated
+    /// Not checked yet: IdentityDocumentServices withholds the raw request until the user consents.
+    ///
+    /// The signature is verified at submission, before any credential data is released, but that is
+    /// too late for a consent dialog to name the reader.
+    case pendingRawRequest
+    /// The signature is cryptographically valid, but no application trust policy accepts the reader.
+    ///
+    /// Not a verification failure. It means the wallet has no basis for telling the user who the
+    /// reader is, which is also what a wallet with no configured trust policy always reports.
+    case untrusted(reason: String)
+    /// Reader authentication is cryptographically valid and an application trust policy accepted it.
     case trusted(certificateSubject: String)
 }
 

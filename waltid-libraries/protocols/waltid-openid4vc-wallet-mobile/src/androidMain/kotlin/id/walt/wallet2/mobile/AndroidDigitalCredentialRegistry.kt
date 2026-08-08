@@ -64,7 +64,12 @@ public class AndroidDigitalCredentialRegistry(
                             MobileWalletDigitalCredentialFormat.SD_JWT_VC,
                         ),
                         requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.UNSIGNED),
-                        responseProtection = listOf(MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED),
+                        // response_mode=dc_api and dc_api.jwt respectively. The verifier chooses; both
+                        // are implemented, so both are advertised.
+                        responseProtection = listOf(
+                            MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
+                            MobileWalletDigitalCredentialResponseProtection.JWE,
+                        ),
                         supported = runtimeAvailable,
                         unsupportedReason = unavailableReason,
                     ),
@@ -124,7 +129,14 @@ public class AndroidDigitalCredentialRegistry(
             return MobileWalletCredentialRegistrationResult(false, 0, "Credential Manager requires API 23")
         }
         if (persistProjection) {
-            runCatching { projectionStore.replace(registryId, records) }.onFailure { error ->
+            // An empty desired state means the wallet holds nothing to project - after deleteWallet,
+            // for instance. Storing an empty projection would leave its encrypted blob and its
+            // AndroidKeyStore key behind indefinitely, so drop both instead.
+            val persist = runCatching {
+                if (records.isEmpty()) projectionStore.clear(registryId)
+                else projectionStore.replace(registryId, records)
+            }
+            persist.onFailure { error ->
                 registrationAvailable = false
                 return MobileWalletCredentialRegistrationResult(
                     available = false,
@@ -135,7 +147,16 @@ public class AndroidDigitalCredentialRegistry(
         }
         val entries = records.map { it.toAndroidEntry() }
         return runCatching {
-            registryManager.registerCredentials(OpenId4VpRegistry(entries, registryId))
+            // Registering only the unsigned protocol makes Credential Manager ignore signed and
+            // multisigned requests rather than route them here to be rejected. The library default
+            // advertises all three.
+            registryManager.registerCredentials(
+                OpenId4VpRegistry(
+                    credentialEntries = entries,
+                    id = registryId,
+                    supportedProtocols = listOf(OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_UNSIGNED),
+                )
+            )
             registryManager.registerCredentials(
                 AndroidAnnexCRegistry(
                     id = "$registryId-annex-c",

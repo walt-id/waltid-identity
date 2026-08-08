@@ -5,8 +5,10 @@ import WalletSDK
 enum IdentityDocumentSharedConfiguration {
     static let appGroupIdentifier = "group.id.walt.wallet.demo"
     static let keychainAccessGroupSuffix = "id.walt.wallet.shared"
-    static let documentTypesKey = "id.walt.wallet.identity-document-types"
-    static let registryIDKey = "id.walt.wallet.identity-document-registry-id"
+    // The wallet core writes these two, so it owns their spelling. Only registrationIDsKey is the
+    // demo app's own bookkeeping.
+    static let documentTypesKey = DigitalCredentialRegistrationStorage.documentTypesKey
+    static let registryIDKey = DigitalCredentialRegistrationStorage.registryIDKey
     static let registrationIDsKey = "id.walt.wallet.identity-document-registration-ids"
     static let supportedDocumentTypes: Set<String> = [
         "org.iso.18013.5.1.mDL",

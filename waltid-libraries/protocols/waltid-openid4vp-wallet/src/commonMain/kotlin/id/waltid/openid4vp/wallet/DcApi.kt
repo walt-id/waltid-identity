@@ -2,6 +2,7 @@ package id.waltid.openid4vp.wallet
 
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.ktor.http.URLBuilder
 import io.ktor.http.URLProtocol
 import io.ktor.http.Url
@@ -65,6 +66,9 @@ public object DcApiWallet {
 
     private const val ANDROID_APP_ORIGIN_PREFIX = "android:apk-key-hash:"
 
+    /** base64url, unpadded - the encoding Credential Manager uses for the signing certificate hash. */
+    private val ANDROID_APP_ORIGIN_HASH = Regex("[A-Za-z0-9_-]+")
+
     /**
      * Resolves a DC API request using only the origin authenticated by the platform adapter.
      *
@@ -76,7 +80,7 @@ public object DcApiWallet {
         data: JsonObject,
         origin: String,
     ): ResolvedDcApiRequest {
-        val validatedOrigin = validatePlatformOrigin(origin)
+        val validatedOrigin = canonicalizePlatformOrigin(origin)
         val requestProtocol = DcApiRequestProtocol.fromValue(protocol)
         val authorizationRequest = when (requestProtocol) {
             DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED -> resolveUnsignedRequest(data)
@@ -88,23 +92,47 @@ public object DcApiWallet {
 
     /**
      * Builds the successful DigitalCredential payload. No network transport is performed.
+     *
+     * For `response_mode=dc_api.jwt` the members are wrapped in a single `response` JWE encrypted to
+     * the verifier's `client_metadata` key, so the platform and the calling website relay ciphertext
+     * they cannot read. For `dc_api` they are returned in the clear.
      */
-    public fun buildResponse(
+    public suspend fun buildResponse(
         request: ResolvedDcApiRequest,
         vpToken: String,
         idToken: String? = null,
     ): DcApiCredentialResponse {
-        val responseMode = request.authorizationRequest.responseMode
-        require(responseMode == OpenID4VPResponseMode.DC_API) {
-            "DC API response builder cannot handle response_mode=$responseMode"
+        val authorizationRequest = request.authorizationRequest
+        val members = buildJsonObject {
+            put("vp_token", Json.parseToJsonElement(vpToken))
+            idToken?.let { put("id_token", JsonPrimitive(it)) }
         }
-        return DcApiCredentialResponse(
-            protocol = request.protocol.value,
-            data = buildJsonObject {
-                put("vp_token", Json.parseToJsonElement(vpToken))
-                idToken?.let { put("id_token", JsonPrimitive(it)) }
-            },
-        )
+        val data = when (val responseMode = authorizationRequest.responseMode) {
+            OpenID4VPResponseMode.DC_API -> members
+            OpenID4VPResponseMode.DC_API_JWT -> {
+                // The same encryption metadata the mdoc session transcript was thumbprinted with, so
+                // the verifier reconstructs a transcript matching the key it decrypts with.
+                val encryption = requireNotNull(ResponseEncryption.resolveCrypto2(authorizationRequest)) {
+                    "response_mode=dc_api.jwt requires client_metadata response-encryption keys"
+                }
+                buildJsonObject {
+                    put(
+                        "response",
+                        JsonPrimitive(
+                            WalletPresentFunctionality2.encryptDirectPostResponse(
+                                payload = members,
+                                recipientPublicKey = encryption.recipientPublicKey,
+                                contentEncryption = encryption.contentEncryption,
+                            ),
+                        ),
+                    )
+                }
+            }
+            else -> throw IllegalArgumentException(
+                "DC API response builder cannot handle response_mode=$responseMode",
+            )
+        }
+        return DcApiCredentialResponse(protocol = request.protocol.value, data = data)
     }
 
     /** OpenID4VP protocol errors are fulfilled DC API responses, not transport failures. */
@@ -119,15 +147,25 @@ public object DcApiWallet {
     public fun encodeResponse(response: DcApiCredentialResponse): String =
         json.encodeToString(DcApiCredentialResponse.serializer(), response)
 
-    public fun validatePlatformOrigin(origin: String): String {
+    /**
+     * The single origin canonicalizer for every DC API platform adapter.
+     *
+     * The result is hashed into the mdoc session transcript, which the verifier reconstructs from its
+     * own `expected_origins` entry without ever receiving the wallet's copy. Two adapters that
+     * normalize differently - one lowercasing the host, one not - therefore produce a device
+     * signature no verifier can reproduce, and the failure surfaces as an opaque `device-auth`
+     * rejection. So platform code must pass the raw OS-asserted value straight to this function and
+     * use what it returns; it must not pre-normalize.
+     *
+     * @return the canonical origin: an Android app origin verbatim, or a web origin as
+     *   `scheme://lowercased-host[:non-default-port]`.
+     */
+    public fun canonicalizePlatformOrigin(origin: String): String {
         require(origin.isNotBlank() && origin == origin.trim()) {
-            "The platform-asserted origin must be a non-blank, canonical string"
+            "The platform-asserted origin must be a non-blank, untrimmed-free string"
         }
         if (origin.startsWith(ANDROID_APP_ORIGIN_PREFIX)) {
-            require(
-                origin.removePrefix(ANDROID_APP_ORIGIN_PREFIX)
-                    .matches(Regex("[A-Za-z0-9_-]+")),
-            ) {
+            require(origin.removePrefix(ANDROID_APP_ORIGIN_PREFIX).matches(ANDROID_APP_ORIGIN_HASH)) {
                 "Android app origin must contain one base64url signing-certificate hash"
             }
             return origin
@@ -146,15 +184,14 @@ public object DcApiWallet {
                 url.parameters.isEmpty() &&
                 (url.encodedPath.isEmpty() || url.encodedPath == "/")
         ) { "The platform-asserted origin must not contain credentials, a path, query, or fragment" }
-        val canonicalOrigin = URLBuilder().apply {
+        // ktor preserves host case, so this lowercasing is what makes the result canonical rather
+        // than merely validated. It is also why callers must not lowercase beforehand: an IPv6
+        // literal keeps the brackets ktor's `host` reports, and `Url` would reject a mangled one.
+        return URLBuilder().apply {
             protocol = url.protocol
-            host = url.host
+            host = url.host.lowercase()
             if (url.port != url.protocol.defaultPort) port = url.port
         }.buildString().removeSuffix("/")
-        require(origin == canonicalOrigin) {
-            "The platform-asserted web origin must use canonical scheme, host, and port serialization"
-        }
-        return origin
     }
 
     /**
@@ -166,10 +203,8 @@ public object DcApiWallet {
         require(request.responseType?.responseType?.contains("vp_token") == true) {
             "DC API Authorization Request must request vp_token"
         }
-        // Encrypted responses (response_mode=dc_api.jwt) are not implemented; reject them at
-        // resolution time rather than after the user has already consented to disclosure.
-        require(request.responseMode == OpenID4VPResponseMode.DC_API) {
-            "DC API Authorization Request response_mode must be dc_api"
+        require(request.responseMode in OpenID4VPResponseMode.DC_API_RESPONSES) {
+            "DC API Authorization Request response_mode must be dc_api or dc_api.jwt"
         }
         require(!request.nonce.isNullOrBlank()) { "DC API Authorization Request nonce is required" }
         require(request.dcqlQuery != null) { "DC API Authorization Request must contain dcql_query" }
@@ -186,7 +221,15 @@ public object DcApiWallet {
             .also { it.dcqlQuery?.precheck() }
     }
 
-    private fun isLocalhostHttp(url: Url): Boolean =
-        url.protocol == URLProtocol.HTTP &&
-            (url.host == "localhost" || url.host == "127.0.0.1" || url.host == "::1" || url.host.endsWith(".localhost"))
+    /**
+     * Loopback origins browsers treat as secure contexts, so a local development verifier works.
+     *
+     * `[::1]` carries the brackets because that is how ktor's [Url.host] reports an IPv6 literal;
+     * comparing against a bare `::1` silently never matches.
+     */
+    private fun isLocalhostHttp(url: Url): Boolean {
+        if (url.protocol != URLProtocol.HTTP) return false
+        val host = url.host.lowercase()
+        return host == "localhost" || host == "127.0.0.1" || host == "[::1]" || host.endsWith(".localhost")
+    }
 }
