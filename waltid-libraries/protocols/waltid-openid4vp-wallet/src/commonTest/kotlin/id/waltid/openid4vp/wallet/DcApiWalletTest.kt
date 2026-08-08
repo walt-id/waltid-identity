@@ -254,44 +254,90 @@ class DcApiWalletTest {
         assertEquals("invalid_request", response.data["error"]?.jsonPrimitive?.content)
     }
 
+    /**
+     * The full accepted matrix, as a table, because this is the sole origin canonicalizer and its
+     * output is hashed into the mdoc session transcript that the verifier reconstructs from
+     * `expected_origins` without ever seeing the wallet's copy. Every normalization below is a place
+     * where a second, platform-local implementation could disagree by one character and produce a
+     * device signature no verifier can reproduce - which surfaces only as an opaque `device-auth`
+     * rejection, so it is asserted here rather than left to a device test to discover.
+     *
+     * Two entries are regressions: an uppercase host was once returned as-is here but lowercased by
+     * the Android adapter, and `[::1]` was accepted by that adapter but rejected here, because the
+     * loopback check compared against a bare `::1` while ktor reports the brackets.
+     */
     @Test
-    fun `platform origin rejects complex or insecure web values and accepts Android app origins`() {
-        assertEquals(
-            "android:apk-key-hash:abc123",
-            DcApiWallet.canonicalizePlatformOrigin("android:apk-key-hash:abc123"),
-        )
-        assertFailsWith<IllegalArgumentException> {
-            DcApiWallet.canonicalizePlatformOrigin("https://verifier.example/path")
+    fun `platform origin canonicalization accepts and normalizes every supported origin shape`() {
+        mapOf(
+            // An Android app origin is opaque and passes through verbatim - there is nothing in it to
+            // normalize, and altering it would break the verifier's exact match.
+            "android:apk-key-hash:abc123" to "android:apk-key-hash:abc123",
+            "https://verifier.example" to "https://verifier.example",
+            // Scheme and host are case-insensitive per RFC 3986, so both are folded down.
+            "HTTPS://verifier.example" to "https://verifier.example",
+            "https://VERIFIER.example" to "https://verifier.example",
+            "https://Verifier.Example:8443" to "https://verifier.example:8443",
+            // A default port is dropped and a non-default one kept, for both schemes, because
+            // `https://x` and `https://x:443` are the same origin and must hash identically.
+            "https://verifier.example:443" to "https://verifier.example",
+            "https://verifier.example:8443" to "https://verifier.example:8443",
+            "http://localhost" to "http://localhost",
+            "http://localhost:80" to "http://localhost",
+            "http://localhost:8080" to "http://localhost:8080",
+            // A trailing empty path is not part of an origin.
+            "https://verifier.example/" to "https://verifier.example",
+            // The loopback forms a browser treats as a secure context, so a local verifier works.
+            "http://127.0.0.1:9000" to "http://127.0.0.1:9000",
+            "http://[::1]:8080" to "http://[::1]:8080",
+            "http://verifier.localhost:8080" to "http://verifier.localhost:8080",
+        ).forEach { (raw, expected) ->
+            assertEquals(expected, DcApiWallet.canonicalizePlatformOrigin(raw), "canonicalizing '$raw'")
+            // A canonical result is idempotent - re-canonicalizing must not change it, which is what
+            // lets an adapter pass this output on without the value drifting.
+            assertEquals(expected, DcApiWallet.canonicalizePlatformOrigin(expected), "not idempotent for '$raw'")
         }
-        assertFailsWith<IllegalArgumentException> {
-            DcApiWallet.canonicalizePlatformOrigin("http://verifier.example")
-        }
-        assertEquals("http://localhost:8080", DcApiWallet.canonicalizePlatformOrigin("http://localhost:8080"))
     }
 
     /**
-     * This is the sole origin canonicalizer, because its output is hashed into the mdoc session
-     * transcript that the verifier reconstructs from `expected_origins` without ever seeing the
-     * wallet's copy. Both cases below are ones where a second, platform-local implementation
-     * previously disagreed with this one, each yielding an unreproducible device signature:
-     *
-     * - an uppercase host was returned as-is here but lowercased by the Android adapter
-     * - `[::1]` was accepted by the Android adapter but rejected here, because the loopback check
-     *   compared against a bare `::1` while ktor reports the brackets
+     * The rejected matrix. Each entry carries something an origin cannot: a component beyond
+     * scheme/host/port, or a transport that is not a secure context. Accepting any of them would let
+     * two different requesters canonicalize to the same origin, or let a plaintext caller be treated
+     * as the authenticated party the session transcript then binds.
      */
     @Test
-    fun `platform origin canonicalization normalizes host case and bracketed loopback`() {
-        assertEquals("https://verifier.example", DcApiWallet.canonicalizePlatformOrigin("https://VERIFIER.example"))
-        assertEquals("https://verifier.example", DcApiWallet.canonicalizePlatformOrigin("https://verifier.example:443"))
-        assertEquals("https://verifier.example:8443", DcApiWallet.canonicalizePlatformOrigin("https://verifier.example:8443"))
-        assertEquals("http://[::1]:8080", DcApiWallet.canonicalizePlatformOrigin("http://[::1]:8080"))
-        assertEquals("http://127.0.0.1:9000", DcApiWallet.canonicalizePlatformOrigin("http://127.0.0.1:9000"))
-
-        // A canonical result is idempotent - re-canonicalizing must not change it, which is what
-        // lets an adapter pass its output on without the value drifting.
-        listOf("https://VERIFIER.example:443/", "http://[::1]:8080", "android:apk-key-hash:abc123").forEach { raw ->
-            val once = DcApiWallet.canonicalizePlatformOrigin(raw)
-            assertEquals(once, DcApiWallet.canonicalizePlatformOrigin(once), "not idempotent for '$raw'")
+    fun `platform origin canonicalization rejects anything that is not scheme host and port`() {
+        listOf(
+            // Non-loopback HTTP: the OS cannot attest a plaintext caller's identity.
+            "http://verifier.example",
+            "http://verifier.example:8080",
+            // `localhost` as a *suffix* is a different registrable domain, not loopback.
+            "http://notlocalhost",
+            "http://localhost.example",
+            // Components an origin does not have. A path, query or fragment would otherwise be
+            // silently dropped, making two distinct URLs canonicalize to one origin.
+            "https://verifier.example/path",
+            "https://verifier.example/?a=b",
+            "https://verifier.example?a=b",
+            "https://verifier.example/#fragment",
+            "https://verifier.example#fragment",
+            // Credentials in the authority: `user@host` is attacker-controlled text that reads as the
+            // host in a UI, and it is not part of the origin either.
+            "https://user@verifier.example",
+            "https://user:password@verifier.example",
+            // Neither a web origin nor the Android app form.
+            "verifier.example",
+            "ftp://verifier.example",
+            "android:apk-key-hash:not+base64url",
+            "android:apk-key-hash:",
+            // Blank or untrimmed: whitespace would change the hash while looking identical.
+            "",
+            "   ",
+            " https://verifier.example",
+            "https://verifier.example ",
+        ).forEach { raw ->
+            assertFailsWith<IllegalArgumentException>("should have rejected '$raw'") {
+                DcApiWallet.canonicalizePlatformOrigin(raw)
+            }
         }
     }
 
