@@ -13,10 +13,12 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
-import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -135,22 +137,107 @@ class MobileWalletDigitalCredentialPresentationTest {
      * `dc_api.jwt` without usable verifier encryption keys must fail rather than degrade to a
      * cleartext response, which the verifier would still accept as an answer to its encrypted
      * request. The wallet may not release a presentation it cannot protect.
+     *
+     * It must fail at *preview*, not at submission. A preview that succeeds has already matched DCQL
+     * over the store and returned the matching credentials to the caller, so an unanswerable request
+     * would still have told the verifier what the wallet holds - and on Android it would have opened
+     * a consent dialog for a presentation that could never be delivered. Every case here therefore
+     * also asserts the store was read no more than by a request rejected before it was even resolved.
      */
     @Test
-    fun anEncryptedResponseModeWithoutVerifierKeysFailsRatherThanFallingBackToCleartext() = runTest {
-        val fixture = walletFixture(sdJwtCredential())
+    fun anUnusableEncryptedResponseConfigurationIsRejectedBeforeAnyCredentialIsMatched() = runTest {
+        // What the wallet reads before it has looked at the request at all: the registry projection
+        // is rebuilt to map platform entry ids onto credential ids, which happens for every request
+        // including one rejected as stale. Measured rather than hardcoded, so this stays an assertion
+        // about ordering rather than about how the projection is built.
+        val readsBeforeAnyResolution = run {
+            val fixture = walletFixture(sdJwtCredential())
+            fixture.registryEntryId("pid-1")
+            fixture.forgetCredentialReads()
+            assertFailsWith<MobileWalletStaleRegistryEntryException> {
+                fixture.wallet.previewDigitalCredentialPresentation(
+                    dcApiRequest(
+                        data = sdJwtQuery(),
+                        selectedRegistryEntryIds = listOf("dc-entry-from-a-replaced-projection"),
+                    )
+                )
+            }
+            fixture.credentialReads()
+        }
 
-        val preview = fixture.wallet.previewDigitalCredentialPresentation(
-            dcApiRequest(
-                data = sdJwtQuery(responseMode = "dc_api.jwt"),
-                selectedRegistryEntryIds = listOf(fixture.registryEntryId("pid-1")),
-            )
+        // Each case is a verifier configuration the wallet cannot encrypt to, paired with why.
+        val unusableClientMetadata = listOf(
+            "no client_metadata at all" to null,
+            "an empty jwks" to """{"jwks": {"keys": []}}""",
+            "no key usable for key agreement" to """
+                {"jwks": {"keys": [{
+                  "kty": "EC", "crv": "P-256", "kid": "sig-key", "use": "sig", "alg": "ES256",
+                  "x": "y4ajD4aIXGiLGqiF81nN5HvBFvBEvrZcgFsp5VIJO30",
+                  "y": "jyrZRfxKz113LQNg2x5f7Nu4fwW5Ov5gCzhPaTZuTCg"
+                }]}}
+            """.trimIndent(),
+            "an unsupported key-management alg" to """
+                {"jwks": {"keys": [{
+                  "kty": "EC", "crv": "P-256", "kid": "enc-key", "use": "enc", "alg": "ECDH-ES+A256KW",
+                  "x": "y4ajD4aIXGiLGqiF81nN5HvBFvBEvrZcgFsp5VIJO30",
+                  "y": "jyrZRfxKz113LQNg2x5f7Nu4fwW5Ov5gCzhPaTZuTCg"
+                }]}}
+            """.trimIndent(),
+            "an unsupported curve" to """
+                {"jwks": {"keys": [{
+                  "kty": "EC", "crv": "P-224", "kid": "enc-key", "use": "enc", "alg": "ECDH-ES",
+                  "x": "y4ajD4aIXGiLGqiF81nN5HvBFvBEvrZcgFsp5VIJO30",
+                  "y": "jyrZRfxKz113LQNg2x5f7Nu4fwW5Ov5gCzhPaTZuTCg"
+                }]}}
+            """.trimIndent(),
+            "malformed key material" to """
+                {"jwks": {"keys": [{
+                  "kty": "EC", "crv": "P-256", "kid": "enc-key", "use": "enc", "alg": "ECDH-ES",
+                  "x": "not-base64url-coordinates"
+                }]}}
+            """.trimIndent(),
+            // A verifier publishing its private key is either compromised or misconfigured; either
+            // way the wallet must not encrypt to it as though the key were confidential.
+            "a private key published as the recipient" to """
+                {"jwks": {"keys": [{
+                  "kty": "EC", "crv": "P-256", "kid": "enc-key", "use": "enc", "alg": "ECDH-ES",
+                  "x": "y4ajD4aIXGiLGqiF81nN5HvBFvBEvrZcgFsp5VIJO30",
+                  "y": "jyrZRfxKz113LQNg2x5f7Nu4fwW5Ov5gCzhPaTZuTCg",
+                  "d": "9s7NRfxKz113LQNg2x5f7Nu4fwW5Ov5gCzhPaTZuTCg"
+                }]}}
+            """.trimIndent(),
+            // A usable key, but no content-encryption algorithm in common.
+            "no compatible content encryption" to """
+                {
+                  "jwks": {"keys": [{
+                    "kty": "EC", "crv": "P-256", "kid": "enc-key", "use": "enc", "alg": "ECDH-ES",
+                    "x": "y4ajD4aIXGiLGqiF81nN5HvBFvBEvrZcgFsp5VIJO30",
+                    "y": "jyrZRfxKz113LQNg2x5f7Nu4fwW5Ov5gCzhPaTZuTCg"
+                  }]},
+                  "encrypted_response_enc_values_supported": ["XC20P"]
+                }
+            """.trimIndent(),
         )
 
-        assertFailsWith<IllegalArgumentException> {
-            fixture.wallet.submitDigitalCredentialPresentation(
-                requestId = preview.requestId,
-                selectedCredentialOptions = preview.credentialOptions.selections(),
+        unusableClientMetadata.forEach { (why, clientMetadata) ->
+            val fixture = walletFixture(sdJwtCredential())
+            val registryEntryId = fixture.registryEntryId("pid-1")
+            // Registration itself reads the store, so count only what the preview reads.
+            fixture.forgetCredentialReads()
+
+            assertFailsWith<IllegalArgumentException>("dc_api.jwt with $why was previewed") {
+                fixture.wallet.previewDigitalCredentialPresentation(
+                    dcApiRequest(
+                        data = sdJwtQuery(responseMode = "dc_api.jwt", clientMetadata = clientMetadata),
+                        selectedRegistryEntryIds = listOf(registryEntryId),
+                    )
+                )
+            }
+
+            assertEquals(
+                readsBeforeAnyResolution,
+                fixture.credentialReads(),
+                "dc_api.jwt with $why matched credentials before rejecting the request",
             )
         }
     }
@@ -308,7 +395,18 @@ class MobileWalletDigitalCredentialPresentationTest {
     // Fixtures
     // -----------------------------------------------------------------------------------------
 
-    private class Fixture(val wallet: MobileWallet, private val registry: CapturingRegistry) {
+    private class Fixture(
+        val wallet: MobileWallet,
+        private val registry: CapturingRegistry,
+        private val credentialStore: RecordingCredentialStore,
+    ) {
+        /** How many times the credential store has been read since the last [forgetCredentialReads]. */
+        fun credentialReads(): Int = credentialStore.reads
+
+        fun forgetCredentialReads() {
+            credentialStore.reads = 0
+        }
+
         /**
          * The registry entry id the platform would have been handed for [credentialId]. Read back
          * from the projection the wallet actually published rather than recomputed here, so a test
@@ -341,20 +439,21 @@ class MobileWalletDigitalCredentialPresentationTest {
             )
         )
         val registry = CapturingRegistry()
+        val credentialStore = RecordingCredentialStore().also { store ->
+            credentials.forEach { store.addCredential(it) }
+        }
         val wallet = MobileWallet(
             walletId = "dc-api-presentation-wallet",
             keyStore = InMemoryKeyStore().also { it.addCrypto2Key(holderKey) },
             didStore = InMemoryDidStore().also {
                 it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
             },
-            credentialStore = InMemoryCredentialStore().also { store ->
-                credentials.forEach { store.addCredential(it) }
-            },
+            credentialStore = credentialStore,
             generateAndPersistKey = { error("Digital Credentials presentation must not bootstrap a key") },
             transactionDataProfiles = transactionDataProfiles,
             credentialRegistry = registry,
         )
-        return Fixture(wallet, registry)
+        return Fixture(wallet, registry, credentialStore)
     }
 
     private fun dcApiRequest(
@@ -440,6 +539,32 @@ class MobileWalletDigitalCredentialPresentationTest {
 
     private fun List<MobileWalletPresentationCredentialOption>.selections() =
         map { MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId) }
+
+    /**
+     * Credential store that counts reads, so a test can assert a request was refused *before* the
+     * wallet looked at what it holds. Asserting only on the thrown exception would pass equally for a
+     * rejection that happens after DCQL matching, which is the ordering bug this guards.
+     */
+    private class RecordingCredentialStore : WalletCredentialStore {
+        private val credentials = mutableMapOf<String, StoredCredential>()
+        var reads: Int = 0
+
+        override suspend fun getCredential(id: String): StoredCredential? {
+            reads++
+            return credentials[id]
+        }
+
+        override suspend fun listCredentials(): Flow<StoredCredential> {
+            reads++
+            return credentials.values.toList().asFlow()
+        }
+
+        override suspend fun addCredential(entry: StoredCredential) {
+            credentials[entry.id] = entry
+        }
+
+        override suspend fun removeCredential(id: String): Boolean = credentials.remove(id) != null
+    }
 
     /** Registry that keeps the last published projection so tests can read real entry ids back. */
     private class CapturingRegistry : MobileWalletCredentialRegistry {

@@ -2,6 +2,13 @@ package id.waltid.openid4vp.wallet
 
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJwe
+import id.walt.crypto2.jose.JweContentEncryption
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.migration.v1.V1KeyMigration
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.objects.handover.OpenID4VPDCAPIHandoverInfo
 import id.walt.mdoc.objects.sha256
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
@@ -13,9 +20,11 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -150,6 +159,54 @@ class DcApiWalletTest {
             Json.parseToJsonElement(jwe.substringBefore('.').decodeBase64Url())
                 .jsonObject["kid"]?.jsonPrimitive?.content,
             "the JWE protected header must name the verifier key the wallet encrypted to",
+        )
+    }
+
+    /**
+     * The test above proves the response *looks* encrypted; this proves the verifier can actually read
+     * it. The key pair is fixed rather than generated, so the assertion is on the protocol producing a
+     * decryptable JWE for a published `client_metadata` key, not on a round trip through key material
+     * this test also chose - a wallet that encrypted to the wrong key would still round-trip if both
+     * halves came from the same freshly generated key.
+     */
+    @Test
+    fun `the verifier decrypts the encrypted response back to the vp token it asked for`() = runTest {
+        val vpToken = """{"pid":["presentation"]}"""
+        val response = DcApiWallet.buildResponse(
+            request = ResolvedDcApiRequest(
+                protocol = DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
+                origin = "https://verifier.example",
+                authorizationRequest = authorizationRequest(
+                    responseMode = OpenID4VPResponseMode.DC_API_JWT,
+                    clientMetadata = ClientMetadata(
+                        jwks = ClientMetadata.Jwks(listOf(json.parseToJsonElement(DECRYPTABLE_PUBLIC_JWK).jsonObject)),
+                        encryptedResponseEncValuesSupported = listOf("A256GCM"),
+                    ),
+                ),
+            ),
+            vpToken = vpToken,
+        )
+
+        val recipientKey = CryptoRuntime(defaultSoftwareKeyProviders()).restore(
+            V1KeyMigration().migrate(
+                recordId = KeyId("verifier-response-key"),
+                serialized = buildJsonObject {
+                    put("type", "jwk")
+                    put("jwk", json.parseToJsonElement(DECRYPTABLE_PRIVATE_JWK).jsonObject)
+                },
+                usages = setOf(KeyUsage.KEY_AGREEMENT),
+            )
+        )
+        val decrypted = CompactJwe.decrypt(
+            compactJwe = assertNotNull(response.data["response"]?.jsonPrimitive?.content),
+            recipientKey = recipientKey,
+            allowedContentEncryptions = setOf(JweContentEncryption.A256GCM),
+        )
+
+        assertEquals("A256GCM", decrypted.protectedHeader["enc"]?.jsonPrimitive?.content)
+        assertEquals(
+            buildJsonObject { put("vp_token", json.parseToJsonElement(vpToken)) },
+            Json.parseToJsonElement(decrypted.plaintext.decodeToString()),
         )
     }
 
@@ -375,5 +432,30 @@ class DcApiWalletTest {
 
     private companion object {
         private const val VERIFIER_KEY_ID = "enc-key"
+
+        /**
+         * A fixed P-256 key pair standing in for the verifier's published response-encryption key. The
+         * public half goes into `client_metadata`; the private half only ever decrypts in the test.
+         */
+        private const val DECRYPTABLE_PUBLIC_JWK = """{
+            "kty":"EC",
+            "crv":"P-256",
+            "x":"i5_Mav2at_Apor6AD8pFLoEZIy5YVxzZLD8PyvGZCo4",
+            "y":"8KWjGEMdQu0tnKqvZ2lQJUsbz9nLskFuIjcv9FV0kvA",
+            "use":"enc",
+            "kid":"verifier-response-key",
+            "alg":"ECDH-ES"
+        }"""
+
+        private const val DECRYPTABLE_PRIVATE_JWK = """{
+            "kty":"EC",
+            "crv":"P-256",
+            "x":"i5_Mav2at_Apor6AD8pFLoEZIy5YVxzZLD8PyvGZCo4",
+            "y":"8KWjGEMdQu0tnKqvZ2lQJUsbz9nLskFuIjcv9FV0kvA",
+            "d":"cTw-m-LcAE7LbpHLTipjpm6Pr91liLjUubeoVACq29I",
+            "use":"enc",
+            "kid":"verifier-response-key",
+            "alg":"ECDH-ES"
+        }"""
     }
 }
