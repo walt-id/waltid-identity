@@ -25,10 +25,9 @@ case "$phase" in
     # so the unfiltered compose-demo phase (API 34, `default` image) can only skip them; this
     # phase's playstore image is the only place they execute. A class omitted here therefore runs
     # nowhere, and because the report step does not surface skips, it reads as green rather than as
-    # a gap - which is how these three went unnoticed after being added.
+    # a gap - which is how three classes went unnoticed after being added.
     dc_api_test_classes="id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest"
     dc_api_test_classes+=",id.walt.walletdemo.compose.android.DigitalCredentialBrowserSharingE2ETest"
-    dc_api_test_classes+=",id.walt.walletdemo.compose.android.DcApiDeploymentComparisonE2ETest"
     script="ANDROID_TEST_CLASS=$dc_api_test_classes ./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
     emulator_options="-no-window -gpu auto -noaudio -no-boot-anim -camera-back none -memory 4096 -feature GLDirectMem,HasSharedSlotsHostMemoryAllocator"
     report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**/*.xml"

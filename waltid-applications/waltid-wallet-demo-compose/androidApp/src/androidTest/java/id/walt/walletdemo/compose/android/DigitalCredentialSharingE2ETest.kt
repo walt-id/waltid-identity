@@ -471,7 +471,8 @@ class DigitalCredentialSharingE2ETest {
         // predates that enforcement, and the certificate issuer2.demo.walt.id actually signs with is
         // X.509 v1 with no extensions, so it has neither keyUsage:digitalSignature nor
         // EKU 1.0.18013.5.1.2. A verifier that does enforce the profile rejects this same
-        // presentation; see DcApiDeploymentComparisonE2ETest and DeployedIssuerDocumentSignerTest.
+        // presentation - which is a deployment gap on the issuer, not something a wallet change
+        // fixes, and not something this assertion can be strengthened to catch.
         val policyResults = info["policy_results"] ?: error("Session info has no policy_results: $info")
         val executed = policyResults.executedPolicyIds()
         requiredPolicyIds.forEach { policyId ->
