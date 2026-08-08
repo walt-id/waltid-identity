@@ -112,10 +112,10 @@ public struct AnnexCDocumentRequest: Equatable, Sendable {
 
 /// Reader-authentication trust result for an Annex C presentation request.
 ///
-/// Only ``trusted`` means the reader was identified, and it requires both a valid signature and an
-/// accepting application trust policy. A request whose reader authentication fails cryptographic
-/// verification produces no result at all - it is rejected - so every case here describes a request
-/// that is still processable, differing in why the reader is not identified.
+/// Only ``trusted(certificateSubject:)`` means the reader was identified, and it requires both a
+/// valid signature and an accepting application trust policy. A request whose reader authentication
+/// fails cryptographic verification produces no result at all - it is rejected - so every case here
+/// describes a request that is still processable, differing in why the reader is not identified.
 public enum ReaderTrust: Equatable, Sendable {
     /// The protocol carries no reader authentication, as with the OpenID4VP Digital Credentials API.
     case notApplicable
