@@ -239,7 +239,7 @@ public actor Wallet {
     }
     /// Returns the current IdentityDocumentServices capability snapshot.
     public func digitalCredentialCapabilities() async -> DigitalCredentialCapabilities {
-        #if os(iOS)
+        #if canImport(WalletCore) && os(iOS)
         if #available(iOS 26.0, *),
            let appGroupIdentifier = configuration.crossProcessAccess?.appGroupIdentifier {
             let status = await IdentityDocumentProviderRegistrationStore().status

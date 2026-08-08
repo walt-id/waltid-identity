@@ -2,36 +2,48 @@ import Foundation
 #if os(iOS)
 import IdentityDocumentServices
 #endif
+#if canImport(WalletCore) && os(iOS)
+import WalletCore
+#endif
 
 /// Shared runtime-status bridge used by the SDK and an IdentityDocument provider extension.
+///
+/// Only Swift can query `IdentityDocumentProviderRegistrationStore`, and only the wallet core knows
+/// how the status is stored. So this translates Apple's status into the wallet core's status type and
+/// hands it over; neither the App Group key nor the stored spelling of a status is written here.
 public enum DigitalCredentialRegistrationStorage {
-    /// App Group user-defaults key containing the latest provider-registration status.
-    public static let registrationStatusKey = "id.walt.wallet.identity-document-registration-status"
+    #if canImport(WalletCore) && os(iOS)
+    /// App Group key the wallet core publishes the registered mdoc document types under.
+    public static var documentTypesKey: String { IosIdentityDocumentRegistry.companion.DOCUMENT_TYPES_KEY }
 
-    #if os(iOS)
+    /// App Group key the wallet core publishes the current logical registry identifier under.
+    public static var registryIDKey: String { IosIdentityDocumentRegistry.companion.REGISTRY_ID_KEY }
+
     @available(iOS 26.0, *)
     public static func persist(
         status: IdentityDocumentProviderRegistrationStore.Status,
         appGroupIdentifier: String
     ) {
-        UserDefaults(suiteName: appGroupIdentifier)?.set(
-            status.walletStorageValue,
-            forKey: registrationStatusKey
+        IosIdentityDocumentRegistry.companion.reportRegistrationStatus(
+            appGroupIdentifier: appGroupIdentifier,
+            status: status.walletRegistrationStatus
         )
     }
     #endif
 }
 
-#if os(iOS)
+#if canImport(WalletCore) && os(iOS)
 @available(iOS 26.0, *)
 private extension IdentityDocumentProviderRegistrationStore.Status {
-    var walletStorageValue: String {
+    /// An unrecognized future status is reported as unsupported: the conservative choice, since
+    /// registration proceeds only for `.authorized`.
+    var walletRegistrationStatus: IosIdentityDocumentRegistrationStatus {
         switch self {
-        case .authorized: "authorized"
-        case .notDetermined: "notDetermined"
-        case .notAuthorized: "notAuthorized"
-        case .notSupported: "notSupported"
-        @unknown default: "notSupported"
+        case .authorized: .authorized
+        case .notDetermined: .notDetermined
+        case .notAuthorized: .notAuthorized
+        case .notSupported: .notSupported
+        @unknown default: .notSupported
         }
     }
 }

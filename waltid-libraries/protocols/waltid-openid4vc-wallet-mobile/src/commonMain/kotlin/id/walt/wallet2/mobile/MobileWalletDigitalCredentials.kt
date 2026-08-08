@@ -18,25 +18,41 @@ public object MobileWalletDigitalCredentialProtocols {
     public const val ISO_MDOC_ANNEX_C: String = "org-iso-mdoc"
 }
 
-/** Credential formats exposed through the platform Digital Credentials integration. */
-public enum class MobileWalletDigitalCredentialFormat {
-    MDOC,
-    SD_JWT_VC,
+/**
+ * Credential formats exposed through the platform Digital Credentials integration.
+ *
+ * [identifier] is the credential format identifier this entry represents. Capability metadata is
+ * reported to host applications through it rather than through the enum-entry name, so renaming an
+ * entry cannot silently change what the wallet advertises.
+ *
+ * @property identifier Stable credential format identifier.
+ */
+public enum class MobileWalletDigitalCredentialFormat(public val identifier: String) {
+    MDOC("mso_mdoc"),
+    SD_JWT_VC("dc+sd-jwt"),
 }
 
-/** Authentication applied to a Digital Credentials request. */
-public enum class MobileWalletDigitalCredentialRequestProtection {
-    UNSIGNED,
-    SIGNED,
-    MULTISIGNED,
-    READER_AUTHENTICATED,
+/**
+ * Authentication applied to a Digital Credentials request.
+ *
+ * @property identifier Stable identifier reported in capability metadata.
+ */
+public enum class MobileWalletDigitalCredentialRequestProtection(public val identifier: String) {
+    UNSIGNED("unsigned"),
+    SIGNED("signed"),
+    MULTISIGNED("multisigned"),
+    READER_AUTHENTICATED("reader_authenticated"),
 }
 
-/** Protection applied to the response returned to the requesting platform. */
-public enum class MobileWalletDigitalCredentialResponseProtection {
-    UNENCRYPTED,
-    JWE,
-    HPKE,
+/**
+ * Protection applied to the response returned to the requesting platform.
+ *
+ * @property identifier Stable identifier reported in capability metadata.
+ */
+public enum class MobileWalletDigitalCredentialResponseProtection(public val identifier: String) {
+    UNENCRYPTED("unencrypted"),
+    JWE("jwe"),
+    HPKE("hpke"),
 }
 
 /**
@@ -265,9 +281,6 @@ public data class MobileWalletDigitalCredentialResponse(
     public val protocol: String,
     public val dataJson: String,
 )
-
-/** Explicit user cancellation; adapters must map this to the platform cancellation contract. */
-public class MobileWalletDigitalCredentialCancellationException : Exception("Digital credential presentation cancelled")
 
 /**
  * Selected platform registry entry no longer maps to a current wallet credential.

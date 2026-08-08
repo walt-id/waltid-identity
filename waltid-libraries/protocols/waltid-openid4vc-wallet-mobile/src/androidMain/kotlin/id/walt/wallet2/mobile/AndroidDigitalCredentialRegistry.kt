@@ -124,7 +124,14 @@ public class AndroidDigitalCredentialRegistry(
             return MobileWalletCredentialRegistrationResult(false, 0, "Credential Manager requires API 23")
         }
         if (persistProjection) {
-            runCatching { projectionStore.replace(registryId, records) }.onFailure { error ->
+            // An empty desired state means the wallet holds nothing to project - after deleteWallet,
+            // for instance. Storing an empty projection would leave its encrypted blob and its
+            // AndroidKeyStore key behind indefinitely, so drop both instead.
+            val persist = runCatching {
+                if (records.isEmpty()) projectionStore.clear(registryId)
+                else projectionStore.replace(registryId, records)
+            }
+            persist.onFailure { error ->
                 registrationAvailable = false
                 return MobileWalletCredentialRegistrationResult(
                     available = false,

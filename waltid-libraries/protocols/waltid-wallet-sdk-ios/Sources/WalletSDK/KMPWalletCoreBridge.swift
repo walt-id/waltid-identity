@@ -735,9 +735,11 @@ private extension MobileWalletDigitalCredentialCapabilities {
             capabilities: swiftArray(capabilities, of: MobileWalletDigitalCredentialCapability.self).map {
                 DigitalCredentialCapability(
                     protocolIdentifier: $0.protocol,
-                    credentialFormats: swiftArray($0.credentialFormats, of: MobileWalletDigitalCredentialFormat.self).map { String(describing: $0) },
-                    requestProtection: swiftArray($0.requestProtection, of: MobileWalletDigitalCredentialRequestProtection.self).map { String(describing: $0) },
-                    responseProtection: swiftArray($0.responseProtection, of: MobileWalletDigitalCredentialResponseProtection.self).map { String(describing: $0) },
+                    // `identifier`, not String(describing:): SKIE renders these as Swift enums, so
+                    // describing them would publish compiler-derived case names as API.
+                    credentialFormats: swiftArray($0.credentialFormats, of: MobileWalletDigitalCredentialFormat.self).map(\.identifier),
+                    requestProtection: swiftArray($0.requestProtection, of: MobileWalletDigitalCredentialRequestProtection.self).map(\.identifier),
+                    responseProtection: swiftArray($0.responseProtection, of: MobileWalletDigitalCredentialResponseProtection.self).map(\.identifier),
                     supported: $0.supported,
                     unsupportedReason: $0.unsupportedReason
                 )

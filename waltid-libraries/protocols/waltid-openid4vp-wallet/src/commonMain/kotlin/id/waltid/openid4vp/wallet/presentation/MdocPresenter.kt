@@ -463,44 +463,15 @@ object MdocPresenter {
     /**
      * Builds one selectively disclosed Annex C document using the same device-authentication
      * implementation as OpenID4VP. The native platform adapter never handles signing or claims.
-     */
-    @Deprecated("Use the Crypto2Key overload")
-    suspend fun buildAnnexCDocument(
-        digitalCredential: DigitalCredential,
-        requestedElements: Map<String, List<String>>,
-        sessionTranscript: SessionTranscript,
-        holderKey: Key,
-    ): Document = buildAnnexCDocumentWithKey(
-        digitalCredential,
-        requestedElements,
-        sessionTranscript,
-        holderKey,
-        null,
-    )
-
-    /**
-     * Builds one selectively disclosed Annex C document using the same device-authentication
-     * implementation as OpenID4VP. The native platform adapter never handles signing or claims.
+     *
+     * Annex C is reached only through the mobile Digital Credentials adapters, whose signing keys are
+     * always platform-managed, so there is no legacy-key overload: this path is crypto2-only.
      */
     suspend fun buildAnnexCDocument(
         digitalCredential: DigitalCredential,
         requestedElements: Map<String, List<String>>,
         sessionTranscript: SessionTranscript,
         holderKey: Crypto2Key,
-    ): Document = buildAnnexCDocumentWithKey(
-        digitalCredential,
-        requestedElements,
-        sessionTranscript,
-        null,
-        holderKey,
-    )
-
-    private suspend fun buildAnnexCDocumentWithKey(
-        digitalCredential: DigitalCredential,
-        requestedElements: Map<String, List<String>>,
-        sessionTranscript: SessionTranscript,
-        holderKey: Key?,
-        holderCrypto2Key: Crypto2Key?,
     ): Document {
         val credential = digitalCredential as? MdocsCredential
             ?: throw IllegalArgumentException("ISO 18013-7 Annex C requires an mdoc credential")
@@ -520,9 +491,9 @@ object MdocPresenter {
             sessionTranscript = sessionTranscript,
             credential = credential,
             disclosedDeviceNamespaces = disclosedDeviceNamespaces,
-            holderKey = holderKey,
+            holderKey = null,
             allowedAlgorithms = null,
-            holderCrypto2Key = holderCrypto2Key,
+            holderCrypto2Key = holderKey,
         )
         return Document(
             docType = credential.docType,
