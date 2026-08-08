@@ -2,6 +2,11 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.cose.Cose
+import id.walt.cose.CoseCertificate
+import id.walt.cose.CoseHeaders
+import id.walt.cose.CoseKey
+import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseVerifier
 import id.walt.credentials.CredentialDetectorTypes
 import id.walt.credentials.CredentialParser
@@ -22,6 +27,7 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
+import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.openid4vp.clientidprefix.ClientIdError
@@ -1069,6 +1075,196 @@ class MobileWalletTest {
         )
     }
 
+    /**
+     * A recipient key the response could never be HPKE-sealed to must stop the request before the
+     * consent dialog, not at submission.
+     *
+     * Getting this wrong is not merely an ordering nit: a wallet that discovers the unusable key only
+     * while sealing has already shown the user which claims a reader asked for and obtained their
+     * approval to disclose them, and then fails. So the assertions below pin *both* that the request
+     * is rejected and that no credential was ever read - a store access is the observable proxy for
+     * "the wallet started preparing a consent screen".
+     */
+    @Test
+    fun annexCRejectsUnsealableHpkeRecipientKeyBeforeConsent() = runTest {
+        val docType = "org.iso.18013.5.1.mDL"
+        val namespace = "org.iso.18013.5.1"
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "mdl-1",
+                credential = MdocsCredential(
+                    credentialData = buildJsonObject {
+                        put(namespace, buildJsonObject { put("given_name", "Ada") })
+                    },
+                    signed = MdocsExamples.mdocsExampleBase64Url,
+                    docType = docType,
+                ),
+                label = "mDL",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "annex-c-hpke-validation-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "unused-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:unused", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            generateAndPersistKey = unusedKeyGenerator(),
+        )
+        val request = DeviceRequest(
+            docType = docType,
+            requestedElements = mapOf(namespace to listOf("given_name")),
+        ).encodeToBase64Url()
+        val parsedRequest = wallet.parseAnnexCDeviceRequest(request)
+
+        // A structurally valid encryptionInfo whose recipient key the Annex C HPKE suite cannot use.
+        // The nonce is deliberately well-formed: DCAPIEncryptionParameters enforces its own 16-byte
+        // minimum, so a short nonce would make this test pass on the wrong check.
+        val wrongCurveKey = DCAPIEncryptionInfo(
+            nonce = ByteArray(16) { it.toByte() },
+            recipientPublicKey = CoseKey(
+                kty = Cose.KeyTypes.EC2,
+                crv = Cose.EllipticCurves.P_384,
+                x = ByteArray(48) { 1 },
+                y = ByteArray(48) { 2 },
+            ),
+        ).encodeToBase64Url()
+        val privateKeyIncluded = DCAPIEncryptionInfo(
+            nonce = ByteArray(16) { it.toByte() },
+            recipientPublicKey = coseCompliantCbor.decodeFromByteArray(
+                DCAPIEncryptionInfo.serializer(),
+                READER_ENCRYPTION_INFO.decodeBase64Url(),
+            ).encryptionParameters.recipientPublicKey.copy(d = ByteArray(32) { 3 }),
+        ).encodeToBase64Url()
+
+        listOf(
+            wrongCurveKey to "P-256",
+            privateKeyIncluded to "public material only",
+        ).forEach { (encryptionInfo, expectedReason) ->
+            val rejection = assertFailsWith<IllegalArgumentException> {
+                wallet.previewAnnexCPresentation(
+                    MobileWalletAnnexCRequest(
+                        parsedRequest = parsedRequest,
+                        verifiedOrigin = "https://verifier.example",
+                        deviceRequestBase64Url = request,
+                        encryptionInfoBase64Url = encryptionInfo,
+                    )
+                )
+            }
+            assertTrue(
+                rejection.causeChainMessages().any { it.contains(expectedReason) },
+                "Expected an HPKE recipient-key rejection mentioning '$expectedReason', got: " +
+                    rejection.causeChainMessages(),
+            )
+        }
+        assertTrue(
+            credentialStore.streamCount == 0,
+            "The wallet read credentials for a request whose encryption metadata is unusable",
+        )
+    }
+
+    /**
+     * Reader authentication must be restricted to the algorithms ISO 18013-5 §9.1.3.4 permits, and the
+     * restriction has to be read from the *protected* header where it is signed over.
+     *
+     * `ESP256` is the sharp case: it is a legitimate, fully-specified P-256 ECDSA identifier that the
+     * allowlist deliberately excludes, so a wallet that trusted `alg` blindly would happily verify it.
+     * The assertion walks the cause chain because both call sites wrap the failure - matching only on
+     * the outer message would also pass for an ordinary bad signature and prove nothing.
+     */
+    @Test
+    fun annexCRejectsReaderAuthenticationAlgorithmOutsideTheAllowlist() = runTest {
+        val wallet = annexCWalletWithMdl("annex-c-reader-alg-allowlist-wallet")
+        val signedRequest = DeviceRequest.decodeFromBase64Url(SIGNED_READER_REQUEST)
+        val docRequest = signedRequest.docRequests.single()
+        val readerAuth = requireNotNull(docRequest.readerAuth)
+        val protectedHeaders = coseCompliantCbor.decodeFromByteArray(
+            CoseHeaders.serializer(),
+            readerAuth.protected,
+        )
+        assertEquals(Cose.Algorithm.ES256, protectedHeaders.algorithm, "Fixture must be an ES256 signature")
+        val disallowedAlgorithm = signedRequest.copy(
+            docRequests = listOf(
+                docRequest.copy(
+                    readerAuth = readerAuth.copy(
+                        protected = coseCompliantCbor.encodeToByteArray(
+                            CoseHeaders.serializer(),
+                            protectedHeaders.copy(algorithm = Cose.Algorithm.ESP256),
+                        ),
+                    ),
+                )
+            ),
+        )
+        val parsedRequest = wallet.parseAnnexCDeviceRequest(signedRequest.encodeToBase64Url())
+
+        val rejection = assertFailsWith<IllegalArgumentException> {
+            wallet.previewAnnexCPresentation(
+                MobileWalletAnnexCRequest(
+                    parsedRequest = parsedRequest,
+                    verifiedOrigin = "https://verifier.example",
+                    deviceRequestBase64Url = disallowedAlgorithm.encodeToBase64Url(),
+                    encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+                )
+            )
+        }
+        assertTrue(
+            rejection.causeChainMessages().any { it.contains("COSE algorithm is not allowed") },
+            "Expected rejection by the reader-authentication algorithm allowlist, got: " +
+                rejection.causeChainMessages(),
+        )
+    }
+
+    /**
+     * Every reader-authentication signature in one request must come from the same certificate chain.
+     *
+     * Without this, a request could pair a signature the wallet can verify with a second signature
+     * from an unrelated chain, and whichever chain reached [MobileWalletReaderTrustEvaluator] would
+     * decide the trust state the user is shown - so the reader identity displayed at consent need not
+     * be the one that authenticated the request. The mismatch is checked before signature
+     * verification, which is why the second signature here can be arbitrary bytes.
+     */
+    @OptIn(ExperimentalEncodingApi::class)
+    @Test
+    fun annexCRejectsReaderAuthenticationSignaturesFromDifferentCertificateChains() = runTest {
+        val wallet = annexCWalletWithMdl("annex-c-reader-chain-mismatch-wallet")
+        val signedRequest = DeviceRequest.decodeFromBase64Url(SIGNED_READER_REQUEST)
+        val docRequest = signedRequest.docRequests.single()
+        val readerAuth = requireNotNull(docRequest.readerAuth)
+        // Only the *second* signature can trip the check: the first one establishes the chain the rest
+        // are compared against, so a single-signature request could never exercise this.
+        val mismatchedChains = signedRequest.copy(
+            docRequests = listOf(
+                docRequest,
+                docRequest.copy(
+                    readerAuth = readerAuth.copy(
+                        unprotected = readerAuth.unprotected.copy(
+                            x5chain = listOf(CoseCertificate(Base64.decode(OTHER_READER_CERTIFICATE_BASE64))),
+                        ),
+                        protected = coseCompliantCbor.encodeToByteArray(
+                            CoseHeaders.serializer(),
+                            CoseHeaders(algorithm = Cose.Algorithm.ES256),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val parsedRequest = wallet.parseAnnexCDeviceRequest(mismatchedChains.encodeToBase64Url())
+
+        val rejection = assertFailsWith<IllegalArgumentException> {
+            wallet.previewAnnexCPresentation(
+                MobileWalletAnnexCRequest(
+                    parsedRequest = parsedRequest,
+                    verifiedOrigin = "https://verifier.example",
+                    deviceRequestBase64Url = mismatchedChains.encodeToBase64Url(),
+                    encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+                )
+            )
+        }
+        assertTrue(
+            rejection.causeChainMessages().any { it.contains("different certificate chains") },
+            "Expected rejection because the signatures use different certificate chains, got: " +
+                rejection.causeChainMessages(),
+        )
+    }
+
     @Test
     fun capabilityModelsFailClosedByDefault() = runTest {
         assertFalse(UnavailableMobileWalletCredentialRegistry.capabilities.platformAvailable)
@@ -1178,6 +1374,41 @@ class MobileWalletTest {
     private fun unusedKeyGenerator(): suspend (MobileWalletKeyType) -> ManagedKeyMaterial =
         { error("This test must not bootstrap a new key") }
 
+    /** A wallet holding one mDL, for Annex C tests that must reach reader-authentication checks. */
+    private fun annexCWalletWithMdl(walletId: String): MobileWallet = MobileWallet(
+        walletId = walletId,
+        keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "unused-key", keyType = "secp256r1")),
+        didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:unused", document = JsonObject(emptyMap()))),
+        credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "mdl-1",
+                credential = MdocsCredential(
+                    credentialData = buildJsonObject {
+                        put("org.iso.18013.5.1", buildJsonObject { put("given_name", "Ada") })
+                    },
+                    signed = MdocsExamples.mdocsExampleBase64Url,
+                    docType = "org.iso.18013.5.1.mDL",
+                ),
+                label = "mDL",
+            )
+        ),
+        generateAndPersistKey = unusedKeyGenerator(),
+    )
+
+    /**
+     * The messages of a throwable and every cause beneath it.
+     *
+     * Annex C wraps reader-authentication failures in a positional message, so an assertion that only
+     * read the outermost message would pass for any rejection and prove nothing about which check
+     * fired.
+     */
+    private fun Throwable.causeChainMessages(): List<String> =
+        generateSequence(this) { it.cause }.mapNotNull { it.message }.toList()
+
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun String.decodeBase64Url(): ByteArray =
+        Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL).decode(this)
+
     private val displayJson = kotlinx.serialization.json.Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -1188,6 +1419,9 @@ class MobileWalletTest {
             "MIIBsTCCAVegAwIBAgIUJklaRrIjkEZlDdPk2+qPneHHD6kwCgYIKoZIzj0EAwIwLjEQMA4GA1UEAwwHRXhhbXBsZTENMAsGA1UECgwEVGVzdDELMAkGA1UEBhMCVVMwHhcNMjYwMzMxMDkwNDMwWhcNMjcwMzMxMDkwNDMwWjAuMRAwDgYDVQQDDAdFeGFtcGxlMQ0wCwYDVQQKDARUZXN0MQswCQYDVQQGEwJVUzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABM4ukI9BoHfMYjKmokWc5GMiN7DJBQAPPZBHXHhwmuQE+JyeRcamM+uCS1N+naE0itVbs7fQ/5xbujSSK9pYdb6jUzBRMB0GA1UdDgQWBBSwjqgulcWH4AqTJwPjBGj3VGIAsTAfBgNVHSMEGDAWgBSwjqgulcWH4AqTJwPjBGj3VGIAsTAPBgNVHRMBAf8EBTADAQH/MAoGCCqGSM49BAMCA0gAMEUCIQCoWAleGRqR+kb+5SeRt/scogZPiQiM7wJ69tadEPPJwQIgdygIZSMQSXlxXbZ10QKtN6qSjggqFVUV4/Z2/pnBUBk="
         const val READER_ENCRYPTION_INFO =
             "gmVkY2FwaaJlbm9uY2VQAQIDBAUGBwgJCgsMDQ4PEHJyZWNpcGllbnRQdWJsaWNLZXmkAQIgASFYIM4ukI9BoHfMYjKmokWc5GMiN7DJBQAPPZBHXHhwmuQEIlgg-JyeRcamM-uCS1N-naE0itVbs7fQ_5xbujSSK9pYdb4"
+        /** A second self-signed P-256 reader certificate, unrelated to [READER_CERTIFICATE_BASE64]. */
+        const val OTHER_READER_CERTIFICATE_BASE64 =
+            "MIIBzDCCAXGgAwIBAgIUePOjQNDuOrysvlG1mxyNml2jcdowCgYIKoZIzj0EAwIwMzEVMBMGA1UEAwwMT3RoZXIgUmVhZGVyMQ0wCwYDVQQKDARUZXN0MQswCQYDVQQGEwJVUzAeFw0yNjA4MDgwMzUxMDBaFw0zNjA4MDUwMzUxMDBaMDMxFTATBgNVBAMMDE90aGVyIFJlYWRlcjENMAsGA1UECgwEVGVzdDELMAkGA1UEBhMCVVMwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQNs2RBhi04sO0GTNchxPgYGqPqwgZb8KpuUM+opp5fgziyF2KmDOQs1YtIG2a+9St+5C38fLcaWDUGuwrSLxeGo2MwYTAdBgNVHQ4EFgQUvjfoXfSFM14SPJMzryov6FxnbrkwHwYDVR0jBBgwFoAUvjfoXfSFM14SPJMzryov6FxnbrkwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCB4AwCgYIKoZIzj0EAwIDSQAwRgIhAJya7LMs0pjNW50GibaTk1i3QV4NXWfa3F6tv6JFgfG+AiEAwzZTMYiLt+Kh4yumndUoecTAp/fFdzvMRTHeZHamm3M="
         const val SIGNED_READER_REQUEST =
             "omd2ZXJzaW9uYzEuMGtkb2NSZXF1ZXN0c4GibGl0ZW1zUmVxdWVzdNgYWEqiZ2RvY1R5cGV1b3JnLmlzby4xODAxMy41LjEubURMam5hbWVTcGFjZXOhcW9yZy5pc28uMTgwMTMuNS4xoWpnaXZlbl9uYW1l9GpyZWFkZXJBdXRohEOhASahGCFZAbUwggGxMIIBV6ADAgECAhQmSVpGsiOQRmUN0-Tb6o-d4ccPqTAKBggqhkjOPQQDAjAuMRAwDgYDVQQDDAdFeGFtcGxlMQ0wCwYDVQQKDARUZXN0MQswCQYDVQQGEwJVUzAeFw0yNjAzMzEwOTA0MzBaFw0yNzAzMzEwOTA0MzBaMC4xEDAOBgNVBAMMB0V4YW1wbGUxDTALBgNVBAoMBFRlc3QxCzAJBgNVBAYTAlVTMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEzi6Qj0Ggd8xiMqaiRZzkYyI3sMkFAA89kEdceHCa5AT4nJ5FxqYz64JLU36doTSK1Vuzt9D_nFu6NJIr2lh1vqNTMFEwHQYDVR0OBBYEFLCOqC6VxYfgCpMnA-MEaPdUYgCxMB8GA1UdIwQYMBaAFLCOqC6VxYfgCpMnA-MEaPdUYgCxMA8GA1UdEwEB_wQFMAMBAf8wCgYIKoZIzj0EAwIDSAAwRQIhAKhYCV4ZGpH6Rv7lJ5G3-xyiBk-JCIzvAnr21p0Q88nBAiB3KAhlIxBJeXFdtnXRAq03qpKOCCoVVRXj9nb-mcFQGfZYQE524YTazDQiCCYBcZRzZHc0GfcMBDJVNIRZ1Svd3hXLG7pj8eTefRllnxRtj4nGQO-MQIJoRqPaDiMuIh1BLVU"
     }
@@ -1290,10 +1524,16 @@ class MobileWalletTest {
     ) : WalletCredentialStore {
         val removedCredentialIds = mutableListOf<String>()
 
+        /** How often the wallet enumerated stored credentials, so tests can assert it never did. */
+        var streamCount = 0
+            private set
+
         override suspend fun getCredential(id: String): StoredCredential? = credentials.firstOrNull { it.id == id }
 
-        override suspend fun listCredentials(): Flow<StoredCredential> =
-            credentials.toList().asFlow()
+        override suspend fun listCredentials(): Flow<StoredCredential> {
+            streamCount++
+            return credentials.toList().asFlow()
+        }
 
         override suspend fun addCredential(entry: StoredCredential) =
             error("Recording credential store should not add credentials in this test")
