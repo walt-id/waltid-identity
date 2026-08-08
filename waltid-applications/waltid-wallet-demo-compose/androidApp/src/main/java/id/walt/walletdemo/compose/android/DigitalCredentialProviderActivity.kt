@@ -10,12 +10,11 @@ import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletAnnexCPreview
 import id.walt.wallet2.mobile.MobileWalletAnnexCRequest
 import id.walt.wallet2.mobile.MobileWalletAnnexCSubmission
-import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletDigitalCredentialProtocols
 import id.walt.wallet2.mobile.MobileWalletDigitalCredentialPreview
-import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialOption
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
+import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,9 +35,13 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
             runCatching {
                 val allowlist = assets.open("privileged_apps.json").bufferedReader().use { it.readText() }
                 val input = AndroidDigitalCredentialProvider.extract(intent, allowlist)
-                // No verifier trust anchors are configured: the wallet accepts only unsigned DC API
-                // requests, whose requester identity is the platform-asserted origin.
-                val wallet = MobileWalletFactory(applicationContext).create(config = MobileWalletConfig())
+                // The same construction MainActivity uses. Credential Manager launches this activity
+                // without the wallet UI having run, so configuring a wallet here independently would
+                // open a different database and apply a different transaction-data policy.
+                val wallet = createAndroidDemoMobileWallet(
+                    context = applicationContext,
+                    config = demoWalletConfig(),
+                ).wallet
                 wallet.bootstrap()
                 if (input.request.protocol == MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C) {
                     val data = Json.parseToJsonElement(input.request.dataJson).jsonObject
@@ -142,21 +145,9 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
         selections: List<MobileWalletPresentationCredentialSelection>,
         selectedOptions: List<MobileWalletPresentationCredentialOption>,
     ) {
-        val claimLines = selectedOptions.flatMap { option ->
-            option.disclosures.filter { it.required || !it.selectable }.map { disclosure ->
-                "${disclosure.name ?: disclosure.path}: ${disclosure.displayValue ?: disclosure.valueJson}"
-            }
-        }.distinct()
-        val credentialLines = selectedOptions.map(::credentialTitle).distinct()
-        val message = buildString {
-            append("Requester: ${preview.request.verifierMetadata?.display?.name ?: preview.verifiedOrigin}\n")
-            append("Protocol: ${preview.protocol}\n")
-            append("\nCredential${if (credentialLines.size == 1) "" else "s"}:\n${credentialLines.joinToString("\n")}\n")
-            if (claimLines.isNotEmpty()) append("\nData to share:\n${claimLines.joinToString("\n")}")
-        }
         AlertDialog.Builder(this)
             .setTitle("Share digital credential?")
-            .setMessage(message)
+            .setMessage(digitalCredentialConsentMessage(preview, selectedOptions))
             .setCancelable(false)
             .setNegativeButton("Cancel") { _, _ ->
                 AndroidDigitalCredentialProvider.setCancellation(resultIntent)

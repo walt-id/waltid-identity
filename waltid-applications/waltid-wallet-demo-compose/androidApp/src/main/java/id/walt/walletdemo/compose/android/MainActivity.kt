@@ -7,7 +7,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import id.walt.walletdemo.compose.logic.DemoWalletConfig
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.createAndroidDemoWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoPinStore
@@ -23,13 +22,7 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
 
-        val config = DemoWalletConfig(
-            attestationBaseUrl = BuildConfig.ATTESTATION_BASE_URL,
-            attestationAttesterPath = BuildConfig.ATTESTATION_ATTESTER_PATH,
-            attestationBearerToken = BuildConfig.ATTESTATION_BEARER_TOKEN,
-            attestationHostHeader = BuildConfig.ATTESTATION_HOST_HEADER,
-            transactionDataProfilesUrl = BuildConfig.TRANSACTION_DATA_PROFILES_URL,
-        )
+        val config = demoWalletConfig()
         controller = WalletDemoController(
             wallet = createAndroidDemoWallet(
                 context = applicationContext,

@@ -69,6 +69,9 @@ dependencies {
     implementation(identityLibs.kotlinx.coroutines.android)
     implementation(identityLibs.kotlinx.serialization.json)
 
+    testImplementation(kotlin("test-junit"))
+    testImplementation(identityLibs.junit)
+
     androidTestImplementation(identityLibs.androidx.test.ext.junit)
     androidTestImplementation(identityLibs.androidx.test.runner)
     androidTestImplementation(identityLibs.androidx.test.uiautomator)
