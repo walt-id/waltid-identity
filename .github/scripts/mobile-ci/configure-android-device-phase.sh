@@ -26,8 +26,10 @@ case "$phase" in
     # phase's playstore image is the only place they execute. A class omitted here therefore runs
     # nowhere, and because the report step does not surface skips, it reads as green rather than as
     # a gap - which is how three classes went unnoticed after being added.
+    #
+    # The browser-mediated classes are deliberately absent, not overlooked: they are blocked on a
+    # non-wallet deployment gap and live on the browser-test follow-up branch, which lists them here.
     dc_api_test_classes="id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest"
-    dc_api_test_classes+=",id.walt.walletdemo.compose.android.DigitalCredentialBrowserSharingE2ETest"
     script="ANDROID_TEST_CLASS=$dc_api_test_classes ./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
     emulator_options="-no-window -gpu auto -noaudio -no-boot-anim -camera-back none -memory 4096 -feature GLDirectMem,HasSharedSlotsHostMemoryAllocator"
     report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**/*.xml"
