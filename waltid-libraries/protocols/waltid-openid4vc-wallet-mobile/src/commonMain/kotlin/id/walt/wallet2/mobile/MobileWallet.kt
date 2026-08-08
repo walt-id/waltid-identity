@@ -535,6 +535,11 @@ public class MobileWallet internal constructor(
                 protocol = request.protocol,
                 data = Json.parseToJsonElement(request.dataJson).jsonObject,
                 origin = request.verifiedOrigin,
+                // An empty selection means "the platform restricted nothing" - iOS asserts no
+                // selection at all, and DCQL then matches over the whole store. It must never be
+                // reachable from a *malformed* platform selection, which would silently widen the
+                // candidate set; keeping that impossible is the platform adapter's job, and
+                // AndroidDigitalCredentialProvider refuses a selection it cannot resolve to entries.
                 eligibleCredentialIds = selectedCredentialIds.ifEmpty { null },
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
