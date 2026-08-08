@@ -14,7 +14,7 @@
 	<array>
 		<string>org.iso.18013.5.1.mDL</string>
 		<string>eu.europa.ec.eudi.pid.1</string>
-		<string>eu.europa.ec.eudi.photoid.1</string>
+		<string>org.iso.23220.photoid.1</string>
 	</array>
 </dict>
 </plist>

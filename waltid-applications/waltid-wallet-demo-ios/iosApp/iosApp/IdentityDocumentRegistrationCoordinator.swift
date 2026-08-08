@@ -10,10 +10,13 @@ enum IdentityDocumentSharedConfiguration {
     static let documentTypesKey = DigitalCredentialRegistrationStorage.documentTypesKey
     static let registryIDKey = DigitalCredentialRegistrationStorage.registryIDKey
     static let registrationIDsKey = "id.walt.wallet.identity-document-registration-ids"
+    // Must stay a subset of the mobile-document-types entitlement, which Apple provisions from a
+    // fixed list. "eu.europa.ec.eudi.photoid.1" is not on it; the photo ID doctype Apple recognises
+    // is "org.iso.23220.photoid.1", which is also the spelling the rest of this repo uses.
     static let supportedDocumentTypes: Set<String> = [
         "org.iso.18013.5.1.mDL",
         "eu.europa.ec.eudi.pid.1",
-        "eu.europa.ec.eudi.photoid.1",
+        "org.iso.23220.photoid.1",
     ]
 
     static var keychainAccessGroup: String? {
