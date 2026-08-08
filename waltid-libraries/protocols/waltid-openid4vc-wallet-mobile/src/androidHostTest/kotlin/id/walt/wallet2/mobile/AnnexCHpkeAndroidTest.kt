@@ -20,7 +20,7 @@ class AnnexCHpkeAndroidTest {
             info = info,
         )
         val decrypted = recipient.decryptHpke(
-            cipherTextWithEnc = encrypted.enc + encrypted.cipherText,
+            cipherTextWithEnc = encrypted.encapsulatedKey.toByteArray() + encrypted.ciphertext.toByteArray(),
             info = info,
             aad = null,
         )

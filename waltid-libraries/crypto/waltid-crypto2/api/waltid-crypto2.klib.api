@@ -2061,6 +2061,7 @@ final object id.walt.crypto2.hpke/Hpke { // id.walt.crypto2.hpke/Hpke|null[0]
 
     final suspend fun openBase(id.walt.crypto2.keys/Key, id.walt.crypto2.keys/HpkeCiphertext, kotlin/ByteArray = ..., kotlin/ByteArray = ..., dev.whyoleg.cryptography/CryptographyProvider = ...): kotlin/ByteArray // id.walt.crypto2.hpke/Hpke.openBase|openBase(id.walt.crypto2.keys.Key;id.walt.crypto2.keys.HpkeCiphertext;kotlin.ByteArray;kotlin.ByteArray;dev.whyoleg.cryptography.CryptographyProvider){}[0]
     final suspend fun sealBase(id.walt.crypto2.keys/EncodedKey.Jwk, kotlin/ByteArray, kotlin/ByteArray = ..., kotlin/ByteArray = ..., dev.whyoleg.cryptography/CryptographyProvider = ...): id.walt.crypto2.keys/HpkeCiphertext // id.walt.crypto2.hpke/Hpke.sealBase|sealBase(id.walt.crypto2.keys.EncodedKey.Jwk;kotlin.ByteArray;kotlin.ByteArray;kotlin.ByteArray;dev.whyoleg.cryptography.CryptographyProvider){}[0]
+    final suspend fun validateRecipientPublicKey(id.walt.crypto2.keys/EncodedKey.Jwk, dev.whyoleg.cryptography/CryptographyProvider = ...) // id.walt.crypto2.hpke/Hpke.validateRecipientPublicKey|validateRecipientPublicKey(id.walt.crypto2.keys.EncodedKey.Jwk;dev.whyoleg.cryptography.CryptographyProvider){}[0]
 }
 
 final object id.walt.crypto2.keys/KeySerializer : kotlinx.serialization/KSerializer<id.walt.crypto2.keys/Key> { // id.walt.crypto2.keys/KeySerializer|null[0]

@@ -9,30 +9,25 @@ import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toEncodedJwk
 import id.walt.cose.verifyDetached
-import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.hpke.Hpke
-import id.walt.crypto2.jose.Jwk
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.toStoredSoftwareKey
-import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.crypto2.keys.HpkeCiphertext
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
-import id.walt.mdoc.objects.dcapi.DCAPIHandover
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
-import id.walt.mdoc.objects.sha256
+import id.walt.mdoc.objects.handover.AnnexCDcapiHandoverInfo
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.handlers.PreviewSessionStore
 import id.waltid.openid4vp.wallet.DcApiWallet
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import id.walt.x509.CertificateDer
-import id.walt.x509.crypto2PublicJwk
+import id.walt.x509.crypto2VerificationKey
 import id.walt.x509.verifyOrderedCertificateChainSignatures
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
@@ -48,13 +43,6 @@ import kotlinx.serialization.json.jsonObject
 
 @Serializable
 @CborObjectAsArray
-private data class AnnexCDcApiInfo(
-    val encryptionInfoBase64Url: String,
-    val serializedOrigin: String,
-)
-
-@Serializable
-@CborObjectAsArray
 private data class AnnexCEncryptedResponse(
     val type: String,
     val response: AnnexCEncryptedResponseData,
@@ -64,11 +52,6 @@ private data class AnnexCEncryptedResponse(
 private data class AnnexCEncryptedResponseData(
     @ByteString val enc: ByteArray,
     @ByteString val cipherText: ByteArray,
-)
-
-internal data class AnnexCHpkeCiphertext(
-    val enc: ByteArray,
-    val cipherText: ByteArray,
 )
 
 /**
@@ -82,17 +65,11 @@ internal suspend fun encryptAnnexCHpke(
     recipientPublicKey: CoseKey,
     plaintext: ByteArray,
     info: ByteArray,
-): AnnexCHpkeCiphertext {
-    val sealed = Hpke.sealBase(
-        recipientPublicKey = recipientPublicKey.toEncodedJwk(),
-        plaintext = plaintext,
-        info = info,
-    )
-    return AnnexCHpkeCiphertext(
-        enc = sealed.encapsulatedKey.toByteArray(),
-        cipherText = sealed.ciphertext.toByteArray(),
-    )
-}
+): HpkeCiphertext = Hpke.sealBase(
+    recipientPublicKey = recipientPublicKey.toEncodedJwk(),
+    plaintext = plaintext,
+    info = info,
+)
 
 internal class MobileWalletAnnexCEngine(
     private val wallet: Wallet,
@@ -119,7 +96,7 @@ internal class MobileWalletAnnexCEngine(
                 "Parsed and raw Annex C requests are inconsistent"
             }
         }
-        request.encryptionInfoBase64Url?.let(::decodeAndValidateEncryptionInfo)
+        request.encryptionInfoBase64Url?.let { decodeAndValidateEncryptionInfo(it) }
         require((request.deviceRequestBase64Url == null) == (request.encryptionInfoBase64Url == null)) {
             "Raw Annex C deviceRequest and encryptionInfo must be supplied together"
         }
@@ -145,7 +122,10 @@ internal class MobileWalletAnnexCEngine(
         } else {
             verifyReaderAuthentication(
                 deviceRequest = rawRequest,
-                transcript = buildSessionTranscript(requireNotNull(request.encryptionInfoBase64Url), origin),
+                transcript = AnnexCDcapiHandoverInfo.sessionTranscript(
+                    base64EncryptionInfo = requireNotNull(request.encryptionInfoBase64Url),
+                    origin = origin,
+                ),
             )
         }
         val requestId = retainedRequests.create(
@@ -180,7 +160,10 @@ internal class MobileWalletAnnexCEngine(
                 "Parsed and raw Annex C requests are inconsistent"
             }
             val encryptionInfo = decodeAndValidateEncryptionInfo(submission.encryptionInfoBase64Url)
-            val transcript = buildSessionTranscript(submission.encryptionInfoBase64Url, origin)
+            val transcript = AnnexCDcapiHandoverInfo.sessionTranscript(
+                base64EncryptionInfo = submission.encryptionInfoBase64Url,
+                origin = origin,
+            )
             verifyReaderAuthentication(deviceRequest, transcript)
 
             val selectionsByQuery = submission.selectedCredentialOptions.associateBy { it.queryId }
@@ -226,7 +209,10 @@ internal class MobileWalletAnnexCEngine(
                 AnnexCEncryptedResponse.serializer(),
                 AnnexCEncryptedResponse(
                     type = "dcapi",
-                    response = AnnexCEncryptedResponseData(ciphertext.enc, ciphertext.cipherText),
+                    response = AnnexCEncryptedResponseData(
+                        enc = ciphertext.encapsulatedKey.toByteArray(),
+                        cipherText = ciphertext.ciphertext.toByteArray(),
+                    ),
                 ),
             ).encodeToBase64Url()
             MobileWalletDigitalCredentialResponse(
@@ -244,27 +230,20 @@ internal class MobileWalletAnnexCEngine(
             require(request.docRequests.isNotEmpty()) { "Annex C DeviceRequest has no document requests" }
         }
 
-    private fun decodeAndValidateEncryptionInfo(base64Url: String): DCAPIEncryptionInfo =
+    /**
+     * Decodes `encryptionInfo` and rejects a recipient key the response could never be sealed to.
+     *
+     * The key-shape rules are crypto2's, so the wallet cannot drift from what [Hpke.sealBase] will
+     * accept; the check runs here rather than at submission because a reader that sent unusable
+     * encryption metadata must not reach the consent dialog.
+     */
+    private suspend fun decodeAndValidateEncryptionInfo(base64Url: String): DCAPIEncryptionInfo =
         coseCompliantCbor.decodeFromByteArray(
             DCAPIEncryptionInfo.serializer(),
             base64Url.decodeFromBase64Url(),
         ).also { info ->
-            val key = info.encryptionParameters.recipientPublicKey
-            require(key.kty == Cose.KeyTypes.EC2 && key.crv == Cose.EllipticCurves.P_256) {
-                "Annex C HPKE currently requires a P-256 recipient key"
-            }
-            require(key.x?.size == 32 && key.y?.size == 32 && key.d == null) {
-                "Annex C encryptionInfo contains an invalid recipient public key"
-            }
+            Hpke.validateRecipientPublicKey(info.encryptionParameters.recipientPublicKey.toEncodedJwk())
         }
-
-    private fun buildSessionTranscript(encryptionInfoBase64Url: String, origin: String): SessionTranscript {
-        val infoHash = coseCompliantCbor.encodeToByteArray(
-            AnnexCDcApiInfo.serializer(),
-            AnnexCDcApiInfo(encryptionInfoBase64Url, origin),
-        ).sha256()
-        return SessionTranscript.forDcApi(DCAPIHandover(DCAPIHandover.HandoverType.dcapi, infoHash))
-    }
 
     private suspend fun verifyReaderAuthentication(
         deviceRequest: DeviceRequest,
@@ -294,16 +273,9 @@ internal class MobileWalletAnnexCEngine(
             ) {
                 "Annex C reader authentication signatures use different certificate chains"
             }
-            val readerPublicJwk = CertificateDer(chain.first()).crypto2PublicJwk()
-            val readerKey = crypto2Runtime.restore(
-                readerPublicJwk.toStoredSoftwareKey(
-                    KeyId(Jwk.sha256Thumbprint(readerPublicJwk)),
-                    setOf(KeyUsage.VERIFY),
-                )
-            )
             require(
                 signature.verifyDetached(
-                    key = readerKey,
+                    key = CertificateDer(chain.first()).crypto2VerificationKey(),
                     detachedPayload = detachedPayload,
                     allowedAlgorithms = READER_AUTHENTICATION_COSE_ALGORITHMS,
                 )
@@ -415,8 +387,6 @@ internal class MobileWalletAnnexCEngine(
         (this as? JsonPrimitive)?.contentOrNull ?: toString()
 
     private companion object {
-        private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
-
         /**
          * COSE algorithms accepted for ISO 18013-5 reader authentication.
          *
