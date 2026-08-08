@@ -190,7 +190,7 @@ final enum class id.walt.wallet2.mobile/MobileWalletPresentationErrorCode : kotl
 }
 
 abstract fun interface id.walt.wallet2.mobile/MobileWalletReaderTrustEvaluator { // id.walt.wallet2.mobile/MobileWalletReaderTrustEvaluator|null[0]
-    abstract suspend fun evaluate(kotlin.collections/List<kotlin/ByteArray>): id.walt.wallet2.mobile/MobileWalletReaderTrust // id.walt.wallet2.mobile/MobileWalletReaderTrustEvaluator.evaluate|evaluate(kotlin.collections.List<kotlin.ByteArray>){}[0]
+    abstract suspend fun evaluate(kotlin.collections/List<kotlin/ByteArray>): id.walt.wallet2.mobile/MobileWalletReaderTrustDecision // id.walt.wallet2.mobile/MobileWalletReaderTrustEvaluator.evaluate|evaluate(kotlin.collections.List<kotlin.ByteArray>){}[0]
 }
 
 abstract interface id.walt.wallet2.mobile.swiftinterop/WalletBridgeCredentialStore { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeCredentialStore|null[0]
@@ -370,7 +370,7 @@ sealed interface id.walt.wallet2.mobile/MobileWalletPresentationResult { // id.w
 }
 
 sealed interface id.walt.wallet2.mobile/MobileWalletReaderTrust { // id.walt.wallet2.mobile/MobileWalletReaderTrust|null[0]
-    final class Trusted : id.walt.wallet2.mobile/MobileWalletReaderTrust { // id.walt.wallet2.mobile/MobileWalletReaderTrust.Trusted|null[0]
+    final class Trusted : id.walt.wallet2.mobile/MobileWalletReaderTrustDecision { // id.walt.wallet2.mobile/MobileWalletReaderTrust.Trusted|null[0]
         constructor <init>(kotlin/String) // id.walt.wallet2.mobile/MobileWalletReaderTrust.Trusted.<init>|<init>(kotlin.String){}[0]
 
         final val certificateSubject // id.walt.wallet2.mobile/MobileWalletReaderTrust.Trusted.certificateSubject|{}certificateSubject[0]
@@ -383,17 +383,17 @@ sealed interface id.walt.wallet2.mobile/MobileWalletReaderTrust { // id.walt.wal
         final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletReaderTrust.Trusted.toString|toString(){}[0]
     }
 
-    final class Unverified : id.walt.wallet2.mobile/MobileWalletReaderTrust { // id.walt.wallet2.mobile/MobileWalletReaderTrust.Unverified|null[0]
-        constructor <init>(kotlin/String) // id.walt.wallet2.mobile/MobileWalletReaderTrust.Unverified.<init>|<init>(kotlin.String){}[0]
+    final class Untrusted : id.walt.wallet2.mobile/MobileWalletReaderTrustDecision { // id.walt.wallet2.mobile/MobileWalletReaderTrust.Untrusted|null[0]
+        constructor <init>(kotlin/String) // id.walt.wallet2.mobile/MobileWalletReaderTrust.Untrusted.<init>|<init>(kotlin.String){}[0]
 
-        final val reason // id.walt.wallet2.mobile/MobileWalletReaderTrust.Unverified.reason|{}reason[0]
-            final fun <get-reason>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletReaderTrust.Unverified.reason.<get-reason>|<get-reason>(){}[0]
+        final val reason // id.walt.wallet2.mobile/MobileWalletReaderTrust.Untrusted.reason|{}reason[0]
+            final fun <get-reason>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletReaderTrust.Untrusted.reason.<get-reason>|<get-reason>(){}[0]
 
-        final fun component1(): kotlin/String // id.walt.wallet2.mobile/MobileWalletReaderTrust.Unverified.component1|component1(){}[0]
-        final fun copy(kotlin/String = ...): id.walt.wallet2.mobile/MobileWalletReaderTrust.Unverified // id.walt.wallet2.mobile/MobileWalletReaderTrust.Unverified.copy|copy(kotlin.String){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletReaderTrust.Unverified.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletReaderTrust.Unverified.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletReaderTrust.Unverified.toString|toString(){}[0]
+        final fun component1(): kotlin/String // id.walt.wallet2.mobile/MobileWalletReaderTrust.Untrusted.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): id.walt.wallet2.mobile/MobileWalletReaderTrust.Untrusted // id.walt.wallet2.mobile/MobileWalletReaderTrust.Untrusted.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletReaderTrust.Untrusted.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletReaderTrust.Untrusted.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletReaderTrust.Untrusted.toString|toString(){}[0]
     }
 
     final object NotApplicable : id.walt.wallet2.mobile/MobileWalletReaderTrust { // id.walt.wallet2.mobile/MobileWalletReaderTrust.NotApplicable|null[0]
@@ -401,7 +401,21 @@ sealed interface id.walt.wallet2.mobile/MobileWalletReaderTrust { // id.walt.wal
         final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletReaderTrust.NotApplicable.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletReaderTrust.NotApplicable.toString|toString(){}[0]
     }
+
+    final object NotAuthenticated : id.walt.wallet2.mobile/MobileWalletReaderTrust { // id.walt.wallet2.mobile/MobileWalletReaderTrust.NotAuthenticated|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletReaderTrust.NotAuthenticated.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletReaderTrust.NotAuthenticated.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletReaderTrust.NotAuthenticated.toString|toString(){}[0]
+    }
+
+    final object PendingRawRequest : id.walt.wallet2.mobile/MobileWalletReaderTrust { // id.walt.wallet2.mobile/MobileWalletReaderTrust.PendingRawRequest|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletReaderTrust.PendingRawRequest.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletReaderTrust.PendingRawRequest.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletReaderTrust.PendingRawRequest.toString|toString(){}[0]
+    }
 }
+
+sealed interface id.walt.wallet2.mobile/MobileWalletReaderTrustDecision : id.walt.wallet2.mobile/MobileWalletReaderTrust // id.walt.wallet2.mobile/MobileWalletReaderTrustDecision|null[0]
 
 sealed interface id.walt.wallet2.mobile/MobileWalletResponseEncryption { // id.walt.wallet2.mobile/MobileWalletResponseEncryption|null[0]
     abstract val contentEncryptionAlgorithm // id.walt.wallet2.mobile/MobileWalletResponseEncryption.contentEncryptionAlgorithm|{}contentEncryptionAlgorithm[0]
@@ -1532,5 +1546,5 @@ final object id.walt.wallet2.mobile/UnavailableMobileWalletCredentialRegistry : 
 }
 
 final object id.walt.wallet2.mobile/UnconfiguredMobileWalletReaderTrustEvaluator : id.walt.wallet2.mobile/MobileWalletReaderTrustEvaluator { // id.walt.wallet2.mobile/UnconfiguredMobileWalletReaderTrustEvaluator|null[0]
-    final suspend fun evaluate(kotlin.collections/List<kotlin/ByteArray>): id.walt.wallet2.mobile/MobileWalletReaderTrust // id.walt.wallet2.mobile/UnconfiguredMobileWalletReaderTrustEvaluator.evaluate|evaluate(kotlin.collections.List<kotlin.ByteArray>){}[0]
+    final suspend fun evaluate(kotlin.collections/List<kotlin/ByteArray>): id.walt.wallet2.mobile/MobileWalletReaderTrustDecision // id.walt.wallet2.mobile/UnconfiguredMobileWalletReaderTrustEvaluator.evaluate|evaluate(kotlin.collections.List<kotlin.ByteArray>){}[0]
 }

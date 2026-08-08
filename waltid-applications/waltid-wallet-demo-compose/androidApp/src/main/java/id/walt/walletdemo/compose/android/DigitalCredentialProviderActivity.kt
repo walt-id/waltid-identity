@@ -95,7 +95,10 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
     ) {
         val trust = when (val value = preview.readerTrust) {
             is id.walt.wallet2.mobile.MobileWalletReaderTrust.Trusted -> "Trusted reader: ${value.certificateSubject}"
-            is id.walt.wallet2.mobile.MobileWalletReaderTrust.Unverified -> "Unverified reader: ${value.reason}"
+            is id.walt.wallet2.mobile.MobileWalletReaderTrust.Untrusted -> "Reader not recognized: ${value.reason}"
+            id.walt.wallet2.mobile.MobileWalletReaderTrust.NotAuthenticated -> "Reader did not identify itself"
+            id.walt.wallet2.mobile.MobileWalletReaderTrust.PendingRawRequest ->
+                "Reader identity is checked when the response is built"
             id.walt.wallet2.mobile.MobileWalletReaderTrust.NotApplicable -> "Reader trust not applicable"
         }
         val claimLines = selectedOptions.flatMap { option ->

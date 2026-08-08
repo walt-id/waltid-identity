@@ -69,7 +69,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
-import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import id.walt.crypto2.keys.Key as ManagedKeyMaterial
@@ -950,11 +949,133 @@ class MobileWalletTest {
         }
     }
 
+    /**
+     * The four non-trusted reader states must stay distinguishable, and none of them may be produced
+     * by a signature that failed to verify.
+     *
+     * The last case is the one that matters most: on Apple's deferred path the preview cannot check
+     * the signature at all, so consent is granted while the reader is still unauthenticated. A bad
+     * signature arriving with the raw request must reject the submission rather than be reported as
+     * a trust state the user already accepted.
+     */
+    @OptIn(ExperimentalEncodingApi::class)
+    @Test
+    fun annexCDistinguishesReaderTrustStatesAndRejectsBadSignaturesAfterConsent() = runTest {
+        val origin = "https://verifier.example"
+        val namespace = "org.iso.18013.5.1"
+        val docType = "org.iso.18013.5.1.mDL"
+        val signedRequest = DeviceRequest.decodeFromBase64Url(SIGNED_READER_REQUEST)
+        val signature = requireNotNull(signedRequest.docRequests.single().readerAuth)
+        val holderSigner = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("holder-key"),
+                spec = KeySpec.Edwards(EdwardsCurve.ED25519),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        // No readerTrustEvaluator: this exercises the default policy, which must never report Trusted.
+        val wallet = MobileWallet(
+            walletId = "annex-c-reader-trust-states-wallet",
+            keyStore = PreloadedKeyStore(
+                WalletKeyInfo(keyId = holderSigner.id.value, keyType = "Ed25519"),
+                managedKey = holderSigner,
+            ),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = RecordingCredentialStore(
+                StoredCredential(
+                    id = "mdl-1",
+                    credential = MdocsCredential(
+                        credentialData = buildJsonObject {
+                            put(namespace, buildJsonObject { put("given_name", "Ada") })
+                        },
+                        signed = MdocsExamples.mdocsExampleBase64Url,
+                        docType = docType,
+                    ),
+                    label = "mDL",
+                )
+            ),
+            generateAndPersistKey = { error("Reader-trust previews must not generate keys") },
+        )
+        val parsedRequest = wallet.parseAnnexCDeviceRequest(signedRequest.encodeToBase64Url())
+
+        // A verified signature with no configured trust policy: untrusted, and truthfully so.
+        val verified = wallet.previewAnnexCPresentation(
+            MobileWalletAnnexCRequest(
+                parsedRequest = parsedRequest,
+                verifiedOrigin = origin,
+                deviceRequestBase64Url = SIGNED_READER_REQUEST,
+                encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+            )
+        )
+        val untrusted = assertIs<MobileWalletReaderTrust.Untrusted>(verified.readerTrust)
+        assertTrue(
+            untrusted.reason.contains("no reader trust policy is configured"),
+            "The default evaluator must say why the reader is untrusted, not imply a rejected policy: " +
+                untrusted.reason,
+        )
+
+        // A request carrying no reader authentication at all: anonymous, not merely unverified.
+        val unauthenticated = DeviceRequest(
+            docType = docType,
+            requestedElements = mapOf(namespace to listOf("given_name")),
+        )
+        assertEquals(
+            MobileWalletReaderTrust.NotAuthenticated,
+            wallet.previewAnnexCPresentation(
+                MobileWalletAnnexCRequest(
+                    parsedRequest = wallet.parseAnnexCDeviceRequest(unauthenticated.encodeToBase64Url()),
+                    verifiedOrigin = origin,
+                    deviceRequestBase64Url = unauthenticated.encodeToBase64Url(),
+                    encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+                )
+            ).readerTrust,
+        )
+
+        // Apple's pre-consent shape: the raw request is withheld, so nothing has been checked yet.
+        val deferred = wallet.previewAnnexCPresentation(
+            MobileWalletAnnexCRequest(parsedRequest = parsedRequest, verifiedOrigin = origin)
+        )
+        assertEquals(MobileWalletReaderTrust.PendingRawRequest, deferred.readerTrust)
+
+        val tamperedRequest = signedRequest.copy(
+            docRequests = listOf(
+                signedRequest.docRequests.single().copy(
+                    readerAuth = signature.copy(
+                        signature = signature.signature.copyOf().also { bytes ->
+                            bytes[0] = (bytes[0].toInt() xor 1).toByte()
+                        }
+                    )
+                )
+            ),
+        )
+        val rejection = assertFailsWith<IllegalArgumentException> {
+            wallet.submitAnnexCPresentation(
+                MobileWalletAnnexCSubmission(
+                    requestId = deferred.requestId,
+                    verifiedOrigin = origin,
+                    deviceRequestBase64Url = tamperedRequest.encodeToBase64Url(),
+                    encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+                    selectedCredentialOptions = deferred.credentialOptions.map {
+                        MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
+                    },
+                )
+            )
+        }
+        // The submission must fail on the signature, not on some earlier structural check that would
+        // make this test pass without proving anything about reader authentication.
+        assertTrue(
+            rejection.message?.contains("signature") == true,
+            "Expected a reader-authentication signature rejection, got: ${rejection.message}",
+        )
+    }
+
     @Test
     fun capabilityModelsFailClosedByDefault() = runTest {
         assertFalse(UnavailableMobileWalletCredentialRegistry.capabilities.platformAvailable)
         assertFalse(UnavailableMobileWalletCredentialRegistry.capabilities.registrationAvailable)
-        assertIs<MobileWalletReaderTrust.Unverified>(
+        // Untrusted, not Trusted: a wallet with no configured policy has no basis for identifying a
+        // reader, however valid its signature.
+        assertIs<MobileWalletReaderTrust.Untrusted>(
             UnconfiguredMobileWalletReaderTrustEvaluator.evaluate(emptyList())
         )
     }

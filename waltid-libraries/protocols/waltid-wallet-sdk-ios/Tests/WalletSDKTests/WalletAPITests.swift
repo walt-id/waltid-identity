@@ -524,7 +524,7 @@ final class WalletAPITests: XCTestCase {
             verifiedOrigin: "https://verifier.example",
             parsedRequest: parsed,
             credentialOptions: [],
-            readerTrust: .unverified(reason: "raw request unavailable before consent")
+            readerTrust: .pendingRawRequest
         )
         bridge.digitalCredentialResponseResult = .init(protocolIdentifier: "org-iso-mdoc", dataJSON: #"{"response":"ciphertext"}"#)
         let wallet = Wallet(bridge: bridge)
@@ -803,7 +803,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         verifiedOrigin: "https://verifier.example",
         parsedRequest: .init(documents: []),
         credentialOptions: [],
-        readerTrust: .unverified(reason: "not configured")
+        readerTrust: .untrusted(reason: "not configured")
     )
     var digitalCredentialResponseResult = DigitalCredentialResponse(protocolIdentifier: "org-iso-mdoc", dataJSON: "{}")
     private(set) var bootstrapCalls: [BootstrapCall] = []

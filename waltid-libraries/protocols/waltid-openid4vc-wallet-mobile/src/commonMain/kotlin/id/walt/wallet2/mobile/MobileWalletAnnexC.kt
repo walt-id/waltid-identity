@@ -118,7 +118,7 @@ internal class MobileWalletAnnexCEngine(
             }
         }
         val readerTrust = if (rawRequest == null) {
-            MobileWalletReaderTrust.Unverified("Raw reader authentication is only available after user consent")
+            MobileWalletReaderTrust.PendingRawRequest
         } else {
             verifyReaderAuthentication(
                 deviceRequest = rawRequest,
@@ -164,6 +164,10 @@ internal class MobileWalletAnnexCEngine(
                 base64EncryptionInfo = submission.encryptionInfoBase64Url,
                 origin = origin,
             )
+            // For its rejection, not its verdict: the trust state informed the consent the user has
+            // already given, but a signature that does not verify must stop the response here. This
+            // is the only point where Apple's raw request is available, so it is the only point
+            // where a deferred reader signature can be checked at all.
             verifyReaderAuthentication(deviceRequest, transcript)
 
             val selectionsByQuery = submission.selectedCredentialOptions.associateBy { it.queryId }
@@ -245,6 +249,16 @@ internal class MobileWalletAnnexCEngine(
             Hpke.validateRecipientPublicKey(info.encryptionParameters.recipientPublicKey.toEncodedJwk())
         }
 
+    /**
+     * Verifies reader authentication if the request carries any, then asks the application's trust
+     * policy whether the verified reader is one it recognises.
+     *
+     * Reader authentication is optional in Annex C, so its absence is reported as
+     * [MobileWalletReaderTrust.NotAuthenticated] and the request stays processable - an anonymous
+     * reader is a reader the user can still decline. A signature that is *present but does not
+     * verify* is different in kind: it means the request was tampered with or replayed, so every
+     * such case throws and the request never reaches consent or a response.
+     */
     private suspend fun verifyReaderAuthentication(
         deviceRequest: DeviceRequest,
         transcript: SessionTranscript,
@@ -252,7 +266,7 @@ internal class MobileWalletAnnexCEngine(
         val authenticatedRequests = deviceRequest.docRequests.filter { it.readerAuth != null }
         val readerAuthAll = deviceRequest.readerAuthAll.orEmpty()
         if (authenticatedRequests.isEmpty() && readerAuthAll.isEmpty()) {
-            return MobileWalletReaderTrust.Unverified("The Annex C request contains no reader authentication")
+            return MobileWalletReaderTrust.NotAuthenticated
         }
         require(readerAuthAll.isNotEmpty() || authenticatedRequests.size == deviceRequest.docRequests.size) {
             "Mixed authenticated and unauthenticated Annex C document requests are rejected"

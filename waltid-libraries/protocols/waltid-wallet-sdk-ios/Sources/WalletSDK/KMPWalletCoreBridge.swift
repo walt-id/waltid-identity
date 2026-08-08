@@ -767,9 +767,13 @@ private extension MobileWalletAnnexCPreview {
 private extension MobileWalletReaderTrust {
     func toSwiftReaderTrust() -> ReaderTrust {
         if self is MobileWalletReaderTrustNotApplicable { return .notApplicable }
-        if let value = self as? MobileWalletReaderTrustUnverified { return .unverified(reason: value.reason) }
+        if self is MobileWalletReaderTrustNotAuthenticated { return .notAuthenticated }
+        if self is MobileWalletReaderTrustPendingRawRequest { return .pendingRawRequest }
+        if let value = self as? MobileWalletReaderTrustUntrusted { return .untrusted(reason: value.reason) }
         if let value = self as? MobileWalletReaderTrustTrusted { return .trusted(certificateSubject: value.certificateSubject) }
-        return .unverified(reason: "Unknown reader trust state")
+        // A state this SDK build does not know about cannot be reported as identifying the reader,
+        // and the reason string says so rather than implying a rejected trust policy.
+        return .untrusted(reason: "Unrecognized reader trust state")
     }
 }
 

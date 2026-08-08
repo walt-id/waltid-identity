@@ -111,12 +111,27 @@ public struct AnnexCDocumentRequest: Equatable, Sendable {
 }
 
 /// Reader-authentication trust result for an Annex C presentation request.
+///
+/// Only ``trusted`` means the reader was identified, and it requires both a valid signature and an
+/// accepting application trust policy. A request whose reader authentication fails cryptographic
+/// verification produces no result at all - it is rejected - so every case here describes a request
+/// that is still processable, differing in why the reader is not identified.
 public enum ReaderTrust: Equatable, Sendable {
-    /// Reader authentication does not apply to this request.
+    /// The protocol carries no reader authentication, as with the OpenID4VP Digital Credentials API.
     case notApplicable
-    /// Reader authentication could not be verified.
-    case unverified(reason: String)
-    /// Reader authentication was verified against the configured trust policy.
+    /// The request supports reader authentication but carried none, so the reader is anonymous.
+    case notAuthenticated
+    /// Not checked yet: IdentityDocumentServices withholds the raw request until the user consents.
+    ///
+    /// The signature is verified at submission, before any credential data is released, but that is
+    /// too late for a consent dialog to name the reader.
+    case pendingRawRequest
+    /// The signature is cryptographically valid, but no application trust policy accepts the reader.
+    ///
+    /// Not a verification failure. It means the wallet has no basis for telling the user who the
+    /// reader is, which is also what a wallet with no configured trust policy always reports.
+    case untrusted(reason: String)
+    /// Reader authentication is cryptographically valid and an application trust policy accepted it.
     case trusted(certificateSubject: String)
 }
 
