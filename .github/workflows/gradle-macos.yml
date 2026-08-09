@@ -10,6 +10,11 @@ on:
         required: false
         default: ''
 
+# The gradle-ios pin is a commit on this branch, not on main: a workflow consumes a composite action
+# at the pinned SHA, so an edit to the action's own file has no effect on this PR's CI until the pin
+# points at the commit carrying it. Without this, the provider verification steps would be added and
+# never executed, and a green run would say nothing about them. Retarget the pin at the merged SHA
+# when this lands.
 env:
   XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
   IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=latest
@@ -30,7 +35,7 @@ jobs:
 
       - name: Compile iOS targets and run Kotlin iOS simulator tests
         timeout-minutes: 40
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@e308a1bfcc0c4b23d92155d90284113dbcad96a5
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
@@ -60,7 +65,7 @@ jobs:
         # Same XCFramework cost as the Compose job; this one already used 29 of its previous 35 min,
         # so a cold cache left no margin.
         timeout-minutes: 65
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@e308a1bfcc0c4b23d92155d90284113dbcad96a5
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
@@ -69,6 +74,7 @@ jobs:
           run-ios-simulator-tests: 'false'
           run-wallet-core-xcframework: 'true'
           run-native-demo-tests: 'true'
+          run-native-identity-document-provider-checks: 'true'
           run-compose-demo-tests: 'false'
           test-report-job-name: ${{ env.JOB_NAME_PREFIX }}wallet-core-native-ios-demo-tests
           test-report-check-name: Native iOS Demo Test Report
@@ -90,7 +96,7 @@ jobs:
         # Assembling WalletCore costs ~27 min on a cold Konan cache and the demo's own tests ~11 min,
         # so the previous 40 min was below the job's actual work now that it needs the XCFramework.
         timeout-minutes: 65
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@e308a1bfcc0c4b23d92155d90284113dbcad96a5
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
@@ -102,6 +108,7 @@ jobs:
           run-wallet-core-xcframework: 'true'
           run-native-demo-tests: 'false'
           run-compose-demo-tests: 'true'
+          run-compose-identity-document-provider-checks: 'true'
           test-report-job-name: ${{ env.JOB_NAME_PREFIX }}compose-ios-demo-tests
           test-report-check-name: Compose iOS Demo Test Report
           test-report-require-tests: 'false'
