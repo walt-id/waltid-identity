@@ -20,26 +20,35 @@ import id.walt.walletdemo.compose.logic.ClaimItem
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialOption
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
-import id.walt.walletdemo.compose.logic.WalletDemoPresentationPreview
+import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.logic.toRequestedDisclosureGroup
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
+/**
+ * The wallet's single presentation-review surface, shared by every transport that can ask for a
+ * credential.
+ *
+ * @param review What the user is being asked to share, already mapped off the transport's preview.
+ * @param onReject Sends a protocol-level refusal to the requester. Pass null for transports with no
+ * such message - the platform Digital Credentials APIs return a cancellation instead, and offering
+ * both a Reject and a Cancel button there would promise the requester gets told two different things.
+ */
 @Composable
-internal fun PresentationReviewSection(
-    preview: WalletDemoPresentationPreview,
+internal fun SharingReviewSection(
+    review: WalletDemoSharingReview,
     selectedCredentialOptions: Set<WalletDemoPresentationCredentialSelection>,
     selectedDisclosureOptions: Set<WalletDemoPresentationDisclosureSelection>,
     selectionComplete: Boolean,
     enabled: Boolean,
-    readOnly: Boolean = false,
     onToggleCredential: (WalletDemoPresentationCredentialSelection) -> Unit,
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
     onCredentialClick: (String) -> Unit,
     onSubmit: () -> Unit,
-    onReject: () -> Unit,
     onCancel: () -> Unit,
+    onReject: (() -> Unit)? = null,
+    readOnly: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -48,7 +57,7 @@ internal fun PresentationReviewSection(
             .testTag(WalletUiTestTags.PresentationReview),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        VerifierReviewSections(preview)
+        SharingRequestSections(review.request)
 
         Text(
             "Select credentials to share",
@@ -56,7 +65,7 @@ internal fun PresentationReviewSection(
             fontWeight = FontWeight.SemiBold,
         )
 
-        preview.credentialOptions.forEach { option ->
+        review.credentialOptions.forEach { option ->
             val details = option.toCredentialDetails()
             val credentialDisplay = details.toCardDisplayData()
             val requestedDisclosureItems = option.toRequestedDisclosureGroup()?.items.orEmpty()
@@ -94,7 +103,7 @@ internal fun PresentationReviewSection(
                     onClick = { onCredentialClick(details.summary.id) },
                 )
                 if (option.disclosures.isNotEmpty()) {
-                    PresentationDisclosureList(
+                    SharingDisclosureList(
                         option = option,
                         credentialSelected = option.selection in selectedCredentialOptions,
                         selectedDisclosureOptions = selectedDisclosureOptions,
@@ -109,19 +118,19 @@ internal fun PresentationReviewSection(
         }
 
         if (!readOnly) {
-            ReviewActionsRow(
+            SharingActionsRow(
                 enabled = enabled,
                 selectionComplete = selectionComplete,
                 onSubmit = onSubmit,
-                onReject = onReject,
                 onCancel = onCancel,
+                onReject = onReject,
             )
         }
     }
 }
 
 @Composable
-private fun PresentationDisclosureList(
+private fun SharingDisclosureList(
     option: WalletDemoPresentationCredentialOption,
     credentialSelected: Boolean,
     selectedDisclosureOptions: Set<WalletDemoPresentationDisclosureSelection>,
@@ -188,12 +197,12 @@ private fun PresentationDisclosureList(
 }
 
 @Composable
-private fun ReviewActionsRow(
+private fun SharingActionsRow(
     enabled: Boolean,
     selectionComplete: Boolean,
     onSubmit: () -> Unit,
-    onReject: () -> Unit,
     onCancel: () -> Unit,
+    onReject: (() -> Unit)?,
 ) {
     Row(
         modifier = Modifier.testTag(WalletUiTestTags.PresentationActions),
@@ -206,19 +215,21 @@ private fun ReviewActionsRow(
         ) {
             Text("Share")
         }
-        TextButton(
-            onClick = onReject,
-            enabled = enabled,
-            modifier = Modifier.testTag(WalletUiTestTags.PresentationRejectButton),
-        ) {
-            Text("Reject")
+        onReject?.let { reject ->
+            TextButton(
+                onClick = reject,
+                enabled = enabled,
+                modifier = Modifier.testTag(WalletUiTestTags.PresentationRejectButton),
+            ) {
+                Text("Reject")
+            }
         }
         TextButton(
             onClick = onCancel,
             enabled = enabled,
             modifier = Modifier.testTag(WalletUiTestTags.PresentationCancelButton),
         ) {
-            Text("Cancel review")
+            Text(if (onReject == null) "Cancel" else "Cancel review")
         }
     }
 }
