@@ -1,4 +1,5 @@
 import SwiftUI
+import WalletDemoSharingUI
 
 @main
 struct WalletDemoApp: App {

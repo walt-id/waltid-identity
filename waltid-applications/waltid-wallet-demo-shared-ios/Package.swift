@@ -2,9 +2,10 @@
 
 import PackageDescription
 
-// Provider orchestration shared by the native and Compose demo IdentityDocument extensions. It is
+// Provider orchestration and sharing-review UI shared by the native and Compose demos. It is
 // deliberately not a public walt.id framework: it exists so the two demos cannot drift apart in the
-// parts that decide whether the platform sees them as one wallet.
+// parts that decide whether the platform sees them as one wallet, nor in what the user is shown
+// before credential data leaves the device.
 let package = Package(
     name: "WalletDemoIdentityDocumentSupport",
     platforms: [
@@ -15,14 +16,28 @@ let package = Package(
             name: "WalletDemoIdentityDocumentSupport",
             targets: ["WalletDemoIdentityDocumentSupport"]
         ),
+        // Split out so a demo app can render the sharing review without linking the provider
+        // orchestration, and so the UI target cannot reach for IdentityDocumentServices: the review
+        // renders a value model, and every Apple request object stays on the provider side.
+        .library(
+            name: "WalletDemoSharingUI",
+            targets: ["WalletDemoSharingUI"]
+        ),
     ],
     dependencies: [
         .package(path: "../../waltid-libraries/protocols/waltid-wallet-sdk-ios"),
     ],
     targets: [
         .target(
+            name: "WalletDemoSharingUI",
+            dependencies: [
+                .product(name: "WalletSDK", package: "waltid-wallet-sdk-ios"),
+            ]
+        ),
+        .target(
             name: "WalletDemoIdentityDocumentSupport",
             dependencies: [
+                "WalletDemoSharingUI",
                 .product(name: "WalletSDK", package: "waltid-wallet-sdk-ios"),
             ]
         ),

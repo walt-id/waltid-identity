@@ -1,10 +1,14 @@
 import SwiftUI
 import UIKit
 
-struct ClaimValueRow: View {
-    let item: ClaimItem
+public struct ClaimValueRow: View {
+    public let item: ClaimItem
 
-    var body: some View {
+    public init(item: ClaimItem) {
+        self.item = item
+    }
+
+    public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(item.label)
                 .font(.caption.weight(.semibold))

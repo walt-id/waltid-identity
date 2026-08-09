@@ -1,5 +1,6 @@
 import Foundation
 import WalletDemoIdentityDocumentSupport
+import WalletDemoSharingUI
 import WalletSDK
 
 enum WalletTab: Hashable {
@@ -157,8 +158,21 @@ class WalletViewModel: ObservableObject {
         !isLoading && presentationReview != nil && !presentationCompleted
     }
 
+    /// The review the shared SwiftUI surface renders for a ready OpenID4VP preview.
+    var presentationSharingReview: SharingReviewModel? {
+        presentationPreview?.sharingReview()
+    }
+
+    /// Credentials and disclosures the user has chosen so far.
+    var presentationSharingSelection: SharingSelection {
+        SharingSelection(
+            credentials: selectedPresentationCredentialOptions,
+            disclosures: selectedPresentationDisclosureOptions
+        )
+    }
+
     var presentationCredentialSelectionComplete: Bool {
-        presentationPreview?.hasCompleteCredentialSelection(selectedPresentationCredentialOptions) == true
+        presentationSharingReview?.hasCompleteCredentialSelection(selectedPresentationCredentialOptions) == true
     }
 
     func statusMessage(for tab: WalletTab) -> String {
@@ -710,7 +724,7 @@ class WalletViewModel: ObservableObject {
                 newPreviewHandle = nil
                 switch result {
                 case .ready(let preview):
-                    selectedPresentationCredentialOptions = preview.defaultCredentialSelection()
+                    selectedPresentationCredentialOptions = preview.sharingReview().defaultCredentialSelection()
                     selectedPresentationDisclosureOptions = []
                     setSuccess(WalletStatusText.reviewPresentationRequest, tab: .present)
                 case .invalid:
@@ -733,46 +747,18 @@ class WalletViewModel: ObservableObject {
     }
 
     func togglePresentationCredential(_ selection: PresentationCredentialSelection) {
-        let wasSelected = selectedPresentationCredentialOptions.contains(selection)
-        let option = presentationPreview?
-            .credentialOptions
-            .first { $0.selection == selection }
-
-        if wasSelected {
-            selectedPresentationCredentialOptions.remove(selection)
-        } else {
-            if option?.multiple != true {
-                selectedPresentationCredentialOptions = Set(
-                    selectedPresentationCredentialOptions.filter { $0.queryID != selection.queryID }
-                )
-            }
-            selectedPresentationCredentialOptions.insert(selection)
-        }
-
-        let retainedDisclosures: Set<PresentationDisclosureSelection>
-        if option?.multiple == true {
-            retainedDisclosures = Set(
-                selectedPresentationDisclosureOptions.filter {
-                    $0.queryID != selection.queryID || $0.credentialID != selection.credentialID
-                }
-            )
-        } else {
-            retainedDisclosures = Set(
-                selectedPresentationDisclosureOptions.filter { $0.queryID != selection.queryID }
-            )
-        }
-        selectedPresentationDisclosureOptions = retainedDisclosures
-            .forSelectedCredentials(selectedPresentationCredentialOptions)
+        guard let review = presentationSharingReview else { return }
+        apply(review.toggling(credential: selection, in: presentationSharingSelection))
     }
 
     func togglePresentationDisclosure(_ selection: PresentationDisclosureSelection) {
-        if selectedPresentationDisclosureOptions.contains(selection) {
-            selectedPresentationDisclosureOptions.remove(selection)
-        } else {
-            selectedPresentationDisclosureOptions.insert(selection)
-        }
-        selectedPresentationDisclosureOptions = selectedPresentationDisclosureOptions
-            .forSelectedCredentials(selectedPresentationCredentialOptions)
+        guard let review = presentationSharingReview else { return }
+        apply(review.toggling(disclosure: selection, in: presentationSharingSelection))
+    }
+
+    private func apply(_ selection: SharingSelection) {
+        selectedPresentationCredentialOptions = selection.credentials
+        selectedPresentationDisclosureOptions = selection.disclosures
     }
 
     func submitPresentation() {
@@ -1105,65 +1091,6 @@ private extension PresentationPreviewResult {
         switch self {
         case .ready(let preview): preview.previewHandle
         case .invalid(let error): error.previewHandle
-        }
-    }
-}
-
-private extension PresentationPreview {
-    func hasCompleteCredentialSelection(_ selectedCredentialOptions: Set<PresentationCredentialSelection>) -> Bool {
-        let optionBySelection = Dictionary(uniqueKeysWithValues: credentialOptions.map { ($0.selection, $0) })
-        let selectedOptions = selectedCredentialOptions.compactMap { optionBySelection[$0] }
-        guard !selectedOptions.isEmpty else { return false }
-        let selectedCountsByQueryID = Dictionary(grouping: selectedOptions, by: \.queryID).mapValues(\.count)
-        guard !selectedOptions.contains(where: { option in
-            (selectedCountsByQueryID[option.queryID] ?? 0) > 1 && !option.multiple
-        }) else {
-            return false
-        }
-
-        let selectedQueryIDs = Set(selectedOptions.map(\.queryID))
-        if credentialRequirements.isEmpty { return true }
-        return credentialRequirements.allSatisfy { requirement in
-            requirement.options.contains { option in
-                !option.isEmpty && option.allSatisfy { selectedQueryIDs.contains($0) }
-            }
-        }
-    }
-
-    func defaultCredentialSelection() -> Set<PresentationCredentialSelection> {
-        var firstSelectionByQueryID: [String: PresentationCredentialSelection] = [:]
-        var orderedQueryIDs: [String] = []
-        for option in credentialOptions where firstSelectionByQueryID[option.queryID] == nil {
-            firstSelectionByQueryID[option.queryID] = option.selection
-            orderedQueryIDs.append(option.queryID)
-        }
-        guard let firstQueryID = orderedQueryIDs.first else { return [] }
-        if credentialRequirements.isEmpty {
-            return Set([firstSelectionByQueryID[firstQueryID]].compactMap { $0 })
-        }
-
-        var selectedQueryIDs: [String] = []
-        for requirement in credentialRequirements {
-            let queryIDs = requirement.options.first { option in
-                !option.isEmpty && option.allSatisfy { firstSelectionByQueryID[$0] != nil }
-            } ?? requirement.options.first?.filter { firstSelectionByQueryID[$0] != nil }
-            for queryID in queryIDs ?? [] where !selectedQueryIDs.contains(queryID) {
-                selectedQueryIDs.append(queryID)
-            }
-        }
-        return Set(selectedQueryIDs.compactMap { firstSelectionByQueryID[$0] })
-    }
-}
-
-private extension Set where Element == PresentationDisclosureSelection {
-    func forSelectedCredentials(
-        _ selectedCredentialOptions: Set<PresentationCredentialSelection>
-    ) -> Set<PresentationDisclosureSelection> {
-        return filter {
-            let disclosure = $0
-            return selectedCredentialOptions.contains {
-                $0.queryID == disclosure.queryID && $0.credentialID == disclosure.credentialID
-            }
         }
     }
 }

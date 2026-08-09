@@ -1,9 +1,9 @@
 import Foundation
 import WalletSDK
 
-enum CredentialDisplayNormalizer {
+public enum CredentialDisplayNormalizer {
 
-    static func details(for credential: Credential) -> CredentialDetails {
+    public static func details(for credential: Credential) -> CredentialDetails {
         var result = details(
             id: credential.id,
             title: credential.label ?? credential.format,
@@ -25,7 +25,7 @@ enum CredentialDisplayNormalizer {
         )
     }
 
-    static func details(for option: PresentationCredentialOption) -> CredentialDetails {
+    public static func details(for option: PresentationCredentialOption) -> CredentialDetails {
         let parsed = details(
             id: option.selection.id,
             title: option.label ?? option.format,
@@ -64,11 +64,11 @@ enum CredentialDisplayNormalizer {
         )
     }
 
-    static func transactionDataGroups(for request: PresentationRequestInfo) -> [ClaimGroup] {
+    public static func transactionDataGroups(for request: PresentationRequestInfo) -> [ClaimGroup] {
         transactionDataGroups(for: request.transactionData)
     }
 
-    static func transactionDataGroups(for transactionData: [PresentationTransactionData]) -> [ClaimGroup] {
+    public static func transactionDataGroups(for transactionData: [PresentationTransactionData]) -> [ClaimGroup] {
         let baseTitles = transactionData.map { item in
             item.displayName.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
                 ?? CredentialDisplayVocabulary.transactionDataTitle
@@ -122,7 +122,7 @@ enum CredentialDisplayNormalizer {
         }
     }
 
-    static func details(
+    public static func details(
         id: String,
         title: String,
         issuer: String?,
@@ -575,12 +575,12 @@ private extension ClaimItem {
     }
 }
 
-struct CredentialDisplayJSONMember {
-    let key: String
-    let value: CredentialDisplayJSONValue
+public struct CredentialDisplayJSONMember {
+    public let key: String
+    public let value: CredentialDisplayJSONValue
 }
 
-enum CredentialDisplayJSONValue {
+public enum CredentialDisplayJSONValue {
     case object([CredentialDisplayJSONMember])
     case array([CredentialDisplayJSONValue])
     case string(String)
@@ -588,7 +588,7 @@ enum CredentialDisplayJSONValue {
     case bool(Bool)
     case null
 
-    var rawJSON: String {
+    public var rawJSON: String {
         switch self {
         case .object(let members):
             let body = members
@@ -609,8 +609,8 @@ enum CredentialDisplayJSONValue {
     }
 }
 
-enum CredentialDisplayJSONParser {
-    static func parse(_ rawJSON: String) -> CredentialDisplayJSONValue? {
+public enum CredentialDisplayJSONParser {
+    public static func parse(_ rawJSON: String) -> CredentialDisplayJSONValue? {
         var parser = Parser(rawJSON)
         return try? parser.parse()
     }

@@ -1,13 +1,13 @@
 import SwiftUI
 import WalletSDK
 
-struct ReviewMetadataSection<Content: View>: View {
-    let title: String
-    let titleAccessibilityIdentifier: String?
-    let contentInsets: EdgeInsets
-    let content: Content
+public struct ReviewMetadataSection<Content: View>: View {
+    public let title: String
+    public let titleAccessibilityIdentifier: String?
+    public let contentInsets: EdgeInsets
+    public let content: Content
 
-    init(
+    public init(
         title: String,
         titleAccessibilityIdentifier: String? = nil,
         contentInsets: EdgeInsets = EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16),
@@ -19,7 +19,7 @@ struct ReviewMetadataSection<Content: View>: View {
         self.content = content()
     }
 
-    var body: some View {
+    public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             titleView
 
@@ -46,13 +46,13 @@ struct ReviewMetadataSection<Content: View>: View {
     }
 }
 
-struct MetadataDisclosure<Content: View>: View {
-    let title: String
-    let accessibilityIdentifier: String?
-    let content: Content
+public struct MetadataDisclosure<Content: View>: View {
+    public let title: String
+    public let accessibilityIdentifier: String?
+    public let content: Content
     @State private var isExpanded: Bool
 
-    init(
+    public init(
         title: String,
         initiallyExpanded: Bool,
         accessibilityIdentifier: String? = nil,
@@ -64,7 +64,7 @@ struct MetadataDisclosure<Content: View>: View {
         _isExpanded = State(initialValue: initiallyExpanded)
     }
 
-    var body: some View {
+    public var body: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
             content.padding(.top, 4)
         } label: {
@@ -83,10 +83,16 @@ struct MetadataDisclosure<Content: View>: View {
     }
 }
 
-struct MetadataIdentityView: View {
-    let display: MetadataDisplay?
-    let fallbackName: String
-    let supportingText: String?
+public struct MetadataIdentityView: View {
+    public let display: MetadataDisplay?
+    public let fallbackName: String
+    public let supportingText: String?
+
+    public init(display: MetadataDisplay?, fallbackName: String, supportingText: String?) {
+        self.display = display
+        self.fallbackName = fallbackName
+        self.supportingText = supportingText
+    }
 
     private var name: String {
         guard let displayName = display?.name?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -105,7 +111,7 @@ struct MetadataIdentityView: View {
         return url
     }
 
-    var body: some View {
+    public var body: some View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
@@ -154,31 +160,35 @@ private struct MetadataLogoFallback: View {
     }
 }
 
-struct MetadataDetailItem {
-    let label: String
-    let value: String?
-    let linkURI: String?
+public struct MetadataDetailItem {
+    public let label: String
+    public let value: String?
+    public let linkURI: String?
 
-    init(label: String, value: String?, linkURI: String? = nil) {
+    public init(label: String, value: String?, linkURI: String? = nil) {
         self.label = label
         self.value = value
         self.linkURI = linkURI
     }
 
-    var isVisible: Bool {
+    public var isVisible: Bool {
         guard let value else { return false }
         return !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 
-struct MetadataDetailList: View {
-    let items: [MetadataDetailItem]
+public struct MetadataDetailList: View {
+    public let items: [MetadataDetailItem]
+
+    public init(items: [MetadataDetailItem]) {
+        self.items = items
+    }
 
     private var visibleItems: [MetadataDetailItem] {
         items.filter(\.isVisible)
     }
 
-    var body: some View {
+    public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(Array(visibleItems.enumerated()), id: \.offset) { index, item in
                 if index > 0 {
