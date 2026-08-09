@@ -22,6 +22,10 @@
 		C0DE00000000000000001024 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001014 /* WalletDemoIdentityDocumentSupport */; };
 		C0DE00000000000000001041 /* IdentityDocumentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000001033 /* IdentityDocumentProvider.swift */; };
 		C0DE00000000000000001042 /* IdentityDocumentProvider.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000001032 /* IdentityDocumentProvider.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C0DE00000000000000001111 /* CrossProcessWalletTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000001101 /* CrossProcessWalletTests.swift */; };
+		C0DE00000000000000001112 /* CrossProcessWalletAssertions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000001102 /* CrossProcessWalletAssertions.swift */; };
+		C0DE00000000000000001113 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001141 /* WalletSDK */; };
+		C0DE00000000000000001114 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001142 /* WalletDemoIdentityDocumentSupport */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -53,6 +57,13 @@
 			remoteGlobalIDString = C0DE00000000000000001051;
 			remoteInfo = IdentityDocumentProvider;
 		};
+		C0DE00000000000000001162 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B33B17DE2C2C394F001A32F7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B33B17E52C2C394F001A32F7;
+			remoteInfo = iosApp;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -72,6 +83,9 @@
 		C0DE00000000000000001033 /* IdentityDocumentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityDocumentProvider.swift; sourceTree = "<group>"; };
 		C0DE00000000000000001034 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C0DE00000000000000001035 /* IdentityDocumentProvider.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IdentityDocumentProvider.entitlements; sourceTree = "<group>"; };
+		C0DE00000000000000001101 /* CrossProcessWalletTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossProcessWalletTests.swift; sourceTree = "<group>"; };
+		C0DE00000000000000001102 /* CrossProcessWalletAssertions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossProcessWalletAssertions.swift; sourceTree = "<group>"; };
+		C0DE00000000000000001103 /* iosAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -101,6 +115,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C0DE00000000000000001133 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C0DE00000000000000001113 /* WalletSDK in Frameworks */,
+				C0DE00000000000000001114 /* WalletDemoIdentityDocumentSupport in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -110,6 +133,8 @@
 				B33B17E82C2C394F001A32F7 /* iosApp */,
 				C0DE00000000000000001036 /* IdentityDocumentProvider */,
 				C0DE00000000000000000401 /* iosAppUITests */,
+				C0DE00000000000000001104 /* iosAppTests */,
+				C0DE00000000000000001105 /* ../../mobile-e2e-fixtures/ios/IdentityDocumentTests */,
 				B33B17E72C2C394F001A32F7 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -120,6 +145,7 @@
 				B33B17E62C2C394F001A32F7 /* iosApp.app */,
 				C0DE00000000000000001032 /* IdentityDocumentProvider.appex */,
 				C0DE00000000000000000004 /* iosAppUITests.xctest */,
+				C0DE00000000000000001103 /* iosAppTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -156,6 +182,22 @@
 				C0DE00000000000000000008 /* DemoBackend.swift */,
 			);
 			path = iosAppUITests;
+			sourceTree = "<group>";
+		};
+		C0DE00000000000000001104 /* iosAppTests */ = {
+			isa = PBXGroup;
+			children = (
+				C0DE00000000000000001101 /* CrossProcessWalletTests.swift */,
+			);
+			path = iosAppTests;
+			sourceTree = "<group>";
+		};
+		C0DE00000000000000001105 /* ../../mobile-e2e-fixtures/ios/IdentityDocumentTests */ = {
+			isa = PBXGroup;
+			children = (
+				C0DE00000000000000001102 /* CrossProcessWalletAssertions.swift */,
+			);
+			path = "../../mobile-e2e-fixtures/ios/IdentityDocumentTests";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -224,6 +266,27 @@
 			productReference = C0DE00000000000000000004 /* iosAppUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		C0DE00000000000000001151 /* iosAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C0DE00000000000000001121 /* Build configuration list for PBXNativeTarget "iosAppTests" */;
+			buildPhases = (
+				C0DE00000000000000001132 /* Sources */,
+				C0DE00000000000000001133 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C0DE00000000000000001161 /* PBXTargetDependency */,
+			);
+			name = iosAppTests;
+			packageProductDependencies = (
+				C0DE00000000000000001141 /* WalletSDK */,
+				C0DE00000000000000001142 /* WalletDemoIdentityDocumentSupport */,
+			);
+			productName = iosAppTests;
+			productReference = C0DE00000000000000001103 /* iosAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -243,6 +306,10 @@
 					};
 					C0DE00000000000000001051 = {
 						CreatedOnToolsVersion = 26.5;
+					};
+					C0DE00000000000000001151 = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = B33B17E52C2C394F001A32F7;
 					};
 				};
 			};
@@ -267,6 +334,7 @@
 				B33B17E52C2C394F001A32F7 /* iosApp */,
 				C0DE00000000000000001051 /* IdentityDocumentProvider */,
 				C0DE00000000000000000501 /* iosAppUITests */,
+				C0DE00000000000000001151 /* iosAppTests */,
 			);
 		};
 /* End PBXProject section */
@@ -341,6 +409,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C0DE00000000000000001132 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C0DE00000000000000001111 /* CrossProcessWalletTests.swift in Sources */,
+				C0DE00000000000000001112 /* CrossProcessWalletAssertions.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -353,6 +430,11 @@
 			isa = PBXTargetDependency;
 			target = C0DE00000000000000001051 /* IdentityDocumentProvider */;
 			targetProxy = C0DE00000000000000001072 /* PBXContainerItemProxy */;
+		};
+		C0DE00000000000000001161 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B33B17E52C2C394F001A32F7 /* iosApp */;
+			targetProxy = C0DE00000000000000001162 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -618,6 +700,48 @@
 			};
 			name = Release;
 		};
+		C0DE00000000000000001122 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PLATFORM_DIR)/Developer/Library/Frameworks",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.walletdemo.compose.iosTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/iosApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/iosApp";
+			};
+			name = Debug;
+		};
+		C0DE00000000000000001123 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PLATFORM_DIR)/Developer/Library/Frameworks",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.walletdemo.compose.iosTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/iosApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/iosApp";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -653,6 +777,15 @@
 			buildConfigurations = (
 				C0DE00000000000000000801 /* Debug */,
 				C0DE00000000000000000802 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C0DE00000000000000001121 /* Build configuration list for PBXNativeTarget "iosAppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0DE00000000000000001122 /* Debug */,
+				C0DE00000000000000001123 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -695,6 +828,16 @@
 			productName = WalletSDK;
 		};
 		C0DE00000000000000001014 /* WalletDemoIdentityDocumentSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C0DE00000000000000001002 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */;
+			productName = WalletDemoIdentityDocumentSupport;
+		};
+		C0DE00000000000000001141 /* WalletSDK */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C0DE00000000000000001001 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */;
+			productName = WalletSDK;
+		};
+		C0DE00000000000000001142 /* WalletDemoIdentityDocumentSupport */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C0DE00000000000000001002 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */;
 			productName = WalletDemoIdentityDocumentSupport;
