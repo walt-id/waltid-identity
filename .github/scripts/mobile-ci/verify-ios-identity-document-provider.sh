@@ -58,6 +58,9 @@ cd "$project_dir"
 
 # Build the extension on its own first so a provider that cannot compile against IdentityDocumentServices
 # or WalletSDK is reported as an extension failure rather than as a host-app failure.
+#
+# The build settings expand through the `[@]+` form because macOS ships bash 3.2, where `"${array[@]}"`
+# on an empty array is an unbound-variable error under `set -u` - the Compose demo passes none.
 for scheme in IdentityDocumentProvider iosApp; do
   echo "==> Building scheme $scheme in $project_dir"
   xcodebuild build \
@@ -66,7 +69,7 @@ for scheme in IdentityDocumentProvider iosApp; do
     -destination "$destination" \
     -derivedDataPath "$derived_data" \
     -quiet \
-    "${build_settings[@]}"
+    ${build_settings[@]+"${build_settings[@]}"}
 done
 
 products="$derived_data/Build/Products/Debug-iphonesimulator"
