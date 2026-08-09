@@ -91,6 +91,62 @@ final class AnnexCPresentationModelTests: XCTestCase {
     }
 
     @MainActor
+    func testSharingHandsThePlatformTheSealedBytesBuiltFromTheRawRequestAndTheChosenCredentials() async {
+        let context = StubRequestContext(rawRequest: Self.rawRequestJSON)
+        let wallet = StubWallet(
+            preview: Self.preview(documentTypes: ["org.iso.18013.5.1.mDL", "eu.europa.ec.eudi.pid.1"]),
+            responseJSON: #"{"response":"-_--An8"}"#
+        )
+        let model = AnnexCPresentationModel(context: context, makeWallet: { wallet })
+        await model.prepare()
+
+        await model.submit()
+
+        XCTAssertNil(model.failure)
+        XCTAssertEqual(context.sendResponseCount, 1, "The raw request may be requested exactly once")
+        guard let submitted = wallet.submitted else {
+            return XCTFail("The platform released the raw request but the wallet was never asked to seal a response")
+        }
+        // The request ID and origin come from stage 1's retained preview, not from the raw request:
+        // that is what binds the sealed response to the request the user actually consented to.
+        XCTAssertEqual(submitted.requestID, "request-1")
+        XCTAssertEqual(submitted.verifiedOrigin, "https://reader.example")
+        XCTAssertEqual(submitted.deviceRequestBase64URL, "ZGV2aWNlLXJlcXVlc3QtYnl0ZXM")
+        XCTAssertEqual(submitted.encryptionInfoBase64URL, "ZW5jcnlwdGlvbi1pbmZvLWJ5dGVz")
+        XCTAssertEqual(
+            submitted.selectedCredentialOptions.map(\.queryID),
+            ["annexC.0", "annexC.1"],
+            "Documents have to be submitted in the order the request listed them, not in the selection's order"
+        )
+        XCTAssertEqual(submitted.selectedCredentialOptions.map(\.credentialID), ["cred-mdl", "cred-1"])
+        XCTAssertEqual(
+            context.sentResponse,
+            Data([0xfb, 0xff, 0xbe, 0x02, 0x7f]),
+            "Apple gets the decoded sealed bytes, not the wallet's base64url envelope"
+        )
+    }
+
+    @MainActor
+    func testAFailedSealLeavesTheRequestAnsweredNowhereAndTheReviewUsableAgain() async {
+        let context = StubRequestContext(rawRequest: Self.rawRequestJSON)
+        let wallet = StubWallet(
+            preview: Self.preview(documentTypes: ["org.iso.18013.5.1.mDL"]),
+            submitFailure: StubWalletFailure()
+        )
+        let model = AnnexCPresentationModel(context: context, makeWallet: { wallet })
+        await model.prepare()
+
+        await model.submit()
+
+        XCTAssertEqual(model.failure, StubWalletFailure().localizedDescription)
+        XCTAssertNil(context.sentResponse, "A wallet that could not seal a response must not hand the platform any bytes")
+        XCTAssertFalse(
+            model.isSubmitting,
+            "Staying in the submitting state would leave the user with a spinner and no way to retry or cancel"
+        )
+    }
+
+    @MainActor
     func testAMissingVerifiedOriginFailsTheRequestRatherThanReviewingAnAnonymousCaller() async {
         let model = AnnexCPresentationModel(
             context: StubRequestContext(verifiedOrigin: nil),
@@ -105,16 +161,26 @@ final class AnnexCPresentationModelTests: XCTestCase {
 
     // MARK: - Stubs
 
+    /// Stands in for Apple's context, and for the platform's half of the two-stage flow.
+    ///
+    /// ``sendResponse(_:)`` runs the closure with `rawRequest` and keeps what it returned, because the
+    /// wallet only sees the `DeviceRequest` and `EncryptionInfo` inside that closure - counting the
+    /// calls alone would leave the whole path from released request to sealed bytes unexercised.
     private final class StubRequestContext: AnnexCRequestContext, @unchecked Sendable {
         private let origin: URL?
+        private let rawRequest: Data?
         private let lock = NSLock()
         private var counts = (cancel: 0, sendResponse: 0)
+        private var response: Data?
 
         var cancelCount: Int { lock.withLock { counts.cancel } }
         var sendResponseCount: Int { lock.withLock { counts.sendResponse } }
+        /// Bytes the model handed back, or `nil` if it never produced any.
+        var sentResponse: Data? { lock.withLock { response } }
 
-        init(verifiedOrigin: URL? = URL(string: "https://reader.example")) {
+        init(verifiedOrigin: URL? = URL(string: "https://reader.example"), rawRequest: Data? = nil) {
             origin = verifiedOrigin
+            self.rawRequest = rawRequest
         }
 
         var requestSnapshot: MobileDocumentRequestSnapshot {
@@ -142,11 +208,45 @@ final class AnnexCPresentationModelTests: XCTestCase {
             _ build: @escaping @Sendable @concurrent (RawAnnexCRequest) async throws -> Data
         ) async throws {
             lock.withLock { counts.sendResponse += 1 }
+            guard let rawRequest else { return }
+            let sealed = try await build(RawAnnexCRequest(data: rawRequest))
+            lock.withLock { response = sealed }
         }
     }
 
-    private struct StubWallet: AnnexCPresentationWallet {
-        let preview: AnnexCPresentationPreview
+    /// The wallet's failure, distinguishable in an assertion from any error the orchestration invents.
+    private struct StubWalletFailure: LocalizedError {
+        var errorDescription: String? { "Stub wallet refused to seal a response" }
+    }
+
+    /// Everything the wallet was asked to seal, kept so stage 2's arguments can be asserted exactly.
+    private struct SubmittedPresentation: Sendable {
+        let requestID: String
+        let verifiedOrigin: String
+        let deviceRequestBase64URL: String
+        let encryptionInfoBase64URL: String
+        let selectedCredentialOptions: [PresentationCredentialSelection]
+    }
+
+    private final class StubWallet: AnnexCPresentationWallet, @unchecked Sendable {
+        private let preview: AnnexCPresentationPreview
+        private let responseJSON: String
+        private let submitFailure: (any Error)?
+        private let lock = NSLock()
+        private var recorded: SubmittedPresentation?
+
+        /// Stage 2's arguments, or `nil` if the wallet was never asked to seal anything.
+        var submitted: SubmittedPresentation? { lock.withLock { recorded } }
+
+        init(
+            preview: AnnexCPresentationPreview,
+            responseJSON: String = "{}",
+            submitFailure: (any Error)? = nil
+        ) {
+            self.preview = preview
+            self.responseJSON = responseJSON
+            self.submitFailure = submitFailure
+        }
 
         func previewAnnexCPresentation(
             parsedRequest: AnnexCParsedRequest,
@@ -163,9 +263,27 @@ final class AnnexCPresentationModelTests: XCTestCase {
             encryptionInfoBase64URL: String,
             selectedCredentialOptions: [PresentationCredentialSelection]
         ) async throws -> DigitalCredentialResponse {
-            DigitalCredentialResponse(protocolIdentifier: "org-iso-mdoc", dataJSON: "{}")
+            lock.withLock {
+                recorded = SubmittedPresentation(
+                    requestID: requestID,
+                    verifiedOrigin: verifiedOrigin,
+                    deviceRequestBase64URL: deviceRequestBase64URL,
+                    encryptionInfoBase64URL: encryptionInfoBase64URL,
+                    selectedCredentialOptions: selectedCredentialOptions
+                )
+            }
+            if let submitFailure { throw submitFailure }
+            return DigitalCredentialResponse(protocolIdentifier: "org-iso-mdoc", dataJSON: responseJSON)
         }
     }
+
+    /// What the platform releases after consent: base64url `DeviceRequest` and `DCAPIEncryptionInfo`.
+    private static let rawRequestJSON = Data(#"""
+    {
+      "deviceRequest": "ZGV2aWNlLXJlcXVlc3QtYnl0ZXM",
+      "encryptionInfo": "ZW5jcnlwdGlvbi1pbmZvLWJ5dGVz"
+    }
+    """#.utf8)
 
     private static func preview(
         documentTypes: [String],
