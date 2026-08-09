@@ -32,37 +32,6 @@ object DemoTestBackend {
     private const val ISSUER_BASE_URL = "https://issuer2.demo.walt.id"
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
 
-    /**
-     * A second, independently deployed verifier2 - the one the portal's DC API page is wired to.
-     *
-     * Present so a test can hold the wallet, the issuer and the credential fixed and vary only the
-     * verifier build. See [DcApiDeployment].
-     */
-    const val PORTAL_VERIFIER_BASE_URL = "https://verifier2.portal.test.waltid.cloud"
-
-    /**
-     * The two deployed spellings of the DC API session-create payload.
-     *
-     * The same OpenAPI example title (`[openid4vp-dc_api][iso mdl] unsigned & unencrypted`) is served
-     * with incompatible request shapes by the two live verifier2 builds, and each rejects the other's
-     * with HTTP 400 `Failed to convert request body`:
-     *
-     * - [DEMO] - `verifier2.demo.walt.id` (`0.23.0`), and what this branch's
-     *   `DcApiAnnexDFlowSetup` serializes.
-     * - [PORTAL] - `verifier2.portal.test.waltid.cloud` (`1.0.2608051216-feat-portal2-dcapi`).
-     *
-     * This is modelled as an explicit choice rather than a try-both fallback so that a test names the
-     * shape it expects: a deployment that changes spelling should fail a test, not be absorbed.
-     */
-    enum class DcApiDeployment(
-        val verifierBaseUrl: String,
-        internal val flowType: String,
-        internal val coreKey: String,
-    ) {
-        DEMO(VERIFIER_BASE_URL, flowType = "dc_api", coreKey = "core"),
-        PORTAL(PORTAL_VERIFIER_BASE_URL, flowType = "dc_api_openid4vp", coreKey = "core_flow"),
-    }
-
     const val TRANSACTION_DATA_PROFILES_URL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
     private const val EUDI_PID_SD_JWT_VCT = "$ISSUER_BASE_URL/openid4vci/urn:eudi:pid:1"
     private const val PAYMENT_AUTHORIZATION_TYPE = "org.waltid.transaction-data.payment-authorization"
@@ -302,11 +271,9 @@ object DemoTestBackend {
     suspend fun createDcApiVerifierSession(
         scenario: CredentialScenario,
         expectedOrigins: List<String>,
-        deployment: DcApiDeployment = DcApiDeployment.DEMO,
     ): DcApiVerifierSession = createDcApiVerifierSession(
         credentialQueries = listOf(scenario.verifierCredentialQuery),
         expectedOrigins = expectedOrigins,
-        deployment = deployment,
     )
 
     /**
@@ -324,17 +291,15 @@ object DemoTestBackend {
         expectedOrigins: List<String>,
         encryptedResponse: Boolean = false,
         transactionData: List<JsonObject> = emptyList(),
-        deployment: DcApiDeployment = DcApiDeployment.DEMO,
     ): DcApiVerifierSession {
         require(expectedOrigins.isNotEmpty()) { "DC API sessions require at least one expected origin" }
         require(credentialQueries.isNotEmpty()) { "DC API sessions require at least one DCQL credential query" }
 
         val payload = buildJsonObject {
             // "dc_api" is the @SerialName of DcApiAnnexDFlowSetup; unlike cross_device this flow
-            // spells its core config "core", and it takes no url_config. The deployed portal build
-            // spells both differently - see DcApiDeployment.
-            put("flow_type", deployment.flowType)
-            putJsonObject(deployment.coreKey) {
+            // spells its core config "core", and it takes no url_config.
+            put("flow_type", "dc_api")
+            putJsonObject("core") {
                 putJsonObject("dcql_query") {
                     putJsonArray("credentials") {
                         credentialQueries.forEach { add(it) }
@@ -357,15 +322,15 @@ object DemoTestBackend {
         }
 
         val response = requestJson(
-            url = "${deployment.verifierBaseUrl}/verification-session/create",
+            url = "$VERIFIER_BASE_URL/verification-session/create",
             body = payload,
         )
         val sessionId = response["sessionId"]?.jsonPrimitive?.contentOrNull
-            ?: error("Missing sessionId in verifier2 DC API response from ${deployment.verifierBaseUrl}: $response")
+            ?: error("Missing sessionId in public demo verifier2 DC API response: $response")
 
         return DcApiVerifierSession(
             sessionId = sessionId,
-            requestJson = dcApiRequestJson(sessionId, deployment),
+            requestJson = dcApiRequestJson(sessionId),
         )
     }
 
@@ -374,11 +339,8 @@ object DemoTestBackend {
      * would pass to `navigator.credentials.get({ digital: ... })`, and what Credential Manager
      * expects as its request JSON.
      */
-    private suspend fun dcApiRequestJson(
-        sessionId: String,
-        deployment: DcApiDeployment = DcApiDeployment.DEMO,
-    ): String {
-        val response = client.get("${deployment.verifierBaseUrl}/verification-session/$sessionId/request") {
+    private suspend fun dcApiRequestJson(sessionId: String): String {
+        val response = client.get("$VERIFIER_BASE_URL/verification-session/$sessionId/request") {
             accept(ContentType.Application.Json)
         }
         val body = response.bodyAsText()
@@ -391,12 +353,8 @@ object DemoTestBackend {
     }
 
     /** Posts a wallet's `{protocol, data}` DC API response to the verifier for real verification. */
-    suspend fun submitDcApiResponse(
-        sessionId: String,
-        responseJson: String,
-        deployment: DcApiDeployment = DcApiDeployment.DEMO,
-    ): String {
-        val response = client.post("${deployment.verifierBaseUrl}/verification-session/$sessionId/response") {
+    suspend fun submitDcApiResponse(sessionId: String, responseJson: String): String {
+        val response = client.post("$VERIFIER_BASE_URL/verification-session/$sessionId/response") {
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             accept(ContentType.Application.Json)
             setBody(responseJson)
@@ -439,11 +397,8 @@ object DemoTestBackend {
         putProfileField(fields, "payee", "ACME Corp")
     }
 
-    suspend fun verifierSessionInfo(
-        sessionId: String,
-        deployment: DcApiDeployment = DcApiDeployment.DEMO,
-    ): JsonObject {
-        val response = client.get("${deployment.verifierBaseUrl}/verification-session/$sessionId/info") {
+    suspend fun verifierSessionInfo(sessionId: String): JsonObject {
+        val response = client.get("$VERIFIER_BASE_URL/verification-session/$sessionId/info") {
             accept(ContentType.Application.Json)
         }
         val body = response.bodyAsText()
