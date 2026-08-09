@@ -1,8 +1,11 @@
 import SwiftUI
+import WalletDemoIdentityDocumentSupport
 import sharedUI
 
 @main
 struct ComposeWalletDemoApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+
     private let walletId: String
     private let attestationBaseUrl: String
     private let attestationAttesterPath: String
@@ -29,13 +32,36 @@ struct ComposeWalletDemoApp: App {
                 attestationAttesterPath: attestationAttesterPath,
                 attestationBearerToken: attestationBearerToken,
                 attestationHostHeader: attestationHostHeader,
-                transactionDataProfilesUrl: transactionDataProfilesUrl
+                transactionDataProfilesUrl: transactionDataProfilesUrl,
+                appGroupIdentifier: Self.namespace.appGroupIdentifier,
+                keychainAccessGroup: Self.namespace.keychainAccessGroup ?? ""
             )
             .ignoresSafeArea()
             .onOpenURL { url in
                 sharedUI.WalletDemoIosKt.handleWalletDemoDeepLink(url: url.absoluteString)
             }
+            .task {
+                // Startup reconciliation: the Compose wallet republishes its desired projection on
+                // every mutation, but only Swift can push it into Apple's store, and the extension's
+                // performRegistrationUpdates() may not have run since the last change.
+                await Self.reconcileRegistrations()
+            }
+            .onChange(of: scenePhase) { phase in
+                // Provider authorization is granted in Settings, outside this app, and Apple sends no
+                // notification when it changes. Becoming active is the first moment the app can
+                // observe the new status, so it reconciles here instead of polling.
+                guard phase == .active else { return }
+                Task { await Self.reconcileRegistrations() }
+            }
         }
+    }
+
+    private static let namespace = IdentityDocumentNamespace.composeDemo
+
+    private static func reconcileRegistrations() async {
+        guard #available(iOS 26.0, *) else { return }
+        await IdentityDocumentRegistrationCoordinator(namespace: namespace)
+            .reconcileFromPlatformCallback()
     }
 }
 

@@ -9,6 +9,10 @@ struct ContentView: UIViewControllerRepresentable {
     let attestationBearerToken: String
     let attestationHostHeader: String
     let transactionDataProfilesUrl: String
+    /// App Group the Compose wallet shares with the document-provider extension.
+    let appGroupIdentifier: String
+    /// Build-expanded shared Keychain access group; empty when this build has no such entitlement.
+    let keychainAccessGroup: String
 
     func makeUIViewController(context: Context) -> UIViewController {
         sharedUI.WalletDemoIosKt.walletDemoViewController(
@@ -17,7 +21,9 @@ struct ContentView: UIViewControllerRepresentable {
             attestationAttesterPath: attestationAttesterPath,
             attestationBearerToken: attestationBearerToken,
             attestationHostHeader: attestationHostHeader,
-            transactionDataProfilesUrl: transactionDataProfilesUrl
+            transactionDataProfilesUrl: transactionDataProfilesUrl,
+            appGroupIdentifier: appGroupIdentifier,
+            keychainAccessGroup: keychainAccessGroup
         )
     }
 
@@ -32,6 +38,8 @@ struct ContentView: UIViewControllerRepresentable {
         attestationAttesterPath: "",
         attestationBearerToken: "",
         attestationHostHeader: "",
-        transactionDataProfilesUrl: ""
+        transactionDataProfilesUrl: "",
+        appGroupIdentifier: "",
+        keychainAccessGroup: ""
     )
 }
