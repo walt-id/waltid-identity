@@ -41,4 +41,12 @@ class WalletDemoSharingReviewAndroidTest {
     @Test
     fun shareStaysDisabledUntilEveryRequestedDocumentHasACredential() =
         scenarios.shareStaysDisabledUntilEveryRequestedDocumentHasACredential()
+
+    @Test
+    fun choosingAnotherCredentialForOneQueryReplacesItAndItsDisclosures() =
+        scenarios.choosingAnotherCredentialForOneQueryReplacesItAndItsDisclosures()
+
+    @Test
+    fun optionalDisclosuresStartOffAndTravelOnlyWhenTurnedOn() =
+        scenarios.optionalDisclosuresStartOffAndTravelOnlyWhenTurnedOn()
 }

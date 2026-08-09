@@ -4,6 +4,8 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -11,21 +13,20 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runComposeUiTest
-import id.walt.walletdemo.compose.logic.CredentialDisplayNormalizer
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
-import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialOption
-import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialRequirement
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
-import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosure
+import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoReaderTrust
-import id.walt.walletdemo.compose.logic.WalletDemoSharingDetail
-import id.walt.walletdemo.compose.logic.WalletDemoSharingEncryptionMechanism
-import id.walt.walletdemo.compose.logic.WalletDemoSharingRequest
 import id.walt.walletdemo.compose.logic.WalletDemoSharingRequester
-import id.walt.walletdemo.compose.logic.WalletDemoSharingResponseProtection
-import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
-import id.walt.walletdemo.compose.logic.WalletDemoTransactionDataItem
+import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewFixtures.OPTIONAL_DISCLOSURE_PATH
+import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewFixtures.REQUIRED_DISCLOSURE_PATH
+import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewFixtures.annexCReview
+import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewFixtures.credentialOption
+import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewFixtures.digitalCredentialReview
+import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewFixtures.disclosureSelection
+import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewFixtures.optionalDisclosure
+import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewFixtures.requiredDisclosure
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
@@ -241,77 +242,109 @@ class WalletDemoSharingReviewTestScenarios {
         assertEquals(setOf(mdl.selection, photoId.selection), submitted?.credentials)
     }
 
-    private fun digitalCredentialReview(): WalletDemoSharingReview = WalletDemoSharingReview(
-        request = WalletDemoSharingRequest(
-            requester = WalletDemoSharingRequester(
-                fallbackName = "https://verifier.example",
-                verifiedOrigin = "https://verifier.example",
-            ),
-            responseProtection = WalletDemoSharingResponseProtection.Encrypted(
-                mechanism = WalletDemoSharingEncryptionMechanism.DcApiJwt,
-            ),
-            transactionData = CredentialDisplayNormalizer.transactionDataGroups(
-                listOf(
-                    WalletDemoTransactionDataItem(
-                        type = "org.waltid.transaction-data.payment-authorization",
-                        displayName = "Payment Authorization",
-                        credentialQueryIds = listOf("pid"),
-                        supportedFields = listOf("amount", "currency", "payee"),
-                        rawJson = """{"amount":"42.00","currency":"EUR","payee":"ACME Corp"}""",
-                        detailsJson = """{"amount":"42.00","currency":"EUR","payee":"ACME Corp"}""",
-                    ),
-                )
-            ),
-            technicalDetails = listOf(
-                WalletDemoSharingDetail("Protocol", "openid4vp-v1-unsigned"),
-                WalletDemoSharingDetail("Response mode", "dc_api.jwt"),
-            ),
-        ),
-        credentialOptions = listOf(credentialOption()),
-    )
+    /**
+     * Two wallet credentials can satisfy the same credential query, and they are alternatives rather
+     * than an accumulation: a DCQL credential query asks for one match unless it allows several.
+     * Choosing the second must therefore deselect the first *and* drop the disclosures approved for it -
+     * permission to disclose an attribute from one document is not permission to disclose it from
+     * another, and a review that carried the choice over would share what the user never approved.
+     */
+    fun choosingAnotherCredentialForOneQueryReplacesItAndItsDisclosures() = runComposeUiTest {
+        var submitted: WalletDemoSharingSelection? = null
+        val first = credentialOption(
+            queryId = "org.iso.18013.5.1.mDL",
+            credentialId = "credential-1",
+            disclosures = listOf(requiredDisclosure(), optionalDisclosure()),
+        )
+        val second = credentialOption(
+            queryId = "org.iso.18013.5.1.mDL",
+            credentialId = "credential-2",
+            label = "Driving licence (renewed)",
+            disclosures = listOf(requiredDisclosure(), optionalDisclosure()),
+        )
+        setContent {
+            WalletDemoSharingReviewScreen(
+                review = annexCReview(
+                    readerTrust = WalletDemoReaderTrust.NotAuthenticated,
+                    credentialOptions = listOf(first, second),
+                ),
+                title = "Share mobile document?",
+                onSubmit = { submitted = it },
+                onCancel = {},
+            )
+        }
 
-    private fun annexCReview(
-        readerTrust: WalletDemoReaderTrust,
-        credentialOptions: List<WalletDemoPresentationCredentialOption> = listOf(
-            credentialOption(queryId = "org.iso.18013.5.1.mDL"),
-        ),
-    ): WalletDemoSharingReview = WalletDemoSharingReview(
-        request = WalletDemoSharingRequest(
-            requester = WalletDemoSharingRequester(
-                fallbackName = "https://verifier.example",
-                verifiedOrigin = "https://verifier.example",
-            ),
-            readerTrust = readerTrust,
-            responseProtection = WalletDemoSharingResponseProtection.Encrypted(
-                mechanism = WalletDemoSharingEncryptionMechanism.AnnexCHpke,
-                keyManagementAlgorithm = "DHKEM(P-256, HKDF-SHA256)",
-                contentEncryptionAlgorithm = "AES-128-GCM",
-            ),
-        ),
-        credentialOptions = credentialOptions,
-        credentialRequirements = credentialOptions.map { option ->
-            WalletDemoPresentationCredentialRequirement(options = listOf(listOf(option.queryId)))
-        },
-    )
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(first.selection.id))
+            .performScrollTo()
+            .assertIsOn()
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(second.selection.id))
+            .performScrollTo()
+            .assertIsOff()
 
-    private fun credentialOption(
-        queryId: String = "pid",
-        credentialId: String = "credential-1",
-    ): WalletDemoPresentationCredentialOption = WalletDemoPresentationCredentialOption(
-        queryId = queryId,
-        credentialId = credentialId,
-        label = "Driving licence",
-        issuer = "Test Issuer",
-        format = "mso_mdoc",
-        credentialDataJson = "{}",
-        disclosures = listOf(
-            WalletDemoPresentationDisclosure(
-                label = "Given name",
-                path = "org.iso.18013.5.1/given_name",
-                valueJson = "\"Ada\"",
-                displayValue = "Ada",
-                selectivelyDisclosable = false,
-            ),
-        ),
-    )
+        // Approving the first credential's optional disclosure is what gives the switch something to
+        // leak: without it, an implementation that never dropped disclosures would still pass.
+        val firstOptionalDisclosure = disclosureSelection(first, OPTIONAL_DISCLOSURE_PATH)
+        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(firstOptionalDisclosure.id))
+            .performScrollTo()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(firstOptionalDisclosure.id))
+            .performScrollTo()
+            .assertIsOn()
+
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(second.selection.id))
+            .performScrollTo()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(first.selection.id))
+            .performScrollTo()
+            .assertIsOff()
+
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().performClick()
+        assertEquals(setOf(second.selection), submitted?.credentials)
+        assertEquals(emptySet<WalletDemoPresentationDisclosureSelection>(), submitted?.disclosures)
+    }
+
+    /**
+     * A disclosure the credential can withhold is the user's decision; one the request requires is not.
+     * The optional one therefore gets a toggle that starts off and travels only once it is turned on,
+     * and the required one gets no toggle at all - offering a control the wallet cannot honour would
+     * misdescribe what Share does. Deselecting the credential also disables the toggle, because there is
+     * no longer a document to disclose from.
+     */
+    fun optionalDisclosuresStartOffAndTravelOnlyWhenTurnedOn() = runComposeUiTest {
+        var submitted: WalletDemoSharingSelection? = null
+        val option = credentialOption(disclosures = listOf(requiredDisclosure(), optionalDisclosure()))
+        setContent {
+            WalletDemoSharingReviewScreen(
+                review = digitalCredentialReview(credentialOptions = listOf(option)),
+                title = "Share digital credential?",
+                onSubmit = { submitted = it },
+                onCancel = {},
+            )
+        }
+
+        val required = disclosureSelection(option, REQUIRED_DISCLOSURE_PATH)
+        val optional = disclosureSelection(option, OPTIONAL_DISCLOSURE_PATH)
+        onNodeWithTag(WalletUiTestTags.presentationDisclosure(required.id)).performScrollTo().assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.presentationDisclosureToggle(required.id)).assertCountEquals(0)
+        onNodeWithText("Required by request").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().assertIsOff()
+        onNodeWithText("Optional disclosure").performScrollTo().assertIsDisplayed()
+
+        // Submitted untouched: a required disclosure is not carried as a selection, so an empty
+        // disclosure set here is what "the user approved nothing optional" has to look like.
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().performClick()
+        assertEquals(emptySet<WalletDemoPresentationDisclosureSelection>(), submitted?.disclosures)
+
+        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().performClick()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().performClick()
+        assertEquals(setOf(optional), submitted?.disclosures)
+
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(option.selection.id))
+            .performScrollTo()
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id))
+            .performScrollTo()
+            .assertIsNotEnabled()
+    }
+
 }
