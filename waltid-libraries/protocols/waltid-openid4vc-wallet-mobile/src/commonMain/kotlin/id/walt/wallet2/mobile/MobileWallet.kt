@@ -198,6 +198,7 @@ public class MobileWallet internal constructor(
     private val credentialRegistry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
     private val readerTrustEvaluator: MobileWalletReaderTrustEvaluator = UnconfiguredMobileWalletReaderTrustEvaluator,
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
+    private val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
     /** Issuance transport override. Only tests set this; production uses the configured engine. */
     issuanceHttpClient: HttpClient? = null,
@@ -486,6 +487,11 @@ public class MobileWallet internal constructor(
      * The store is authoritative and the change is committed by the time this runs, so a registry
      * that cannot be updated must not turn a completed operation into a failed one. The outcome is
      * reported through [digitalCredentialRegistration] instead.
+     *
+     * Every wallet operation that changes the credential set ends here, which is why the host
+     * notification is emitted here rather than at each of those operations: a platform whose
+     * registration store only the host can write (iOS) otherwise depends on the next caller
+     * remembering to tell it.
      */
     private suspend fun syncDigitalCredentialRegistration() {
         runCatching { refreshDigitalCredentialRegistration() }.onFailure { failure ->
@@ -495,6 +501,26 @@ public class MobileWallet internal constructor(
                 registeredEntryCount = 0,
                 reason = failure.message ?: failure::class.simpleName ?: "Credential registration failed",
             )
+        }
+        notifyDigitalCredentialRegistryChanged()
+    }
+
+    /**
+     * Tells the host the published registry state may have changed, for platforms it has to apply.
+     *
+     * Emitted after every synchronization attempt, successful or not: the registry this wallet writes
+     * is a *desired* state on iOS, and applying it to Apple's registration store is the host's
+     * privilege, not the wallet's. Whether a synchronization failed is a poor filter for that - an
+     * unauthorized provider still gets its desired state published, and re-applying an unchanged
+     * state is a no-op - so this reports the fact of a credential-set change and leaves the decision
+     * to the host.
+     *
+     * A host failure is contained for the same reason [syncDigitalCredentialRegistration] contains a
+     * registry failure: the credential change is already committed.
+     */
+    private suspend fun notifyDigitalCredentialRegistryChanged() {
+        runCatching { onDigitalCredentialRegistryChanged() }.onFailure { failure ->
+            if (failure is CancellationException) throw failure
         }
     }
 

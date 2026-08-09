@@ -7,10 +7,15 @@ import IdentityDocumentServices
 
 /// The single place either demo applies its desired registrations to Apple's store.
 ///
-/// Both the host app - after bootstrap, issuance, deletion, and on becoming active - and the
-/// extension's `performRegistrationUpdates()` call this. A second implementation would let the two
-/// entry points disagree about what is registered, which is exactly the failure that makes a wallet
-/// disappear from the provider picker.
+/// Both host apps and the extension's `performRegistrationUpdates()` call this. A second
+/// implementation would let the entry points disagree about what is registered, which is exactly the
+/// failure that makes a wallet disappear from the provider picker.
+///
+/// The host calls it whenever the wallet's credential set changed - the native demo directly, the
+/// Compose demo through `onDigitalCredentialRegistryChanged` - and on becoming active, since provider
+/// authorization is granted in Settings with no notification. Both are needed: the wallet can publish
+/// its desired projection but only this process may write Apple's store, and Apple's own callback runs
+/// periodically rather than on change.
 @available(iOS 26.0, *)
 public struct IdentityDocumentRegistrationCoordinator: Sendable {
     private let namespace: IdentityDocumentNamespace
@@ -43,9 +48,9 @@ public struct IdentityDocumentRegistrationCoordinator: Sendable {
         }
 
         // Fails closed on anything short of a published projection: the plan below is allowed to
-        // remove every `dc-` registration, so an absent or undecodable projection - which says
-        // nothing about what the wallet holds - must not be read as "the wallet wants nothing". A
-        // malformed one throws out of here; the callback path below logs it.
+        // remove every registration, so an absent or undecodable projection - which says nothing
+        // about what the wallet holds - must not be read as "the wallet wants nothing". A malformed
+        // one throws out of here; the callback path below logs it.
         guard let desired = try desiredRegistrations(
             from: DigitalCredentialRegistrationStorage.desiredRegistrations(
                 appGroupIdentifier: namespace.appGroupIdentifier

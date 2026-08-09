@@ -33,6 +33,13 @@ import kotlin.uuid.Uuid
  * When no preference matches, selection falls back to an unlocalized entry and then the first entry.
  * @property transactionDataProfiles Transaction data profiles this mobile wallet accepts in OpenID4VP requests.
  * @property credentialRegistry Platform metadata registry. Platform factories install their native default when omitted.
+ * @property onDigitalCredentialRegistryChanged Called after the wallet re-published its desired platform
+ * registration state, because the credential set changed. Only needed where applying that state is the
+ * host's privilege rather than the wallet's: on iOS the wallet can write its desired projection but only
+ * the app process may write Apple's `IdentityDocumentProviderRegistrationStore`, and Apple's own
+ * `performRegistrationUpdates()` runs only periodically. A host that ships a document-provider extension
+ * reconciles here so an issued or deleted credential reaches the platform immediately instead of at the
+ * next foreground transition. Failures are swallowed: the credential change is already committed.
  * @property readerTrustEvaluator Application trust policy for verified ISO 18013-7 reader chains.
  * @property crossProcessAccess Optional shared-container/keychain configuration for provider extensions.
  */
@@ -45,6 +52,7 @@ public data class MobileWalletConfig(
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     public val credentialRegistry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
+    public val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
     public val readerTrustEvaluator: MobileWalletReaderTrustEvaluator = UnconfiguredMobileWalletReaderTrustEvaluator,
     public val crossProcessAccess: MobileWalletCrossProcessAccess? = null,
 )
@@ -206,6 +214,7 @@ internal fun createSqlDelightMobileWallet(
         clientIdTrustConfiguration = clientIdTrustConfiguration,
         onEvent = config.onEvent,
         credentialRegistry = config.credentialRegistry,
+        onDigitalCredentialRegistryChanged = config.onDigitalCredentialRegistryChanged,
         readerTrustEvaluator = config.readerTrustEvaluator,
         deleteLocalPersistence = deleteLocalPersistence,
     )

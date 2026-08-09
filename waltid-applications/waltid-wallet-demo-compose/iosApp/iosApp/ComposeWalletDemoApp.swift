@@ -34,7 +34,14 @@ struct ComposeWalletDemoApp: App {
                 attestationHostHeader: attestationHostHeader,
                 transactionDataProfilesUrl: transactionDataProfilesUrl,
                 appGroupIdentifier: Self.namespace.appGroupIdentifier,
-                keychainAccessGroup: Self.requiredKeychainAccessGroup
+                keychainAccessGroup: Self.requiredKeychainAccessGroup,
+                // Issuance and deletion republish the wallet's desired projection, which is not
+                // Apple's store; pushing it there is this process's privilege. Reconciling on the
+                // notification rather than on the next foreground transition is what makes a freshly
+                // issued credential presentable now.
+                onDigitalCredentialRegistryChanged: {
+                    Task { await Self.reconcileRegistrations() }
+                }
             )
             .ignoresSafeArea()
             .onOpenURL { url in

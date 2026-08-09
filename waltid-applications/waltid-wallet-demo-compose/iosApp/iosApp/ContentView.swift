@@ -13,17 +13,21 @@ struct ContentView: UIViewControllerRepresentable {
     let appGroupIdentifier: String
     /// Build-expanded shared Keychain access group; empty when this build has no such entitlement.
     let keychainAccessGroup: String
+    /// Called from Kotlin after the wallet's credential set changed, so this process can reconcile
+    /// Apple's registration store. Only the app may call `IdentityDocumentServices`.
+    let onDigitalCredentialRegistryChanged: () -> Void
 
     func makeUIViewController(context: Context) -> UIViewController {
         sharedUI.WalletDemoIosKt.walletDemoViewController(
+            appGroupIdentifier: appGroupIdentifier,
+            keychainAccessGroup: keychainAccessGroup,
+            onDigitalCredentialRegistryChanged: onDigitalCredentialRegistryChanged,
             walletId: walletId,
             attestationBaseUrl: attestationBaseUrl,
             attestationAttesterPath: attestationAttesterPath,
             attestationBearerToken: attestationBearerToken,
             attestationHostHeader: attestationHostHeader,
-            transactionDataProfilesUrl: transactionDataProfilesUrl,
-            appGroupIdentifier: appGroupIdentifier,
-            keychainAccessGroup: keychainAccessGroup
+            transactionDataProfilesUrl: transactionDataProfilesUrl
         )
     }
 
@@ -40,6 +44,7 @@ struct ContentView: UIViewControllerRepresentable {
         attestationHostHeader: "",
         transactionDataProfilesUrl: "",
         appGroupIdentifier: "",
-        keychainAccessGroup: ""
+        keychainAccessGroup: "",
+        onDigitalCredentialRegistryChanged: {}
     )
 }

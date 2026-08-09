@@ -855,6 +855,84 @@ class MobileWalletTest {
         assertEquals("Credential Manager rejected the registry", reported.reason)
     }
 
+    /**
+     * A credential-set change has to *request host reconciliation*, not merely re-publish a projection.
+     *
+     * On iOS the registry this wallet writes is a desired state in a shared container; Apple's
+     * `IdentityDocumentProviderRegistrationStore` is writable only by the host app, and
+     * `performRegistrationUpdates()` runs only periodically. So asserting that the projection changed
+     * proves nothing about whether the platform will offer the credential - the host has to be told.
+     */
+    @Test
+    fun aCredentialSetChangeAsksTheHostToReconcileThePlatformRegistrations() = runTest {
+        val registry = RecordingMetadataRegistry()
+        val reconciliationRequests = mutableListOf<Int>()
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "pid-1",
+                credential = CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2).second,
+                label = "PID",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "registry-notification-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            generateAndPersistKey = { error("Registry notification must not generate keys") },
+            credentialRegistry = registry,
+            // Records how many projections had been published when the host was notified, which is what
+            // proves the notification follows the publish rather than racing it.
+            onDigitalCredentialRegistryChanged = { reconciliationRequests += registry.replacements.size },
+        )
+
+        assertTrue(wallet.deleteCredential("pid-1"))
+        assertEquals(listOf(1), reconciliationRequests, "deletion has to ask the host to reconcile, once")
+
+        // The direct retry entry point is *not* a credential-set change: it is the host's own way of
+        // re-publishing, so notifying there would be the wallet calling the host back into itself.
+        wallet.refreshDigitalCredentialRegistration()
+        assertEquals(listOf(1), reconciliationRequests)
+    }
+
+    /**
+     * The host is told even when publishing the desired state failed, and its failure is contained.
+     *
+     * A failed publish is a poor filter for "nothing to reconcile": on iOS the wallet's own registry
+     * write and Apple's store are different things, so the host still has an authoritative earlier
+     * projection to apply. And the credential change is already committed by this point, so a host that
+     * throws must not be able to turn a completed deletion into a failed one.
+     */
+    @Test
+    fun theHostIsAskedToReconcileEvenWhenPublishingFailedAndItsOwnFailureIsContained() = runTest {
+        val registry = FailingMetadataRegistry(IllegalStateException("Registry rejected the projection"))
+        var reconciliationRequests = 0
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "pid-1",
+                credential = CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2).second,
+                label = "PID",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "registry-notification-failure-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            generateAndPersistKey = { error("Registry notification must not generate keys") },
+            credentialRegistry = registry,
+            onDigitalCredentialRegistryChanged = {
+                reconciliationRequests++
+                throw IllegalStateException("IdentityDocumentServices is unavailable")
+            },
+        )
+
+        assertTrue(wallet.deleteCredential("pid-1"))
+        assertEquals(listOf("pid-1"), credentialStore.removedCredentialIds)
+        assertEquals(1, reconciliationRequests)
+        assertFalse(assertNotNull(wallet.digitalCredentialRegistration.value).available)
+    }
+
     @Test
     fun unavailableRegistrySurfacesItsReasonWithoutThrowing() = runTest {
         val registry = FailingMetadataRegistry()
