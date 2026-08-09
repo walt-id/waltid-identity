@@ -1,5 +1,6 @@
 import Foundation
 import OSLog
+import WalletDemoSharingUI
 import WalletSDK
 
 /// Wallet operations the Annex C two-stage flow needs.
@@ -38,8 +39,14 @@ public final class AnnexCPresentationModel: ObservableObject {
     @Published public private(set) var failure: String?
     /// Whether a response is being built and sealed.
     @Published public private(set) var isSubmitting = false
-    /// Chosen credential per DCQL query ID.
-    @Published public var selectedCredentialIDsByQuery: [String: String] = [:]
+    /// What the user is being asked to share, in the wallet's shared review vocabulary.
+    ///
+    /// Derived from ``preview`` so the review UI never sees the Annex C preview handle, the retained
+    /// request ID or the platform request context - those stay here, with the orchestration that has
+    /// to submit them.
+    @Published public private(set) var review: SharingReviewModel?
+    /// Credentials and disclosures the user has chosen.
+    @Published public private(set) var selection = SharingSelection()
 
     private let context: any AnnexCRequestContext
     private let makeWallet: @Sendable () async throws -> any AnnexCPresentationWallet
@@ -60,24 +67,21 @@ public final class AnnexCPresentationModel: ObservableObject {
         self.makeWallet = makeWallet
     }
 
-    /// DCQL query IDs the user must decide on, in stable order.
-    public var queryIDs: [String] {
-        guard let preview else { return [] }
-        return Array(Set(preview.credentialOptions.map(\.queryID))).sorted()
-    }
-
     /// Whether every requested document has a credential chosen for it.
     public var hasCompleteSelection: Bool {
-        guard preview != nil else { return false }
-        return queryIDs.allSatisfy { queryID in
-            guard let credentialID = selectedCredentialIDsByQuery[queryID] else { return false }
-            return options(for: queryID).contains { $0.credentialID == credentialID }
-        }
+        review?.hasCompleteCredentialSelection(selection.credentials) == true
     }
 
-    /// Credentials that satisfy one query.
-    public func options(for queryID: String) -> [PresentationCredentialOption] {
-        preview?.credentialOptions.filter { $0.queryID == queryID } ?? []
+    /// Applies a credential toggle using the wallet's shared selection rules.
+    public func toggleCredential(_ credential: PresentationCredentialSelection) {
+        guard let review else { return }
+        selection = review.toggling(credential: credential, in: selection)
+    }
+
+    /// Applies a disclosure toggle using the wallet's shared selection rules.
+    public func toggleDisclosure(_ disclosure: PresentationDisclosureSelection) {
+        guard let review else { return }
+        selection = review.toggling(disclosure: disclosure, in: selection)
     }
 
     /// Runs stage 1: parses the request, opens the shared wallet, and builds the consent preview.
@@ -99,14 +103,12 @@ public final class AnnexCPresentationModel: ObservableObject {
                 selectedRegistryEntryIDs: []
             )
             preview = prepared
-            // Pre-select only where there is nothing to choose, so a real choice is never made for
-            // the user.
-            selectedCredentialIDsByQuery = Dictionary(
-                uniqueKeysWithValues: Set(prepared.credentialOptions.map(\.queryID)).compactMap { queryID in
-                    let options = prepared.credentialOptions.filter { $0.queryID == queryID }
-                    return options.count == 1 ? (queryID, options[0].credentialID) : nil
-                }
-            )
+            let review = prepared.sharingReview()
+            self.review = review
+            // The same opening selection every other transport gets, rather than a provider-specific
+            // rule: the choice is visible and changeable in the review, and a wallet that pre-selected
+            // differently here would answer the same request differently depending on how it was asked.
+            selection = SharingSelection(credentials: review.defaultCredentialSelection())
         } catch {
             log.error("Annex C preview failed: \(error.localizedDescription, privacy: .public)")
             failure = error.localizedDescription
@@ -116,14 +118,15 @@ public final class AnnexCPresentationModel: ObservableObject {
     /// Runs stage 2: requests the raw request and returns the sealed response to the platform.
     public func submit() async {
         guard let wallet, let preview, !isSubmitting else { return }
-        let selections = queryIDs.compactMap { queryID -> PresentationCredentialSelection? in
-            guard let credentialID = selectedCredentialIDsByQuery[queryID] else { return nil }
-            return options(for: queryID).first { $0.credentialID == credentialID }?.selection
-        }
-        guard selections.count == queryIDs.count else {
+        guard hasCompleteSelection else {
             failure = IdentityDocumentSupportFailure.missingCredentialSelection.localizedDescription
             return
         }
+        // Submitted in preview order rather than in the set's order, so the response documents follow
+        // the order the request listed them in.
+        let selections = preview.credentialOptions
+            .map(\.selection)
+            .filter(selection.credentials.contains)
         isSubmitting = true
         do {
             try await context.sendResponse { rawRequest in

@@ -91,20 +91,6 @@ public struct RawAnnexCRequest: Decodable, Equatable, Sendable {
     }
 }
 
-/// One-line, user-facing rendering of reader-authentication trust.
-///
-/// Shared so that the two demos cannot describe the same trust state differently; the wording is
-/// deliberately about who the reader is, not about whether the request is safe.
-public func readerTrustDescription(_ trust: ReaderTrust) -> String {
-    switch trust {
-    case .notApplicable: return "Not applicable"
-    case .notAuthenticated: return "Reader did not identify itself"
-    case .pendingRawRequest: return "Reader identity is checked when the response is built"
-    case .untrusted(let reason): return "Reader not recognized: \(reason)"
-    case .trusted(let subject): return "Trusted: \(subject)"
-    }
-}
-
 extension Data {
     /// Decodes unpadded base64url, the encoding every Annex C field uses.
     public init?(base64URLEncoded value: String) {

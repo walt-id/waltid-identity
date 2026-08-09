@@ -26,6 +26,7 @@ public enum WalletAccessibilityID {
     public static let presentationSubmitButton = identifier("presentationSubmitButton")
     public static let presentationRejectButton = identifier("presentationRejectButton")
     public static let presentationError = identifier("presentationError")
+    public static let presentationPreparing = identifier("presentationPreparing")
     public static let presentationErrorNotifyButton = identifier("presentationErrorNotifyButton")
     public static let presentationErrorDismissButton = identifier("presentationErrorDismissButton")
     public static let presentationCancelButton = identifier("presentationCancelButton")

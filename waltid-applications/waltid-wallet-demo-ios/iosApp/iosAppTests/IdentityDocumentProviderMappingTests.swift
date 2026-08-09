@@ -2,8 +2,7 @@ import XCTest
 import WalletDemoIdentityDocumentSupport
 import WalletSDK
 
-/// Pure provider mappings: Apple request to parsed request, response envelope to sealed bytes, and
-/// reader trust to display text.
+/// Pure provider mappings: Apple request to parsed request, and response envelope to sealed bytes.
 ///
 /// These are the transformations the extension would otherwise hide behind an iOS 26 request that no
 /// test can construct.
@@ -86,20 +85,6 @@ final class IdentityDocumentProviderMappingTests: XCTestCase {
         XCTAssertThrowsError(try encryptedResponseData(fromResponseJSON: #"{"response":"not base64!"}"#)) { error in
             XCTAssertEqual(error as? IdentityDocumentSupportFailure, .invalidResponseEncoding)
         }
-    }
-
-    func testReaderTrustStatesAreDistinguishableToTheUser() {
-        let descriptions = [
-            readerTrustDescription(.notApplicable),
-            readerTrustDescription(.notAuthenticated),
-            readerTrustDescription(.pendingRawRequest),
-            readerTrustDescription(.untrusted(reason: "no anchor")),
-            readerTrustDescription(.trusted(certificateSubject: "CN=Verifier")),
-        ]
-
-        XCTAssertEqual(Set(descriptions).count, descriptions.count, "Trust states must not read alike")
-        XCTAssertTrue(readerTrustDescription(.trusted(certificateSubject: "CN=Verifier")).contains("CN=Verifier"))
-        XCTAssertTrue(readerTrustDescription(.untrusted(reason: "no anchor")).contains("no anchor"))
     }
 
     func testTheTwoDemosDoNotShareACrossProcessNamespace() {

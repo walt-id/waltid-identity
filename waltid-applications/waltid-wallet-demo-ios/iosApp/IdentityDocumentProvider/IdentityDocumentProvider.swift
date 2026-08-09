@@ -16,7 +16,7 @@ struct WaltIdentityDocumentProvider: IdentityDocumentProvider {
 
     var body: some IdentityDocumentRequestScene {
         ISO18013MobileDocumentRequestScene { context in
-            BasicAnnexCReviewView(context: context) {
+            AnnexCReviewView(context: context) {
                 try await Self.namespace.providerWallet()
             }
         }
