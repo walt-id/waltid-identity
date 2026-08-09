@@ -33,10 +33,13 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextContainingVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.sendDeepLink
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForStatus
+import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewTestTags
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
@@ -145,9 +148,10 @@ class DigitalCredentialSharingE2ETest {
             // Share button is used, so this is asserted between the two.
             beforeShare = { device ->
                 listOf(PAYMENT_AUTHORIZATION_DISPLAY_NAME, "42.00", "EUR", "ACME Corp").forEach { expected ->
-                    assertNotNull(
-                        "Consent did not show '$expected' before sharing",
-                        device.wait(Until.findObject(By.textContains(expected)), UI_ELEMENT_TIMEOUT),
+                    assertTextContainingVisibleAfterScrolling(
+                        device = device,
+                        substring = expected,
+                        message = "Review did not show '$expected' before sharing",
                     )
                 }
             },
@@ -422,13 +426,18 @@ class DigitalCredentialSharingE2ETest {
             ?: device.wait(Until.findObject(By.text("Continue")), UI_ELEMENT_TIMEOUT)
         continueButton?.click()
 
+        // The provider surface is the wallet's own Compose review, so it is driven by the shared test
+        // tags the in-app presentation flow uses. Waiting on the review root before the Share button
+        // keeps a failure attributable: a review that never opened reads differently from a review
+        // that opened without an enabled Share action.
+        assertNotNull(
+            "Wallet provider review did not open",
+            waitForResource(device, WALLET_SHARING_REVIEW_TAG, UI_ELEMENT_TIMEOUT),
+        )
+
         beforeShare(device)
 
-        val shareButton = device.wait(Until.findObject(By.res("android:id/button1")), UI_ELEMENT_TIMEOUT)
-            ?: device.wait(Until.findObject(By.text("Share")), UI_ELEMENT_TIMEOUT)
-            ?: device.wait(Until.findObject(By.text("SHARE")), UI_ELEMENT_TIMEOUT)
-        assertNotNull("Wallet provider consent did not open", shareButton)
-        shareButton!!.click()
+        clickByTag(device, WALLET_SHARE_BUTTON_TAG)
 
         val response = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) {
             DigitalCredentialTestVerifier.await().getOrThrow()
@@ -631,6 +640,16 @@ class DigitalCredentialSharingE2ETest {
         /** Owns `CredentialSelectorActivity`, i.e. the picker window these tests drive. */
         private const val CREDENTIAL_SELECTOR_PACKAGE = "com.google.android.gms"
         private const val CANDIDATE_CLICK_ATTEMPTS = 3
+
+        /**
+         * Compose test tags of the wallet's shared review, exported as Android resource IDs.
+         *
+         * These are the same tags the in-app OpenID4VP review is driven by, which is the point: the
+         * provider surface is not a separate UI with its own selectors, so a change that broke one of
+         * these would break both lanes rather than only this one.
+         */
+        private val WALLET_SHARING_REVIEW_TAG = WalletDemoSharingReviewTestTags.Review
+        private val WALLET_SHARE_BUTTON_TAG = WalletDemoSharingReviewTestTags.ShareButton
 
         /**
          * The policy ids verifier2 reports for its default mdoc set, restricted to the two that must
