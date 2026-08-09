@@ -57,7 +57,9 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
 
       - name: Build WalletCore and run native iOS demo tests
-        timeout-minutes: 35
+        # Same XCFramework cost as the Compose job; this one already used 29 of its previous 35 min,
+        # so a cold cache left no margin.
+        timeout-minutes: 65
         uses: walt-id/waltid-identity/.github/actions/gradle-ios@c95b601fc5095d5668eb8c906af992d8e00ed513
         with:
           waltid-directory: 'waltid-identity'
@@ -85,7 +87,9 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
 
       - name: Run Compose iOS demo tests
-        timeout-minutes: 40
+        # Assembling WalletCore costs ~27 min on a cold Konan cache and the demo's own tests ~11 min,
+        # so the previous 40 min was below the job's actual work now that it needs the XCFramework.
+        timeout-minutes: 65
         uses: walt-id/waltid-identity/.github/actions/gradle-ios@c95b601fc5095d5668eb8c906af992d8e00ed513
         with:
           waltid-directory: 'waltid-identity'
