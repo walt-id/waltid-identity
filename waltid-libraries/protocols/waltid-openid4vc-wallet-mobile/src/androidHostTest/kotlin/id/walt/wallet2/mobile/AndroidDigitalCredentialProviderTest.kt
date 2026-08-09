@@ -3,6 +3,7 @@ package id.walt.wallet2.mobile
 import android.content.Intent
 import android.content.pm.Signature
 import android.content.pm.SigningInfo
+import android.os.Bundle
 import android.service.credentials.CredentialProviderService
 import androidx.credentials.DigitalCredential
 import androidx.credentials.ExperimentalDigitalCredentialApi
@@ -24,7 +25,17 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+
+private const val EXTRA_CREDENTIAL_SET_ID =
+    "androidx.credentials.registry.provider.extra.CREDENTIAL_SET_ID"
+private const val EXTRA_CREDENTIAL_SET_ELEMENT_LENGTH =
+    "androidx.credentials.registry.provider.extra.CREDENTIAL_SET_ELEMENT_LENGTH"
+private const val EXTRA_CREDENTIAL_SET_ELEMENT_ID_PREFIX =
+    "androidx.credentials.registry.provider.extra.CREDENTIAL_SET_ELEMENT_ID_"
+private const val EXTRA_CREDENTIAL_SET_ELEMENT_METADATA_PREFIX =
+    "androidx.credentials.registry.provider.extra.CREDENTIAL_SET_ELEMENT_METADATA_"
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -38,6 +49,7 @@ class AndroidDigitalCredentialProviderTest {
             requestJson = """{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}""",
             packageName = "id.walt.caller",
             signingInfo = signingInfo(signature),
+            selectedCredentialSet = selectedCredentialSetExtras(),
         )
 
         val input = AndroidDigitalCredentialProvider.extract(intent, """{"apps":[]}""")
@@ -59,11 +71,77 @@ class AndroidDigitalCredentialProviderTest {
             packageName = "id.walt.untrusted-browser",
             signingInfo = signingInfo(Signature(byteArrayOf(5, 6, 7, 8))),
             origin = "https://verifier.example",
+            selectedCredentialSet = selectedCredentialSetExtras(),
         )
 
         assertFailsWith<IllegalStateException> {
             AndroidDigitalCredentialProvider.extract(intent, """{"apps":[]}""")
         }
+    }
+
+    /**
+     * A Credential Manager request without a selected credential set is refused, and specifically not
+     * treated as "the platform asserted no selection".
+     *
+     * This wallet registers through `RegistryManager`, so the platform always reports what the user
+     * picked. Accepting the absence would produce `selectedRegistryEntryIds = []`, which
+     * `MobileWallet.previewDigitalCredentialPresentation` reads as unrestricted matching over the whole
+     * store - turning "no platform selection" into "search the entire wallet".
+     *
+     * The envelope here offers a single alternative on purpose: that is the one shape whose *protocol
+     * request* resolution needs no attribution, so it is the shape in which a missing selection could
+     * otherwise slip through unnoticed.
+     */
+    @OptIn(ExperimentalDigitalCredentialApi::class)
+    @Config(sdk = [35])
+    @Test
+    fun rejectsARegistryRequestThatCarriesNoSelectedCredentialSet() {
+        val intent = providerIntent(
+            requestJson = """{"requests":[{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}]}""",
+            packageName = "id.walt.caller",
+            signingInfo = signingInfo(Signature(byteArrayOf(1, 2, 3, 4))),
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            AndroidDigitalCredentialProvider.extract(intent, """{"apps":[]}""")
+        }
+    }
+
+    /**
+     * The refusal happens during extraction, before any wallet is consulted. `extract` is the only
+     * boundary between Credential Manager and credential matching, so a failure here is what makes the
+     * unrestricted path unreachable rather than merely unused: nothing downstream ever receives a
+     * request built from a missing selection.
+     */
+    @OptIn(ExperimentalDigitalCredentialApi::class)
+    @Config(sdk = [35])
+    @Test
+    fun refusesAMissingSelectionBeforeProducingAnyPlatformNeutralRequest() {
+        val extraction = runCatching {
+            AndroidDigitalCredentialProvider.extract(
+                providerIntent(
+                    requestJson = """{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}""",
+                    packageName = "id.walt.caller",
+                    signingInfo = signingInfo(Signature(byteArrayOf(1, 2, 3, 4))),
+                ),
+                """{"apps":[]}""",
+            )
+        }
+
+        assertNull(extraction.getOrNull())
+        // And the same intent with a selection added does produce one, so the absence is what failed.
+        assertEquals(
+            listOf("opaque-entry"),
+            AndroidDigitalCredentialProvider.extract(
+                providerIntent(
+                    requestJson = """{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}""",
+                    packageName = "id.walt.caller",
+                    signingInfo = signingInfo(Signature(byteArrayOf(1, 2, 3, 4))),
+                    selectedCredentialSet = selectedCredentialSetExtras(),
+                ),
+                """{"apps":[]}""",
+            ).request.selectedRegistryEntryIds,
+        )
     }
 
     @OptIn(ExperimentalDigitalCredentialApi::class)
@@ -77,6 +155,7 @@ class AndroidDigitalCredentialProviderTest {
                 requestJson = """{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}""",
                 packageName = "id.walt.caller",
                 signingInfo = signingInfo(Signature(byteArrayOf(1, 2, 3, 4))),
+                selectedCredentialSet = selectedCredentialSetExtras(),
             ),
             """{"apps":[]}""",
         ).providerRequest
@@ -124,6 +203,7 @@ class AndroidDigitalCredentialProviderTest {
         packageName: String,
         signingInfo: SigningInfo,
         origin: String? = null,
+        selectedCredentialSet: Bundle? = null,
     ): Intent {
         val option = GetDigitalCredentialOption(requestJson)
         val frameworkOption = android.credentials.CredentialOption.Builder(
@@ -139,7 +219,29 @@ class AndroidDigitalCredentialProviderTest {
         return Intent().putExtra(
             CredentialProviderService.EXTRA_GET_CREDENTIAL_REQUEST,
             android.service.credentials.GetCredentialRequest(callingApp, listOf(frameworkOption)),
-        )
+        ).also { intent ->
+            selectedCredentialSet?.let(intent::putExtras)
+        }
+    }
+
+    /**
+     * The intent extras Credential Manager adds for a registry-based selection, in the shape
+     * `ProviderGetCredentialRequest.selectedCredentialSet` reads them back from. The keys are private
+     * to `androidx.credentials.registry.provider`, so they are written literally rather than through an
+     * API that does not exist for providers.
+     */
+    private fun selectedCredentialSetExtras(
+        credentialSetId: String = "req:0;null",
+        credentials: List<Pair<String, String?>> = listOf(
+            "opaque-entry" to """{"dc_request_index":0,"dcql_cred_id":"pid"}""",
+        ),
+    ): Bundle = Bundle().apply {
+        putString(EXTRA_CREDENTIAL_SET_ID, credentialSetId)
+        putInt(EXTRA_CREDENTIAL_SET_ELEMENT_LENGTH, credentials.size)
+        credentials.forEachIndexed { index, (credentialId, metadata) ->
+            putString("$EXTRA_CREDENTIAL_SET_ELEMENT_ID_PREFIX$index", credentialId)
+            metadata?.let { putString("$EXTRA_CREDENTIAL_SET_ELEMENT_METADATA_PREFIX$index", it) }
+        }
     }
 
     private fun signingInfo(signature: Signature): SigningInfo = SigningInfo().also { signingInfo ->
@@ -403,6 +505,9 @@ class AndroidDigitalCredentialProviderTest {
      * = null`, meaning unrestricted DCQL matching over the whole store. That is correct for a platform
      * that asserts no selection (iOS), and must be unreachable from a platform selection that could
      * not be resolved - otherwise a malformed matcher result would *widen* the candidate set.
+     *
+     * The absent-selection case has no representation here at all: `resolveSelectedProtocolRequest`
+     * requires a selection, so the unrestricted shape is not something this entry point can express.
      */
     @Test
     fun neverTurnsAMalformedSelectionIntoAnUnrestrictedOne() {
@@ -427,16 +532,6 @@ class AndroidDigitalCredentialProviderTest {
                 credentials = emptyList(),
             )
         }
-        // Only the absence of any platform selection yields an unrestricted request, which is the iOS
-        // shape rather than anything Credential Manager can produce.
-        assertEquals(
-            emptyList(),
-            AndroidDigitalCredentialProvider.resolveSelectedProtocolRequest(
-                requestJson = """{"requests":[{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}]}""",
-                verifiedOrigin = "https://verifier.example",
-                selection = null,
-            ).selectedRegistryEntryIds,
-        )
     }
 
     /** Signed variants stay unsupported: an envelope offering only those must fail closed. */
@@ -458,16 +553,19 @@ class AndroidDigitalCredentialProviderTest {
 
     @Test
     fun rejectsEmptyOrMalformedProtocolRequests() {
+        val selection = openId4VpSelection(requestIndex = 0, registryEntryIds = listOf("oid4vp-entry"))
         assertFailsWith<IllegalArgumentException> {
             AndroidDigitalCredentialProvider.resolveSelectedProtocolRequest(
                 requestJson = """{"requests":[]}""",
                 verifiedOrigin = "https://verifier.example",
+                selection = selection,
             )
         }
         assertFailsWith<IllegalArgumentException> {
             AndroidDigitalCredentialProvider.resolveSelectedProtocolRequest(
                 requestJson = """{"protocol":"openid4vp-v1-unsigned","data":"secret"}""",
                 verifiedOrigin = "https://verifier.example",
+                selection = selection,
             )
         }
         // A protocol-less entry is malformed even when a sibling entry is servable, because the
@@ -476,6 +574,7 @@ class AndroidDigitalCredentialProviderTest {
             AndroidDigitalCredentialProvider.resolveSelectedProtocolRequest(
                 requestJson = """{"requests":[{"data":{"nonce":"n"}},{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}]}""",
                 verifiedOrigin = "https://verifier.example",
+                selection = selection,
             )
         }
     }
@@ -505,6 +604,7 @@ class AndroidDigitalCredentialProviderTest {
             // Uppercase host and an explicit default port: the two cases where the deleted adapter
             // copy and the protocol rule used to disagree.
             origin = "https://VERIFIER.example:443",
+            selectedCredentialSet = selectedCredentialSetExtras(),
         )
 
         val input = AndroidDigitalCredentialProvider.extract(

@@ -89,6 +89,13 @@ public object AndroidDigitalCredentialProvider {
      * Locates the protocol request Credential Manager's selection belongs to and derives the origin
      * from authenticated caller data. A populated privileged origin is rejected unless the caller
      * package and signing certificate match [privilegedAppsJson].
+     *
+     * A selected credential set is mandatory here. This wallet registers its credentials through
+     * `RegistryManager`, so Credential Manager always reports which of them the user picked; a request
+     * arriving without one is not a request this entry point can answer. Continuing without it would
+     * produce an empty `selectedRegistryEntryIds`, which
+     * [MobileWallet.previewDigitalCredentialPresentation] reads as "match the whole wallet" - correct
+     * for a platform that asserts no selection, and never correct for Credential Manager.
      */
     public fun extract(
         intent: Intent,
@@ -116,15 +123,16 @@ public object AndroidDigitalCredentialProvider {
             ?: throw IllegalArgumentException("Calling application has no signing certificate")
         val verifiedOrigin = DcApiWallet.canonicalizePlatformOrigin(assertedOrigin)
 
+        val selectedSet = requireNotNull(providerRequest.selectedCredentialSet) {
+            "Registry-based Digital Credentials request has no selected credential set"
+        }
         val request = resolveSelectedProtocolRequest(
             requestJson = options.single().requestJson,
             verifiedOrigin = verifiedOrigin,
-            selection = providerRequest.selectedCredentialSet?.let { selectedSet ->
-                parseMatcherSelection(
-                    credentialSetId = selectedSet.credentialSetId,
-                    credentials = selectedSet.credentials.map { it.credentialId to it.metadata },
-                )
-            },
+            selection = parseMatcherSelection(
+                credentialSetId = selectedSet.credentialSetId,
+                credentials = selectedSet.credentials.map { it.credentialId to it.metadata },
+            ),
         )
 
         return AndroidDigitalCredentialProviderInput(request = request, providerRequest = providerRequest)
@@ -140,6 +148,7 @@ public object AndroidDigitalCredentialProvider {
      * request the user was never shown.
      *
      * Resolution therefore fails closed rather than guessing:
+     * - there must be a platform selection at all, which on Credential Manager there always is;
      * - the matcher must attribute the selection to exactly one `requests` index;
      * - that index must exist, and any protocol the matcher named must equal `requests[index]`'s;
      * - that protocol must be one the wallet can answer, so a selected signed alternative is refused
@@ -155,11 +164,15 @@ public object AndroidDigitalCredentialProvider {
      *
      * Anything else - no attribution across several alternatives, or a named protocol offered more
      * than once - is refused.
+     *
+     * [selection] is required rather than optional so that no Credential Manager request can reach an
+     * unrestricted `selectedRegistryEntryIds`. The platform-neutral wallet API still permits an empty
+     * selection for platforms such as iOS that assert none; that path simply does not exist here.
      */
     internal fun resolveSelectedProtocolRequest(
         requestJson: String,
         verifiedOrigin: String,
-        selection: MatcherSelectedRequest? = null,
+        selection: MatcherSelectedRequest,
     ): MobileWalletDigitalCredentialRequest {
         val requestObject = Json.parseToJsonElement(requestJson).jsonObject
         val requests = requestObject["requests"] as? JsonArray
@@ -176,8 +189,8 @@ public object AndroidDigitalCredentialProvider {
                 ?: throw IllegalArgumentException("Digital credential request protocol is required")
         }
 
-        val selectedIndex = selection?.requestIndex
-            ?: selection?.protocol?.let { attributedProtocol ->
+        val selectedIndex = selection.requestIndex
+            ?: selection.protocol?.let { attributedProtocol ->
                 val candidates = offeredProtocols.withIndex()
                     .filter { (_, offered) -> offered == attributedProtocol }
                     .map { (index, _) -> index }
@@ -204,7 +217,7 @@ public object AndroidDigitalCredentialProvider {
                 "${protocolRequests.size}"
         }
         val protocol = offeredProtocols[selectedIndex]
-        selection?.protocol?.let { attributedProtocol ->
+        selection.protocol?.let { attributedProtocol ->
             require(attributedProtocol == protocol) {
                 "Credential Manager attributed the selection to '$attributedProtocol' but protocol " +
                     "request $selectedIndex is '$protocol'"
@@ -215,15 +228,14 @@ public object AndroidDigitalCredentialProvider {
         }
         val data = protocolRequests[selectedIndex]["data"] as? JsonObject
             ?: throw IllegalArgumentException("Digital credential request data must be an object")
-        val selectedRegistryEntryIds = selection?.registryEntryIds.orEmpty()
-        require(selection == null || selectedRegistryEntryIds.isNotEmpty()) {
+        require(selection.registryEntryIds.isNotEmpty()) {
             "Credential Manager reported a selection with no registry entries"
         }
         return MobileWalletDigitalCredentialRequest(
             protocol = protocol,
             dataJson = Json.encodeToString(JsonObject.serializer(), data),
             verifiedOrigin = verifiedOrigin,
-            selectedRegistryEntryIds = selectedRegistryEntryIds,
+            selectedRegistryEntryIds = selection.registryEntryIds,
         )
     }
 
