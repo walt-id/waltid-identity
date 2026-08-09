@@ -34,7 +34,7 @@ struct ComposeWalletDemoApp: App {
                 attestationHostHeader: attestationHostHeader,
                 transactionDataProfilesUrl: transactionDataProfilesUrl,
                 appGroupIdentifier: Self.namespace.appGroupIdentifier,
-                keychainAccessGroup: Self.namespace.keychainAccessGroup ?? ""
+                keychainAccessGroup: Self.requiredKeychainAccessGroup
             )
             .ignoresSafeArea()
             .onOpenURL { url in
@@ -57,6 +57,23 @@ struct ComposeWalletDemoApp: App {
     }
 
     private static let namespace = IdentityDocumentNamespace.composeDemo
+
+    /// The build-expanded shared Keychain group, or a crash naming what is missing.
+    ///
+    /// This target embeds a document-provider extension, so there is no meaningful degraded mode: with
+    /// the wrong Keychain group the wallet stores its signing key where the extension cannot read it,
+    /// and every presentation fails at the point of signing with no earlier symptom. Failing at launch
+    /// points at the actual cause - an Info.plist key that the build did not expand - instead.
+    private static var requiredKeychainAccessGroup: String {
+        guard let keychainAccessGroup = namespace.keychainAccessGroup else {
+            fatalError(
+                IdentityDocumentSupportFailure
+                    .unresolvedKeychainAccessGroup(IdentityDocumentNamespace.keychainAccessGroupInfoKey)
+                    .localizedDescription
+            )
+        }
+        return keychainAccessGroup
+    }
 
     private static func reconcileRegistrations() async {
         guard #available(iOS 26.0, *) else { return }

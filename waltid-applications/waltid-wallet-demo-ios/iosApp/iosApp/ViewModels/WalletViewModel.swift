@@ -1,4 +1,5 @@
 import Foundation
+import WalletDemoIdentityDocumentSupport
 import WalletSDK
 
 enum WalletTab: Hashable {
@@ -988,9 +989,21 @@ class WalletViewModel: ObservableObject {
         )
     }
 
-    private static func crossProcessAccessConfiguration() -> WalletCrossProcessAccess? {
+    /// Cross-process access for this demo, or a crash naming what is missing.
+    ///
+    /// Not optional: this target embeds a document-provider extension, and a wallet that quietly falls
+    /// back to process-local storage looks healthy while being invisible to that extension. The
+    /// symptom would be a failed presentation on a device, so the misconfiguration - an Info.plist key
+    /// the build did not expand - has to stop the app at launch instead.
+    private static func crossProcessAccessConfiguration() -> WalletCrossProcessAccess {
         guard let keychainAccessGroup = IdentityDocumentSharedConfiguration.keychainAccessGroup,
-              !keychainAccessGroup.isEmpty else { return nil }
+              !keychainAccessGroup.isEmpty else {
+            fatalError(
+                IdentityDocumentSupportFailure
+                    .unresolvedKeychainAccessGroup(IdentityDocumentNamespace.keychainAccessGroupInfoKey)
+                    .localizedDescription
+            )
+        }
         return WalletCrossProcessAccess(
             appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier,
             keychainAccessGroup: keychainAccessGroup
