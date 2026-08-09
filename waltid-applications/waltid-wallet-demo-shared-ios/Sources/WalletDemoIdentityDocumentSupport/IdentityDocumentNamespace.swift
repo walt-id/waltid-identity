@@ -118,8 +118,6 @@ public struct IdentityDocumentNamespace: Sendable {
 public enum IdentityDocumentSupportFailure: LocalizedError, Equatable {
     /// The bundle carries no build-expanded shared Keychain access group under the given key.
     case unresolvedKeychainAccessGroup(String)
-    /// The App Group container could not be opened, so no desired state can be read.
-    case sharedContainerUnavailable(String)
     /// No host app has published desired registrations, so the active wallet is unknown.
     case missingDesiredRegistrations(String)
     /// Desired registrations exist but could not be decoded, so nothing may be concluded from them.
@@ -139,8 +137,6 @@ public enum IdentityDocumentSupportFailure: LocalizedError, Equatable {
         switch self {
         case .unresolvedKeychainAccessGroup(let key):
             return "The Info.plist value \(key) is missing, so app and extension cannot share Keychain items"
-        case .sharedContainerUnavailable(let group):
-            return "The App Group container \(group) is unavailable"
         case .missingDesiredRegistrations(let group):
             return "No wallet has published its documents into \(group) yet; open the app first"
         case .unreadableDesiredRegistrations(let reason):

@@ -101,20 +101,23 @@ final class IdentityDocumentRegistrationPlanTests: XCTestCase {
         XCTAssertTrue(plan.toAdd.isEmpty)
     }
 
-    func testForeignRegistrationsAreNeverDeleted() {
+    func testARegistrationAbsentFromTheDesiredStateIsRemovedWhateverItsIdentifier() {
+        // A published projection is authoritative for the whole store: this integration is the only
+        // writer of Apple's registrations for this provider, so an identifier it does not currently
+        // want registered is a stale one - from an older build's identifier scheme, or a credential
+        // deleted while reconciliation could not run - and leaving it makes the platform offer a
+        // document that cannot be presented.
         let plan = reconciliationPlan(
             desired: [],
             existing: [ExistingRegistration(documentIdentifier: "legacy-registration", documentType: mdl)],
             supportedDocumentTypes: supported
         )
 
-        XCTAssertTrue(
-            plan.isEmpty,
-            "Only \(managedRegistrationIdentifierPrefix)-prefixed identifiers are owned by this integration"
-        )
+        XCTAssertEqual(plan.toRemove, ["legacy-registration"])
+        XCTAssertTrue(plan.toAdd.isEmpty)
     }
 
-    func testEmptyWalletClearsManagedRegistrations() {
+    func testEmptyWalletClearsRegistrations() {
         let plan = reconciliationPlan(
             desired: [],
             existing: [
