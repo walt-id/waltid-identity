@@ -41,11 +41,19 @@ inputs:
     required: false
     type: string
     default: 'true'
-  run-identity-document-provider-checks:
-    description: 'Build both document provider extensions and verify their built configuration'
+  # Split per demo rather than one flag for both: each check builds that demo's app and extension, so
+  # it belongs in the job that already has that project's build warm. A single flag would make the
+  # native job build the Compose demo and the reverse, doubling the two slowest jobs in the matrix.
+  run-native-identity-document-provider-checks:
+    description: 'Build the native demo document provider extension and verify its built configuration'
     required: false
     type: string
-    default: 'true'
+    default: 'false'
+  run-compose-identity-document-provider-checks:
+    description: 'Build the Compose demo document provider extension and verify its built configuration'
+    required: false
+    type: string
+    default: 'false'
   test-report-job-name:
     description: 'Job name to associate with the published iOS JUnit report'
     required: false
@@ -126,7 +134,7 @@ runs:
         ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework
 
     - name: Resolve iOS simulator destination
-      if: ${{ inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-identity-document-provider-checks == 'true' }}
+      if: ${{ inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-native-identity-document-provider-checks == 'true' || inputs.run-compose-identity-document-provider-checks == 'true' }}
       id: resolve-simulator
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
       shell: bash
@@ -158,7 +166,7 @@ runs:
     # disagrees with its host about App Group, Keychain group or doctypes is invisible to iOS, and that
     # failure otherwise only appears during on-device presentation.
     - name: Verify native iOS identity document provider
-      if: ${{ inputs.run-identity-document-provider-checks == 'true' }}
+      if: ${{ inputs.run-native-identity-document-provider-checks == 'true' }}
       id: native_identity_document_provider_checks
       continue-on-error: true
       shell: bash
@@ -172,7 +180,7 @@ runs:
           --build-setting OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
 
     - name: Verify Compose iOS identity document provider
-      if: ${{ inputs.run-identity-document-provider-checks == 'true' }}
+      if: ${{ inputs.run-compose-identity-document-provider-checks == 'true' }}
       id: compose_identity_document_provider_checks
       continue-on-error: true
       shell: bash
@@ -323,7 +331,7 @@ runs:
         retention-days: 7
 
     - name: Fail if iOS tests failed
-      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-identity-document-provider-checks == 'true') }}
+      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-native-identity-document-provider-checks == 'true' || inputs.run-compose-identity-document-provider-checks == 'true') }}
       shell: bash
       run: |
         failed=()
@@ -331,10 +339,10 @@ runs:
         if [[ "${{ inputs.run-ios-simulator-tests }}" == "true" && "${{ steps.ios_simulator_tests.outcome }}" == "failure" ]]; then
           failed+=("iosSimulatorArm64Test")
         fi
-        if [[ "${{ inputs.run-identity-document-provider-checks }}" == "true" && "${{ steps.native_identity_document_provider_checks.outcome }}" == "failure" ]]; then
+        if [[ "${{ inputs.run-native-identity-document-provider-checks }}" == "true" && "${{ steps.native_identity_document_provider_checks.outcome }}" == "failure" ]]; then
           failed+=("native identity document provider configuration")
         fi
-        if [[ "${{ inputs.run-identity-document-provider-checks }}" == "true" && "${{ steps.compose_identity_document_provider_checks.outcome }}" == "failure" ]]; then
+        if [[ "${{ inputs.run-compose-identity-document-provider-checks }}" == "true" && "${{ steps.compose_identity_document_provider_checks.outcome }}" == "failure" ]]; then
           failed+=("Compose identity document provider configuration")
         fi
         if [[ "${{ inputs.run-native-demo-tests }}" == "true" && "${{ steps.ios_demo_app_tests.outcome }}" == "failure" ]]; then
