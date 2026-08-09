@@ -218,6 +218,31 @@ public struct AnnexCPresentationPreview: Equatable, Sendable {
     public let credentialOptions: [PresentationCredentialOption]
     /// Result of reader-authentication trust evaluation.
     public let readerTrust: ReaderTrust
+
+    /// Creates a retained Annex C consent state.
+    ///
+    /// Public so that consent UI outside this package can be exercised without an iOS 26 device
+    /// request, which no test can construct.
+    ///
+    /// - Parameters:
+    ///   - requestID: Wallet-bound handle used to submit the retained preview.
+    ///   - verifiedOrigin: Verified origin bound to the presentation request.
+    ///   - parsedRequest: Parsed request the raw post-consent request must match.
+    ///   - credentialOptions: Credentials eligible for user consent.
+    ///   - readerTrust: Result of reader-authentication trust evaluation.
+    public init(
+        requestID: String,
+        verifiedOrigin: String,
+        parsedRequest: AnnexCParsedRequest,
+        credentialOptions: [PresentationCredentialOption],
+        readerTrust: ReaderTrust
+    ) {
+        self.requestID = requestID
+        self.verifiedOrigin = verifiedOrigin
+        self.parsedRequest = parsedRequest
+        self.credentialOptions = credentialOptions
+        self.readerTrust = readerTrust
+    }
 }
 
 /// Encrypted ISO 18013-7 response JSON returned to IdentityDocumentServices.
@@ -226,4 +251,17 @@ public struct DigitalCredentialResponse: Equatable, Sendable {
     public let protocolIdentifier: String
     /// Protocol response encoded as JSON.
     public let dataJSON: String
+
+    /// Creates an encrypted digital-credential response.
+    ///
+    /// Public so that provider orchestration outside this package can be exercised against a stand-in
+    /// wallet, which is the only way to test a flow the platform starts.
+    ///
+    /// - Parameters:
+    ///   - protocolIdentifier: Platform protocol identifier for the encrypted response.
+    ///   - dataJSON: Protocol response encoded as JSON.
+    public init(protocolIdentifier: String, dataJSON: String) {
+        self.protocolIdentifier = protocolIdentifier
+        self.dataJSON = dataJSON
+    }
 }
