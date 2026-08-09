@@ -99,6 +99,41 @@ public struct SharingRequester: Equatable {
             verifiedOrigin?.isPresentableValue == true ||
             details.contains { $0.value?.isPresentableValue == true }
     }
+
+    /// Names the one requester claim the transport authenticated, wherever it is shown.
+    public static let verifiedOriginLabel = "Verified website"
+
+    /// The name the review heads the requester section with, or `nil` when the request named nobody.
+    public var identityName: String? {
+        display?.name?.presentableValue ?? fallbackName?.presentableValue
+    }
+
+    /// Whether ``verifiedOrigin`` is itself the name heading the section.
+    ///
+    /// True is what a request carrying no verifier metadata looks like: there is nothing self-asserted
+    /// to head the section with, so the origin does.
+    public var verifiedOriginIsIdentityName: Bool {
+        guard let verifiedOrigin = verifiedOrigin?.presentableValue else { return false }
+        return verifiedOrigin == identityName
+    }
+
+    /// Caption for ``identityName``, or `nil` when the heading needs none.
+    ///
+    /// The origin is the only requester claim that was authenticated rather than self-asserted, so it
+    /// is always marked as one. When it is itself the heading it is captioned there, because an
+    /// unlabelled origin reads as one more self-asserted requester claim.
+    public var identityNameCaption: String? {
+        verifiedOriginIsIdentityName ? Self.verifiedOriginLabel : nil
+    }
+
+    /// The labelled rows shown under ``identityName``.
+    ///
+    /// The origin leads them, but only when it is not already the heading: one string, one statement
+    /// about it. Repeating it would read as two independent facts about the requester.
+    public var detailRows: [SharingDetail] {
+        let leadingOrigin = verifiedOriginIsIdentityName ? nil : verifiedOrigin?.presentableValue
+        return [SharingDetail(label: Self.verifiedOriginLabel, value: leadingOrigin)] + details
+    }
 }
 
 /// One labelled value in a requester or technical-details list.

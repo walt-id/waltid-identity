@@ -85,6 +85,45 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
+    func testAnOriginThatHeadsTheRequesterSectionIsCaptionedAsVerifiedAndNotRepeated() {
+        let requester = annexCPreview(verifiedOrigin: "https://reader.example").sharingReview().request.requester
+
+        XCTAssertEqual(requester?.identityName, "https://reader.example")
+        XCTAssertEqual(
+            requester?.identityNameCaption,
+            SharingRequester.verifiedOriginLabel,
+            "An uncaptioned heading reads as one more self-asserted requester claim, and the origin is the only authenticated one"
+        )
+        XCTAssertEqual(
+            requester?.detailRows.filter { $0.value?.isEmpty == false }.map(\.label),
+            [],
+            "The origin already heads the section, so a labelled row repeating it would read as a second, independent requester fact"
+        )
+    }
+
+    func testAnOriginBesideSelfAssertedMetadataIsALabelledRowRatherThanACaption() {
+        let requester = SharingRequester(
+            display: MetadataDisplay(name: "Example Verifier", locale: "en", logoURI: nil, logoAltText: nil),
+            fallbackName: "https://verifier.example",
+            verifiedOrigin: "https://verifier.example",
+            details: [SharingDetail(label: "Privacy policy", value: "https://verifier.example/privacy")]
+        )
+
+        XCTAssertEqual(requester.identityName, "Example Verifier")
+        XCTAssertNil(
+            requester.identityNameCaption,
+            "The heading here is self-asserted metadata, and captioning it as verified would present it as authenticated"
+        )
+        XCTAssertEqual(
+            requester.detailRows.map { [$0.label, $0.value ?? ""] },
+            [
+                [SharingRequester.verifiedOriginLabel, "https://verifier.example"],
+                ["Privacy policy", "https://verifier.example/privacy"],
+            ],
+            "The origin stays visible under its own label: a review showing only the name a request asked to be called would hide the one verified fact"
+        )
+    }
+
     // MARK: - Reader trust
 
     func testAProtocolWithoutReaderAuthenticationGetsNoReaderTrustState() {

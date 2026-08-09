@@ -43,34 +43,23 @@ public struct SharingRequestSections: View {
 struct RequesterSection: View {
     let requester: SharingRequester
 
-    private var identityName: String? {
-        requester.display?.name?.presentableValue ?? requester.fallbackName?.presentableValue
-    }
-
     private var details: [MetadataDetailItem] {
-        // A verified origin leads the details because it is the only requester claim that was
-        // authenticated rather than self-asserted. It is dropped when it is already the identity
-        // being shown - a request with no verifier metadata is headed by its origin, and repeating it
-        // as a labelled row would read as two independent facts about the requester.
-        let verifiedOrigin = requester.verifiedOrigin?.presentableValue
-        let leading = verifiedOrigin == identityName ? nil : verifiedOrigin
-        return ([MetadataDetailItem(label: "Verified website", value: leading)] +
-            requester.details.map { MetadataDetailItem(label: $0.label, value: $0.value, linkURI: $0.linkURI) })
+        (requester.detailRows.map { MetadataDetailItem(label: $0.label, value: $0.value, linkURI: $0.linkURI) })
             .filter(\.isVisible)
     }
 
     var body: some View {
         let details = details
-        if identityName != nil || !details.isEmpty {
+        if requester.identityName != nil || !details.isEmpty {
             ReviewMetadataSection(
                 title: "Requester",
                 titleAccessibilityIdentifier: WalletAccessibilityID.presentationVerifierSection
             ) {
-                if let identityName {
+                if let identityName = requester.identityName {
                     MetadataIdentityView(
                         display: requester.display,
                         fallbackName: identityName,
-                        supportingText: nil
+                        supportingText: requester.identityNameCaption
                     )
                     if !details.isEmpty {
                         Divider()
