@@ -59,10 +59,13 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithTag(WalletDemoSharingReviewTestTags.Review).assertIsDisplayed()
         onNodeWithTag(WalletDemoSharingReviewTestTags.RequesterSection).performScrollTo().assertIsDisplayed()
         // An unsigned Digital Credentials request has no verifier metadata, so the authenticated origin
-        // is the requester identity - and is shown once, not also repeated as a labelled row.
+        // is the requester identity. It is shown once, captioned as verified: the origin string is not
+        // repeated as a second labelled row, but the fact that it was authenticated is still stated -
+        // an uncaptioned origin reads as one more self-asserted requester claim.
         onNodeWithText("https://verifier.example").performScrollTo().assertIsDisplayed()
         onAllNodesWithText("https://verifier.example").assertCountEquals(1)
-        onAllNodesWithText("Verified website").assertCountEquals(0)
+        onNodeWithText("Verified website").performScrollTo().assertIsDisplayed()
+        onAllNodesWithText("Verified website").assertCountEquals(1)
         onNodeWithText("Payment Authorization").performScrollTo().assertIsDisplayed()
         onNodeWithText("42.00").performScrollTo().assertIsDisplayed()
         onNodeWithText("EUR").performScrollTo().assertIsDisplayed()

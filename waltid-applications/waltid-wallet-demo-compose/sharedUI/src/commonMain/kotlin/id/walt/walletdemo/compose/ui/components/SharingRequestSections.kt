@@ -66,12 +66,14 @@ private fun RequesterSection(requester: WalletDemoSharingRequester) {
     val displayName = requester.display?.name?.trim()?.takeIf { it.isNotEmpty() }
     val fallbackName = requester.fallbackName?.trim()?.takeIf { it.isNotEmpty() }
     val identityName = displayName ?: fallbackName
+    val verifiedOrigin = requester.verifiedOrigin?.trim()?.takeIf { it.isNotEmpty() }
+    // The origin is the only requester claim that was authenticated rather than self-asserted, so it is
+    // always labelled as such - but never twice. When it is itself the identity being shown, which is
+    // what a request carrying no verifier metadata looks like, the label captions that heading instead
+    // of repeating the origin as a second row: one string, one statement about it.
+    val originIsIdentity = verifiedOrigin != null && verifiedOrigin == identityName
     val details = buildList {
-        // A verified origin leads the details because it is the only requester claim that was
-        // authenticated rather than self-asserted. It is dropped when it is already the identity being
-        // shown - a request with no verifier metadata is headed by its origin, and repeating it as a
-        // labelled row would read as two independent facts about the requester.
-        add(WalletDemoSharingDetail("Verified website", requester.verifiedOrigin?.takeIf { it != identityName }))
+        add(WalletDemoSharingDetail(VERIFIED_ORIGIN_LABEL, verifiedOrigin?.takeIf { !originIsIdentity }))
         addAll(requester.details)
     }.filter { !it.value.isNullOrBlank() }
 
@@ -85,7 +87,7 @@ private fun RequesterSection(requester: WalletDemoSharingRequester) {
             MetadataIdentityRow(
                 display = requester.display,
                 fallbackName = identityName,
-                supportingText = null,
+                supportingText = VERIFIED_ORIGIN_LABEL.takeIf { originIsIdentity },
             )
             if (details.isNotEmpty()) MetadataRowDivider()
         }
@@ -207,6 +209,9 @@ private fun TechnicalDetailsSection(details: List<WalletDemoSharingDetail>) {
         }
     }
 }
+
+/** Names the one requester claim the transport authenticated, wherever it is shown. */
+private const val VERIFIED_ORIGIN_LABEL = "Verified website"
 
 private val WalletDemoSharingEncryptionMechanism.displayName: String
     get() = when (this) {
