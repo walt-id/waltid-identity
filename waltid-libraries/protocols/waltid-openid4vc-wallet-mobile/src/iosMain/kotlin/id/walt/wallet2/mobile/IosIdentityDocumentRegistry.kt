@@ -14,16 +14,19 @@ import platform.Foundation.NSUserDefaults
  * carries no claim values, no portrait, no issuer-signed payload, and no key material: the shared
  * App Group container is readable by every process in the group and survives app deletion.
  *
+ * Carries only what Apple's registration store takes. The wallet-local credential id is deliberately
+ * absent: the reconciler never resolves a registration back to a credential, and Apple does not hand
+ * `documentIdentifier` to the provider extension either, so a credential id here would be shared
+ * metadata with no reader.
+ *
  * @property documentIdentifier `MobileDocumentRegistration.documentIdentifier` for this credential.
  * Always the wallet's stable [MobileWalletCredentialRegistryRecord.registryEntryId] so that a
  * refresh of an unchanged wallet is a no-op for Apple's store.
- * @property credentialId Wallet-local credential this registration resolves back to.
  * @property documentType ISO mdoc doctype registered with Apple, for example `org.iso.18013.5.1.mDL`.
  */
 @Serializable
 public data class IosIdentityDocumentProjectionRecord(
     public val documentIdentifier: String,
-    public val credentialId: String,
     public val documentType: String,
 )
 
@@ -42,13 +45,11 @@ public data class IosIdentityDocumentProjectionRecord(
  * assuming `"default"` is what keeps a host started with a non-default wallet id presentable.
  *
  * @property walletId Wallet whose credentials these registrations resolve to.
- * @property registryId Logical registry identifier the wallet published under, for diagnostics.
  * @property registrations Desired registrations, one per presentable mdoc credential.
  */
 @Serializable
 public data class IosIdentityDocumentProjectionState(
     public val walletId: String,
-    public val registryId: String,
     public val registrations: List<IosIdentityDocumentProjectionRecord>,
 )
 
@@ -179,9 +180,12 @@ public class IosIdentityDocumentRegistry(
      * be served by a provider extension.
      *
      * [MobileWalletCredentialRegistrationResult.registeredEntryCount] counts desired registrations
-     * written for [registryId], not registrations Apple has accepted: applying them is Swift's job.
+     * written, not registrations Apple has accepted: applying them is Swift's job.
      * [MobileWalletCredentialRegistrationResult.available] therefore still reports whether Apple can
      * currently be updated at all, which is what an application surfaces to the user.
+     *
+     * [registryId] is unused here. Apple's store is keyed by document identifier alone, and the
+     * projection describes exactly one wallet, so a registry id would be a value with no reader.
      */
     override suspend fun replace(
         registryId: String,
@@ -197,12 +201,11 @@ public class IosIdentityDocumentRegistry(
             .map {
                 IosIdentityDocumentProjectionRecord(
                     documentIdentifier = it.registryEntryId,
-                    credentialId = it.credentialId,
                     documentType = it.type,
                 )
             }
 
-        val persisted = runCatching { writeProjection(group, registryId, projection) }
+        val persisted = runCatching { writeProjection(group, projection) }
         persisted.exceptionOrNull()?.let { failure ->
             return MobileWalletCredentialRegistrationResult(
                 available = false,
@@ -220,7 +223,6 @@ public class IosIdentityDocumentRegistry(
 
     private fun writeProjection(
         group: String,
-        registryId: String,
         projection: List<IosIdentityDocumentProjectionRecord>,
     ) {
         // A blind overwrite, not a read-modify-write: this wallet's state is the whole desired state,
@@ -232,7 +234,6 @@ public class IosIdentityDocumentRegistry(
                 IosIdentityDocumentProjectionState.serializer(),
                 IosIdentityDocumentProjectionState(
                     walletId = walletId,
-                    registryId = registryId,
                     registrations = projection,
                 ),
             ),

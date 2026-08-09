@@ -85,8 +85,8 @@ class IosIdentityDocumentRegistryTest {
             assertEquals(2, result.registeredEntryCount)
             assertContentEquals(
                 listOf(
-                    IosIdentityDocumentProjectionRecord("dc-a", "cred-a", MDL),
-                    IosIdentityDocumentProjectionRecord("dc-b", "cred-b", MDL),
+                    IosIdentityDocumentProjectionRecord("dc-a", MDL),
+                    IosIdentityDocumentProjectionRecord("dc-b", MDL),
                 ),
                 published(suite).registrations,
             )
@@ -104,7 +104,6 @@ class IosIdentityDocumentRegistryTest {
             )
 
             assertEquals("test-123", published(suite).walletId)
-            assertEquals("registry-1", published(suite).registryId)
         }
     }
 
@@ -158,7 +157,7 @@ class IosIdentityDocumentRegistryTest {
             )
 
             assertContentEquals(
-                listOf(IosIdentityDocumentProjectionRecord("dc-b", "cred-b", PID)),
+                listOf(IosIdentityDocumentProjectionRecord("dc-b", PID)),
                 published(suite).registrations,
             )
         }
@@ -177,7 +176,7 @@ class IosIdentityDocumentRegistryTest {
             assertFalse(result.available)
             assertEquals("IdentityDocumentServices registration is not authorized", result.reason)
             assertContentEquals(
-                listOf(IosIdentityDocumentProjectionRecord("dc-a", "cred-a", MDL)),
+                listOf(IosIdentityDocumentProjectionRecord("dc-a", MDL)),
                 published(suite).registrations,
             )
         }
@@ -197,7 +196,7 @@ class IosIdentityDocumentRegistryTest {
 
             assertTrue(registry.capabilities.registrationAvailable)
             assertContentEquals(
-                listOf(IosIdentityDocumentProjectionRecord("dc-a", "cred-a", MDL)),
+                listOf(IosIdentityDocumentProjectionRecord("dc-a", MDL)),
                 published(suite).registrations,
             )
         }
@@ -240,7 +239,7 @@ class IosIdentityDocumentRegistryTest {
             val state = published(suite)
             assertEquals("wallet-b", state.walletId)
             assertContentEquals(
-                listOf(IosIdentityDocumentProjectionRecord("dc-b", "cred-b", PID)),
+                listOf(IosIdentityDocumentProjectionRecord("dc-b", PID)),
                 state.registrations,
             )
         }
@@ -278,7 +277,7 @@ class IosIdentityDocumentRegistryTest {
             // Well-formed JSON but not this contract: an older build's projection carried no wallet id,
             // and guessing one would open the wrong database.
             NSUserDefaults(suiteName = suite).setObject(
-                "{\"registryId\":\"registry-1\",\"registrations\":[]}",
+                "{\"registrations\":[]}",
                 forKey = IosIdentityDocumentRegistry.PROJECTION_STATE_KEY,
             )
 
