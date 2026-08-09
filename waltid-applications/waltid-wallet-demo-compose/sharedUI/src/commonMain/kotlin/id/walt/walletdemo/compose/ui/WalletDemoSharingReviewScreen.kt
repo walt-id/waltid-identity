@@ -37,11 +37,17 @@ import id.walt.walletdemo.compose.ui.screens.CredentialDetailsScreen
  * [WalletDemoSharingSelection] to [onSubmit], so a host launched by the OS does not have to reproduce
  * the selection rules the in-app flow already implements.
  *
+ * A platform back gesture is handled here only as far as this screen's own navigation goes: while
+ * credential details are open it closes them. At the review root there is nothing left for the screen
+ * to undo, so the gesture is passed to [onBackAtRoot] - the host, not the review, decides what leaving
+ * an OS-invoked surface means, and that is deliberately not assumed to equal [onCancel].
+ *
  * @param title Heading naming the kind of request, since a provider screen has no surrounding app chrome.
  * @param enabled Whether the user can still act; pass false while a submission is in flight.
  * @param onSubmit Invoked with the user's selection when Share is confirmed.
  * @param onCancel Invoked when the user declines without a protocol-level rejection.
  * @param onReject Protocol-level refusal, or null when the transport has no such message.
+ * @param onBackAtRoot Platform back gesture at the review root, or null to let the host handle it.
  */
 @Composable
 fun WalletDemoSharingReviewScreen(
@@ -51,12 +57,31 @@ fun WalletDemoSharingReviewScreen(
     onCancel: () -> Unit,
     onReject: (() -> Unit)? = null,
     enabled: Boolean = true,
+    onBackAtRoot: (() -> Unit)? = null,
 ) {
     var selection by remember(review) {
         mutableStateOf(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
     }
     var openCredentialDetailsId by remember(review) { mutableStateOf<String?>(null) }
     val scrollState = rememberScrollState()
+    val openDetails = openCredentialDetailsId?.let { detailsId ->
+        review.credentialOptions
+            .map { it.toCredentialDetails() }
+            .firstOrNull { it.summary.id == detailsId }
+    }
+
+    // Called unconditionally, as the platform handlers require. A submission already in flight
+    // consumes the gesture and does nothing: the response is on its way, so neither closing this
+    // screen nor abandoning it is an outcome the user can still choose.
+    SystemBackHandler(
+        enabled = openDetails != null || !enabled || onBackAtRoot != null,
+    ) {
+        when {
+            openDetails != null -> openCredentialDetailsId = null
+            !enabled -> Unit
+            else -> onBackAtRoot?.invoke()
+        }
+    }
 
     MaterialTheme {
         Surface(
@@ -65,12 +90,6 @@ fun WalletDemoSharingReviewScreen(
                 .exportTestTagsForPlatformAutomation(),
             color = MaterialTheme.colorScheme.background,
         ) {
-            val openDetails = openCredentialDetailsId?.let { detailsId ->
-                review.credentialOptions
-                    .map { it.toCredentialDetails() }
-                    .firstOrNull { it.summary.id == detailsId }
-            }
-
             if (openDetails != null) {
                 CredentialDetailsScreen(
                     details = openDetails,

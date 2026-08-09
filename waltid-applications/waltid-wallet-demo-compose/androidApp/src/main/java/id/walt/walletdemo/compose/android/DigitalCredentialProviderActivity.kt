@@ -107,6 +107,11 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
      * There is no Reject action: Credential Manager has no channel for a protocol-level refusal, so
      * declining returns the platform's cancellation instead. [enabled] is dropped for the duration of
      * a submission so a second tap cannot start a second response for one request.
+     *
+     * Back and Cancel resolve to different Credential Manager outcomes, which is why the review is
+     * given both. Cancel is a decision about the request and ends the whole operation; back out of the
+     * review is a decision about this provider only, and returning [RESULT_CANCELED] is what lets
+     * Credential Manager put its own selector back up so another provider can still answer.
      */
     private fun showReview(
         review: WalletDemoSharingReview,
@@ -127,6 +132,7 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
                     AndroidDigitalCredentialProvider.setCancellation(resultIntent)
                     finishProviderResult()
                 },
+                onBackAtRoot = ::finishWithoutProviderResult,
             )
         }
     }
@@ -189,6 +195,21 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
 
     private fun finishProviderResult() {
         setResult(RESULT_OK, resultIntent)
+        finish()
+    }
+
+    /**
+     * Leaves this provider without answering, which Credential Manager reads as "ask again".
+     *
+     * [RESULT_CANCELED] carries no Credential Manager payload on purpose: writing a cancellation
+     * exception here would produce the same result as the Cancel button and end the caller's
+     * `getCredential` call, whereas backing out of one provider's review is a choice about this wallet
+     * and not about the request. It is also what the OS does for this Activity by default, so a back
+     * gesture arriving before the review has been composed - while the request is still being
+     * previewed - already resolves the same way.
+     */
+    private fun finishWithoutProviderResult() {
+        setResult(RESULT_CANCELED)
         finish()
     }
 
