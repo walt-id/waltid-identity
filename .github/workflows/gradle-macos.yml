@@ -93,7 +93,9 @@ jobs:
           simulator-destination: ${{ env.IOS_SIMULATOR_DESTINATION }}
           run-compile-smoke: 'false'
           run-ios-simulator-tests: 'false'
-          run-wallet-core-xcframework: 'false'
+          # The Compose demo embeds a document-provider extension that links WalletSDK, so this job
+          # needs the local WalletCore binary target the same way the native demo job does.
+          run-wallet-core-xcframework: 'true'
           run-native-demo-tests: 'false'
           run-compose-demo-tests: 'true'
           test-report-job-name: ${{ env.JOB_NAME_PREFIX }}compose-ios-demo-tests
