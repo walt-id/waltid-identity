@@ -33,7 +33,11 @@ public struct BasicAnnexCReviewView: View {
                 .navigationTitle("Share documents")
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
+                        // Disabled while submitting for the same reason Share is: cancelling mid-flight
+                        // tears down the scene while `sendResponse` is still sealing a response, so the
+                        // platform would receive both a cancellation and a response for one request.
                         Button("Cancel") { model.cancel() }
+                            .disabled(model.isSubmitting)
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Share") { Task { await model.submit() } }
