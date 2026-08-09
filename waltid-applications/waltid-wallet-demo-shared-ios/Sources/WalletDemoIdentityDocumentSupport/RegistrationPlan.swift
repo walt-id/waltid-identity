@@ -1,4 +1,5 @@
 import Foundation
+import WalletSDK
 
 /// One mdoc credential the wallet wants Apple to offer.
 public struct DesiredRegistration: Equatable, Hashable, Sendable {
@@ -83,6 +84,36 @@ public func reconciliationPlan(
         .sorted()
 
     return RegistrationPlan(toAdd: toAdd, toRemove: toRemove)
+}
+
+/// Turns a projection read from the App Group into the registrations to reconcile against, or `nil`.
+///
+/// Split out of ``IdentityDocumentRegistrationCoordinator`` because this is the fail-closed decision,
+/// and the coordinator around it can only run against Apple's actor on an authorized iOS 26 device.
+/// The distinction it makes is not cosmetic: ``reconciliationPlan(desired:existing:supportedDocumentTypes:)``
+/// removes every managed registration absent from `desired`, so reading "I could not find out what the
+/// wallet holds" as an empty desired set would unregister documents the wallet can still present.
+///
+/// - Parameter projection: What the shared App Group says about the active wallet.
+/// - Returns: The wallet's desired registrations, or `nil` when no wallet has published yet and Apple's
+///   store must be left exactly as it is. An empty array is a decision, not an absence: the wallet has
+///   no presentable mdoc credential and its managed registrations have to go.
+/// - Throws: ``IdentityDocumentSupportFailure/unreadableDesiredRegistrations(_:)`` when the projection
+///   exists but cannot be decoded. Thrown rather than returned as `nil` because a corrupt container is a
+///   bug worth surfacing, while a missing one is the normal state of a fresh install.
+public func desiredRegistrations(
+    from projection: DesiredRegistrationProjection
+) throws -> [DesiredRegistration]? {
+    switch projection {
+    case .missing:
+        return nil
+    case .malformed(let reason):
+        throw IdentityDocumentSupportFailure.unreadableDesiredRegistrations(reason)
+    case .published(_, let registrations):
+        return registrations.map {
+            DesiredRegistration(documentIdentifier: $0.documentIdentifier, documentType: $0.documentType)
+        }
+    }
 }
 
 /// Prefix the wallet core gives every per-credential registry entry identifier.

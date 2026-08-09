@@ -1,5 +1,6 @@
 import XCTest
 import WalletDemoIdentityDocumentSupport
+import WalletSDK
 
 /// Reconciliation semantics, exercised as a pure diff rather than against Apple's actor.
 ///
@@ -124,6 +125,48 @@ final class IdentityDocumentRegistrationPlanTests: XCTestCase {
         )
 
         XCTAssertEqual(plan.toRemove, ["dc-a", "dc-b"])
+    }
+
+    // MARK: - Fail-closed reads of the shared projection
+
+    func testACorruptProjectionYieldsNoPlanAtAllRatherThanAnEmptyOne() {
+        // An undecodable projection says nothing about what the wallet holds. Read as "nothing desired"
+        // it would remove every `dc-` registration below, so it must not produce a desired set at all.
+        XCTAssertThrowsError(try desiredRegistrations(from: .malformed(reason: "unexpected end of input"))) { error in
+            XCTAssertEqual(
+                error as? IdentityDocumentSupportFailure,
+                .unreadableDesiredRegistrations("unexpected end of input"),
+                "The decoder message is the only trace of this on a device, so it has to be carried"
+            )
+        }
+    }
+
+    func testAMissingProjectionYieldsNoPlanAtAllRatherThanAnEmptyOne() throws {
+        XCTAssertNil(
+            try desiredRegistrations(from: .missing),
+            "A fresh install has published nothing, which is not the same as wanting nothing registered"
+        )
+    }
+
+    func testAPublishedEmptyProjectionDoesUnregisterManagedDocuments() throws {
+        // The counterpart to the two above: an empty projection *is* authoritative - the wallet's last
+        // mdoc credential was deleted - so failing closed must not swallow this case too.
+        let desired = try XCTUnwrap(
+            try desiredRegistrations(from: .published(walletID: "test-123", registrations: []))
+        )
+        XCTAssertTrue(desired.isEmpty)
+
+        let plan = reconciliationPlan(
+            desired: desired,
+            existing: [
+                ExistingRegistration(documentIdentifier: "dc-a", documentType: mdl),
+                ExistingRegistration(documentIdentifier: "dc-b", documentType: pid),
+            ],
+            supportedDocumentTypes: supported
+        )
+
+        XCTAssertEqual(plan.toRemove, ["dc-a", "dc-b"])
+        XCTAssertTrue(plan.toAdd.isEmpty)
     }
 
     func testPlanIsDeterministicRegardlessOfInputOrder() {

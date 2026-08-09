@@ -42,9 +42,18 @@ public struct IdentityDocumentRegistrationCoordinator: Sendable {
             return RegistrationPlan(toAdd: [], toRemove: [])
         }
 
-        let desired = DigitalCredentialRegistrationStorage
-            .desiredRegistrations(appGroupIdentifier: namespace.appGroupIdentifier)
-            .map { DesiredRegistration(documentIdentifier: $0.documentIdentifier, documentType: $0.documentType) }
+        // Fails closed on anything short of a published projection: the plan below is allowed to
+        // remove every `dc-` registration, so an absent or undecodable projection - which says
+        // nothing about what the wallet holds - must not be read as "the wallet wants nothing". A
+        // malformed one throws out of here; the callback path below logs it.
+        guard let desired = try desiredRegistrations(
+            from: DigitalCredentialRegistrationStorage.desiredRegistrations(
+                appGroupIdentifier: namespace.appGroupIdentifier
+            )
+        ) else {
+            log.info("No desired registration state in App Group \(namespace.appGroupIdentifier, privacy: .public); leaving Apple's registrations untouched")
+            return RegistrationPlan(toAdd: [], toRemove: [])
+        }
         let existing = try await store.registrations.map { registration in
             // `IdentityDocumentRegistration` exposes only the identifier. A registration that is not
             // a mobile document gets an unmatchable doctype, so the planner treats it as stale rather

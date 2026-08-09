@@ -13,14 +13,31 @@ import WalletCore
 /// hands it over; neither the App Group key nor the stored spelling of a status is written here.
 public enum DigitalCredentialRegistrationStorage {
     #if canImport(WalletCore) && os(iOS)
-    /// Desired mdoc registrations of every wallet sharing `appGroupIdentifier`.
+    /// Desired mdoc registrations of the wallet that currently owns `appGroupIdentifier`.
     ///
     /// This is the wallet's intent, not Apple's state: it is published regardless of provider
     /// authorization so that a later authorization can be reconciled without reissuing credentials.
+    ///
+    /// The three outcomes are kept apart rather than flattened to a list, because only a published
+    /// projection authorizes removing registrations; see ``DesiredRegistrationProjection``.
     public static func desiredRegistrations(
         appGroupIdentifier: String
-    ) -> [IosIdentityDocumentProjectionRecord] {
-        IosIdentityDocumentRegistry.companion.readDesiredRegistrations(appGroupIdentifier: appGroupIdentifier)
+    ) -> DesiredRegistrationProjection {
+        let result = IosIdentityDocumentRegistry.companion
+            .readDesiredRegistrations(appGroupIdentifier: appGroupIdentifier)
+        if result is IosIdentityDocumentProjectionResultMissing { return .missing }
+        if let malformed = result as? IosIdentityDocumentProjectionResultMalformed {
+            return .malformed(reason: malformed.reason)
+        }
+        if let published = result as? IosIdentityDocumentProjectionResultPublished {
+            return .published(
+                walletID: published.state.walletId,
+                registrations: published.state.registrations
+            )
+        }
+        // A future case this SDK build does not know about says nothing about the wallet's intent,
+        // so it must not authorize mutating Apple's store either.
+        return .malformed(reason: "Unrecognized identity document projection state")
     }
 
     @available(iOS 26.0, *)
@@ -37,6 +54,33 @@ public enum DigitalCredentialRegistrationStorage {
 }
 
 #if canImport(WalletCore) && os(iOS)
+/// What the shared App Group says about the active wallet's desired registrations.
+///
+/// Deliberately not an array: reconciliation *removes* registrations, and removing one stops the
+/// platform offering a document that may still be presentable. Only ``published(walletID:registrations:)``
+/// is a statement of intent; the other two mean the intent is unknown and Apple's store must be left
+/// exactly as it is.
+///
+/// Not `Sendable`: the published payload is the wallet core's own projection record, a Kotlin object.
+/// Callers map it into their own value type before the first `await`, as reconciliation does.
+public enum DesiredRegistrationProjection {
+    /// No wallet has published a projection yet - a fresh install, or a build without the App Group.
+    case missing
+    /// A projection exists but could not be decoded, so nothing can be concluded from it.
+    ///
+    /// - Parameter reason: Decoder message, for the log that is the only trace of this on a device.
+    case malformed(reason: String)
+    /// The active wallet's authoritative desired state.
+    ///
+    /// An empty `registrations` array is authoritative too: the wallet holds no presentable mdoc
+    /// credential and its managed registrations must be removed.
+    ///
+    /// - Parameters:
+    ///   - walletID: Wallet these registrations belong to; the extension must open this wallet.
+    ///   - registrations: One desired registration per presentable mdoc credential.
+    case published(walletID: String, registrations: [IosIdentityDocumentProjectionRecord])
+}
+
 @available(iOS 26.0, *)
 private extension IdentityDocumentProviderRegistrationStore.Status {
     /// An unrecognized future status is reported as unsupported: the conservative choice, since

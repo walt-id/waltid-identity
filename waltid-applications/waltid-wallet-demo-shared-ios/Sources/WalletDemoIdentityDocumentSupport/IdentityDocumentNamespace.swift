@@ -47,9 +47,11 @@ public struct IdentityDocumentNamespace: Sendable {
 
     /// Wallet configuration for a process that must share state with its counterpart.
     ///
-    /// - Parameter walletID: Wallet identifier; must match the host app's, or the extension opens a
-    ///   different database under the same App Group.
-    public func walletConfiguration(walletID: String = "default") throws -> WalletConfiguration {
+    /// - Parameter walletID: Wallet identifier. Has no default: the wallet id decides which
+    ///   `wallet_<id>` database is opened, so a default here would let the extension silently open a
+    ///   different database than the host whenever the host runs with a non-default wallet id. The
+    ///   extension resolves it from ``activeWalletID()`` instead of assuming one.
+    public func walletConfiguration(walletID: String) throws -> WalletConfiguration {
         guard let keychainAccessGroup else {
             throw IdentityDocumentSupportFailure.unresolvedKeychainAccessGroup(Self.keychainAccessGroupInfoKey)
         }
@@ -60,6 +62,28 @@ public struct IdentityDocumentNamespace: Sendable {
                 keychainAccessGroup: keychainAccessGroup
             )
         )
+    }
+
+    /// The wallet id the host app published into the shared container.
+    ///
+    /// Apple's `ISO18013MobileDocumentRequestContext` carries the parsed request, the origin,
+    /// `sendResponse` and `cancel` - not the `documentIdentifier` of the registration that matched.
+    /// So the extension cannot derive the wallet from the request and has to read the host's own
+    /// published state, which is also why the projection covers exactly one wallet.
+    ///
+    /// - Throws: ``IdentityDocumentSupportFailure/missingDesiredRegistrations`` when no host has
+    ///   published yet, or ``IdentityDocumentSupportFailure/unreadableDesiredRegistrations(_:)`` when
+    ///   the projection cannot be decoded. Guessing `"default"` in either case would open an empty
+    ///   database and present the user an empty picker instead of an error.
+    public func activeWalletID() throws -> String {
+        switch DigitalCredentialRegistrationStorage.desiredRegistrations(appGroupIdentifier: appGroupIdentifier) {
+        case .published(let walletID, _):
+            return walletID
+        case .missing:
+            throw IdentityDocumentSupportFailure.missingDesiredRegistrations(appGroupIdentifier)
+        case .malformed(let reason):
+            throw IdentityDocumentSupportFailure.unreadableDesiredRegistrations(reason)
+        }
     }
 
     /// Info.plist key carrying the build-expanded shared Keychain access group.
@@ -96,6 +120,10 @@ public enum IdentityDocumentSupportFailure: LocalizedError, Equatable {
     case unresolvedKeychainAccessGroup(String)
     /// The App Group container could not be opened, so no desired state can be read.
     case sharedContainerUnavailable(String)
+    /// No host app has published desired registrations, so the active wallet is unknown.
+    case missingDesiredRegistrations(String)
+    /// Desired registrations exist but could not be decoded, so nothing may be concluded from them.
+    case unreadableDesiredRegistrations(String)
     /// Apple offered alternative document request sets, which this demo does not choose between.
     case alternativeRequestSetsUnsupported
     /// Apple's parsed request contained no documents.
@@ -113,6 +141,10 @@ public enum IdentityDocumentSupportFailure: LocalizedError, Equatable {
             return "The Info.plist value \(key) is missing, so app and extension cannot share Keychain items"
         case .sharedContainerUnavailable(let group):
             return "The App Group container \(group) is unavailable"
+        case .missingDesiredRegistrations(let group):
+            return "No wallet has published its documents into \(group) yet; open the app first"
+        case .unreadableDesiredRegistrations(let reason):
+            return "The shared document registration state could not be read: \(reason)"
         case .alternativeRequestSetsUnsupported:
             return "Alternative document request sets are not supported"
         case .emptyRequest:
