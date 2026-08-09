@@ -13,11 +13,15 @@ import WalletCore
 /// hands it over; neither the App Group key nor the stored spelling of a status is written here.
 public enum DigitalCredentialRegistrationStorage {
     #if canImport(WalletCore) && os(iOS)
-    /// App Group key the wallet core publishes the registered mdoc document types under.
-    public static var documentTypesKey: String { IosIdentityDocumentRegistry.companion.DOCUMENT_TYPES_KEY }
-
-    /// App Group key the wallet core publishes the current logical registry identifier under.
-    public static var registryIDKey: String { IosIdentityDocumentRegistry.companion.REGISTRY_ID_KEY }
+    /// Desired mdoc registrations of every wallet sharing `appGroupIdentifier`.
+    ///
+    /// This is the wallet's intent, not Apple's state: it is published regardless of provider
+    /// authorization so that a later authorization can be reconciled without reissuing credentials.
+    public static func desiredRegistrations(
+        appGroupIdentifier: String
+    ) -> [IosIdentityDocumentProjectionRecord] {
+        IosIdentityDocumentRegistry.companion.readDesiredRegistrations(appGroupIdentifier: appGroupIdentifier)
+    }
 
     @available(iOS 26.0, *)
     public static func persist(
