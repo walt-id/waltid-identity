@@ -43,12 +43,23 @@ struct WalletDemoApp: App {
         )
     }()
 
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             ContentView(viewModel: viewModel)
             .tint(.waltBlue)
             .onOpenURL { url in
                 viewModel.handleDeepLink(url)
+            }
+            .onChange(of: scenePhase) { phase in
+                // Provider authorization is granted in Settings, outside this app, and Apple sends no
+                // notification when it changes. Becoming active is the first moment the app can
+                // observe the new status, so it reconciles here instead of polling.
+                guard phase == .active else { return }
+                if #available(iOS 26.0, *) {
+                    Task { await DemoIdentityDocumentRegistration.updateFromPlatformCallback() }
+                }
             }
         }
     }

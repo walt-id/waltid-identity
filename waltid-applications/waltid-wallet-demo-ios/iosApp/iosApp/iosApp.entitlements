@@ -17,5 +17,16 @@
 		<string>$(AppIdentifierPrefix)id.walt.wallet.shared</string>
 		<string>$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	</array>
+	<!--
+	  The host app - not only the extension - reads and mutates
+	  IdentityDocumentProviderRegistrationStore, so it needs the Mobile Document Provider capability
+	  too. The App ID must have it enabled in the developer portal for both Debug and Release
+	  provisioning profiles; without that, signing fails on this key rather than at runtime.
+	-->
+	<key>com.apple.developer.identity-document-services.document-provider.mobile-document-types</key>
+	<array>
+		<string>org.iso.18013.5.1.mDL</string>
+		<string>eu.europa.ec.eudi.pid.1</string>
+	</array>
 </dict>
 </plist>

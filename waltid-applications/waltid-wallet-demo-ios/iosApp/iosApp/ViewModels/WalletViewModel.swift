@@ -578,7 +578,7 @@ class WalletViewModel: ObservableObject {
 
         credentials = refreshedCredentials
         if #available(iOS 26.0, *) {
-            try await IdentityDocumentRegistrationCoordinator.update()
+            try await DemoIdentityDocumentRegistration.update()
         }
         issuanceSession = nil
         offerPreview = nil
@@ -604,7 +604,7 @@ class WalletViewModel: ObservableObject {
                     let refreshedCredentials = try await walletClient.credentials()
                     credentials = refreshedCredentials
                     if #available(iOS 26.0, *) {
-                        try await IdentityDocumentRegistrationCoordinator.update()
+                        try await DemoIdentityDocumentRegistration.update()
                     }
                     deferredCredentials.removeAll { $0.id == credential.id }
                     lastReceivedCredentialIDs = credentialIDs
@@ -957,7 +957,7 @@ class WalletViewModel: ObservableObject {
                 did = result.did
                 credentials = list
                 if #available(iOS 26.0, *) {
-                    try await IdentityDocumentRegistrationCoordinator.update()
+                    try await DemoIdentityDocumentRegistration.update()
                 }
                 isReady = true
                 setSuccess(WalletStatusText.walletReady)

@@ -1,79 +1,38 @@
 import Foundation
-import IdentityDocumentServices
+import WalletDemoIdentityDocumentSupport
 import WalletSDK
 
+/// This demo's cross-process namespace, under the name the app and its tests already use.
+///
+/// The values themselves live in ``IdentityDocumentNamespace/nativeDemo`` so that the host app, the
+/// provider extension, and the Compose demo cannot drift apart in the settings that decide whether
+/// two processes see one wallet.
 enum IdentityDocumentSharedConfiguration {
-    static let appGroupIdentifier = "group.id.walt.wallet.demo"
-    static let keychainAccessGroupSuffix = "id.walt.wallet.shared"
-    // The wallet core writes these two, so it owns their spelling. Only registrationIDsKey is the
-    // demo app's own bookkeeping.
-    static let documentTypesKey = DigitalCredentialRegistrationStorage.documentTypesKey
-    static let registryIDKey = DigitalCredentialRegistrationStorage.registryIDKey
-    static let registrationIDsKey = "id.walt.wallet.identity-document-registration-ids"
-    // Must stay a subset of the mobile-document-types entitlement, which Apple provisions from a
-    // fixed list. "eu.europa.ec.eudi.photoid.1" is not on it; the photo ID doctype Apple recognises
-    // is "org.iso.23220.photoid.1", which is also the spelling the rest of this repo uses.
-    static let supportedDocumentTypes: Set<String> = [
-        "org.iso.18013.5.1.mDL",
-        "eu.europa.ec.eudi.pid.1",
-        "org.iso.23220.photoid.1",
-    ]
+    static let namespace = IdentityDocumentNamespace.nativeDemo
+    static let appGroupIdentifier = namespace.appGroupIdentifier
+    static let keychainAccessGroupSuffix = namespace.keychainAccessGroupSuffix
+    static let supportedDocumentTypes = namespace.supportedDocumentTypes
 
-    static var keychainAccessGroup: String? {
-        Bundle.main.object(forInfoDictionaryKey: "WALTKeychainAccessGroup") as? String
-    }
+    static var keychainAccessGroup: String? { namespace.keychainAccessGroup }
 }
 
+/// Reconciliation entry point for this demo, so call sites do not each construct a coordinator.
+///
+/// All registration logic is in the shared module: a second implementation here would let the host
+/// app and the extension disagree about what is registered.
 @available(iOS 26.0, *)
-enum IdentityDocumentRegistrationCoordinator {
+enum DemoIdentityDocumentRegistration {
+    /// Applies the wallet's desired registrations to Apple's store, propagating failures.
     static func update() async throws {
-        guard let defaults = UserDefaults(suiteName: IdentityDocumentSharedConfiguration.appGroupIdentifier) else {
-            throw RegistrationFailure.sharedContainerUnavailable
-        }
-        let store = IdentityDocumentProviderRegistrationStore()
-        let status = await store.status
-        DigitalCredentialRegistrationStorage.persist(
-            status: status,
-            appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
-        )
-        guard status == .authorized else { return }
-
-        let requestedTypes = Set(
-            defaults.stringArray(forKey: IdentityDocumentSharedConfiguration.documentTypesKey) ?? []
-        )
-        let documentTypes = requestedTypes
-            .intersection(IdentityDocumentSharedConfiguration.supportedDocumentTypes)
-            .sorted()
-        let registryID = defaults.string(forKey: IdentityDocumentSharedConfiguration.registryIDKey) ?? "empty"
-        let desiredRegistrations = documentTypes.map { documentType in
-            (
-                documentType,
-                "id.walt.wallet.\(registryID).\(Data(documentType.utf8).base64EncodedString())"
-            )
-        }
-        let desiredIDs = Set(desiredRegistrations.map { $0.1 })
-        let existingIDs = Set(try await store.registrations.map(\.documentIdentifier))
-
-        for (documentType, identifier) in desiredRegistrations where !existingIDs.contains(identifier) {
-            try await store.addRegistration(
-                MobileDocumentRegistration(
-                    mobileDocumentType: documentType,
-                    supportedAuthorityKeyIdentifiers: [],
-                    documentIdentifier: identifier
-                )
-            )
-        }
-
-        let previousIDs = Set(
-            defaults.stringArray(forKey: IdentityDocumentSharedConfiguration.registrationIDsKey) ?? []
-        )
-        for identifier in previousIDs.subtracting(desiredIDs).intersection(existingIDs) {
-            try await store.removeRegistration(forDocumentIdentifier: identifier)
-        }
-        defaults.set(desiredRegistrations.map { $0.1 }, forKey: IdentityDocumentSharedConfiguration.registrationIDsKey)
+        try await coordinator.reconcile()
     }
 
-    enum RegistrationFailure: Error {
-        case sharedContainerUnavailable
+    /// Same reconciliation for Apple's registration-update callback, which cannot report an error.
+    static func updateFromPlatformCallback() async {
+        await coordinator.reconcileFromPlatformCallback()
     }
+
+    private static let coordinator = IdentityDocumentRegistrationCoordinator(
+        namespace: IdentityDocumentSharedConfiguration.namespace
+    )
 }
