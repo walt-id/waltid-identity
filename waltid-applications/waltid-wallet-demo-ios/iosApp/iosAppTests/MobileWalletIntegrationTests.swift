@@ -153,8 +153,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertEqual(second.keyID, first.keyID, "Encrypted wallet key reference should survive wallet facade recreation")
     }
 
-    func testCrossProcessWalletReopensSharedEncryptedStateAndSigningKey() async throws {
-        let walletID = "ios-cross-process-wallet-\(UUID().uuidString)"
+    /// Both wallets are opened in this one test process, so this covers the App Group storage path and
+    /// the shared Keychain group placement, not a second process's entitlement to reach them.
+    func testAppGroupWalletReopensSharedEncryptedStateAndSigningKey() async throws {
+        let walletID = "ios-app-group-wallet-\(UUID().uuidString)"
         let keychainAccessGroup = try XCTUnwrap(IdentityDocumentSharedConfiguration.keychainAccessGroup)
         let configuration = WalletConfiguration(
             walletID: walletID,

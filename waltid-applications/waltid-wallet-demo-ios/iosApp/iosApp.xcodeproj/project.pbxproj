@@ -15,7 +15,7 @@
 		A75200000000000000000024 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A75200000000000000000021 /* WalletDemoIdentityDocumentSupport */; };
 		A75200000000000000000025 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A75200000000000000000022 /* WalletDemoIdentityDocumentSupport */; };
 		A75200000000000000000026 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A75200000000000000000023 /* WalletDemoIdentityDocumentSupport */; };
-		A75200000000000000000031 /* CrossProcessWalletAssertions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000030 /* CrossProcessWalletAssertions.swift */; };
+		A75200000000000000000031 /* SharedWalletConfigurationAssertions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000030 /* SharedWalletConfigurationAssertions.swift */; };
 		A7520000000000000000000C /* IdentityDocumentProvider.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = A75200000000000000000002 /* IdentityDocumentProvider.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A75200000000000000000011 /* IdentityDocumentRegistrationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000010 /* IdentityDocumentRegistrationCoordinator.swift */; };
 		A75200000000000000000012 /* IdentityDocumentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000013 /* IdentityDocumentProvider.swift */; };
@@ -155,7 +155,7 @@
 		A75200000000000000000013 /* IdentityDocumentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityDocumentProvider.swift; sourceTree = "<group>"; };
 		A75200000000000000000014 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A75200000000000000000015 /* IdentityDocumentProvider.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IdentityDocumentProvider.entitlements; sourceTree = "<group>"; };
-		A75200000000000000000030 /* CrossProcessWalletAssertions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossProcessWalletAssertions.swift; sourceTree = "<group>"; };
+		A75200000000000000000030 /* SharedWalletConfigurationAssertions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedWalletConfigurationAssertions.swift; sourceTree = "<group>"; };
 		A75200000000000000000016 /* iosApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iosApp.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -384,7 +384,7 @@
 		A75200000000000000000032 /* ../../mobile-e2e-fixtures/ios/IdentityDocumentTests */ = {
 			isa = PBXGroup;
 			children = (
-				A75200000000000000000030 /* CrossProcessWalletAssertions.swift */,
+				A75200000000000000000030 /* SharedWalletConfigurationAssertions.swift */,
 			);
 			name = "../../mobile-e2e-fixtures/ios/IdentityDocumentTests";
 			path = "../../mobile-e2e-fixtures/ios/IdentityDocumentTests";
@@ -713,7 +713,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A75200000000000000000031 /* CrossProcessWalletAssertions.swift in Sources */,
+				A75200000000000000000031 /* SharedWalletConfigurationAssertions.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
