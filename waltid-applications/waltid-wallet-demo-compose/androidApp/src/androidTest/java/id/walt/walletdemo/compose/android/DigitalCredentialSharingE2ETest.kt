@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.util.Base64
 import androidx.credentials.DigitalCredential
 import androidx.credentials.ExperimentalDigitalCredentialApi
+import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -54,6 +55,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -338,6 +340,101 @@ class DigitalCredentialSharingE2ETest {
     }
 
     /**
+     * Cancel on the wallet's review answers the request: the caller's `getCredential` ends with
+     * [GetCredentialCancellationException].
+     *
+     * This is what makes Cancel a decision about the request rather than about this wallet - the user
+     * declined to share, and no further provider is offered the request. Asserted through the real
+     * caller because the exception type is what Credential Manager derives from the provider result,
+     * and only the caller sees the derivation.
+     */
+    @Test
+    fun cancellingTheProviderReviewCancelsTheCallersRequest() = runBlocking {
+        val fixture = start() ?: return@runBlocking
+        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
+        fixture.issue(scenario)
+        val session = DemoTestBackend.createDcApiVerifierSession(
+            scenario = scenario,
+            expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
+        )
+
+        fixture.openProviderReview(session.requestJson, candidateText = MDL_DOC_TYPE)
+        clickByTag(fixture.device, WalletDemoSharingReviewTestTags.CancelButton)
+
+        val outcome = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) { DigitalCredentialTestVerifier.await() }
+        val error = outcome.exceptionOrNull()
+        assertNotNull("Cancel produced a credential instead of a cancellation: ${outcome.getOrNull()}", error)
+        assertTrue(
+            "Cancel must surface a cancellation, not ${error!!::class.java.name}: ${error.message}",
+            error is GetCredentialCancellationException,
+        )
+    }
+
+    /**
+     * The system back gesture at the review root leaves this provider without answering, and Credential
+     * Manager puts its selector back up rather than ending the caller's request.
+     *
+     * Back and Cancel are deliberately different outcomes, and this is the assertion that pins the
+     * difference: a provider that wrote a cancellation here would take the choice of trying another
+     * wallet away from the user. The request is still live afterwards, which is proven by going back in
+     * and completing it - the same session, answered after the back gesture.
+     */
+    @Test
+    fun backingOutOfTheProviderReviewLeavesTheRequestAnswerable() = runBlocking {
+        val fixture = start() ?: return@runBlocking
+        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
+        fixture.issue(scenario)
+        val session = DemoTestBackend.createDcApiVerifierSession(
+            scenario = scenario,
+            expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
+        )
+
+        fixture.openProviderReview(session.requestJson, candidateText = MDL_DOC_TYPE)
+        fixture.device.pressBack()
+
+        // The review is gone and no result has been delivered: the request is neither answered nor
+        // failed, which is the state that lets the platform ask again.
+        assertTrue(
+            "Provider review stayed up after the back gesture",
+            fixture.device.wait(Until.gone(By.res(WALLET_SHARING_REVIEW_TAG)), UI_ELEMENT_TIMEOUT),
+        )
+        assertFalse(
+            "Backing out of the review delivered a Credential Manager result",
+            DigitalCredentialTestVerifier.isComplete(),
+        )
+
+        // Re-entering through the platform and sharing settles the same request, which a provider that
+        // had ended it could not do.
+        val candidate = fixture.device.wait(Until.findObject(By.textContains(MDL_DOC_TYPE)), UI_ELEMENT_TIMEOUT)
+        assertNotNull("Credential Manager did not offer the request again after the back gesture", candidate)
+        assertTrue(
+            "Could not re-enter the provider after the back gesture",
+            fixture.device.clickCandidate(MDL_DOC_TYPE),
+        )
+        val continueButton = fixture.device.wait(Until.findObject(By.res("continue_button")), UI_ELEMENT_TIMEOUT)
+            ?: fixture.device.wait(Until.findObject(By.text("Continue")), UI_ELEMENT_TIMEOUT)
+        continueButton?.click()
+        assertNotNull(
+            "Wallet provider review did not reopen",
+            waitForResource(fixture.device, WALLET_SHARING_REVIEW_TAG, UI_ELEMENT_TIMEOUT),
+        )
+        clickByTag(fixture.device, WALLET_SHARE_BUTTON_TAG)
+
+        val response = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) {
+            DigitalCredentialTestVerifier.await().getOrThrow()
+        }
+        val credential = requireNotNull(response.credential as? DigitalCredential) {
+            "Caller did not receive a digital credential: ${response.credential}"
+        }
+        assertVerifierAccepted(
+            sessionId = session.sessionId,
+            responseJson = credential.credentialJson,
+            presentedCredentialId = "mdl",
+            requiredPolicyIds = MDOC_REQUIRED_POLICIES,
+        )
+    }
+
+    /**
      * An unlocked wallet on a device that can run these tests, or null when it cannot.
      *
      * Bundling the instrumentation handles keeps each test's own body about the protocol variant it
@@ -398,6 +495,32 @@ class DigitalCredentialSharingE2ETest {
         clickCandidate: Boolean = false,
         beforeShare: (UiDevice) -> Unit = {},
     ): DigitalCredential {
+        openProviderReview(requestJson, candidateText, clickCandidate)
+
+        beforeShare(device)
+
+        clickByTag(device, WALLET_SHARE_BUTTON_TAG)
+
+        val response = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) {
+            DigitalCredentialTestVerifier.await().getOrThrow()
+        }
+        return requireNotNull(response.credential as? DigitalCredential) {
+            "Caller did not receive a digital credential: ${response.credential}"
+        }
+    }
+
+    /**
+     * Drives [requestJson] through Credential Manager up to the wallet's own review, and leaves it open.
+     *
+     * Separated from [share] because how the review is answered is the thing under test in the
+     * outcome cases: they get the identical platform-side path up to this point and diverge only on
+     * what the user does with the surface.
+     */
+    private fun Fixture.openProviderReview(
+        requestJson: String,
+        candidateText: String,
+        clickCandidate: Boolean = false,
+    ) {
         DigitalCredentialTestVerifier.reset(requestJson)
         // The previous test's picker window can still be up, and it showed candidate text too. A node
         // bound from it goes stale the moment it tears down, so wait it out before looking at all -
@@ -434,17 +557,6 @@ class DigitalCredentialSharingE2ETest {
             "Wallet provider review did not open",
             waitForResource(device, WALLET_SHARING_REVIEW_TAG, UI_ELEMENT_TIMEOUT),
         )
-
-        beforeShare(device)
-
-        clickByTag(device, WALLET_SHARE_BUTTON_TAG)
-
-        val response = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) {
-            DigitalCredentialTestVerifier.await().getOrThrow()
-        }
-        return requireNotNull(response.credential as? DigitalCredential) {
-            "Caller did not receive a digital credential: ${response.credential}"
-        }
     }
 
     /**

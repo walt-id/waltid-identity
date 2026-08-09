@@ -59,4 +59,13 @@ internal object DigitalCredentialTestVerifier {
     }
 
     suspend fun await(): Result<GetCredentialResponse> = result.await()
+
+    /**
+     * Whether Credential Manager has already resolved the request, either way.
+     *
+     * The absence of a result is itself an outcome to assert: a provider that leaves the request
+     * unanswered is what lets the platform offer it elsewhere, and that is indistinguishable from a
+     * cancellation unless it can be checked without waiting for one.
+     */
+    fun isComplete(): Boolean = result.isCompleted
 }
