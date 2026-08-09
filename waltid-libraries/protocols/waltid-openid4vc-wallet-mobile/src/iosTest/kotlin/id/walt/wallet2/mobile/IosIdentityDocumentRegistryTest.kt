@@ -7,12 +7,13 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class IosIdentityDocumentRegistryTest {
     @Test
     fun capabilitiesExposeOnlyAnnexCAndRequireSharedRegistrationConfiguration() {
-        val capabilities = IosIdentityDocumentRegistry(null).capabilities
+        val capabilities = registry(null).capabilities
 
         assertFalse(capabilities.registrationAvailable)
         assertEquals("iOS/iPadOS 26", capabilities.minimumOsVersion)
@@ -37,7 +38,7 @@ class IosIdentityDocumentRegistryTest {
 
     @Test
     fun registrationFailsClosedWithoutAnAppGroup() = runTest {
-        val result = IosIdentityDocumentRegistry(null).replace("registry", emptyList())
+        val result = registry(null).replace("registry", emptyList())
 
         assertFalse(result.available)
         assertEquals("An App Group is required", result.reason)
@@ -47,7 +48,7 @@ class IosIdentityDocumentRegistryTest {
     fun capabilitiesFollowTheReportedIdentityDocumentServicesRuntimeStatus() {
         val suite = newSuite()
         val defaults = NSUserDefaults(suiteName = suite)
-        val registry = IosIdentityDocumentRegistry(suite)
+        val registry = registry(suite)
         try {
             assertFalse(registry.capabilities.platformAvailable)
             assertFalse(registry.capabilities.registrationAvailable)
@@ -72,7 +73,7 @@ class IosIdentityDocumentRegistryTest {
     fun everyMdocCredentialBecomesItsOwnDesiredRegistration() = runTest {
         withSuite { suite ->
             report(suite, IosIdentityDocumentRegistrationStatus.AUTHORIZED)
-            val result = IosIdentityDocumentRegistry(suite).replace(
+            val result = registry(suite).replace(
                 "registry-1",
                 listOf(
                     registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL),
@@ -87,15 +88,30 @@ class IosIdentityDocumentRegistryTest {
                     IosIdentityDocumentProjectionRecord("dc-a", "cred-a", MDL),
                     IosIdentityDocumentProjectionRecord("dc-b", "cred-b", MDL),
                 ),
-                IosIdentityDocumentRegistry.readDesiredRegistrations(suite),
+                published(suite).registrations,
             )
+        }
+    }
+
+    @Test
+    fun theProjectionNamesTheWalletTheExtensionHasToOpen() = runTest {
+        withSuite { suite ->
+            // The extension gets no wallet id from Apple's request context, so the only thing that keeps
+            // a host started with a non-default wallet id presentable is this field.
+            registry(suite, walletId = "test-123").replace(
+                "registry-1",
+                listOf(registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL)),
+            )
+
+            assertEquals("test-123", published(suite).walletId)
+            assertEquals("registry-1", published(suite).registryId)
         }
     }
 
     @Test
     fun onlyMdocCredentialsEnterTheAppleProjection() = runTest {
         withSuite { suite ->
-            IosIdentityDocumentRegistry(suite).replace(
+            registry(suite).replace(
                 "registry-1",
                 listOf(
                     registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL),
@@ -105,7 +121,7 @@ class IosIdentityDocumentRegistryTest {
 
             assertContentEquals(
                 listOf("dc-a"),
-                IosIdentityDocumentRegistry.readDesiredRegistrations(suite).map { it.documentIdentifier },
+                published(suite).registrations.map { it.documentIdentifier },
             )
         }
     }
@@ -113,21 +129,21 @@ class IosIdentityDocumentRegistryTest {
     @Test
     fun refreshingAnUnchangedWalletKeepsTheSameDocumentIdentifiers() = runTest {
         withSuite { suite ->
-            val registry = IosIdentityDocumentRegistry(suite)
+            val registry = registry(suite)
             val records = listOf(registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL))
 
             registry.replace("registry-1", records)
-            val first = IosIdentityDocumentRegistry.readDesiredRegistrations(suite)
+            val first = published(suite).registrations
             registry.replace("registry-1", records)
 
-            assertContentEquals(first, IosIdentityDocumentRegistry.readDesiredRegistrations(suite))
+            assertContentEquals(first, published(suite).registrations)
         }
     }
 
     @Test
     fun deletingOneCredentialRemovesOnlyItsDesiredRegistration() = runTest {
         withSuite { suite ->
-            val registry = IosIdentityDocumentRegistry(suite)
+            val registry = registry(suite)
             registry.replace(
                 "registry-1",
                 listOf(
@@ -143,7 +159,7 @@ class IosIdentityDocumentRegistryTest {
 
             assertContentEquals(
                 listOf(IosIdentityDocumentProjectionRecord("dc-b", "cred-b", PID)),
-                IosIdentityDocumentRegistry.readDesiredRegistrations(suite),
+                published(suite).registrations,
             )
         }
     }
@@ -153,7 +169,7 @@ class IosIdentityDocumentRegistryTest {
         withSuite { suite ->
             report(suite, IosIdentityDocumentRegistrationStatus.NOT_AUTHORIZED)
 
-            val result = IosIdentityDocumentRegistry(suite).replace(
+            val result = registry(suite).replace(
                 "registry-1",
                 listOf(registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL)),
             )
@@ -162,7 +178,7 @@ class IosIdentityDocumentRegistryTest {
             assertEquals("IdentityDocumentServices registration is not authorized", result.reason)
             assertContentEquals(
                 listOf(IosIdentityDocumentProjectionRecord("dc-a", "cred-a", MDL)),
-                IosIdentityDocumentRegistry.readDesiredRegistrations(suite),
+                published(suite).registrations,
             )
         }
     }
@@ -171,7 +187,7 @@ class IosIdentityDocumentRegistryTest {
     fun authorizationArrivingLaterNeedsNoCredentialReissuance() = runTest {
         withSuite { suite ->
             report(suite, IosIdentityDocumentRegistrationStatus.NOT_DETERMINED)
-            val registry = IosIdentityDocumentRegistry(suite)
+            val registry = registry(suite)
             registry.replace(
                 "registry-1",
                 listOf(registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL)),
@@ -182,15 +198,15 @@ class IosIdentityDocumentRegistryTest {
             assertTrue(registry.capabilities.registrationAvailable)
             assertContentEquals(
                 listOf(IosIdentityDocumentProjectionRecord("dc-a", "cred-a", MDL)),
-                IosIdentityDocumentRegistry.readDesiredRegistrations(suite),
+                published(suite).registrations,
             )
         }
     }
 
     @Test
-    fun anEmptyWalletClearsTheDesiredRegistrations() = runTest {
+    fun anEmptyWalletPublishesAnEmptyProjectionRatherThanNone() = runTest {
         withSuite { suite ->
-            val registry = IosIdentityDocumentRegistry(suite)
+            val registry = registry(suite)
             registry.replace(
                 "registry-1",
                 listOf(registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL)),
@@ -199,32 +215,75 @@ class IosIdentityDocumentRegistryTest {
             val result = registry.replace("registry-1", emptyList())
 
             assertEquals(0, result.registeredEntryCount)
-            assertTrue(IosIdentityDocumentRegistry.readDesiredRegistrations(suite).isEmpty())
+            // Published-and-empty, not Missing: the reconciler unregisters on the first and keeps its
+            // hands off Apple's store on the second, and a wallet whose last mdoc was deleted means the
+            // former.
+            assertEquals(emptyList(), published(suite).registrations)
         }
     }
 
     @Test
-    fun oneRegistryDoesNotOverwriteAnother() = runTest {
+    fun theLatestWalletToRefreshReplacesTheProjectionInsteadOfMergingIntoIt() = runTest {
         withSuite { suite ->
-            val registry = IosIdentityDocumentRegistry(suite)
-            registry.replace(
+            // A merged projection would describe registrations the extension could not fulfil: Apple
+            // passes it no documentIdentifier, so it cannot tell which wallet a request belongs to and
+            // can only serve the one wallet the projection names.
+            registry(suite, walletId = "wallet-a").replace(
                 "registry-a",
                 listOf(registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL)),
             )
-            registry.replace(
+            registry(suite, walletId = "wallet-b").replace(
                 "registry-b",
                 listOf(registryRecord("dc-b", "cred-b", MobileWalletDigitalCredentialFormat.MDOC, PID)),
             )
 
-            registry.replace(
-                "registry-a",
-                listOf(registryRecord("dc-a2", "cred-a2", MobileWalletDigitalCredentialFormat.MDOC, MDL)),
+            val state = published(suite)
+            assertEquals("wallet-b", state.walletId)
+            assertContentEquals(
+                listOf(IosIdentityDocumentProjectionRecord("dc-b", "cred-b", PID)),
+                state.registrations,
+            )
+        }
+    }
+
+    @Test
+    fun anUnwrittenAppGroupReadsAsMissingRatherThanAsAnEmptyWallet() = runTest {
+        withSuite { suite ->
+            assertIs<IosIdentityDocumentProjectionResult.Missing>(
+                IosIdentityDocumentRegistry.readDesiredRegistrations(suite),
+            )
+        }
+    }
+
+    @Test
+    fun anUndecodableProjectionReadsAsMalformedRatherThanAsAnEmptyWallet() = runTest {
+        withSuite { suite ->
+            // Decoded to empty, this would instruct the reconciler to unregister every managed document
+            // the wallet can still present - so the corrupt case has to stay distinguishable.
+            NSUserDefaults(suiteName = suite).setObject(
+                "{\"walletId\":\"test-123\",\"registrations\":",
+                forKey = IosIdentityDocumentRegistry.PROJECTION_STATE_KEY,
             )
 
-            assertEquals(
-                setOf("dc-a2", "dc-b"),
-                IosIdentityDocumentRegistry.readDesiredRegistrations(suite)
-                    .mapTo(mutableSetOf()) { it.documentIdentifier },
+            val result = IosIdentityDocumentRegistry.readDesiredRegistrations(suite)
+
+            assertIs<IosIdentityDocumentProjectionResult.Malformed>(result)
+            assertTrue(result.reason.isNotEmpty(), "a malformed projection has to carry a loggable reason")
+        }
+    }
+
+    @Test
+    fun aProjectionMissingTheWalletIdReadsAsMalformed() = runTest {
+        withSuite { suite ->
+            // Well-formed JSON but not this contract: an older build's projection carried no wallet id,
+            // and guessing one would open the wrong database.
+            NSUserDefaults(suiteName = suite).setObject(
+                "{\"registryId\":\"registry-1\",\"registrations\":[]}",
+                forKey = IosIdentityDocumentRegistry.PROJECTION_STATE_KEY,
+            )
+
+            assertIs<IosIdentityDocumentProjectionResult.Malformed>(
+                IosIdentityDocumentRegistry.readDesiredRegistrations(suite),
             )
         }
     }
@@ -233,7 +292,7 @@ class IosIdentityDocumentRegistryTest {
     fun theProjectionCarriesNoClaimValues() = runTest {
         withSuite { suite ->
             val defaults = NSUserDefaults(suiteName = suite)
-            IosIdentityDocumentRegistry(suite).replace(
+            registry(suite).replace(
                 "registry-1",
                 listOf(
                     MobileWalletCredentialRegistryRecord(
@@ -259,6 +318,14 @@ class IosIdentityDocumentRegistryTest {
     }
 
     private fun newSuite() = "id.walt.wallet.registry-test.${NSUUID().UUIDString}"
+
+    private fun registry(appGroupIdentifier: String?, walletId: String = "default") =
+        IosIdentityDocumentRegistry(appGroupIdentifier = appGroupIdentifier, walletId = walletId)
+
+    private fun published(suite: String): IosIdentityDocumentProjectionState =
+        assertIs<IosIdentityDocumentProjectionResult.Published>(
+            IosIdentityDocumentRegistry.readDesiredRegistrations(suite),
+        ).state
 
     private suspend fun withSuite(block: suspend (String) -> Unit) {
         val suite = newSuite()

@@ -247,6 +247,40 @@ sealed interface <#A: out kotlin/Any?> id.walt.wallet2.mobile.swiftinterop/Walle
     }
 }
 
+sealed interface id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult { // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult|null[0]
+    final class Malformed : id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult { // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Malformed|null[0]
+        constructor <init>(kotlin/String) // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Malformed.<init>|<init>(kotlin.String){}[0]
+
+        final val reason // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Malformed.reason|{}reason[0]
+            final fun <get-reason>(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Malformed.reason.<get-reason>|<get-reason>(){}[0]
+
+        final fun component1(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Malformed.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Malformed // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Malformed.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Malformed.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Malformed.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Malformed.toString|toString(){}[0]
+    }
+
+    final class Published : id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult { // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Published|null[0]
+        constructor <init>(id.walt.wallet2.mobile/IosIdentityDocumentProjectionState) // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Published.<init>|<init>(id.walt.wallet2.mobile.IosIdentityDocumentProjectionState){}[0]
+
+        final val state // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Published.state|{}state[0]
+            final fun <get-state>(): id.walt.wallet2.mobile/IosIdentityDocumentProjectionState // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Published.state.<get-state>|<get-state>(){}[0]
+
+        final fun component1(): id.walt.wallet2.mobile/IosIdentityDocumentProjectionState // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Published.component1|component1(){}[0]
+        final fun copy(id.walt.wallet2.mobile/IosIdentityDocumentProjectionState = ...): id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Published // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Published.copy|copy(id.walt.wallet2.mobile.IosIdentityDocumentProjectionState){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Published.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Published.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Published.toString|toString(){}[0]
+    }
+
+    final object Missing : id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult { // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Missing|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Missing.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Missing.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult.Missing.toString|toString(){}[0]
+    }
+}
+
 sealed interface id.walt.wallet2.mobile/MobileWalletDatabaseKey { // id.walt.wallet2.mobile/MobileWalletDatabaseKey|null[0]
     final class Provided : id.walt.wallet2.mobile/MobileWalletDatabaseKey { // id.walt.wallet2.mobile/MobileWalletDatabaseKey.Provided|null[0]
         constructor <init>(id.walt.wallet2.persistence.encryption/DatabaseEncryptionKeyProvider) // id.walt.wallet2.mobile/MobileWalletDatabaseKey.Provided.<init>|<init>(id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider){}[0]
@@ -662,8 +696,74 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletSdkBridgeFactory { // id.w
     final suspend fun create(id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridgeFactory.create|create(id.walt.wallet2.mobile.swiftinterop.WalletBridgeConfiguration){}[0]
 }
 
+final class id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord { // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String) // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.<init>|<init>(kotlin.String;kotlin.String;kotlin.String){}[0]
+
+    final val credentialId // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.credentialId|{}credentialId[0]
+        final fun <get-credentialId>(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.credentialId.<get-credentialId>|<get-credentialId>(){}[0]
+    final val documentIdentifier // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.documentIdentifier|{}documentIdentifier[0]
+        final fun <get-documentIdentifier>(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.documentIdentifier.<get-documentIdentifier>|<get-documentIdentifier>(){}[0]
+    final val documentType // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.documentType|{}documentType[0]
+        final fun <get-documentType>(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.documentType.<get-documentType>|<get-documentType>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.component2|component2(){}[0]
+    final fun component3(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ...): id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.copy|copy(kotlin.String;kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord> { // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.$serializer|null[0]
+        final val descriptor // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord) // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.wallet2.mobile.IosIdentityDocumentProjectionRecord){}[0]
+    }
+
+    final object Companion { // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord> // id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class id.walt.wallet2.mobile/IosIdentityDocumentProjectionState { // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin.collections/List<id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord>) // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.<init>|<init>(kotlin.String;kotlin.String;kotlin.collections.List<id.walt.wallet2.mobile.IosIdentityDocumentProjectionRecord>){}[0]
+
+    final val registrations // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.registrations|{}registrations[0]
+        final fun <get-registrations>(): kotlin.collections/List<id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord> // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.registrations.<get-registrations>|<get-registrations>(){}[0]
+    final val registryId // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.registryId|{}registryId[0]
+        final fun <get-registryId>(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.registryId.<get-registryId>|<get-registryId>(){}[0]
+    final val walletId // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.walletId|{}walletId[0]
+        final fun <get-walletId>(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.walletId.<get-walletId>|<get-walletId>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord> // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<id.walt.wallet2.mobile/IosIdentityDocumentProjectionRecord> = ...): id.walt.wallet2.mobile/IosIdentityDocumentProjectionState // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.copy|copy(kotlin.String;kotlin.String;kotlin.collections.List<id.walt.wallet2.mobile.IosIdentityDocumentProjectionRecord>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.wallet2.mobile/IosIdentityDocumentProjectionState> { // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.$serializer|null[0]
+        final val descriptor // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.wallet2.mobile/IosIdentityDocumentProjectionState // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.wallet2.mobile/IosIdentityDocumentProjectionState) // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.wallet2.mobile.IosIdentityDocumentProjectionState){}[0]
+    }
+
+    final object Companion { // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.Companion|null[0]
+        final val $childSerializers // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile/IosIdentityDocumentProjectionState> // id.walt.wallet2.mobile/IosIdentityDocumentProjectionState.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final class id.walt.wallet2.mobile/IosIdentityDocumentRegistry : id.walt.wallet2.mobile/MobileWalletCredentialRegistry { // id.walt.wallet2.mobile/IosIdentityDocumentRegistry|null[0]
-    constructor <init>(kotlin/String?) // id.walt.wallet2.mobile/IosIdentityDocumentRegistry.<init>|<init>(kotlin.String?){}[0]
+    constructor <init>(kotlin/String?, kotlin/String) // id.walt.wallet2.mobile/IosIdentityDocumentRegistry.<init>|<init>(kotlin.String?;kotlin.String){}[0]
 
     final val capabilities // id.walt.wallet2.mobile/IosIdentityDocumentRegistry.capabilities|{}capabilities[0]
         final fun <get-capabilities>(): id.walt.wallet2.mobile/MobileWalletDigitalCredentialCapabilities // id.walt.wallet2.mobile/IosIdentityDocumentRegistry.capabilities.<get-capabilities>|<get-capabilities>(){}[0]
@@ -671,11 +771,10 @@ final class id.walt.wallet2.mobile/IosIdentityDocumentRegistry : id.walt.wallet2
     final suspend fun replace(kotlin/String, kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord>): id.walt.wallet2.mobile/MobileWalletCredentialRegistrationResult // id.walt.wallet2.mobile/IosIdentityDocumentRegistry.replace|replace(kotlin.String;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletCredentialRegistryRecord>){}[0]
 
     final object Companion { // id.walt.wallet2.mobile/IosIdentityDocumentRegistry.Companion|null[0]
-        final const val DOCUMENT_TYPES_KEY // id.walt.wallet2.mobile/IosIdentityDocumentRegistry.Companion.DOCUMENT_TYPES_KEY|{}DOCUMENT_TYPES_KEY[0]
-            final fun <get-DOCUMENT_TYPES_KEY>(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentRegistry.Companion.DOCUMENT_TYPES_KEY.<get-DOCUMENT_TYPES_KEY>|<get-DOCUMENT_TYPES_KEY>(){}[0]
-        final const val REGISTRY_ID_KEY // id.walt.wallet2.mobile/IosIdentityDocumentRegistry.Companion.REGISTRY_ID_KEY|{}REGISTRY_ID_KEY[0]
-            final fun <get-REGISTRY_ID_KEY>(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentRegistry.Companion.REGISTRY_ID_KEY.<get-REGISTRY_ID_KEY>|<get-REGISTRY_ID_KEY>(){}[0]
+        final const val PROJECTION_STATE_KEY // id.walt.wallet2.mobile/IosIdentityDocumentRegistry.Companion.PROJECTION_STATE_KEY|{}PROJECTION_STATE_KEY[0]
+            final fun <get-PROJECTION_STATE_KEY>(): kotlin/String // id.walt.wallet2.mobile/IosIdentityDocumentRegistry.Companion.PROJECTION_STATE_KEY.<get-PROJECTION_STATE_KEY>|<get-PROJECTION_STATE_KEY>(){}[0]
 
+        final fun readDesiredRegistrations(kotlin/String): id.walt.wallet2.mobile/IosIdentityDocumentProjectionResult // id.walt.wallet2.mobile/IosIdentityDocumentRegistry.Companion.readDesiredRegistrations|readDesiredRegistrations(kotlin.String){}[0]
         final fun reportRegistrationStatus(kotlin/String, id.walt.wallet2.mobile/IosIdentityDocumentRegistrationStatus) // id.walt.wallet2.mobile/IosIdentityDocumentRegistry.Companion.reportRegistrationStatus|reportRegistrationStatus(kotlin.String;id.walt.wallet2.mobile.IosIdentityDocumentRegistrationStatus){}[0]
     }
 }

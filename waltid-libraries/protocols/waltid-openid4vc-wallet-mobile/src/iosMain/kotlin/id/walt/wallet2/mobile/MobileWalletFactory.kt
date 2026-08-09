@@ -33,7 +33,12 @@ public actual class MobileWalletFactory {
         }
         val platformConfig = if (config.credentialRegistry === UnavailableMobileWalletCredentialRegistry) {
             config.copy(
-                credentialRegistry = IosIdentityDocumentRegistry(sharedAccess?.appGroupIdentifier),
+                // The wallet id goes into the projection so the provider extension opens this
+                // wallet's `wallet_${walletId}` database rather than assuming the default one.
+                credentialRegistry = IosIdentityDocumentRegistry(
+                    appGroupIdentifier = sharedAccess?.appGroupIdentifier,
+                    walletId = config.walletId,
+                ),
             )
         } else config
         return createEncryptedSqlDelightMobileWallet(
