@@ -16,6 +16,7 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.mdoc.objects.SessionTranscript
+import id.walt.mdoc.objects.sha256
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
@@ -94,13 +95,28 @@ internal class MobileWalletAnnexCEngine(
         val origin: String,
         val deviceRequest: DeviceRequest?,
         val encryptionInfoBase64Url: String?,
+        val rawRequest: RawRequest?,
         val selectedRegistryEntryIds: List<String>,
     )
 
-    private data class RetainedRequest(
+    /**
+     * The raw request consent was given for, in the form each part has to be compared in.
+     *
+     * [deviceRequestDigest] digests the *decoded* bytes, so a re-spelled Base64URL encoding of the
+     * same request is still accepted while any change to the request itself is not.
+     * [encryptionInfoBase64Url] is kept verbatim instead, because the session transcript binds that
+     * string as written: for this part the spelling is the security-relevant value, not just what it
+     * decodes to.
+     */
+    private class RawRequest(
+        val deviceRequestDigest: ByteArray,
+        val encryptionInfoBase64Url: String,
+    )
+
+    private class RetainedRequest(
         val parsedRequest: MobileWalletAnnexCParsedRequest,
         val verifiedOrigin: String,
-        val encryptionInfoBase64Url: String?,
+        val rawRequest: RawRequest?,
         val allowedCredentialIds: Set<String>,
     )
 
@@ -144,7 +160,7 @@ internal class MobileWalletAnnexCEngine(
             value = RetainedRequest(
                 parsedRequest = validated.parsedRequest,
                 verifiedOrigin = validated.origin,
-                encryptionInfoBase64Url = validated.encryptionInfoBase64Url,
+                rawRequest = validated.rawRequest,
                 allowedCredentialIds = options.mapTo(mutableSetOf()) { it.credentialId },
             ),
         )
@@ -187,6 +203,12 @@ internal class MobileWalletAnnexCEngine(
             origin = origin,
             deviceRequest = deviceRequest,
             encryptionInfoBase64Url = request.encryptionInfoBase64Url,
+            rawRequest = request.deviceRequestBase64Url?.let { deviceRequestBase64Url ->
+                RawRequest(
+                    deviceRequestDigest = deviceRequestBase64Url.decodeFromBase64Url().sha256(),
+                    encryptionInfoBase64Url = requireNotNull(request.encryptionInfoBase64Url),
+                )
+            },
             selectedRegistryEntryIds = request.selectedRegistryEntryIds,
         )
     }
@@ -231,10 +253,16 @@ internal class MobileWalletAnnexCEngine(
      * Proves the post-consent request is the one the user consented to, then re-derives the session
      * transcript and encryption metadata from its bytes.
      *
+     * When the raw request was already available at preview, it must be exactly the one consent was
+     * given for. The parsed request alone is too weak a binding: it carries no reader
+     * authentication, no `deviceRequestInfo` and no version, so a request that dropped or replaced
+     * its reader auth after consent would still compare equal and would still be answerable - a
+     * verified reader shown on the consent screen must be the reader that receives the response.
+     *
      * Reader authentication is verified again here for its *rejection*, not its verdict: the trust
      * state already informed the consent that was given, but a signature that does not verify must
-     * stop the response. On Apple's deferred path this is the only point where the raw request exists
-     * at all, so it is the only point where that signature can be checked.
+     * stop the response. On Apple's deferred path the raw request first exists here, so byte
+     * equality cannot be required and these consistency checks are the available binding.
      */
     private suspend fun confirmRequestUnchangedAfterConsent(
         submission: MobileWalletAnnexCSubmission,
@@ -242,8 +270,14 @@ internal class MobileWalletAnnexCEngine(
     ): ConfirmedRequest {
         val origin = DcApiWallet.canonicalizePlatformOrigin(submission.verifiedOrigin)
         require(origin == retained.verifiedOrigin) { "Annex C origin changed after consent" }
-        if (retained.encryptionInfoBase64Url != null) {
-            require(submission.encryptionInfoBase64Url == retained.encryptionInfoBase64Url) {
+        retained.rawRequest?.let { consented ->
+            require(
+                submission.deviceRequestBase64Url.decodeFromBase64Url().sha256()
+                    .contentEquals(consented.deviceRequestDigest)
+            ) {
+                "Annex C deviceRequest changed after consent"
+            }
+            require(submission.encryptionInfoBase64Url == consented.encryptionInfoBase64Url) {
                 "Annex C encryptionInfo changed after consent"
             }
         }

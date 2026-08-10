@@ -6,7 +6,9 @@ import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseKey
+import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
+import id.walt.cose.toCoseSigner
 import id.walt.cose.toCoseVerifier
 import id.walt.credentials.CredentialDetectorTypes
 import id.walt.credentials.CredentialParser
@@ -19,6 +21,9 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.algorithms.DigestAlgorithm
+import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
+import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.KeyId
@@ -27,13 +32,20 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
+import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
+import id.walt.mdoc.objects.deviceretrieval.DeviceRequestInfo
 import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
+import id.walt.mdoc.objects.deviceretrieval.UseCase
 import id.walt.openid4vci.offers.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.x509.GenericX509CertificateBuilder
+import id.walt.x509.GenericX509CertificateProfileData
+import id.walt.x509.X509DistinguishedName
+import id.walt.x509.X509KeyUsage
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -1268,6 +1280,129 @@ class MobileWalletTest {
     }
 
     /**
+     * A request the raw bytes of which were available at consent must be answered byte for byte.
+     *
+     * Every rejected case below produces a request that is *valid* and parses to exactly what the
+     * user saw, so the parsed request alone could not tell them apart: it carries no reader
+     * authentication, no `deviceRequestInfo` and no version. The reader named on the consent screen
+     * has to be the reader that receives the response.
+     */
+    @OptIn(ExperimentalEncodingApi::class)
+    @Test
+    fun annexCAnswersOnlyTheExactRawRequestConsentWasGivenFor() = runTest {
+        val origin = "https://verifier.example"
+        val wallet = annexCWalletWithMdlAndHolderKey("annex-c-consent-binding-wallet")
+        val signedRequest = DeviceRequest.decodeFromBase64Url(SIGNED_READER_REQUEST)
+        val docRequest = signedRequest.docRequests.single()
+        val transcript = AnnexCTranscriptBuilder.buildSessionTranscript(READER_ENCRYPTION_INFO, origin)
+
+        val preview = wallet.previewAnnexCPresentation(
+            MobileWalletAnnexCRequest(
+                parsedRequest = wallet.parseAnnexCDeviceRequest(SIGNED_READER_REQUEST),
+                verifiedOrigin = origin,
+                deviceRequestBase64Url = SIGNED_READER_REQUEST,
+                encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+            )
+        )
+        assertIs<MobileWalletReaderTrust.Untrusted>(preview.readerTrust)
+
+        suspend fun submit(deviceRequestBase64Url: String) = wallet.submitAnnexCPresentation(
+            MobileWalletAnnexCSubmission(
+                requestId = preview.requestId,
+                verifiedOrigin = origin,
+                deviceRequestBase64Url = deviceRequestBase64Url,
+                encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+                selectedCredentialOptions = preview.credentialOptions.map {
+                    MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
+                },
+            )
+        )
+
+        suspend fun assertRejected(deviceRequestBase64Url: String, case: String) {
+            val rejection = assertFailsWith<IllegalArgumentException> { submit(deviceRequestBase64Url) }
+            assertTrue(
+                rejection.message?.contains("deviceRequest changed after consent") == true,
+                "Expected $case to be rejected as a changed request, got: ${rejection.message}",
+            )
+        }
+
+        // Dropping reader authentication leaves a request that is still answerable on its own, and
+        // whose trust state - NotAuthenticated - is a permitted one. It is not the one consented to.
+        assertRejected(
+            signedRequest.copy(docRequests = listOf(docRequest.copy(readerAuth = null)))
+                .encodeToBase64Url(),
+            "a request with reader authentication removed",
+        )
+
+        // A second reader whose signature genuinely verifies. The preview below is what proves that:
+        // an invalid substitute would throw there, so the rejection cannot be a verification failure
+        // in disguise.
+        val otherReaderKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("other-reader-key"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        val otherReaderCertificate = GenericX509CertificateBuilder().buildDer(
+            profileData = GenericX509CertificateProfileData(
+                subjectName = X509DistinguishedName(commonName = "Substitute Reader"),
+                keyUsage = setOf(X509KeyUsage.DigitalSignature),
+            ),
+            subjectPublicKey = otherReaderKey,
+            signingKey = otherReaderKey,
+            signatureAlgorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER),
+        )
+        val substitutedReader = signedRequest.copy(
+            docRequests = listOf(
+                docRequest.copy(
+                    readerAuth = CoseSign1.createAndSignDetached(
+                        protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES256),
+                        unprotectedHeaders = CoseHeaders(
+                            x5chain = listOf(CoseCertificate(otherReaderCertificate.bytes.toByteArray())),
+                        ),
+                        detachedPayload = ReaderAuthenticationPayloads.forDocument(transcript, docRequest.itemsRequest),
+                        signer = otherReaderKey.toCoseSigner(Cose.Algorithm.ES256),
+                    ),
+                )
+            ),
+        ).encodeToBase64Url()
+        assertIs<MobileWalletReaderTrust.Untrusted>(
+            wallet.previewAnnexCPresentation(
+                MobileWalletAnnexCRequest(
+                    parsedRequest = wallet.parseAnnexCDeviceRequest(substitutedReader),
+                    verifiedOrigin = origin,
+                    deviceRequestBase64Url = substitutedReader,
+                    encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+                )
+            ).readerTrust,
+        )
+        assertRejected(substitutedReader, "a request re-signed by a different valid reader")
+
+        // deviceRequestInfo is outside the per-document reader-authentication payload, so this
+        // request keeps the original reader's valid signature while changing what was requested.
+        assertRejected(
+            signedRequest.copy(
+                deviceRequestInfo = ByteStringWrapper(
+                    DeviceRequestInfo(
+                        useCases = listOf(UseCase(mandatory = true, documentSets = listOf(listOf(0u)))),
+                    )
+                ),
+            ).encodeToBase64Url(),
+            "a request carrying added deviceRequestInfo",
+        )
+
+        // Comparison is on decoded bytes, not on how they were spelled: the fixture is unpadded, and
+        // its padded form is the same request.
+        val response = submit("$SIGNED_READER_REQUEST=")
+        assertEquals(MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C, response.protocol)
+        assertTrue(
+            displayJson.parseToJsonElement(response.dataJson).jsonObject["response"]
+                ?.jsonPrimitive?.content?.isNotBlank() == true
+        )
+    }
+
+    /**
      * A recipient key the response could never be HPKE-sealed to must stop the request before the
      * consent dialog, not at submission.
      *
@@ -1668,6 +1803,41 @@ class MobileWalletTest {
         ),
         generateAndPersistKey = unusedKeyGenerator(),
     )
+
+    /** [annexCWalletWithMdl] with a signing key, for Annex C tests that build a response. */
+    private suspend fun annexCWalletWithMdlAndHolderKey(walletId: String): MobileWallet {
+        // A managed crypto2 key, not an imported private JWK: Android's software provider only
+        // accepts RSA private JWK material, so importing this Ed25519 key would fail there.
+        val holderSigner = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("holder-key"),
+                spec = KeySpec.Edwards(EdwardsCurve.ED25519),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        return MobileWallet(
+            walletId = walletId,
+            keyStore = PreloadedKeyStore(
+                WalletKeyInfo(keyId = holderSigner.id.value, keyType = "Ed25519"),
+                managedKey = holderSigner,
+            ),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = RecordingCredentialStore(
+                StoredCredential(
+                    id = "mdl-1",
+                    credential = MdocsCredential(
+                        credentialData = buildJsonObject {
+                            put("org.iso.18013.5.1", buildJsonObject { put("given_name", "Ada") })
+                        },
+                        signed = MdocsExamples.mdocsExampleBase64Url,
+                        docType = "org.iso.18013.5.1.mDL",
+                    ),
+                    label = "mDL",
+                )
+            ),
+            generateAndPersistKey = unusedKeyGenerator(),
+        )
+    }
 
     /**
      * The messages of a throwable and every cause beneath it.
