@@ -170,6 +170,22 @@ internal object WalletComposeE2EHelper {
         fail("$message. Expected one of $texts.\n${visibleUiSnapshot(device)}")
     }
 
+    /**
+     * Asserts [substring] appears in some wallet text node, scrolling to look for it.
+     *
+     * Separate from [assertTextVisibleAfterScrolling] because a review renders one value per row: a
+     * claim value the request supplied may be wrapped in surrounding label text, so an exact match
+     * would fail on content that is in fact on screen.
+     */
+    fun assertTextContainingVisibleAfterScrolling(
+        device: UiDevice,
+        substring: String,
+        message: String,
+    ) {
+        if (findTextContainingAfterScrolling(device, substring) != null) return
+        fail("$message. Expected a node containing '$substring'.\n${visibleUiSnapshot(device)}")
+    }
+
     fun assertClaimValueVisibleAfterScrolling(
         device: UiDevice,
         path: String,
@@ -245,6 +261,27 @@ internal object WalletComposeE2EHelper {
         }
         return null
     }
+
+    private fun findTextContainingAfterScrolling(device: UiDevice, substring: String): UiObject2? {
+        findVisibleTextContaining(device, substring)?.let { return it }
+        repeat(6) {
+            device.scrollDown()
+            findVisibleTextContaining(device, substring)?.let { return it }
+        }
+        repeat(12) {
+            device.scrollUp()
+            findVisibleTextContaining(device, substring)?.let { return it }
+        }
+        return null
+    }
+
+    private fun findVisibleTextContaining(device: UiDevice, substring: String): UiObject2? =
+        device.findObjects(By.pkg("id.walt.walletdemo.compose"))
+            .flatMap { it.flatten() }
+            .firstOrNull { node ->
+                node.isVisibleOn(device) &&
+                    runCatching { node.text?.contains(substring) == true }.getOrDefault(false)
+            }
 
     private fun findVisibleText(device: UiDevice, texts: List<String>): UiObject2? =
         device.findObjects(By.pkg("id.walt.walletdemo.compose"))
