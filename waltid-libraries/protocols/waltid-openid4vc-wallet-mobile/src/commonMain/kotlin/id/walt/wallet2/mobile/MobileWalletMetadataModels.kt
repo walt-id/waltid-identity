@@ -1,11 +1,6 @@
 package id.walt.wallet2.mobile
 
-import id.walt.openid4vci.metadata.issuer.ClaimDisplay
-import id.walt.openid4vci.metadata.issuer.CredentialDisplay
-import id.walt.openid4vci.metadata.issuer.IssuerDisplay
-import id.walt.openid4vci.offers.TxCode
 import id.walt.verifier.openid.models.authorization.ClientMetadata
-import id.walt.wallet2.handlers.WalletOfferPreviewResult
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.experimental.ExperimentalObjCName
@@ -37,92 +32,6 @@ public data class MobileWalletMetadataDisplay(
     public val backgroundColor: String? = null,
     public val backgroundImageUri: String? = null,
     public val textColor: String? = null,
-)
-
-/**
- * Typed credential issuer metadata needed by mobile review interfaces.
- *
- * @property credentialIssuer Canonical credential issuer identifier from issuer metadata.
- * @property display Best localized display entry selected using [MobileWalletConfig.preferredLocales].
- */
-public data class MobileWalletIssuerMetadata(
-    public val credentialIssuer: String,
-    public val display: MobileWalletMetadataDisplay?,
-)
-
-/**
- * Display metadata for one claim declared by an offered credential configuration.
- *
- * @property path Claim path relative to the credential root.
- * @property mandatory Whether the issuer declares that the claim is always included.
- * @property displayName Best localized human-readable claim name when available.
- */
-public data class MobileWalletCredentialClaimMetadata(
-    public val path: List<String>,
-    public val mandatory: Boolean?,
-    public val displayName: String?,
-)
-
-/**
- * Typed metadata for one credential configuration referenced by an offer.
- *
- * This describes the issuer's supported configuration before issuance; it is not credential data.
- *
- * @property configurationId Credential configuration identifier referenced by the offer.
- * @property format OpenID4VCI credential format.
- * @property scope Authorization scope associated with the configuration.
- * @property vct SD-JWT VC type identifier when present.
- * @property doctype ISO mdoc document type when present.
- * @property display Best localized credential display entry.
- * @property claims Claims declared by the credential configuration.
- */
-public data class MobileWalletOfferedCredentialMetadata(
-    public val configurationId: String,
-    public val format: String,
-    public val scope: String?,
-    public val vct: String?,
-    public val doctype: String?,
-    public val display: MobileWalletMetadataDisplay?,
-    public val claims: List<MobileWalletCredentialClaimMetadata>,
-)
-
-/** Input modes defined for an OpenID4VCI transaction code. */
-public enum class MobileWalletTransactionCodeInputMode {
-    Numeric,
-    Text,
-}
-
-/**
- * Transaction-code metadata that a mobile wallet uses to collect issuer-delivered input.
- *
- * @property inputMode Permitted input character class; omitted protocol values default to numeric.
- * @property length Exact expected character count when the issuer provides one.
- * @property description Issuer-provided guidance for obtaining or entering the code.
- */
-@OptIn(ExperimentalObjCName::class)
-public data class MobileWalletTransactionCodeRequirement(
-    public val inputMode: MobileWalletTransactionCodeInputMode,
-    public val length: Int?,
-    @ObjCName("descriptionText")
-    public val description: String?,
-)
-
-/**
- * Result of resolving and retaining an OpenID4VCI credential offer for review.
- *
- * [MobileWallet.receive] reuses the retained resolution for the same wallet and offer, so the
- * metadata reviewed here and the offer accepted by the user belong to the same resolution.
- *
- * @property previewHandle Opaque handle required to accept or discard this reviewed offer.
- * @property issuer Typed issuer metadata selected for the configured locale preferences.
- * @property offeredCredentials Metadata for every credential configuration referenced by the offer.
- * @property transactionCode Input requirement when the issuer requires a separately delivered code.
- */
-public data class MobileWalletOfferResolution(
-    public val previewHandle: MobileWalletIssuancePreviewHandle,
-    public val issuer: MobileWalletIssuerMetadata,
-    public val offeredCredentials: List<MobileWalletOfferedCredentialMetadata>,
-    public val transactionCode: MobileWalletTransactionCodeRequirement?,
 )
 
 /**
@@ -191,36 +100,6 @@ public sealed interface MobileWalletResponseEncryption {
     }
 }
 
-internal fun WalletOfferPreviewResult.toMobileOfferResolution(
-    preferredLocales: List<String>,
-): MobileWalletOfferResolution = MobileWalletOfferResolution(
-    previewHandle = MobileWalletIssuancePreviewHandle(previewHandle.value),
-    issuer = MobileWalletIssuerMetadata(
-        credentialIssuer = issuerMetadata.credentialIssuer,
-        display = issuerMetadata.display.selectPreferred(preferredLocales)?.toMobileDisplay(),
-    ),
-    offeredCredentials = offeredCredentials.map { offeredCredential ->
-        val configuration = offeredCredential.configuration
-        val metadata = configuration.credentialMetadata
-        MobileWalletOfferedCredentialMetadata(
-            configurationId = offeredCredential.credentialConfigurationId,
-            format = configuration.format.value,
-            scope = configuration.scope,
-            vct = configuration.vct,
-            doctype = configuration.doctype,
-            display = metadata?.display.selectPreferred(preferredLocales)?.toMobileDisplay(),
-            claims = metadata?.claims.orEmpty().map { claim ->
-                MobileWalletCredentialClaimMetadata(
-                    path = claim.path,
-                    mandatory = claim.mandatory,
-                    displayName = claim.display.selectPreferred(preferredLocales)?.name,
-                )
-            },
-        )
-    },
-    transactionCode = transactionCode?.toMobileRequirement(),
-)
-
 @OptIn(ExperimentalSerializationApi::class)
 internal fun ClientMetadata.toMobileVerifierMetadata(
     preferredLocales: List<String>,
@@ -244,21 +123,6 @@ internal fun ClientMetadata.toMobileVerifierMetadata(
     )
 }
 
-internal fun TxCode.toMobileRequirement(): MobileWalletTransactionCodeRequirement {
-    val expectedLength = length
-    require(expectedLength == null || expectedLength > 0) { "Transaction code length must be positive when provided" }
-    val mode = when (inputMode ?: "numeric") {
-        "numeric" -> MobileWalletTransactionCodeInputMode.Numeric
-        "text" -> MobileWalletTransactionCodeInputMode.Text
-        else -> throw IllegalArgumentException("Unsupported transaction code input mode: $inputMode")
-    }
-    return MobileWalletTransactionCodeRequirement(
-        inputMode = mode,
-        length = expectedLength,
-        description = description?.takeIf { it.isNotBlank() },
-    )
-}
-
 internal fun ResponseEncryption.Metadata?.toMobileResponseEncryption(): MobileWalletResponseEncryption =
     this?.let {
         MobileWalletResponseEncryption.Required(
@@ -268,26 +132,6 @@ internal fun ResponseEncryption.Metadata?.toMobileResponseEncryption(): MobileWa
             verifierKeyThumbprint = verifierKeyThumbprint,
         )
     } ?: MobileWalletResponseEncryption.NotRequired
-
-private fun IssuerDisplay.toMobileDisplay(): MobileWalletMetadataDisplay =
-    MobileWalletMetadataDisplay(
-        name = name,
-        locale = locale,
-        logoUri = logo?.uri,
-        logoAltText = logo?.altText,
-    )
-
-private fun CredentialDisplay.toMobileDisplay(): MobileWalletMetadataDisplay =
-    MobileWalletMetadataDisplay(
-        name = name,
-        locale = locale,
-        logoUri = logo?.uri,
-        logoAltText = logo?.altText,
-        description = description,
-        backgroundColor = backgroundColor,
-        backgroundImageUri = backgroundImage?.uri,
-        textColor = textColor,
-    )
 
 private data class LocalizedValue(
     val locale: String?,
@@ -320,15 +164,6 @@ private fun <T> List<T>?.selectPreferred(
     }
     return entries.firstOrNull { locale(it).isNullOrBlank() } ?: entries.first()
 }
-
-private fun List<IssuerDisplay>?.selectPreferred(preferredLocales: List<String>): IssuerDisplay? =
-    selectPreferred(preferredLocales, IssuerDisplay::locale)
-
-private fun List<CredentialDisplay>?.selectPreferred(preferredLocales: List<String>): CredentialDisplay? =
-    selectPreferred(preferredLocales, CredentialDisplay::locale)
-
-private fun List<ClaimDisplay>?.selectPreferred(preferredLocales: List<String>): ClaimDisplay? =
-    selectPreferred(preferredLocales, ClaimDisplay::locale)
 
 private fun List<LocalizedValue>.selectPreferred(preferredLocales: List<String>): LocalizedValue? =
     selectPreferred(preferredLocales, LocalizedValue::locale)

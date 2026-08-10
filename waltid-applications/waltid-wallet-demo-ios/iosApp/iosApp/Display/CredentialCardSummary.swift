@@ -4,6 +4,7 @@ struct CredentialCardSummary {
     let title: String
     let credentialType: String?
     let holderName: String?
+    let issuer: String
     let dateText: String?
     let validityText: String?
     let portraitData: Data?
@@ -22,11 +23,15 @@ extension CredentialDetails {
         let portrait = firstImage(in: items)
         let expiryDate = firstExpiryDate(in: items)
         let addedDate = addedAt.map(Self.cardDateFormatter.string(from:))
+        let issuerName = issuerDisplay?.name?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+            ?? issuer?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+            ?? CredentialDisplayText.unknown
 
         return CredentialCardSummary(
             title: title,
             credentialType: firstCredentialType(in: items),
             holderName: holderName.isEmpty ? subject : holderName,
+            issuer: issuerName,
             dateText: expiryDate ?? addedDate,
             validityText: expiryDate.map(CredentialDisplayText.expires) ?? addedDate.map(CredentialDisplayText.added),
             portraitData: portrait?.data,
@@ -42,6 +47,12 @@ extension CredentialDetails {
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }()
+}
+
+private extension String {
+    var nonEmpty: String? {
+        isEmpty ? nil : self
+    }
 }
 
 private func firstText(in items: [ClaimItem], role: ClaimRole) -> String? {
