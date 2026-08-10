@@ -5,6 +5,9 @@ import id.walt.certificate.x509.extension.CrlDistributionPointsExtension
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension.Companion.extensionCrlDistributionPoints
 import id.walt.certificate.x509.model.GeneralName
 import id.walt.crypto.keys.JvmJWKKeyCreator
+import id.walt.crypto2.algorithms.DigestAlgorithm
+import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
+import id.walt.crypto2.algorithms.SignatureAlgorithm
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -13,7 +16,41 @@ class BuildCertificateWithCrlExtensionTest {
 
     @Test
     fun shouldCreateCrlWithMultipleUrls(): Unit = runTest {
-        val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
+        val cert = X509CertificateUtil.createSelfSignedCertificate(key, sigAlg) {
+            extensionCrlDistributionPoints {
+                addUriDistributionPoint(
+                    listOf(
+                        "https://walt.id/crl",
+                        "https://walt-id.com/crl"
+                    ),
+                    setOf(CrlDistributionPointsExtension.ReasonFlag.privilegeWithdrawn)
+                )
+            }
+        }
+
+        assertNotNull(cert.data.extensionCrlDistributionPoints) { distributionPoints ->
+            assertEquals(1, distributionPoints.distributionPoints.size)
+            val dp = distributionPoints.distributionPoints.first()
+            assertNull(dp.distributionPointNameRelativeToCrlIssuer)
+            assertNotNull(dp.reason) { reason ->
+                assertEquals(1, reason.size)
+                assertTrue(reason.contains(CrlDistributionPointsExtension.ReasonFlag.privilegeWithdrawn))
+            }
+            assertNull(dp.cRLIssuer)
+            assertNotNull(dp.distributionPointFullName?.toList()) { fullName ->
+                assertEquals(2, fullName.size)
+                assertEquals("https://walt.id/crl", fullName[0].value)
+                assertEquals(GeneralName.NameType.uniformResourceIdentifier, fullName[0].type)
+                assertEquals("https://walt-id.com/crl", fullName[1].value)
+                assertEquals(GeneralName.NameType.uniformResourceIdentifier, fullName[1].type)
+            }
+        }
+    }
+
+
+    @Test
+    fun shouldCreateCrlWithMultipleUrlsCrypto1(): Unit = runTest {
+        val cert = X509CertificateUtil.createSelfSignedCertificate(crypto1key) {
             extensionCrlDistributionPoints {
                 addUriDistributionPoint(
                     listOf(
@@ -46,7 +83,7 @@ class BuildCertificateWithCrlExtensionTest {
 
     @Test
     fun shouldCreateCrlWithDistributionPointRelativeToCrlIssuer(): Unit = runTest {
-        val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
+        val cert = X509CertificateUtil.createSelfSignedCertificate(crypto1key) {
             extensionCrlDistributionPoints {
                 addDistributionPointRelativeName(
                     "ou = Walt.id ",
@@ -69,7 +106,7 @@ class BuildCertificateWithCrlExtensionTest {
     @Test
     fun shouldCreateCrlWithDistributionPointWithCrlIssuer(): Unit = runTest {
 
-        val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
+        val cert = X509CertificateUtil.createSelfSignedCertificate(crypto1key) {
             extensionCrlDistributionPoints {
                 addDistributionPointRelativeName(
                     "ou = Walt.id ",
@@ -94,7 +131,9 @@ class BuildCertificateWithCrlExtensionTest {
     }
 
     companion object {
-        val key = runBlocking {
+        val sigAlg = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, encoding = EcdsaSignatureEncoding.DER)
+        val key = runBlocking { TestKeyUtil.genEcKey("test-key") }
+        val crypto1key = runBlocking {
             JvmJWKKeyCreator.importPEM(caIssuerPrivateKey).getOrThrow()
         }
     }

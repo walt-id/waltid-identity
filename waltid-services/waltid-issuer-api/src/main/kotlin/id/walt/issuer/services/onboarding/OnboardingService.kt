@@ -142,7 +142,6 @@ object OnboardingService {
 
         val documentSingerCert = X509CertificateUtil.createCertificate(iacaKey, iacaCert) {
             profileDocumentSignerCertificate(
-                issuerCertificate = iacaCert,
                 crlDistributionPointUri = request.certificateData.crlDistributionPointUri,
                 issuerEmailAddress = request.certificateData.issuerEmailAddress,
                 issuerUri = request.certificateData.issuerUri,

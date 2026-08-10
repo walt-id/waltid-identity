@@ -29,7 +29,6 @@ class IsoDocumentSignerX509CertificateProfileTest {
             withCertificateTestKey(KeyType.secp384r1) { subjectKey ->
                 val cert = X509CertificateUtil.createCertificate(rootCaKey, rootCert) {
                     profileDocumentSignerCertificate(
-                        issuerCertificate = rootCert,
                         crlDistributionPointUri = "https://crl.walt.id/crl.der",
                         issuerEmailAddress = "office@walt.id",
                         subjectKey = subjectKey,

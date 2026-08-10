@@ -6,7 +6,7 @@ import id.walt.certificate.TestData.intermediateIssuerKeyPem
 import id.walt.certificate.TestData.intermediateIssuerPublicKeyIdHex
 import id.walt.certificate.TestData.intermediateIssuerPublicKeyValueHex
 import id.walt.certificate.TestKeys.opensslHexFormat
-import id.walt.certificate.x509.BuildCertificateWithCrlExtensionTest.Companion.key
+import id.walt.certificate.x509.BuildCertificateWithCrlExtensionTest.Companion.crypto1key
 import id.walt.certificate.x509.SignatureValidationUtil.verifyPemChain
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.certificate.x509.extension.CrlDistributionPointsExtension
@@ -19,6 +19,8 @@ import id.walt.certificate.x509.model.GeneralName
 import id.walt.certificate.x509.testdata.TestDataCertificates.gtsRootR4CrtPem
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.algorithms.DigestAlgorithm
+import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.x509.X509TestCertificates
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.bytestring.toHexString
@@ -31,9 +33,23 @@ import kotlin.test.*
 class SignumImplementationTest {
 
     @Test
+    fun shouldCreateSelfSignedCertificate() = runTest {
+        val key = TestKeyUtil.genRsaKey("test")
+        val sigAlg = SignatureAlgorithm.RsaPkcs1(DigestAlgorithm.SHA_256)
+        val ca = signumCertUtil.createSelfSignedCertificate(key, sigAlg) {}
+        val leaf = signumCertUtil.createCertificate(key, ca, sigAlg) {
+            subjectDn = "CN=Test"
+            subjectPublicKey(key)
+        }
+        assertNotNull(leaf).also {
+            signumCertUtil.validateCertificateChain(listOf(leaf), InMemoryTrustStore(listOf(ca)))
+        }
+    }
+
+    @Test
     fun shouldCreateCrlWithDistributionPointWithCrlIssuer(): Unit = runTest {
 
-        val cert = signumCertUtil.createSelfSignedCertificate(key) {
+        val cert = signumCertUtil.createSelfSignedCertificate(crypto1key) {
             extensionCrlDistributionPoints {
                 addDistributionPointRelativeName(
                     "ou = Walt.id ",
@@ -92,7 +108,7 @@ class SignumImplementationTest {
 
     @Test
     fun shouldCreateCrlWithMultipleUrls(): Unit = runTest {
-        val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
+        val cert = X509CertificateUtil.createSelfSignedCertificate(crypto1key) {
             extensionCrlDistributionPoints {
                 addUriDistributionPoint(
                     listOf(

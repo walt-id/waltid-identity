@@ -7,6 +7,10 @@ import id.walt.crypto.keys.Key as Crypto1Key
 
 interface X509CertificateSigner {
 
+    suspend fun convertKeyToPublicKeyInfo(key: Key): PublicKeyInfo
+
+    suspend fun convertKeyToPublicKeyInfo(key: Crypto1Key): PublicKeyInfo
+
     suspend fun signCertificate(
         issuerKey: Key,
         signatureAlgorithm: SignatureAlgorithm,

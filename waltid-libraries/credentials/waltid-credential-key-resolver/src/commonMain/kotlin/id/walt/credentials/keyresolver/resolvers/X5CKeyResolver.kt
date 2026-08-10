@@ -5,7 +5,6 @@ import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.x509.CertificateDer
 import id.walt.x509.crypto2PublicJwk
-import id.walt.x509.verifyOrderedCertificateChainSignatures
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -28,14 +27,6 @@ object X5CKeyResolver : BaseKeyResolver {
 
         val certificateChainStrings = x5c.map { it.jsonPrimitive.content }
         val issuerCertificate = certificateChainStrings.first()
-
-        // Per RFC 7515 §4.1.6, x5c values are base64-encoded (standard), not base64url.
-        if (certificateChainStrings.size > 1) {
-            verifyOrderedCertificateChainSignatures(
-                certificateChainStrings.map { CertificateDer(it.decodeFromBase64()) }
-            )
-        }
-
         return CertificateDer(issuerCertificate.decodeFromBase64()).crypto2PublicJwk()
     }
 }

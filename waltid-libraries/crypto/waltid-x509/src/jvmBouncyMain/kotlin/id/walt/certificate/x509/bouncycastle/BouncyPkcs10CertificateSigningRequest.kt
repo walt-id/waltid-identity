@@ -1,11 +1,9 @@
 package id.walt.certificate.x509.bouncycastle
 
 import id.walt.certificate.x509.Pkcs10CertificateSigningRequest
-import id.walt.certificate.x509.X509SigningAlgorithmInfo
-import id.walt.certificate.x509.extension.Extension
 import id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory
+import id.walt.certificate.x509.extension.Extension
 import kotlinx.io.bytestring.ByteString
-import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.pkcs.PKCS10CertificationRequest
 
 class BouncyPkcs10CertificateSigningRequest(val csr: PKCS10CertificationRequest) : Pkcs10CertificateSigningRequest {
@@ -20,17 +18,7 @@ class BouncyPkcs10CertificateSigningRequest(val csr: PKCS10CertificationRequest)
                 get() = ByteString(csr.subject.encoded)
 
             override val subjectPublicKeyInfo: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo =
-                object : Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo {
-                    override val algorithmName: String
-                        get() = X509SigningAlgorithmInfo.algorithmNameByOid(algorithmOid)
-                    override val algorithmOid: String
-                        get() = csr.subjectPublicKeyInfo.algorithm.algorithm.toString()
-                    override val ellipticCurveOid: String?
-                        get() = (csr.subjectPublicKeyInfo.algorithm.parameters as? ASN1ObjectIdentifier)?.toString()
-                    override val keyValueRaw: ByteString = ByteString(csr.subjectPublicKeyInfo.publicKeyData.bytes)
-                    override val encodedDer: ByteString
-                        get() = ByteString(csr.subjectPublicKeyInfo.encoded)
-                }
+                BouncyPublicKeyInfo(csr.subjectPublicKeyInfo)
 
             override val extensions: Map<String, Extension>
                 get() {

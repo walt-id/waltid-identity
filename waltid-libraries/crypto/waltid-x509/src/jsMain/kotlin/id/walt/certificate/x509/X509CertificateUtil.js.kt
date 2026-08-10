@@ -6,16 +6,22 @@ import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.X509CertificateChainValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 
 actual fun platformDefaultServices(): X509CertificateServices {
-    val signatureValidator = SignumSignatureValidator()
+    val signatureValidator = SignumSignatureValidator(
+        SignumCrypto2SignatureValidationImpl()
+    )
+    val signer = SignumCertificateSigner()
     return X509CertificateServices(
+        cryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
         csrParser = SignumCsrParser(),
-        csrSigner = SignumCsrSigner(),
+        csrSigner = signer,
         certificateParser = SignumCertificateParser(),
         signatureValidator = signatureValidator,
         serialNumberGenerator = NodejsX509CertificateSerialNumberGenerator(),
-        certificateSigner = SignumCertificateSigner(),
+        certificateSigner = signer,
         certificateChainValidator = X509CertificateChainValidator(
             listOf(
                 X509CertificateValidityValidator(),

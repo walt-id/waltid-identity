@@ -34,10 +34,19 @@ interface X509SigningAlgorithmInfo {
         const val KEY_ALG_NAME_EC = "id-ecPublicKey"
         const val KEY_ALG_OID_EC = "1.2.840.10045.2.1"
 
+        const val CURVE_SECP256R1_OID = "1.2.840.10045.3.1.7" //prime256v1 or secp256r1
+        const val CURVE_SECP384R1_OID = "1.3.132.0.34" // ansip384r1 or secp384r1
+        const val CURVE_SECP521R1_OID = "1.3.132.0.35" // ansip521r1 or secp521r1
+        const val CURVE_SECP256K1_OID = "1.3.132.0.10"
+        const val CURVE_BRAINPOOL_P256R1_OID = "1.3.36.3.3.2.8.1.1.7"
+        const val CURVE_BRAINPOOL_P384R1_OID = "1.3.36.3.3.2.8.1.1.11"
+        const val CURVE_BRAINPOOL_P512R1_OID = "1.3.36.3.3.2.8.1.1.13"
+
         const val KEY_ALG_NAME_RSA = "rsaEncryption"
         const val KEY_ALG_OID_RSA = "1.2.840.113549.1.1.1"
 
         fun ofKey(key: Key, signatureAlgorithm: SignatureAlgorithm): X509SigningAlgorithmInfo {
+            signatureAlgorithm.requireCompatibleWith(key)
             return when (key.spec) {
                 is KeySpec.Rsa -> {
                     when (signatureAlgorithm) {
@@ -85,13 +94,13 @@ interface X509SigningAlgorithmInfo {
                     val ecKeySpec = key.spec as KeySpec.Ec
                     require(signatureAlgorithm is SignatureAlgorithm.Ecdsa) { "Expected ECDSA signature algorithm, got ${signatureAlgorithm::class.simpleName}" }
                     val ellipticCurve = when (ecKeySpec.curve) {
-                        EcCurve.P256 -> "1.2.840.10045.3.1.7" //prime256v1 or secp256r1
-                        EcCurve.P384 -> "1.3.132.0.34" // ansip384r1 or secp384r1
-                        EcCurve.P521 -> "1.3.132.0.35" // ansip521r1 or secp521r1
-                        EcCurve.SECP256K1 -> "1.3.132.0.10"
-                        EcCurve.BRAINPOOL_P256R1 -> "1.3.36.3.3.2.8.1.1.7"
-                        EcCurve.BRAINPOOL_P384R1 -> "1.3.36.3.3.2.8.1.1.11"
-                        EcCurve.BRAINPOOL_P512R1 -> "1.3.36.3.3.2.8.1.1.13"
+                        EcCurve.P256 -> CURVE_SECP256R1_OID //prime256v1 or secp256r1
+                        EcCurve.P384 -> CURVE_SECP384R1_OID // ansip384r1 or secp384r1
+                        EcCurve.P521 -> CURVE_SECP521R1_OID // ansip521r1 or secp521r1
+                        EcCurve.SECP256K1 -> CURVE_SECP256K1_OID
+                        EcCurve.BRAINPOOL_P256R1 -> CURVE_BRAINPOOL_P256R1_OID
+                        EcCurve.BRAINPOOL_P384R1 -> CURVE_BRAINPOOL_P384R1_OID
+                        EcCurve.BRAINPOOL_P512R1 -> CURVE_BRAINPOOL_P512R1_OID
                         else -> throw IllegalArgumentException("Unsupported ECDSA curve: ${ecKeySpec.curve.name}")
                     }
 
@@ -146,6 +155,28 @@ interface X509SigningAlgorithmInfo {
         fun algorithmNameByOid(oid: String): String =
             oidToNameMap[oid] ?: oid
 
+        fun keySpecByOid(keyAlgorithmOid: String, curveOid: String? = null, rsaKeyLengthBits: Int?): KeySpec =
+            when (keyAlgorithmOid) {
+                KEY_ALG_OID_EC -> {
+                    requireNotNull(curveOid) { "Curve OID is required for EC key" }
+                    when (curveOid) {
+                        CURVE_SECP256R1_OID -> KeySpec.Ec(EcCurve.P256)
+                        CURVE_SECP384R1_OID -> KeySpec.Ec(EcCurve.P384)
+                        CURVE_SECP521R1_OID -> KeySpec.Ec(EcCurve.P521)
+                        CURVE_SECP256K1_OID -> KeySpec.Ec(EcCurve.SECP256K1)
+                        CURVE_BRAINPOOL_P256R1_OID -> KeySpec.Ec(EcCurve.BRAINPOOL_P256R1)
+                        CURVE_BRAINPOOL_P384R1_OID -> KeySpec.Ec(EcCurve.BRAINPOOL_P384R1)
+                        CURVE_BRAINPOOL_P512R1_OID -> KeySpec.Ec(EcCurve.BRAINPOOL_P512R1)
+                        else -> throw IllegalArgumentException("Unsupported EC curve OID: '$curveOid'")
+                    }
+                }
+
+                KEY_ALG_OID_RSA -> {
+                    requireNotNull(rsaKeyLengthBits) { "Key length is required for RSA key" }
+                    KeySpec.Rsa(rsaKeyLengthBits)}
+                else -> throw IllegalArgumentException("Unsupported key algorithm OID: '$keyAlgorithmOid'")
+            }
+
 
         private val signingAlgorithmInfoMap = mapOf(
             Crypto1KeyType.Ed25519 to Info(
@@ -161,7 +192,7 @@ interface X509SigningAlgorithmInfo {
                 signingAlgorithmOid = "1.2.840.10045.4.3.2",
                 keyAlgorithmName = KEY_ALG_NAME_EC,
                 keyAlgorithmOid = KEY_ALG_OID_EC,
-                keyEllipticCurveOid = "1.3.132.0.10"
+                keyEllipticCurveOid = CURVE_SECP256K1_OID
             ),
 
             Crypto1KeyType.secp256r1 to Info(
@@ -169,7 +200,7 @@ interface X509SigningAlgorithmInfo {
                 signingAlgorithmOid = "1.2.840.10045.4.3.2",
                 keyAlgorithmName = KEY_ALG_NAME_EC,
                 keyAlgorithmOid = KEY_ALG_OID_EC,
-                keyEllipticCurveOid = "1.2.840.10045.3.1.7"
+                keyEllipticCurveOid = CURVE_SECP256R1_OID
             ),
 
             Crypto1KeyType.secp384r1 to Info(
@@ -177,7 +208,7 @@ interface X509SigningAlgorithmInfo {
                 signingAlgorithmOid = "1.2.840.10045.4.3.3",
                 keyAlgorithmName = KEY_ALG_NAME_EC,
                 keyAlgorithmOid = KEY_ALG_OID_EC,
-                keyEllipticCurveOid = "1.3.132.0.34"
+                keyEllipticCurveOid = CURVE_SECP384R1_OID
             ),
 
             Crypto1KeyType.secp521r1 to Info(
@@ -185,7 +216,7 @@ interface X509SigningAlgorithmInfo {
                 signingAlgorithmOid = "1.2.840.10045.4.3.4",
                 keyAlgorithmName = KEY_ALG_NAME_EC,
                 keyAlgorithmOid = KEY_ALG_OID_EC,
-                keyEllipticCurveOid = "1.3.132.0.35"
+                keyEllipticCurveOid = CURVE_SECP521R1_OID
             ),
 
             Crypto1KeyType.RSA to Info(

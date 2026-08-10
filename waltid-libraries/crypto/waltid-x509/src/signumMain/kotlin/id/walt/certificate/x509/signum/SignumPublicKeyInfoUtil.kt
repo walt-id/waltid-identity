@@ -1,31 +1,31 @@
-package id.walt.certificate.x509
+package id.walt.certificate.x509.signum
 
-import at.asitplus.signum.indispensable.CryptoPublicKey
-import id.walt.crypto.keys.Key
+import id.walt.certificate.x509.PublicKeyInfo
+import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.KeyEncodingFormat
 import kotlin.io.encoding.Base64
+import id.walt.crypto.keys.Key as Crypto1Key
 
 object SignumPublicKeyInfoUtil {
 
-    suspend fun Key.toSignumPublicKey(): CryptoPublicKey =
-        publicKeyInfoOfKey(this)
+    suspend fun publicKeyInfoOfKey(key: Key): PublicKeyInfo {
+        val encoded = key.capabilities.publicKeyExporter?.exportPublicKey(format = KeyEncodingFormat.SPKI_DER)
+        require(encoded != null) { "Key with id '${key.id}' does not support public key export" }
+        return SignumPublicKeyInfo.ofDerEncoded(encoded.data.toByteArray())
+    }
 
-    suspend fun publicKeyInfoOfKey(keyPair: Key): CryptoPublicKey {
-        // publicKey.getPublicKeyRepresentation() doesn't work for EC keys
-        // so we use the PEM to get to the key bytes
-        val publicKey = keyPair.getPublicKey()
-        val publicKeyPem = publicKey.exportPEM()
+    suspend fun publicKeyInfoOfKey(key: Crypto1Key): PublicKeyInfo {
+        val publicKeyPem = key.getPublicKey().exportPEM()
         return parsePublicKeyPem(publicKeyPem)
     }
 
     private val pemHeaderFooterRegx = Regex("(^-+[A-Z\\s]+-+\\s*$)|\\s+", RegexOption.MULTILINE)
 
-    fun parsePublicKeyPem(publicKeyPem: String): CryptoPublicKey {
+    private fun parsePublicKeyPem(publicKeyPem: String): SignumPublicKeyInfo {
         try {
-            // org.bouncycastle.openssl.PEMParser seems to have some issues
-            // decode manually
             val base64 = publicKeyPem.replace(pemHeaderFooterRegx, "").trim()
-            val derEncoded: ByteArray = Base64.decode(base64)
-            return CryptoPublicKey.decodeFromDer(derEncoded)
+            val asn1encoded = Base64.decode(base64)
+            return SignumPublicKeyInfo.ofDerEncoded(asn1encoded)
         } catch (e: Exception) {
             throw RuntimeException("Could not parse public key info from $publicKeyPem", e)
         }

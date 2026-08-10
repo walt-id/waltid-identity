@@ -60,6 +60,8 @@ open class X509CertificateDataBuilder(
             get() = error("needs to be taken from issuer key")
         override val ellipticCurveOid: String
             get() = error("needs to be taken from issuer key")
+        override val rsaKeyLengthBits: Int?
+            get() = error("needs to be taken from issuer key")
         override val keyValueRaw: ByteString
             get() = error("needs to be taken from issuer key")
         override val encodedDer: ByteString

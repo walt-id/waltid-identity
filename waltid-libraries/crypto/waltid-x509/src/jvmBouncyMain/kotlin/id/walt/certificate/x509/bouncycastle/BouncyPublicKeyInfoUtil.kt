@@ -4,7 +4,6 @@ import id.walt.certificate.x509.bouncycastle.BouncyPublicKeyInfo
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyEncodingFormat
-import kotlinx.io.bytestring.ByteString
 import org.bouncycastle.asn1.ASN1InputStream
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier
@@ -22,12 +21,7 @@ object BouncyPublicKeyInfoUtil {
             ?: throw IllegalArgumentException("X.509 key must support public-key export")
         check(encoded is EncodedKey.SpkiDer) { "X.509 key was not export as SPKI, format was: ${encoded.encodingFormat}" }
         val spki = SubjectPublicKeyInfo.getInstance(encoded.data.toByteArray())
-        return BouncyPublicKeyInfo(
-            spki.algorithm.algorithm.id,
-            (spki.algorithm.parameters?.toASN1Primitive() as? ASN1ObjectIdentifier)?.id,
-            ByteString(spki.publicKeyData.bytes),
-            ByteString(spki.encoded)
-        )
+        return BouncyPublicKeyInfo(spki)
     }
 
     suspend fun publicKeyInfoOfKey(keyPair: Crypto1Key): PublicKeyInfo {
@@ -36,16 +30,7 @@ object BouncyPublicKeyInfoUtil {
         val publicKey = keyPair.getPublicKey()
         val publicKeyPem = publicKey.exportPEM()
         val keyInfo = parsePublicKeyPem(publicKeyPem)
-        return BouncyPublicKeyInfo(
-            keyInfo.algorithm.algorithm.id,
-            keyInfo.algorithm?.parameters
-                ?.let { it as? ASN1ObjectIdentifier }
-                ?.let { p ->
-                    ASN1ObjectIdentifier.getInstance(p).id
-                },
-            ByteString(keyInfo.publicKeyData.bytes),
-            ByteString(keyInfo.encoded)
-        )
+        return BouncyPublicKeyInfo(keyInfo)
     }
 
     val PublicKeyInfo.bouncyCastleAlgorithmIdentifier: AlgorithmIdentifier

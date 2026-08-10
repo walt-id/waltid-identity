@@ -13,8 +13,12 @@ import id.walt.certificate.x509.extension.KeyUsageExtension
 import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.model.GeneralName
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.algorithms.DigestAlgorithm
+import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.keys.Key
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.bytestring.toHexString
 import kotlin.test.*
@@ -22,7 +26,36 @@ import kotlin.test.*
 class X509CertificateSigningTest {
 
     @Test
-    fun shouldSignSelfSignedCertificate() = runTest {
+    fun shouldSignCertificateWithRsaKey() = runTest {
+        val issuerKey = TestKeyUtil.genRsaKey("rsa-key")
+        val sigAlg = SignatureAlgorithm.RsaPkcs1(DigestAlgorithm.SHA_256)
+        signAndValidateCertificate(issuerKey, sigAlg)
+    }
+
+    suspend fun signAndValidateCertificate(issuerKey: Key, sigAlg: SignatureAlgorithm) {
+        val rootCert = assertNotNull(X509CertificateUtil.createSelfSignedCertificate(issuerKey, sigAlg) {
+            subjectDn = "CN=Test, OU=Walt.id, O=Walt.id, L=Graz, C=AT"
+        })
+            .also { cert ->
+                val result =
+                    X509CertificateUtil.validateCertificateChain(listOf(cert), InMemoryTrustStore(listOf(cert)))
+                assertTrue(result.valid)
+            }
+
+        assertNotNull(X509CertificateUtil.createCertificate(issuerKey, rootCert, sigAlg) {
+            subjectDn = "CN=Test Leaf, OU=Walt.id, O=Walt.id, L=Graz, C=AT"
+            subjectPublicKey(issuerKey)
+        }).also { cert ->
+            val result = X509CertificateUtil.validateCertificateChain(
+                listOf(cert),
+                InMemoryTrustStore(listOf(rootCert))
+            )
+            assertTrue(result.valid)
+        }
+    }
+
+    @Test
+    fun shouldSignSelfSignedCertificateWithCrypto1Api() = runTest {
         val certificate = withCertificateTestKey(KeyType.RSA) { key ->
             X509CertificateUtil.createSelfSignedCertificate(key) {
                 subjectDn = "OU=waltid"

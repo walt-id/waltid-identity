@@ -45,6 +45,7 @@ class X509CertificateSignatureValidator(
             val publicKeyAlgorithm = issuerCertificate.data.subjectPublicKeyInfo.algorithmName
             val signatureAlgorithmName = certificate.signatureAlgorithmName
             if (signatureValidator.validateCertificateSignature(
+                    context.cryptoRuntime,
                     issuerCertificate.data.subjectPublicKeyInfo,
                     certificate
                 )

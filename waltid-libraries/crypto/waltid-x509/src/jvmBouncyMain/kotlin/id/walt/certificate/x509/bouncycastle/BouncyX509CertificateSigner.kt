@@ -8,6 +8,7 @@ import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension
+import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.Key
 import kotlinx.io.bytestring.isNotEmpty
@@ -37,6 +38,12 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
             Security.addProvider(BouncyCastleProvider())
         }
     }
+
+    override suspend fun convertKeyToPublicKeyInfo(key: Key): PublicKeyInfo =
+        BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(key)
+
+    override suspend fun convertKeyToPublicKeyInfo(key: Crypto1Key): PublicKeyInfo =
+        BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(key)
 
     override suspend fun signCertificate(
         issuerKey: Key,
@@ -107,10 +114,10 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
     }
 
     override suspend fun validateCertificateSignature(
+        cryptoRuntime: CryptoRuntime,
         issuerPublicKey: X509Certificate.SubjectPublicKeyInfo,
         certificate: X509Certificate
     ): Boolean {
-
         val bouncyCertificate = if (certificate is BouncyX509Certificate) {
             certificate.certificate
         } else {
@@ -133,6 +140,7 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
     }
 
     override suspend fun validateCsrSignature(
+        cryptoRuntime: CryptoRuntime,
         csr: Pkcs10CertificateSigningRequest
     ): Boolean {
         val bouncyCsr = if (csr is BouncyPkcs10CertificateSigningRequest) {

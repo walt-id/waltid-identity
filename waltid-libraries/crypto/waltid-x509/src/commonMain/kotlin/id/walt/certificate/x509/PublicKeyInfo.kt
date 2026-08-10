@@ -2,9 +2,13 @@ package id.walt.certificate.x509
 
 import id.walt.certificate.der.ByteArrayUtil
 import id.walt.certificate.der.ByteArrayUtil.byteStringToBase64Pem
-import id.walt.crypto.keys.Key as Crypto1Key
 import id.walt.crypto.utils.ShaUtils
-import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.keys.StoredKey.Companion.CURRENT_VERSION
+import id.walt.crypto2.serialization.BinaryData
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.toHexString
 
@@ -38,6 +42,8 @@ interface PublicKeyInfo {
     val keyId: ByteString
         get() = ByteString(ShaUtils.sha1(keyValueRaw.toByteArray()))
 
+    val rsaKeyLengthBits: Int?
+
     /**
      * X509 SubjectPublicKeyInfo encoded as DER
      */
@@ -46,10 +52,20 @@ interface PublicKeyInfo {
     val encodedPem: String
         get() = byteStringToBase64Pem(encodedDer, "PUBLIC KEY")
 
+    val keySpec: StoredKey.Software
+        get() {
+            return StoredKey.Software(
+                version = CURRENT_VERSION,
+                id = KeyId(keyId.toHexString()),
+                spec = X509SigningAlgorithmInfo.keySpecByOid(
+                    keyAlgorithmOid = algorithmOid,
+                    curveOid = ellipticCurveOid,
+                    rsaKeyLengthBits = rsaKeyLengthBits
+                ),
+                usages = setOf(KeyUsage.VERIFY),
+                material = EncodedKey.SpkiDer(BinaryData(encodedDer.toByteArray()))
+            )
+        }
+
     companion object
 }
-
-
-expect suspend fun PublicKeyInfo.Companion.ofKey(key: Crypto1Key): PublicKeyInfo
-
-expect suspend fun PublicKeyInfo.Companion.ofKey(key: Key): PublicKeyInfo

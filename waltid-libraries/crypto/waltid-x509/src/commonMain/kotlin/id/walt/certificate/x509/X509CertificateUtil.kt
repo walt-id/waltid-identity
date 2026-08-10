@@ -8,6 +8,7 @@ import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.X509CertificateChainValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
+import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.Key
@@ -82,12 +83,13 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
             subjectDn = "OU=issuer, DC=test, O=Walt.id"
         )
         block.invoke(builder)
+        builder.issuerDnRaw = issuerCert.data.subjectDnRaw
         requireNotNull((builder.subjectPublicKeyInfo as X509CertificateDataBuilder.WaltIdKeySubjectPublicKeyInfoBuilder).key) {
             "Certificate subject public key missing"
         }
         builder.extensionAuthorityKeyIdentifier()
         issuerCert.data.extensionSubjectKeyIdentifier?.let { subjectKeyId ->
-            val issuerPublicKeyInfo = PublicKeyInfo.ofKey(issuerKey)
+            val issuerPublicKeyInfo = services.certificateSigner.convertKeyToPublicKeyInfo(issuerKey)
             require(subjectKeyId.keyIdentifier == issuerPublicKeyInfo.keyId) {
                 "Issuer certificate is not signed by issuer key. Subject key identifier does not match issuer public key identifier."
             }
@@ -112,11 +114,10 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         }
         builder.extensionAuthorityKeyIdentifier()
         issuerCert.data.extensionSubjectKeyIdentifier?.let { subjectKeyId ->
-            // TODO: check key ids
-            //val issuerPublicKeyInfo = PublicKeyInfo.ofKey(issuerKey)
-            //require(subjectKeyId.keyIdentifier == issuerPublicKeyInfo.keyId) {
-            //    "Issuer certificate is not signed by issuer key. Subject key identifier does not match issuer public key identifier."
-            //}
+            val issuerPublicKeyInfo = services.certificateSigner.convertKeyToPublicKeyInfo(issuerKey)
+            require(subjectKeyId.keyIdentifier == issuerPublicKeyInfo.keyId) {
+                "Issuer certificate is not signed by issuer key. Subject key identifier does not match issuer public key identifier."
+            }
         }
         return services.certificateSigner.signCertificate(issuerKey, builder)
     }
@@ -136,7 +137,7 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
     }
 
     suspend fun validateCsrSignature(csr: Pkcs10CertificateSigningRequest): Boolean =
-        services.signatureValidator.validateCsrSignature(csr)
+        services.signatureValidator.validateCsrSignature(services.cryptoRuntime, csr)
 
     suspend fun validateCertificateChain(
         certificateChain: Collection<X509Certificate>,
@@ -148,7 +149,7 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         certificateChain: Collection<X509Certificate>,
         additionalTrust: X509CertificateTrustStore? = null
     ): ValidationResult =
-        services.certificateChainValidator.validate(certificateChain, additionalTrust)
+        services.certificateChainValidator.validate(services.cryptoRuntime, certificateChain, additionalTrust)
 
     companion object Default : X509CertificateUtil(platformDefaultServices())
 
@@ -169,6 +170,8 @@ private class UtilImpl(services: X509CertificateServices) : X509CertificateUtil(
 
 class X509CertificateUtilBuilder internal constructor(val from: X509CertificateUtil) {
 
+    private var cryptoRuntime: CryptoRuntime = from.services.cryptoRuntime
+
     //trust
     private var trustStore: X509CertificateTrustStore = from.services.certificateChainValidator.trustStore
 
@@ -182,6 +185,10 @@ class X509CertificateUtilBuilder internal constructor(val from: X509CertificateU
 
     private var servicesChanged: Boolean = false
     private var trustChanged: Boolean = false
+
+    fun setCryptoRuntime(cryptoRuntime: CryptoRuntime) {
+        this.cryptoRuntime = cryptoRuntime
+    }
 
     fun addValidators(vararg validators: X509CertificateValidator) {
         val originValidatorIdMap = certificateChainValidator.validators
@@ -220,6 +227,7 @@ class X509CertificateUtilBuilder internal constructor(val from: X509CertificateU
 
     internal fun toUtil(): X509CertificateUtil = if (servicesChanged) {
         from.services.copy(
+            cryptoRuntime = cryptoRuntime,
             certificateParser = certificateParser,
             csrParser = csrParser,
             csrSigner = csrSigner,
@@ -227,7 +235,10 @@ class X509CertificateUtilBuilder internal constructor(val from: X509CertificateU
             certificateChainValidator = evaluateChainValidator()
         )
     } else {
-        from.services.copy(certificateChainValidator = evaluateChainValidator())
+        from.services.copy(
+            cryptoRuntime = cryptoRuntime,
+            certificateChainValidator = evaluateChainValidator()
+        )
     }.let {
         UtilImpl(it)
     }

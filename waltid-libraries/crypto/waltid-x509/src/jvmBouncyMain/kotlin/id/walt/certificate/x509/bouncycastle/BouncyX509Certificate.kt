@@ -1,15 +1,13 @@
 package id.walt.certificate.x509.bouncycastle
 
 import id.walt.certificate.x509.X509Certificate
-import id.walt.certificate.x509.X509SigningAlgorithmInfo
 import id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory
 import id.walt.certificate.x509.extension.Extension
 import kotlinx.io.bytestring.ByteString
-import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.cert.X509CertificateHolder
 import kotlin.time.toKotlinInstant
 
- class BouncyX509Certificate(val certificate: X509CertificateHolder) : X509Certificate {
+class BouncyX509Certificate(val certificate: X509CertificateHolder) : X509Certificate {
 
     override val data: X509Certificate.CertificateData = object : X509Certificate.CertificateData {
 
@@ -22,17 +20,7 @@ import kotlin.time.toKotlinInstant
         override val subjectDnRaw: ByteString = ByteString(certificate.subject.encoded)
 
         override val subjectPublicKeyInfo: X509Certificate.SubjectPublicKeyInfo =
-            object : X509Certificate.SubjectPublicKeyInfo {
-                override val algorithmName: String
-                    get() = X509SigningAlgorithmInfo.algorithmNameByOid(algorithmOid)
-                override val algorithmOid: String
-                    get() = certificate.subjectPublicKeyInfo.algorithm.algorithm.toString()
-                override val ellipticCurveOid: String?
-                    get() = (certificate.subjectPublicKeyInfo.algorithm.parameters as? ASN1ObjectIdentifier)?.toString()
-                override val keyValueRaw: ByteString = ByteString(certificate.subjectPublicKeyInfo.publicKeyData.bytes)
-                override val encodedDer: ByteString
-                    get() = ByteString(certificate.subjectPublicKeyInfo.encoded)
-            }
+            BouncyPublicKeyInfo(certificate.subjectPublicKeyInfo)
 
         override val issuerDn: String = certificate.issuer.toString()
 

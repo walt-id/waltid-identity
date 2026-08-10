@@ -4,9 +4,13 @@ import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateTrustStore
 import id.walt.certificate.x509.truststore.CompositeTrustStore
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
+import id.walt.crypto2.CryptoRuntime
 import kotlin.time.Clock
 
-class ValidationContext(trustStore: X509CertificateTrustStore) : X509CertificateTrustStore {
+class ValidationContext(
+    val cryptoRuntime: CryptoRuntime,
+    trustStore: X509CertificateTrustStore
+) : X509CertificateTrustStore {
 
     private val internalLog = mutableListOf<ValidationResult.ValidationLogEntry>()
     private val internalChainTrust = InMemoryTrustStore()

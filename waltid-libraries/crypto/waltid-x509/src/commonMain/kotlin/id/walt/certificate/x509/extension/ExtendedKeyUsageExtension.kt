@@ -71,5 +71,10 @@ interface ExtendedKeyUsageExtension : Extension {
         fun addKeyUsage(vararg keyUsage: KeyUsage) {
             keyPurposeIdList.addAll(keyUsage.map { it.id })
         }
+
+        fun addKeyUsage(vararg keyUsageOids: String) {
+            keyPurposeIdList.addAll(keyUsageOids.map { it })
+        }
+
     }
 }

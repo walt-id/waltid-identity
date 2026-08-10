@@ -19,8 +19,10 @@ import id.walt.certificate.x509.profile.IsoProfileX509CertificateValidationUtil.
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
-import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.Key
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import id.walt.crypto.keys.Key as Crypto1Key
 
 
 /**
@@ -73,7 +75,6 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
     override val id: String = ID
 
     fun X509CertificateDataBuilder.profileDocumentSignerCertificate(
-        issuerCertificate: X509Certificate,
         crlDistributionPointUri: String,
         issuerEmailAddress: String? = null,
         issuerUri: String? = null,
@@ -96,7 +97,38 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
         )
             .joinToString(",")
         profileDocumentSignerCertificate(
-            issuerCertificate = issuerCertificate,
+            crlDistributionPointUri = crlDistributionPointUri,
+            issuerEmailAddress = issuerEmailAddress,
+            issuerUri = issuerUri,
+            subjectKey = subjectKey,
+            subjectDn = subjectDn,
+        )
+    }
+
+
+    fun X509CertificateDataBuilder.profileDocumentSignerCertificate(
+        crlDistributionPointUri: String,
+        issuerEmailAddress: String? = null,
+        issuerUri: String? = null,
+        subjectKey: Crypto1Key,
+        subjectDnCountryCode: String,
+        subjectDnStateOrProvinceName: String? = null,
+        subjectDnLocalityName: String? = null,
+        subjectDnOrganizationName: String? = null,
+        subjectDnCommonName: String,
+        subjectDnSerialNumber: String? = null,
+    ) {
+        require(subjectDnCountryCode.length == 2) { "Require two letter country code but is '${subjectDnCountryCode}'" }
+        require(subjectDnCommonName.isNotBlank()) { "common name must not be blank" }
+        val subjectDn = listOfNotNull(
+            subjectDnCommonName.let { cn -> "CN=${cn}${subjectDnSerialNumber?.let { "+SERIALNUMBER=${it.trim()}" } ?: ""}" },
+            subjectDnOrganizationName?.ifBlank { null }?.let { "O=${it.trim()}" },
+            subjectDnLocalityName?.ifBlank { null }?.let { "L=${it.trim()}" },
+            subjectDnStateOrProvinceName?.ifBlank { null }?.let { "ST=${it.trim()}" },
+            subjectDnCountryCode.let { "C=${it.uppercase().trim()}" },
+        )
+            .joinToString(",")
+        profileDocumentSignerCertificate(
             crlDistributionPointUri = crlDistributionPointUri,
             issuerEmailAddress = issuerEmailAddress,
             issuerUri = issuerUri,
@@ -106,15 +138,63 @@ object IsoDocumentSignerX509CertificateProfile : X509CertificateProfile, X509Cer
     }
 
     fun X509CertificateDataBuilder.profileDocumentSignerCertificate(
-        issuerCertificate: X509Certificate,
         crlDistributionPointUri: String,
         issuerEmailAddress: String? = null,
         issuerUri: String? = null,
         subjectKey: Key,
         subjectDn: String,
     ) {
-        this.issuerDnRaw = issuerCertificate.data.subjectDnRaw
         this.subjectDn = subjectDn
+        val now = Clock.System.now()
+        validity = X509Certificate.Validity(
+            notBefore = now,
+            notAfter = now + maxValidityTime
+        )
+        subjectPublicKey(subjectKey)
+        extensionSubjectKeyIdentifier()
+        extensionKeyUsage {
+            critical = true
+            addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature)
+        }
+        extensionExtendedKeyUsage {
+            critical = true
+            addKeyUsage(ExtendedKeyUsageExtension.KeyUsage.mdlDS)
+        }
+        extensionIssuerAltName {
+            require(issuerEmailAddress != null || issuerUri != null) { "Either issuerEmailAddress or issuerUri must be set" }
+            if (issuerEmailAddress != null) {
+                addEmail(issuerEmailAddress)
+            }
+            if (issuerUri != null) {
+                addUri(issuerUri)
+            }
+        }
+        extensionCrlDistributionPoints {
+            addDistributionPointFullName(
+                listOf(
+                    GeneralName(
+                        GeneralName.NameType.uniformResourceIdentifier,
+                        crlDistributionPointUri
+                    )
+                )
+            )
+        }
+    }
+
+
+    fun X509CertificateDataBuilder.profileDocumentSignerCertificate(
+        crlDistributionPointUri: String,
+        issuerEmailAddress: String? = null,
+        issuerUri: String? = null,
+        subjectKey: Crypto1Key,
+        subjectDn: String,
+    ) {
+        this.subjectDn = subjectDn
+        val now = Clock.System.now()
+        validity = X509Certificate.Validity(
+            notBefore = now,
+            notAfter = now + maxValidityTime
+        )
         subjectPublicKey(subjectKey)
         extensionSubjectKeyIdentifier()
         extensionKeyUsage {
