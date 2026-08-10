@@ -92,10 +92,8 @@ internal fun VerificationSessionSetup.publicView(): VerificationSessionSetup = w
     is CrossDeviceFlowSetup -> copy(core = core.publicView())
     is SameDeviceFlowSetup -> copy(core = core.publicView())
     is DcApiAnnexDFlowSetup -> copy(core = core.publicView())
-    is DcApiAnnexCFlowSetup -> DcApiAnnexCFlowSetup(
-        coreInput = core.publicView(),
-        requestedElements = requestedElements,
-        origin = origin,
+    is DcApiAnnexCFlowSetup -> copy(
+        coreFlow = coreFlow.publicView(),
     )
 }
 
