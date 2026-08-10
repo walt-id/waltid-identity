@@ -21,15 +21,10 @@ import org.robolectric.annotation.Config
 /**
  * What the platform back gesture does to the sharing review.
  *
- * Android-only because only a platform with a back gesture can dispatch one: the gesture is delivered
- * through the host Activity's own dispatcher, so the review is hosted in a real [ComponentActivity]
- * rather than in the platform-neutral test host. What the gesture must *mean* is not Android-specific,
- * and the review under test is the shared one - these assertions are about the split the screen
- * implements, not about a second Android review.
- *
- * The outcome each case resolves to on the Credential Manager side belongs to
- * `DigitalCredentialProviderActivity`, which is what turns `onBackAtRoot` into `RESULT_CANCELED`.
- * Here the concern is only which of the three the review chooses.
+ * Android-only because the gesture is delivered through the host Activity's own dispatcher, so the
+ * shared review has to be hosted in a real [ComponentActivity]. Which Credential Manager outcome each
+ * case resolves to belongs to `DigitalCredentialProviderActivity`; here the concern is only which of the
+ * three the review chooses.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -37,9 +32,9 @@ import org.robolectric.annotation.Config
 class WalletDemoSharingReviewBackHandlingAndroidTest {
 
     /**
-     * With credential details open the gesture is the screen's own navigation, so it closes them and
-     * the host is not told anything. Reporting a host-level back here would end an OS-invoked surface
-     * because the user looked at what they were about to share.
+     * With credential details open the gesture is the screen's own navigation: it closes them and the host
+     * is told nothing, rather than ending an OS-invoked surface because the user looked at what they were
+     * about to share.
      */
     @Test
     fun backClosesCredentialDetailsWithoutLeavingTheReview() =
@@ -99,9 +94,8 @@ class WalletDemoSharingReviewBackHandlingAndroidTest {
         }
 
     /**
-     * A submission already in flight consumes the gesture and does nothing. The response is on its way,
-     * so neither leaving the surface nor cancelling the request is an outcome the user can still be
-     * given - and a host that received either would report a second, contradictory result for one
+     * A submission already in flight consumes the gesture and does nothing: the response is on its way,
+     * and a host that received a back or a cancel now would report a second, contradictory result for one
      * request.
      */
     @Test
@@ -134,10 +128,9 @@ class WalletDemoSharingReviewBackHandlingAndroidTest {
         }
 
     /**
-     * Dispatches a back gesture the way the operating system does, through the host Activity's
-     * dispatcher. Compose's own test host has no back input, so the gesture has to be injected where
-     * the platform injects it - which is also what proves the review registered against that
-     * dispatcher rather than against a handler nothing dispatches to.
+     * Dispatches a back gesture the way the operating system does, through the host Activity's dispatcher,
+     * which also proves the review registered against that dispatcher and not against a handler nothing
+     * dispatches to.
      */
     private fun AndroidComposeUiTest<ComponentActivity>.pressBack() {
         runOnUiThread { requireNotNull(activity) { "No host activity" }.onBackPressedDispatcher.onBackPressed() }

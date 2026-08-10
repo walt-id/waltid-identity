@@ -61,12 +61,9 @@ import kotlin.test.assertTrue
 /**
  * DC API (OpenID4VP 1.0 Appendix A) mdoc round trip against the real verifier.
  *
- * This closes the gap left by [DigitalCredentialSharingE2ETest][1]: that instrumentation test drives
- * the Android Credential Manager plumbing but its stub verifier never verifies the response, so a
- * wrong session transcript or a re-encoded issuer signature passes it. Here the actual verifier
- * consumes the wallet's response and runs its real mdoc policies (device auth, issuer auth).
- *
- * [1] `waltid-wallet-demo-compose/androidApp/src/androidTest/.../DigitalCredentialSharingE2ETest.kt`
+ * The real verifier consumes the wallet's response and runs its actual mdoc policies (device auth,
+ * issuer auth), which no test driving only the Credential Manager plumbing can check: a wrong session
+ * transcript or a re-encoded issuer signature is invisible without verification.
  */
 class DcApiMdocVerifier2IntegrationTest {
 
@@ -212,10 +209,9 @@ class DcApiMdocVerifier2IntegrationTest {
     fun test() = runRoundTrip(port = 17021, walletOrigin = origin, expectSuccess = true)
 
     /**
-     * Negative control for the origin class of bug: the wallet asserts an origin the verifier was
-     * not configured with, so the two sides hash different [OpenID4VPDCAPIHandoverInfo] and only
-     * `mso_mdoc/device-auth` fails. Issuer auth does not involve the origin, so it still passes -
-     * which is what makes "device auth AND issuer auth both failed" a different diagnosis.
+     * The wallet asserts an origin the verifier was not configured with, so the two sides hash different
+     * [OpenID4VPDCAPIHandoverInfo] and only `mso_mdoc/device-auth` fails. Issuer auth does not involve
+     * the origin, so "device auth and issuer auth both failed" is a different diagnosis.
      */
     @Test
     fun mismatchedOriginFailsOnlyDeviceAuth() =
@@ -311,9 +307,8 @@ class DcApiMdocVerifier2IntegrationTest {
                 }
             }
 
-            // Parsed as JSON rather than as Verification2Session: `PresentedRawData.state` has no
-            // default, and a DC API session has no `state`, so the omitted field breaks the typed
-            // decode. Pre-existing on main (7d94ffdb0), unrelated to this test.
+            // Parsed as JSON rather than as Verification2Session: `PresentedRawData.state` has no default,
+            // and a DC API session has no `state`, so the omitted field breaks the typed decode.
             val info = testAndReturn("View presented session") {
                 http.get("/verification-session/$sessionId/info").body<JsonObject>()
             }

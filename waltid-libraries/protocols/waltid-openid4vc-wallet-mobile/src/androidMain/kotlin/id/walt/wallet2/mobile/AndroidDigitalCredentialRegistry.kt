@@ -64,8 +64,7 @@ public class AndroidDigitalCredentialRegistry(
                             MobileWalletDigitalCredentialFormat.SD_JWT_VC,
                         ),
                         requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.UNSIGNED),
-                        // response_mode=dc_api and dc_api.jwt respectively. The verifier chooses; both
-                        // are implemented, so both are advertised.
+                        // response_mode=dc_api and dc_api.jwt respectively.
                         responseProtection = listOf(
                             MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
                             MobileWalletDigitalCredentialResponseProtection.JWE,
@@ -148,8 +147,7 @@ public class AndroidDigitalCredentialRegistry(
         val entries = records.map { it.toAndroidEntry() }
         return runCatching {
             // Registering only the unsigned protocol makes Credential Manager ignore signed and
-            // multisigned requests rather than route them here to be rejected. The library default
-            // advertises all three.
+            // multisigned requests rather than route them here to be rejected.
             registryManager.registerCredentials(
                 OpenId4VpRegistry(
                     credentialEntries = entries,

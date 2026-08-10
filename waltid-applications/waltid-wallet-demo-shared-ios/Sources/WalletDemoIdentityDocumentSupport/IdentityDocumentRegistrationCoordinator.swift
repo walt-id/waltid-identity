@@ -7,15 +7,10 @@ import IdentityDocumentServices
 
 /// The single place either demo applies its desired registrations to Apple's store.
 ///
-/// Both host apps and the extension's `performRegistrationUpdates()` call this. A second
-/// implementation would let the entry points disagree about what is registered, which is exactly the
-/// failure that makes a wallet disappear from the provider picker.
-///
-/// The host calls it whenever the wallet's credential set changed - the native demo directly, the
-/// Compose demo through `onDigitalCredentialRegistryChanged` - and on becoming active, since provider
-/// authorization is granted in Settings with no notification. Both are needed: the wallet can publish
-/// its desired projection but only this process may write Apple's store, and Apple's own callback runs
-/// periodically rather than on change.
+/// Both host apps and the extension's `performRegistrationUpdates()` call this. Only these processes
+/// may write Apple's store, and Apple's callback runs periodically rather than on change, so the host
+/// also reconciles after a credential-set change and on becoming active - provider authorization is
+/// granted in Settings with no notification.
 @available(iOS 26.0, *)
 public struct IdentityDocumentRegistrationCoordinator: Sendable {
     private let namespace: IdentityDocumentNamespace
@@ -47,10 +42,9 @@ public struct IdentityDocumentRegistrationCoordinator: Sendable {
             return RegistrationPlan(toAdd: [], toRemove: [])
         }
 
-        // Fails closed on anything short of a published projection: the plan below is allowed to
-        // remove every registration, so an absent or undecodable projection - which says nothing
-        // about what the wallet holds - must not be read as "the wallet wants nothing". A malformed
-        // one throws out of here; the callback path below logs it.
+        // Fails closed on anything short of a published projection: the plan below may remove every
+        // registration, so an absent or undecodable projection must not be read as "the wallet wants
+        // nothing".
         guard let desired = try desiredRegistrations(
             from: DigitalCredentialRegistrationStorage.desiredRegistrations(
                 appGroupIdentifier: namespace.appGroupIdentifier
@@ -96,9 +90,8 @@ public struct IdentityDocumentRegistrationCoordinator: Sendable {
 
     /// Reconciles from Apple's own registration-update callback, logging rather than throwing.
     ///
-    /// `performRegistrationUpdates()` cannot throw, and on a device the only trace of a failure here
-    /// is this log line, so it carries the identifiers needed to tell "nothing to register" apart
-    /// from "registration was rejected".
+    /// `performRegistrationUpdates()` cannot throw, so on a device this log line is the only trace of
+    /// a failure.
     public func reconcileFromPlatformCallback() async {
         do {
             let plan = try await reconcile()

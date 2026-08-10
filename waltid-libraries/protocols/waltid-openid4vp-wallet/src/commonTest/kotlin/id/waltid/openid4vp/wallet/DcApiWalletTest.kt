@@ -130,10 +130,9 @@ class DcApiWalletTest {
     }
 
     /**
-     * Under `dc_api.jwt` the operating system and the website that called `getCredential` both relay
-     * the response, so the disclosed claims must not be readable by either. Asserting on the member
-     * set - `response` present, `vp_token` absent - is what pins that: a builder that emitted both
-     * would encrypt nothing in practice while still looking encrypted.
+     * Under `dc_api.jwt` the operating system and the website that called `getCredential` both relay the
+     * response, so the disclosed claims must be readable by neither. The member set is asserted because
+     * a builder emitting `vp_token` alongside `response` would encrypt nothing in practice.
      */
     @Test
     fun `an encrypted response mode wraps the members in a jwe the platform cannot read`() = runTest {
@@ -163,11 +162,9 @@ class DcApiWalletTest {
     }
 
     /**
-     * The test above proves the response *looks* encrypted; this proves the verifier can actually read
-     * it. The key pair is fixed rather than generated, so the assertion is on the protocol producing a
-     * decryptable JWE for a published `client_metadata` key, not on a round trip through key material
-     * this test also chose - a wallet that encrypted to the wrong key would still round-trip if both
-     * halves came from the same freshly generated key.
+     * The verifier can actually decrypt what the test above only proves *looks* encrypted. The key pair
+     * is fixed rather than generated: a wallet encrypting to the wrong key would still round-trip if both
+     * halves came from key material this test chose itself.
      */
     @Test
     fun `the verifier decrypts the encrypted response back to the vp token it asked for`() = runTest {
@@ -255,22 +252,17 @@ class DcApiWalletTest {
     }
 
     /**
-     * The full accepted matrix, as a table, because this is the sole origin canonicalizer and its
-     * output is hashed into the mdoc session transcript that the verifier reconstructs from
-     * `expected_origins` without ever seeing the wallet's copy. Every normalization below is a place
-     * where a second, platform-local implementation could disagree by one character and produce a
-     * device signature no verifier can reproduce - which surfaces only as an opaque `device-auth`
-     * rejection, so it is asserted here rather than left to a device test to discover.
-     *
-     * Two entries are regressions: an uppercase host was once returned as-is here but lowercased by
-     * the Android adapter, and `[::1]` was accepted by that adapter but rejected here, because the
-     * loopback check compared against a bare `::1` while ktor reports the brackets.
+     * The full accepted matrix, as a table: this is the sole origin canonicalizer, and its output is
+     * hashed into the mdoc session transcript that the verifier reconstructs from `expected_origins`
+     * without ever seeing the wallet's copy. A platform-local implementation disagreeing by one
+     * character produces a device signature no verifier can reproduce, visible only as an opaque
+     * `device-auth` rejection.
      */
     @Test
     fun `platform origin canonicalization accepts and normalizes every supported origin shape`() {
         mapOf(
-            // An Android app origin is opaque and passes through verbatim - there is nothing in it to
-            // normalize, and altering it would break the verifier's exact match.
+            // An Android app origin is opaque and passes through verbatim; altering it would break the
+            // verifier's exact match.
             "android:apk-key-hash:abc123" to "android:apk-key-hash:abc123",
             "https://verifier.example" to "https://verifier.example",
             // Scheme and host are case-insensitive per RFC 3986, so both are folded down.
@@ -292,17 +284,16 @@ class DcApiWalletTest {
             "http://verifier.localhost:8080" to "http://verifier.localhost:8080",
         ).forEach { (raw, expected) ->
             assertEquals(expected, DcApiWallet.canonicalizePlatformOrigin(raw), "canonicalizing '$raw'")
-            // A canonical result is idempotent - re-canonicalizing must not change it, which is what
-            // lets an adapter pass this output on without the value drifting.
+            // Idempotent, so an adapter can pass this output on without the value drifting.
             assertEquals(expected, DcApiWallet.canonicalizePlatformOrigin(expected), "not idempotent for '$raw'")
         }
     }
 
     /**
      * The rejected matrix. Each entry carries something an origin cannot: a component beyond
-     * scheme/host/port, or a transport that is not a secure context. Accepting any of them would let
-     * two different requesters canonicalize to the same origin, or let a plaintext caller be treated
-     * as the authenticated party the session transcript then binds.
+     * scheme/host/port, or a transport that is not a secure context. Accepting one would let two
+     * different requesters canonicalize to the same origin, or bind the session transcript to a
+     * plaintext caller as though it were authenticated.
      */
     @Test
     fun `platform origin canonicalization rejects anything that is not scheme host and port`() {
@@ -321,7 +312,7 @@ class DcApiWalletTest {
             "https://verifier.example/#fragment",
             "https://verifier.example#fragment",
             // Credentials in the authority: `user@host` is attacker-controlled text that reads as the
-            // host in a UI, and it is not part of the origin either.
+            // host in a UI, and is not part of the origin.
             "https://user@verifier.example",
             "https://user:password@verifier.example",
             // Neither a web origin nor the Android app form.

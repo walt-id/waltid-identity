@@ -57,7 +57,7 @@ fail() {
 cd "$project_dir"
 
 # The iosApp target depends on the IdentityDocumentProvider target and embeds its .appex, so this one
-# build compiles the provider too; a separate extension build would only repeat it.
+# build compiles the provider too.
 #
 # The build settings expand through the `[@]+` form because macOS ships bash 3.2, where `"${array[@]}"`
 # on an empty array is an unbound-variable error under `set -u` - the Compose demo passes none.

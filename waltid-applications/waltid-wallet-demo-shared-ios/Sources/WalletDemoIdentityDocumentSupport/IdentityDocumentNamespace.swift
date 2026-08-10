@@ -5,8 +5,7 @@ import WalletSDK
 ///
 /// Every value here has to be identical in the host app and its provider extension, otherwise the
 /// two processes open different databases or cannot load the same signing key and the wallet only
-/// *looks* shared. The two demos deliberately use different namespaces so that installing both does
-/// not make them share credentials.
+/// *looks* shared.
 public struct IdentityDocumentNamespace: Sendable {
     /// App Group holding the encrypted wallet database and the desired-registration state.
     public let appGroupIdentifier: String
@@ -37,9 +36,7 @@ public struct IdentityDocumentNamespace: Sendable {
 
     /// The `AppIdentifierPrefix`-expanded Keychain access group of the running bundle.
     ///
-    /// Read from the bundle rather than composed in code: only the build knows the Team ID, and
-    /// guessing it wrong yields a group the process is not entitled to, which fails at first use
-    /// rather than at launch.
+    /// Read from the bundle rather than composed in code: only the build knows the Team ID.
     public var keychainAccessGroup: String? {
         (Bundle.main.object(forInfoDictionaryKey: Self.keychainAccessGroupInfoKey) as? String)
             .flatMap { $0.isEmpty ? nil : $0 }
@@ -47,10 +44,9 @@ public struct IdentityDocumentNamespace: Sendable {
 
     /// Wallet configuration for a process that must share state with its counterpart.
     ///
-    /// - Parameter walletID: Wallet identifier. Has no default: the wallet id decides which
-    ///   `wallet_<id>` database is opened, so a default here would let the extension silently open a
-    ///   different database than the host whenever the host runs with a non-default wallet id. The
-    ///   extension resolves it from ``activeWalletID()`` instead of assuming one.
+    /// - Parameter walletID: Wallet identifier. Has no default: it decides which `wallet_<id>`
+    ///   database is opened, so a default would let the extension silently open a different one than
+    ///   the host.
     public func walletConfiguration(walletID: String) throws -> WalletConfiguration {
         guard let keychainAccessGroup else {
             throw IdentityDocumentSupportFailure.unresolvedKeychainAccessGroup(Self.keychainAccessGroupInfoKey)
@@ -66,14 +62,9 @@ public struct IdentityDocumentNamespace: Sendable {
 
     /// The wallet id the host app published into the shared container.
     ///
-    /// The extension cannot derive the wallet from the request, so it reads the host's published
-    /// state - see the projection type in `IosIdentityDocumentRegistry` for why that state describes
-    /// exactly one wallet.
-    ///
     /// - Throws: ``IdentityDocumentSupportFailure/missingDesiredRegistrations`` when no host has
     ///   published yet, or ``IdentityDocumentSupportFailure/unreadableDesiredRegistrations(_:)`` when
-    ///   the projection cannot be decoded. Guessing `"default"` in either case would open an empty
-    ///   database and present the user an empty picker instead of an error.
+    ///   the projection cannot be decoded. Neither falls back to a guessed wallet id.
     public func activeWalletID() throws -> String {
         switch DigitalCredentialRegistrationStorage.desiredRegistrations(appGroupIdentifier: appGroupIdentifier) {
         case .published(let walletID, _):
@@ -90,9 +81,8 @@ public struct IdentityDocumentNamespace: Sendable {
 
     /// Doctypes both demos advertise.
     ///
-    /// Only what the demo actually issues and presents. Apple also recognises
-    /// `org.iso.23220.photoid.1`, which is intentionally absent: an advertised doctype the wallet
-    /// cannot satisfy makes the wallet appear in a picker and then fail.
+    /// Only what the demo actually issues and presents: an advertised doctype the wallet cannot
+    /// satisfy makes it appear in a picker and then fail.
     public static let demoDocumentTypes: Set<String> = [
         "org.iso.18013.5.1.mDL",
         "eu.europa.ec.eudi.pid.1",

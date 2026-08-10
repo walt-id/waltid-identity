@@ -7,8 +7,7 @@ import XCTest
 /// What the provider extension does with a request, without an iOS 26 request to do it with.
 ///
 /// The Apple context is stubbed because Apple's own request type cannot be constructed in a test;
-/// everything below it - the review the user sees, the selection rules, and which actions are
-/// available - is the real orchestration the extension runs.
+/// everything below it is the real orchestration the extension runs.
 final class AnnexCPresentationModelTests: XCTestCase {
 
     @MainActor
@@ -163,9 +162,9 @@ final class AnnexCPresentationModelTests: XCTestCase {
 
     /// Stands in for Apple's context, and for the platform's half of the two-stage flow.
     ///
-    /// ``sendResponse(_:)`` runs the closure with `rawRequest` and keeps what it returned, because the
-    /// wallet only sees the `DeviceRequest` and `EncryptionInfo` inside that closure - counting the
-    /// calls alone would leave the whole path from released request to sealed bytes unexercised.
+    /// ``sendResponse(_:)`` runs the closure with `rawRequest` and keeps what it returned: the wallet only
+    /// sees the `DeviceRequest` and `EncryptionInfo` inside that closure, so counting calls alone would
+    /// leave the path from released request to sealed bytes unexercised.
     private final class StubRequestContext: AnnexCRequestContext, @unchecked Sendable {
         private let origin: URL?
         private let rawRequest: Data?

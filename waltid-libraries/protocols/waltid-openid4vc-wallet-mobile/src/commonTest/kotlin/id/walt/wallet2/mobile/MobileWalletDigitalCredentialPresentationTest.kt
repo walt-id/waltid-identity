@@ -33,11 +33,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Presentation over the OS-mediated Digital Credentials API, driven through the public
- * [MobileWallet] facade rather than the protocol module, because the facade owns two translations no
- * protocol-level test can reach: the platform registry entry ids the OS hands back become wallet
- * credential ids, and the wallet's configured transaction-data profiles become the metadata the
- * provider consent UI renders.
+ * Presentation over the OS-mediated Digital Credentials API, driven through the [MobileWallet] facade
+ * rather than the protocol module, which owns two translations no protocol-level test can reach:
+ * platform registry entry ids become wallet credential ids, and configured transaction-data profiles
+ * become the metadata the provider consent UI renders.
  */
 class MobileWalletDigitalCredentialPresentationTest {
 
@@ -135,21 +134,18 @@ class MobileWalletDigitalCredentialPresentationTest {
 
     /**
      * `dc_api.jwt` without usable verifier encryption keys must fail rather than degrade to a
-     * cleartext response, which the verifier would still accept as an answer to its encrypted
-     * request. The wallet may not release a presentation it cannot protect.
+     * cleartext response, which the verifier would still accept as an answer to its encrypted request.
      *
-     * It must fail at *preview*, not at submission. A preview that succeeds has already matched DCQL
-     * over the store and returned the matching credentials to the caller, so an unanswerable request
-     * would still have told the verifier what the wallet holds - and on Android it would have opened
-     * a consent dialog for a presentation that could never be delivered. Every case here therefore
-     * also asserts the store was read no more than by a request rejected before it was even resolved.
+     * It must fail at *preview*: a successful preview has already matched DCQL over the store and
+     * returned the matches to the caller, so an unanswerable request would still have disclosed what
+     * the wallet holds. Every case therefore also asserts the store was read no more than by a request
+     * rejected before resolution.
      */
     @Test
     fun anUnusableEncryptedResponseConfigurationIsRejectedBeforeAnyCredentialIsMatched() = runTest {
-        // What the wallet reads before it has looked at the request at all: the registry projection
-        // is rebuilt to map platform entry ids onto credential ids, which happens for every request
-        // including one rejected as stale. Measured rather than hardcoded, so this stays an assertion
-        // about ordering rather than about how the projection is built.
+        // What the wallet reads before looking at the request at all: the registry projection is rebuilt
+        // to map platform entry ids onto credential ids, for every request including a stale one.
+        // Measured rather than hardcoded, so this asserts ordering and not how the projection is built.
         val readsBeforeAnyResolution = run {
             val fixture = walletFixture(sdJwtCredential())
             fixture.registryEntryId("pid-1")
@@ -305,10 +301,9 @@ class MobileWalletDigitalCredentialPresentationTest {
     }
 
     /**
-     * The verifier's `transaction_data` has to survive the Credential Manager transport and reach
-     * the provider UI as the existing [MobileWalletTransactionDataItem], with the display name and
-     * field list coming from the wallet's configured profile rather than from the request - a
-     * verifier must not be able to label its own authorization prompt.
+     * The verifier's `transaction_data` has to survive the Credential Manager transport and reach the
+     * provider UI as a [MobileWalletTransactionDataItem]. Display name and field list come from the
+     * wallet's configured profile: a verifier must not be able to label its own authorization prompt.
      */
     @Test
     fun transactionDataReachesThePreviewThroughTheConfiguredWalletProfile() = runTest {
@@ -359,9 +354,8 @@ class MobileWalletDigitalCredentialPresentationTest {
     }
 
     /**
-     * A transaction-data type the wallet holds no profile for must be rejected before consent: the
-     * provider UI cannot describe what it has no profile for, so presenting anyway would ask the
-     * user to authorize something unlabelled.
+     * A transaction-data type the wallet holds no profile for is rejected before consent, rather than
+     * asking the user to authorize something the provider UI cannot label.
      */
     @Test
     fun anUnconfiguredTransactionDataTypeIsRejectedBeforeConsent() = runTest {
@@ -408,9 +402,9 @@ class MobileWalletDigitalCredentialPresentationTest {
         }
 
         /**
-         * The registry entry id the platform would have been handed for [credentialId]. Read back
-         * from the projection the wallet actually published rather than recomputed here, so a test
-         * cannot pass against an entry id the OS would never have seen.
+         * The registry entry id the platform would have been handed for [credentialId], read back from
+         * the published projection rather than recomputed, so no test can pass against an entry id the
+         * OS would never have seen.
          */
         suspend fun registryEntryId(credentialId: String): String {
             if (registry.records.isEmpty()) wallet.refreshDigitalCredentialRegistration()
@@ -526,10 +520,9 @@ class MobileWalletDigitalCredentialPresentationTest {
     )
 
     /**
-     * Parsed rather than hand-built, because the parser is what puts `docType` into
-     * `credentialData` - and that key is the only thing DCQL's `doctype_value` constraint reads. A
-     * hand-built fixture omitting it matches nothing, which no assertion here could tell apart from
-     * a routing bug.
+     * Parsed rather than hand-built: the parser is what puts `docType` into `credentialData`, which is
+     * the only key DCQL's `doctype_value` constraint reads. A fixture omitting it matches nothing, which
+     * would be indistinguishable here from a routing bug.
      */
     private suspend fun mdocCredential(id: String = "mdl-1"): StoredCredential = StoredCredential(
         id = id,
@@ -541,9 +534,9 @@ class MobileWalletDigitalCredentialPresentationTest {
         map { MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId) }
 
     /**
-     * Credential store that counts reads, so a test can assert a request was refused *before* the
-     * wallet looked at what it holds. Asserting only on the thrown exception would pass equally for a
-     * rejection that happens after DCQL matching, which is the ordering bug this guards.
+     * Credential store that counts reads, so a test can assert a request was refused *before* the wallet
+     * looked at what it holds; the thrown exception alone would not distinguish that from a rejection
+     * after DCQL matching.
      */
     private class RecordingCredentialStore : WalletCredentialStore {
         private val credentials = mutableMapOf<String, StoredCredential>()

@@ -75,14 +75,11 @@ internal suspend fun encryptAnnexCHpke(
 )
 
 /**
- * The whole ISO 18013-7 Annex C presentation flow, in one place.
+ * The whole ISO 18013-7 Annex C presentation flow.
  *
- * The two entry points read as the sequence they perform. [preview] validates the request, matches
- * available wallet documents, evaluates reader trust and retains the consent state. [submit] verifies
- * that the post-consent request is immutably the one consented to, builds the selected documents, and
- * HPKE-encrypts the `DeviceResponse`. Each step is a private method rather than a class: the steps
- * are not independently useful, they share the wallet and the session transcript, and splitting them
- * across types would hide the ordering that makes the flow safe.
+ * [preview] validates the request, matches available wallet documents, evaluates reader trust and
+ * retains the consent state. [submit] verifies that the post-consent request is the one consented to,
+ * builds the selected documents, and HPKE-encrypts the `DeviceResponse`.
  */
 internal class MobileWalletAnnexCEngine(
     private val wallet: Wallet,
@@ -103,10 +100,8 @@ internal class MobileWalletAnnexCEngine(
      * The raw request consent was given for, in the form each part has to be compared in.
      *
      * [deviceRequestDigest] digests the *decoded* bytes, so a re-spelled Base64URL encoding of the
-     * same request is still accepted while any change to the request itself is not.
-     * [encryptionInfoBase64Url] is kept verbatim instead, because the session transcript binds that
-     * string as written: for this part the spelling is the security-relevant value, not just what it
-     * decodes to.
+     * same request is still accepted. [encryptionInfoBase64Url] is kept verbatim, because the session
+     * transcript binds that string as written.
      */
     private class RawRequest(
         val deviceRequestDigest: ByteArray,
@@ -254,15 +249,12 @@ internal class MobileWalletAnnexCEngine(
      * transcript and encryption metadata from its bytes.
      *
      * When the raw request was already available at preview, it must be exactly the one consent was
-     * given for. The parsed request alone is too weak a binding: it carries no reader
-     * authentication, no `deviceRequestInfo` and no version, so a request that dropped or replaced
-     * its reader auth after consent would still compare equal and would still be answerable - a
-     * verified reader shown on the consent screen must be the reader that receives the response.
+     * given for. The parsed request alone is too weak a binding: it carries no reader authentication,
+     * no `deviceRequestInfo` and no version, so a request that dropped or replaced its reader auth
+     * after consent would compare equal and remain answerable.
      *
-     * Reader authentication is verified again here for its *rejection*, not its verdict: the trust
-     * state already informed the consent that was given, but a signature that does not verify must
-     * stop the response. On Apple's deferred path the raw request first exists here, so byte
-     * equality cannot be required and these consistency checks are the available binding.
+     * On Apple's deferred path the raw request first exists here, so byte equality cannot be required
+     * and these consistency checks are the available binding.
      */
     private suspend fun confirmRequestUnchangedAfterConsent(
         submission: MobileWalletAnnexCSubmission,

@@ -34,10 +34,9 @@ import kotlin.test.assertNull
  * The platform-invoked sharing review, exercised through the same screen a Digital Credentials
  * provider host shows.
  *
- * These cover what a provider surface has to get right and what an in-app OpenID4VP review never
- * exercises: reviewing a request with no protocol rejection channel, and rendering the concepts a
- * platform transport does have (verified origin, reader authentication, session encryption) without
- * inventing the ones it does not.
+ * These cover what an in-app OpenID4VP review never exercises: a request with no protocol rejection
+ * channel, and the concepts only a platform transport has - verified origin, reader authentication,
+ * session encryption.
  */
 @OptIn(ExperimentalTestApi::class)
 class WalletDemoSharingReviewTestScenarios {
@@ -59,9 +58,8 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithTag(WalletDemoSharingReviewTestTags.Review).assertIsDisplayed()
         onNodeWithTag(WalletDemoSharingReviewTestTags.RequesterSection).performScrollTo().assertIsDisplayed()
         // An unsigned Digital Credentials request has no verifier metadata, so the authenticated origin
-        // is the requester identity. It is shown once, captioned as verified: the origin string is not
-        // repeated as a second labelled row, but the fact that it was authenticated is still stated -
-        // an uncaptioned origin reads as one more self-asserted requester claim.
+        // is the requester identity: shown once, and captioned as verified, because an uncaptioned origin
+        // reads as one more self-asserted requester claim.
         onNodeWithText("https://verifier.example").performScrollTo().assertIsDisplayed()
         onAllNodesWithText("https://verifier.example").assertCountEquals(1)
         onNodeWithText("Verified website").performScrollTo().assertIsDisplayed()
@@ -77,9 +75,9 @@ class WalletDemoSharingReviewTestScenarios {
     }
 
     /**
-     * Self-asserted verifier metadata heads the section, and the authenticated origin stays visible
-     * beside it under its own label: the two have different weight, and a review that showed only the
-     * name a request asked to be called would hide the one requester fact that was actually verified.
+     * Self-asserted verifier metadata heads the section, and the authenticated origin stays visible beside
+     * it under its own label. Showing only the name a request asked to be called would hide the one
+     * requester fact that was actually verified.
      */
     fun verifiedOriginStaysVisibleBesideSelfAssertedVerifierMetadata() = runComposeUiTest {
         setContent {
@@ -176,9 +174,8 @@ class WalletDemoSharingReviewTestScenarios {
     }
 
     /**
-     * Annex C does have reader authentication, and an unrecognised reader is described as a trust
-     * decision rather than as a verification failure - a request whose reader signature failed never
-     * reaches a review at all, so calling this one a bad signature would misdescribe it.
+     * Annex C does have reader authentication, and an unrecognised reader is described as a trust decision
+     * rather than a verification failure: a request whose reader signature failed never reaches a review.
      */
     fun untrustedReaderIsDescribedAsATrustDecisionNotASignatureFailure() = runComposeUiTest {
         setContent {
@@ -246,11 +243,9 @@ class WalletDemoSharingReviewTestScenarios {
     }
 
     /**
-     * Two wallet credentials can satisfy the same credential query, and they are alternatives rather
-     * than an accumulation: a DCQL credential query asks for one match unless it allows several.
-     * Choosing the second must therefore deselect the first *and* drop the disclosures approved for it -
-     * permission to disclose an attribute from one document is not permission to disclose it from
-     * another, and a review that carried the choice over would share what the user never approved.
+     * Two wallet credentials satisfying the same DCQL credential query are alternatives, not an
+     * accumulation. Choosing the second deselects the first *and* drops the disclosures approved for it:
+     * permission to disclose an attribute from one document is not permission to disclose it from another.
      */
     fun choosingAnotherCredentialForOneQueryReplacesItAndItsDisclosures() = runComposeUiTest {
         var submitted: WalletDemoSharingSelection? = null
@@ -284,8 +279,8 @@ class WalletDemoSharingReviewTestScenarios {
             .performScrollTo()
             .assertIsOff()
 
-        // Approving the first credential's optional disclosure is what gives the switch something to
-        // leak: without it, an implementation that never dropped disclosures would still pass.
+        // Approving the first credential's optional disclosure gives the switch something to leak;
+        // without it, an implementation that never dropped disclosures would still pass.
         val firstOptionalDisclosure = disclosureSelection(first, OPTIONAL_DISCLOSURE_PATH)
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(firstOptionalDisclosure.id))
             .performScrollTo()
@@ -307,11 +302,9 @@ class WalletDemoSharingReviewTestScenarios {
     }
 
     /**
-     * A disclosure the credential can withhold is the user's decision; one the request requires is not.
-     * The optional one therefore gets a toggle that starts off and travels only once it is turned on,
-     * and the required one gets no toggle at all - offering a control the wallet cannot honour would
-     * misdescribe what Share does. Deselecting the credential also disables the toggle, because there is
-     * no longer a document to disclose from.
+     * A disclosure the credential can withhold is the user's decision; one the request requires is not. The
+     * optional one gets a toggle that starts off, and the required one gets none, because offering a
+     * control the wallet cannot honour would misdescribe what Share does.
      */
     fun optionalDisclosuresStartOffAndTravelOnlyWhenTurnedOn() = runComposeUiTest {
         var submitted: WalletDemoSharingSelection? = null
@@ -333,8 +326,8 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().assertIsOff()
         onNodeWithText("Optional disclosure").performScrollTo().assertIsDisplayed()
 
-        // Submitted untouched: a required disclosure is not carried as a selection, so an empty
-        // disclosure set here is what "the user approved nothing optional" has to look like.
+        // A required disclosure is not carried as a selection, so an empty disclosure set is what
+        // "the user approved nothing optional" looks like.
         onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performScrollTo().performClick()
         assertEquals(emptySet<WalletDemoPresentationDisclosureSelection>(), submitted?.disclosures)
 

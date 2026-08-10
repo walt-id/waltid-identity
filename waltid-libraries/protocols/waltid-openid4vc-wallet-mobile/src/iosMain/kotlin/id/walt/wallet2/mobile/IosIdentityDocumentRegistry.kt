@@ -15,8 +15,7 @@ import platform.Foundation.NSUserDefaults
  * the group and survives app deletion.
  *
  * @property documentIdentifier `MobileDocumentRegistration.documentIdentifier` for this credential.
- * Always the wallet's stable [MobileWalletCredentialRegistryRecord.registryEntryId] so that a
- * refresh of an unchanged wallet is a no-op for Apple's store.
+ * Always the wallet's stable [MobileWalletCredentialRegistryRecord.registryEntryId].
  * @property documentType ISO mdoc doctype registered with Apple, for example `org.iso.18013.5.1.mDL`.
  */
 @Serializable
@@ -28,12 +27,11 @@ public data class IosIdentityDocumentProjectionRecord(
 /**
  * Desired IdentityDocumentServices registration state of the one wallet that owns this App Group.
  *
- * One wallet rather than a union of several, because Apple hands the provider extension only the
- * parsed request, the requesting origin, `sendResponse` and `cancel` - not the matched registration's
- * `documentIdentifier`. An extension therefore cannot tell which wallet a request was registered for,
- * so a multi-wallet projection would describe registrations it could never fulfil. The wallet that
- * refreshed last is the active one, and [walletId] tells the extension which `wallet_${walletId}`
- * database to open instead of assuming `"default"`.
+ * One wallet rather than a union of several: Apple hands the provider extension the parsed request,
+ * the requesting origin, `sendResponse` and `cancel`, but not the matched registration's
+ * `documentIdentifier`, so an extension cannot tell which wallet a request was registered for. The
+ * wallet that refreshed last is the active one, and [walletId] names the `wallet_${walletId}` database
+ * the extension must open.
  *
  * @property walletId Wallet whose credentials these registrations resolve to.
  * @property registrations Desired registrations, one per presentable mdoc credential.
@@ -47,10 +45,9 @@ public data class IosIdentityDocumentProjectionState(
 /**
  * Outcome of reading the shared projection, with "absent" and "unreadable" kept apart.
  *
- * Reconciliation removes registrations, so collapsing these two into an empty state would be a
- * data-loss bug: an unwritten or corrupt container would read as "this wallet wants nothing
- * registered" and every managed registration would be unregistered, silently removing documents the
- * wallet can still present. Only [Published] is authoritative.
+ * Reconciliation removes registrations, so only [Published] is authoritative: collapsing the other two
+ * into an empty state would unregister every managed document whenever the container is unwritten or
+ * corrupt.
  */
 public sealed interface IosIdentityDocumentProjectionResult {
     /** No wallet has published a projection into this App Group yet. Apple's store must be left alone. */
@@ -59,7 +56,7 @@ public sealed interface IosIdentityDocumentProjectionResult {
     /**
      * A projection exists but could not be decoded, so the wallet's intent is unknown.
      *
-     * @property reason Decoder message, for the log line that is the only trace of this on a device.
+     * @property reason Decoder message.
      */
     public data class Malformed(public val reason: String) : IosIdentityDocumentProjectionResult
 
@@ -79,13 +76,12 @@ public sealed interface IosIdentityDocumentProjectionResult {
  *
  * This publishes what the wallet *wants* registered; only Swift can talk to
  * `IdentityDocumentProviderRegistrationStore`, so the host app and the provider extension read this
- * state and reconcile Apple's actual registrations against it. The desired state is written
- * regardless of the reported authorization status, so that authorizing the provider later lets
+ * state and reconcile Apple's actual registrations against it. The desired state is written regardless
+ * of the reported authorization status, so authorizing the provider later lets
  * `performRegistrationUpdates()` rebuild Apple's registry without reissuing any credential.
  *
  * @param appGroupIdentifier App Group holding the projection; null disables Apple registration.
- * @param walletId Wallet this registry projects. Published with the projection so the provider
- * extension opens this wallet's database instead of guessing one.
+ * @param walletId Wallet this registry projects, published with the projection.
  * @property capabilities Current iOS platform and registration availability.
  */
 @OptIn(ExperimentalForeignApi::class)
@@ -170,8 +166,6 @@ public class IosIdentityDocumentRegistry(
      *
      * [MobileWalletCredentialRegistrationResult.registeredEntryCount] counts desired registrations
      * written, not registrations Apple has accepted, because applying them is Swift's job.
-     * [MobileWalletCredentialRegistrationResult.available] reports whether Apple can currently be
-     * updated at all, which is what an application surfaces to the user.
      *
      * [registryId] is unused: Apple's store is keyed by document identifier alone.
      */
@@ -213,9 +207,8 @@ public class IosIdentityDocumentRegistry(
         group: String,
         projection: List<IosIdentityDocumentProjectionRecord>,
     ) {
-        // A blind overwrite: this wallet's state is the whole desired state, so there is nothing to
-        // merge. An empty projection is written rather than removed, because "holds no mdoc
-        // credential" must reach the reconciler as an instruction and not as an absent container.
+        // An empty projection is written rather than removed, because "holds no mdoc credential" must
+        // reach the reconciler as an instruction and not as an absent container.
         NSUserDefaults(suiteName = group).setObject(
             projectionJson.encodeToString(
                 IosIdentityDocumentProjectionState.serializer(),
@@ -241,17 +234,13 @@ public class IosIdentityDocumentRegistry(
          *
          * Returns a result rather than a list because both callers - the host app's scene-activation
          * task and Apple's `performRegistrationUpdates()` - run where a thrown error is swallowed, so
-         * the missing/malformed/published distinction has to be carried in the return value.
+         * the missing/malformed/published distinction has to survive in the return value.
          */
         public fun readDesiredRegistrations(appGroupIdentifier: String): IosIdentityDocumentProjectionResult =
             readProjectionState(NSUserDefaults(suiteName = appGroupIdentifier))
 
         /**
          * Records the runtime registration authorization Swift observed, for [capabilities] to read.
-         *
-         * Only Swift can query `IdentityDocumentProviderRegistrationStore`. Keeping the write here
-         * rather than in Swift means the defaults key and each status's stored spelling live in one
-         * place.
          */
         public fun reportRegistrationStatus(
             appGroupIdentifier: String,

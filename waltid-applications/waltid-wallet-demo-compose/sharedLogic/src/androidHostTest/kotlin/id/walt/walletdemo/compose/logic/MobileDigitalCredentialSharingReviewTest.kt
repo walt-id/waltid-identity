@@ -19,9 +19,8 @@ import kotlin.test.assertTrue
 /**
  * The mapping from a platform Digital Credentials preview onto what the user reviews.
  *
- * These tests exist where a wallet's consent bugs are cheapest to catch: everything the review UI can
- * possibly show is decided here, so a dropped transaction or an invented protocol field fails a test
- * instead of shipping a screen that misdescribes the request.
+ * Everything the review UI can show is decided here, so a dropped transaction or an invented protocol
+ * field fails a test instead of shipping a screen that misdescribes the request.
  */
 class MobileDigitalCredentialSharingReviewTest {
     /**
@@ -153,8 +152,8 @@ class MobileDigitalCredentialSharingReviewTest {
     }
 
     /**
-     * The OpenID4VP DC API has no reader authentication, and an absent concept is answered by having no
-     * reader-trust state at all rather than by a state that reads as a failed check.
+     * The OpenID4VP DC API has no reader authentication, which maps to no reader-trust state at all rather
+     * than to a state that reads as a failed check.
      */
     @Test
     fun protocolWithoutReaderAuthenticationHasNoReaderTrustState() {
@@ -200,8 +199,8 @@ class MobileDigitalCredentialSharingReviewTest {
     }
 
     /**
-     * Annex C requests every listed document, so each requested document becomes its own requirement -
-     * without that, a partial answer would look complete and Share would enable too early.
+     * Annex C requests every listed document, so each becomes its own requirement; otherwise a partial
+     * answer would look complete and Share would enable too early.
      */
     @Test
     fun annexCRequiresOneCredentialPerRequestedDocument() {

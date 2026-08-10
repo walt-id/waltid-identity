@@ -65,43 +65,30 @@ import java.security.MessageDigest
 
 /**
  * OS-mediated Digital Credentials sharing E2Es against the public demo verifier, one per protocol
- * variant the wallet claims to support natively on Android.
+ * variant the wallet supports natively on Android. Nothing is stubbed: issuer2 issues, Credential
+ * Manager mediates, and verifier2 verifies the OpenID4VP variants.
  *
- * The whole chain is real in every case: issuer2 issues into the wallet, Android Credential Manager
- * mediates the picker, the wallet's own provider activity builds the response, and it is verified by
- * the code that would verify it in production - verifier2 for the OpenID4VP variants, and the shared
- * `waltid-18013-7-verifier` reader for Annex C. Nothing is stubbed, so a wrong session transcript, a
- * re-encoded issuer signature or a missing disclosure fails a test instead of passing it.
+ * Annex C is verified in-process with the shared verifier-side [AnnexCRequestBuilder] and
+ * [AnnexCResponseVerifier], because it has no back-channel - the encrypted DeviceResponse returns
+ * through the OS to whoever called `getCredential`, so reader and caller are the same party. A hosted
+ * session could not be bound to this caller either: it requires a secure-context origin, while
+ * Credential Manager asserts `android:apk-key-hash:...` for a native one.
  *
- * Annex C is verified in-process rather than against the hosted verifier, and that is not a shortcut
- * around the wallet. Annex C has no back-channel: the encrypted DeviceResponse travels back through
- * the OS to whoever called `getCredential`, so the reader and the caller are necessarily the same
- * party. The request is built with the shared verifier-side [AnnexCRequestBuilder] and decrypted with
- * [AnnexCResponseVerifier], which is what the deployed verifier runs. A hosted Annex C session could
- * not be bound to this caller anyway: its setup requires a secure-context origin, while Credential
- * Manager asserts `android:apk-key-hash:...` for a native caller.
- *
- * These require an emulator image with Google Play services. The regular AOSP device-test lane
- * intentionally skips them; the dedicated Play Store lane runs them.
+ * These require Google Play services, so only the dedicated Play Store lane runs them.
  */
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalDigitalCredentialApi::class)
 class DigitalCredentialSharingE2ETest {
 
-    /**
-     * The baseline: `response_mode=dc_api`, one mdoc, no encryption, verified by verifier2's real
-     * policy set.
-     */
+    /** The baseline: `response_mode=dc_api`, one mdoc, no encryption. */
     @Test
     fun sharesMdocThroughClearOpenId4VpDcApi() = runBlocking {
         val fixture = start() ?: return@runBlocking
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
         fixture.issue(scenario)
 
-        // The verifier hashes expectedOrigins.first() into the mdoc session transcript and the wallet
-        // hashes what Credential Manager asserts for this (native, non-browser) caller. The debug
-        // signing key differs per machine and per CI runner, so derive it at runtime rather than
-        // pinning a fingerprint.
+        // Both sides hash this origin into the mdoc session transcript. The debug signing key differs
+        // per machine and per CI runner, so it is derived at runtime rather than pinned.
         val session = DemoTestBackend.createDcApiVerifierSession(
             scenario = scenario,
             expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
@@ -123,10 +110,9 @@ class DigitalCredentialSharingE2ETest {
     }
 
     /**
-     * SD-JWT VC plus `transaction_data`, which is the case where consent and cryptography have to
-     * agree: the wallet signs the transaction-data hashes into the KB-JWT, so anything it did not
-     * show the user is something it authorized on their behalf unseen. Both halves are asserted -
-     * the fields on screen, and the hashes in the KB-JWT.
+     * SD-JWT VC plus `transaction_data`, where consent and cryptography must agree: the wallet signs
+     * the transaction-data hashes into the KB-JWT, so both halves are asserted - the fields on screen,
+     * and the hashes in the KB-JWT.
      */
     @Test
     fun sharesSdJwtWithTransactionDataThroughCredentialManager() = runBlocking {
@@ -146,8 +132,6 @@ class DigitalCredentialSharingE2ETest {
             // The registry entry's subtitle is the credential type, and for this SD-JWT VC the vct is
             // the issuer-scoped URL ending in the configuration id.
             candidateText = scenario.credentialConfigurationId,
-            // Everything the presentation will sign over must be on the consent surface before the
-            // Share button is used, so this is asserted between the two.
             beforeShare = { device ->
                 listOf(PAYMENT_AUTHORIZATION_DISPLAY_NAME, "42.00", "EUR", "ACME Corp").forEach { expected ->
                     assertTextContainingVisibleAfterScrolling(
@@ -167,9 +151,8 @@ class DigitalCredentialSharingE2ETest {
                 ?.get("pid")?.jsonArray?.firstOrNull()?.jsonPrimitive?.content,
         ) { "SD-JWT response carries no presentation for query 'pid': $responseJson" }
 
-        // sha-256 over the base64url transaction_data entry the verifier sent, which is what
-        // OpenID4VP binds. Recomputing it here rather than trusting whatever the wallet emitted is
-        // the point: a wallet that hashed the decoded object, or hashed a different item, fails.
+        // OpenID4VP binds sha-256 over the base64url transaction_data entry as sent. Recomputed here so
+        // that a wallet which hashed the decoded object, or a different item, fails.
         val requestedItem = requireNotNull(
             Json.parseToJsonElement(session.requestJson).jsonObject["requests"]?.jsonArray
                 ?.firstOrNull()?.jsonObject
@@ -192,18 +175,17 @@ class DigitalCredentialSharingE2ETest {
             sessionId = session.sessionId,
             responseJson = credential.credentialJson,
             presentedCredentialId = "pid",
-            // The transaction-data policy is named explicitly: it is the verifier-side counterpart of
-            // the KB-JWT assertion above, and it is the one that would silently not run if the
-            // verifier stopped recognising the item.
+            // Named explicitly because it is the policy that would silently not run if the verifier
+            // stopped recognising the item.
             requiredPolicyIds = SD_JWT_REQUIRED_POLICIES + "dc+sd-jwt/transaction-data-hash-check",
         )
     }
 
     /**
-     * `response_mode=dc_api.jwt`. mdoc is chosen deliberately over SD-JWT: with an encrypted response
-     * the verifier must both decrypt the JWE *and* rebuild the mdoc session transcript from the
-     * thumbprint of the very encryption key it published, so a wallet that thumbprinted anything else
-     * produces a readable JWE whose device signature does not verify.
+     * `response_mode=dc_api.jwt`, with mdoc rather than SD-JWT: the verifier must both decrypt the JWE
+     * *and* rebuild the mdoc session transcript from the thumbprint of the encryption key it published,
+     * so a wallet that thumbprinted anything else produces a readable JWE whose device signature does
+     * not verify.
      */
     @Test
     fun sharesMdocThroughEncryptedDcApiJwt() = runBlocking {
@@ -221,15 +203,13 @@ class DigitalCredentialSharingE2ETest {
         val responseJson = Json.parseToJsonElement(credential.credentialJson).jsonObject
         assertEquals("openid4vp-v1-unsigned", responseJson["protocol"]?.jsonPrimitive?.content)
         val data = requireNotNull(responseJson["data"]?.jsonObject) { "Response carries no data: $responseJson" }
-        // Asserting the exact member set, not just that "response" exists: an implementation that
-        // encrypted the members *and* left them in the clear would satisfy a weaker assertion while
-        // disclosing everything encryption was asked for.
+        // The exact member set, not just that "response" exists: an implementation that encrypted the
+        // members *and* left them in the clear would satisfy a weaker assertion while disclosing
+        // everything encryption was asked for.
         assertEquals("Encrypted response must carry only 'response': ${data.keys}", setOf("response"), data.keys)
         val compactJwe = requireNotNull(data["response"]?.jsonPrimitive?.content) { "No response member" }
         assertEquals("Encrypted response is not a compact JWE: $compactJwe", 5, compactJwe.split('.').size)
 
-        // Verification is what proves this readable: verifier2 decrypts with its own private key and
-        // then runs device-auth against the transcript it derives from its published key.
         assertVerifierAccepted(
             sessionId = session.sessionId,
             responseJson = credential.credentialJson,
@@ -239,34 +219,25 @@ class DigitalCredentialSharingE2ETest {
     }
 
     /**
-     * Two alternatives in one request envelope - a protocol this wallet does not support at index 0,
-     * `org-iso-mdoc` for the mDL at index 1 - with the Annex C one selected.
+     * Two alternatives in one request envelope - an unsupported protocol at index 0, `org-iso-mdoc` for
+     * the mDL at index 1 - with the Annex C one selected. Multipaz's Annex C matcher attributes by
+     * protocol rather than by request index, so this covers the attribution path that carries no index.
      *
-     * This is the case a wallet that picks a protocol itself gets wrong. The user chooses an
-     * alternative in the picker and the wallet must answer *that* one; answering index 0 because it
-     * happens to be first answers a request the user never saw. Selecting the non-zero alternative is
-     * therefore the whole point, and Multipaz's Annex C matcher attributes its selection by protocol
-     * rather than by request index, so this also covers the attribution path that carries no index at
-     * all.
+     * Index 0 is `preview`, the legacy Digital Credentials protocol identifier, rather than an
+     * OpenID4VP alternative, because two platform behaviours make an OpenID4VP and an Annex C
+     * alternative mutually exclusive on Android today, in either order:
      *
-     * Index 0 is `preview` - the legacy Digital Credentials protocol identifier - rather than an
-     * OpenID4VP alternative, and that is a platform constraint rather than a preference. Two
-     * independent behaviours of the registered matcher pair make an OpenID4VP alternative and an Annex
-     * C one mutually exclusive on Android today, in either order:
-     *
-     * 1. Multipaz's Annex C matcher iterates `requests[]` and stops at the first entry whose
-     *    `protocol` it recognises - and it recognises all three `openid4vp-v1-*` values as well as
-     *    `org-iso-mdoc`. An OpenID4VP entry ahead of the Annex C one therefore ends its scan before it
-     *    reaches Annex C, whether or not that entry matches anything. An unrecognised protocol is
-     *    skipped, which is what makes this envelope work.
+     * 1. Multipaz's Annex C matcher scans `requests[]` and stops at the first `protocol` it recognises,
+     *    which includes all three `openid4vp-v1-*` values. An OpenID4VP entry ahead of the Annex C one
+     *    therefore ends the scan first; an unrecognised protocol is skipped, which is what makes this
+     *    envelope work.
      * 2. When both registries produce a candidate for the same request, only the OpenID4VP registry's
-     *    candidates reach the picker, so an Annex C entry ahead of a *matchable* OpenID4VP one is
-     *    matched and then dropped.
+     *    reach the picker, so an Annex C entry ahead of a *matchable* OpenID4VP one is matched and
+     *    dropped.
      *
-     * Neither is wallet behaviour and neither is reachable from wallet code: the AndroidX OpenID4VP
-     * matcher is embedded in `androidx.credentials.registry` and `OpenId4VpRegistry` accepts no
-     * replacement. The wallet's own selection across a mixed OpenID4VP/Annex C envelope is covered by
-     * host tests instead, which is where it can be exercised without the platform picker.
+     * Neither is reachable from wallet code: the AndroidX OpenID4VP matcher is embedded in
+     * `androidx.credentials.registry` and `OpenId4VpRegistry` accepts no replacement. Mixed
+     * OpenID4VP/Annex C envelopes are covered by host tests, which need no platform picker.
      */
     @Test
     fun selectsNonZeroAnnexCAlternativeFromMultiProtocolRequest() = runBlocking {
@@ -303,10 +274,9 @@ class DigitalCredentialSharingE2ETest {
             responseJson["data"]?.jsonObject?.get("response")?.jsonPrimitive?.content,
         ) { "Annex C response carries no encrypted response: $responseJson" }
 
-        // The single real control in this flow. `info` is CBOR(SessionTranscript) over
-        // sha256(cbor([encryptionInfoB64, origin])), so decryption succeeds only if the wallet hashed
-        // the origin Credential Manager asserted for this caller and the same encryptionInfo string
-        // the reader sent. Any drift in either fails here rather than producing a wrong plaintext.
+        // HPKE `info` is CBOR(SessionTranscript) over sha256(cbor([encryptionInfoB64, origin])), so
+        // decryption succeeds only if the wallet hashed the origin Credential Manager asserted and the
+        // same encryptionInfo string the reader sent. Drift in either fails here.
         val deviceResponse = coseCompliantCbor.decodeFromByteArray(
             DeviceResponse.serializer(),
             AnnexCResponseVerifier.decryptToDeviceResponse(
@@ -323,8 +293,8 @@ class DigitalCredentialSharingE2ETest {
         val document = documents.single()
         assertEquals(MDL_DOC_TYPE, document.docType)
 
-        // Without this the test would pass on an empty but well-formed DeviceResponse, which is
-        // exactly what a broken matcher selection or a dropped disclosure produces.
+        // Without this the test would pass on an empty but well-formed DeviceResponse, which is what a
+        // broken matcher selection or a dropped disclosure produces.
         val issuerNamespaces = requireNotNull(document.issuerSigned.namespaces) {
             "Annex C document carries no issuer-signed namespaces"
         }
@@ -341,12 +311,9 @@ class DigitalCredentialSharingE2ETest {
 
     /**
      * Cancel on the wallet's review answers the request: the caller's `getCredential` ends with
-     * [GetCredentialCancellationException].
-     *
-     * This is what makes Cancel a decision about the request rather than about this wallet - the user
-     * declined to share, and no further provider is offered the request. Asserted through the real
-     * caller because the exception type is what Credential Manager derives from the provider result,
-     * and only the caller sees the derivation.
+     * [GetCredentialCancellationException] and no further provider is offered the request. Asserted
+     * through the real caller, because Credential Manager derives the exception type from the provider
+     * result and only the caller sees that derivation.
      */
     @Test
     fun cancellingTheProviderReviewCancelsTheCallersRequest() = runBlocking {
@@ -372,12 +339,8 @@ class DigitalCredentialSharingE2ETest {
 
     /**
      * The system back gesture at the review root leaves this provider without answering, and Credential
-     * Manager puts its selector back up rather than ending the caller's request.
-     *
-     * Back and Cancel are deliberately different outcomes, and this is the assertion that pins the
-     * difference: a provider that wrote a cancellation here would take the choice of trying another
-     * wallet away from the user. The request is still live afterwards, which is proven by going back in
-     * and completing it - the same session, answered after the back gesture.
+     * Manager puts its selector back up rather than ending the caller's request. That the request is
+     * still live is proven by re-entering and completing the same session.
      */
     @Test
     fun backingOutOfTheProviderReviewLeavesTheRequestAnswerable() = runBlocking {
@@ -392,8 +355,7 @@ class DigitalCredentialSharingE2ETest {
         fixture.openProviderReview(session.requestJson, candidateText = MDL_DOC_TYPE)
         fixture.device.pressBack()
 
-        // The review is gone and no result has been delivered: the request is neither answered nor
-        // failed, which is the state that lets the platform ask again.
+        // Neither answered nor failed is the state that lets the platform ask again.
         assertTrue(
             "Provider review stayed up after the back gesture",
             fixture.device.wait(Until.gone(By.res(WALLET_SHARING_REVIEW_TAG)), UI_ELEMENT_TIMEOUT),
@@ -403,8 +365,6 @@ class DigitalCredentialSharingE2ETest {
             DigitalCredentialTestVerifier.isComplete(),
         )
 
-        // Re-entering through the platform and sharing settles the same request, which a provider that
-        // had ended it could not do.
         val candidate = fixture.device.wait(Until.findObject(By.textContains(MDL_DOC_TYPE)), UI_ELEMENT_TIMEOUT)
         assertNotNull("Credential Manager did not offer the request again after the back gesture", candidate)
         assertTrue(
@@ -434,12 +394,7 @@ class DigitalCredentialSharingE2ETest {
         )
     }
 
-    /**
-     * An unlocked wallet on a device that can run these tests, or null when it cannot.
-     *
-     * Bundling the instrumentation handles keeps each test's own body about the protocol variant it
-     * covers rather than about UiAutomator setup.
-     */
+    /** An unlocked wallet on a device that can run these tests, or null when it cannot. */
     private class Fixture(val context: Context, val device: UiDevice)
 
     private fun start(): Fixture? {
@@ -511,10 +466,6 @@ class DigitalCredentialSharingE2ETest {
 
     /**
      * Drives [requestJson] through Credential Manager up to the wallet's own review, and leaves it open.
-     *
-     * Separated from [share] because how the review is answered is the thing under test in the
-     * outcome cases: they get the identical platform-side path up to this point and diverge only on
-     * what the user does with the surface.
      */
     private fun Fixture.openProviderReview(
         requestJson: String,
@@ -522,8 +473,7 @@ class DigitalCredentialSharingE2ETest {
         clickCandidate: Boolean = false,
     ) {
         DigitalCredentialTestVerifier.reset(requestJson)
-        // The previous test's picker window can still be up, and it showed candidate text too. A node
-        // bound from it goes stale the moment it tears down, so wait it out before looking at all -
+        // The previous test's picker can still be up and showing candidate text, so wait it out:
         // otherwise the candidate found below may belong to a request that is already over.
         device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT)
         context.startActivity(
@@ -533,8 +483,8 @@ class DigitalCredentialSharingE2ETest {
 
         val candidate = device.wait(Until.findObject(By.textContains(candidateText)), UI_ELEMENT_TIMEOUT)
         assertNotNull("Credential Manager did not surface a '$candidateText' candidate", candidate)
-        // Re-resolved rather than reused: between the wait above and this click the picker may have
-        // recomposed, and a stale node throws instead of failing an assertion.
+        // Re-resolved rather than reused: the picker may have recomposed since the wait above, and a
+        // stale node throws instead of failing an assertion.
         if (clickCandidate) {
             assertTrue(
                 "Could not click the '$candidateText' candidate",
@@ -542,17 +492,12 @@ class DigitalCredentialSharingE2ETest {
             )
         }
 
-        // The picker only asks for confirmation when it has something to confirm; after an explicit
-        // candidate click some builds go straight to the provider. A missing consent step that was
-        // actually required still fails, on the Share button that then never appears.
+        // Optional: after an explicit candidate click some builds go straight to the provider. A
+        // confirmation step that was required but missed still fails, on the Share button below.
         val continueButton = device.wait(Until.findObject(By.res("continue_button")), UI_ELEMENT_TIMEOUT)
             ?: device.wait(Until.findObject(By.text("Continue")), UI_ELEMENT_TIMEOUT)
         continueButton?.click()
 
-        // The provider surface is the wallet's own Compose review, so it is driven by the shared test
-        // tags the in-app presentation flow uses. Waiting on the review root before the Share button
-        // keeps a failure attributable: a review that never opened reads differently from a review
-        // that opened without an enabled Share action.
         assertNotNull(
             "Wallet provider review did not open",
             waitForResource(device, WALLET_SHARING_REVIEW_TAG, UI_ELEMENT_TIMEOUT),
@@ -563,10 +508,8 @@ class DigitalCredentialSharingE2ETest {
      * Posts the wallet's response to verifier2 and asserts it verified.
      *
      * Unlike direct_post, `response_mode=dc_api` sends nothing from the wallet to the verifier: the
-     * response comes back through the OS to whoever called `getCredential`, and that caller delivers
-     * it. This test is that caller, so it posts - which is also what makes the verifier run its real
-     * policies over the wallet's output. Verification is inline, so the session is already terminal
-     * when this returns and there is nothing to poll for.
+     * response returns through the OS to whoever called `getCredential`, and this test is that caller.
+     * Verification is inline, so the session is already terminal when this returns.
      */
     private suspend fun assertVerifierAccepted(
         sessionId: String,
@@ -581,19 +524,13 @@ class DigitalCredentialSharingE2ETest {
             "Verifier did not report the presented credential '$presentedCredentialId': $info",
             info["presented_credentials"]?.jsonObject?.get(presentedCredentialId),
         )
-        // The sessions are created without a vp_policies override, so the verifier applies its full
-        // default set. [requiredPolicyIds] names the ones that would otherwise fail silently by not
-        // running - a policy that is skipped rather than failed leaves the session SUCCESSFUL, so
-        // "no failures" alone would pass on a verifier that checked nothing.
+        // A skipped policy leaves the session SUCCESSFUL, so "no failures" alone would pass on a
+        // verifier that checked nothing; [requiredPolicyIds] must therefore be asserted as executed.
         //
-        // Note what mso_mdoc/issuer_auth passing here does *not* establish. It proves the wallet
-        // relayed the issuer signature unaltered - a re-encoded COSE_Sign1 would fail it - but not
-        // that the document signer meets the ISO 18013-5 profile. verifier2.demo.walt.id 0.23.0
-        // predates that enforcement, and the certificate issuer2.demo.walt.id actually signs with is
-        // X.509 v1 with no extensions, so it has neither keyUsage:digitalSignature nor
-        // EKU 1.0.18013.5.1.2. A verifier that does enforce the profile rejects this same
-        // presentation - which is a deployment gap on the issuer, not something a wallet change
-        // fixes, and not something this assertion can be strengthened to catch.
+        // mso_mdoc/issuer_auth proves the wallet relayed the issuer signature unaltered, but not that
+        // the document signer meets the ISO 18013-5 certificate profile: issuer2.demo.walt.id signs
+        // with an X.509 v1 certificate carrying neither keyUsage:digitalSignature nor
+        // EKU 1.0.18013.5.1.2, which verifier2 0.23.0 does not yet enforce.
         val policyResults = info["policy_results"] ?: error("Session info has no policy_results: $info")
         val executed = policyResults.executedPolicyIds()
         requiredPolicyIds.forEach { policyId ->
@@ -605,10 +542,7 @@ class DigitalCredentialSharingE2ETest {
         )
     }
 
-    /**
-     * The reader's recipient key. Annex C fixes the suite at
-     * DHKEM(P-256)/HKDF-SHA256/AES-128-GCM, so this is P-256 key agreement and nothing is negotiable.
-     */
+    /** The reader's recipient key. Annex C fixes the suite at DHKEM(P-256)/HKDF-SHA256/AES-128-GCM. */
     private suspend fun annexCReaderKey(): Key =
         CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
             GenerateSoftwareKeyRequest(
@@ -623,9 +557,8 @@ class DigitalCredentialSharingE2ETest {
             .exportPublicKey().toPublicJwk(spec).toCoseKey()
 
     /**
-     * An alternative no registered matcher claims. `preview` is the legacy Digital Credentials
-     * protocol identifier, so this is a value a real verifier could offer for backwards compatibility
-     * rather than one invented for the test - and one this wallet reports as unsupported.
+     * An alternative no registered matcher claims. `preview` is the legacy Digital Credentials protocol
+     * identifier, so it is a value a real verifier could offer rather than one invented for the test.
      */
     private fun unsupportedProtocolRequestEntry(): JsonObject = buildJsonObject {
         put("protocol", JsonPrimitive("preview"))
@@ -656,9 +589,9 @@ class DigitalCredentialSharingE2ETest {
     }
 
     /**
-     * `android:apk-key-hash:<base64url-sha256(signing cert)>` - the origin Credential Manager
-     * asserts for a native caller. Mirrors `AndroidDigitalCredentialProvider.nativeAppOrigin`,
-     * which is internal to the wallet-mobile module.
+     * `android:apk-key-hash:<base64url-sha256(signing cert)>`, the origin Credential Manager asserts for
+     * a native caller. Mirrors `AndroidDigitalCredentialProvider.nativeAppOrigin`, which is internal to
+     * the wallet-mobile module.
      */
     private fun nativeAppOrigin(context: Context): String {
         val signatures = context.packageManager
@@ -712,10 +645,8 @@ class DigitalCredentialSharingE2ETest {
      * Clicks the candidate whose text contains [candidateText], retrying while the picker is still
      * settling.
      *
-     * The node is looked up inside the retry rather than passed in: walking to a clickable ancestor
-     * touches the accessibility tree several times, and any of those touches throws
-     * [StaleObjectException] if the window recomposed in between. Retrying the whole lookup is what
-     * makes that recoverable; reusing a node is what made it fatal.
+     * The lookup is inside the retry because walking to a clickable ancestor touches the accessibility
+     * tree several times, and any of those throws [StaleObjectException] if the window recomposed.
      */
     private fun UiDevice.clickCandidate(candidateText: String): Boolean {
         repeat(CANDIDATE_CLICK_ATTEMPTS) {
@@ -754,30 +685,23 @@ class DigitalCredentialSharingE2ETest {
         private const val CANDIDATE_CLICK_ATTEMPTS = 3
 
         /**
-         * Compose test tags of the wallet's shared review, exported as Android resource IDs.
-         *
-         * These are the same tags the in-app OpenID4VP review is driven by, which is the point: the
-         * provider surface is not a separate UI with its own selectors, so a change that broke one of
-         * these would break both lanes rather than only this one.
+         * Compose test tags of the wallet's shared review, exported as Android resource IDs. The same
+         * tags the in-app OpenID4VP review is driven by; the provider surface is not a separate UI.
          */
         private val WALLET_SHARING_REVIEW_TAG = WalletDemoSharingReviewTestTags.Review
         private val WALLET_SHARE_BUTTON_TAG = WalletDemoSharingReviewTestTags.ShareButton
 
         /**
-         * The policy ids verifier2 reports for its default mdoc set, restricted to the two that must
-         * not merely "not fail": holder binding, which for the DC API is the session-transcript check
-         * and so is the one control specific to this flow, and issuer authenticity, whose absence
-         * would quietly reduce the whole assertion to a binding-only check.
+         * Holder binding, which for the DC API is the session-transcript check, plus issuer
+         * authenticity. Both must be asserted as executed, not merely as not failed.
          */
         private val MDOC_REQUIRED_POLICIES = listOf("mso_mdoc/device-auth", "mso_mdoc/issuer_auth")
 
         /**
-         * The SD-JWT counterpart. `kb-jwt_signature` is holder binding, and `sd_hash-check` is what
-         * ties that signature to the exact disclosure set presented - without it a wallet could sign
-         * a KB-JWT over one presentation and ship another. Issuer authenticity is deliberately not
-         * listed: verifier2's default *VP* policy set for `dc+sd-jwt` contains no issuer-signature
-         * policy (see VPVerificationPolicyManager.simpleDcSdJwtPolicies), so naming one here would
-         * assert coverage this session does not have.
+         * The SD-JWT counterpart: `kb-jwt_signature` is holder binding and `sd_hash-check` ties that
+         * signature to the exact disclosure set presented. Issuer authenticity is absent because
+         * verifier2's default *VP* policy set for `dc+sd-jwt` contains no issuer-signature policy (see
+         * VPVerificationPolicyManager.simpleDcSdJwtPolicies).
          */
         private val SD_JWT_REQUIRED_POLICIES = listOf("dc+sd-jwt/kb-jwt_signature", "dc+sd-jwt/sd_hash-check")
     }
