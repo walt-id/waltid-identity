@@ -64,8 +64,18 @@ function applyOverride() {
   }
 }
 
+/** Keep the user's Credential Type when swapping swagger offer examples. */
+function mapExamplePayload(payload: unknown): unknown {
+  const obj = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
+  if (selectedProfile.value) {
+    obj.profileId = selectedProfile.value;
+  }
+  return obj;
+}
+
 // Initialise the dropdown once profiles + payload are available: prefer the
 // profileId already present in the example, otherwise the first profile.
+// Never re-sync from payload after the user (or init) has chosen a profile.
 watch(
   [() => props.profiles.profiles.value, json],
   () => {
@@ -75,7 +85,6 @@ watch(
     const matchesPayload =
       !!fromPayload && list.some((p) => p.profileId === fromPayload);
     selectedProfile.value = matchesPayload ? fromPayload! : list[0]!.profileId;
-    // If the example shipped a profileId we don't recognise, align the payload now.
     if (!matchesPayload) applyOverride();
     props.profiles.loadDetail(selectedProfile.value);
   },
@@ -184,7 +193,7 @@ watch(
 
 watch(selectedIndex, () =>
   nextTick(() => {
-    applyOverride();
+    // JsonEditor already stamped selectedProfile via mapExamplePayload.
     applySecurityOverridesToJson();
   }),
 );
@@ -252,6 +261,7 @@ async function submit() {
       :loading="swagger.loading.value"
       :error="swagger.error.value"
       :warning="credentialDataOverrideWarning"
+      :map-example-payload="mapExamplePayload"
       @reload="swagger.load()"
     />
 
