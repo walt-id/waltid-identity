@@ -308,7 +308,11 @@ class AzureKeyRestApi(
             val publicKey = JWKKey.importJWK(publicKeyJsonModified.toMap().toJsonElement().toString())
                 .getOrElse { exception -> throw IllegalArgumentException("Invalid JWK in public key: $publicKeyJson", exception) }
 
-            val keyType = azureKeyToKeyTypeMapping(crvFromResponse, azureKeyType)
+            val keyType = if (azureKeyType == "RSA") {
+                publicKey.keyType
+            } else {
+                azureKeyToKeyTypeMapping(crvFromResponse, azureKeyType)
+            }
 
             return ParsedAzurePublicKey(kid, azureKeyType, crvFromResponse, keyType, publicKey)
         }
@@ -418,7 +422,11 @@ class AzureKeyRestApi(
                 val keyRequestBody = if (kty == "RSA") {
                     KeyCreateRequest(
                         kty = kty,
-                        keySize = 2048
+                        keySize = when (type) {
+                            KeyType.RSA3072 -> 3072
+                            KeyType.RSA4096 -> 4096
+                            else -> 2048
+                        }
                     )
                 } else {
                     KeyCreateRequest(
@@ -439,7 +447,8 @@ class AzureKeyRestApi(
                 val createdKey = AzureKeyRestApi(
                     id = keyId,
                     auth = metadata.auth,
-                    _keyType = parsedAzurePublicKey.keyType,
+                    // Prefer requested type: Azure kty/crv cannot distinguish RSA key sizes.
+                    _keyType = type,
                     _publicKey = DirectSerializedKey(parsedAzurePublicKey.publicKey)
                 )
                 createdKey.auth?.clientSecret = metadata.auth.clientSecret
