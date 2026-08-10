@@ -33,8 +33,8 @@ cohort = "2.9.9"
 smiley-openapi = "5.7.0"
 
 # Kotlinx
-kotlinx-serialization = "1.11.1-waltid_20260519-SNAPSHOT"
-kotlinx-serialization-cbor-TEMP = "1.11.1-waltid_20260519-SNAPSHOT"
+kotlinx-serialization = "1.11.1-waltid_20260809-SNAPSHOT"
+kotlinx-serialization-cbor-TEMP = "1.11.1-waltid_20260809-SNAPSHOT"
 
 kotlinx-datetime = "0.8.0"
 kotlinx-coroutines = "1.11.0"
