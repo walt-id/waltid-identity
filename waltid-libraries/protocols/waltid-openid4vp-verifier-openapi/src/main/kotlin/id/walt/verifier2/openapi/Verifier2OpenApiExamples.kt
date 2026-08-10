@@ -17,6 +17,7 @@ import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyAttribute
 import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyListArguments
 import id.walt.policies2.vp.policies.*
 import id.walt.verifier2.data.CrossDeviceFlowSetup
+import id.walt.verifier2.data.DcApiAnnexDFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.OpenId4VPConfig
 import id.walt.verifier2.data.UrlConfig
@@ -25,6 +26,7 @@ import id.walt.verifier2.data.Verification2Session.DefinedVerificationPolicies
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 object Verifier2OpenApiExamples {
 
@@ -416,6 +418,68 @@ object Verifier2OpenApiExamples {
                     put("currency", JsonPrimitive("EUR"))
                     put("payee", JsonPrimitive("ACME Corp"))
                     put("reference", JsonPrimitive("INV-2026-042"))
+                }
+            )
+        )
+    )
+
+    /**
+     * EUDI TS-12 style demo: SCA payment card + EU age verification over DC API,
+     * with `payment_details` transaction data bound to the SCA credential.
+     */
+    val openid4vpDcApiScaPaymentCardAndAgeVerificationPaymentDetails = DcApiAnnexDFlowSetup(
+        core = GeneralFlowConfig(
+            dcqlQuery = DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "sca_payment_card",
+                        format = CredentialFormat.MSO_MDOC,
+                        meta = MsoMdocMeta(doctypeValue = "eu.europa.ec.eudi.sca.payment_card.1"),
+                        claims = listOf(
+                            ClaimsQuery(pathStrings = listOf("eu.europa.ec.eudi.sca.payment_card.1", "card_scheme")),
+                            ClaimsQuery(pathStrings = listOf("eu.europa.ec.eudi.sca.payment_card.1", "card_last4")),
+                            ClaimsQuery(pathStrings = listOf("eu.europa.ec.eudi.sca.payment_card.1", "pan_reference")),
+                            ClaimsQuery(pathStrings = listOf("eu.europa.ec.eudi.sca.payment_card.1", "card_holder_name")),
+                            ClaimsQuery(pathStrings = listOf("eu.europa.ec.eudi.sca.payment_card.1", "expiry_date")),
+                        )
+                    ),
+                    CredentialQuery(
+                        id = "proof_of_age",
+                        format = CredentialFormat.MSO_MDOC,
+                        meta = MsoMdocMeta(doctypeValue = "eu.europa.ec.av.1"),
+                        claims = listOf(
+                            ClaimsQuery(pathStrings = listOf("eu.europa.ec.av.1", "age_over_18")),
+                        )
+                    ),
+                )
+            ),
+            signedRequest = false,
+            encryptedResponse = false,
+        ),
+        expectedOrigins = listOf("https://digital-credentials.walt.id"),
+        haip = false,
+        openid = OpenId4VPConfig(
+            transactionData = listOf(
+                buildJsonObject {
+                    put("type", "payment_details")
+                    put("credential_ids", JsonArray(listOf(JsonPrimitive("sca_payment_card"))))
+                    put("require_cryptographic_holder_binding", true)
+                    put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
+                    put(
+                        "payload",
+                        buildJsonObject {
+                            put("transaction_id", "8D8AC610-566D-4EF0-9C22-186B2A5ED793")
+                            put(
+                                "payee",
+                                buildJsonObject {
+                                    put("name", "Super Store")
+                                    put("id", "merchant-001")
+                                }
+                            )
+                            put("currency", "EUR")
+                            put("amount", 11.56)
+                        }
+                    )
                 }
             )
         )

@@ -117,6 +117,9 @@ object VerificationSessionCreateOpenApi {
                 example("[openid4vp-dc_api][iso mdl] signed & encrypted") { value = DcApiAnnexDFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_MDL }
                 example("[openid4vp-dc_api][iso photo-id] signed & encrypted") { value = DcApiAnnexDFlowSetup.EX_SIGNED_ENCRYPTED_PHOTOID }
                 example("[openid4vp-dc_api][iso pid] signed & encrypted") { value = DcApiAnnexDFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_PID }
+                example("[openid4vp-dc_api][sca + age] payment_details") {
+                    value = Verifier2OpenApiExamples.openid4vpDcApiScaPaymentCardAndAgeVerificationPaymentDetails
+                }
 
                 // Annex-C examples
                 example("[iso-18013-7-dc_api][iso mdl]") { value = DcApiAnnexCFlowSetup.EXTENDED_MDL_EXAMPLE }
