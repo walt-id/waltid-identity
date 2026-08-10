@@ -50,6 +50,8 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         scope.launch {
             runCatching {
+                // Vendored subset of https://www.gstatic.com/gpm-passkeys-privileged-apps/apps.json.
+                // Pinned in the APK on purpose: fetching it would put caller-origin trust on the network.
                 val allowlist = assets.open("privileged_apps.json").bufferedReader().use { it.readText() }
                 val input = AndroidDigitalCredentialProvider.extract(intent, allowlist)
                 // The same construction MainActivity uses. Credential Manager launches this activity
