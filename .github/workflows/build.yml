@@ -106,3 +106,5 @@ jobs:
     with:
       enable-android-build: ${{ needs.android-eligibility.outputs.should-run == 'true' }}
       report-check-name: 'gradle-build / gradle (ubuntu-22.04)'
+      run-issuer-conformance: true
+      run-haip-conformance: true
