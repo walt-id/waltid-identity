@@ -10,6 +10,22 @@ public object MobileWalletDigitalCredentialProtocols {
     public const val OPENID4VP_MULTISIGNED: String = "openid4vp-v1-multisigned"
     /** ISO 18013-7 Annex C mobile-document protocol identifier. */
     public const val ISO_MDOC_ANNEX_C: String = "org-iso-mdoc"
+    /** OpenID4VCI Digital Credentials issuance protocol identifier. */
+    public const val OPENID4VCI_V1: String = "openid4vci-v1"
+}
+
+/**
+ * Protocol identifiers accepted at the Android CREATE_CREDENTIAL boundary for OpenID4VCI.
+ *
+ * Callers and matchers historically emit several aliases for the same offer shape; the wallet
+ * normalizes them to [MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1].
+ */
+public object MobileWalletDigitalCredentialIssuanceProtocolAliases {
+    public val ACCEPTED: Set<String> = setOf(
+        MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+        "openid4vci1.0",
+        "openid4vci",
+    )
 }
 
 /**
@@ -190,6 +206,41 @@ public data class MobileWalletDigitalCredentialRequest(
     public val verifiedOrigin: String,
     public val selectedRegistryEntryIds: List<String> = emptyList(),
 )
+
+/**
+ * Platform-neutral OpenID4VCI create request from Android Credential Manager.
+ *
+ * @property protocol Canonical protocol identifier ([MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1]).
+ * @property offerJson Credential Offer JSON object from the create request `data` member.
+ * @property verifiedOrigin Authenticated origin reported by the platform.
+ */
+public data class MobileWalletDigitalCredentialCreateRequest(
+    public val protocol: String,
+    public val offerJson: String,
+    public val verifiedOrigin: String,
+)
+
+/**
+ * Platform response acknowledging that the holder accepted a Digital Credentials issuance request.
+ *
+ * The browser/issuer does not receive the credential itself; success means the wallet processed the
+ * offer (stored credentials and/or accepted the handoff).
+ *
+ * @property protocol Protocol identifier returned to the platform.
+ * @property dataJson Protocol response payload encoded as JSON, typically `{}`.
+ */
+public data class MobileWalletDigitalCredentialCreateResponse(
+    public val protocol: String = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+    public val dataJson: String = "{}",
+) {
+    public companion object {
+        /** Acknowledgement returned after the wallet successfully processes an OpenID4VCI create request. */
+        public fun acknowledgment(
+            protocol: String = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+        ): MobileWalletDigitalCredentialCreateResponse =
+            MobileWalletDigitalCredentialCreateResponse(protocol = protocol, dataJson = "{}")
+    }
+}
 
 /**
  * Verifier and transaction metadata extracted from an OpenID4VP request received through a

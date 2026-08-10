@@ -78,6 +78,26 @@ Backend E2E fixtures are intentionally shared:
 - iOS UI tests use the shared Swift `TestHelpers` backend fixtures from `../mobile-e2e-fixtures/ios/TestHelpers`.
 - Public demo UI tests run through the normal Android instrumentation and XCTest runners.
 
+## Digital Credentials API
+
+Android builds register with Credential Manager for:
+
+- **Presentation (`GET_CREDENTIAL`)** — OpenID4VP unsigned and ISO 18013-7 Annex C, via `DigitalCredentialProviderActivity`.
+- **Issuance (`CREATE_CREDENTIAL`)** — OpenID4VCI (`openid4vci-v1` and common aliases), via `DigitalCredentialCreateActivity`.
+
+Issuance reuses the same offer-review UI as the Receive tab. Pre-authorized offers complete inside the create activity. Authorization-code offers open the system browser and finish when the existing `openid://` deep link returns (forwarded from `MainActivity` while a create flow is pending).
+
+### Manual Chrome origin-trial check
+
+Chrome 143+ on Android can exercise create issuance with the Digital Credentials creation flag:
+
+1. Install and open this demo once so Credential Manager registers creation options.
+2. Enable `chrome://flags/#web-identity-digital-credentials-creation`.
+3. Use an issuer page that calls `navigator.credentials.create({ digital: { requests: [{ protocol: "openid4vci-v1", data: <CredentialOffer> }] } })`, for example [digital-credentials.dev/dmv](https://digital-credentials.dev/dmv) (same-device or QR cross-device).
+4. Select the walt.id wallet, accept the offer, and confirm the credential appears under Credentials.
+
+iOS Identity Document providers currently cover presentation only; create/issuance is Android-first.
+
 ## Related modules
 
 - [waltid-openid4vc-wallet-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md)

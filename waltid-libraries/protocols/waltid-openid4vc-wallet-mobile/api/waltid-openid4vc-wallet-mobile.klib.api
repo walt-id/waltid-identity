@@ -1137,6 +1137,45 @@ final class id.walt.wallet2.mobile/MobileWalletDigitalCredentialCapability { // 
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCapability.toString|toString(){}[0]
 }
 
+final class id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest { // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String) // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest.<init>|<init>(kotlin.String;kotlin.String;kotlin.String){}[0]
+
+    final val offerJson // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest.offerJson|{}offerJson[0]
+        final fun <get-offerJson>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest.offerJson.<get-offerJson>|<get-offerJson>(){}[0]
+    final val protocol // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest.protocol|{}protocol[0]
+        final fun <get-protocol>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest.protocol.<get-protocol>|<get-protocol>(){}[0]
+    final val verifiedOrigin // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest.verifiedOrigin|{}verifiedOrigin[0]
+        final fun <get-verifiedOrigin>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest.verifiedOrigin.<get-verifiedOrigin>|<get-verifiedOrigin>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest.component2|component2(){}[0]
+    final fun component3(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ...): id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest.copy|copy(kotlin.String;kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateRequest.toString|toString(){}[0]
+}
+
+final class id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse { // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse|null[0]
+    constructor <init>(kotlin/String = ..., kotlin/String = ...) // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+    final val dataJson // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse.dataJson|{}dataJson[0]
+        final fun <get-dataJson>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse.dataJson.<get-dataJson>|<get-dataJson>(){}[0]
+    final val protocol // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse.protocol|{}protocol[0]
+        final fun <get-protocol>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse.protocol.<get-protocol>|<get-protocol>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ...): id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse.copy|copy(kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse.toString|toString(){}[0]
+
+    final object Companion { // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse.Companion|null[0]
+        final fun acknowledgment(kotlin/String = ...): id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse // id.walt.wallet2.mobile/MobileWalletDigitalCredentialCreateResponse.Companion.acknowledgment|acknowledgment(kotlin.String){}[0]
+    }
+}
+
 final class id.walt.wallet2.mobile/MobileWalletDigitalCredentialPreview { // id.walt.wallet2.mobile/MobileWalletDigitalCredentialPreview|null[0]
     constructor <init>(kotlin/String, kotlin/String, kotlin/String, id.walt.wallet2.mobile/MobileWalletDigitalCredentialRequestInfo, kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletPresentationCredentialOption>, kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletPresentationCredentialRequirement>, id.walt.wallet2.mobile/MobileWalletReaderTrust) // id.walt.wallet2.mobile/MobileWalletDigitalCredentialPreview.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;id.walt.wallet2.mobile.MobileWalletDigitalCredentialRequestInfo;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletPresentationCredentialOption>;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletPresentationCredentialRequirement>;id.walt.wallet2.mobile.MobileWalletReaderTrust){}[0]
 
@@ -1239,7 +1278,7 @@ final class id.walt.wallet2.mobile/MobileWalletFactory { // id.walt.wallet2.mobi
 }
 
 final class id.walt.wallet2.mobile/MobileWalletIssuanceRequest { // id.walt.wallet2.mobile/MobileWalletIssuanceRequest|null[0]
-    constructor <init>(kotlin/String, kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ...) // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?){}[0]
+    constructor <init>(kotlin/String? = ..., kotlin/String? = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ...) // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?){}[0]
 
     final val clientId // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.clientId|{}clientId[0]
         final fun <get-clientId>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.clientId.<get-clientId>|<get-clientId>(){}[0]
@@ -1247,17 +1286,20 @@ final class id.walt.wallet2.mobile/MobileWalletIssuanceRequest { // id.walt.wall
         final fun <get-did>(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.did.<get-did>|<get-did>(){}[0]
     final val keyId // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.keyId|{}keyId[0]
         final fun <get-keyId>(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.keyId.<get-keyId>|<get-keyId>(){}[0]
+    final val offerJson // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.offerJson|{}offerJson[0]
+        final fun <get-offerJson>(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.offerJson.<get-offerJson>|<get-offerJson>(){}[0]
     final val offerUrl // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.offerUrl|{}offerUrl[0]
-        final fun <get-offerUrl>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.offerUrl.<get-offerUrl>|<get-offerUrl>(){}[0]
+        final fun <get-offerUrl>(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.offerUrl.<get-offerUrl>|<get-offerUrl>(){}[0]
     final val redirectUri // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.redirectUri|{}redirectUri[0]
         final fun <get-redirectUri>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.redirectUri.<get-redirectUri>|<get-redirectUri>(){}[0]
 
-    final fun component1(): kotlin/String // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.component1|component1(){}[0]
-    final fun component2(): kotlin/String // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.component2|component2(){}[0]
+    final fun component1(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.component2|component2(){}[0]
     final fun component3(): kotlin/String // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.component3|component3(){}[0]
-    final fun component4(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.component4|component4(){}[0]
+    final fun component4(): kotlin/String // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.component4|component4(){}[0]
     final fun component5(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.component5|component5(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ...): id.walt.wallet2.mobile/MobileWalletIssuanceRequest // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?){}[0]
+    final fun component6(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.component6|component6(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/String? = ...): id.walt.wallet2.mobile/MobileWalletIssuanceRequest // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.copy|copy(kotlin.String?;kotlin.String?;kotlin.String;kotlin.String;kotlin.String?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletIssuanceRequest.toString|toString(){}[0]
@@ -1624,9 +1666,16 @@ final class id.walt.wallet2.mobile/WalletAttestationConfig { // id.walt.wallet2.
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/WalletAttestationConfig.toString|toString(){}[0]
 }
 
+final object id.walt.wallet2.mobile/MobileWalletDigitalCredentialIssuanceProtocolAliases { // id.walt.wallet2.mobile/MobileWalletDigitalCredentialIssuanceProtocolAliases|null[0]
+    final val ACCEPTED // id.walt.wallet2.mobile/MobileWalletDigitalCredentialIssuanceProtocolAliases.ACCEPTED|{}ACCEPTED[0]
+        final fun <get-ACCEPTED>(): kotlin.collections/Set<kotlin/String> // id.walt.wallet2.mobile/MobileWalletDigitalCredentialIssuanceProtocolAliases.ACCEPTED.<get-ACCEPTED>|<get-ACCEPTED>(){}[0]
+}
+
 final object id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols { // id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols|null[0]
     final const val ISO_MDOC_ANNEX_C // id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C|{}ISO_MDOC_ANNEX_C[0]
         final fun <get-ISO_MDOC_ANNEX_C>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C.<get-ISO_MDOC_ANNEX_C>|<get-ISO_MDOC_ANNEX_C>(){}[0]
+    final const val OPENID4VCI_V1 // id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1|{}OPENID4VCI_V1[0]
+        final fun <get-OPENID4VCI_V1>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1.<get-OPENID4VCI_V1>|<get-OPENID4VCI_V1>(){}[0]
     final const val OPENID4VP_MULTISIGNED // id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols.OPENID4VP_MULTISIGNED|{}OPENID4VP_MULTISIGNED[0]
         final fun <get-OPENID4VP_MULTISIGNED>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols.OPENID4VP_MULTISIGNED.<get-OPENID4VP_MULTISIGNED>|<get-OPENID4VP_MULTISIGNED>(){}[0]
     final const val OPENID4VP_SIGNED // id.walt.wallet2.mobile/MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED|{}OPENID4VP_SIGNED[0]

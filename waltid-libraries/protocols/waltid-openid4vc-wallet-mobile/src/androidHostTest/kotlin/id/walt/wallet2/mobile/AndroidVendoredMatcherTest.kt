@@ -44,4 +44,25 @@ class AndroidVendoredMatcherTest {
         assertTrue(notice.contains("Apache License"), "notice lost the Apache-2.0 text")
         assertTrue(notice.contains("MIT License"), "notice lost the cJSON attribution")
     }
+
+    @Test
+    fun openId4VciMatcherAssetIsThePinnedProvisionBinary() {
+        val matcher = assets.open("id/walt/wallet2/mobile/provision_hardcoded.wasm")
+            .use { it.readBytes() }
+
+        assertEquals(
+            "d6b4846072839bb43b98dfa5da5ae9ec83f2c30ce875c1ebd19c5ad2b5344ac1",
+            MessageDigest.getInstance("SHA-256").digest(matcher).joinToString("") { "%02x".format(it) },
+            "vendored OpenID4VCI matcher content changed; see OPENID4VCI-MATCHER.md before repinning",
+        )
+    }
+
+    @Test
+    fun openId4VciMatcherNoticeShipsBesideTheMatcher() {
+        val notice = assets.open("id/walt/wallet2/mobile/NOTICE-provision_hardcoded.txt")
+            .use { it.readBytes() }.decodeToString()
+
+        assertTrue(notice.contains("digitalcredentialsdev/CMWallet"), "notice lost its provenance")
+        assertTrue(notice.contains("provision_hardcoded.wasm"), "notice lost the asset name")
+    }
 }

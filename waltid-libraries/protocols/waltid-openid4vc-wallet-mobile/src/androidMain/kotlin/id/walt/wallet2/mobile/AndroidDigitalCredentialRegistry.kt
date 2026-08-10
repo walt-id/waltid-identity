@@ -2,12 +2,16 @@ package id.walt.wallet2.mobile
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Bitmap.CompressFormat
 import android.os.Build
+import androidx.credentials.DigitalCredential
+import androidx.credentials.ExperimentalDigitalCredentialApi
 import androidx.credentials.registry.digitalcredentials.mdoc.MdocEntry
 import androidx.credentials.registry.digitalcredentials.mdoc.MdocField
 import androidx.credentials.registry.digitalcredentials.openid4vp.OpenId4VpRegistry
 import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtClaim
 import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtEntry
+import androidx.credentials.registry.provider.RegisterCreationOptionsRequest
 import androidx.credentials.registry.provider.RegistryManager
 import androidx.credentials.registry.provider.digitalcredentials.DigitalCredentialEntry
 import androidx.credentials.registry.provider.digitalcredentials.DigitalCredentialRegistry
@@ -25,8 +29,14 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
+import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 /**
  * Android Credential Manager metadata registry adapter.
@@ -44,14 +54,21 @@ public class AndroidDigitalCredentialRegistry(
     private val registryManager: RegistryManager = RegistryManager.create(applicationContext)
     private val icon: Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
     private var registrationAvailable: Boolean = false
+    private var creationRegistrationAvailable: Boolean = false
 
     override val capabilities: MobileWalletDigitalCredentialCapabilities
         get() {
             val platformAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
             val runtimeAvailable = platformAvailable && registrationAvailable
+            val creationAvailable = platformAvailable && creationRegistrationAvailable
             val unavailableReason = when {
                 !platformAvailable -> "Credential Manager requires Android 6 (API 23)"
                 !registrationAvailable -> "Credential registration has not completed successfully"
+                else -> null
+            }
+            val creationUnavailableReason = when {
+                !platformAvailable -> "Credential Manager requires Android 6 (API 23)"
+                !creationRegistrationAvailable -> "Credential creation registration has not completed successfully"
                 else -> null
             }
             return MobileWalletDigitalCredentialCapabilities(
@@ -105,6 +122,17 @@ public class AndroidDigitalCredentialRegistry(
                         supported = runtimeAvailable,
                         unsupportedReason = unavailableReason,
                     ),
+                    MobileWalletDigitalCredentialCapability(
+                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+                        credentialFormats = listOf(
+                            MobileWalletDigitalCredentialFormat.MDOC,
+                            MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+                        ),
+                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.UNSIGNED),
+                        responseProtection = listOf(MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED),
+                        supported = creationAvailable,
+                        unsupportedReason = creationUnavailableReason,
+                    ),
                 ),
             )
         }
@@ -115,6 +143,7 @@ public class AndroidDigitalCredentialRegistry(
     ): MobileWalletCredentialRegistrationResult {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             registrationAvailable = false
+            creationRegistrationAvailable = false
             return MobileWalletCredentialRegistrationResult(false, 0, "Credential Manager requires API 23")
         }
         val entries = records.map { it.toAndroidEntry() }
@@ -135,10 +164,12 @@ public class AndroidDigitalCredentialRegistry(
                     matcher = applicationContext.assets.open(ANNEX_C_MATCHER_ASSET).use { it.readBytes() },
                 )
             )
+            registerOpenId4VciCreationOptions()
             registrationAvailable = true
             MobileWalletCredentialRegistrationResult(true, entries.size)
         }.getOrElse { error ->
             registrationAvailable = false
+            creationRegistrationAvailable = false
             MobileWalletCredentialRegistrationResult(
                 available = false,
                 registeredEntryCount = 0,
@@ -146,6 +177,61 @@ public class AndroidDigitalCredentialRegistry(
             )
         }
     }
+
+    @OptIn(ExperimentalDigitalCredentialApi::class)
+    private suspend fun registerOpenId4VciCreationOptions() {
+        val matcher = applicationContext.assets.open(OPENID4VCI_MATCHER_ASSET).use { it.readBytes() }
+        registryManager.registerCreationOptions(
+            object : RegisterCreationOptionsRequest(
+                creationOptions = encodeOpenId4VciCreationOptions(
+                    title = "walt.id Wallet",
+                    subtitle = "Save a credential to this wallet",
+                    iconPng = icon.toPngBytes(),
+                ),
+                matcher = matcher,
+                type = DigitalCredential.TYPE_DIGITAL_CREDENTIAL,
+                id = OPENID4VCI_CREATION_REGISTRY_ID,
+            ) {},
+        )
+        creationRegistrationAvailable = true
+    }
+
+    /**
+     * Binary creation-options database understood by the vendored OpenID4VCI provision matcher.
+     *
+     * Layout matches the CMWallet / Android Credential Manager sample: little-endian JSON offset,
+     * then icon bytes, then a JSON display object whose icon offsets point into that blob.
+     */
+    internal fun encodeOpenId4VciCreationOptions(
+        title: String,
+        subtitle: String?,
+        iconPng: ByteArray,
+    ): ByteArray {
+        val jsonOffset = 4 + iconPng.size
+        val json = buildJsonObject {
+            putJsonObject("display") {
+                put("title", title)
+                if (subtitle != null) put("subtitle", subtitle)
+                putJsonObject("icon") {
+                    put("start", 4)
+                    put("length", iconPng.size)
+                }
+            }
+        }.toString().encodeToByteArray()
+        return ByteArrayOutputStream(jsonOffset + json.size).use { out ->
+            val offsetBytes = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(jsonOffset).array()
+            out.write(offsetBytes)
+            out.write(iconPng)
+            out.write(json)
+            out.toByteArray()
+        }
+    }
+
+    private fun Bitmap.toPngBytes(): ByteArray =
+        ByteArrayOutputStream().use { out ->
+            compress(CompressFormat.PNG, 100, out)
+            out.toByteArray()
+        }
 
     internal fun MobileWalletCredentialRegistryRecord.toAndroidEntry(): DigitalCredentialEntry {
         val display = setOf(
@@ -255,6 +341,9 @@ public class AndroidDigitalCredentialRegistry(
         // Vendored, not a dependency; package-qualified so it cannot collide with another library's
         // copy in the application asset merge. See ANNEX-C-MATCHER.md.
         private const val ANNEX_C_MATCHER_ASSET = "id/walt/wallet2/mobile/identitycredentialmatcher.wasm"
+        // Vendored OpenID4VCI creation matcher. See OPENID4VCI-MATCHER.md.
+        private const val OPENID4VCI_MATCHER_ASSET = "id/walt/wallet2/mobile/provision_hardcoded.wasm"
+        private const val OPENID4VCI_CREATION_REGISTRY_ID = "openid4vci"
         private const val MAX_MATCHER_VALUE_LENGTH = 128
         private const val SIGNED_UNSUPPORTED_REASON =
             "The wallet accepts only the unsigned OpenID4VP Digital Credentials protocol"

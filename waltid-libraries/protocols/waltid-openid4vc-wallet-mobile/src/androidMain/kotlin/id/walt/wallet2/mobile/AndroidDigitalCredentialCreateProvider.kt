@@ -1,0 +1,152 @@
+package id.walt.wallet2.mobile
+
+import android.content.Intent
+import android.util.Base64
+import androidx.credentials.CreateDigitalCredentialRequest
+import androidx.credentials.CreateDigitalCredentialResponse
+import androidx.credentials.ExperimentalDigitalCredentialApi
+import androidx.credentials.exceptions.CreateCredentialCancellationException
+import androidx.credentials.exceptions.CreateCredentialUnknownException
+import androidx.credentials.provider.PendingIntentHandler
+import androidx.credentials.provider.ProviderCreateCredentialRequest
+import id.waltid.openid4vp.wallet.DcApiWallet
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import java.security.MessageDigest
+
+/**
+ * Verified Android Credential Manager create input after caller and protocol extraction.
+ *
+ * @property request Platform-neutral OpenID4VCI create request.
+ * @property providerRequest Original Credential Manager create request kept for diagnostics.
+ */
+public data class AndroidDigitalCredentialCreateProviderInput(
+    public val request: MobileWalletDigitalCredentialCreateRequest,
+    public val providerRequest: ProviderCreateCredentialRequest,
+)
+
+/** Android framework boundary for official holder CREATE_CREDENTIAL request and response handling. */
+@OptIn(ExperimentalDigitalCredentialApi::class)
+public object AndroidDigitalCredentialCreateProvider {
+    /**
+     * Locates the OpenID4VCI create request and derives the origin from authenticated caller data.
+     *
+     * A populated privileged origin is rejected unless the caller package and signing certificate
+     * match [privilegedAppsJson].
+     */
+    public fun extract(
+        intent: Intent,
+        privilegedAppsJson: String,
+    ): AndroidDigitalCredentialCreateProviderInput {
+        val providerRequest = requireNotNull(PendingIntentHandler.retrieveProviderCreateCredentialRequest(intent)) {
+            "Missing ProviderCreateCredentialRequest"
+        }
+        val callingRequest = providerRequest.callingRequest
+        require(callingRequest is CreateDigitalCredentialRequest) {
+            "CREATE_CREDENTIAL request must be a CreateDigitalCredentialRequest"
+        }
+        val callingApp = providerRequest.callingAppInfo
+        val privilegedOrigin = callingApp.getOrigin(privilegedAppsJson)
+        if (callingApp.isOriginPopulated()) {
+            require(!privilegedOrigin.isNullOrBlank()) {
+                "Privileged caller is not present in the configured browser allowlist"
+            }
+        }
+        val assertedOrigin = privilegedOrigin
+            ?: callingApp.signingInfoCompat.signingCertificateHistory.firstOrNull()?.toByteArray()?.let {
+                nativeAppOrigin(it)
+            }
+            ?: throw IllegalArgumentException("Calling application has no signing certificate")
+        val verifiedOrigin = DcApiWallet.canonicalizePlatformOrigin(assertedOrigin)
+        val request = resolveCreateRequest(
+            requestJson = callingRequest.requestJson,
+            verifiedOrigin = verifiedOrigin,
+        )
+        return AndroidDigitalCredentialCreateProviderInput(
+            request = request,
+            providerRequest = providerRequest,
+        )
+    }
+
+    /**
+     * Resolves the first supported OpenID4VCI protocol alternative from a create-request envelope.
+     *
+     * Unsupported alternatives are skipped so an issuer that also offers an unknown protocol still
+     * reaches this wallet when an accepted OpenID4VCI alias is present.
+     */
+    internal fun resolveCreateRequest(
+        requestJson: String,
+        verifiedOrigin: String,
+    ): MobileWalletDigitalCredentialCreateRequest {
+        val requestObject = Json.parseToJsonElement(requestJson).jsonObject
+        val requests = requestObject["requests"] as? JsonArray
+        val protocolRequests = when {
+            requests != null -> {
+                require(requests.isNotEmpty()) { "At least one protocol request is required" }
+                requests.map { it.jsonObject }
+            }
+            requestObject["protocol"] != null -> listOf(requestObject)
+            else -> throw IllegalArgumentException("Digital credential create request has no protocol request")
+        }
+        val selected = protocolRequests.firstOrNull { protocolRequest ->
+            val protocol = protocolRequest["protocol"]?.jsonPrimitive?.content
+            protocol != null && protocol in MobileWalletDigitalCredentialIssuanceProtocolAliases.ACCEPTED
+        } ?: throw IllegalArgumentException(
+            "No supported OpenID4VCI Digital Credentials create protocol was offered",
+        )
+        val data = selected["data"] as? JsonObject
+            ?: throw IllegalArgumentException("Digital credential create request data must be an object")
+        return MobileWalletDigitalCredentialCreateRequest(
+            protocol = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+            offerJson = Json.encodeToString(JsonObject.serializer(), data),
+            verifiedOrigin = verifiedOrigin,
+        )
+    }
+
+    /** Writes the official Credential Manager create result payload to [resultIntent]. */
+    public fun setResponse(
+        resultIntent: Intent,
+        response: MobileWalletDigitalCredentialCreateResponse = MobileWalletDigitalCredentialCreateResponse.acknowledgment(),
+    ) {
+        val responseJson = Json.encodeToString(
+            JsonObject.serializer(),
+            JsonObject(
+                mapOf(
+                    "protocol" to kotlinx.serialization.json.JsonPrimitive(response.protocol),
+                    "data" to Json.parseToJsonElement(response.dataJson).jsonObject,
+                )
+            ),
+        )
+        PendingIntentHandler.setCreateCredentialResponse(
+            resultIntent,
+            CreateDigitalCredentialResponse(responseJson),
+        )
+    }
+
+    /** Maps explicit user refusal to the platform cancellation exception. */
+    public fun setCancellation(resultIntent: Intent) {
+        PendingIntentHandler.setCreateCredentialException(
+            resultIntent,
+            CreateCredentialCancellationException(),
+        )
+    }
+
+    /** Maps malformed, unsupported, or failed requests without leaking sensitive inputs. */
+    public fun setFailure(resultIntent: Intent, message: String = "Digital credential issuance failed") {
+        PendingIntentHandler.setCreateCredentialException(
+            resultIntent,
+            CreateCredentialUnknownException(message),
+        )
+    }
+
+    internal fun nativeAppOrigin(signingCertificate: ByteArray): String =
+        "android:apk-key-hash:${
+            Base64.encodeToString(
+                MessageDigest.getInstance("SHA-256").digest(signingCertificate),
+                Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING,
+            )
+        }"
+}

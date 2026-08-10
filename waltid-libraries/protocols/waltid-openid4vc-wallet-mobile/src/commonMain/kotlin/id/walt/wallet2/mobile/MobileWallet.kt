@@ -323,7 +323,8 @@ public class MobileWallet internal constructor(
         request: MobileWalletIssuanceRequest,
     ): WalletIssuanceSession = issuanceSessions.start(
         newIssuanceRequest(
-            offerUrl = request.offerUrl.trim(),
+            offerUrl = request.offerUrl?.trim()?.takeIf { it.isNotEmpty() },
+            offerJson = request.offerJson?.trim()?.takeIf { it.isNotEmpty() },
             keyId = request.keyId,
             did = request.did,
             clientId = request.clientId,
@@ -399,7 +400,8 @@ public class MobileWallet internal constructor(
         }
 
     private suspend fun newIssuanceRequest(
-        offerUrl: String,
+        offerUrl: String?,
+        offerJson: String?,
         clientId: String,
         redirectUri: String,
         keyId: String? = null,
@@ -408,8 +410,10 @@ public class MobileWallet internal constructor(
         val selectedKeyId = keyId ?: keyStore.listKeys().toList().firstOrNull()?.keyId
             ?: error("No holder key is available for credential issuance")
         val selectedDid = did ?: didStore.listDids().toList().firstOrNull()?.did
+        val offerJsonObject = offerJson?.let { Json.parseToJsonElement(it).jsonObject }
         return WalletIssuanceSessionRequest(
-            offerUrl = Url(offerUrl),
+            offerUrl = offerUrl?.let { Url(it) },
+            offerJson = offerJsonObject,
             keyId = selectedKeyId,
             did = selectedDid,
             clientId = clientId,

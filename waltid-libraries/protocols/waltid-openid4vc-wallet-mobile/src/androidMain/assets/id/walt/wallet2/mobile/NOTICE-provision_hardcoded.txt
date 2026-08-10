@@ -1,0 +1,13 @@
+NOTICE for provision_hardcoded.wasm
+
+This file records the provenance of the vendored OpenID4VCI Credential Manager
+creation matcher shipped beside this notice.
+
+Upstream project: CMWallet (https://github.com/digitalcredentialsdev/CMWallet)
+Upstream path: app/src/main/assets/provision_hardcoded.wasm
+Matcher sources: matcher-rs/ (issuance / provision matcher)
+
+CMWallet is an Android sample wallet demonstrating Credential Manager Digital
+Credentials issuance and presentation. The matcher binary is vendored here so
+this library does not depend on CMWallet as a Maven artifact. Refresh guidance
+is in OPENID4VCI-MATCHER.md at the module root.
