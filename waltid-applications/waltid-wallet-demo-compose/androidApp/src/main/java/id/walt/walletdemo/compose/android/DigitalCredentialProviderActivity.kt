@@ -33,14 +33,8 @@ import kotlinx.coroutines.launch
 /**
  * Credential Manager provider entry point.
  *
- * The Activity is deliberately thin: it extracts the platform request, previews it through the wallet,
- * shows the wallet's shared review UI, and turns the user's answer back into a Credential Manager
- * result. It renders no consent copy of its own, because a second presentation surface would drift
- * from the one the in-app OpenID4VP flow is reviewed and tested against.
- *
- * It stays separate from [MainActivity] rather than routing through it: Credential Manager owns this
- * task's lifecycle and expects exactly one result from it, which is not something the wallet's own
- * navigation should be able to influence.
+ * Separate from [MainActivity]: Credential Manager owns this task's lifecycle and expects exactly one
+ * result from it, which the wallet's own navigation must not be able to influence.
  */
 class DigitalCredentialProviderActivity : ComponentActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -54,9 +48,9 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
                 // Pinned in the APK on purpose: fetching it would put caller-origin trust on the network.
                 val allowlist = assets.open("privileged_apps.json").bufferedReader().use { it.readText() }
                 val input = AndroidDigitalCredentialProvider.extract(intent, allowlist)
-                // The same construction MainActivity uses. Credential Manager launches this activity
-                // without the wallet UI having run, so configuring a wallet here independently would
-                // open a different database and apply a different transaction-data policy.
+                // The same construction MainActivity uses: Credential Manager launches this activity
+                // without the wallet UI having run, and a wallet configured independently here would
+                // open a different database.
                 val wallet = createAndroidDemoMobileWallet(
                     context = applicationContext,
                     config = demoWalletConfig(),
@@ -89,14 +83,9 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
     /**
      * Shows the shared review UI.
      *
-     * There is no Reject action: Credential Manager has no channel for a protocol-level refusal, so
-     * declining returns the platform's cancellation instead. [enabled] is dropped for the duration of
-     * a submission so a second tap cannot start a second response for one request.
-     *
-     * Back and Cancel resolve to different Credential Manager outcomes, which is why the review is
-     * given both. Cancel is a decision about the request and ends the whole operation; back out of the
-     * review is a decision about this provider only, and returning [RESULT_CANCELED] is what lets
-     * Credential Manager put its own selector back up so another provider can still answer.
+     * Cancel and back resolve to different Credential Manager outcomes: Cancel ends the caller's whole
+     * operation, while backing out of this provider's review returns [RESULT_CANCELED] so Credential
+     * Manager can put its selector back up and another provider can still answer.
      */
     private fun showReview(
         review: WalletDemoSharingReview,
@@ -185,12 +174,8 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
     /**
      * Leaves this provider without answering, which Credential Manager reads as "ask again".
      *
-     * [RESULT_CANCELED] carries no Credential Manager payload on purpose: writing a cancellation
-     * exception here would produce the same result as the Cancel button and end the caller's
-     * `getCredential` call, whereas backing out of one provider's review is a choice about this wallet
-     * and not about the request. It is also what the OS does for this Activity by default, so a back
-     * gesture arriving before the review has been composed - while the request is still being
-     * previewed - already resolves the same way.
+     * [RESULT_CANCELED] must carry no Credential Manager payload: writing a cancellation exception here
+     * would end the caller's `getCredential` call, as the Cancel button does.
      */
     private fun finishWithoutProviderResult() {
         setResult(RESULT_CANCELED)

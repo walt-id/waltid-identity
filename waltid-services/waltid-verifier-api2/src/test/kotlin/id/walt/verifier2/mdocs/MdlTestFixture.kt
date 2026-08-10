@@ -1,20 +1,19 @@
 package id.walt.verifier2.mdocs
 
 /**
- * Shared mDL test fixture, extracted so the DC API round trip and the cross-device mdoc test verify
- * the same issuer-signed credential. A DC API failure is then attributable to the DC API path.
+ * Shared mDL test fixture, so the DC API round trip and the cross-device mdoc test verify the same
+ * issuer-signed credential and a DC API failure is attributable to the DC API path.
  *
  * [HOLDER_JWK] is the `deviceKey` embedded in this fixture's MSO - `device_key_auth` fails if the two
- * drift apart. Its `kid` is that key's RFC 7638 thumbprint. Both tests share it, so it exists once
- * here rather than once per test; [HOLDER_SERIALIZED_KEY] is the same key in the envelope the crypto
- * v1 `KeyManager` takes, while the DC API test feeds [HOLDER_JWK] to crypto2 directly.
+ * drift apart - and its `kid` is that key's RFC 7638 thumbprint. [HOLDER_SERIALIZED_KEY] is the same key
+ * in the envelope the crypto v1 `KeyManager` takes.
  *
  * ## Expiry
  *
  * Deliberately long-lived, because `mso_mdoc/issuer_auth` checks the DS certificate against the
  * session's verification time and that time is not injectable through the HTTP API
  * (`VerificationSessionContext.verificationTime` defaults to `Clock.System.now()`), so these tests
- * cannot pin a clock - a short-lived fixture turns into a CI failure on a calendar date:
+ * cannot pin a clock and a short-lived fixture becomes a CI failure on a calendar date:
  * - the document signer in [MDL_FIXTURE_X5C] is valid **2026-01-01 to 2046-01-01** (its "Waltid Test
  *   IACA" issuer covers the same window, the ISO 18013-5 20-year maximum for an IACA)
  * - the MSO's `validUntil` is **2045-12-31**, inside the signer's window as ISO 18013-5 requires
@@ -35,8 +34,7 @@ internal const val MDL_FIXTURE_SIGNER_JWK: String =
 
 /**
  * Private half of [MDL_FIXTURE_SIGNER_JWK], for tests that mint their own mdoc at runtime instead of
- * replaying [MDL_FIXTURE_SIGNED_HEX]. Shared so there is one long-lived test signer identity rather
- * than per-test copies that each expire on their own schedule.
+ * replaying [MDL_FIXTURE_SIGNED_HEX].
  */
 internal const val MDL_FIXTURE_SIGNER_PRIVATE_JWK: String =
     """{"type":"jwk","jwk":{"kty":"EC","crv":"P-256","d":"K3ubHvBXmkLu8ggz2AS6o2p86OYxBGyI-tx8yvPUt_4","x":"XWcPtk1wrtkEOtnJHeuFpFTzX3zjcLOb2piMIzNsUhQ","y":"Jpj1SaBuehCp6ntSdDDpU-2B6t9ysgLcxY651Pc6wAw"}}"""

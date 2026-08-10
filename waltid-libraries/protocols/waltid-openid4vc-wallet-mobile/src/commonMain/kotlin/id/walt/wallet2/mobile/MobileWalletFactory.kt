@@ -35,12 +35,8 @@ import kotlin.uuid.Uuid
  * @property credentialRegistry Platform metadata registry. Platform factories install their native default when omitted.
  * @property readerTrustEvaluator Application trust policy for verified ISO 18013-7 reader chains.
  * @property crossProcessAccess Optional shared-container/keychain configuration for provider extensions.
- * @property onDigitalCredentialRegistryChanged Called after a credential-set change re-published the
- * platform registration projection. Set this where publishing the projection and applying it to the
- * platform are different privileges: the wallet can write what it wants registered, but a platform whose
- * registration store only the host process may write needs the host to apply it, and the platform's own
- * refresh may not run until long after the change. Failures are contained, because the credential change
- * is already committed.
+ * @property onDigitalCredentialRegistryChanged Called after a credential-set mutation republishes
+ * platform registration metadata. Failures do not roll back the committed wallet mutation.
  */
 public data class MobileWalletConfig(
     public val walletId: String = "default",

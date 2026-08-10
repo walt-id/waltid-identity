@@ -7,17 +7,10 @@ import XCTest
 /// Asserts that a demo's shared wallet configuration puts state and key material where the provider
 /// extension looks for them.
 ///
-/// Scope, stated precisely: both wallets below are opened in the *test host process*, so this proves the
-/// app-side half of the contract - the namespace resolves to this demo's App Group and Keychain group, a
-/// second wallet built from that namespace reopens the existing database and signing key instead of
-/// creating new ones, and that key can sign. It does not prove that a *different* process is entitled to
-/// reach them: that is decided by the built entitlements, which
-/// `.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh` asserts on the built products,
-/// and finally by acceptance on a physical device.
-///
-/// The second wallet comes from ``IdentityDocumentNamespace/providerWallet(walletID:)``, the extension's
-/// own entry point, and every assertion about what the extension can see is made before anything
-/// bootstraps it - which is what proves the extension does not need to.
+/// Both wallets are opened in the *test host process*, so this covers the app-side half of the contract
+/// only. Whether another process is entitled to reach them is decided by the built entitlements, which
+/// `.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh` asserts, and finally by
+/// acceptance on a physical device.
 ///
 /// - Parameters:
 ///   - namespace: The demo namespace under test; supplies the App Group and Keychain group.
@@ -43,15 +36,13 @@ public func assertWalletReopensSharedStateAndSigningKey(
         line: line
     )
 
-    // The host app's configuration, built the way the app builds it. Only this wallet bootstraps,
-    // because only the host app ever does.
+    // Only the host wallet bootstraps, because only the host app ever does.
     let hostConfiguration = try namespace.walletConfiguration(walletID: walletID)
     let hostWallet = try await Wallet(configuration: hostConfiguration)
     let hostBootstrap = try await hostWallet.bootstrap()
     let hostCredentials = try await hostWallet.credentials()
 
-    // The provider's own entry point rather than a re-creation of it: `providerWallet(walletID:)` is
-    // what the extension calls, and it deliberately does not bootstrap.
+    // `providerWallet(walletID:)` is the extension's own entry point, and does not bootstrap.
     let providerWallet = try await namespace.providerWallet(walletID: walletID)
     let providerCredentials = try await providerWallet.credentials()
     XCTAssertEqual(
@@ -62,9 +53,8 @@ public func assertWalletReopensSharedStateAndSigningKey(
         line: line
     )
 
-    // Resolving the signing key is the other half of what Annex C needs. Asserted on the Keychain item
-    // rather than through a wallet API because the only wallet API that forces key resolution is
-    // `bootstrap()`, which writes - see below.
+    // Asserted on the Keychain item rather than through a wallet API, because the only wallet API that
+    // forces key resolution is `bootstrap()`, which writes.
     try assertSigningKeyIsUsableFromSharedAccessGroup(
         keyID: hostBootstrap.keyID,
         expectedAccessGroup: keychainAccessGroup,
@@ -72,11 +62,9 @@ public func assertWalletReopensSharedStateAndSigningKey(
         line: line
     )
 
-    // The wallet's own key-resolution path: on a wallet that already has a DID, `bootstrap()` creates
-    // nothing and fails if the platform cannot load the persisted key. Run on a throwaway instance
-    // rather than on `providerWallet` because it also republishes the projection - which is why the
-    // extension must not call it, and why keeping it off the provider wallet leaves the assertions
-    // above proving the extension's path needs no bootstrap.
+    // On a wallet that already has a DID, `bootstrap()` creates nothing and fails if the platform cannot
+    // load the persisted key. Run on a throwaway instance rather than on `providerWallet`, which must
+    // stay un-bootstrapped for the assertions above to mean anything.
     let bootstrapProbeWallet = try await Wallet(configuration: hostConfiguration)
     let probedResolution = try await bootstrapProbeWallet.bootstrap()
     XCTAssertEqual(

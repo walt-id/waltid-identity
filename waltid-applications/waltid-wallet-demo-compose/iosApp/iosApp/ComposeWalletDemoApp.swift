@@ -35,10 +35,8 @@ struct ComposeWalletDemoApp: App {
                 transactionDataProfilesUrl: transactionDataProfilesUrl,
                 appGroupIdentifier: Self.namespace.appGroupIdentifier,
                 keychainAccessGroup: Self.requiredKeychainAccessGroup,
-                // Issuance and deletion republish the wallet's desired projection, which is not
-                // Apple's store; pushing it there is this process's privilege. Reconciling on the
-                // notification rather than on the next foreground transition is what makes a freshly
-                // issued credential presentable now.
+                // The wallet republishes its desired projection, which is not Apple's store; only this
+                // process may write that.
                 onDigitalCredentialRegistryChanged: {
                     Task { await Self.reconcileRegistrations() }
                 }
@@ -48,15 +46,11 @@ struct ComposeWalletDemoApp: App {
                 sharedUI.WalletDemoIosKt.handleWalletDemoDeepLink(url: url.absoluteString)
             }
             .task {
-                // Startup reconciliation: the Compose wallet republishes its desired projection on
-                // every mutation, but only Swift can push it into Apple's store, and the extension's
-                // performRegistrationUpdates() may not have run since the last change.
                 await Self.reconcileRegistrations()
             }
             .onChange(of: scenePhase) { phase in
-                // Provider authorization is granted in Settings, outside this app, and Apple sends no
-                // notification when it changes. Becoming active is the first moment the app can
-                // observe the new status, so it reconciles here instead of polling.
+                // Provider authorization is granted in Settings with no notification, so becoming
+                // active is the first moment this app can observe a change to it.
                 guard phase == .active else { return }
                 Task { await Self.reconcileRegistrations() }
             }
@@ -67,10 +61,8 @@ struct ComposeWalletDemoApp: App {
 
     /// The build-expanded shared Keychain group, or a crash naming what is missing.
     ///
-    /// This target embeds a document-provider extension, so there is no meaningful degraded mode: with
-    /// the wrong Keychain group the wallet stores its signing key where the extension cannot read it,
-    /// and every presentation fails at the point of signing with no earlier symptom. Failing at launch
-    /// points at the actual cause - an Info.plist key that the build did not expand - instead.
+    /// With the wrong group the wallet stores its signing key where the extension cannot read it, and
+    /// every presentation fails at signing with no earlier symptom.
     private static var requiredKeychainAccessGroup: String {
         guard let keychainAccessGroup = namespace.keychainAccessGroup else {
             fatalError(

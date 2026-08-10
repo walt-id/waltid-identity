@@ -21,14 +21,9 @@ case "$phase" in
     emulator_target="default"
     ;;
   dc-api-compose)
-    # Every Digital Credentials test must be named here. They all `assumeTrue` Google Play services,
-    # so the unfiltered compose-demo phase (API 34, `default` image) can only skip them; this
-    # phase's playstore image is the only place they execute. A class omitted here therefore runs
-    # nowhere, and because the report step does not surface skips, it reads as green rather than as
-    # a gap - which is how three classes went unnoticed after being added.
-    #
-    # The browser-mediated classes are deliberately absent, not overlooked: they are blocked on a
-    # non-wallet deployment gap and live on the browser-test follow-up branch, which lists them here.
+    # Dedicated Play Store lane; these tests require Google Play services. Every Digital Credentials
+    # test class must be named here: other phases only skip them, and a skip reads as green, so a
+    # class left out of this list runs nowhere without failing anything.
     dc_api_test_classes="id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest"
     script="ANDROID_TEST_CLASS=$dc_api_test_classes ./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
     emulator_options="-no-window -gpu auto -noaudio -no-boot-anim -camera-back none -memory 4096 -feature GLDirectMem,HasSharedSlotsHostMemoryAllocator"

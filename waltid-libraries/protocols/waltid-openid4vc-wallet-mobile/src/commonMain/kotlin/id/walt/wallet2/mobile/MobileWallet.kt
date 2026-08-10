@@ -484,19 +484,10 @@ public class MobileWallet internal constructor(
     /**
      * Synchronizes the platform registry after the wallet store has already changed.
      *
-     * The store is authoritative and the change is committed by the time this runs, so a registry
-     * that cannot be updated must not turn a completed operation into a failed one. The outcome is
-     * reported through [digitalCredentialRegistration] instead.
-     *
-     * Every wallet operation that changes the credential set ends here, which is why the host
-     * notification is emitted here rather than at each of those operations: a platform whose
-     * registration store only the host may write otherwise depends on the next caller remembering
-     * to tell it.
-     *
-     * The host is notified even when publishing failed, because a failed publish says nothing about
-     * whether there is state worth applying: an earlier projection may still be pending. A host
-     * failure is contained for the same reason a registry failure is - the credential change is
-     * already committed.
+     * The credential change is committed by the time this runs, so neither a registry nor a host
+     * failure may turn a completed operation into a failed one; the outcome is reported through
+     * [digitalCredentialRegistration] instead. The host is notified even when publishing failed,
+     * because an earlier projection may still be pending.
      */
     private suspend fun syncDigitalCredentialRegistration() {
         runCatching { refreshDigitalCredentialRegistration() }.onFailure { failure ->
@@ -549,11 +540,10 @@ public class MobileWallet internal constructor(
                 protocol = request.protocol,
                 data = Json.parseToJsonElement(request.dataJson).jsonObject,
                 origin = request.verifiedOrigin,
-                // An empty selection means "the platform restricted nothing" - iOS asserts no
-                // selection at all, and DCQL then matches over the whole store. It must never be
-                // reachable from a *malformed* platform selection, which would silently widen the
-                // candidate set; keeping that impossible is the platform adapter's job, and
-                // AndroidDigitalCredentialProvider refuses a selection it cannot resolve to entries.
+                // Empty means the platform supplied no credential restriction, and DCQL then matches
+                // over the whole store. Platform adapters must fail closed when a selection was
+                // expected but could not be resolved, because arriving here from a malformed
+                // selection would silently widen the candidate set.
                 eligibleCredentialIds = selectedCredentialIds.ifEmpty { null },
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),

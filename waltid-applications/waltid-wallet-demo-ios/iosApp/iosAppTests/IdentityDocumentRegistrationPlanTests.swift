@@ -102,11 +102,9 @@ final class IdentityDocumentRegistrationPlanTests: XCTestCase {
     }
 
     func testARegistrationAbsentFromTheDesiredStateIsRemovedWhateverItsIdentifier() {
-        // A published projection is authoritative for the whole store: this integration is the only
-        // writer of Apple's registrations for this provider, so an identifier it does not currently
-        // want registered is a stale one - from an older build's identifier scheme, or a credential
-        // deleted while reconciliation could not run - and leaving it makes the platform offer a
-        // document that cannot be presented.
+        // A published projection is authoritative for the whole store: this integration is the only writer
+        // of Apple's registrations for this provider, so an identifier it does not want registered is
+        // stale, and leaving it makes the platform offer a document that cannot be presented.
         let plan = reconciliationPlan(
             desired: [],
             existing: [ExistingRegistration(documentIdentifier: "legacy-registration", documentType: mdl)],
@@ -152,8 +150,8 @@ final class IdentityDocumentRegistrationPlanTests: XCTestCase {
     }
 
     func testAPublishedEmptyProjectionDoesUnregisterManagedDocuments() throws {
-        // The counterpart to the two above: an empty projection *is* authoritative - the wallet's last
-        // mdoc credential was deleted - so failing closed must not swallow this case too.
+        // An empty projection *is* authoritative - the wallet's last mdoc credential was deleted - so
+        // failing closed must not swallow this case too.
         let desired = try XCTUnwrap(
             try desiredRegistrations(from: .published(walletID: "test-123", registrations: []))
         )

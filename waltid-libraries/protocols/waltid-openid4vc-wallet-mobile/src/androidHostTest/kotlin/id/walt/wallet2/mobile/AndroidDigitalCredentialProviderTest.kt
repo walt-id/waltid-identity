@@ -86,11 +86,10 @@ class AndroidDigitalCredentialProviderTest {
      * This wallet registers through `RegistryManager`, so the platform always reports what the user
      * picked. Accepting the absence would produce `selectedRegistryEntryIds = []`, which
      * `MobileWallet.previewDigitalCredentialPresentation` reads as unrestricted matching over the whole
-     * store - turning "no platform selection" into "search the entire wallet".
+     * store.
      *
-     * The envelope here offers a single alternative on purpose: that is the one shape whose *protocol
-     * request* resolution needs no attribution, so it is the shape in which a missing selection could
-     * otherwise slip through unnoticed.
+     * The envelope offers a single alternative because that is the one shape whose *protocol request*
+     * resolution needs no attribution, so a missing selection could otherwise pass unnoticed.
      */
     @OptIn(ExperimentalDigitalCredentialApi::class)
     @Config(sdk = [35])
@@ -109,8 +108,7 @@ class AndroidDigitalCredentialProviderTest {
 
     /**
      * The refusal happens during extraction, before any wallet is consulted. `extract` is the only
-     * boundary between Credential Manager and credential matching, so a failure here is what makes the
-     * unrestricted path unreachable rather than merely unused: nothing downstream ever receives a
+     * boundary between Credential Manager and credential matching, so nothing downstream can receive a
      * request built from a missing selection.
      */
     @OptIn(ExperimentalDigitalCredentialApi::class)
@@ -284,10 +282,9 @@ class AndroidDigitalCredentialProviderTest {
     }
 
     /**
-     * The alternative the user chose is the one that is answered, even though the wallet also supports
-     * the entry at index 0. Choosing by index rather than by protocol support is the whole point: the
-     * two entries here differ in `nonce`, so answering the wrong one produces a response bound to a
-     * request the user was never shown.
+     * The alternative the user chose is answered even though the wallet also supports the entry at index
+     * 0. The two entries differ only in `nonce`, so answering the wrong one produces a response bound to
+     * a request the user was never shown.
      */
     @Test
     fun answersTheAlternativeTheMatcherAttributedTheSelectionTo() {
@@ -308,8 +305,7 @@ class AndroidDigitalCredentialProviderTest {
 
     /**
      * When both OpenID4VP and Annex C are offered, the matcher-attributed one wins in either array
-     * order. There is no wallet preference left to consult: Credential Manager already showed the user
-     * one candidate list and recorded which entry they picked.
+     * order; the wallet has no protocol preference of its own to apply.
      */
     @Test
     fun answersTheMatcherSelectedProtocolWhateverOrderTheVerifierOffers() {
@@ -326,10 +322,9 @@ class AndroidDigitalCredentialProviderTest {
             ]}
         """.trimIndent()
 
-        // Annex C selected, listed first and then second. Its matcher names only the protocol, so
-        // the resolution is by protocol in both orders. The leading `7` is multipaz's combination
-        // counter and is deliberately not the index of either alternative: reading it as one is the
-        // bug this replaces.
+        // Annex C selected, listed first and then second. Its matcher names only the protocol, so the
+        // resolution is by protocol in both orders. The leading `7` is multipaz's combination counter
+        // and is deliberately not the index of either alternative.
         listOf(annexCFirst, openId4VpFirst).forEach { requestJson ->
             val request = AndroidDigitalCredentialProvider.resolveSelectedProtocolRequest(
                 requestJson = requestJson,
@@ -427,8 +422,7 @@ class AndroidDigitalCredentialProviderTest {
 
     /**
      * A selected signed alternative fails, and specifically does not fall through to the unsigned
-     * sibling: the user consented to the signed request, and answering the other one would produce a
-     * response for a request they never saw.
+     * sibling, which would answer a request the user never saw.
      */
     @Test
     fun rejectsASelectedSignedAlternativeInsteadOfSwitchingToTheUnsignedSibling() {
@@ -475,10 +469,7 @@ class AndroidDigitalCredentialProviderTest {
         }
     }
 
-    /**
-     * An opaque selection across several alternatives fails closed. Falling back to a wallet-chosen
-     * alternative here is exactly the second, independent protocol decision this must not make.
-     */
+    /** An opaque selection across several alternatives fails closed rather than picking one. */
     @Test
     fun rejectsAnUnattributedSelectionWhenSeveralAlternativesAreOffered() {
         assertFailsWith<IllegalArgumentException> {
@@ -501,13 +492,9 @@ class AndroidDigitalCredentialProviderTest {
     /**
      * No malformed selection may reach `selectedRegistryEntryIds = []`.
      *
-     * `MobileWallet.previewDigitalCredentialPresentation` reads an empty list as `eligibleCredentialIds
-     * = null`, meaning unrestricted DCQL matching over the whole store. That is correct for a platform
-     * that asserts no selection (iOS), and must be unreachable from a platform selection that could
-     * not be resolved - otherwise a malformed matcher result would *widen* the candidate set.
-     *
-     * The absent-selection case has no representation here at all: `resolveSelectedProtocolRequest`
-     * requires a selection, so the unrestricted shape is not something this entry point can express.
+     * `MobileWallet.previewDigitalCredentialPresentation` reads an empty list as unrestricted DCQL
+     * matching over the whole store, so a malformed matcher result must not be able to *widen* the
+     * candidate set.
      */
     @Test
     fun neverTurnsAMalformedSelectionIntoAnUnrestrictedOne() {
@@ -568,8 +555,7 @@ class AndroidDigitalCredentialProviderTest {
                 selection = selection,
             )
         }
-        // A protocol-less entry is malformed even when a sibling entry is servable, because the
-        // envelope no longer describes what the verifier is asking for.
+        // A protocol-less entry is malformed even when a sibling entry is servable.
         assertFailsWith<IllegalArgumentException> {
             AndroidDigitalCredentialProvider.resolveSelectedProtocolRequest(
                 requestJson = """{"requests":[{"data":{"nonce":"n"}},{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}]}""",
@@ -585,10 +571,10 @@ class AndroidDigitalCredentialProviderTest {
     }
 
     /**
-     * The adapter must not canonicalize; it delegates to `DcApiWallet.canonicalizePlatformOrigin`,
-     * which also feeds the mdoc session transcript. Asserting through `extract` rather than on a
-     * helper is deliberate: a reintroduced private normalizer would still satisfy a helper-level
-     * test while producing a transcript the verifier cannot reproduce.
+     * The adapter must not canonicalize origins itself; it delegates to
+     * `DcApiWallet.canonicalizePlatformOrigin`, which also feeds the mdoc session transcript. Asserted
+     * through `extract`, because a private normalizer would still satisfy a helper-level test while
+     * producing a transcript the verifier cannot reproduce.
      */
     @OptIn(ExperimentalDigitalCredentialApi::class)
     @Config(sdk = [35])
@@ -601,8 +587,6 @@ class AndroidDigitalCredentialProviderTest {
             requestJson = """{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}""",
             packageName = "id.walt.browser",
             signingInfo = signingInfo(signature),
-            // Uppercase host and an explicit default port: the two cases where the deleted adapter
-            // copy and the protocol rule used to disagree.
             origin = "https://VERIFIER.example:443",
             selectedCredentialSet = selectedCredentialSetExtras(),
         )
@@ -616,9 +600,9 @@ class AndroidDigitalCredentialProviderTest {
     }
 
     /**
-     * Each matcher's own emission is read on its terms, and an id in neither shape is passed through
-     * untouched. The AndroidX matcher registers whatever entry id the wallet gave it, which for this
-     * wallet is a UUID and must not be reinterpreted as a composite.
+     * Each matcher's emission is read on its own terms, and an id in neither shape is passed through
+     * untouched. The AndroidX matcher registers whatever entry id the wallet gave it - here a UUID -
+     * which must not be reinterpreted as a composite.
      */
     @Test
     fun readsEachMatcherIdOnItsOwnTermsAndLeavesOpaqueIdsAlone() {

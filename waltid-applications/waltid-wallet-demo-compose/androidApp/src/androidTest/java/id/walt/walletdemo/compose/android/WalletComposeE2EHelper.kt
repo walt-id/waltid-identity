@@ -171,11 +171,9 @@ internal object WalletComposeE2EHelper {
     }
 
     /**
-     * Asserts [substring] appears in some wallet text node, scrolling to look for it.
-     *
-     * Separate from [assertTextVisibleAfterScrolling] because a review renders one value per row: a
-     * claim value the request supplied may be wrapped in surrounding label text, so an exact match
-     * would fail on content that is in fact on screen.
+     * Asserts [substring] appears in some wallet text node, scrolling to look for it. For values the
+     * review renders wrapped in surrounding label text, where an exact match would fail on content that
+     * is in fact on screen.
      */
     fun assertTextContainingVisibleAfterScrolling(
         device: UiDevice,

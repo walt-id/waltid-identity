@@ -1,12 +1,6 @@
 package id.walt.wallet2.mobile
 
-/**
- * Protocol identifiers understood by platform Digital Credentials APIs.
- *
- * [OPENID4VP_SIGNED] and [OPENID4VP_MULTISIGNED] are declared so that capability metadata can
- * report them as unsupported, and so that a request naming one is recognised rather than treated as
- * an unknown value. Neither is accepted for presentation.
- */
+/** Protocol identifiers understood by platform Digital Credentials APIs. */
 public object MobileWalletDigitalCredentialProtocols {
     /** Unsigned OpenID4VP Digital Credentials protocol identifier. */
     public const val OPENID4VP_UNSIGNED: String = "openid4vp-v1-unsigned"
@@ -21,11 +15,8 @@ public object MobileWalletDigitalCredentialProtocols {
 /**
  * Credential formats exposed through the platform Digital Credentials integration.
  *
- * [identifier] is the credential format identifier this entry represents. Capability metadata is
- * reported to host applications through it rather than through the enum-entry name, so renaming an
- * entry cannot silently change what the wallet advertises.
- *
- * @property identifier Stable credential format identifier.
+ * @property identifier Stable credential format identifier reported in capability metadata, never
+ * the enum-entry name.
  */
 public enum class MobileWalletDigitalCredentialFormat(public val identifier: String) {
     MDOC("mso_mdoc"),
@@ -94,8 +85,8 @@ public data class MobileWalletDigitalCredentialCapabilities(
 /**
  * Matcher-visible credential metadata supplied to a platform credential registry.
  *
- * This is not the credential: no issuer-signed payload, proof, or key material is included. The
- * claim values it does carry are the user's personal data, because the platform matcher runs out of
+ * This is not the credential: no issuer-signed payload, proof, or key material is included. It does
+ * carry decoded claim values, which are the user's personal data - the platform matcher runs out of
  * process and cannot ask the wallet for a value it was not given.
  *
  * @property registryEntryId Stable platform registry entry identifier.
@@ -153,11 +144,9 @@ public interface MobileWalletCredentialRegistry {
      * Synchronizes the platform registry named [registryId] to exactly [records].
      *
      * Reusing [registryId] must replace that registry's previous entries rather than add to them,
-     * so a credential the wallet no longer holds stops being offered. Implementations are not
-     * required to be atomic - a platform may take several operations to publish one desired state,
-     * and an interrupted call can leave the registry holding neither the old nor the new set. What
-     * they must do is report the outcome instead of throwing, since the wallet state this projects
-     * has already been committed.
+     * so a credential the wallet no longer holds stops being offered. Implementations need not be
+     * atomic, but must report failure instead of throwing: the wallet state this projects has
+     * already been committed.
      */
     public suspend fun replace(
         registryId: String,
@@ -258,10 +247,7 @@ public data class MobileWalletDigitalCredentialPreview(
  * and reaching it requires both a valid signature and an accepting application trust policy.
  *
  * A request whose reader authentication fails cryptographic verification is rejected and produces no
- * state at all, so every state here describes a still-processable request. The non-trusted states are
- * kept apart because they call for different consent copy: an absent signature is a reader that
- * declined to identify itself, while a valid signature no policy accepts is a reader the wallet
- * cannot vouch for.
+ * state at all, so every state here describes a still-processable request.
  */
 public sealed interface MobileWalletReaderTrust {
     /** The protocol carries no reader authentication, as with the OpenID4VP Digital Credentials API. */
@@ -274,17 +260,16 @@ public sealed interface MobileWalletReaderTrust {
      * Reader authentication has not been checked yet because the platform withholds the raw request
      * until the user consents.
      *
-     * Apple's IdentityDocumentServices exposes only a parsed request before consent. The signature
-     * is verified, and a bad one rejects the request, before any credential data is released - but
-     * that happens at submission, so a consent dialog cannot yet name the reader.
+     * Apple's IdentityDocumentServices exposes only a parsed request before consent. The signature is
+     * still verified before any credential data is released, but that happens at submission, so a
+     * consent dialog cannot yet name the reader.
      */
     public data object PendingRawRequest : MobileWalletReaderTrust
 
     /**
      * The reader's signature is cryptographically valid, but no application trust policy accepts it.
      *
-     * Not a verification failure: the wallet simply has no basis for telling the user who the reader
-     * is, which is also what the default [UnconfiguredMobileWalletReaderTrustEvaluator] reports.
+     * Not a verification failure: the wallet simply has no basis for telling the user who the reader is.
      *
      * @property reason Reason the trust policy did not accept the reader.
      */
@@ -301,8 +286,8 @@ public sealed interface MobileWalletReaderTrust {
 /**
  * The two outcomes an application trust policy may return.
  *
- * Narrower than [MobileWalletReaderTrust] on purpose: a policy is only ever consulted for a reader
- * whose signature already verified, so it cannot report that authentication was absent or deferred.
+ * Narrower than [MobileWalletReaderTrust]: a policy is only consulted for a reader whose signature
+ * already verified, so it cannot report that authentication was absent or deferred.
  */
 public sealed interface MobileWalletReaderTrustDecision : MobileWalletReaderTrust
 

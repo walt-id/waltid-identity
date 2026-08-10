@@ -33,10 +33,6 @@ public data class AndroidDigitalCredentialProviderInput(
 /**
  * One selection Credential Manager attributed to a protocol request, as the matcher emitted it.
  *
- * The platform has already matched and let the user choose. This type carries only what the matcher
- * said about *which* request the choice belongs to, so the adapter can locate that request instead of
- * making a second, independent protocol decision.
- *
  * @property registryEntryId Registry entry identifier the wallet registered.
  * @property requestIndex `requests` index the matcher attributed the selection to, or null when the
  *   matcher supplied no index.
@@ -68,10 +64,8 @@ public object AndroidDigitalCredentialProvider {
     /**
      * Protocols this wallet can answer.
      *
-     * This is a capability filter, not a preference order: which request is answered is decided by
-     * the platform's matcher and the user, and this set only rejects a selection the wallet cannot
-     * fulfill. The signed variants are absent, so a selected signed alternative fails closed rather
-     * than being silently redirected to an unsigned sibling.
+     * A capability filter, not a preference order: it only rejects a selection the wallet cannot
+     * fulfill, and never redirects one protocol to another.
      */
     private val supportedProtocols = setOf(
         MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
@@ -90,12 +84,9 @@ public object AndroidDigitalCredentialProvider {
      * from authenticated caller data. A populated privileged origin is rejected unless the caller
      * package and signing certificate match [privilegedAppsJson].
      *
-     * A selected credential set is mandatory here. This wallet registers its credentials through
-     * `RegistryManager`, so Credential Manager always reports which of them the user picked; a request
-     * arriving without one is not a request this entry point can answer. Continuing without it would
-     * produce an empty `selectedRegistryEntryIds`, which
-     * [MobileWallet.previewDigitalCredentialPresentation] reads as "match the whole wallet" - correct
-     * for a platform that asserts no selection, and never correct for Credential Manager.
+     * A selected credential set is mandatory: continuing without one would produce an empty
+     * `selectedRegistryEntryIds`, which [MobileWallet.previewDigitalCredentialPresentation] reads as
+     * "match the whole wallet".
      */
     public fun extract(
         intent: Intent,
@@ -113,9 +104,8 @@ public object AndroidDigitalCredentialProvider {
                 "Privileged caller is not present in the configured browser allowlist"
             }
         }
-        // Canonicalization belongs to DcApiWallet, which is also what the mdoc session transcript is
-        // built from. Normalizing here as well would let the two drift; this only decides *which*
-        // origin flavour the platform asserted.
+        // Only decides which origin flavour the platform asserted. Canonicalization stays in
+        // DcApiWallet, which the mdoc session transcript is also built from.
         val assertedOrigin = privilegedOrigin
             ?: callingApp.signingInfoCompat.signingCertificateHistory.firstOrNull()?.toByteArray()?.let {
                 nativeAppOrigin(it)
@@ -139,35 +129,14 @@ public object AndroidDigitalCredentialProvider {
     }
 
     /**
-     * Determines which protocol request the platform's selected credentials belong to.
+     * Resolves the request selected by Credential Manager.
      *
-     * A verifier may offer the same presentation over several alternative protocols
-     * (OpenID4VP 1.0 Appendix A `requests`). Credential Manager has already run the matcher against
-     * every alternative and the user has already chosen; this resolves *which request that choice was
-     * made against*. It deliberately makes no protocol choice of its own - doing so could answer a
-     * request the user was never shown.
-     *
-     * Resolution therefore fails closed rather than guessing:
-     * - there must be a platform selection at all, which on Credential Manager there always is;
-     * - the matcher must attribute the selection to exactly one `requests` index;
-     * - that index must exist, and any protocol the matcher named must equal `requests[index]`'s;
-     * - that protocol must be one the wallet can answer, so a selected signed alternative is refused
-     *   instead of being redirected to an unsigned sibling;
-     * - the resolved selection must be non-empty, since downstream code reads an empty selection as
-     *   "no restriction" and a malformed selection must never widen the candidate set.
-     *
-     * Two inferences are permitted, neither of which is a wallet preference:
-     * - a single-alternative envelope, where index 0 is not a choice at all;
-     * - a protocol the matcher named that matches exactly one offered alternative, which identifies
-     *   that alternative uniquely. Multipaz's Annex C matcher attributes by protocol and not by index,
-     *   so without this an Annex C alternative could never be selected from a multi-protocol envelope.
-     *
-     * Anything else - no attribution across several alternatives, or a named protocol offered more
-     * than once - is refused.
-     *
-     * [selection] is required rather than optional so that no Credential Manager request can reach an
-     * unrestricted `selectedRegistryEntryIds`. The platform-neutral wallet API still permits an empty
-     * selection for platforms such as iOS that assert none; that path simply does not exist here.
+     * Ambiguous or inconsistent matcher attribution fails closed; the wallet never substitutes another
+     * protocol alternative. Two inferences are permitted, neither of them a wallet preference: a
+     * single-alternative envelope, where index 0 is not a choice; and a protocol the matcher named that
+     * exactly one alternative offers, which identifies it uniquely. Multipaz's Annex C matcher
+     * attributes by protocol rather than by index, so without the second an Annex C alternative could
+     * never be selected from a multi-protocol envelope.
      */
     internal fun resolveSelectedProtocolRequest(
         requestJson: String,
@@ -283,13 +252,9 @@ public object AndroidDigitalCredentialProvider {
     /**
      * Reduces one selected credential set to the single protocol request it belongs to.
      *
-     * Every selected credential must agree on that request; two credentials attributed to different
-     * `requests` entries are not one answerable selection, so the disagreement is an error rather than
-     * something to resolve by majority or by taking the first.
-     *
-     * [credentialSetId] corroborates the per-credential attribution when the OpenID4VP matcher
-     * supplies it. It is not the sole source: only that matcher emits it, and a set id disagreeing with
-     * the credentials it contains is malformed.
+     * Every selected credential must agree on that request; a disagreement is an error rather than
+     * something to resolve by majority or by taking the first. [credentialSetId] corroborates the
+     * per-credential attribution when the OpenID4VP matcher supplies it, and is not the sole source.
      *
      * @param credentialSetId `credentialSetId` reported by Credential Manager.
      * @param credentials Selected `credentialId` to `metadata` pairs, in platform order. `metadata` is
@@ -330,8 +295,7 @@ public object AndroidDigitalCredentialProvider {
     /**
      * Reads one selected credential the way the matcher that produced it writes them.
      *
-     * The two matchers this wallet registers attribute differently, and each is parsed on its own
-     * terms rather than through an invented shared convention:
+     * The two matchers this wallet registers attribute differently:
      * - The AndroidX OpenID4VP matcher puts the registry entry id in `credentialId` and a JSON object
      *   in `metadata` whose `dc_request_index` names the `requests` entry it matched.
      * - Multipaz's `identitycredentialmatcher.wasm`, which serves the Annex C registry, has no
@@ -339,7 +303,7 @@ public object AndroidDigitalCredentialProvider {
      *   leading integer is a combination counter, **not** a `requests` index, so only the protocol and
      *   document id are read from it; the request index comes from `credentialSetId`.
      *
-     * A `credentialId` in neither shape is passed through untouched with no attribution, which
+     * A `credentialId` in neither shape is passed through with no attribution, which
      * [resolveSelectedProtocolRequest] accepts only for a single-alternative envelope.
      */
     internal fun parseMatcherCredentialId(credentialId: String, metadata: String?): MatcherCredentialSelection {

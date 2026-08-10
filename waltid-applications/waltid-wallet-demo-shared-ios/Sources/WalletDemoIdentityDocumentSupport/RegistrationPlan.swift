@@ -42,20 +42,12 @@ public struct RegistrationPlan: Equatable, Sendable {
 
 /// Computes the add/remove diff between the wallet's desired state and Apple's actual store.
 ///
-/// Pure on purpose: this is the only part of registration with interesting behaviour, and it can be
-/// exercised without an iOS 26 device or a mocked framework.
-///
-/// A published projection is authoritative for the whole store, so any registration absent from it is
-/// removed. That is safe because this integration is the only writer of Apple's store for this
-/// provider and an unreadable projection never reaches here - ``desiredRegistrations(from:)`` fails
-/// closed first.
-///
 /// - Parameters:
 ///   - desired: Desired registrations read from the wallet's shared projection state.
 ///   - existing: Registrations Apple currently holds.
 ///   - supportedDocumentTypes: Doctypes this build's entitlement actually grants. A desired doctype
-///     outside this set is dropped rather than registered: Apple rejects the addition, and one
-///     rejected doctype would otherwise abort reconciliation for the valid ones.
+///     outside this set is dropped rather than registered, because Apple rejects the addition and one
+///     rejected doctype would abort reconciliation for the valid ones.
 public func reconciliationPlan(
     desired: [DesiredRegistration],
     existing: [ExistingRegistration],
@@ -86,16 +78,14 @@ public func reconciliationPlan(
 
 /// Turns a projection read from the App Group into the registrations to reconcile against, or `nil`.
 ///
-/// Split out of ``IdentityDocumentRegistrationCoordinator`` because this is the fail-closed decision
-/// and the coordinator around it only runs against Apple's actor on an authorized iOS 26 device.
+/// A missing projection is not an empty desired state; only a published projection may remove
+/// registrations.
 ///
 /// - Parameter projection: What the shared App Group says about the active wallet.
 /// - Returns: The wallet's desired registrations, or `nil` when no wallet has published yet and Apple's
-///   store must be left exactly as it is. An empty array is a decision, not an absence: the wallet has
-///   no presentable mdoc credential and its registrations have to go.
+///   store must be left exactly as it is.
 /// - Throws: ``IdentityDocumentSupportFailure/unreadableDesiredRegistrations(_:)`` when the projection
-///   exists but cannot be decoded. Thrown rather than returned as `nil` because a corrupt container is a
-///   bug worth surfacing, while a missing one is the normal state of a fresh install.
+///   exists but cannot be decoded.
 public func desiredRegistrations(
     from projection: DesiredRegistrationProjection
 ) throws -> [DesiredRegistration]? {

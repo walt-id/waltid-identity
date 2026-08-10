@@ -41,9 +41,8 @@ inputs:
     required: false
     type: string
     default: 'true'
-  # Split per demo rather than one flag for both: each check builds that demo's app and extension, so
-  # it belongs in the job that already has that project's build warm. A single flag would make the
-  # native job build the Compose demo and the reverse, doubling the two slowest jobs in the matrix.
+  # One flag per demo: each check builds that demo's app and extension, so it belongs in the job whose
+  # build is already warm for that project.
   run-native-identity-document-provider-checks:
     description: 'Build the native demo document provider extension and verify its built configuration'
     required: false
@@ -162,9 +161,8 @@ runs:
         echo "Matched destination line: $MATCHING_LINE"
         echo "destination=$RESOLVED_DESTINATION" >> $GITHUB_OUTPUT
 
-    # Runs before the test steps: a provider extension that does not compile, is not embedded, or
-    # disagrees with its host about App Group, Keychain group or doctypes is invisible to iOS, and that
-    # failure otherwise only appears during on-device presentation.
+    # A provider extension that is not embedded, or disagrees with its host about App Group, Keychain
+    # group or doctypes, is invisible to iOS and fails no build - only an on-device presentation.
     - name: Verify native iOS identity document provider
       if: ${{ inputs.run-native-identity-document-provider-checks == 'true' }}
       id: native_identity_document_provider_checks

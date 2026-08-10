@@ -17,9 +17,8 @@ import id.walt.walletdemo.compose.logic.WalletDemoTransactionDataItem
 /**
  * Reviews and credential options the sharing-review tests are written against.
  *
- * Kept apart from the scenarios so a platform-specific test can drive the same screen against the
- * same request. Back handling is the case that needs it: only the platform that has a back gesture
- * can dispatch one, while what the gesture must do to a review is not platform-specific at all.
+ * Kept apart from the scenarios so a platform-specific test - back handling, which needs a real back
+ * gesture - can drive the same screen against the same request.
  */
 internal object WalletDemoSharingReviewFixtures {
     const val REQUIRED_DISCLOSURE_PATH: String = "org.iso.18013.5.1/given_name"
@@ -112,9 +111,8 @@ internal object WalletDemoSharingReviewFixtures {
     )
 
     /**
-     * A disclosure the credential format can withhold and the request did not insist on, which is the
-     * only shape [WalletDemoPresentationDisclosure.selectable] is true for and so the only one the
-     * review renders a toggle beside.
+     * A disclosure the credential format can withhold and the request did not insist on: the only shape
+     * [WalletDemoPresentationDisclosure.selectable] is true for, and so the only one with a toggle.
      */
     fun optionalDisclosure(): WalletDemoPresentationDisclosure = WalletDemoPresentationDisclosure(
         label = "Portrait",

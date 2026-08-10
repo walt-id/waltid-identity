@@ -5,10 +5,9 @@ import XCTest
 
 /// What the shared sharing review says about a request, for each transport that can produce one.
 ///
-/// These are mapping tests rather than rendering tests: the review model is what decides which
-/// sections exist, what they claim, and which actions are offered, so it is where a transport can
-/// start describing a request as something it is not. The rendering above it has no protocol
-/// knowledge left to get wrong.
+/// Mapping tests rather than rendering tests: the review model decides which sections exist, what they
+/// claim and which actions are offered, so it is where a transport could start describing a request as
+/// something it is not.
 final class SharingReviewModelTests: XCTestCase {
 
     // MARK: - Requester identity

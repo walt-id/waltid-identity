@@ -179,11 +179,11 @@ object DemoTestBackend {
 
     /**
      * One `payment-authorization` transaction data item bound to [credentialId], with the fields the
-     * deployed profile actually declares.
+     * deployed profile declares.
      *
-     * The profile is fetched rather than assumed so a deployment that stops declaring `amount`,
-     * `currency` or `payee` fails here, instead of producing an item whose fields a test then cannot
-     * find on screen for a reason it would misattribute to the wallet.
+     * The profile is fetched rather than assumed, so a deployment that stops declaring `amount`,
+     * `currency` or `payee` fails here instead of producing an item whose fields a test cannot find on
+     * screen for a reason it would misattribute to the wallet.
      */
     suspend fun paymentAuthorizationTransactionData(credentialId: String): JsonObject {
         val fields = transactionDataProfileFields(PAYMENT_AUTHORIZATION_TYPE)
@@ -262,11 +262,11 @@ object DemoTestBackend {
     /**
      * Creates an Annex D (Digital Credentials API) session and fetches its request object.
      *
-     * [expectedOrigins] is not cosmetic: the verifier hashes its first entry into the mdoc session
-     * transcript, and the wallet hashes the origin the OS asserted for the calling app. If the two
-     * disagree, `mso_mdoc/device-auth` fails with a signature error that never mentions the origin.
-     * So the caller must pass the origin the platform will actually report - for a native caller
-     * that is `android:apk-key-hash:<base64url-sha256-of-signing-cert>`.
+     * The verifier hashes the first [expectedOrigins] entry into the mdoc session transcript, and the
+     * wallet hashes the origin the OS asserted for the calling app; a disagreement fails
+     * `mso_mdoc/device-auth` with a signature error that never mentions the origin. Callers must pass the
+     * origin the platform will actually report - for a native caller
+     * `android:apk-key-hash:<base64url-sha256-of-signing-cert>`.
      */
     suspend fun createDcApiVerifierSession(
         scenario: CredentialScenario,
@@ -280,11 +280,11 @@ object DemoTestBackend {
      * As above, for the cases a single [CredentialScenario] cannot express.
      *
      * [encryptedResponse] switches the session to `response_mode=dc_api.jwt`, which also makes the
-     * verifier derive the mdoc session transcript from its own encryption key's JWK thumbprint - so
-     * this flag changes what a correct wallet response looks like, not just how it is wrapped.
+     * verifier derive the mdoc session transcript from its own encryption key's JWK thumbprint - so it
+     * changes what a correct wallet response looks like, not just how it is wrapped.
      *
-     * [transactionData] is passed through verbatim so a test can assert on the exact fields the
-     * wallet displayed and hashed; see [paymentAuthorizationTransactionData].
+     * [transactionData] is passed through verbatim, so a test can assert on the exact fields the wallet
+     * displayed and hashed; see [paymentAuthorizationTransactionData].
      */
     suspend fun createDcApiVerifierSession(
         credentialQueries: List<JsonObject>,
@@ -314,8 +314,8 @@ object DemoTestBackend {
                     }
                 }
             }
-            // No vp_policies override: the verifier applies its full default mdoc policy set, which
-            // is what makes a policy regression visible here instead of silently skipped.
+            // No vp_policies override: the verifier applies its full default mdoc policy set, so a policy
+            // regression is visible here instead of silently skipped.
             putJsonArray("expectedOrigins") {
                 expectedOrigins.forEach { add(JsonPrimitive(it)) }
             }
@@ -335,9 +335,9 @@ object DemoTestBackend {
     }
 
     /**
-     * The `digital` member of the verifier's request object - i.e. exactly the argument a browser
-     * would pass to `navigator.credentials.get({ digital: ... })`, and what Credential Manager
-     * expects as its request JSON.
+     * The `digital` member of the verifier's request object: the argument a browser passes to
+     * `navigator.credentials.get({ digital: ... })`, and what Credential Manager expects as its request
+     * JSON.
      */
     private suspend fun dcApiRequestJson(sessionId: String): String {
         val response = client.get("$VERIFIER_BASE_URL/verification-session/$sessionId/request") {
@@ -378,19 +378,15 @@ object DemoTestBackend {
         putJsonArray("transaction_data_hashes_alg") {
             add(JsonPrimitive("sha-256"))
         }
-        // TODO: remove this member, and switch PAYMENT_AUTHORIZATION_TYPE to `payment_details` with
-        //  the `payee_name`/`payment_amount`/`payment_currency` field names, once the
-        //  `payment_details` profile is deployed to wallet.demo.walt.id and verifier2.demo.walt.id.
-        //  The profile is already committed to the four transaction-data-profiles.conf files, and the
-        //  switch is verified to pass against a local stack serving it; this workaround exists only
-        //  because the item is resolved from the deployed profile list at run time.
+        // TODO: switch PAYMENT_AUTHORIZATION_TYPE to `payment_details` with the
+        //  `payee_name`/`payment_amount`/`payment_currency` field names, and drop `merchant_name`, once
+        //  that profile is deployed to wallet.demo.walt.id and verifier2.demo.walt.id. The item is
+        //  resolved from the deployed profile list at run time.
         //
-        // Not a profile field, and not optional on Android: AndroidX's default OpenID4VP matcher
-        // treats a single transaction_data item as a payment unconditionally, and for a type it does
-        // not recognise it reads `merchant_name` and hands it to Credential Manager, which rejects a
-        // null one ("Merchant name should not be null") and then produces no candidate at all. The
-        // item is what the verifier sends, so this is where the field belongs; it reaches consent as
-        // a decoded detail like any other non-standard member.
+        // Not a profile field, and not optional on Android: AndroidX's default OpenID4VP matcher treats a
+        // single transaction_data item as a payment unconditionally, and for an unrecognised type reads
+        // `merchant_name` and hands it to Credential Manager, which rejects a null one ("Merchant name
+        // should not be null") and produces no candidate at all.
         put("merchant_name", JsonPrimitive("ACME Corp"))
         putProfileField(fields, "amount", "42.00")
         putProfileField(fields, "currency", "EUR")

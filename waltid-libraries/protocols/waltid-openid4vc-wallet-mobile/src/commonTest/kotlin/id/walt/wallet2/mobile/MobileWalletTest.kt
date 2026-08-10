@@ -822,12 +822,9 @@ class MobileWalletTest {
     }
 
     /**
-     * The issuance counterpart of the deletion case above.
-     *
-     * Issuance stores the credential first and projects it into the platform registry afterwards, so
-     * a registry that rejects the projection must not be able to reach back and turn an issued
-     * credential into [WalletIssuanceOutcome.Failed]. The wallet would then hold a credential the
-     * application was told it never received.
+     * The issuance counterpart of the deletion case above: a registry that rejects the projection must
+     * not turn a stored credential into [WalletIssuanceOutcome.Failed], leaving the wallet holding a
+     * credential the application was told it never received.
      */
     @Test
     fun failedRegistrySynchronizationDoesNotTurnStoredIssuanceIntoFailedIssuance() = runTest {
@@ -870,10 +867,9 @@ class MobileWalletTest {
     /**
      * A credential-set change has to *request host reconciliation*, not merely re-publish a projection.
      *
-     * On iOS the registry this wallet writes is a desired state in a shared container; Apple's
-     * `IdentityDocumentProviderRegistrationStore` is writable only by the host app, and
-     * `performRegistrationUpdates()` runs only periodically. So asserting that the projection changed
-     * proves nothing about whether the platform will offer the credential - the host has to be told.
+     * On iOS this registry writes a desired state into a shared container, while Apple's
+     * `IdentityDocumentProviderRegistrationStore` is writable only by the host app, so a changed
+     * projection alone does not make the platform offer the credential.
      */
     @Test
     fun aCredentialSetChangeAsksTheHostToReconcileThePlatformRegistrations() = runTest {
@@ -893,27 +889,24 @@ class MobileWalletTest {
             credentialStore = credentialStore,
             generateAndPersistKey = { error("Registry notification must not generate keys") },
             credentialRegistry = registry,
-            // Records how many projections had been published when the host was notified, which is what
-            // proves the notification follows the publish rather than racing it.
+            // How many projections had been published when the host was notified, which proves the
+            // notification follows the publish rather than racing it.
             onDigitalCredentialRegistryChanged = { reconciliationRequests += registry.replacements.size },
         )
 
         assertTrue(wallet.deleteCredential("pid-1"))
         assertEquals(listOf(1), reconciliationRequests, "deletion has to ask the host to reconcile, once")
 
-        // The direct retry entry point is *not* a credential-set change: it is the host's own way of
-        // re-publishing, so notifying there would be the wallet calling the host back into itself.
+        // The direct retry entry point is not a credential-set change: it is the host's own way of
+        // re-publishing, so notifying there would call the host back into itself.
         wallet.refreshDigitalCredentialRegistration()
         assertEquals(listOf(1), reconciliationRequests)
     }
 
     /**
-     * The host is told even when publishing the desired state failed, and its failure is contained.
-     *
-     * A failed publish is a poor filter for "nothing to reconcile": on iOS the wallet's own registry
-     * write and Apple's store are different things, so the host still has an authoritative earlier
-     * projection to apply. And the credential change is already committed by this point, so a host that
-     * throws must not be able to turn a completed deletion into a failed one.
+     * The host is told even when publishing the desired state failed, because an earlier projection may
+     * still be pending; and since the credential change is already committed, a host that throws must
+     * not turn a completed deletion into a failed one.
      */
     @Test
     fun theHostIsAskedToReconcileEvenWhenPublishingFailedAndItsOwnFailureIsContained() = runTest {
@@ -1160,13 +1153,9 @@ class MobileWalletTest {
     }
 
     /**
-     * The four non-trusted reader states must stay distinguishable, and none of them may be produced
-     * by a signature that failed to verify.
-     *
-     * The last case is the one that matters most: on Apple's deferred path the preview cannot check
-     * the signature at all, so consent is granted while the reader is still unauthenticated. A bad
-     * signature arriving with the raw request must reject the submission rather than be reported as
-     * a trust state the user already accepted.
+     * The four non-trusted reader states must stay distinguishable, and none of them may be produced by
+     * a signature that failed to verify. On Apple's deferred path the preview cannot check the signature
+     * at all, so a bad one arriving with the raw request has to reject the submission.
      */
     @OptIn(ExperimentalEncodingApi::class)
     @Test
@@ -1271,8 +1260,7 @@ class MobileWalletTest {
                 )
             )
         }
-        // The submission must fail on the signature, not on some earlier structural check that would
-        // make this test pass without proving anything about reader authentication.
+        // The failure must be the signature, not an earlier structural check.
         assertTrue(
             rejection.message?.contains("signature") == true,
             "Expected a reader-authentication signature rejection, got: ${rejection.message}",
@@ -1280,12 +1268,10 @@ class MobileWalletTest {
     }
 
     /**
-     * A request the raw bytes of which were available at consent must be answered byte for byte.
+     * A request whose raw bytes were available at consent must be answered byte for byte.
      *
-     * Every rejected case below produces a request that is *valid* and parses to exactly what the
-     * user saw, so the parsed request alone could not tell them apart: it carries no reader
-     * authentication, no `deviceRequestInfo` and no version. The reader named on the consent screen
-     * has to be the reader that receives the response.
+     * Every rejected case below is a *valid* request that parses to exactly what the user saw, because
+     * the parsed request carries no reader authentication, no `deviceRequestInfo` and no version.
      */
     @OptIn(ExperimentalEncodingApi::class)
     @Test
@@ -1326,17 +1312,16 @@ class MobileWalletTest {
             )
         }
 
-        // Dropping reader authentication leaves a request that is still answerable on its own, and
-        // whose trust state - NotAuthenticated - is a permitted one. It is not the one consented to.
+        // Dropping reader authentication leaves a request that is answerable on its own, with the
+        // permitted trust state NotAuthenticated - but not the one consented to.
         assertRejected(
             signedRequest.copy(docRequests = listOf(docRequest.copy(readerAuth = null)))
                 .encodeToBase64Url(),
             "a request with reader authentication removed",
         )
 
-        // A second reader whose signature genuinely verifies. The preview below is what proves that:
-        // an invalid substitute would throw there, so the rejection cannot be a verification failure
-        // in disguise.
+        // A second reader whose signature genuinely verifies - proven by the preview below, which an
+        // invalid substitute would fail, so the rejection is not a verification failure in disguise.
         val otherReaderKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("other-reader-key"),
@@ -1392,8 +1377,8 @@ class MobileWalletTest {
             "a request carrying added deviceRequestInfo",
         )
 
-        // Comparison is on decoded bytes, not on how they were spelled: the fixture is unpadded, and
-        // its padded form is the same request.
+        // Comparison is on decoded bytes, not on spelling: the fixture is unpadded, and its padded form
+        // is the same request.
         val response = submit("$SIGNED_READER_REQUEST=")
         assertEquals(MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C, response.protocol)
         assertTrue(
@@ -1404,13 +1389,9 @@ class MobileWalletTest {
 
     /**
      * A recipient key the response could never be HPKE-sealed to must stop the request before the
-     * consent dialog, not at submission.
-     *
-     * Getting this wrong is not merely an ordering nit: a wallet that discovers the unusable key only
-     * while sealing has already shown the user which claims a reader asked for and obtained their
-     * approval to disclose them, and then fails. So the assertions below pin *both* that the request
-     * is rejected and that no credential was ever read - a store access is the observable proxy for
-     * "the wallet started preparing a consent screen".
+     * consent dialog, not at submission: discovering it while sealing means the user has already been
+     * asked to disclose claims for a request that cannot be answered. Both the rejection and the absence
+     * of any credential read are asserted, the latter standing in for "no consent screen was prepared".
      */
     @Test
     fun annexCRejectsUnsealableHpkeRecipientKeyBeforeConsent() = runTest {
@@ -1489,13 +1470,13 @@ class MobileWalletTest {
     }
 
     /**
-     * Reader authentication must be restricted to the algorithms ISO 18013-5 §9.1.3.4 permits, and the
-     * restriction has to be read from the *protected* header where it is signed over.
+     * Reader authentication must be restricted to the algorithms ISO 18013-5 §9.1.3.4 permits, read from
+     * the *protected* header where they are signed over.
      *
-     * `ESP256` is the sharp case: it is a legitimate, fully-specified P-256 ECDSA identifier that the
-     * allowlist deliberately excludes, so a wallet that trusted `alg` blindly would happily verify it.
-     * The assertion walks the cause chain because both call sites wrap the failure - matching only on
-     * the outer message would also pass for an ordinary bad signature and prove nothing.
+     * `ESP256` is the sharp case: a legitimate, fully-specified P-256 ECDSA identifier the allowlist
+     * excludes, so a wallet trusting `alg` blindly would verify it. The assertion walks the cause chain
+     * because both call sites wrap the failure, and the outer message alone would also match an ordinary
+     * bad signature.
      */
     @Test
     fun annexCRejectsReaderAuthenticationAlgorithmOutsideTheAllowlist() = runTest {
@@ -1542,11 +1523,10 @@ class MobileWalletTest {
     /**
      * Every reader-authentication signature in one request must come from the same certificate chain.
      *
-     * Without this, a request could pair a signature the wallet can verify with a second signature
-     * from an unrelated chain, and whichever chain reached [MobileWalletReaderTrustEvaluator] would
-     * decide the trust state the user is shown - so the reader identity displayed at consent need not
-     * be the one that authenticated the request. The mismatch is checked before signature
-     * verification, which is why the second signature here can be arbitrary bytes.
+     * Otherwise whichever chain reached [MobileWalletReaderTrustEvaluator] would decide the trust state
+     * shown to the user, and the reader identity displayed at consent need not be the one that
+     * authenticated the request. The mismatch is checked before signature verification, so the second
+     * signature here can be arbitrary bytes.
      */
     @OptIn(ExperimentalEncodingApi::class)
     @Test
@@ -1555,8 +1535,8 @@ class MobileWalletTest {
         val signedRequest = DeviceRequest.decodeFromBase64Url(SIGNED_READER_REQUEST)
         val docRequest = signedRequest.docRequests.single()
         val readerAuth = requireNotNull(docRequest.readerAuth)
-        // Only the *second* signature can trip the check: the first one establishes the chain the rest
-        // are compared against, so a single-signature request could never exercise this.
+        // The first signature establishes the chain the rest are compared against, so two doc requests
+        // are needed to exercise this at all.
         val mismatchedChains = signedRequest.copy(
             docRequests = listOf(
                 docRequest,
@@ -1701,12 +1681,7 @@ class MobileWalletTest {
     private fun unusedKeyGenerator(): suspend (MobileWalletKeyType) -> ManagedKeyMaterial =
         { error("This test must not bootstrap a new key") }
 
-    /**
-     * A pre-authorized offer carried inline, so resolving it needs no offer fetch of its own.
-     *
-     * [MobileWalletIssuanceRequest] accepts only a URL, which is the shape the wallet receives from a
-     * QR code or a deep link.
-     */
+    /** A pre-authorized offer carried inline, so resolving it needs no offer fetch of its own. */
     private fun preAuthorizedOfferUrl(): String = URLBuilder(CROSS_DEVICE_CREDENTIAL_OFFER_URL).apply {
         parameters.append(
             "credential_offer",
@@ -1726,8 +1701,8 @@ class MobileWalletTest {
     /**
      * The smallest OpenID4VCI issuer that answers one pre-authorized request with one credential.
      *
-     * Nothing beyond the four endpoints the flow reaches is served, so a request the wallet should
-     * not make surfaces as a 404 rather than being silently absorbed.
+     * Only the endpoints the flow reaches are served, so a request the wallet should not make surfaces
+     * as a 404 instead of being silently absorbed.
      */
     private fun mockIssuer(): HttpClient = HttpClient(MockEngine) {
         engine {
@@ -1842,9 +1817,8 @@ class MobileWalletTest {
     /**
      * The messages of a throwable and every cause beneath it.
      *
-     * Annex C wraps reader-authentication failures in a positional message, so an assertion that only
-     * read the outermost message would pass for any rejection and prove nothing about which check
-     * fired.
+     * Annex C wraps reader-authentication failures in a positional message, so matching the outermost
+     * message alone would pass for any rejection and prove nothing about which check fired.
      */
     private fun Throwable.causeChainMessages(): List<String> =
         generateSequence(this) { it.cause }.mapNotNull { it.message }.toList()
