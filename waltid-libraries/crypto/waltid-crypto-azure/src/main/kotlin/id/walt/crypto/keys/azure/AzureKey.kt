@@ -76,8 +76,18 @@ class AzureKey(
 
             val cryptoClient = KeyVaultClientFactory.cryptoClient(config.auth.keyVaultUrl, id)
             val signResult = cryptoClient.sign(azureSignatureAlgorithm, digest).awaitSingle()
+            val rawSignature = signResult.signature
+                ?: throw SigningException("Azure Key Vault returned null signature")
 
-            signResult.signature ?: throw SigningException("Azure Key Vault returned null signature")
+            // Azure Key Vault returns EC signatures in IEEE P1363 (R||S) format, but the
+            // waltid-crypto contract for signRaw is ASN.1 DER for EC (matches JWKKey, AWSKey,
+            // OCIKey, and AzureKeyRestApi). Consumers like BouncyCastle's ContentSigner used
+            // for X.509 issuance decode the result as DER, so convert here to keep parity.
+            if (keyType in KeyTypes.EC_KEYS) {
+                EccUtils.convertP1363toDER(rawSignature)
+            } else {
+                rawSignature
+            }
         } catch (e: ResourceNotFoundException) {
             throw KeyNotFoundException(id, "Key not found in Azure Key Vault", e)
         } catch (e: com.azure.core.exception.HttpResponseException) {
@@ -101,9 +111,14 @@ class AzureKey(
         val header = Json.encodeToString(appendedHeader).encodeToByteArray().encodeToBase64Url()
         val payload = plaintext.encodeToBase64Url()
 
-        var rawSignature = signRaw("$header.$payload".encodeToByteArray())
+        val rawDerOrRsaSignature = signRaw("$header.$payload".encodeToByteArray())
+        val jwsSignature = if (keyType in KeyTypes.EC_KEYS) {
+            EccUtils.convertDERtoIEEEP1363(rawDerOrRsaSignature)
+        } else {
+            rawDerOrRsaSignature
+        }
 
-        val encodedSignature = rawSignature.encodeToBase64Url()
+        val encodedSignature = jwsSignature.encodeToBase64Url()
         return "$header.$payload.$encodedSignature"
     }
 
