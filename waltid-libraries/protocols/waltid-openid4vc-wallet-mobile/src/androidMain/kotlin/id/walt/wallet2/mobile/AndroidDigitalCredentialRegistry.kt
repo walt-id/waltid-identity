@@ -252,7 +252,9 @@ public class AndroidDigitalCredentialRegistry(
     }
 
     private companion object {
-        private const val ANNEX_C_MATCHER_ASSET = "identitycredentialmatcher.wasm"
+        // Vendored, not a dependency; package-qualified so it cannot collide with another library's
+        // copy in the application asset merge. See ANNEX-C-MATCHER.md.
+        private const val ANNEX_C_MATCHER_ASSET = "id/walt/wallet2/mobile/identitycredentialmatcher.wasm"
         private const val MAX_MATCHER_VALUE_LENGTH = 128
         private const val SIGNED_UNSUPPORTED_REASON =
             "The wallet accepts only the unsigned OpenID4VP Digital Credentials protocol"
