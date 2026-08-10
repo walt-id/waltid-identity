@@ -31,6 +31,10 @@ import kotlinx.serialization.json.longOrNull
 /**
  * Android Credential Manager metadata registry adapter.
  *
+ * Credential Manager owns the registered metadata: a registry published here survives wallet process
+ * death and device reboot, and is served to a caller without the wallet ever being launched, so the
+ * wallet keeps no copy to replay at startup. Verified on API 37 with Google Play services 26.29.32.
+ *
  * @property capabilities Current Android platform and registry availability.
  */
 public class AndroidDigitalCredentialRegistry(
@@ -38,7 +42,6 @@ public class AndroidDigitalCredentialRegistry(
 ) : MobileWalletCredentialRegistry {
     private val applicationContext: Context = context.applicationContext
     private val registryManager: RegistryManager = RegistryManager.create(applicationContext)
-    private val projectionStore = AndroidCredentialRegistryProjectionStore(applicationContext)
     private val icon: Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
     private var registrationAvailable: Boolean = false
 
@@ -114,36 +117,6 @@ public class AndroidDigitalCredentialRegistry(
             registrationAvailable = false
             return MobileWalletCredentialRegistrationResult(false, 0, "Credential Manager requires API 23")
         }
-        val projectionRecords = records.map { it.toProjectionRecord() }
-        return replaceProjection(registryId, projectionRecords, persistProjection = true)
-    }
-
-    private suspend fun replaceProjection(
-        registryId: String,
-        records: List<AndroidCredentialRegistryProjectionRecord>,
-        persistProjection: Boolean,
-    ): MobileWalletCredentialRegistrationResult {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            registrationAvailable = false
-            return MobileWalletCredentialRegistrationResult(false, 0, "Credential Manager requires API 23")
-        }
-        if (persistProjection) {
-            // An empty desired state means the wallet holds nothing to project - after deleteWallet,
-            // for instance. Storing an empty projection would leave its encrypted blob and its
-            // AndroidKeyStore key behind indefinitely, so drop both instead.
-            val persist = runCatching {
-                if (records.isEmpty()) projectionStore.clear(registryId)
-                else projectionStore.replace(registryId, records)
-            }
-            persist.onFailure { error ->
-                registrationAvailable = false
-                return MobileWalletCredentialRegistrationResult(
-                    available = false,
-                    registeredEntryCount = 0,
-                    reason = error.message ?: "Credential registry projection could not be persisted",
-                )
-            }
-        }
         val entries = records.map { it.toAndroidEntry() }
         return runCatching {
             // Registering only the unsigned protocol makes Credential Manager ignore signed and
@@ -158,7 +131,7 @@ public class AndroidDigitalCredentialRegistry(
             registryManager.registerCredentials(
                 AndroidAnnexCRegistry(
                     id = "$registryId-annex-c",
-                    credentials = encodeAnnexCProjectionDatabase(records),
+                    credentials = encodeAnnexCCredentialDatabase(records),
                     matcher = applicationContext.assets.open(ANNEX_C_MATCHER_ASSET).use { it.readBytes() },
                 )
             )
@@ -174,49 +147,7 @@ public class AndroidDigitalCredentialRegistry(
         }
     }
 
-    /**
-     * Replays encrypted desired state after a process start without opening wallet credentials.
-     * Android hosts should invoke this from application startup, before presenting the wallet UI.
-     */
-    public suspend fun restorePersistedRegistrations(): List<MobileWalletCredentialRegistrationResult> {
-        val projections = runCatching { projectionStore.readAll() }.getOrElse { error ->
-            registrationAvailable = false
-            return listOf(
-                MobileWalletCredentialRegistrationResult(
-                    available = false,
-                    registeredEntryCount = 0,
-                    reason = error.message ?: "Credential registry projection could not be restored",
-                )
-            )
-        }
-        return projections.map { projection ->
-            replaceProjection(
-                registryId = projection.registryId,
-                records = projection.records,
-                persistProjection = false,
-            )
-        }
-    }
-
-    private fun MobileWalletCredentialRegistryRecord.toProjectionRecord(): AndroidCredentialRegistryProjectionRecord =
-        AndroidCredentialRegistryProjectionRecord(
-            registryEntryId = registryEntryId,
-            format = format,
-            type = type,
-            fields = fields.map { field ->
-                AndroidCredentialRegistryProjectionField(
-                    path = field.path,
-                    valueJson = field.valueJson,
-                    selectivelyDisclosable = field.selectivelyDisclosable,
-                )
-            },
-            displayName = displayName,
-        )
-
-    internal fun MobileWalletCredentialRegistryRecord.toAndroidEntry(): DigitalCredentialEntry =
-        toProjectionRecord().toAndroidEntry()
-
-    internal fun AndroidCredentialRegistryProjectionRecord.toAndroidEntry(): DigitalCredentialEntry {
+    internal fun MobileWalletCredentialRegistryRecord.toAndroidEntry(): DigitalCredentialEntry {
         val display = setOf(
             VerificationEntryDisplayProperties(
                 displayName,
@@ -263,8 +194,8 @@ public class AndroidDigitalCredentialRegistry(
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    internal fun encodeAnnexCProjectionDatabase(
-        records: List<AndroidCredentialRegistryProjectionRecord>,
+    internal fun encodeAnnexCCredentialDatabase(
+        records: List<MobileWalletCredentialRegistryRecord>,
     ): ByteArray = coseCompliantCbor.encodeToByteArray(
         AndroidAnnexCCredentialDatabase(
             protocols = listOf(MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C),
@@ -296,10 +227,6 @@ public class AndroidDigitalCredentialRegistry(
                 },
         )
     )
-
-    internal fun encodeAnnexCCredentialDatabase(
-        records: List<MobileWalletCredentialRegistryRecord>,
-    ): ByteArray = encodeAnnexCProjectionDatabase(records.map { it.toProjectionRecord() })
 
     private fun String.toPlatformValue(): Any = Json.parseToJsonElement(this).toPlatformValue()
 
