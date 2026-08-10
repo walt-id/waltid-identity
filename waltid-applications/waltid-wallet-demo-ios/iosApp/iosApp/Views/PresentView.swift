@@ -1,4 +1,5 @@
 import SwiftUI
+import WalletDemoSharingUI
 import WebKit
 import WalletSDK
 
@@ -55,11 +56,10 @@ struct PresentView: View {
                             .accessibilityIdentifier(WalletAccessibilityID.presentationNewButton)
                     }
 
-                    if let preview = viewModel.presentationPreview {
-                        PresentationReviewView(
-                            preview: preview,
-                            selectedCredentialOptions: viewModel.selectedPresentationCredentialOptions,
-                            selectedDisclosureOptions: viewModel.selectedPresentationDisclosureOptions,
+                    if let review = viewModel.presentationSharingReview {
+                        SharingReviewView(
+                            review: review,
+                            selection: viewModel.presentationSharingSelection,
                             selectionComplete: viewModel.presentationCredentialSelectionComplete,
                             isLoading: !viewModel.presentationReviewEnabled,
                             isReadOnly: viewModel.presentationCompleted,
@@ -67,6 +67,8 @@ struct PresentView: View {
                             onToggleDisclosure: viewModel.togglePresentationDisclosure,
                             onCredentialSelected: { detailsID in selectedDetailsID = detailsID },
                             onSubmit: viewModel.submitPresentation,
+                            // Normal OpenID4VP can tell the verifier it was refused, so Reject is
+                            // offered alongside dismissing the review locally.
                             onReject: viewModel.rejectPresentation,
                             onCancel: viewModel.cancelPresentationReview
                         )
@@ -153,7 +155,7 @@ private struct PresentationErrorView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("This request cannot be completed")
                 .font(.headline)
-            VerifierReviewSections(request: error.request)
+            SharingRequestSections(request: error.request.sharingRequest())
             Text(error.message)
             Text("OpenID4VP error: \(error.code.rawValue)")
                 .font(.caption)

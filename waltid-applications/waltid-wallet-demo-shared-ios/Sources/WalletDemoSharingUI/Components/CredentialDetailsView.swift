@@ -1,10 +1,14 @@
 import SwiftUI
 import WalletSDK
 
-struct CredentialDetailsView: View {
-    let details: CredentialDetails
+public struct CredentialDetailsView: View {
+    public let details: CredentialDetails
 
-    var body: some View {
+    public init(details: CredentialDetails) {
+        self.details = details
+    }
+
+    public var body: some View {
         let systemInfoGroup = details.systemInfoGroup
 
         VStack(alignment: .leading, spacing: 12) {

@@ -1,7 +1,7 @@
 import Foundation
 
-enum CredentialTypeIdentifier {
-    static func token(_ rawValue: String) -> String? {
+public enum CredentialTypeIdentifier {
+    public static func token(_ rawValue: String) -> String? {
         let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return nil }
 

@@ -59,14 +59,14 @@ private struct NormalizedClaimKey: Hashable {
     }
 }
 
-enum CredentialDisplayVocabulary {
-    static let genericVerifiableCredentialType = "VerifiableCredential"
-    static let requestedDisclosuresTitle = "Requested disclosures"
-    static let transactionDataTitle = "Transaction data"
-    static let transactionDataTypeLabel = "Type"
-    static let transactionDataCredentialQueriesLabel = "Credential queries"
-    static let transactionDataDetailsLabel = "Details"
-    static let transactionDataRequestDataLabel = "Request data"
+public enum CredentialDisplayVocabulary {
+    public static let genericVerifiableCredentialType = "VerifiableCredential"
+    public static let requestedDisclosuresTitle = "Requested disclosures"
+    public static let transactionDataTitle = "Transaction data"
+    public static let transactionDataTypeLabel = "Type"
+    public static let transactionDataCredentialQueriesLabel = "Credential queries"
+    public static let transactionDataDetailsLabel = "Details"
+    public static let transactionDataRequestDataLabel = "Request data"
 
     private static let givenNameClaim = "given_name"
     private static let familyNameClaim = "family_name"
@@ -175,7 +175,7 @@ enum CredentialDisplayVocabulary {
         "termsOfUse"
     ].map(NormalizedClaimKey.init))
 
-    static func groupKind(for components: [String], format: String? = nil) -> ClaimGroupKind {
+    public static func groupKind(for components: [String], format: String? = nil) -> ClaimGroupKind {
         let path = ClaimPath(components: components)
         if let semantics = MdocClaimDisplaySemantics.describe(format: format, path: components) {
             switch semantics.group {
@@ -202,11 +202,11 @@ enum CredentialDisplayVocabulary {
         return .other
     }
 
-    static func humanizedLabel(_ key: String) -> String {
+    public static func humanizedLabel(_ key: String) -> String {
         descriptor(for: key)?.label ?? ClaimLabelFormatter.humanize(key)
     }
 
-    static func disclosureLabel(name: String?, path: String) -> String {
+    public static func disclosureLabel(name: String?, path: String) -> String {
         if let name = name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
             return humanizedLabel(name)
         }
@@ -216,7 +216,7 @@ enum CredentialDisplayVocabulary {
         return path
     }
 
-    static func transactionDataLabel(_ field: DisplayTransactionDataField) -> String {
+    public static func transactionDataLabel(_ field: DisplayTransactionDataField) -> String {
         switch field {
         case .type: return transactionDataTypeLabel
         case .credentialQueryIDs: return transactionDataCredentialQueriesLabel
@@ -225,11 +225,11 @@ enum CredentialDisplayVocabulary {
         }
     }
 
-    static func roles(for components: [String]) -> Set<ClaimRole> {
+    public static func roles(for components: [String]) -> Set<ClaimRole> {
         roles(for: ClaimPath(components: components))
     }
 
-    static func claimPathCompare(_ lhs: [String], _ rhs: [String], format: String? = nil) -> ComparisonResult {
+    public static func claimPathCompare(_ lhs: [String], _ rhs: [String], format: String? = nil) -> ComparisonResult {
         let lhsSemanticOrder = MdocClaimDisplaySemantics.sortOrder(format: format, path: lhs)
         let rhsSemanticOrder = MdocClaimDisplaySemantics.sortOrder(format: format, path: rhs)
         if lhsSemanticOrder < rhsSemanticOrder { return .orderedAscending }
@@ -265,11 +265,11 @@ enum CredentialDisplayVocabulary {
         return roles
     }
 
-    static func isGenericCredentialType(_ value: String) -> Bool {
+    public static func isGenericCredentialType(_ value: String) -> Bool {
         CredentialTypeIdentifier.token(value)?.compare(genericVerifiableCredentialType, options: .caseInsensitive) == .orderedSame
     }
 
-    static func readableCredentialType(_ value: String) -> String? {
+    public static func readableCredentialType(_ value: String) -> String? {
         guard let token = CredentialTypeIdentifier.token(value),
             !isGenericCredentialType(token) else {
             return nil
@@ -341,11 +341,11 @@ enum CredentialDisplayVocabulary {
     private static let unknownClaimDisplayOrder = 10_000
 }
 
-enum MdocClaimDisplayGroup: String, Hashable {
+public enum MdocClaimDisplayGroup: String, Hashable {
     case ageAttestations = "Age attestations"
     case travelDocumentData = "Travel document data"
 
-    var order: Int {
+    public var order: Int {
         switch self {
         case .ageAttestations: return 1
         case .travelDocumentData: return 2
@@ -353,19 +353,19 @@ enum MdocClaimDisplayGroup: String, Hashable {
     }
 }
 
-enum MdocClaimValueKind {
+public enum MdocClaimValueKind {
     case bool
     case binary
     case other
 }
 
-struct MdocClaimDisplaySemantics {
-    let group: MdocClaimDisplayGroup
-    let label: String
-    let sortOrder: Int
-    let valueKind: MdocClaimValueKind
+public struct MdocClaimDisplaySemantics {
+    public let group: MdocClaimDisplayGroup
+    public let label: String
+    public let sortOrder: Int
+    public let valueKind: MdocClaimValueKind
 
-    static func describe(format: String?, path: [String]) -> MdocClaimDisplaySemantics? {
+    public static func describe(format: String?, path: [String]) -> MdocClaimDisplaySemantics? {
         guard format == mdocFormat else { return nil }
 
         if path.contains(where: ageAttestationNamespaces.contains),
@@ -414,7 +414,7 @@ struct MdocClaimDisplaySemantics {
         )
     }
 
-    static func sortOrder(format: String?, path: [String]) -> Int {
+    public static func sortOrder(format: String?, path: [String]) -> Int {
         describe(format: format, path: path)?.sortOrder ?? .max
     }
 

@@ -1,9 +1,13 @@
 import SwiftUI
 
-struct ClaimGroupView: View {
-    let group: ClaimGroup
+public struct ClaimGroupView: View {
+    public let group: ClaimGroup
 
-    var body: some View {
+    public init(group: ClaimGroup) {
+        self.group = group
+    }
+
+    public var body: some View {
         if !group.items.isEmpty {
             ReviewMetadataSection(
                 title: group.title,

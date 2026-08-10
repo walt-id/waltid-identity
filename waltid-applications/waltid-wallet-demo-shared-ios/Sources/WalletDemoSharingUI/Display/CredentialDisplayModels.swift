@@ -1,18 +1,18 @@
 import Foundation
 import WalletSDK
 
-struct CredentialDetails: Equatable, Identifiable {
-    let id: String
-    let title: String
-    let issuer: String?
-    let subject: String?
-    let format: String
-    let addedAt: Date?
-    let groups: [ClaimGroup]
-    let metadataJSON: String?
-    let issuerDisplay: MetadataDisplay?
+public struct CredentialDetails: Equatable, Identifiable {
+    public let id: String
+    public let title: String
+    public let issuer: String?
+    public let subject: String?
+    public let format: String
+    public let addedAt: Date?
+    public let groups: [ClaimGroup]
+    public let metadataJSON: String?
+    public let issuerDisplay: MetadataDisplay?
 
-    init(
+    public init(
         id: String,
         title: String,
         issuer: String?,
@@ -36,31 +36,31 @@ struct CredentialDetails: Equatable, Identifiable {
     }
 }
 
-struct ClaimGroup: Equatable, Identifiable {
-    let title: String
-    let items: [ClaimItem]
-    let initiallyExpanded: Bool
+public struct ClaimGroup: Equatable, Identifiable {
+    public let title: String
+    public let items: [ClaimItem]
+    public let initiallyExpanded: Bool
 
-    init(title: String, items: [ClaimItem], initiallyExpanded: Bool = true) {
+    public init(title: String, items: [ClaimItem], initiallyExpanded: Bool = true) {
         self.title = title
         self.items = items
         self.initiallyExpanded = initiallyExpanded
     }
 
-    var id: String { title }
+    public var id: String { title }
 }
 
-struct ClaimItem: Equatable, Identifiable {
-    let path: ClaimItemPath
-    let pathComponents: [String]
-    let label: String
-    let value: DisplayValue
-    let rawValue: String?
-    let roles: Set<ClaimRole>
+public struct ClaimItem: Equatable, Identifiable {
+    public let path: ClaimItemPath
+    public let pathComponents: [String]
+    public let label: String
+    public let value: DisplayValue
+    public let rawValue: String?
+    public let roles: Set<ClaimRole>
 
-    var id: String { path.id }
+    public var id: String { path.id }
 
-    init(
+    public init(
         path: ClaimItemPath,
         pathComponents: [String] = [],
         label: String,
@@ -77,7 +77,7 @@ struct ClaimItem: Equatable, Identifiable {
     }
 }
 
-enum DisplayValue: Equatable {
+public enum DisplayValue: Equatable {
     case text(String)
     case number(String)
     case bool(Bool)
@@ -89,14 +89,14 @@ enum DisplayValue: Equatable {
     case null
 }
 
-struct ClaimItemPath: Hashable {
+public struct ClaimItemPath: Hashable {
     private let renderedID: RenderedClaimPath
 
-    var id: String {
+    public var id: String {
         renderedID.value
     }
 
-    init(id: String) {
+    public init(id: String) {
         self.renderedID = .raw(id)
     }
 
@@ -104,23 +104,23 @@ struct ClaimItemPath: Hashable {
         self.renderedID = renderedID
     }
 
-    func indexedChild(_ index: Int) -> ClaimItemPath {
+    public func indexedChild(_ index: Int) -> ClaimItemPath {
         ClaimItemPath(renderedID: renderedID.indexed(index))
     }
 
-    func child(_ name: String) -> ClaimItemPath {
+    public func child(_ name: String) -> ClaimItemPath {
         ClaimItemPath(renderedID: renderedID.child(name))
     }
 
-    static func root() -> ClaimItemPath {
+    public static func root() -> ClaimItemPath {
         ClaimItemPath(renderedID: .raw(DisplayClaimPathRoot.root.id))
     }
 
-    static func topLevel(_ name: String) -> ClaimItemPath {
+    public static func topLevel(_ name: String) -> ClaimItemPath {
         ClaimItemPath(renderedID: .raw(name))
     }
 
-    static func transactionData(index: Int, field: DisplayTransactionDataField) -> ClaimItemPath {
+    public static func transactionData(index: Int, field: DisplayTransactionDataField) -> ClaimItemPath {
         ClaimItemPath(
             renderedID: RenderedClaimPath
                 .raw(DisplayClaimPathRoot.transactionData.id)
@@ -161,7 +161,7 @@ private struct RenderedClaimPath: Hashable {
     }
 }
 
-enum ClaimGroupKind: CaseIterable {
+public enum ClaimGroupKind: CaseIterable {
     case personal
     case ageAttestations
     case address
@@ -169,7 +169,7 @@ enum ClaimGroupKind: CaseIterable {
     case travelDocumentData
     case technical
 
-    var title: String {
+    public var title: String {
         switch self {
         case .personal: return "Personal details"
         case .ageAttestations: return "Age attestations"
@@ -180,7 +180,7 @@ enum ClaimGroupKind: CaseIterable {
         }
     }
 
-    var order: Int {
+    public var order: Int {
         switch self {
         case .personal: return 0
         case .ageAttestations: return 1
@@ -191,7 +191,7 @@ enum ClaimGroupKind: CaseIterable {
         }
     }
 
-    var initiallyExpanded: Bool {
+    public var initiallyExpanded: Bool {
         switch self {
         case .ageAttestations, .travelDocumentData, .technical: return false
         case .personal, .address, .other: return true
@@ -199,7 +199,7 @@ enum ClaimGroupKind: CaseIterable {
     }
 }
 
-enum ClaimRole: Hashable {
+public enum ClaimRole: Hashable {
     case givenName
     case familyName
     case temporal
@@ -208,45 +208,45 @@ enum ClaimRole: Hashable {
     case credentialType
 }
 
-enum CredentialDisplayText {
-    static let unknown = "Unknown"
+public enum CredentialDisplayText {
+    public static let unknown = "Unknown"
 
-    static func expires(_ date: String) -> String { "Expires \(date)" }
-    static func added(_ date: String) -> String { "Added \(date)" }
+    public static func expires(_ date: String) -> String { "Expires \(date)" }
+    public static func added(_ date: String) -> String { "Added \(date)" }
 }
 
-struct DisplayClaimPath {
-    let itemPath: ClaimItemPath
-    let components: [String]
+public struct DisplayClaimPath {
+    public let itemPath: ClaimItemPath
+    public let components: [String]
 
-    static func topLevel(_ name: String) -> DisplayClaimPath {
+    public static func topLevel(_ name: String) -> DisplayClaimPath {
         DisplayClaimPath(itemPath: ClaimItemPath.topLevel(name), components: [name])
     }
 
-    static func transactionData(index: Int, field: DisplayTransactionDataField) -> DisplayClaimPath {
+    public static func transactionData(index: Int, field: DisplayTransactionDataField) -> DisplayClaimPath {
         DisplayClaimPath(
             itemPath: ClaimItemPath.transactionData(index: index, field: field),
             components: [DisplayClaimPathRoot.transactionData.id, field.id]
         )
     }
 
-    func child(_ child: String) -> DisplayClaimPath {
+    public func child(_ child: String) -> DisplayClaimPath {
         DisplayClaimPath(
             itemPath: itemPath.child(child),
             components: components + [child]
         )
     }
 
-    func indexed(_ index: Int) -> DisplayClaimPath {
+    public func indexed(_ index: Int) -> DisplayClaimPath {
         DisplayClaimPath(itemPath: itemPath.indexedChild(index), components: components)
     }
 }
 
-enum DisplayClaimPathRoot {
+public enum DisplayClaimPathRoot {
     case root
     case transactionData
 
-    var id: String {
+    public var id: String {
         switch self {
         case .root: return "$"
         case .transactionData: return "transactionData"
@@ -254,13 +254,13 @@ enum DisplayClaimPathRoot {
     }
 }
 
-enum DisplayTransactionDataField {
+public enum DisplayTransactionDataField {
     case type
     case credentialQueryIDs
     case details
     case raw
 
-    var id: String {
+    public var id: String {
         switch self {
         case .type: return "type"
         case .credentialQueryIDs: return "credentialQueryIds"

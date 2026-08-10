@@ -2,18 +2,18 @@ import SwiftUI
 import UIKit
 import WalletSDK
 
-struct CredentialCardView: View {
-    let details: CredentialDetails
+public struct CredentialCardView: View {
+    public let details: CredentialDetails
 
-    init(details: CredentialDetails) {
+    public init(details: CredentialDetails) {
         self.details = details
     }
 
-    init(credential: Credential) {
+    public init(credential: Credential) {
         self.details = CredentialDisplayNormalizer.details(for: credential)
     }
 
-    var body: some View {
+    public var body: some View {
         HStack(alignment: .top, spacing: 12) {
             CredentialPortraitView(summary: details.cardSummary, size: 56)
 
@@ -53,11 +53,16 @@ struct CredentialCardView: View {
     }
 }
 
-struct CredentialCardButton: View {
-    let details: CredentialDetails
-    let action: () -> Void
+public struct CredentialCardButton: View {
+    public let details: CredentialDetails
+    public let action: () -> Void
 
-    var body: some View {
+    public init(details: CredentialDetails, action: @escaping () -> Void) {
+        self.details = details
+        self.action = action
+    }
+
+    public var body: some View {
         Button(action: action) {
             CredentialCardView(details: details)
         }
@@ -67,11 +72,16 @@ struct CredentialCardButton: View {
     }
 }
 
-struct CredentialPortraitView: View {
-    let summary: CredentialCardSummary
-    let size: CGFloat
+public struct CredentialPortraitView: View {
+    public let summary: CredentialCardSummary
+    public let size: CGFloat
 
-    var body: some View {
+    public init(summary: CredentialCardSummary, size: CGFloat) {
+        self.summary = summary
+        self.size = size
+    }
+
+    public var body: some View {
         Group {
             if let data = summary.portraitData, let image = UIImage(data: data) {
                 Image(uiImage: image)

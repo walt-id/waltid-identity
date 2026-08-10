@@ -1,22 +1,22 @@
 import Foundation
 
-struct ClaimPathExpression {
-    enum Segment: Equatable {
+public struct ClaimPathExpression {
+    public enum Segment: Equatable {
         case key(String)
         case index(Int)
         case wildcard
     }
 
-    let segments: [Segment]
+    public let segments: [Segment]
 
-    var leafKey: String? {
+    public var leafKey: String? {
         segments.reversed().compactMap { segment in
             if case .key(let value) = segment { return value }
             return nil
         }.first
     }
 
-    static func parse(_ rawValue: String) -> ClaimPathExpression {
+    public static func parse(_ rawValue: String) -> ClaimPathExpression {
         let path = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         if let jsonArrayPath = parseJSONArrayPath(path) {
             return jsonArrayPath
