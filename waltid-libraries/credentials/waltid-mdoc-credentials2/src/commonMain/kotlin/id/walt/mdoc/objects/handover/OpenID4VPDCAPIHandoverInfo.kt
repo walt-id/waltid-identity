@@ -11,7 +11,7 @@ import kotlinx.serialization.cbor.CborObjectAsArray
 @CborObjectAsArray
 data class OpenID4VPDCAPIHandoverInfo(
     /** verifier's origin - without 'origin:' prefix (e.g., https://verifier.example.com) */
-    val origin: String?,
+    val origin: String,
 
     /** nonce of authorization request*/
     val nonce: String,
