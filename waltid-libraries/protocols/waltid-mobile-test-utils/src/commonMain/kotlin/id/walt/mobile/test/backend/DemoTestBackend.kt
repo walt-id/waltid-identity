@@ -35,6 +35,7 @@ object DemoTestBackend {
     const val TRANSACTION_DATA_PROFILES_URL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
     private const val EUDI_PID_SD_JWT_VCT = "$ISSUER_BASE_URL/openid4vci/urn:eudi:pid:1"
     private const val PAYMENT_AUTHORIZATION_TYPE = "org.waltid.transaction-data.payment-authorization"
+    // The fields the currently deployed profile declares, not the ones #2062 configures.
     private val requiredPaymentAuthorizationFields = setOf("amount", "currency", "payee")
 
     val scenarios = listOf(
@@ -183,7 +184,8 @@ object DemoTestBackend {
      *
      * The profile is fetched rather than assumed, so a deployment that stops declaring `amount`,
      * `currency` or `payee` fails here instead of producing an item whose fields a test cannot find on
-     * screen for a reason it would misattribute to the wallet.
+     * screen for a reason it would misattribute to the wallet. `payee` is required only for as long as
+     * the deployed profile is the pre-#2062 one.
      */
     suspend fun paymentAuthorizationTransactionData(credentialId: String): JsonObject {
         val fields = transactionDataProfileFields(PAYMENT_AUTHORIZATION_TYPE)
@@ -378,18 +380,15 @@ object DemoTestBackend {
         putJsonArray("transaction_data_hashes_alg") {
             add(JsonPrimitive("sha-256"))
         }
-        // TODO: switch PAYMENT_AUTHORIZATION_TYPE to `payment_details` with the
-        //  `payee_name`/`payment_amount`/`payment_currency` field names, and drop `merchant_name`, once
-        //  that profile is deployed to wallet.demo.walt.id and verifier2.demo.walt.id. The item is
-        //  resolved from the deployed profile list at run time.
-        //
-        // Not a profile field, and not optional on Android: AndroidX's default OpenID4VP matcher treats a
-        // single transaction_data item as a payment unconditionally, and for an unrecognised type reads
-        // `merchant_name` and hands it to Credential Manager, which rejects a null one ("Merchant name
-        // should not be null") and produces no candidate at all.
+        // Credential Manager consumes merchant_name/amount, so merchant_name is sent whether or not the
+        // deployed profile declares it yet.
         put("merchant_name", JsonPrimitive("ACME Corp"))
         putProfileField(fields, "amount", "42.00")
         putProfileField(fields, "currency", "EUR")
+        // TODO: Remove `payee` once the transaction-data profile from #2062 is deployed to
+        //  wallet.demo.walt.id and verifier2.demo.walt.id. The repository config already declares
+        //  merchant_name/amount/currency; the deployed one still declares payee, and the fields are
+        //  resolved from it at run time.
         putProfileField(fields, "payee", "ACME Corp")
     }
 

@@ -42,9 +42,9 @@ internal object WalletDemoSharingReviewFixtures {
                         type = "org.waltid.transaction-data.payment-authorization",
                         displayName = "Payment Authorization",
                         credentialQueryIds = listOf("pid"),
-                        supportedFields = listOf("amount", "currency", "payee"),
-                        rawJson = """{"amount":"42.00","currency":"EUR","payee":"ACME Corp"}""",
-                        detailsJson = """{"amount":"42.00","currency":"EUR","payee":"ACME Corp"}""",
+                        supportedFields = listOf("merchant_name", "amount", "currency"),
+                        rawJson = """{"merchant_name":"ACME Corp","amount":"42.00","currency":"EUR"}""",
+                        detailsJson = """{"merchant_name":"ACME Corp","amount":"42.00","currency":"EUR"}""",
                     ),
                 )
             ),
