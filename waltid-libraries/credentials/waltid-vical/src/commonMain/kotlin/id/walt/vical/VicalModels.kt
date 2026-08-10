@@ -2,16 +2,11 @@
 
 package id.walt.vical
 
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.jose.Jwk
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toStoredSoftwareKey
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.vical.serializers.VicalInstantSerializer
-import id.walt.x509.CertificateDer
-import id.walt.x509.crypto2PublicJwk
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -20,6 +15,7 @@ import kotlinx.serialization.cbor.ByteString
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Instant
 import id.walt.crypto2.keys.Key as Crypto2Key
+import kotlinx.io.bytestring.ByteString as KotlinByteString
 
 /**
  * Represents the payload of a VICAL. This data class is aligned with the CDDL structure
@@ -54,7 +50,10 @@ data class VicalData(
         |    Issue id: ${vicalIssueID}
         |    Next update: ${nextUpdate}
         |     
-        |    ${certificateInfos.mapIndexed { idx, cert -> cert.toString().prependIndent("    ").drop(4) }.joinToString("\n")}
+        |    ${
+            certificateInfos.mapIndexed { idx, cert -> cert.toString().prependIndent("    ").drop(4) }
+                .joinToString("\n")
+        }
         |--- End of VICAL ---
         """.trimMargin()
 }
@@ -108,11 +107,9 @@ data class CertificateInfo(
     @Deprecated("Use getCrypto2Key()")
     suspend fun getKey() = JWKKey.importFromDerCertificate(certificate)
 
-    suspend fun getCrypto2Key(): Crypto2Key {
-        val jwk = CertificateDer(certificate).crypto2PublicJwk()
-        val stored = jwk.toStoredSoftwareKey(KeyId(Jwk.sha256Thumbprint(jwk)), setOf(KeyUsage.VERIFY))
-        return crypto2Runtime.restore(stored)
-    }
+    suspend fun getCrypto2Key(): Crypto2Key =
+        X509CertificateUtil.parseCertificateDerEncoded(KotlinByteString(certificate))
+            .data.subjectPublicKeyInfo.restore(crypto2Runtime)
 
     // Auto-generated equals/hashCode are not sufficient for ByteArray properties.
     override fun equals(other: Any?): Boolean {

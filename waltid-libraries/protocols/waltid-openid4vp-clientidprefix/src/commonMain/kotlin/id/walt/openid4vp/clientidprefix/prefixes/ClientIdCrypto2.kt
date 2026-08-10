@@ -12,7 +12,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
 internal object ClientIdCrypto2 {
-    private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+    val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     suspend fun verify(jws: String, key: Key) {
         val algorithm = CompactJws.decodeUnverified(jws).algorithm

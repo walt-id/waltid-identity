@@ -14,6 +14,8 @@ class InMemoryTrustStore(trustedCertificates: List<X509Certificate> = emptyList(
         }
     }
 
+    fun isEmpty(): Boolean = internalSubjectDnMap.isEmpty()
+
     override fun findCertificateBySubjectDn(subjectDn: String): List<X509Certificate> =
         internalSubjectDnMap[subjectDn]?.values?.toList()
             ?: emptyList()
