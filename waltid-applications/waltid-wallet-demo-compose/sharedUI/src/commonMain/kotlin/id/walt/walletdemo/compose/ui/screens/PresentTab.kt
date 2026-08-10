@@ -22,8 +22,9 @@ import id.walt.walletdemo.compose.logic.presentationCredentialSelectionComplete
 import id.walt.walletdemo.compose.logic.presentationPreviewActionEnabled
 import id.walt.walletdemo.compose.logic.presentationReviewEnabled
 import id.walt.walletdemo.compose.logic.presentationUrlEntryEnabled
+import id.walt.walletdemo.compose.logic.toSharingReview
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
-import id.walt.walletdemo.compose.ui.components.PresentationReviewSection
+import id.walt.walletdemo.compose.ui.components.SharingReviewSection
 import id.walt.walletdemo.compose.ui.components.PresentationErrorSection
 import id.walt.walletdemo.compose.ui.components.UrlActionSection
 
@@ -84,8 +85,8 @@ internal fun PresentTab(
         }
 
         state.presentationPreview?.let { preview ->
-            PresentationReviewSection(
-                preview = preview,
+            SharingReviewSection(
+                review = preview.toSharingReview(),
                 selectedCredentialOptions = state.selectedPresentationCredentialOptions,
                 selectedDisclosureOptions = state.selectedPresentationDisclosureOptions,
                 selectionComplete = state.presentationCredentialSelectionComplete(),
