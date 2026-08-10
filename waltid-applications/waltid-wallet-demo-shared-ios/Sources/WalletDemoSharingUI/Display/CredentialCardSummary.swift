@@ -1,18 +1,18 @@
 import Foundation
 
-struct CredentialCardSummary {
-    let title: String
-    let credentialType: String?
-    let holderName: String?
-    let issuer: String
-    let dateText: String?
-    let validityText: String?
-    let portraitData: Data?
-    let portraitMimeType: String?
+public struct CredentialCardSummary {
+    public let title: String
+    public let credentialType: String?
+    public let holderName: String?
+    public let issuer: String
+    public let dateText: String?
+    public let validityText: String?
+    public let portraitData: Data?
+    public let portraitMimeType: String?
 }
 
 extension CredentialDetails {
-    var cardSummary: CredentialCardSummary {
+    public var cardSummary: CredentialCardSummary {
         let items = groups.flatMap(\.items)
         let holderName = [
             firstText(in: items, role: .givenName),

@@ -1,7 +1,7 @@
 import Foundation
 
-enum CredentialDisplayValueDecoder {
-    static func decodedValue(
+public enum CredentialDisplayValueDecoder {
+    public static func decodedValue(
         for value: String,
         path: DisplayClaimPath,
         renderJSON: (CredentialDisplayJSONValue, DisplayClaimPath) -> DisplayValue
@@ -22,7 +22,7 @@ enum CredentialDisplayValueDecoder {
         return .decodedText(decoded)
     }
 
-    static func imageDisplayValue(for list: [CredentialDisplayJSONValue], roles: Set<ClaimRole>) -> DisplayValue? {
+    public static func imageDisplayValue(for list: [CredentialDisplayJSONValue], roles: Set<ClaimRole>) -> DisplayValue? {
         guard roles.contains(.image),
               let data = byteArrayData(from: list),
               let mimeType = ImageBytes.mimeType(for: data, hint: nil) else {

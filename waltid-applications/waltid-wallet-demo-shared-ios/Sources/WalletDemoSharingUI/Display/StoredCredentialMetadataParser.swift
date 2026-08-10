@@ -5,8 +5,8 @@ import WalletSDK
 ///
 /// The wallet stores OpenID4VCI issuer display under `issuerDisplay` as an array of
 /// `{ name, locale, logo: { uri, alt_text } }` entries.
-enum StoredCredentialMetadataParser {
-    static func issuerDisplay(
+public enum StoredCredentialMetadataParser {
+    public static func issuerDisplay(
         from metadataJSON: String?,
         preferredLocales: [String] = []
     ) -> MetadataDisplay? {

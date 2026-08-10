@@ -1,4 +1,5 @@
 import SwiftUI
+import WalletDemoSharingUI
 
 struct EmptyCredentialsView: View {
     var body: some View {

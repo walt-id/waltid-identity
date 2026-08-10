@@ -1,7 +1,7 @@
 import Foundation
 
 extension CredentialDetails {
-    var systemInfoGroup: ClaimGroup? {
+    public var systemInfoGroup: ClaimGroup? {
         let items = [
             addedAt.map(Self.systemInfoDateFormatter.string(from:)).systemInfoItem(path: "system.added", label: "Added"),
             id.systemInfoItem(path: "system.id", label: "Credential ID"),

@@ -135,26 +135,38 @@ final class WalletViewModelPresentationTests: XCTestCase {
         )
     }
 
+    /// Waits for `predicate`, bounded by elapsed time rather than by a yield count.
+    ///
+    /// Yielding alone bounds nothing: opening a wallet does real keychain and file work off this
+    /// actor, so a fixed number of yields is a machine-speed-dependent deadline that a loaded CI
+    /// runner can miss while the wallet is still perfectly healthy. Sleeping between polls also stops
+    /// the spin from starving the work it is waiting for.
     @MainActor
     private func waitUntil(
-        _ predicate: @escaping @MainActor () -> Bool,
-        attempts: Int = 1_000
+        timeoutNanoseconds: UInt64 = 20_000_000_000,
+        _ predicate: @escaping @MainActor () -> Bool
     ) async throws {
-        for _ in 0..<attempts {
-            if predicate() { return }
-            await Task.yield()
+        let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+        while !predicate() {
+            guard DispatchTime.now().uptimeNanoseconds < deadline else {
+                XCTFail("Timed out waiting for wallet state")
+                return
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
         }
-        XCTFail("Timed out waiting for wallet state")
     }
 
     private func waitUntilAsync(
-        _ predicate: @escaping () async -> Bool,
-        attempts: Int = 1_000
+        timeoutNanoseconds: UInt64 = 20_000_000_000,
+        _ predicate: @escaping () async -> Bool
     ) async throws {
-        for _ in 0..<attempts {
-            if await predicate() { return }
-            await Task.yield()
+        let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+        while !(await predicate()) {
+            guard DispatchTime.now().uptimeNanoseconds < deadline else {
+                XCTFail("Timed out waiting for wallet client state")
+                return
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
         }
-        XCTFail("Timed out waiting for wallet client state")
     }
 }
