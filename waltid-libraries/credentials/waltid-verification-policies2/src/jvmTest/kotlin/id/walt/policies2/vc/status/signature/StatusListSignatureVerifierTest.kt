@@ -36,7 +36,7 @@ class StatusListSignatureVerifierTest {
     @BeforeAll
     fun setup() = runTest {
         DidService.minimalInit()
-        verifier = StatusListSignatureVerifier()
+        verifier = StatusListSignatureVerifier(allowUntrustedInlineJwk = true)
         testKey = JWKKey.generate(KeyType.Ed25519)
         val didResult = DidService.registerByKey("key", testKey)
         testDid = didResult.did
@@ -105,7 +105,10 @@ class StatusListSignatureVerifierTest {
             val result = verifier.verifyJwt(tamperedJwt)
             
             assertTrue(result.isFailure)
-            assertTrue(result.exceptionOrNull() is SignatureInvalidException)
+            assertTrue(
+                result.exceptionOrNull() is SignatureInvalidException,
+                "Expected SignatureInvalidException, got ${result.exceptionOrNull()}",
+            )
         }
 
         @Test
@@ -207,7 +210,10 @@ class StatusListSignatureVerifierTest {
             val result = verifier.verifyCwt(tamperedCwt)
             
             assertTrue(result.isFailure)
-            assertTrue(result.exceptionOrNull() is SignatureInvalidException)
+            assertTrue(
+                result.exceptionOrNull() is SignatureInvalidException,
+                "Expected SignatureInvalidException, got ${result.exceptionOrNull()}",
+            )
         }
 
         @Test
@@ -220,10 +226,11 @@ class StatusListSignatureVerifierTest {
     }
 
     private suspend fun createSignedJwt(key: JWKKey, did: String, payload: JsonObject): String {
+        val verificationMethodId = DidService.resolveToCrypto2Keys(did).getOrThrow().single().id.value
         val header = buildJsonObject {
             put("alg", "EdDSA")
             put("typ", "statuslist+jwt")
-            put("kid", "$did#${key.getKeyId()}")
+            put("kid", verificationMethodId)
         }
         
         val headerB64 = Json.encodeToString(JsonObject.serializer(), header).encodeToByteArray().encodeToBase64Url()
@@ -256,10 +263,11 @@ class StatusListSignatureVerifierTest {
     }
 
     private suspend fun createSignedCwt(key: JWKKey, did: String, payload: ByteArray): ByteArray {
+        val verificationMethodId = DidService.resolveToCrypto2Keys(did).getOrThrow().single().id.value
         val protectedHeaders = CoseHeaders(
             algorithm = -8, // EdDSA
             contentType = id.walt.cose.CoseContentType.AsString("statuslist+cwt"),
-            kid = "$did#${key.getKeyId()}".encodeToByteArray() // ISO 18013-5 Second Edition: kid in protected headers
+            kid = verificationMethodId.encodeToByteArray() // ISO 18013-5 Second Edition: kid in protected headers
         )
         
         val unprotectedHeaders = CoseHeaders()

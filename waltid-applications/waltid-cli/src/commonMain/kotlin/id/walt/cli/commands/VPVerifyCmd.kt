@@ -1,349 +1,260 @@
 package id.walt.cli.commands
 
-import com.github.ajalt.clikt.core.*
-import com.github.ajalt.clikt.parameters.options.*
+import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.Context
+import com.github.ajalt.clikt.core.ProgramResult
+import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.installMordantMarkdown
+import com.github.ajalt.clikt.parameters.options.convert
+import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.help
+import com.github.ajalt.clikt.parameters.options.multiple
+import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.path
-import id.walt.cli.util.JsonUtils.toJsonPrimitive
+import id.walt.cli.util.CliDcql
+import id.walt.cli.util.CredentialHolderBinding
+import id.walt.cli.util.KeyUtil
 import id.walt.cli.util.PrettyPrinter
+import id.walt.cli.util.VCUtil
 import id.walt.cli.util.WaltIdCmdHelpOptionMessage
-import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.did.dids.DidService
-import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.oid4vc.data.dif.PresentationSubmission
-import id.walt.policies.ExpirationDatePolicyException
-import id.walt.policies.NotBeforePolicyException
-import id.walt.policies.PolicyManager
-import id.walt.policies.Verifier
-import id.walt.policies.models.PolicyRequest
-import id.walt.policies.models.PolicyResult
-import id.walt.policies.models.PresentationVerificationResponse
+import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.presentations.formats.JwtVcJsonPresentation
+import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.dcql.DcqlDisclosure
+import id.walt.dcql.DcqlParser
+import id.walt.dcql.RawDcqlCredential
+import id.walt.dcql.models.DcqlQuery
+import id.walt.policies2.vp.policies.AudienceCheckJwtVcJsonVPPolicy
+import id.walt.policies2.vp.policies.ExpCheckJwtVcJsonVPPolicy
+import id.walt.policies2.vp.policies.JwtVcJsonVPPolicy
+import id.walt.policies2.vp.policies.NbfCheckJwtVcJsonVPPolicy
+import id.walt.policies2.vp.policies.NonceCheckJwtVcJsonVPPolicy
+import id.walt.policies2.vp.policies.VPPolicyRunner
+import id.walt.policies2.vp.policies.VerificationSessionContext
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import java.io.File
 import kotlin.io.path.readText
-import kotlin.time.Duration
 
+class VPVerifyCmd : CliktCommand(name = "verify") {
+    override fun help(context: Context) = """Verify Final OpenID4VP DCQL jwt_vc_json presentations.
 
-class VPVerifyCmd : CliktCommand(
-    name = "verify"
-) {
-    override fun help(context: Context) = """Apply a wide range of verification policies on a W3C Verifiable Presentation (VP).
-        
         Example usage:
         ----------------
-        waltid vp verify -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \
-        -pd ./presDef.json \
-        -ps ./presSub.json \
-        -vp ./vpPath.jwt
-        waltid vp verify -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \
-        -pd ./presDef.json \
-        -ps ./presSub.json \
-        -vp ./vpPath.jwt \
-        -vpp maximum-credentials \
-        -vppa=max=2 \
-        -vpp minimum-credentials \
-        -vppa=min=1
-        waltid vp verify -hd did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV \
-        -pd ./presDef.json \
-        -ps ./presSub.json \
-        -vp ./vpPath.jwt \
-        -vpp maximum-credentials \
-        -vppa=max=2 \
-        -vpp minimum-credentials \
-        -vppa=min=1 \
-        -vcp allowed-issuer \
-        -vcpa=issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV
+        waltid vp verify -hd <holder-did> -vd <verifier-id> -n <nonce> \
+          -dq query.json -vp vp-token.json
+
+        Envelope and credential signatures are mandatory. Requested policies are additive.
     """.replace("\n", "  \n")
 
     init {
         installMordantMarkdown()
+        context { localization = WaltIdCmdHelpOptionMessage }
     }
 
     override val printHelpOnEmptyArgs = true
 
-    init {
-        context {
-            localization = WaltIdCmdHelpOptionMessage
-        }
-    }
+    val print = PrettyPrinter(this)
 
-    val print: PrettyPrinter = PrettyPrinter(this)
-
-    private val holderDid: String by option(
-        "-hd", "--holder-did"
-    ).help("The DID of the holder that created (signed) the verifiable presentation. If specified, the VP token signature will be validated against this value.")
+    private val holderDid by option("-hd", "--holder-did")
+        .help("Expected holder DID. When omitted, the signed iss claim is used.")
         .default("")
 
-    private val presentationDefinitionPath by option("-pd", "--presentation-definition").path(
-        mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false
-    ).help("The file path of the presentation definition (required).")
+    private val verifierDid by option("-vd", "--verifier-did")
+        .help("Expected verifier client ID/audience.")
         .required()
 
-    private val presentationSubmissionPath by option("-ps", "--presentation-submission").path(
-        mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false
-    ).help("The file path of the presentation submission (required).").required()
+    private val nonce by option("-n", "--nonce")
+        .help("Expected OpenID4VP nonce.")
+        .required()
 
-    private val vpPath by option("-vp", "--verifiable-presentation").path(
-        mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false
-    ).help("The file path of the verifiable presentation (required).").required()
+    private val dcqlQueryPath by option("-dq", "--dcql-query")
+        .path(mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false)
+        .help("Original Final OpenID4VP DCQL query.")
+        .required()
 
-    private val vpPolicies: List<String> by option(
-        "-vpp", "--vp-policy"
-    ).help("Specify one, or more policies to be applied while validating the VP JWT (signature policy is always applied).")
+    private val vpPath by option("-vp", "--verifiable-presentation")
+        .path(mustExist = true, canBeDir = false, mustBeReadable = true, canBeSymlink = false)
+        .help("Final vp_token JSON object to verify.")
+        .required()
+
+    private val vpPolicies by option("-vpp", "--vp-policy")
+        .choice("signature", "expired", "not-before")
+        .multiple()
+        .help("Envelope policies. Signature, audience, and nonce are always checked; time checks run by default.")
+
+    private val globalVcPolicies by option("-vcp", "--vc-policy")
         .choice(
-            *listOf(
-                "signature",
-                "expired",
-                "not-before",
-                "holder-binding",
-                "maximum-credentials",
-                "minimum-credentials",
-            ).toTypedArray()
-        ).multiple()
+            "signature",
+            "expired",
+            "expiration",
+            "not-before",
+            "revoked-status-list",
+            "schema",
+            "allowed-issuer",
+            "webhook",
+        )
+        .multiple()
 
-    private val vpPolicyArguments: Map<String, String> by option("-vppa", "--vp-policy-arg").associate().help {
-        """Argument required by some VP policies, namely:
-            
-            |Policy|Expected Argument|
-            |------|--------|
-            |signature| - |
-            |expired| - |
-            |not-before| - |
-            |maximum-credentials|max=5|
-            |minimum-credentials|min=2|
-        """.trimMargin()
-    }
-
-    private val globalVcPolicies: List<String> by option(
-        "-vcp", "--vc-policy"
-    ).help("Specify one, or more policies to be applied to all credentials contained in the VP JWT (signature policy is always applied).")
-        .choice(
-            *listOf(
-                "signature",
-                "expired",
-                "not-before",
-                "allowed-issuer",
-                "webhook",
-            ).toTypedArray()
-        ).multiple()
-
-    private val globalVcPolicyArguments: Map<String, String> by option("-vcpa", "--vc-policy-arg").associate().help {
-        """Argument required by some VC policies, namely:
-            
-            |Policy|Expected Argument|
-            |------|--------|
-            |signature| - |
-            |expired| - |
-            |not-before| - |
-            |allowed-issuer|issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV|
-            |webhook|url=https://example.com|
-        """.trimMargin()
-    }
+    private val rawVcPolicyArguments by option("-vcpa", "--vc-policy-arg")
+        .convert { value ->
+            value.substringBefore('=', missingDelimiterValue = "").takeIf(String::isNotBlank)
+                ?.let { it to value.substringAfter('=') }
+                ?: fail("must use name=value")
+        }
+        .multiple()
 
     override fun run() {
-        initCmd()
-
-        val cmdParams = parseParameters()
-
-        val verificationResponse = runBlocking {
-            verify(cmdParams)
+        val result = runCatching { runBlocking { verify() } }
+        result.exceptionOrNull()?.let { cause ->
+            print.dim("Overall: ", false)
+            print.red("Fail! ", false)
+            print.italic(cause.message ?: cause::class.simpleName ?: "Verification error")
         }
+        if (result.getOrDefault(false).not()) throw ProgramResult(1)
+    }
 
-        val results = verificationResponse.results.flatMap { it.policyResults }
-        println(results)
+    private suspend fun verify(): Boolean {
+        val query = DcqlParser.parse(dcqlQueryPath.readText()).getOrThrow().also(CliDcql::validate)
+        val presentations = parseVpToken(vpPath.readText(), query)
+        val vcArguments = rawVcPolicyArguments.groupBy({ it.first }, { it.second }).toMutableMap()
+        if ("schema" in globalVcPolicies) {
+            val schemaPath = vcArguments["schema"]?.singleOrNull()
+                ?: throw IllegalArgumentException("Policy schema requires exactly one --vc-policy-arg=schema=/path/to/schema.json")
+            vcArguments["schema"] = listOf(File(schemaPath).also {
+                require(it.isFile) { "Schema file does not exist: $schemaPath" }
+            }.readText())
+        }
+        val vcPolicyList = VCUtil.policies(globalVcPolicies, vcArguments)
+        val timePolicyNames = vpPolicies.ifEmpty { listOf("expired", "not-before") }
+        val policyList = buildList<JwtVcJsonVPPolicy> {
+            add(AudienceCheckJwtVcJsonVPPolicy())
+            add(NonceCheckJwtVcJsonVPPolicy())
+            if ("expired" in timePolicyNames) add(ExpCheckJwtVcJsonVPPolicy())
+            if ("not-before" in timePolicyNames) add(NbfCheckJwtVcJsonVPPolicy())
+        }
+        var overall = true
+        val matchedQueryIds = mutableSetOf<String>()
 
         print.box("VP Verification Result")
-        print.dim("Overall: ", false)
-        if (verificationResponse.overallSuccess()) print.green("Success!") else print.red("Fail!")
-
-        results.forEach {
-            if (it.isSuccess()) {
-                handleSuccess(it)
-            } else {
-                handleFailure(it)
-            }
-        }
-    }
-
-    private fun initCmd() = runBlocking {
-        DidService.minimalInit()
-    }
-
-    private fun parseParameters(): VpVerifyParameters {
-        //parse the presentation definition
-        val presentationDefinition = PresentationDefinition.fromJSON(
-            Json.decodeFromString<JsonObject>(
-                presentationDefinitionPath.readText()
-            )
-        )
-        //parse the presentation submission
-        val presentationSubmission = PresentationSubmission.fromJSON(
-            Json.decodeFromString<JsonObject>(
-                presentationSubmissionPath.readText()
-            )
-        )
-
-        return VpVerifyParameters(
-            holderDid,
-            presentationDefinition,
-            presentationSubmission,
-            vpPath.readText(),
-            parseVpPolicyRequests(),
-            parseGlobalVcPolicyRequests(),
-        )
-    }
-
-    private fun parseVpPolicyRequests(): List<PolicyRequest> {
-        val vpPolicyRequests = mutableListOf(
-            PolicyRequest(PolicyManager.getPolicy("signature")),
-        )
-        if (holderDid.isNotEmpty()) vpPolicyRequests += PolicyRequest(
-            PolicyManager.getPolicy("allowed-issuer"), holderDid.toJsonPrimitive()
-        )
-        vpPolicies.forEach { policyName ->
-            vpPolicyRequests += when (policyName) {
-                "expired", "not-before", "holder-binding" -> {
-                    PolicyRequest(PolicyManager.getPolicy(policyName))
+        presentations.forEach { (queryId, tokens) ->
+            val queryCredential = query.credentials.single { it.id == queryId }
+            val queryCredentials = mutableListOf<RawDcqlCredential>()
+            tokens.forEachIndexed { presentationIndex, token ->
+                val presentation = JwtVcJsonPresentation.parse(token).getOrThrow()
+                val signerDid = requireNotNull(presentation.issuer) { "VP JWT is missing iss" }
+                require(signerDid.startsWith("did:")) { "CLI VP verification requires a DID holder issuer" }
+                if (holderDid.isNotEmpty()) require(holderDid == signerDid) {
+                    "Expected holder DID $holderDid, got $signerDid"
                 }
-
-                "maximum-credentials" -> {
-                    if ("max" !in vpPolicyArguments || vpPolicyArguments["max"]!!.isEmpty()) {
-                        throw MissingOption(this.option("-vppa for the 'maximum-credentials' policy (-vppa=max=5"))
-                    }
-                    PolicyRequest(
-                        PolicyManager.getPolicy(policyName), vpPolicyArguments["max"].toJsonPrimitive()
-                    )
+                val decoded = CompactJws.decodeUnverified(token)
+                require(decoded.algorithm in JwsAlgorithm.fullySpecified) {
+                    "VP JWT uses a non-fully-specified algorithm: ${decoded.algorithm.identifier}"
                 }
-
-                "minimum-credentials" -> {
-                    if ("min" !in vpPolicyArguments || vpPolicyArguments["min"]!!.isEmpty()) {
-                        throw MissingOption(this.option("-vppa for the 'minimum-credentials' policy (-vppa=min=2"))
-                    }
-                    PolicyRequest(
-                        PolicyManager.getPolicy(policyName), vpPolicyArguments["min"].toJsonPrimitive()
-                    )
+                val kid = decoded.protectedHeader["kid"]?.let { (it as? JsonPrimitive)?.contentOrNull }
+                val verificationKey = KeyUtil.resolveDidVerificationKey(signerDid, kid)
+                val signatureResult = runCatching {
+                    CompactJws.verify(token, verificationKey, setOf(decoded.algorithm))
                 }
+                printPolicy("$queryId: jwt_vc_json/envelope_signature", signatureResult.exceptionOrNull())
+                overall = overall && signatureResult.isSuccess
 
-                else -> throw IllegalArgumentException("Unknown, or inapplicable vp policy $policyName")
-            }
-        }
-        return vpPolicyRequests
-    }
-
-    private fun parseGlobalVcPolicyRequests(): List<PolicyRequest> {
-        val globalVcPolicyRequests = mutableListOf<PolicyRequest>(
-            PolicyRequest(PolicyManager.getPolicy("signature"))
-        )
-        globalVcPolicies.forEach { policyName ->
-            globalVcPolicyRequests += when (policyName) {
-                "expired", "not-before" -> {
-                    PolicyRequest(PolicyManager.getPolicy(policyName))
-                }
-
-                "allowed-issuer" -> {
-                    if ("issuer" !in globalVcPolicyArguments || globalVcPolicyArguments["issuer"]!!.isEmpty()) {
-                        throw MissingOption(this.option("--vcpa for the 'allowed-issuer' policy (--vcpa=issuer=did:key:z6Mkp7AVwvWxnsNDuSSbf19sgKzrx223WY95AqZyAGifFVyV"))
-                    }
-                    PolicyRequest(
-                        PolicyManager.getPolicy(policyName),
-                        globalVcPolicyArguments["issuer"].toJsonElement(),
-                    )
-                }
-
-                "webhook" -> {
-                    if ("url" !in globalVcPolicyArguments || globalVcPolicyArguments["url"]!!.isEmpty()) {
-                        throw MissingOption(this.option("--vcpa for the 'webhook' policy (--vcpa=url=https://example.com"))
-                    }
-                    PolicyRequest(
-                        PolicyManager.getPolicy(policyName),
-                        globalVcPolicyArguments["url"].toJsonElement(),
-                    )
-                }
-
-                else -> throw IllegalArgumentException("Unknown, or inapplicable vc policy $policyName")
-            }
-        }
-        return globalVcPolicyRequests
-    }
-
-    private fun verify(params: VpVerifyParameters): PresentationVerificationResponse {
-        try {
-            return runBlocking {
-                val presentationFormat = params.presentationSubmission.descriptorMap.firstOrNull()?.format
-                    ?: throw IllegalArgumentException("No presentation submission or presentation format found.")
-                Verifier.verifyPresentation(
-                    presentationFormat,
-                    vpToken = params.vp,
-                    vpPolicies = params.vpPolicyRequests,
-                    globalVcPolicies = params.globalVcPolicyRequests,
-                    specificCredentialPolicies = emptyMap(),
-                    mapOf(
-                        "presentationDefinition" to params.presentationDefinition,
-                        "presentationSubmission" to params.presentationSubmission,
-                    )
+                val context = VerificationSessionContext(
+                    vpToken = token,
+                    expectedNonce = nonce,
+                    expectedAudience = verifierDid,
+                    expectedOrigins = null,
+                    responseUri = null,
+                    responseMode = OpenID4VPResponseMode.DIRECT_POST,
+                    isSigned = false,
+                    isEncrypted = false,
+                    jwkThumbprint = null,
+                    isAnnexC = false,
                 )
-            }
-        } catch (e: IllegalStateException) {
-            println("Something went wrong.")
-            return PresentationVerificationResponse(
-                results = ArrayList(),
-                time = Duration.ZERO,
-                policiesRun = 0,
-            )
-        }
-    }
+                VPPolicyRunner.verifySpecificPresentation(presentation, policyList, context).forEach { (id, result) ->
+                    printPolicy("$queryId: $id", result.errors.firstOrNull()?.let { IllegalArgumentException(it.message) })
+                    overall = overall && result.success
+                }
 
-    private data class VpVerifyParameters(
-        val holderDid: String,
-        val presentationDefinition: PresentationDefinition,
-        val presentationSubmission: PresentationSubmission,
-        val vp: String,
-        val vpPolicyRequests: List<PolicyRequest>,
-        val globalVcPolicyRequests: List<PolicyRequest>,
-    )
-
-    private fun handleFailure(it: PolicyResult) {
-        when (val exception = it.result.exceptionOrNull()) {
-
-            is id.walt.policies.JsonSchemaVerificationException -> {
-                exception.validationErrors.forEach { err ->
-                    print.dim("${it.request.policy.name}: ", false)
-                    print.red("Fail! ", false)
-                    if (err.objectPath.isEmpty()) {
-                        print.italic("""-> ${err.message}""", linebreak = true)
-                    } else {
-                        print.italic(
-                            """"${err.objectPath}" (in ${err.schemaPath}) -> ${err.message}""", linebreak = true
-                        )
+                val credentials = presentation.credentials.orEmpty()
+                require(credentials.isNotEmpty()) { "Presentation for $queryId contains no credentials" }
+                credentials.forEachIndexed { credentialIndex, credential ->
+                    if (queryCredential.requireCryptographicHolderBinding) {
+                        val binding = runCatching {
+                            CredentialHolderBinding.requireBoundToPresenter(credential, signerDid, verificationKey)
+                        }
+                        printPolicy("$queryId credential[$credentialIndex]: holder-binding", binding.exceptionOrNull())
+                        overall = overall && binding.isSuccess
                     }
+                    VCUtil.verify(credential, vcPolicyList).forEach { run ->
+                        printPolicy("$queryId credential[$credentialIndex]: ${run.policy.id}", run.result.exceptionOrNull())
+                        overall = overall && run.result.isSuccess
+                    }
+                    queryCredentials += credential.toDcqlCredential("$queryId-$presentationIndex-$credentialIndex")
                 }
             }
 
-            is ExpirationDatePolicyException -> {
-                print.dim("${it.request.policy.name}: ", false)
-                print.red("Fail! ", false)
-                print.italic("VC expired since ${exception.date}", linebreak = true)
+            val cardinality = runCatching {
+                CliDcql.requireExactResponseCardinality(queryCredential, tokens.size, queryCredentials.size)
             }
+            printPolicy("$queryId: cardinality", cardinality.exceptionOrNull())
+            overall = overall && cardinality.isSuccess
+            val match = runCatching { CliDcql.match(DcqlQuery(listOf(queryCredential)), queryCredentials) }
+            val dcqlSuccess = match.getOrNull()?.get(queryId)?.size == queryCredentials.size
+            printPolicy("$queryId: dcql", if (dcqlSuccess) null else IllegalArgumentException("Presentation does not satisfy query"))
+            overall = overall && dcqlSuccess
+            if (dcqlSuccess && cardinality.isSuccess) matchedQueryIds += queryId
+        }
 
-            is NotBeforePolicyException -> {
-                print.dim("${it.request.policy.name}: ", false)
-                print.red("Fail! ", false)
-                print.italic("VC not valid until ${exception.date}", linebreak = true)
-            }
+        val fulfillment = runCatching { CliDcql.enforceCredentialSets(query, matchedQueryIds) }
+        printPolicy("dcql fulfillment", fulfillment.exceptionOrNull())
+        overall = overall && fulfillment.isSuccess
+        print.dim("Overall: ", false)
+        if (overall) print.green("Success!") else print.red("Fail!")
+        return overall
+    }
 
-            else -> {
-                print.dim("${it.request.policy.name}: ", false)
-                exception?.message?.let {
-                    print.red("Fail! ", false)
-                    print.italic(it, linebreak = true)
-                } ?: print.red("Fail! ")
+    private fun parseVpToken(raw: String, query: DcqlQuery): Map<String, List<String>> {
+        val json = Json.parseToJsonElement(raw) as? JsonObject
+            ?: throw IllegalArgumentException("Final vp_token must be a JSON object")
+        val queryIds = query.credentials.mapTo(mutableSetOf()) { it.id }
+        require(json.keys.all(queryIds::contains)) { "vp_token contains an unknown DCQL query ID" }
+        return json.mapValues { (queryId, value) ->
+            val tokens = value as? JsonArray
+                ?: throw IllegalArgumentException("vp_token entry $queryId must be an array")
+            require(tokens.isNotEmpty()) { "vp_token entry $queryId must not be empty" }
+            tokens.map { element ->
+                (element as? JsonPrimitive)?.takeIf(JsonPrimitive::isString)?.content
+                    ?: throw IllegalArgumentException("vp_token presentations must be strings")
             }
         }
     }
 
-    private fun handleSuccess(it: PolicyResult) {
-        print.dim("${it.request.policy.name}: ", false)
-        print.green("Success!", linebreak = true)
+    private fun DigitalCredential.toDcqlCredential(id: String): RawDcqlCredential {
+        val selectivelyDisclosable = this as? SelectivelyDisclosableVerifiableCredential
+        return RawDcqlCredential(
+            id = id,
+            format = format,
+            data = credentialData,
+            disclosures = selectivelyDisclosable?.disclosures?.map { DcqlDisclosure(it.name, it.value) },
+            originalCredential = this,
+        )
+    }
+
+    private fun printPolicy(name: String, error: Throwable?) {
+        print.dim("$name: ", false)
+        if (error == null) print.green("Success!") else {
+            print.red("Fail! ", false)
+            print.italic(error.message ?: error::class.simpleName ?: "Verification error")
+        }
     }
 }

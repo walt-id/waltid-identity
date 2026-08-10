@@ -9,6 +9,12 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.http.content.OutgoingContent
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.utils.io.ByteChannel
+import io.ktor.utils.io.writeString
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -16,6 +22,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class TokenRequestBuilderTest {
@@ -152,6 +159,58 @@ class TokenRequestBuilderTest {
 
         assertFalse(error.message.orEmpty().contains("private-token"))
         assertNull(error.cause)
+    }
+
+    @Test
+    fun testSuccessfulTokenResponseBodyReadFailureIsTyped() = runTest {
+        val body = ByteChannel()
+        body.cancel(IllegalStateException("response stream failed"))
+
+        val client = createMockClient {
+            respond(
+                content = body,
+                status = HttpStatusCode.OK,
+                headers = headersOf(
+                    HttpHeaders.ContentType,
+                    ContentType.Application.Json.toString(),
+                ),
+            )
+        }
+
+        val error = assertFailsWith<TokenRequestException> {
+            TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
+                tokenEndpoint = tokenEndpoint,
+                code = "auth-code",
+            )
+        }
+
+        assertEquals(0, error.statusCode)
+        assertEquals(null, error.oauthError)
+        assertNotNull(error.cause)
+    }
+
+    @Test
+    fun testMalformedSuccessfulTokenResponseIsTyped() = runTest {
+        val client = createMockClient {
+            respond(
+                content = """{"access_token":""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(
+                    HttpHeaders.ContentType,
+                    ContentType.Application.Json.toString(),
+                ),
+            )
+        }
+
+        val error = assertFailsWith<TokenRequestException> {
+            TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
+                tokenEndpoint = tokenEndpoint,
+                code = "auth-code",
+            )
+        }
+
+        assertEquals(HttpStatusCode.OK.value, error.statusCode)
+        assertEquals(null, error.oauthError)
     }
 
     @Test
@@ -346,31 +405,204 @@ class TokenRequestBuilderTest {
     }
 
     @Test
-    fun testExchangePreAuthorizedCodeRejectsCrossOriginRedirectWithHeaders() = runTest {
+    fun testExchangePreAuthorizedCodeRejectsCrossOriginPostPreservingRedirect() = runTest {
         var callCount = 0
         val client = createMockClient { _ ->
             callCount += 1
             when (callCount) {
                 1 -> respond(
                     content = "",
-                    status = HttpStatusCode.Found,
+                    status = HttpStatusCode.TemporaryRedirect,
                     headers = headersOf(HttpHeaders.Location, "https://other.example.com/token")
                 )
 
-                else -> error("Cross-origin redirect should not be followed when request headers are present")
+                else -> error("Cross-origin redirect should not be followed")
             }
         }
 
         val builder = TokenRequestBuilder(clientConfig, client)
-        val error = assertFailsWith<IllegalStateException> {
+        val error = assertFailsWith<TokenRequestException> {
             builder.exchangePreAuthorizedCode(
                 tokenEndpoint = tokenEndpoint,
                 preAuthorizedCode = "pre-auth-code",
-                additionalHeaders = mapOf(HttpHeaders.Authorization to "Bearer abc"),
             )
         }
 
-        assertContains(error.message.orEmpty(), "Cross-origin redirect")
+        assertEquals("unsafe_redirect", error.oauthError)
         assertEquals(1, callCount)
+    }
+
+    @Test
+    fun testExchangePreAuthorizedCodeDoesNotRepostAfterSeeOther() = runTest {
+        var callCount = 0
+        val client = createMockClient {
+            callCount += 1
+            respond(
+                content = "",
+                status = HttpStatusCode.SeeOther,
+                headers = headersOf(HttpHeaders.Location, "https://auth.example.com/other-token"),
+            )
+        }
+
+        val error = assertFailsWith<TokenRequestException> {
+            TokenRequestBuilder(clientConfig, client).exchangePreAuthorizedCode(
+                tokenEndpoint = tokenEndpoint,
+                preAuthorizedCode = "pre-auth-code",
+            )
+        }
+
+        assertEquals(HttpStatusCode.SeeOther.value, error.statusCode)
+        assertEquals(1, callCount)
+    }
+
+    @Test
+    fun testExchangePreAuthorizedCodeFollowsSameOriginTemporaryRedirect() = runTest {
+        var callCount = 0
+        val client = createMockClient { request ->
+            callCount += 1
+            when (callCount) {
+                1 -> respond(
+                    content = "",
+                    status = HttpStatusCode.TemporaryRedirect,
+                    headers = headersOf(HttpHeaders.Location, "https://auth.example.com/other-token"),
+                )
+
+                2 -> {
+                    assertEquals("https://auth.example.com/other-token", request.url.toString())
+                    assertEquals("pre-auth-code", request.formParameters()["pre-authorized_code"])
+                    respond(
+                        content = """{"access_token":"access","token_type":"Bearer"}""",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                    )
+                }
+
+                else -> error("Token redirect should only be followed once")
+            }
+        }
+
+        val response = TokenRequestBuilder(clientConfig, client).exchangePreAuthorizedCode(
+            tokenEndpoint = tokenEndpoint,
+            preAuthorizedCode = "pre-auth-code",
+        )
+
+        assertEquals("access", response.access_token)
+        assertEquals(2, callCount)
+    }
+
+    @Test
+    fun testTransportFailureOnSameOriginRedirectIsTyped() = runTest {
+        var callCount = 0
+        val client = createMockClient { _ ->
+            callCount += 1
+            if (callCount == 1) {
+                respond(
+                    content = "",
+                    status = HttpStatusCode.TemporaryRedirect,
+                    headers = headersOf(HttpHeaders.Location, "https://auth.example.com/other-token"),
+                )
+            } else {
+                error("redirected transport failure")
+            }
+        }
+
+        val error = assertFailsWith<TokenRequestException> {
+            TokenRequestBuilder(clientConfig, client).exchangePreAuthorizedCode(
+                tokenEndpoint = tokenEndpoint,
+                preAuthorizedCode = "pre-auth-code",
+            )
+        }
+
+        assertEquals(0, error.statusCode)
+        assertNotNull(error.cause)
+        assertEquals(2, callCount)
+    }
+
+    @Test
+    fun testDpopProofFailureIsNotConvertedIntoTransportFailure() = runTest {
+        var callCount = 0
+        val client = createMockClient {
+            callCount += 1
+            error("DPoP proof must fail before HTTP")
+        }
+
+        val error = assertFailsWith<IllegalStateException> {
+            TokenRequestBuilder(clientConfig, client).exchangePreAuthorizedCode(
+                tokenEndpoint = tokenEndpoint,
+                preAuthorizedCode = "pre-auth-code",
+                dpopProofFactory = { _, _ -> throw IllegalStateException("unsupported DPoP algorithm") },
+            )
+        }
+
+        assertEquals("unsupported DPoP algorithm", error.message)
+        assertEquals(0, callCount)
+    }
+
+    @Test
+    fun testOAuthErrorParsingPreservesCancellation() = runTest {
+        val bodyReady = CompletableDeferred<Unit>()
+        val body = ByteChannel()
+        val client = createMockClient {
+            body.writeString("{\"error\":")
+            bodyReady.complete(Unit)
+            respond(
+                content = body,
+                status = HttpStatusCode.BadRequest,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        val request = async(start = CoroutineStart.UNDISPATCHED) {
+            TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
+                tokenEndpoint = tokenEndpoint,
+                code = "auth-code",
+            )
+        }
+        bodyReady.await()
+        request.cancel()
+
+        assertFailsWith<CancellationException> { request.await() }
+    }
+
+    @Test
+    fun testDpopNonceChallengeRegeneratesProof() = runTest {
+        var callCount = 0
+        val proofInputs = mutableListOf<Pair<String, String?>>()
+        val client = createMockClient { request ->
+            callCount += 1
+            assertEquals("proof-$callCount", request.headers["DPoP"])
+            if (callCount == 1) {
+                respond(
+                    content = "{}",
+                    status = HttpStatusCode.Unauthorized,
+                    headers = headersOf(
+                        HttpHeaders.ContentType to listOf("application/json"),
+                        HttpHeaders.WWWAuthenticate to listOf("DPoP error=\"use_dpop_nonce\""),
+                        "DPoP-Nonce" to listOf("server-nonce"),
+                    ),
+                )
+            } else {
+                respond(
+                    content = """{"access_token":"dpop-token","token_type":"DPoP"}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            }
+        }
+
+        val response = TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
+            tokenEndpoint = tokenEndpoint,
+            code = "auth-code",
+            dpopProofFactory = { endpoint, nonce ->
+                proofInputs += endpoint to nonce
+                "proof-${proofInputs.size}"
+            },
+        )
+
+        assertEquals("dpop-token", response.access_token)
+        assertEquals(
+            listOf(tokenEndpoint to null, tokenEndpoint to "server-nonce"),
+            proofInputs,
+        )
     }
 }

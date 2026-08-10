@@ -46,6 +46,8 @@ import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdoc
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.proofs.CredentialProofValidationException
 import id.walt.crypto.keys.Key
+import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialEndpointHandler
+import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
 import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
@@ -565,6 +567,7 @@ class DefaultOAuth2Provider(
         }
     }
 
+    @Deprecated("Use the Crypto2CredentialSigningKey overload")
     override suspend fun createCredentialResponse(
         request: CredentialRequest,
         configuration: CredentialConfiguration,
@@ -619,6 +622,68 @@ class DefaultOAuth2Provider(
         )
     }
 
+    override suspend fun createCredentialResponse(
+        request: CredentialRequest,
+        configuration: CredentialConfiguration,
+        issuerKey: Crypto2CredentialSigningKey,
+        issuerId: String,
+        credentialData: JsonObject,
+        dataMapping: JsonObject?,
+        selectiveDisclosure: SDMap?,
+        x5Chain: List<CertificateDer>?,
+        display: List<CredentialDisplay>?,
+        w3cVersion: String?,
+        mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
+        credentialStatus: Status?,
+        validFrom: Instant?,
+        validUntil: Instant?,
+        proofValidationContext: CredentialProofValidationContext?,
+    ): CredentialResponseResult {
+        val verifiedProofs = when (
+            val proofResult = verifyCredentialProofs(
+                request = request,
+                configuration = configuration,
+                proofValidationContext = proofValidationContext,
+            )
+        ) {
+            is CredentialProofVerification.Success -> proofResult.proofs
+            is CredentialProofVerification.Failure -> return CredentialResponseResult.Failure(proofResult.error)
+        }
+
+        val handler = config.credentialEndpointHandlers.get(configuration.format)
+            ?: return CredentialResponseResult.Failure(
+                CredentialError(
+                    error = CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
+                    description = "No handler for format ${configuration.format.value}",
+                )
+            )
+        if (handler !is Crypto2CredentialEndpointHandler) {
+            return CredentialResponseResult.Failure(
+                CredentialError(
+                    error = CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
+                    description = "Handler for format ${configuration.format.value} does not support crypto2 signing",
+                )
+            )
+        }
+        return handler.sign(
+            request = request,
+            configuration = configuration,
+            issuerKey = issuerKey,
+            issuerId = issuerId,
+            credentialData = credentialData,
+            dataMapping = dataMapping,
+            selectiveDisclosure = selectiveDisclosure,
+            x5Chain = x5Chain,
+            display = display,
+            w3cVersion = w3cVersion,
+            mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+            credentialStatus = credentialStatus,
+            validFrom = validFrom,
+            validUntil = validUntil,
+            verifiedProofs = verifiedProofs,
+        )
+    }
+
     override fun writeCredentialError(error: CredentialError): CredentialResponseHttp =
         CredentialResponseHttp(
             status = 400,
@@ -641,7 +706,7 @@ class DefaultOAuth2Provider(
     override fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp =
         writeCredentialError(error)
 
-    override fun writeCredentialResponse(
+    override suspend fun writeCredentialResponse(
         request: CredentialRequest,
         response: CredentialResponse
     ): CredentialResponseHttp {
@@ -651,6 +716,8 @@ class DefaultOAuth2Provider(
 
         val encrypted = try {
             config.credentialResponseEncryptor.encrypt(payload, encryption)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             return writeCredentialError(
                 request,

@@ -1,5 +1,6 @@
 package id.walt.crypto.keys.tse
 
+import id.walt.crypto.utils.requireHttpEndpoint
 import kotlinx.serialization.Serializable
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
@@ -14,6 +15,10 @@ data class TSEKeyMetadata(
     val namespace: String? = null,
     val id: String? = null,
 ) {
+    init {
+        requireHttpEndpoint(server, "Vault server URL")
+    }
+
     @JsName("TSEKeyMetadata2")
     constructor(
         server: String,

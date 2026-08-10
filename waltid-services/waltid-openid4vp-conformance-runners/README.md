@@ -79,3 +79,47 @@ VCI wallet conformance uses two local processes: start Wallet API2 with
 `run-wallet-api2-conformance-local.sh`, then run
 `run-wallet-conformance-local.sh` from a second terminal. The complete setup is
 in [docs/VCI-WALLET.md](docs/VCI-WALLET.md).
+
+## CI summaries and soft-fail
+
+The reusable OSS Gradle workflow
+(`.github/workflows/gradle.yml`) appends per-role Markdown summaries to the
+GitHub Actions job summary after `allTests`.
+
+Artifacts (when a role actually runs):
+
+```text
+build/reports/openid-conformance/
+  vp-verifier/summary.md
+  vp-verifier/results.json
+  vci-issuer/summary.md
+  vci-issuer/results.json
+  vci-wallet/summary.md
+  vp-wallet/summary.md
+```
+
+### `CONFORMANCE_ALLOW_FAILURE`
+
+Repo/org Actions variable controlling soft-fail for all conformance roles:
+
+| Value | Behavior |
+|-------|----------|
+| unset / empty / `true` | Soft-fail: failed tests still appear in the job summary, but JUnit does not fail the job for those failures |
+| `false` | Hard-fail: any executed non-passing conformance result fails the job |
+
+While actively working on conformance, keep the variable unset or set to
+`true`. Set it to `false` when conformance must be green to merge.
+
+Local equivalent:
+
+```bash
+export CONFORMANCE_ALLOW_FAILURE=true   # soft-fail
+export CONFORMANCE_ALLOW_FAILURE=false  # hard-fail
+```
+
+For the VCI issuer matrix, `OPENID4VCI_CONFORMANCE_STRICT` and
+`OPENID4VCI_CONFORMANCE_CERTIFICATION_MODE` still apply for local runs.
+When `CONFORMANCE_ALLOW_FAILURE` is present (including empty CI injection), it
+participates in strictness resolution; certification mode always remains strict.
+Issuer reports default to `build/reports/openid-conformance/vci-issuer`
+(override with `OPENID4VCI_CONFORMANCE_REPORT_DIR`).

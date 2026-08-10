@@ -33,8 +33,10 @@ data class W3C11(
 ) : AbstractW3C() {
 
     override val format: String = when (signature) {
-        is JwtCredentialSignature -> "jwt_vc_json"
-        is SdJwtCredentialSignature -> "jwt_vc_json"
+        // A W3C VCDM credential secured with SD-JWT keeps the W3C DCQL/OID4VCI format identifier:
+        // issuers advertise it as jwt_vc_json, so verifiers must be able to query it as jwt_vc_json.
+        // `dc+sd-jwt` is reserved for IETF SD-JWT VC (which requires a `vct`).
+        is JwtCredentialSignature, is SdJwtCredentialSignature -> "jwt_vc_json"
         is DataIntegrityProofCredentialSignature -> "ldp_vc"
         is CoseCredentialSignature -> "vc+cose"  // W3C VCDM secured with COSE_Sign1 (vc-jose-cose)
         null -> "unsigned"

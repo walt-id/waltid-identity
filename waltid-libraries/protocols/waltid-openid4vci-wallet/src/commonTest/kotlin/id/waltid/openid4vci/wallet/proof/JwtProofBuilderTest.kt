@@ -54,11 +54,11 @@ class JwtProofBuilderTest {
         val keyId = "did:key:123"
         val mockKey = MockKey(kid = keyId)
 
-        val proof = builder.buildJwtProof(
+        val proof = builder.buildProof(
             key = mockKey,
             audience = audience,
             nonce = nonce,
-            keyId = keyId
+            binding = ProofKeyBinding.KeyId(keyId),
         )
 
         assertNotNull(proof.jwt)
@@ -69,11 +69,11 @@ class JwtProofBuilderTest {
     fun testBuildJwtProofWithJwk() = runTest {
         val mockKey = MockKey()
 
-        val proof = builder.buildJwtProof(
+        val proof = builder.buildProof(
             key = mockKey,
             audience = audience,
             nonce = nonce,
-            includeJwk = true
+            binding = ProofKeyBinding.Jwk,
         )
 
         assertNotNull(proof.jwt)
@@ -84,11 +84,11 @@ class JwtProofBuilderTest {
     fun proofWithoutNonceOmitsNonceClaim() = runTest {
         val mockKey = MockKey()
 
-        val proof = builder.buildJwtProof(
+        val proof = builder.buildProof(
             key = mockKey,
             audience = audience,
             nonce = null,
-            includeJwk = true,
+            binding = ProofKeyBinding.Jwk,
         )
 
         assertEquals("mock.jwt.proof", proof.jwt!!.first())

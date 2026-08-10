@@ -1,6 +1,9 @@
 package id.walt.w3c
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
@@ -78,6 +81,7 @@ class PresentationBuilder {
     fun buildPresentationJson() = buildPresentationMap().toJsonElement()
     fun buildPresentationJsonString() = Json.encodeToString(buildPresentationJson())
 
+    @Deprecated("Use the crypto2 overload accepting a Key and JwsAlgorithm")
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -86,19 +90,28 @@ class PresentationBuilder {
         return key.signJws(
             plaintext = buildPresentationJsonString().encodeToByteArray(),
             headers = mapOf(
-                "kid" to (did?.let { resolveDidAuthentication(it) } ?: key.getKeyId()).toJsonElement(),
+                "kid" to (did?.let { DidService.resolveAuthenticationMethodId(it, key.getKeyId()) }
+                    ?: key.getKeyId()).toJsonElement(),
                 "typ" to "JWT".toJsonElement()
             )
         )
     }
 
-    private suspend fun resolveDidAuthentication(did: String): String {
-        return DidService.resolve(did).getOrThrow()["authentication"]!!.jsonArray.first().let {
-            if (it is JsonObject) {
-                it.jsonObject["id"]!!.jsonPrimitive.content
-            } else {
-                it.jsonPrimitive.content
-            }
-        }
+    @JsExport.Ignore
+    suspend fun buildAndSign(
+        key: Crypto2Key,
+        algorithm: JwsAlgorithm,
+    ): String {
+        val keyId = did?.let { DidService.resolveAuthenticationMethodId(it, key.id.value) } ?: key.id.value
+        return CompactJws.sign(
+            payload = buildPresentationJsonString().encodeToByteArray(),
+            key = key,
+            algorithm = algorithm,
+            protectedHeader = buildJsonObject {
+                put("kid", keyId)
+                put("typ", "JWT")
+            },
+        )
     }
+
 }

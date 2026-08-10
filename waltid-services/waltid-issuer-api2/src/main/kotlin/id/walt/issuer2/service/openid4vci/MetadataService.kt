@@ -1,7 +1,13 @@
 package id.walt.issuer2.service.openid4vci
 
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyManager
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.keys.publicOnly
+import id.walt.crypto2.migration.v1.V1PublicKeyReference
+import id.walt.crypto2.migration.v1.v1PublicKeyReference
+import id.walt.crypto2.serialization.BinaryData
+import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.issuer2.config.CredentialEncryptionKeyConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
@@ -9,22 +15,13 @@ import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
-import id.walt.openid4vci.metadata.issuer.CredentialRequestEncryption
-import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
-import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
-import id.walt.openid4vci.metadata.issuer.IssuerDisplay
-import id.walt.openid4vci.metadata.issuer.toSignedJwt
+import id.walt.openid4vci.metadata.issuer.*
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
+import id.walt.openid4vci.tokens.jwt.Crypto2JwtSigningKey
 import id.walt.sdjwt.metadata.issuer.JWTVCIssuerMetadata
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 
 class MetadataService(
     serviceConfig: Issuer2ServiceConfig,
@@ -32,6 +29,8 @@ class MetadataService(
     private val profileService: CredentialProfileService,
     private val sessionService: IssuanceSessionService,
     private val preAuthorizedGrantAnonymousAccessSupported: Boolean = false,
+    /** Crypto2 token signing key used for signed issuer metadata. */
+    private val crypto2TokenSigningKey: Crypto2JwtSigningKey? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -66,10 +65,18 @@ class MetadataService(
             )
         }
 
-    suspend fun getSignedCredentialIssuerMetadata(): String =
-        getCredentialIssuerMetadata().toSignedJwt(
-            signingKey = KeyManager.resolveSerializedKey(tokenSigningKeyConfig),
+    suspend fun getSignedCredentialIssuerMetadata(): String {
+        val signingKey = requireNotNull(crypto2TokenSigningKey) {
+            "Signed Credential Issuer Metadata requires a crypto2-capable token signing key"
+        }
+        return getCredentialIssuerMetadata().toSignedJwt(
+            signingKey = signingKey.key,
+            algorithm = signingKey.algorithm,
+            // The kid the issuer publishes, which Crypto2JwtSigningKey already carries; do not let it default to the
+            // crypto2 record ID.
+            keyId = signingKey.keyId,
         )
+    }
 
     fun getAuthorizationServerMetadata(): AuthorizationServerMetadata =
         AuthorizationServerMetadata.fromBaseUrl(
@@ -121,29 +128,65 @@ class MetadataService(
 
     fun issuerBaseUrl(): String = baseUrl
 
+    /**
+     * Publishes the public halves of every key this issuer signs with, per RFC 8414 `jwks_uri`.
+     *
+     * Public material only: a JWKS never needs an operational key, so this reads the published public JWK straight out
+     * of the configured records instead of resolving a provider. That matters for remote-KMS keys (`tse`, `aws-rest-api`,
+     * ...), whose public half is cached in the record but which cannot be restored offline.
+     */
     suspend fun listJwks(): JsonObject {
-        val tokenSigningKey = KeyManager.resolveSerializedKey(tokenSigningKeyConfig)
-        val profileIssuerKeys = profileService.listProfiles()
-            .map { profile -> KeyManager.resolveSerializedKey(profile.issuerKey) }
-        val sessionIssuerKeys = sessionService.listSessions()
-            .map { session -> KeyManager.resolveSerializedKey(session.issuerKey) }
+        val configuredKeys = listOf(tokenSigningKeyConfig) +
+                profileService.listProfiles().map { profile -> profile.issuerKey.toString() } +
+                sessionService.listSessions().map { session -> session.issuerKey.toString() }
 
         return buildJsonObject {
             put("keys", buildJsonArray {
-                (listOf(tokenSigningKey) + profileIssuerKeys + sessionIssuerKeys)
-                    .map { key -> key.getPublicJwkWithKid() }
+                configuredKeys
+                    .mapNotNull { serialized -> publicJwkWithKid(serialized) }
                     .deduplicated()
                     .forEach { add(it) }
             })
         }
     }
 
-    private suspend fun Key.getPublicJwkWithKid(): JsonObject {
-        val publicJwk = getPublicKey().exportJWKObject()
-        return JsonObject(publicJwk.toMutableMap().apply {
-            putIfAbsent("kid", JsonPrimitive(getKeyId()))
+    /**
+     * The `kid` must keep matching what was published before: v1 used `_keyId` when set and otherwise the RFC 7638
+     * thumbprint, so [V1_LEGACY_KEY_ID_METADATA_KEY]-style precedence is preserved here. A record with no public
+     * material at all is skipped rather than failing the whole endpoint, since one unusable profile key must not take
+     * the issuer's JWKS offline.
+     */
+    private suspend fun publicJwkWithKid(serializedKey: String): JsonObject? {
+        val reference = if (serializedKey.isStoredKey()) {
+            StoredKeyCodec.decodeFromString(serializedKey).toPublicKeyReference() ?: return null
+        } else {
+            v1PublicKeyReference(serializedKey) ?: return null
+        }
+        val encoded = EncodedKey.Jwk(
+            BinaryData(reference.publicJwk.toString().encodeToByteArray()),
+            privateMaterial = false,
+        )
+        val keyId = reference.keyId ?: Jwk.sha256Thumbprint(encoded)
+        return JsonObject(reference.publicJwk.toMutableMap().apply {
+            putIfAbsent("kid", JsonPrimitive(keyId))
         })
     }
+
+    private fun StoredKey.toPublicKeyReference(): V1PublicKeyReference? {
+        val jwk = when (this) {
+            is StoredKey.Software -> (material as? EncodedKey.Jwk)?.publicOnly()
+            is StoredKey.Managed -> publicKey as? EncodedKey.Jwk
+        } ?: return null
+        val parsed = Json.parseToJsonElement(jwk.data.toByteArray().decodeToString()) as? JsonObject ?: return null
+        // Deliberately id.value and not legacyKeyId(): Crypto2JwtSigningKey defaults its kid header to id.value, so
+        // that is the kid actually appearing in issued tokens. Advertising anything else here would publish a kid the
+        // issuer never emits. For keys migrated from v1 the two coincide, because the migration uses the v1 published
+        // key ID as the record ID.
+        return V1PublicKeyReference(parsed, id.value.takeIf { it.isNotBlank() })
+    }
+
+    private fun String.isStoredKey(): Boolean =
+        (Json.parseToJsonElement(this) as? JsonObject)?.containsKey("version") == true
 
     private fun List<JsonObject>.deduplicated(): List<JsonObject> {
         val seen = mutableSetOf<String>()

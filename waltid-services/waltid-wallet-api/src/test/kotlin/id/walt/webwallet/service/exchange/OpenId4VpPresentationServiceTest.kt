@@ -11,8 +11,8 @@ import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
-import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
-import id.walt.openid4vp.clientidprefix.ClientValidationResult
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -617,9 +617,18 @@ class OpenId4VpPresentationServiceTest {
 
     @Test
     fun `normalized request URL accepts signed request objects by default when authentication succeeds`() {
-        val service = OpenId4VpPresentationService(mockk(relaxed = true))
-        val signedRequestObject = signedLikeJwt(
-            """
+        val trustedKey = runBlocking { JWKKey.generate(KeyType.Ed25519) }
+        val clientMetadata = ClientMetadata(
+            jwks = ClientMetadata.Jwks(listOf(runBlocking { trustedKey.getPublicKey().exportJWKObject() })),
+            vpFormatsSupported = emptyMap(),
+        )
+        val service = OpenId4VpPresentationService(
+            credentialService = mockk(relaxed = true),
+            clientIdTrustConfiguration = ClientIdTrustConfiguration(
+                preRegisteredClients = mapOf("verifier2" to clientMetadata),
+            ),
+        )
+        val requestPayload = """
             {
               "client_id":"verifier2",
               "response_type":"vp_token",
@@ -628,25 +637,21 @@ class OpenId4VpPresentationServiceTest {
               "nonce":"nonce-123",
               "dcql_query":${json.encodeToString(DcqlQuery.serializer(), query)}
             }
-            """.trimIndent(),
-        )
-
-        mockkObject(ClientIdPrefixAuthenticator)
-        try {
-            val clientMetadata = ClientMetadata.fromJson("""{"vp_formats_supported":{}}""").getOrThrow()
-            coEvery { ClientIdPrefixAuthenticator.authenticate(any(), any(), any()) } returns
-                    ClientValidationResult.Success(clientMetadata)
-
-            val resolvedRequest = runBlocking {
-                resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$signedRequestObject")
-            }
-            val resolvedUrl = Url(resolvedRequest)
-
-            assertEquals(signedRequestObject, resolvedUrl.parameters["request"])
-            assertFalse(resolvedUrl.parameters.contains("dcql_query"))
-        } finally {
-            unmockkObject(ClientIdPrefixAuthenticator)
+            """.trimIndent()
+        val signedRequestObject = runBlocking {
+            trustedKey.signJws(
+                requestPayload.encodeToByteArray(),
+                mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
+            )
         }
+
+        val resolvedRequest = runBlocking {
+            resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$signedRequestObject")
+        }
+        val resolvedUrl = Url(resolvedRequest)
+
+        assertEquals(signedRequestObject, resolvedUrl.parameters["request"])
+        assertFalse(resolvedUrl.parameters.contains("dcql_query"))
     }
 
     @Test

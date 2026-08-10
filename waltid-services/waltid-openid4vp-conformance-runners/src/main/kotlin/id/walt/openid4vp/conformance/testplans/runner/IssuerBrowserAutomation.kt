@@ -95,6 +95,8 @@ internal class IssuerConformanceBrowserAutomation(
                     }
                 }
 
+                browser.quickTunnelFailure(currentUrl)?.let(::error)
+
                 if (currentUrl.contains("/openid4vci/callback")) {
                     currentUrl.callbackErrorDescription()?.let {
                         error("Issuer authorization callback returned error: $it (url=$currentUrl)")
@@ -201,6 +203,21 @@ internal class ConformanceBrowser private constructor(
 
     fun hasElement(selector: String): Boolean =
         runCatching { page.locator(selector).count() > 0 }.getOrDefault(false)
+
+    fun quickTunnelFailure(url: String): String? {
+        val host = runCatching { URI.create(url).host }.getOrNull()
+        if (host?.endsWith(".trycloudflare.com", ignoreCase = true) != true) {
+            return null
+        }
+
+        val title = runCatching { page.title() }.getOrDefault("")
+        if (title.contains("502", ignoreCase = true) && title.contains("bad gateway", ignoreCase = true)) {
+            return "Cloudflare Quick Tunnel returned 502 Bad Gateway before Issuer2 received the browser request " +
+                "(url=$url). This is a retryable CI transport failure; rerun the conformance job."
+        }
+
+        return null
+    }
 
     override fun close() {
         runCatching { context.close() }

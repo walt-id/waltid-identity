@@ -38,7 +38,7 @@ SNIPPETS = (
         (REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md",),
     ),
     Snippet(
-        "kotlin-full-store-overrides",
+        "kotlin-store-overrides",
         REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/MobileWalletPersistenceSnippetsTest.kt",
         (REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md",),
     ),

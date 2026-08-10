@@ -8,7 +8,7 @@ group = "id.walt.permissions"
 
 
 kotlin {
-    js(IR) {
+    js {
         outputModuleName = "waltid-permissions"
     }
 

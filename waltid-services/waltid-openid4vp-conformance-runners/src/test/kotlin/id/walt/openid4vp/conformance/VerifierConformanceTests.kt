@@ -1,6 +1,8 @@
 package id.walt.openid4vp.conformance
 
 import id.walt.openid4vp.conformance.config.ConformanceConfig
+import id.walt.openid4vp.conformance.report.ConformanceCiFlags
+import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.VerifierConformanceTestRunner
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import kotlinx.coroutines.runBlocking
@@ -118,16 +120,15 @@ open class VerifierConformanceTests {
 
         try {
             val results = runner.run()
-            
-            // Print summary
+
             println()
             println("=".repeat(80))
             println("VERIFIER CONFORMANCE TEST RESULTS")
             println("=".repeat(80))
-            
+
             val passed = results.count { it.passed }
             val failed = results.count { !it.passed }
-            
+
             results.forEach { result ->
                 val status = if (result.passed) "✅ PASS" else "❌ FAIL"
                 println("$status: ${result.testName}")
@@ -135,15 +136,22 @@ open class VerifierConformanceTests {
                     println("       ${result.message}")
                 }
             }
-            
+
             println()
             println("Summary: $passed passed, $failed failed out of ${results.size} tests")
             println("=".repeat(80))
-            
-            // Fail the test if any test failed
-            if (failed > 0) {
-                throw AssertionError("$failed verifier conformance test(s) failed")
-            }
+
+            ConformanceReportWriter.writeTestPlanResults(
+                role = ConformanceReportWriter.Role.VP_VERIFIER,
+                results = results,
+                conformanceHost = conformanceHost,
+                conformancePort = conformancePort,
+            )
+            ConformanceReportWriter.failIfNeededFromTestPlanResults(
+                role = ConformanceReportWriter.Role.VP_VERIFIER,
+                results = results,
+                allowFailure = ConformanceCiFlags.allowFailure(),
+            )
         } finally {
             runner.close()
         }

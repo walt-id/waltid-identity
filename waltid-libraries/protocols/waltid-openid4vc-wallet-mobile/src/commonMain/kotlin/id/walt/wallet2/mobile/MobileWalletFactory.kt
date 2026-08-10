@@ -1,19 +1,25 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.wallet2.mobile
 
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.did.dids.Crypto2DidService
 import app.cash.sqldelight.db.SqlDriver
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
-import id.walt.wallet2.persistence.keys.PlatformKeyProvider
-import id.walt.wallet2.persistence.stores.PlatformKeyStore
+import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
+import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
+import id.walt.wallet2.persistence.stores.SqlDelightIssuanceSessionStore
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlin.uuid.Uuid
 
 /**
  * Configuration for creating a [MobileWallet].
@@ -61,11 +67,13 @@ internal fun List<MobileWalletTransactionDataProfile>.toTransactionDataTypeRegis
  * Wallet-local persistence configuration.
  *
  * @property databaseKey Owner of the SQLCipher key used for the encrypted local wallet database.
- * @property stores Optional store overrides. `null` entries keep the platform default for that state category.
+ * @property credentialStore Optional credential-store override. `null` uses the encrypted SQLDelight store.
+ * @property didStore Optional DID-store override. `null` uses the encrypted SQLDelight store.
  */
 public data class MobileWalletPersistence(
     public val databaseKey: MobileWalletDatabaseKey = MobileWalletDatabaseKey.Managed,
-    public val stores: MobileWalletStores = MobileWalletStores(),
+    public val credentialStore: WalletCredentialStore? = null,
+    public val didStore: WalletDidStore? = null,
 )
 
 /**
@@ -88,37 +96,6 @@ public sealed interface MobileWalletDatabaseKey {
 }
 
 /**
- * Optional store overrides for wallet-local state.
- *
- * `null` entries keep the platform default for that state category: credentials and DID
- * documents use the encrypted SQLDelight database, while signing keys use platform-backed
- * key persistence and generation.
- *
- * @property credentials Optional credential store override.
- * @property dids Optional DID document store override.
- * @property keys Optional atomic signing-key store and generation override.
- */
-public data class MobileWalletStores(
-    public val credentials: WalletCredentialStore? = null,
-    public val dids: WalletDidStore? = null,
-    public val keys: MobileWalletKeys? = null,
-)
-
-/**
- * Atomic override for wallet signing-key persistence and generation.
- *
- * Key storage and key generation are configured together because platform default signing keys
- * are coupled to their platform-protected key stores.
- *
- * @property store Store for wallet signing-key references.
- * @property generate Generator used when the wallet needs to create signing keys.
- */
-public data class MobileWalletKeys(
-    public val store: WalletKeyStore,
-    public val generate: suspend (KeyType) -> Key,
-)
-
-/**
  * Platform factory that wires [MobileWallet] to Android or iOS storage and key infrastructure.
  */
 public expect class MobileWalletFactory {
@@ -128,12 +105,22 @@ public expect class MobileWalletFactory {
      * @param config Wallet configuration. Defaults use the stable `default` wallet identifier and P-256 key material.
      */
     public suspend fun create(config: MobileWalletConfig = MobileWalletConfig()): MobileWallet
+
+    /**
+     * Creates a mobile wallet with explicit verifier client-ID trust configuration.
+     */
+    public suspend fun create(
+        config: MobileWalletConfig,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+    ): MobileWallet
+
 }
 
 internal suspend fun createEncryptedSqlDelightMobileWallet(
     config: MobileWalletConfig,
+    clientIdTrustConfiguration: ClientIdTrustConfiguration,
     managedDatabaseKeyProvider: DatabaseEncryptionKeyProvider,
-    platformKeyProvider: PlatformKeyProvider,
+    platformKeyProvider: PlatformManagedKeyProvider,
     openEncryptedDriver: (
         databaseName: String,
         encryptionKey: DatabaseEncryptionKey,
@@ -157,6 +144,7 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
 
     return createSqlDelightMobileWallet(
         config = config,
+        clientIdTrustConfiguration = clientIdTrustConfiguration,
         db = db,
         keyProvider = platformKeyProvider,
         deleteLocalPersistence = {
@@ -167,29 +155,38 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
     )
 }
 
-private fun createSqlDelightMobileWallet(
+internal fun createSqlDelightMobileWallet(
     config: MobileWalletConfig,
+    clientIdTrustConfiguration: ClientIdTrustConfiguration,
     db: WalletPersistenceDatabase,
-    keyProvider: PlatformKeyProvider,
+    keyProvider: PlatformManagedKeyProvider,
+    didService: Crypto2DidService = Crypto2DidService,
     deleteLocalPersistence: suspend () -> Unit,
 ): MobileWallet {
     val queries = db.walletPersistenceQueries
-    val keyOverride = config.persistence.stores.keys
-    val keyStore = keyOverride?.store ?: PlatformKeyStore(keyProvider, queries)
-    val credentialStore = config.persistence.stores.credentials ?: SqlDelightCredentialStore(queries)
-    val didStore = config.persistence.stores.dids ?: SqlDelightDidStore(queries)
-    val keyGenerator = keyOverride?.generate ?: { keyType: KeyType -> keyProvider.generateKey(keyType) }
-
+    val keyStore = SqlDelightKeyStore(keyProvider, queries)
+    val credentialStore = config.persistence.credentialStore ?: SqlDelightCredentialStore(queries)
+    val didStore = config.persistence.didStore ?: SqlDelightDidStore(queries)
+    val issuanceSessionStore = SqlDelightIssuanceSessionStore(queries)
     return MobileWallet(
         walletId = config.walletId,
         keyStore = keyStore,
         didStore = didStore,
         credentialStore = credentialStore,
-        keyGenerator = keyGenerator,
+        issuanceSessionStore = issuanceSessionStore,
+        generateAndPersistKey = { keyType ->
+            keyStore.generateManagedKey(
+                id = KeyId("wallet_key_${Uuid.random()}"),
+                spec = keyType.toKeySpec(),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        },
+        didService = didService,
         defaultKeyType = config.defaultKeyType,
         attestationConfig = config.attestationConfig,
         preferredLocales = config.preferredLocales,
         transactionDataProfiles = config.transactionDataProfiles,
+        clientIdTrustConfiguration = clientIdTrustConfiguration,
         onEvent = config.onEvent,
         deleteLocalPersistence = deleteLocalPersistence,
     )

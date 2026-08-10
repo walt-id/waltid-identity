@@ -1,5 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
+import id.walt.openid4vp.conformance.report.ConformanceCiFlags
+import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.httpdata.CreateTestPlanResponse
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
@@ -56,9 +58,22 @@ class WalletTestPlanRunner(
             result
         }
 
-        printSummary(results)
+        val namedResults = results.mapIndexed { index, result ->
+            result.copy(
+                testName = result.testName.takeIf { it != "unknown" }
+                    ?: "${testPlan.description}#${index + 1}"
+            )
+        }
+        ConformanceReportWriter.writeTestPlanResults(
+            role = ConformanceReportWriter.Role.VP_WALLET,
+            results = namedResults,
+            conformanceHost = conformanceHost,
+            conformancePort = conformancePort,
+            expectRejection = testPlan.expectRejection,
+        )
+        printSummary(namedResults)
 
-        return results
+        return namedResults
     }
 
     private suspend fun createTestPlan(): CreateTestPlanResponse {
@@ -168,17 +183,19 @@ class WalletTestPlanRunner(
         println("=" .repeat(80))
         println()
 
-        if (!testPlan.optional) {
-            if (testPlan.expectRejection) {
-                val allRejected = results.all { it.walletStatus == "REJECTED" || it.conformanceResult == "PASSED" }
-                check(allRejected) {
-                    "Negative test plan expected all requests to be rejected by wallet, but some were accepted"
-                }
-            } else {
-                val allPassed = results.all { it.walletStatus == "PASSED" }
-                check(allPassed) {
-                    "Test plan had ${results.count { it.walletStatus != "PASSED" }} failures"
-                }
+        if (testPlan.optional || ConformanceCiFlags.allowFailure()) {
+            return
+        }
+
+        if (testPlan.expectRejection) {
+            val allRejected = results.all { it.walletStatus == "REJECTED" || it.conformanceResult == "PASSED" }
+            check(allRejected) {
+                "Negative test plan expected all requests to be rejected by wallet, but some were accepted"
+            }
+        } else {
+            val allPassed = results.all { it.walletStatus == "PASSED" }
+            check(allPassed) {
+                "Test plan had ${results.count { it.walletStatus != "PASSED" }} failures"
             }
         }
     }
