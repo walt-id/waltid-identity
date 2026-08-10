@@ -301,7 +301,8 @@ public object AndroidDigitalCredentialProvider {
      * - Multipaz's `identitycredentialmatcher.wasm`, which serves the Annex C registry, has no
      *   metadata channel and instead emits `"<combination-index> <protocol> <document-id>"`. The
      *   leading integer is a combination counter, **not** a `requests` index, so only the protocol and
-     *   document id are read from it; the request index comes from `credentialSetId`.
+     *   document id are read from it. Such a selection therefore carries no request index, and
+     *   [resolveSelectedProtocolRequest] attributes it by protocol instead.
      *
      * A `credentialId` in neither shape is passed through with no attribution, which
      * [resolveSelectedProtocolRequest] accepts only for a single-alternative envelope.
