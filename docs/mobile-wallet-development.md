@@ -100,8 +100,14 @@ Group entitlement, do not switch to a Personal Team and do not remove the entitl
 ID and capability assignment in the walt.id Apple Developer account, then refresh automatic
 provisioning.
 
-Simulator builds validate source and built-product configuration. They do not prove physical-device
-provisioning, provider registration with the system, or cross-process Keychain access.
+A simulator running iOS 26 or later is a usable end-to-end target: it registers the provider
+extension with the system and mediates real requests from Safari. Only `org-iso-mdoc` is available
+there, because `DigitalCredential.userAgentAllowsProtocol()` rejects every `openid4vp` variant, so
+the OpenID4VP variants of this flow can only be exercised on Android.
+
+What a simulator does not establish is physical-device provisioning or cross-process Keychain access:
+its entitlements are the simulated ones the build applied rather than a provisioning profile, and the
+shared Keychain group resolves against a simulated `AppIdentifierPrefix`.
 
 ## Common checks
 
