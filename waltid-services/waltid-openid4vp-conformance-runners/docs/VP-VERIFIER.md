@@ -187,6 +187,19 @@ https://localhost.emobix.co.uk:8443/log-detail.html?log=<test_id>
 3. **Add plain SD-JWT test** to confirm baseline SD-JWT functionality
 4. **Update documentation** with final test results
 
+## CI reports and soft-fail
+
+When verifier conformance runs in CI (or locally), the runner writes:
+
+```text
+build/reports/openid-conformance/vp-verifier/summary.md
+build/reports/openid-conformance/vp-verifier/results.json
+```
+
+The OSS Gradle workflow appends these to the GitHub Actions job summary.
+Soft-fail is controlled by the repo Actions variable `CONFORMANCE_ALLOW_FAILURE`
+(see the module [README](../README.md#ci-summaries-and-soft-fail)).
+
 ## Code Fixes Made (2026-07-08)
 
 ### ClaimsQuery Model

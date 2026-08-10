@@ -6,6 +6,7 @@ import id.walt.wallet2.data.WalletCredentialStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
@@ -56,6 +57,8 @@ class ExposedCredentialStore(
                 it[Wallet2Tables.Credentials.label] = entry.label
                 it[Wallet2Tables.Credentials.addedAt] =
                     (entry.addedAt ?: Clock.System.now()).toJavaInstant()
+                it[Wallet2Tables.Credentials.metadata] =
+                    entry.metadata?.let { meta -> json.encodeToString(JsonObject.serializer(), meta) }
             }
         }
     }
@@ -76,7 +79,10 @@ class ExposedCredentialStore(
                     row[Wallet2Tables.Credentials.serializedCredential]
                 ),
                 label = row[Wallet2Tables.Credentials.label],
-                addedAt = row[Wallet2Tables.Credentials.addedAt].toKotlinInstant()
+                addedAt = row[Wallet2Tables.Credentials.addedAt].toKotlinInstant(),
+                metadata = row[Wallet2Tables.Credentials.metadata]?.let {
+                    json.decodeFromString(JsonObject.serializer(), it)
+                },
             )
         }.getOrNull()
 }
