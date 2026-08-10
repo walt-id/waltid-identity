@@ -7,6 +7,7 @@ import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.algorithms.outputSizeBytes
 import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto.keys.Key as Crypto1Key
@@ -31,7 +32,7 @@ interface X509SigningAlgorithmInfo {
 
     companion object {
 
-        const val KEY_ALG_NAME_EC = "id-ecPublicKey"
+        const val KEY_ALG_NAME_EC = "ecPublicKey"
         const val KEY_ALG_OID_EC = "1.2.840.10045.2.1"
 
         const val CURVE_SECP256R1_OID = "1.2.840.10045.3.1.7" //prime256v1 or secp256r1
@@ -44,6 +45,13 @@ interface X509SigningAlgorithmInfo {
 
         const val KEY_ALG_NAME_RSA = "rsaEncryption"
         const val KEY_ALG_OID_RSA = "1.2.840.113549.1.1.1"
+
+        const val KEY_ALG_NAME_ED25519 = "Ed25519"
+        const val KEY_ALG_OID_ED25519 = "1.3.101.112"
+
+        const val KEY_ALG_NAME_Ed448 = "Ed448"
+        const val KEY_ALG_OID_Ed448 = "1.3.101.113"
+
 
         fun ofKey(key: Key, signatureAlgorithm: SignatureAlgorithm): X509SigningAlgorithmInfo {
             signatureAlgorithm.requireCompatibleWith(key)
@@ -141,7 +149,33 @@ interface X509SigningAlgorithmInfo {
                     }
                 }
 
-                is KeySpec.Edwards -> TODO()
+                is KeySpec.Edwards -> {
+                    val edKeySpec = key.spec as KeySpec.Edwards
+                    when (edKeySpec.curve.name) {
+                        EdwardsCurve.ED25519.name -> {
+                            Info(
+                                signingAlgorithmName = "Ed25519",
+                                signingAlgorithmOid = "1.3.101.112",
+                                keyAlgorithmName = KEY_ALG_NAME_ED25519,
+                                keyAlgorithmOid = "1.3.101.112",
+                                keyEllipticCurveOid = null
+                            )
+                        }
+
+                        EdwardsCurve.ED448.name -> {
+                            Info(
+                                signingAlgorithmName = "Ed448",
+                                signingAlgorithmOid = "1.3.101.113",
+                                keyAlgorithmName = KEY_ALG_NAME_Ed448,
+                                keyAlgorithmOid = "1.3.101.113",
+                                keyEllipticCurveOid = null
+                            )
+                        }
+
+                        else -> throw IllegalArgumentException("Unsupported Edwards curve: ${edKeySpec.curve.name}")
+                    }
+                }
+
                 else -> throw IllegalArgumentException("Unsupported key type: ${key.spec::class.simpleName}")
             }
         }
@@ -173,16 +207,22 @@ interface X509SigningAlgorithmInfo {
 
                 KEY_ALG_OID_RSA -> {
                     requireNotNull(rsaKeyLengthBits) { "Key length is required for RSA key" }
-                    KeySpec.Rsa(rsaKeyLengthBits)}
+                    KeySpec.Rsa(rsaKeyLengthBits)
+                }
+
+                KEY_ALG_OID_ED25519 -> KeySpec.Edwards(EdwardsCurve.ED25519)
+
+                KEY_ALG_OID_Ed448 -> KeySpec.Edwards(EdwardsCurve.ED448)
+
                 else -> throw IllegalArgumentException("Unsupported key algorithm OID: '$keyAlgorithmOid'")
             }
 
 
         private val signingAlgorithmInfoMap = mapOf(
             Crypto1KeyType.Ed25519 to Info(
-                signingAlgorithmName = "id-Ed25519",
+                signingAlgorithmName = "Ed25519",
                 signingAlgorithmOid = "1.3.101.112",
-                keyAlgorithmName = "id-Ed25519",
+                keyAlgorithmName = KEY_ALG_NAME_ED25519,
                 keyAlgorithmOid = "1.3.101.112",
                 keyEllipticCurveOid = null
             ),
@@ -282,6 +322,10 @@ interface X509SigningAlgorithmInfo {
                     require(saltLengthBytes == digest.outputSizeBytes) {
                         "X.509 RSA-PSS salt length must be explicit and match the digest length"
                     }
+                }
+
+                is SignatureAlgorithm.EdDsa -> {
+
                 }
 
                 else -> throw IllegalArgumentException("Unsupported X.509 signature algorithm: $this")

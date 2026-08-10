@@ -31,7 +31,7 @@ class Pkcs10CertificateUtilCsrSigningTest {
                     assertEquals("OU=unit test,O=Walt.id", data.subjectDn)
                     assertNotNull(data.subjectPublicKeyInfo) { pk ->
                         assertEquals("1.2.840.10045.2.1", pk.algorithmOid)
-                        assertEquals("id-ecPublicKey", pk.algorithmName)
+                        assertEquals("ecPublicKey", pk.algorithmName)
                         assertEquals(normalizePem(expectedPublicPem), normalizePem(pk.encodedPem))
                     }
                     assertNotNull(data.extensionSan) { san ->

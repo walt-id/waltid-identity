@@ -1,13 +1,13 @@
 package id.walt.openid4vp.clientidprefix.prefixes
 
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.x509.CertificateDer
-import id.walt.x509.crypto2PublicJwk
+import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
@@ -20,10 +20,9 @@ internal object ClientIdCrypto2 {
     }
 
     suspend fun keyFromCertificate(certificate: ByteArray): Key {
-        val jwk = CertificateDer(certificate).crypto2PublicJwk()
-        return runtime.restore(
-            jwk.toStoredSoftwareKey(KeyId(Jwk.sha256Thumbprint(jwk)), setOf(KeyUsage.VERIFY))
-        )
+        val cert = X509CertificateUtil.parseCertificateDerEncoded(ByteString(certificate))
+        val spki = cert.data.subjectPublicKeyInfo
+        return spki.restore(runtime)
     }
 
     suspend fun keyFromJwk(jwk: JsonObject, fallbackId: String): Key {

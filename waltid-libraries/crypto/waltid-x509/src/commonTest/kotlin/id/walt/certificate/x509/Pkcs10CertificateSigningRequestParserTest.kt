@@ -15,7 +15,7 @@ class Pkcs10CertificateSigningRequestParserTest {
         X509CertificateUtil.parseCsrPem(TestData.csrPem).also { csr ->
             assertEquals("C=AT,ST=Vienna,L=Vienna,O=Walt.id,CN=://walt.id", csr.requestedCertificate.subjectDn)
             assertEquals("1.2.840.10045.2.1", csr.requestedCertificate.subjectPublicKeyInfo.algorithmOid)
-            assertEquals("id-ecPublicKey", csr.requestedCertificate.subjectPublicKeyInfo.algorithmName)
+            assertEquals("ecPublicKey", csr.requestedCertificate.subjectPublicKeyInfo.algorithmName)
             assertEquals(
                 "040f62d46bb95bb0aef9cac3e291191042839ed4670c1c0121e58eff26983511bdef383cf9e352cbd4f520abebd262072b514cad988979853fd69dc25b00e97793",
                 csr.requestedCertificate.subjectPublicKeyInfo.keyValueHex

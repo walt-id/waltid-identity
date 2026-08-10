@@ -27,6 +27,15 @@ object TestKeyUtil {
             )
         )
 
+    suspend fun genEdKey(id: String, curve: EdwardsCurve = EdwardsCurve.ED25519) =
+        runtime.generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId(id),
+                spec = KeySpec.Edwards(curve),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+
     suspend fun loadRsaKeyPem(id: String, rsaPem: String) {
         runtime.restore(
             StoredKey.Software(

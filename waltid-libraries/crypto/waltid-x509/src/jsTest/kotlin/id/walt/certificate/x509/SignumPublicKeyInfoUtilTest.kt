@@ -38,7 +38,7 @@ class SignumPublicKeyInfoUtilTest {
         val key = JWKKey.importPEM(TestKeys.ed25519KeyPem).getOrThrow()
         val info = SignumPublicKeyInfoUtil.publicKeyInfoOfKey(key)
         assertEquals("1.3.101.112", info.algorithmOid)
-        assertEquals("id-Ed25519", info.algorithmName)
+        assertEquals("Ed25519", info.algorithmName)
         assertEquals(
             "48:B3:7C:31:23:20:88:0C:EC:40:04:36:25:89:EF:BD:8B:90:9B:0F",
             info.keyId.toHexString(opensslHexFormat)
@@ -50,7 +50,7 @@ class SignumPublicKeyInfoUtilTest {
         val key = JWKKey.importPEM(TestKeys.ecP256KeyPem).getOrThrow()
         val info = SignumPublicKeyInfoUtil.publicKeyInfoOfKey(key)
         assertEquals("1.2.840.10045.2.1", info.algorithmOid)
-        assertEquals("id-ecPublicKey", info.algorithmName)
+        assertEquals("ecPublicKey", info.algorithmName)
         assertEquals("1.2.840.10045.3.1.7", info.ellipticCurveOid)
         assertEquals(
             "A7:97:E8:20:1F:A9:32:29:98:9D:AE:73:2D:3A:A6:EC:BA:E5:81:09", //value taken from openssl created certificate

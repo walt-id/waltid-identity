@@ -3,10 +3,8 @@ package id.walt.certificate.x509
 import id.walt.certificate.der.ByteArrayUtil
 import id.walt.certificate.der.ByteArrayUtil.byteStringToBase64Pem
 import id.walt.crypto.utils.ShaUtils
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.keys.*
 import id.walt.crypto2.keys.StoredKey.Companion.CURRENT_VERSION
 import id.walt.crypto2.serialization.BinaryData
 import kotlinx.io.bytestring.ByteString
@@ -67,5 +65,11 @@ interface PublicKeyInfo {
             )
         }
 
-    companion object
+    suspend fun restore(runtime: CryptoRuntime): Key {
+        return runtime.restore(RestoreKey(keySpec))
+    }
+
+    companion object {
+        private class RestoreKey(override val storedKey: StoredKey.Software) : SoftwareKey
+    }
 }

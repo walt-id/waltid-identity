@@ -17,7 +17,10 @@ import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.algorithms.DigestAlgorithm
+import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.Key
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.bytestring.toHexString
@@ -32,11 +35,29 @@ class X509CertificateSigningTest {
         signAndValidateCertificate(issuerKey, sigAlg)
     }
 
+    @Test
+    fun shouldSignCertificateWithEcKey() = runTest {
+        val issuerKey = TestKeyUtil.genEcKey("ec-key", EcCurve.P256)
+        val sigAlg = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
+        signAndValidateCertificate(issuerKey, sigAlg)
+    }
+
+    @Ignore //Signum doesn't support Ed25519 yet
+    @Test
+    fun shouldSignCertificateWithEdKey() = runTest {
+        val issuerKey = TestKeyUtil.genEdKey("ed-key", EdwardsCurve.ED25519)
+        val sigAlg = SignatureAlgorithm.EdDsa
+        signAndValidateCertificate(issuerKey, sigAlg)
+    }
+
     suspend fun signAndValidateCertificate(issuerKey: Key, sigAlg: SignatureAlgorithm) {
         val rootCert = assertNotNull(X509CertificateUtil.createSelfSignedCertificate(issuerKey, sigAlg) {
             subjectDn = "CN=Test, OU=Walt.id, O=Walt.id, L=Graz, C=AT"
         })
             .also { cert ->
+                cert.data.subjectPublicKeyInfo.restore(TestKeyUtil.runtime).also {
+                    assertEquals(issuerKey.spec, it.spec)
+                }
                 val result =
                     X509CertificateUtil.validateCertificateChain(listOf(cert), InMemoryTrustStore(listOf(cert)))
                 assertTrue(result.valid)
@@ -46,6 +67,9 @@ class X509CertificateSigningTest {
             subjectDn = "CN=Test Leaf, OU=Walt.id, O=Walt.id, L=Graz, C=AT"
             subjectPublicKey(issuerKey)
         }).also { cert ->
+            cert.data.subjectPublicKeyInfo.restore(TestKeyUtil.runtime).also {
+                assertEquals(issuerKey.spec, it.spec)
+            }
             val result = X509CertificateUtil.validateCertificateChain(
                 listOf(cert),
                 InMemoryTrustStore(listOf(rootCert))
@@ -176,7 +200,7 @@ class X509CertificateSigningTest {
 
             assertNotNull(intermediateCert.data.subjectPublicKeyInfo) { keyInfo ->
                 assertEquals("1.2.840.10045.2.1", keyInfo.algorithmOid)
-                assertEquals("id-ecPublicKey", keyInfo.algorithmName)
+                assertEquals("ecPublicKey", keyInfo.algorithmName)
                 assertEquals(intermediateIssuerPublicKeyValueHex, keyInfo.keyValueHex)
                 assertEquals(normalizePem(expectedPublicPem), normalizePem(keyInfo.encodedPem))
                 assertFalse(normalizePem(keyInfo.encodedPem) == normalizePem(caCert.data.subjectPublicKeyInfo.encodedPem))

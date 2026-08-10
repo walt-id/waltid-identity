@@ -179,7 +179,7 @@ class SignumImplementationTest {
                 assertEquals("OU=unit test,O=Walt.id", data.subjectDn)
                 assertNotNull(data.subjectPublicKeyInfo) { pk ->
                     assertEquals("1.2.840.10045.2.1", pk.algorithmOid)
-                    assertEquals("id-ecPublicKey", pk.algorithmName)
+                    assertEquals("ecPublicKey", pk.algorithmName)
                     assertEquals(intermediateIssuerPublicKeyValueHex, pk.keyValueHex)
                 }
                 assertNotNull(data.extensionSan) { san ->
@@ -217,7 +217,7 @@ class SignumImplementationTest {
         signumCertUtil.parseCsrPem(TestData.csrPem).also { csr ->
             assertEquals("C=AT,ST=Vienna,L=Vienna,O=Walt.id,CN=://walt.id", csr.requestedCertificate.subjectDn)
             assertEquals("1.2.840.10045.2.1", csr.requestedCertificate.subjectPublicKeyInfo.algorithmOid)
-            assertEquals("id-ecPublicKey", csr.requestedCertificate.subjectPublicKeyInfo.algorithmName)
+            assertEquals("ecPublicKey", csr.requestedCertificate.subjectPublicKeyInfo.algorithmName)
             assertEquals(
                 "040f62d46bb95bb0aef9cac3e291191042839ed4670c1c0121e58eff26983511bdef383cf9e352cbd4f520abebd262072b514cad988979853fd69dc25b00e97793",
                 csr.requestedCertificate.subjectPublicKeyInfo.keyValueHex
@@ -317,7 +317,7 @@ class SignumImplementationTest {
 
         assertNotNull(intermediateCert.data.subjectPublicKeyInfo) { keyInfo ->
             assertEquals("1.2.840.10045.2.1", keyInfo.algorithmOid)
-            assertEquals("id-ecPublicKey", keyInfo.algorithmName)
+            assertEquals("ecPublicKey", keyInfo.algorithmName)
             assertEquals(intermediateIssuerPublicKeyValueHex, keyInfo.keyValueHex)
         }
 
@@ -373,7 +373,7 @@ class SignumImplementationTest {
         assertNotNull(signumCertUtil.parseCsrPem(TestData.csrPem)) { csr ->
             assertEquals("C=AT,ST=Vienna,L=Vienna,O=Walt.id,CN=://walt.id", csr.requestedCertificate.subjectDn)
             assertEquals("1.2.840.10045.2.1", csr.requestedCertificate.subjectPublicKeyInfo.algorithmOid)
-            assertEquals("id-ecPublicKey", csr.requestedCertificate.subjectPublicKeyInfo.algorithmName)
+            assertEquals("ecPublicKey", csr.requestedCertificate.subjectPublicKeyInfo.algorithmName)
             assertEquals(
                 "040f62d46bb95bb0aef9cac3e291191042839ed4670c1c0121e58eff26983511bdef383cf9e352cbd4f520abebd262072b514cad988979853fd69dc25b00e97793",
                 csr.requestedCertificate.subjectPublicKeyInfo.keyValueHex

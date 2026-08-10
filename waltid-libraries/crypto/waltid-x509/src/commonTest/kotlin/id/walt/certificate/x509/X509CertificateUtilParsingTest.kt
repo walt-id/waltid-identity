@@ -22,7 +22,7 @@ class X509CertificateUtilParsingTest {
             assertEquals("2026-06-15T08:39:06Z", cert.data.validity.notBefore.toString())
             assertEquals("2026-09-07T08:39:05Z", cert.data.validity.notAfter.toString())
             cert.data.subjectPublicKeyInfo.also {
-                assertEquals("id-ecPublicKey", it.algorithmName)
+                assertEquals("ecPublicKey", it.algorithmName)
                 assertEquals("1.2.840.10045.2.1", it.algorithmOid)
                 assertEquals("1.2.840.10045.3.1.7", it.ellipticCurveOid)
                 assertEquals(

@@ -143,7 +143,7 @@ class Crypto1X509CertificateSigningTest {
 
             assertNotNull(intermediateCert.data.subjectPublicKeyInfo) { keyInfo ->
                 assertEquals("1.2.840.10045.2.1", keyInfo.algorithmOid)
-                assertEquals("id-ecPublicKey", keyInfo.algorithmName)
+                assertEquals("ecPublicKey", keyInfo.algorithmName)
                 assertEquals(intermediateIssuerPublicKeyValueHex, keyInfo.keyValueHex)
                 assertEquals(normalizePem(expectedPublicPem), normalizePem(keyInfo.encodedPem))
                 assertFalse(normalizePem(keyInfo.encodedPem) == normalizePem(caCert.data.subjectPublicKeyInfo.encodedPem))
