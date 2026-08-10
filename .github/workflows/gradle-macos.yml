@@ -35,7 +35,7 @@ jobs:
 
       - name: Compile iOS targets and run Kotlin iOS simulator tests
         timeout-minutes: 40
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@e308a1bfcc0c4b23d92155d90284113dbcad96a5
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@3bf8c6ea854a7543ce9023fa4f0ab436492b5700
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
@@ -65,7 +65,7 @@ jobs:
         # Same XCFramework cost as the Compose job; this one already used 29 of its previous 35 min,
         # so a cold cache left no margin.
         timeout-minutes: 65
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@e308a1bfcc0c4b23d92155d90284113dbcad96a5
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@3bf8c6ea854a7543ce9023fa4f0ab436492b5700
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
@@ -96,7 +96,7 @@ jobs:
         # Assembling WalletCore costs ~27 min on a cold Konan cache and the demo's own tests ~11 min,
         # so the previous 40 min was below the job's actual work now that it needs the XCFramework.
         timeout-minutes: 65
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@e308a1bfcc0c4b23d92155d90284113dbcad96a5
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@3bf8c6ea854a7543ce9023fa4f0ab436492b5700
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
