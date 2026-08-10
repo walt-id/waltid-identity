@@ -1,7 +1,8 @@
 name: Checkout all repos with ref fallback
 description: |
-  Checks out waltid-unified-build, waltid-identity, and waltid-identity-enterprise
-  repositories using a provided ref, falling back to main if it doesn't exist.
+  Checks out waltid-unified-build, waltid-identity, waltid-identity-enterprise, and
+  waltid-identity-enterprise-license repositories using a provided ref, falling back
+  to main if it doesn't exist.
 
 inputs:
   token:
@@ -91,3 +92,25 @@ runs:
         ref: ${{ steps.ref_enterprise.outputs.ref }}
         token: ${{ inputs.token }}
         path: waltid-identity-enterprise
+
+    - name: Determine ref for waltid-identity-enterprise-license
+      id: ref_enterprise_license
+      shell: bash
+      env:
+        REF: ${{ inputs.ref }}
+        TOKEN: ${{ inputs.token }}
+      run: |
+        REPO="walt-id/waltid-identity-enterprise-license"
+        if [ -n "$REF" ] && git ls-remote --exit-code "https://${TOKEN}@github.com/${REPO}.git" "$REF"; then
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+        else
+          echo "ref=main" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Checkout waltid-identity-enterprise-license
+      uses: actions/checkout@v4
+      with:
+        repository: walt-id/waltid-identity-enterprise-license
+        ref: ${{ steps.ref_enterprise_license.outputs.ref }}
+        token: ${{ inputs.token }}
+        path: waltid-identity-enterprise-license
