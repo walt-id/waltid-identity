@@ -40,6 +40,33 @@ public struct RegistrationPlan: Equatable, Sendable {
     public var isEmpty: Bool { toAdd.isEmpty && toRemove.isEmpty }
 }
 
+/// What reconciliation must do about the provider's authorization status before touching Apple's store.
+///
+/// Split out from the reconciler because the status is only readable from Apple's actor, which no test
+/// can construct, and because getting this wrong deadlocks silently rather than failing.
+public enum AuthorizationStep: Equatable, Sendable {
+    /// Register the first supported document to raise Apple's prompt; the status decides nothing yet.
+    case requestAuthorization
+    /// Already authorized: diff and apply as usual.
+    case reconcile
+    /// Declined or unsupported. Apple's store must be left exactly as it is.
+    case leaveAlone
+}
+
+/// Decides whether an undetermined provider should be prompted, reconciled, or left alone.
+///
+/// `notDetermined` must *register* rather than wait: registering is what raises Apple's authorization
+/// prompt, so a reconciler that requires `authorized` first can never leave `notDetermined` at all.
+///
+/// - Parameters:
+///   - isAuthorized: Whether the status is `authorized`.
+///   - isUndetermined: Whether the status is `notDetermined`, i.e. the user has not answered yet.
+public func authorizationStep(isAuthorized: Bool, isUndetermined: Bool) -> AuthorizationStep {
+    if isAuthorized { return .reconcile }
+    if isUndetermined { return .requestAuthorization }
+    return .leaveAlone
+}
+
 /// Computes the add/remove diff between the wallet's desired state and Apple's actual store.
 ///
 /// - Parameters:

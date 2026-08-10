@@ -90,14 +90,14 @@ public struct IdentityDocumentNamespace: Sendable {
 
     /// Namespace of the native SwiftUI demo.
     public static let nativeDemo = IdentityDocumentNamespace(
-        appGroupIdentifier: "group.id.walt.wallet.demo",
-        keychainAccessGroupSuffix: "id.walt.wallet.shared",
+        appGroupIdentifier: "group.id.walt.wallet.native",
+        keychainAccessGroupSuffix: "id.walt.wallet.native.shared",
         supportedDocumentTypes: demoDocumentTypes
     )
 
     /// Namespace of the Compose Multiplatform demo.
     public static let composeDemo = IdentityDocumentNamespace(
-        appGroupIdentifier: "group.id.walt.wallet.compose.demo",
+        appGroupIdentifier: "group.id.walt.wallet.compose",
         keychainAccessGroupSuffix: "id.walt.wallet.compose.shared",
         supportedDocumentTypes: demoDocumentTypes
     )

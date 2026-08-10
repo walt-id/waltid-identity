@@ -10,6 +10,14 @@ import XCTest
 /// `.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh` asserts on the built products,
 /// and finally by acceptance on a physical device.
 final class SharedWalletConfigurationTests: XCTestCase {
+    func testNativeDemoNamespaceMatchesTheIdentifiersBothBundlesAreEntitledTo() throws {
+        try assertNamespaceMatchesTheEntitledIdentifiers(
+            namespace: .nativeDemo,
+            appGroupIdentifier: "group.id.walt.wallet.native",
+            keychainAccessGroupSuffix: "id.walt.wallet.native.shared"
+        )
+    }
+
     func testNativeDemoProviderWalletReopensTheHostAppsStateAndSigningKey() async throws {
         try await assertWalletReopensSharedStateAndSigningKey(
             namespace: .nativeDemo,

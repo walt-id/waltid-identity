@@ -54,9 +54,10 @@ struct WalletDemoApp: App {
                 viewModel.handleDeepLink(url)
             }
             .onChange(of: scenePhase) { phase in
-                // Provider authorization is granted in Settings, outside this app, and Apple sends no
-                // notification when it changes. Becoming active is the first moment the app can
-                // observe the new status, so it reconciles here instead of polling.
+                // Reconciling requests authorization on a first run, and afterwards picks up a status
+                // the user changed in Settings - Apple sends no notification either way. Becoming
+                // active is the first moment the app can act on it, so it reconciles here rather
+                // than polling.
                 guard phase == .active else { return }
                 if #available(iOS 26.0, *) {
                     Task { await DemoIdentityDocumentRegistration.updateFromPlatformCallback() }

@@ -15,6 +15,9 @@ Usage: verify-ios-identity-document-provider.sh \
   --derived-data <path> \
   --app-group <group.identifier> \
   --keychain-group-suffix <suffix without team prefix> \
+  --app-bundle-id <host bundle identifier> \
+  --appex-bundle-id <provider bundle identifier> \
+  --development-team <Team ID> \
   [--doctype <doctype>]... \
   [--build-setting KEY=VALUE]...
 USAGE
@@ -26,6 +29,9 @@ destination=""
 derived_data=""
 expected_app_group=""
 expected_keychain_suffix=""
+expected_app_bundle_id=""
+expected_appex_bundle_id=""
+expected_development_team=""
 expected_doctypes=()
 build_settings=()
 
@@ -36,6 +42,9 @@ while (($#)); do
     --derived-data) derived_data="$2"; shift 2 ;;
     --app-group) expected_app_group="$2"; shift 2 ;;
     --keychain-group-suffix) expected_keychain_suffix="$2"; shift 2 ;;
+    --app-bundle-id) expected_app_bundle_id="$2"; shift 2 ;;
+    --appex-bundle-id) expected_appex_bundle_id="$2"; shift 2 ;;
+    --development-team) expected_development_team="$2"; shift 2 ;;
     --doctype) expected_doctypes+=("$2"); shift 2 ;;
     --build-setting) build_settings+=("$2"); shift 2 ;;
     *) echo "Unknown argument: $1" >&2; usage ;;
@@ -44,6 +53,8 @@ done
 
 [[ -n "$project_dir" && -n "$destination" && -n "$derived_data" ]] || usage
 [[ -n "$expected_app_group" && -n "$expected_keychain_suffix" ]] || usage
+[[ -n "$expected_app_bundle_id" && -n "$expected_appex_bundle_id" ]] || usage
+[[ -n "$expected_development_team" ]] || usage
 if ((${#expected_doctypes[@]} == 0)); then
   expected_doctypes=("org.iso.18013.5.1.mDL" "eu.europa.ec.eudi.pid.1")
 fi
@@ -55,6 +66,34 @@ fail() {
 }
 
 cd "$project_dir"
+
+# The team is asserted on resolved build settings rather than on project.pbxproj, because it may be
+# inherited from the project level and a grep cannot tell which configurations it actually reaches.
+#
+# This proves the Xcode configuration resolves the Walt team. It cannot prove that Apple issued a
+# matching physical-device profile, nor what AppIdentifierPrefix that profile carries - both are
+# settled by inspecting a device-signed product.
+resolved_build_setting() {
+  xcodebuild -showBuildSettings \
+    -project iosApp.xcodeproj \
+    -target "$1" \
+    -configuration "$2" \
+    -destination "$destination" \
+    ${build_settings[@]+"${build_settings[@]}"} 2>/dev/null |
+    awk -v key="$3" '$1 == key && $2 == "=" { $1=""; $2=""; sub(/^ +/, ""); print; exit }'
+}
+
+for target in iosApp IdentityDocumentProvider; do
+  for configuration in Debug Release; do
+    resolved_team="$(resolved_build_setting "$target" "$configuration" DEVELOPMENT_TEAM)"
+    [[ "$resolved_team" == "$expected_development_team" ]] ||
+      fail "$target/$configuration resolves DEVELOPMENT_TEAM '$resolved_team', expected '$expected_development_team'"
+    resolved_style="$(resolved_build_setting "$target" "$configuration" CODE_SIGN_STYLE)"
+    [[ "$resolved_style" == "Automatic" ]] ||
+      fail "$target/$configuration resolves CODE_SIGN_STYLE '$resolved_style', expected Automatic"
+  done
+done
+((failures == 0)) || exit 1
 
 # The iosApp target depends on the IdentityDocumentProvider target and embeds its .appex, so this one
 # build compiles the provider too.
@@ -120,6 +159,18 @@ doctypes_of() {
   plist_value "$1" "com.apple.developer.identity-document-services.document-provider.mobile-document-types"
 }
 
+# Read from the built Info.plists, not from project.pbxproj: PRODUCT_BUNDLE_IDENTIFIER is what the
+# provisioning profile has to match, and only the built bundle shows what it expanded to.
+app_bundle_id="$(plist_value "$app/Info.plist" CFBundleIdentifier)"
+appex_bundle_id="$(plist_value "$appex/Info.plist" CFBundleIdentifier)"
+[[ "$app_bundle_id" == "$expected_app_bundle_id" ]] ||
+  fail "App bundle identifier is '$app_bundle_id', expected '$expected_app_bundle_id'"
+[[ "$appex_bundle_id" == "$expected_appex_bundle_id" ]] ||
+  fail "Extension bundle identifier is '$appex_bundle_id', expected '$expected_appex_bundle_id'"
+# Apple only offers an extension whose identifier is prefixed by its host's.
+[[ "$appex_bundle_id" == "$app_bundle_id."* ]] ||
+  fail "Extension identifier '$appex_bundle_id' is not nested under the host's '$app_bundle_id'"
+
 app_group="$(app_group_of "$app_xcent")"
 appex_group="$(app_group_of "$appex_xcent")"
 [[ "$app_group" == "$expected_app_group" ]] ||
@@ -167,6 +218,9 @@ fi
 
 cat <<SUMMARY
 Identity document provider configuration verified in $project_dir
+  Host bundle id:           $app_bundle_id
+  Provider bundle id:       $appex_bundle_id
+  Development team:         $expected_development_team
   App Group:                $app_group
   Default Keychain group:   $app_keychain
   Advertised doctypes:      $(echo "$expected_doctype_list" | tr '\n' ' ')

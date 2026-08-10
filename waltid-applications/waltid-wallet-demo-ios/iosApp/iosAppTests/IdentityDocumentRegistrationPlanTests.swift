@@ -128,6 +128,27 @@ final class IdentityDocumentRegistrationPlanTests: XCTestCase {
         XCTAssertEqual(plan.toRemove, ["dc-a", "dc-b"])
     }
 
+    // MARK: - Authorization bootstrap
+
+    func testAnUndeterminedProviderRegistersRatherThanWaitingToBeAuthorized() {
+        // Registering is what raises Apple's prompt, so requiring `authorized` first deadlocks: the
+        // status stays `notDetermined` forever and the demo never appears as a provider at all.
+        XCTAssertEqual(
+            authorizationStep(isAuthorized: false, isUndetermined: true),
+            .requestAuthorization
+        )
+    }
+
+    func testAnAuthorizedProviderReconcilesWithoutPromptingAgain() {
+        XCTAssertEqual(authorizationStep(isAuthorized: true, isUndetermined: false), .reconcile)
+    }
+
+    func testADeclinedOrUnsupportedProviderIsLeftAloneRatherThanReprompted() {
+        // `notAuthorized` and `notSupported` both land here: neither may be re-asked from a reconcile,
+        // and neither may mutate Apple's store.
+        XCTAssertEqual(authorizationStep(isAuthorized: false, isUndetermined: false), .leaveAlone)
+    }
+
     // MARK: - Fail-closed reads of the shared projection
 
     func testACorruptProjectionYieldsNoPlanAtAllRatherThanAnEmptyOne() {

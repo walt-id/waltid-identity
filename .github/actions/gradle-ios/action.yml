@@ -173,8 +173,11 @@ runs:
           --project-dir "${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp" \
           --destination "${{ steps.resolve-simulator.outputs.destination }}" \
           --derived-data /tmp/xcode-derived \
-          --app-group group.id.walt.wallet.demo \
-          --keychain-group-suffix id.walt.wallet.shared \
+          --app-group group.id.walt.wallet.native \
+          --keychain-group-suffix id.walt.wallet.native.shared \
+          --app-bundle-id id.walt.wallet.native \
+          --appex-bundle-id id.walt.wallet.native.identitydocumentprovider \
+          --development-team 9BB78CFW7Y \
           --build-setting OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
 
     - name: Verify Compose iOS identity document provider
@@ -187,8 +190,11 @@ runs:
           --project-dir "${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-compose/iosApp" \
           --destination "${{ steps.resolve-simulator.outputs.destination }}" \
           --derived-data /tmp/xcode-derived-compose \
-          --app-group group.id.walt.wallet.compose.demo \
-          --keychain-group-suffix id.walt.wallet.compose.shared
+          --app-group group.id.walt.wallet.compose \
+          --keychain-group-suffix id.walt.wallet.compose.shared \
+          --app-bundle-id id.walt.wallet.compose \
+          --appex-bundle-id id.walt.wallet.compose.identitydocumentprovider \
+          --development-team 9BB78CFW7Y
 
     - name: Execute iOS demo app integration tests
       if: ${{ inputs.run-native-demo-tests == 'true' }}

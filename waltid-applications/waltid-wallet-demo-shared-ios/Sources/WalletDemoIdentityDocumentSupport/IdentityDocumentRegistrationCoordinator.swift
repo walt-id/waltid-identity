@@ -9,8 +9,13 @@ import IdentityDocumentServices
 ///
 /// Both host apps and the extension's `performRegistrationUpdates()` call this. Only these processes
 /// may write Apple's store, and Apple's callback runs periodically rather than on change, so the host
-/// also reconciles after a credential-set change and on becoming active - provider authorization is
-/// granted in Settings with no notification.
+/// also reconciles after a credential-set change and on becoming active - a status change carries no
+/// notification.
+///
+/// Authorization is *requested by registering*, not granted beforehand: from `.notDetermined` the
+/// first `addRegistration` presents Apple's prompt and the status becomes `.authorized` or
+/// `.notAuthorized` according to the answer. Waiting for `.authorized` before registering therefore
+/// deadlocks - the status can never leave `.notDetermined`. Settings is the recovery path afterwards.
 @available(iOS 26.0, *)
 public struct IdentityDocumentRegistrationCoordinator: Sendable {
     private let namespace: IdentityDocumentNamespace
@@ -35,10 +40,15 @@ public struct IdentityDocumentRegistrationCoordinator: Sendable {
             status: status,
             appGroupIdentifier: namespace.appGroupIdentifier
         )
-        guard status == .authorized else {
+        let step = authorizationStep(
+            isAuthorized: status == .authorized,
+            isUndetermined: status == .notDetermined
+        )
+        guard step != .leaveAlone else {
             // Desired state stays untouched in the App Group: the wallet's projection is
-            // authoritative and must survive until the user decides.
-            log.info("Provider registration not authorized (\(String(describing: status), privacy: .public)); leaving desired state in place")
+            // authoritative and must survive until the user decides. A declined provider is not
+            // asked again here; re-enabling it is a Settings action.
+            log.info("Provider registration unavailable (\(String(describing: status), privacy: .public)); leaving desired state in place")
             return RegistrationPlan(toAdd: [], toRemove: [])
         }
 
@@ -53,6 +63,13 @@ public struct IdentityDocumentRegistrationCoordinator: Sendable {
             log.info("No desired registration state in App Group \(namespace.appGroupIdentifier, privacy: .public); leaving Apple's registrations untouched")
             return RegistrationPlan(toAdd: [], toRemove: [])
         }
+
+        if step == .requestAuthorization {
+            guard try await requestAuthorization(store: store, registering: desired) != nil else {
+                return RegistrationPlan(toAdd: [], toRemove: [])
+            }
+        }
+
         let existing = try await store.registrations.map { registration in
             // `IdentityDocumentRegistration` exposes only the identifier. A registration that is not
             // a mobile document gets an unmatchable doctype, so the planner treats it as stale rather
@@ -86,6 +103,60 @@ public struct IdentityDocumentRegistrationCoordinator: Sendable {
             )
         }
         return plan
+    }
+
+    /// Asks for authorization by registering the first supported document, and reports the new status.
+    ///
+    /// Registering *is* the request: Apple presents its prompt during this call. The document is a
+    /// real desired registration rather than a throwaway, so approving it leaves the store correct and
+    /// the diff below simply finds it already present.
+    ///
+    /// - Returns: The status after the user answered, or `nil` when there is nothing to register or the
+    ///   user declined - both cases leave Apple's store alone.
+    private func requestAuthorization(
+        store: IdentityDocumentProviderRegistrationStore,
+        registering desired: [DesiredRegistration]
+    ) async throws -> IdentityDocumentProviderRegistrationStore.Status? {
+        // Only a doctype the entitlement grants can carry the request; anything else is rejected on
+        // its own merits and would look like a declined authorization.
+        guard let first = desired
+            .filter({ namespace.supportedDocumentTypes.contains($0.documentType) })
+            .min(by: { $0.documentIdentifier < $1.documentIdentifier })
+        else {
+            log.info("Authorization is undetermined and the wallet has nothing registrable; not prompting")
+            return nil
+        }
+
+        do {
+            log.info("Requesting provider authorization by registering \(first.documentIdentifier, privacy: .public)")
+            try await store.addRegistration(
+                MobileDocumentRegistration(
+                    mobileDocumentType: first.documentType,
+                    supportedAuthorityKeyIdentifiers: [],
+                    documentIdentifier: first.documentIdentifier
+                )
+            )
+        } catch IdentityDocumentProviderRegistrationStore.RegistrationError.notAuthorized {
+            // A declined prompt is the user's answer, not a wallet failure.
+            let declined = await store.status
+            DigitalCredentialRegistrationStorage.persist(
+                status: declined,
+                appGroupIdentifier: namespace.appGroupIdentifier
+            )
+            log.info("Provider authorization declined (\(String(describing: declined), privacy: .public))")
+            return nil
+        }
+
+        let granted = await store.status
+        DigitalCredentialRegistrationStorage.persist(
+            status: granted,
+            appGroupIdentifier: namespace.appGroupIdentifier
+        )
+        guard granted == .authorized else {
+            log.info("Registration succeeded but status is \(String(describing: granted), privacy: .public); leaving the rest alone")
+            return nil
+        }
+        return granted
     }
 
     /// Reconciles from Apple's own registration-update callback, logging rather than throwing.

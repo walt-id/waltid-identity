@@ -4,11 +4,11 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.id.walt.wallet.demo</string>
+		<string>group.id.walt.wallet.native</string>
 	</array>
 	<key>keychain-access-groups</key>
 	<array>
-		<string>$(AppIdentifierPrefix)id.walt.wallet.shared</string>
+		<string>$(AppIdentifierPrefix)id.walt.wallet.native.shared</string>
 	</array>
 	<!--
 	  Only doctypes this demo actually issues and can present. Apple also provisions

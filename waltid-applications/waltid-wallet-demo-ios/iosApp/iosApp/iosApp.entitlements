@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.id.walt.wallet.demo</string>
+		<string>group.id.walt.wallet.native</string>
 	</array>
 	<!--
 	  The shared group is listed first on purpose: iOS uses the first entry as the default access
@@ -14,7 +14,7 @@
 	-->
 	<key>keychain-access-groups</key>
 	<array>
-		<string>$(AppIdentifierPrefix)id.walt.wallet.shared</string>
+		<string>$(AppIdentifierPrefix)id.walt.wallet.native.shared</string>
 		<string>$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	</array>
 	<!--

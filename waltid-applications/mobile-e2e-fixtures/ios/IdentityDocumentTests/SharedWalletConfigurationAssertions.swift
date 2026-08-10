@@ -4,6 +4,64 @@ import WalletDemoIdentityDocumentSupport
 import WalletSDK
 import XCTest
 
+/// Asserts a demo's namespace names the App Group and Keychain group its two bundles are entitled to.
+///
+/// The identifiers are spelled out at the call site rather than derived, because the failure this
+/// catches is a namespace renamed on one side only: the host keeps working, and the extension opens an
+/// empty container. What the *entitlements* grant is asserted on the built products by
+/// `.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh`; this pins the runtime half.
+///
+/// - Parameters:
+///   - namespace: The demo namespace under test.
+///   - appGroupIdentifier: The App Group the demo's two bundles are entitled to.
+///   - keychainAccessGroupSuffix: The shared Keychain group, without the `AppIdentifierPrefix`.
+///   - file: Call-site file, for failure attribution.
+///   - line: Call-site line, for failure attribution.
+public func assertNamespaceMatchesTheEntitledIdentifiers(
+    namespace: IdentityDocumentNamespace,
+    appGroupIdentifier: String,
+    keychainAccessGroupSuffix: String,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) throws {
+    XCTAssertEqual(
+        namespace.appGroupIdentifier,
+        appGroupIdentifier,
+        "The namespace opens a different App Group than the one both bundles are entitled to",
+        file: file,
+        line: line
+    )
+    XCTAssertEqual(
+        namespace.keychainAccessGroupSuffix,
+        keychainAccessGroupSuffix,
+        "The namespace names a different shared Keychain group than the entitlements grant",
+        file: file,
+        line: line
+    )
+
+    // The running bundle's expanded group has to be the same one, or the wallet writes its signing key
+    // where the extension cannot read it.
+    let resolved = try XCTUnwrap(
+        namespace.keychainAccessGroup,
+        "The test host must carry \(IdentityDocumentNamespace.keychainAccessGroupInfoKey)",
+        file: file,
+        line: line
+    )
+    XCTAssertTrue(
+        resolved.hasSuffix(".\(keychainAccessGroupSuffix)"),
+        "The build resolved the Keychain group to \(resolved), which is not this demo's shared group",
+        file: file,
+        line: line
+    )
+    XCTAssertNotEqual(
+        resolved,
+        keychainAccessGroupSuffix,
+        "AppIdentifierPrefix was not expanded, so this is not a group the entitlement grants",
+        file: file,
+        line: line
+    )
+}
+
 /// Asserts that a demo's shared wallet configuration puts state and key material where the provider
 /// extension looks for them.
 ///

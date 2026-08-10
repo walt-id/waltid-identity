@@ -49,8 +49,9 @@ struct ComposeWalletDemoApp: App {
                 await Self.reconcileRegistrations()
             }
             .onChange(of: scenePhase) { phase in
-                // Provider authorization is granted in Settings with no notification, so becoming
-                // active is the first moment this app can observe a change to it.
+                // Reconciling requests authorization on a first run, and afterwards picks up a status
+                // the user changed in Settings - neither carries a notification, so becoming active
+                // is the first moment this app can act on it.
                 guard phase == .active else { return }
                 Task { await Self.reconcileRegistrations() }
             }

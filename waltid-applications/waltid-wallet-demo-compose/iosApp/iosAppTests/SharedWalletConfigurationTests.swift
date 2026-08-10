@@ -9,6 +9,14 @@ import XCTest
 /// not run a second process; extension-process reachability is settled by the built entitlements and
 /// by acceptance on a physical device.
 final class SharedWalletConfigurationTests: XCTestCase {
+    func testComposeDemoNamespaceMatchesTheIdentifiersBothBundlesAreEntitledTo() throws {
+        try assertNamespaceMatchesTheEntitledIdentifiers(
+            namespace: .composeDemo,
+            appGroupIdentifier: "group.id.walt.wallet.compose",
+            keychainAccessGroupSuffix: "id.walt.wallet.compose.shared"
+        )
+    }
+
     func testComposeDemoProviderWalletReopensTheHostAppsStateAndSigningKey() async throws {
         try await assertWalletReopensSharedStateAndSigningKey(
             namespace: .composeDemo,
