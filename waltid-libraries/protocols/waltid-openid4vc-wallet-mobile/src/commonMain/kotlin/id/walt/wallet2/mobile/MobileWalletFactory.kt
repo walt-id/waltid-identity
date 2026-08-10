@@ -32,6 +32,15 @@ import kotlin.uuid.Uuid
  * @property preferredLocales Ordered BCP 47 locale preferences used for progressive language-tag lookup.
  * When no preference matches, selection falls back to an unlocalized entry and then the first entry.
  * @property transactionDataProfiles Transaction data profiles this mobile wallet accepts in OpenID4VP requests.
+ * @property credentialRegistry Platform metadata registry. Platform factories install their native default when omitted.
+ * @property readerTrustEvaluator Application trust policy for verified ISO 18013-7 reader chains.
+ * @property crossProcessAccess Optional shared-container/keychain configuration for provider extensions.
+ * @property onDigitalCredentialRegistryChanged Called after a credential-set change re-published the
+ * platform registration projection. Set this where publishing the projection and applying it to the
+ * platform are different privileges: the wallet can write what it wants registered, but a platform whose
+ * registration store only the host process may write needs the host to apply it, and the platform's own
+ * refresh may not run until long after the change. Failures are contained, because the credential change
+ * is already committed.
  */
 public data class MobileWalletConfig(
     public val walletId: String = "default",
@@ -41,6 +50,21 @@ public data class MobileWalletConfig(
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    public val credentialRegistry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
+    public val readerTrustEvaluator: MobileWalletReaderTrustEvaluator = UnconfiguredMobileWalletReaderTrustEvaluator,
+    public val crossProcessAccess: MobileWalletCrossProcessAccess? = null,
+    public val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
+)
+
+/**
+ * Cross-process wallet access required by native document-provider extensions.
+ *
+ * @property appGroupIdentifier Apple App Group used to share wallet state with the extension.
+ * @property keychainAccessGroup Keychain access group shared by the app and extension.
+ */
+public data class MobileWalletCrossProcessAccess(
+    public val appGroupIdentifier: String,
+    public val keychainAccessGroup: String,
 )
 
 /**
@@ -188,6 +212,9 @@ internal fun createSqlDelightMobileWallet(
         transactionDataProfiles = config.transactionDataProfiles,
         clientIdTrustConfiguration = clientIdTrustConfiguration,
         onEvent = config.onEvent,
+        credentialRegistry = config.credentialRegistry,
+        onDigitalCredentialRegistryChanged = config.onDigitalCredentialRegistryChanged,
+        readerTrustEvaluator = config.readerTrustEvaluator,
         deleteLocalPersistence = deleteLocalPersistence,
     )
 }
