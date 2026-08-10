@@ -1,8 +1,11 @@
 @file:OptIn(ExperimentalAbiValidation::class)
 
+import com.android.build.api.artifact.SingleArtifact
+import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 import org.jetbrains.kotlin.gradle.dsl.abi.BinariesSource
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+import java.util.zip.ZipFile
 
 plugins {
     id("waltid.mobile.library")
@@ -77,11 +80,8 @@ kotlin {
                 implementation(identityLibs.androidx.credentials.registry.sdjwtvc)
                 implementation(identityLibs.androidx.credentials.registry.provider)
                 implementation(identityLibs.androidx.credentials.registry.provider.play.services)
-                // Supplies the Apache-2.0 matcher asset used for ISO 18013-7 Annex C.
-                // No Multipaz runtime API is linked; wallet data stays in the walt.id SDK model.
-                implementation("org.multipaz:multipaz-dcapi-android:0.100.0") {
-                    isTransitive = false
-                }
+                // The ISO 18013-7 Annex C matcher is a vendored WASM binary, not a dependency:
+                // ANNEX-C-MATCHER.md records its origin and how to refresh it.
             }
             val androidHostTest by getting {
                 dependencies {
@@ -121,5 +121,37 @@ kotlin {
 tasks.withType<Test>().configureEach {
     if (name == "testAndroidHostTest") {
         useJUnit()
+    }
+}
+
+// Configured through the typed extension rather than the `android`/`androidComponents` script
+// accessors, because those are generated only when the Android plugin is applied, and this module is
+// also built with `enableAndroidBuild=false` for iOS.
+if (enableAndroidBuild) extensions.configure<KotlinMultiplatformAndroidComponentsExtension>("androidComponents") {
+    // Asset and resource processing is off by default for Android KMP libraries, and required for
+    // `androidMain/assets` to be packaged into the AAR at all. See ANNEX-C-MATCHER.md.
+    finalizeDsl { android ->
+        android.androidResources.enable = true
+    }
+
+    // The host tests read the matcher through the asset API, which still passes when the published AAR
+    // carries no assets at all, so assert on the artifact itself. See ANNEX-C-MATCHER.md.
+    onVariants { variant ->
+        val aar = variant.artifacts.get(SingleArtifact.AAR)
+        val verifyAnnexCMatcherPackaging = tasks.register("verifyAnnexCMatcherPackaging") {
+            description = "Fails if the AAR does not carry the vendored Annex C matcher and its notice."
+            inputs.file(aar).withPropertyName("aar")
+            doLast {
+                val entries = ZipFile(aar.get().asFile).use { zip ->
+                    zip.entries().asSequence().map { it.name }.toSet()
+                }
+                val missing = setOf(
+                    "assets/id/walt/wallet2/mobile/identitycredentialmatcher.wasm",
+                    "assets/id/walt/wallet2/mobile/NOTICE-identitycredentialmatcher.txt",
+                ) - entries
+                require(missing.isEmpty()) { "AAR is missing vendored matcher assets: $missing" }
+            }
+        }
+        tasks.named("check") { dependsOn(verifyAnnexCMatcherPackaging) }
     }
 }
