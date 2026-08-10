@@ -32,9 +32,9 @@ The portal acts as a frontend that orchestrates these services to demonstrate cr
 
 This portal enables users to:
 
-- **Issue Credentials**: Create credential offers using custom JSON payloads and send them to wallets via OpenID4VCI
+- **Issue Credentials**: Create credential offers using custom JSON payloads and send them to wallets via OpenID4VCI (QR / deep link or Digital Credentials API)
 - **Select a Profile**: Choose an issuance profile from a dropdown (loaded from `/issuer2/profiles`). The selection overrides the `profileId` in the payload, and the full profile definition (`/issuer2/profiles/{profileId}`) is available in a collapsible JSON viewer
-- **Verify Credentials**: Request credential presentations from wallets using OpenID4VP
+- **Verify Credentials**: Request credential presentations from wallets using OpenID4VP (including Digital Credentials API flows)
 - **Load Examples**: Auto-populate payloads from OpenAPI/Swagger specs served by the backend
 - **Read the Docs**: Jump to the relevant Issuer/Verifier API docs from each tab
 - **Monitor Events**: Watch real-time protocol events stream in as wallets interact with the portal
@@ -52,15 +52,29 @@ This portal enables users to:
 
 1. **Edit Payload**: Select a Swagger example or write a custom JSON credential offer payload
 2. **Create Offer**: Portal calls the Issuer API to generate a credential offer
-3. **Scan QR Code**: A QR code is displayed for the wallet to scan (enter PIN if required)
+3. **Deliver to wallet** using one of:
+   - **QR / deep link**: A QR code is displayed for the wallet to scan (enter PIN if required)
+   - **Digital Credentials API**: The portal enriches the offer with issuer/AS metadata and calls `navigator.credentials.create` with protocol `openid4vci-v1`. The issuer stays standard OpenID4VCI — there is no issuer-side DC API protocol mode.
 4. **Monitor Events**: Real-time SSE events show each step (`OFFER_RECEIVED`, `CREDENTIAL_ISSUED`, etc.)
 5. **Wallet Receives**: User accepts the credential in their wallet
+
+#### Digital Credentials API issuance requirements
+
+DC API issuance is experimental (Chrome origin trial). To try it:
+
+- Chrome 143+ on desktop and/or Android
+- Enable `chrome://flags/#web-identity-digital-credentials-creation`
+- Google Play services 24.0+ on Android, plus a compatible wallet (for example CMWallet)
+- Prefer HTTPS (or localhost) so the page is a secure context
+- Hosted demos may also need a Chrome origin-trial token for the site origin
+
+If DC API is unavailable, use QR / deep link delivery — the issuer API is unchanged.
 
 ### Credential Verification Flow
 
 1. **Edit Payload**: Select a Swagger example or write a custom JSON verification request
 2. **Create Session**: Portal calls the Verifier API to generate an authorization request
-3. **Scan QR Code**: A QR code is displayed for the wallet to scan
+3. **Scan QR Code** or complete a **Digital Credentials API** verification session
 4. **Monitor Events**: Real-time SSE events show each step of the presentation exchange
 5. **View Results**: Verified claims are extracted and displayed after a successful presentation
 

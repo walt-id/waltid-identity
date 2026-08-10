@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { useIssuerSession } from "~/composables/useIssuerSession";
+import { getDcApiIssuanceSupport } from "~/utils/dcApiIssuance";
 
 type AuthMethod = "AUTHORIZED" | "PRE_AUTHORIZED";
+type DeliveryMethod = "qr" | "dc_api";
 
 const props = defineProps<{
   session: ReturnType<typeof useIssuerSession>;
@@ -9,8 +11,10 @@ const props = defineProps<{
 
 const selectedOptionId = ref(SIMPLE_CREDENTIAL_OPTIONS[0]!.id);
 const authMethod = ref<AuthMethod>("PRE_AUTHORIZED");
+const deliveryMethod = ref<DeliveryMethod>("qr");
 const credentialDataJson = ref("");
 const parseError = ref<string | null>(null);
+const dcApiSupport = ref(getDcApiIssuanceSupport());
 
 const issueCredentialOptions = computed(() =>
   SIMPLE_CREDENTIAL_OPTIONS.filter((option) => !option.verifyOnly),
@@ -18,6 +22,16 @@ const issueCredentialOptions = computed(() =>
 const selectedOption = computed(() =>
   getSimpleCredentialOption(selectedOptionId.value),
 );
+
+onMounted(() => {
+  dcApiSupport.value = getDcApiIssuanceSupport();
+});
+
+watch(deliveryMethod, (method) => {
+  if (method === "dc_api") {
+    dcApiSupport.value = getDcApiIssuanceSupport();
+  }
+});
 
 watch(
   selectedOption,
@@ -82,7 +96,11 @@ async function submit() {
     payload.runtimeOverrides = { credentialData };
   }
 
-  await props.session.createOffer(payload);
+  if (deliveryMethod.value === "dc_api") {
+    await props.session.createDcApiOffer(payload);
+  } else {
+    await props.session.createOffer(payload);
+  }
 }
 </script>
 
@@ -168,6 +186,51 @@ async function submit() {
       <p class="text-xs text-[--color-text-muted] mt-2">
         Pre-authorized is simplest for demos. Authorized uses the wallet
         authorization flow.
+      </p>
+    </section>
+
+    <section>
+      <label class="form-label">Delivery method</label>
+      <div
+        class="inline-flex rounded-lg border border-[--color-border-strong] bg-white p-1"
+      >
+        <button
+          type="button"
+          class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+          :class="
+            deliveryMethod === 'qr'
+              ? 'bg-slate-900 text-white'
+              : 'text-[--color-text-muted] hover:text-[--color-text]'
+          "
+          @click="deliveryMethod = 'qr'"
+        >
+          QR / deep link
+        </button>
+        <button
+          type="button"
+          class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+          :class="
+            deliveryMethod === 'dc_api'
+              ? 'bg-slate-900 text-white'
+              : 'text-[--color-text-muted] hover:text-[--color-text]'
+          "
+          @click="deliveryMethod = 'dc_api'"
+        >
+          Digital Credentials API
+        </button>
+      </div>
+      <p class="text-xs text-[--color-text-muted] mt-2">
+        QR shows an OpenID4VCI offer for wallets to scan. DC API hands the offer
+        to a platform wallet via
+        <code>navigator.credentials.create</code> (Chrome origin trial).
+      </p>
+      <p
+        v-if="deliveryMethod === 'dc_api' && !dcApiSupport.supported"
+        class="text-xs text-amber-700 mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2"
+      >
+        {{ dcApiSupport.reason }}
+        You can still create the offer; the browser call will fail until the
+        prerequisites are met. QR delivery remains available.
       </p>
     </section>
 

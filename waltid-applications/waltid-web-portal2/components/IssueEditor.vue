@@ -2,6 +2,7 @@
 import type { useSwaggerExamples } from "~/composables/useSwaggerExamples";
 import type { useIssuerSession } from "~/composables/useIssuerSession";
 import type { useProfiles } from "~/composables/useProfiles";
+import { getDcApiIssuanceSupport } from "~/utils/dcApiIssuance";
 
 const props = defineProps<{
   swagger: ReturnType<typeof useSwaggerExamples>;
@@ -15,6 +16,17 @@ const selectedIndex = defineModel<number>("selectedIndex", { default: 0 });
 const keyJson = ref("");
 const x5ChainValues = ref([""]);
 const optionsError = ref<string | null>(null);
+const useDcApi = ref(false);
+const dcApiMediationRequired = ref(false);
+const dcApiSupport = ref(getDcApiIssuanceSupport());
+
+onMounted(() => {
+  dcApiSupport.value = getDcApiIssuanceSupport();
+});
+
+watch(useDcApi, (enabled) => {
+  if (enabled) dcApiSupport.value = getDcApiIssuanceSupport();
+});
 
 // The profile selected in the dropdown. This overrides the (hardcoded) profileId
 // that ships in the Swagger example payload.
@@ -202,7 +214,11 @@ async function submit() {
   const payload = applySecurityOverridesToJson();
   if (!payload) return;
 
-  await props.session.createOffer(payload);
+  if (useDcApi.value) {
+    await props.session.createDcApiOffer(payload, dcApiMediationRequired.value);
+  } else {
+    await props.session.createOffer(payload);
+  }
 }
 </script>
 
@@ -345,6 +361,34 @@ async function submit() {
         </p>
       </div>
     </details>
+
+    <div
+      class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900"
+    >
+      <label class="inline-flex items-center gap-2 font-medium">
+        <input v-model="useDcApi" type="checkbox" />
+        Deliver via Digital Credentials API
+      </label>
+      <p class="mt-1 text-xs text-blue-800">
+        Creates a by-value OpenID4VCI offer, embeds issuer/AS metadata, and calls
+        <code>navigator.credentials.create</code> with protocol
+        <code>openid4vci-v1</code>. Chrome may show its own proximity QR for
+        cross-device handoff.
+      </p>
+      <label
+        v-if="useDcApi"
+        class="mt-3 inline-flex items-center gap-2 font-medium"
+      >
+        <input v-model="dcApiMediationRequired" type="checkbox" />
+        mediation: required
+      </label>
+      <p
+        v-if="useDcApi && !dcApiSupport.supported"
+        class="mt-2 text-xs text-amber-800 rounded-md border border-amber-200 bg-amber-50 p-2"
+      >
+        {{ dcApiSupport.reason }}
+      </p>
+    </div>
 
     <div class="flex items-center gap-3">
       <button
