@@ -3,6 +3,9 @@ package id.walt.wallet2.mobile
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Bitmap.CompressFormat
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.os.Build
 import androidx.credentials.DigitalCredential
 import androidx.credentials.ExperimentalDigitalCredentialApi
@@ -52,7 +55,9 @@ public class AndroidDigitalCredentialRegistry(
 ) : MobileWalletCredentialRegistry {
     private val applicationContext: Context = context.applicationContext
     private val registryManager: RegistryManager = RegistryManager.create(applicationContext)
-    private val icon: Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+    /** Host app icon shown in the Credential Manager wallet / credential picker. */
+    private val icon: Bitmap = loadApplicationIcon(applicationContext)
+    private val iconPng: ByteArray = icon.toPngBytes()
     private var registrationAvailable: Boolean = false
     private var creationRegistrationAvailable: Boolean = false
 
@@ -186,7 +191,7 @@ public class AndroidDigitalCredentialRegistry(
                 creationOptions = encodeOpenId4VciCreationOptions(
                     title = "walt.id Wallet",
                     subtitle = "Save a credential to this wallet",
-                    iconPng = icon.toPngBytes(),
+                    iconPng = iconPng,
                 ),
                 matcher = matcher,
                 type = DigitalCredential.TYPE_DIGITAL_CREDENTIAL,
@@ -232,6 +237,35 @@ public class AndroidDigitalCredentialRegistry(
             compress(CompressFormat.PNG, 100, out)
             out.toByteArray()
         }
+
+    private fun loadApplicationIcon(context: Context): Bitmap {
+        val drawable = context.packageManager.getApplicationIcon(context.applicationInfo)
+        return drawable.toBitmap(maxEdgePx = REGISTRY_ICON_MAX_EDGE_PX)
+    }
+
+    private fun Drawable.toBitmap(maxEdgePx: Int): Bitmap {
+        val source = when {
+            this is BitmapDrawable && bitmap != null && !bitmap.isRecycled -> bitmap
+            else -> {
+                val width = intrinsicWidth.takeIf { it > 0 } ?: maxEdgePx
+                val height = intrinsicHeight.takeIf { it > 0 } ?: maxEdgePx
+                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
+                    val canvas = Canvas(bitmap)
+                    setBounds(0, 0, canvas.width, canvas.height)
+                    draw(canvas)
+                }
+            }
+        }
+        val longestEdge = maxOf(source.width, source.height)
+        if (longestEdge <= maxEdgePx) return source
+        val scale = maxEdgePx.toFloat() / longestEdge.toFloat()
+        return Bitmap.createScaledBitmap(
+            source,
+            (source.width * scale).toInt().coerceAtLeast(1),
+            (source.height * scale).toInt().coerceAtLeast(1),
+            true,
+        )
+    }
 
     internal fun MobileWalletCredentialRegistryRecord.toAndroidEntry(): DigitalCredentialEntry {
         val display = setOf(
@@ -291,7 +325,7 @@ public class AndroidDigitalCredentialRegistry(
                     AndroidAnnexCCredential(
                         title = record.displayName,
                         subtitle = record.type,
-                        bitmap = byteArrayOf(),
+                        bitmap = iconPng,
                         mdoc = AndroidAnnexCMdoc(
                             documentId = record.registryEntryId,
                             docType = record.type,
@@ -345,6 +379,8 @@ public class AndroidDigitalCredentialRegistry(
         private const val OPENID4VCI_MATCHER_ASSET = "id/walt/wallet2/mobile/provision_hardcoded.wasm"
         private const val OPENID4VCI_CREATION_REGISTRY_ID = "openid4vci"
         private const val MAX_MATCHER_VALUE_LENGTH = 128
+        /** Credential Manager selector icons are small; keep registry PNG payloads modest. */
+        private const val REGISTRY_ICON_MAX_EDGE_PX = 128
         private const val SIGNED_UNSUPPORTED_REASON =
             "The wallet accepts only the unsigned OpenID4VP Digital Credentials protocol"
         private const val MULTISIGNED_UNSUPPORTED_REASON =
