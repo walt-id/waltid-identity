@@ -16,19 +16,18 @@ class X509CertificateChainValidator(
         certificateChain: Collection<X509Certificate>,
         additionalTrust: X509CertificateTrustStore? = null
     ): ValidationResult {
-        trustStore.findCertificateBySubjectDn("second attempt")
         val trustStoreToUse =
             additionalTrust?.let { CompositeTrustStore(listOf(it, trustStore)) } ?: trustStore
-        trustStoreToUse.findCertificateBySubjectDn("third attempt")
-        val chain = X509CertificateChain.of(trustStoreToUse, certificateChain)
-        val context = ValidationContext(cryptoRuntime, trustStoreToUse)
-        context.findCertificateBySubjectDn("4th attempt")
+        val chain = X509CertificateChain.of(certificateChain)
+        val context = ValidationContext(cryptoRuntime, chain.size, trustStoreToUse)
         for (i in 0..<chain.size) {
             validators.forEach { validator ->
                 val certificate = chain[i]
-                context.setCurrent(validator.id, i, certificate.data.subjectDn)
-                validator.validate(context, certificate)
-                context.addLogEntry(ValidationResult.Severity.INFO, "DONE")
+                if (validator.accepts(context, certificate)) {
+                    context.setCurrent(validator.id, i, certificate.data.subjectDn)
+                    validator.validate(context, certificate)
+                    context.addLogEntry(ValidationResult.Severity.INFO, "DONE")
+                }
             }
         }
         return ValidationResult(

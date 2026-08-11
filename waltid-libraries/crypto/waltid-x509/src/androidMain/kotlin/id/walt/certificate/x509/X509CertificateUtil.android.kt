@@ -8,6 +8,7 @@ import id.walt.certificate.x509.bouncycastle.BouncyPkcs10CertificateSigningReque
 import id.walt.certificate.x509.bouncycastle.BouncyPkcs10CertificateSigningRequestSigner
 import id.walt.certificate.x509.bouncycastle.BouncyX509CertificateParser
 import id.walt.certificate.x509.bouncycastle.BouncyX509CertificateSigner
+import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.x509.id.walt.certificate.x509.javasec.JavaDefaultTrustStore
@@ -26,6 +27,7 @@ actual fun platformDefaultServices(): X509CertificateServices {
         certificateChainValidator = X509CertificateChainValidator(
             listOf(
                 X509CertificateValidityValidator(),
+                X509CertificateBasicConstraintsValidator(),
                 X509CertificateSignatureValidator(certificateSigner)
             ),
             JavaDefaultTrustStore(certificateParser)

@@ -28,6 +28,7 @@ class Crypto1X509CertificateSigningTest {
                 subjectDn = "OU=waltid"
 
                 extensionBasicConstraints {
+                    critical = false
                     cA = true
                     pathLenConstraint = 5
                 }

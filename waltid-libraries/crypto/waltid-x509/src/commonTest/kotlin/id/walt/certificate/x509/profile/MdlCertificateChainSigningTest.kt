@@ -6,6 +6,7 @@ import id.walt.certificate.x509.profile.IsoDocumentSignerX509CertificateProfile.
 import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile.profileIaCaRootCertificate
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
+import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
@@ -90,7 +91,13 @@ class MdlCertificateChainSigningTest {
     }
 
     companion object {
-        val caTool = X509CertificateUtil { addValidators(IsoIaCaRootX509CertificateProfile) }
+        val caTool = X509CertificateUtil {
+            addValidators(
+                X509CertificateBasicConstraintsValidator(leafCanBeCa = true),
+                IsoIaCaRootX509CertificateProfile
+            )
+        }
+
         val dsTool = X509CertificateUtil { addValidators(IsoDocumentSignerX509CertificateProfile) }
 
     }

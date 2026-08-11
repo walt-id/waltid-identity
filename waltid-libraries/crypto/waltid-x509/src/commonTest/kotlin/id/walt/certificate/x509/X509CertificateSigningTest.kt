@@ -14,6 +14,7 @@ import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionK
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.model.GeneralName
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
+import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.algorithms.DigestAlgorithm
@@ -51,7 +52,7 @@ class X509CertificateSigningTest {
     }
 
     suspend fun signAndValidateCertificate(issuerKey: Key, sigAlg: SignatureAlgorithm) {
-        val rootCert = assertNotNull(X509CertificateUtil.createSelfSignedCertificate(issuerKey, sigAlg) {
+        val rootCert = assertNotNull(caTool.createSelfSignedCertificate(issuerKey, sigAlg) {
             subjectDn = "CN=Test, OU=Walt.id, O=Walt.id, L=Graz, C=AT"
         })
             .also { cert ->
@@ -59,7 +60,7 @@ class X509CertificateSigningTest {
                     assertEquals(issuerKey.spec, it.spec)
                 }
                 val result =
-                    X509CertificateUtil.validateCertificateChain(listOf(cert), InMemoryTrustStore(listOf(cert)))
+                    caTool.validateCertificateChain(listOf(cert), InMemoryTrustStore(listOf(cert)))
                 assertTrue(result.valid)
             }
 
@@ -85,6 +86,7 @@ class X509CertificateSigningTest {
                 subjectDn = "OU=waltid"
 
                 extensionBasicConstraints {
+                    critical = false
                     cA = true
                     pathLenConstraint = 5
                 }
@@ -213,6 +215,12 @@ class X509CertificateSigningTest {
             }
 
             verifyPemChain(intermediateCert.encodedPem, caCert.encodedPem)
+        }
+    }
+
+    companion object {
+        val caTool = X509CertificateUtil {
+            addValidators(X509CertificateBasicConstraintsValidator(leafCanBeCa = true))
         }
     }
 }

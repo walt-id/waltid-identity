@@ -4,6 +4,7 @@ import id.walt.certificate.x509.nodejs.NodejsX509CertificateSerialNumberGenerato
 import id.walt.certificate.x509.signum.*
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.X509CertificateChainValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
 import id.walt.crypto2.CryptoRuntime
@@ -25,6 +26,7 @@ actual fun platformDefaultServices(): X509CertificateServices {
         certificateChainValidator = X509CertificateChainValidator(
             listOf(
                 X509CertificateValidityValidator(),
+                X509CertificateBasicConstraintsValidator(),
                 X509CertificateSignatureValidator(signatureValidator)
             ),
             // TODO: Implement Node.js system trust store

@@ -10,6 +10,7 @@ import id.walt.certificate.x509.profile.IsoDocumentSignerX509CertificateProfile.
 import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile
 import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile.profileIaCaRootCertificate
 import id.walt.certificate.x509.validation.ValidationResult
+import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
@@ -30,6 +31,7 @@ object OnboardingService {
     private val iaCaRootCertUtil = X509CertificateUtil {
         addValidators(
             IsoIaCaRootX509CertificateProfile,
+            X509CertificateBasicConstraintsValidator(leafCanBeCa = true),
             X509CertificateValidityValidator(allowValidityInFuture = true)
         )
     }

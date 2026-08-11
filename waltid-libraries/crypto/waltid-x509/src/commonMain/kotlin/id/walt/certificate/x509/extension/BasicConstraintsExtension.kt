@@ -23,7 +23,7 @@ interface BasicConstraintsExtension : Extension {
 
     data class Builder(
         override val oid: String,
-        override var critical: Boolean = false,
+        override var critical: Boolean = true,
         override var cA: Boolean = false,
         override var pathLenConstraint: Int? = null,
     ) : BasicConstraintsExtension

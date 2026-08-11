@@ -11,6 +11,7 @@ import id.walt.certificate.x509.signum.SignumCsrParser
 import id.walt.certificate.x509.signum.SignumSignatureValidator
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.X509CertificateChainValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
 import id.walt.crypto2.CryptoRuntime
@@ -32,6 +33,7 @@ fun X509CertificateUtilBuilder.signumImplementation() {
         certificateChainValidator = X509CertificateChainValidator(
             listOf(
                 X509CertificateValidityValidator(),
+                X509CertificateBasicConstraintsValidator(),
                 X509CertificateSignatureValidator(signatureValidator)
             ),
             InMemoryTrustStore()
@@ -53,6 +55,7 @@ actual fun platformDefaultServices(): X509CertificateServices {
         certificateChainValidator = X509CertificateChainValidator(
             listOf(
                 X509CertificateValidityValidator(),
+                X509CertificateBasicConstraintsValidator(),
                 X509CertificateSignatureValidator(certificateSigner)
             ),
             JavaDefaultTrustStore(certificateParser)

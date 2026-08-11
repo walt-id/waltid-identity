@@ -9,6 +9,7 @@ import kotlin.time.Clock
 
 class ValidationContext(
     val cryptoRuntime: CryptoRuntime,
+    val chainLength: Int,
     trustStore: X509CertificateTrustStore
 ) : X509CertificateTrustStore {
 
@@ -20,6 +21,16 @@ class ValidationContext(
             internalChainTrust
         )
     )
+
+    private val variableMap = mutableMapOf<String, Any>()
+
+    fun setVariable(key: String, value: Any) {
+        variableMap["${valid}:${key}"] = value
+    }
+
+    fun <T>getVariable(key: String): T? {
+        return variableMap["${valid}:${key}"] as? T
+    }
 
     val valid: Boolean
         get() =
@@ -34,6 +45,9 @@ class ValidationContext(
         get() = current.certificateIndex
     val certificateSubjectDn: String
         get() = current.certificateSubjectDn
+
+    val isLeaf : Boolean
+        get() = certificateIndex == chainLength - 1
 
     override fun findCertificateBySubjectDn(subjectDn: String): List<X509Certificate> =
         internalTrustStore.findCertificateBySubjectDn(subjectDn)

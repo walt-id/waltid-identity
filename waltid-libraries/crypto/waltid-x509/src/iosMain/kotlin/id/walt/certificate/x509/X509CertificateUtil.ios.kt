@@ -23,6 +23,7 @@ actual fun platformDefaultServices(): X509CertificateServices {
         certificateChainValidator = X509CertificateChainValidator(
             listOf(
                 X509CertificateValidityValidator(),
+                X509CertificateBasicConstraintsValidator(),
                 X509CertificateSignatureValidator(signatureValidator)
             ),
             // TODO: Implement ios system trust store

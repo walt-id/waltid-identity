@@ -1,6 +1,7 @@
 package id.walt.certificate.x509
 
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
+import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
@@ -45,7 +46,7 @@ class JvmX509CertificateSigningTest {
                     assertEquals(issuerKey.spec, it.spec)
                 }
                 val result =
-                    X509CertificateUtil.validateCertificateChain(listOf(cert), InMemoryTrustStore(listOf(cert)))
+                    rootUtil.validateCertificateChain(listOf(cert), InMemoryTrustStore(listOf(cert)))
                 assertTrue(result.valid)
             }
 
@@ -61,6 +62,12 @@ class JvmX509CertificateSigningTest {
                 InMemoryTrustStore(listOf(rootCert))
             )
             assertTrue(result.valid)
+        }
+    }
+
+    companion object {
+        val rootUtil = X509CertificateUtil {
+            addValidators(X509CertificateBasicConstraintsValidator(leafCanBeCa = true))
         }
     }
 }

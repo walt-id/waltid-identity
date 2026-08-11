@@ -3,6 +3,7 @@ package id.walt.certificate.x509
 import id.walt.certificate.x509.builder.Pkcs10CertificateSigningRequestBuilder
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
+import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
@@ -50,9 +51,13 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
             issuerDnRaw = ByteString(),
             subjectDn = "OU=CA,DC=test,O=Walt.id",
         )
+        builder.extensionBasicConstraints {
+            cA = true
+        }
         block.invoke(builder)
         builder.issuerDnRaw = ByteString()
         builder.extensionAuthorityKeyIdentifier()
+        builder.extensionSubjectKeyIdentifier()
         return services.certificateSigner.signCertificate(issuerKey, signatureAlgorithm, builder)
     }
 
@@ -65,9 +70,13 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
             issuerDnRaw = ByteString(),
             subjectDn = "OU=CA,DC=test,O=Walt.id",
         )
+        builder.extensionBasicConstraints {
+            cA = true
+        }
         block.invoke(builder)
         builder.issuerDnRaw = ByteString()
         builder.extensionAuthorityKeyIdentifier()
+        builder.extensionSubjectKeyIdentifier()
         return services.certificateSigner.signCertificate(issuerKey, builder)
     }
 

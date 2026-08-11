@@ -6,6 +6,7 @@ import id.walt.certificate.x509.testdata.TestDataCertificates.gtsRootR4CrtPem
 import id.walt.certificate.x509.testdata.TestDataCertificates.gtsWe2CrtPem
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
+import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.TypedKeyGenerationRequest
@@ -38,7 +39,7 @@ class X509CertificateChainValidationTest {
 
     @Test
     fun shouldValidateGoogleCertificateChainWithOneEntry() = runTest {
-        val result = certUtil.validatePemCertificateChain(gtsWe2CrtPem)
+        val result = caCertUtil.validatePemCertificateChain(gtsWe2CrtPem)
         assertTrue(result.valid, "Validation log: ${result.log}")
         result.log.filter { it.validatorId == X509CertificateSignatureValidator.ID }
             .also { signatureValidatorLog ->
@@ -115,6 +116,15 @@ class X509CertificateChainValidationTest {
              * and without a system trust store to ensure the same behavior in JS and JVM
              */
             setTrust(trustStore)
+        }
+
+        val caCertUtil = X509CertificateUtil {
+            /**
+             * Trust store with Google Trust Services root certificate
+             * and without a system trust store to ensure the same behavior in JS and JVM
+             */
+            setTrust(trustStore)
+            addValidators(X509CertificateBasicConstraintsValidator(leafCanBeCa = true))
         }
     }
 }

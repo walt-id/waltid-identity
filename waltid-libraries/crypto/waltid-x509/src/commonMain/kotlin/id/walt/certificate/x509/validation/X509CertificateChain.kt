@@ -1,7 +1,6 @@
 package id.walt.certificate.x509.validation
 
 import id.walt.certificate.x509.X509Certificate
-import id.walt.certificate.x509.X509CertificateTrustStore
 
 class X509CertificateChain private constructor(private val certChainList: List<CertChainEntry>) {
 
@@ -11,8 +10,7 @@ class X509CertificateChain private constructor(private val certChainList: List<C
 
     companion object {
 
-        suspend fun of(
-            trustStore: X509CertificateTrustStore,
+        fun of(
             certificateList: Collection<X509Certificate>
         ): X509CertificateChain {
 

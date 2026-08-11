@@ -2,13 +2,15 @@
 
 package id.walt.openid4vp.clientidprefix.prefixes
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
+import id.walt.certificate.x509.model.GeneralName
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto2.jose.CompactJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.openid4vp.clientidprefix.RequestContext
-import id.walt.openid4vp.clientidprefix.extractSanDnsNamesFromDer
 import id.walt.x509.CertificateDer
 import id.walt.x509.validateClientAuthenticationCertificateChain
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -65,7 +67,7 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
         }
         val leafCertificate = certificates.firstOrNull()
             ?: return ClientValidationResult.Failure(ClientIdError.EmptyX5cHeader)
-        val leafCertDer = leafCertificate.bytes.toByteArray()
+        val leafCert = X509CertificateUtil.parseCertificateDerEncoded(leafCertificate.bytes)
 
         // 1. Validate the certificate path, trust anchor, validity, constraints, and client-auth usage.
         try {
@@ -82,7 +84,7 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
 
         // 2. Verify JWS signature using the leaf certificate's public key.
         val key = try {
-            ClientIdCrypto2.keyFromCertificate(leafCertDer)
+            leafCert.data.subjectPublicKeyInfo.restore(ClientIdCrypto2.runtime)
         } catch (cause: CancellationException) {
             throw cause
         } catch (_: Exception) {
@@ -98,10 +100,12 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
             return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
         }
 
-        // 3. Extract SANs using the isolated JCA utility function.
-        val sans = extractSanDnsNamesFromDer(leafCertDer).getOrElse {
-            return ClientValidationResult.Failure(ClientIdError.CannotExtractSanDnsNamesFromDer)
-        }
+        // 3. Extract SANs
+        val sans = leafCert.data.extensionSan
+            ?.alternativeNames
+            ?.filter { it.type == GeneralName.NameType.dNSName }
+            ?.map { it.value }
+            ?: emptyList()
 
         // 4. Check if the client_id's DNS name is in the SAN list.
         if (clientId.dnsName !in sans) {

@@ -14,10 +14,12 @@ class X509SingleCertificateValidator(
 ) {
 
     suspend fun validate(certificate: X509Certificate): ValidationResult {
-        val context = ValidationContext(cryptoRuntime, trustStore)
+        val context = ValidationContext(cryptoRuntime, 1, trustStore)
         validators.forEach { validator ->
             context.setCurrent(validator.id, 0, certificate.data.subjectDn)
-            validator.validate(context, certificate)
+            if (validator.accepts(context, certificate)) {
+                validator.validate(context, certificate)
+            }
         }
         return ValidationResult(
             context.valid,

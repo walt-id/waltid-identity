@@ -7,6 +7,7 @@ import id.walt.certificate.x509.profile.IsoDocumentSignerX509CertificateProfile
 import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile
 import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile.profileIaCaRootCertificate
 import id.walt.certificate.x509.validation.ValidationResult
+import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
 import id.walt.crypto.keys.*
 import id.walt.issuer.services.onboarding.OnboardingService
@@ -28,6 +29,7 @@ class IsoMdlOnboardingTests {
     companion object {
 
         private val rootCaUtil = X509CertificateUtil {
+            addValidators(X509CertificateBasicConstraintsValidator(leafCanBeCa = true))
             addValidators(IsoIaCaRootX509CertificateProfile)
         }
 

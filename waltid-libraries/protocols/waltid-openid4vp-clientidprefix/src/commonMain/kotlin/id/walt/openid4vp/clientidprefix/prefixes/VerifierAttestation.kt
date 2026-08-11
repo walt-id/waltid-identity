@@ -2,6 +2,9 @@
 
 package id.walt.openid4vp.clientidprefix.prefixes
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
+import id.walt.certificate.x509.model.GeneralName
 import id.walt.credentials.keyresolver.JwtKeyResolver
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.crypto.keys.jwk.JWKKey
@@ -13,7 +16,6 @@ import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.openid4vp.clientidprefix.RequestContext
-import id.walt.openid4vp.clientidprefix.extractSanDnsNamesFromDer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
 import kotlinx.coroutines.CancellationException
@@ -127,7 +129,12 @@ data class VerifierAttestation(val sub: String, override val rawValue: String) :
                     "Verifier Attestation x5c issuer must be an HTTPS URI"
                 }
                 val issuerHost = Url(attestationIssuer).host
-                val issuerDnsNames = extractSanDnsNamesFromDer(leaf.bytes.toByteArray()).getOrThrow()
+                val leafCert = X509CertificateUtil.parseCertificateDerEncoded(leaf.bytes)
+                val issuerDnsNames = leafCert.data.extensionSan
+                    ?.alternativeNames
+                    ?.filter { it.type == GeneralName.NameType.dNSName }
+                    ?.map { it.value }
+                    ?: emptyList()
                 require(issuerHost in issuerDnsNames) {
                     "Verifier Attestation certificate SAN does not match issuer host"
                 }
@@ -135,7 +142,10 @@ data class VerifierAttestation(val sub: String, override val rawValue: String) :
                     JWKKey.importFromDerCertificate(leaf.bytes.toByteArray()).getOrThrow()
                         .verifyJws(attestationJwtString).getOrThrow()
                 } else {
-                    ClientIdCrypto2.verify(attestationJwtString, ClientIdCrypto2.keyFromCertificate(leaf.bytes.toByteArray()))
+                    ClientIdCrypto2.verify(
+                        attestationJwtString,
+                        ClientIdCrypto2.keyFromCertificate(leaf.bytes.toByteArray())
+                    )
                 }
             } else if (decodedAttestation.algorithm == JwsAlgorithm.ES256K) {
                 requireNotNull(decodedAttestation.protectedHeader["kid"]?.jsonPrimitive?.contentOrNull) {
@@ -145,7 +155,8 @@ data class VerifierAttestation(val sub: String, override val rawValue: String) :
                     jwtHeader = JsonObject(decodedAttestation.protectedHeader - "jwk" - "x5c"),
                     jwtPayload = attestationPayload,
                 ) ?: throw IllegalArgumentException("Could not resolve ES256K Verifier Attestation issuer key")
-                val attestationKid = requireNotNull(decodedAttestation.protectedHeader["kid"]?.jsonPrimitive?.contentOrNull)
+                val attestationKid =
+                    requireNotNull(decodedAttestation.protectedHeader["kid"]?.jsonPrimitive?.contentOrNull)
                 require(attestationIssuerKey.getKeyId() == attestationKid) {
                     "Resolved ES256K Verifier Attestation key does not exactly match kid"
                 }
@@ -161,7 +172,7 @@ data class VerifierAttestation(val sub: String, override val rawValue: String) :
                     jwtPayload = attestationPayload,
                 )?.key ?: throw IllegalArgumentException(
                     "Could not resolve public key for Verifier Attestation issuer " +
-                        "(iss=${attestationPayload["iss"]?.jsonPrimitive?.contentOrNull})"
+                            "(iss=${attestationPayload["iss"]?.jsonPrimitive?.contentOrNull})"
                 )
                 ClientIdCrypto2.verify(attestationJwtString, attestationIssuerKey)
             }
@@ -197,8 +208,9 @@ data class VerifierAttestation(val sub: String, override val rawValue: String) :
 
             log.debug { "verifier_attestation: successfully validated for client_id=${clientId.sub}" }
 
-            ClientValidationResult.Success(context.clientMetadata
-                ?: throw IllegalArgumentException("client_metadata parameter is required for verifier_attestation")
+            ClientValidationResult.Success(
+                context.clientMetadata
+                    ?: throw IllegalArgumentException("client_metadata parameter is required for verifier_attestation")
             )
         } catch (cause: CancellationException) {
             throw cause
