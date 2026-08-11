@@ -60,5 +60,33 @@ class RedisExpiringCounter(private val jedis: UnifiedJedis) {
 
             return RedisExpiringCounter(jedis)
         }
+
+        fun fromRedisNodes(
+            type: String,
+            nodes: List<PersistenceNode>,
+            user: String?,
+            password: String?,
+        ): RedisExpiringCounter? {
+            if (type != "redis" && type != "redis-cluster") {
+                return null
+            }
+
+            if (nodes.isEmpty()) {
+                return null
+            }
+
+            val hostAndPorts = nodes.map { HostAndPort(it.host, it.port) }.toSet().toMutableSet()
+
+            if (type == "redis") {
+                require(hostAndPorts.size == 1) { "Non-cluster Redis expiring counter requires exactly one Redis node" }
+            }
+
+            val jedis: UnifiedJedis = when (type) {
+                "redis" -> JedisPooled(hostAndPorts.first().host, hostAndPorts.first().port, user, password)
+                else -> JedisCluster(hostAndPorts, user, password)
+            }
+
+            return RedisExpiringCounter(jedis)
+        }
     }
 }

@@ -2,6 +2,9 @@ package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletBootstrapResult
+import id.walt.wallet2.mobile.MobileWalletAnnexCPreview
+import id.walt.wallet2.mobile.MobileWalletAnnexCRequest
+import id.walt.wallet2.mobile.MobileWalletAnnexCSubmission
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletKeyType
@@ -12,6 +15,8 @@ import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
+import id.walt.wallet2.mobile.MobileWalletDigitalCredentialCapabilities
+import id.walt.wallet2.mobile.MobileWalletDigitalCredentialResponse
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.handlers.WalletIssuanceSession
@@ -184,6 +189,21 @@ public class WalletSdkBridge private constructor(
         previewHandle: MobileWalletPresentationPreviewHandle,
     ): WalletBridgeResult<Unit> =
         walletBridgeCall { operations.discardPresentationPreview(previewHandle) }
+    /** Returns the current iOS IdentityDocumentServices capability snapshot. */
+    public fun digitalCredentialCapabilities(): MobileWalletDigitalCredentialCapabilities =
+        operations.digitalCredentialCapabilities()
+
+    /** Retains a parsed Annex C request for explicit native consent. */
+    public suspend fun previewAnnexCPresentation(
+        request: MobileWalletAnnexCRequest,
+    ): WalletBridgeResult<MobileWalletAnnexCPreview> =
+        walletBridgeCall { operations.previewAnnexCPresentation(request) }
+
+    /** Verifies the post-consent raw request and builds the encrypted Annex C response. */
+    public suspend fun submitAnnexCPresentation(
+        submission: MobileWalletAnnexCSubmission,
+    ): WalletBridgeResult<MobileWalletDigitalCredentialResponse> =
+        walletBridgeCall { operations.submitAnnexCPresentation(submission) }
 
     internal companion object {
         internal fun forOperations(
@@ -197,6 +217,16 @@ public class WalletSdkBridge private constructor(
 }
 
 internal interface WalletSdkBridgeOperations {
+    fun digitalCredentialCapabilities(): MobileWalletDigitalCredentialCapabilities =
+        error("Digital Credentials are not implemented by this test bridge")
+
+    suspend fun previewAnnexCPresentation(request: MobileWalletAnnexCRequest): MobileWalletAnnexCPreview =
+        error("Annex C is not implemented by this test bridge")
+
+    suspend fun submitAnnexCPresentation(
+        submission: MobileWalletAnnexCSubmission,
+    ): MobileWalletDigitalCredentialResponse = error("Annex C is not implemented by this test bridge")
+
     suspend fun bootstrap(
         keyType: MobileWalletKeyType?,
         didMethod: String,
@@ -254,6 +284,16 @@ internal interface WalletSdkBridgeOperations {
 internal class MobileWalletSdkBridgeOperations(
     private val wallet: MobileWallet,
 ) : WalletSdkBridgeOperations {
+    override fun digitalCredentialCapabilities(): MobileWalletDigitalCredentialCapabilities =
+        wallet.digitalCredentialCapabilities()
+
+    override suspend fun previewAnnexCPresentation(request: MobileWalletAnnexCRequest): MobileWalletAnnexCPreview =
+        wallet.previewAnnexCPresentation(request)
+
+    override suspend fun submitAnnexCPresentation(
+        submission: MobileWalletAnnexCSubmission,
+    ): MobileWalletDigitalCredentialResponse = wallet.submitAnnexCPresentation(submission)
+
     override suspend fun bootstrap(
         keyType: MobileWalletKeyType?,
         didMethod: String,

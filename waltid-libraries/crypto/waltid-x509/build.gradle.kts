@@ -37,6 +37,7 @@ kotlin {
         commonMain.dependencies {
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             api(project(":waltid-libraries:crypto:waltid-crypto2"))
+            implementation(project(":waltid-libraries:crypto:waltid-jose"))
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.io.core)
             implementation(identityLibs.kotlinx.io.bytestring)

@@ -1,4 +1,5 @@
 import SwiftUI
+import WalletDemoSharingUI
 
 struct ReceiveView: View {
     @ObservedObject var viewModel: WalletViewModel

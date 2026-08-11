@@ -41,6 +41,18 @@ inputs:
     required: false
     type: string
     default: 'true'
+  # One flag per demo: each check builds that demo's app and extension, so it belongs in the job whose
+  # build is already warm for that project.
+  run-native-identity-document-provider-checks:
+    description: 'Build the native demo document provider extension and verify its built configuration'
+    required: false
+    type: string
+    default: 'false'
+  run-compose-identity-document-provider-checks:
+    description: 'Build the Compose demo document provider extension and verify its built configuration'
+    required: false
+    type: string
+    default: 'false'
   test-report-job-name:
     description: 'Job name to associate with the published iOS JUnit report'
     required: false
@@ -121,7 +133,7 @@ runs:
         ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework
 
     - name: Resolve iOS simulator destination
-      if: ${{ inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' }}
+      if: ${{ inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-native-identity-document-provider-checks == 'true' || inputs.run-compose-identity-document-provider-checks == 'true' }}
       id: resolve-simulator
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
       shell: bash
@@ -148,6 +160,41 @@ runs:
         echo "Resolved simulator destination: $RESOLVED_DESTINATION"
         echo "Matched destination line: $MATCHING_LINE"
         echo "destination=$RESOLVED_DESTINATION" >> $GITHUB_OUTPUT
+
+    # A provider extension that is not embedded, or disagrees with its host about App Group, Keychain
+    # group or doctypes, is invisible to iOS and fails no build - only an on-device presentation.
+    - name: Verify native iOS identity document provider
+      if: ${{ inputs.run-native-identity-document-provider-checks == 'true' }}
+      id: native_identity_document_provider_checks
+      continue-on-error: true
+      shell: bash
+      run: |
+        "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh" \
+          --project-dir "${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp" \
+          --destination "${{ steps.resolve-simulator.outputs.destination }}" \
+          --derived-data /tmp/xcode-derived \
+          --app-group group.id.walt.wallet.native \
+          --keychain-group-suffix id.walt.wallet.native.shared \
+          --app-bundle-id id.walt.wallet.native \
+          --appex-bundle-id id.walt.wallet.native.identitydocumentprovider \
+          --development-team 9BB78CFW7Y \
+          --build-setting OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
+
+    - name: Verify Compose iOS identity document provider
+      if: ${{ inputs.run-compose-identity-document-provider-checks == 'true' }}
+      id: compose_identity_document_provider_checks
+      continue-on-error: true
+      shell: bash
+      run: |
+        "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh" \
+          --project-dir "${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-compose/iosApp" \
+          --destination "${{ steps.resolve-simulator.outputs.destination }}" \
+          --derived-data /tmp/xcode-derived-compose \
+          --app-group group.id.walt.wallet.compose \
+          --keychain-group-suffix id.walt.wallet.compose.shared \
+          --app-bundle-id id.walt.wallet.compose \
+          --appex-bundle-id id.walt.wallet.compose.identitydocumentprovider \
+          --development-team 9BB78CFW7Y
 
     - name: Execute iOS demo app integration tests
       if: ${{ inputs.run-native-demo-tests == 'true' }}
@@ -288,13 +335,19 @@ runs:
         retention-days: 7
 
     - name: Fail if iOS tests failed
-      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true') }}
+      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-native-identity-document-provider-checks == 'true' || inputs.run-compose-identity-document-provider-checks == 'true') }}
       shell: bash
       run: |
         failed=()
 
         if [[ "${{ inputs.run-ios-simulator-tests }}" == "true" && "${{ steps.ios_simulator_tests.outcome }}" == "failure" ]]; then
           failed+=("iosSimulatorArm64Test")
+        fi
+        if [[ "${{ inputs.run-native-identity-document-provider-checks }}" == "true" && "${{ steps.native_identity_document_provider_checks.outcome }}" == "failure" ]]; then
+          failed+=("native identity document provider configuration")
+        fi
+        if [[ "${{ inputs.run-compose-identity-document-provider-checks }}" == "true" && "${{ steps.compose_identity_document_provider_checks.outcome }}" == "failure" ]]; then
+          failed+=("Compose identity document provider configuration")
         fi
         if [[ "${{ inputs.run-native-demo-tests }}" == "true" && "${{ steps.ios_demo_app_tests.outcome }}" == "failure" ]]; then
           failed+=("native iOS demo app tests")

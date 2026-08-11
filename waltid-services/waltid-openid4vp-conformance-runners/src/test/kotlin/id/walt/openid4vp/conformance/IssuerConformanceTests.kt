@@ -24,6 +24,10 @@ class IssuerConformanceTests {
         private const val defaultClientAttesterJwkResource = "/keys/attester-key.json"
         private const val credentialIssuerUrlProperty = "openid4vci.conformance.credential-issuer-url"
         private const val credentialIssuerUrlEnv = "OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL"
+        private const val conformanceSuiteHostProperty = "openid4vci.conformance.suite-host"
+        private const val conformanceSuiteHostEnv = "OPENID4VCI_CONFORMANCE_SUITE_HOST"
+        private const val conformanceSuitePortProperty = "openid4vci.conformance.suite-port"
+        private const val conformanceSuitePortEnv = "OPENID4VCI_CONFORMANCE_SUITE_PORT"
         private const val enterpriseBaseUrlProperty = "openid4vci.conformance.enterprise-base-url"
         private const val enterpriseBaseUrlEnv = "OPENID4VCI_CONFORMANCE_ENTERPRISE_BASE_URL"
         private const val enterpriseTargetProperty = "openid4vci.conformance.enterprise-target"
@@ -111,6 +115,14 @@ class IssuerConformanceTests {
                     "$enterpriseBaseUrl/v2/$it/issuer-service-api/openid4vci"
                 }
 
+        val conformanceSuiteHost: String =
+            propertyOrEnv(conformanceSuiteHostProperty, conformanceSuiteHostEnv)
+                ?: ConformanceConfig.CONFORMANCE_HOST
+
+        val conformanceSuitePort: Int = propertyOrEnv(conformanceSuitePortProperty, conformanceSuitePortEnv)
+            ?.toIntOrNull()
+            ?: ConformanceConfig.CONFORMANCE_PORT
+
         val sdJwtCredentialConfigurationId: String? =
             propertyOrEnv(sdJwtCredentialConfigurationIdProperty, sdJwtCredentialConfigurationIdEnv)
 
@@ -147,8 +159,8 @@ class IssuerConformanceTests {
             withTimeout(timeoutMinutes.minutes) {
                 IssuerConformanceTestRunner(
                     credentialIssuerUrl = requireNotNull(credentialIssuerUrl),
-                    conformanceHost = ConformanceConfig.CONFORMANCE_HOST,
-                    conformancePort = ConformanceConfig.CONFORMANCE_PORT,
+                    conformanceHost = conformanceSuiteHost,
+                    conformancePort = conformanceSuitePort,
                     sdJwtCredentialConfigurationId = sdJwtCredentialConfigurationId,
                     mdocCredentialConfigurationId = mdocCredentialConfigurationId,
                     haipSdJwtCredentialConfigurationId = haipSdJwtCredentialConfigurationId,

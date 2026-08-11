@@ -11,14 +11,20 @@ import at.asitplus.signum.indispensable.pki.TbsCertificationRequest
 import at.asitplus.signum.indispensable.pki.X509Certificate
 import at.asitplus.signum.indispensable.toX509SignatureAlgorithm
 import id.walt.crypto.keys.Key as LegacyKey
+import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ManagedKey
+import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.x509.iso.authorityKeyIdentifierExtension
 import id.walt.x509.iso.basicConstraintsExtension
@@ -45,6 +51,22 @@ fun CertificateDer.crypto2PublicJwk(): EncodedKey.Jwk {
 
 fun CertificateSigningRequestDer.crypto2PublicJwk(): EncodedKey.Jwk =
     Pkcs10CertificationRequest.decodeFromDer(bytes.toByteArray()).tbsCsr.publicKey.toCrypto2PublicJwk()
+
+/**
+ * Restores the certificate's subject public key as a crypto2 key that may only verify signatures.
+ *
+ * Callers that have authenticated a certificate chain and now need to check a signature made by its
+ * leaf can ask for the key instead of assembling a stored-key record themselves; the key carries no
+ * private material and no usage other than [KeyUsage.VERIFY].
+ */
+suspend fun CertificateDer.crypto2VerificationKey(): Key {
+    val jwk = crypto2PublicJwk()
+    return verificationKeyRuntime.restore(
+        jwk.toStoredSoftwareKey(KeyId(Jwk.sha256Thumbprint(jwk)), setOf(KeyUsage.VERIFY))
+    )
+}
+
+private val verificationKeyRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
 
 internal fun CryptoPublicKey.toCrypto2PublicJwk(): EncodedKey.Jwk =
     EncodedKey.Jwk(
