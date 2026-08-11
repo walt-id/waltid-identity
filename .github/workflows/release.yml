@@ -59,6 +59,18 @@ jobs:
     needs: [ version, api-docker ]
     if: ${{ !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
     steps:
+      - name: Determine ref for enterprise repo
+        id: enterprise_ref
+        env:
+          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          if git ls-remote --exit-code --heads "https://$GH_TOKEN@github.com/walt-id/waltid-identity-enterprise.git" "refs/heads/$BRANCH" >/dev/null 2>&1; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Dispatch license deployment in enterprise repo
         uses: actions/github-script@v7
         with:
@@ -68,7 +80,7 @@ jobs:
               owner: 'walt-id',
               repo: 'waltid-identity-enterprise',
               workflow_id: 'deploy-k8s-license.yml',
-              ref: 'main',
+              ref: '${{ steps.enterprise_ref.outputs.ref }}',
               inputs: { version: '${{ needs.version.outputs.release_version }}' }
             })
   branch:
