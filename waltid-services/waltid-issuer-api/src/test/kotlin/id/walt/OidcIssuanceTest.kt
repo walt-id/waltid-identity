@@ -6,9 +6,16 @@ import id.walt.issuer.issuance.CIProvider
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.AuthenticationMethod
+import id.walt.oid4vc.data.GrantType
+import id.walt.oid4vc.data.TxCode
+import id.walt.oid4vc.errors.TokenError
 import id.walt.oid4vc.requests.CredentialOfferRequest
+import id.walt.oid4vc.requests.TokenRequest
+import id.walt.oid4vc.responses.TokenErrorCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.minutes
 
 class OidcIssuanceTest {
@@ -41,6 +48,123 @@ class OidcIssuanceTest {
         val offerRequest = CredentialOfferRequest(issuanceSession.credentialOffer!!)
         val offerUri = OpenID4VCI.getCredentialOfferRequestUrl(offerRequest)
         println("Offer URI: $offerUri")
+    }
+
+    @Test
+    fun testPreAuthorizedCodeIsSingleUse() {
+        ConfigManager.testWithConfigs(testConfigs)
+        val ciTestProvider = CIProvider()
+
+        val issuanceSession = ciTestProvider.initializeCredentialOffer(
+            issuanceRequests = listOf(
+                IssuanceRequest(
+                    issuerKey = IssuerApiTest.jsonKeyObj,
+                    credentialData = IssuerApiTest.jsonVCObj,
+                    credentialConfigurationId = "VerifiableId",
+                    mapping = IssuerApiTest.jsonMappingObj,
+                    issuerDid = TEST_ISSUER_DID,
+                    authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+                )
+            ),
+            expiresIn = 5.minutes
+        )
+
+        val preAuthorizedCode = issuanceSession
+            .credentialOffer!!
+            .grants[GrantType.pre_authorized_code.value]!!
+            .preAuthorizedCode!!
+
+        val tokenRequest = TokenRequest.PreAuthorizedCode(
+            preAuthorizedCode = preAuthorizedCode
+        )
+
+        // First exchange must succeed
+        val firstResponse = ciTestProvider.processTokenRequest(tokenRequest)
+
+        assertNotNull(firstResponse.accessToken)
+
+        // The same pre-authorized code must not be accepted twice
+        val error = assertFailsWith<TokenError> {
+            ciTestProvider.processTokenRequest(tokenRequest)
+        }
+
+        assertEquals(
+            TokenErrorCode.invalid_grant,
+            error.errorCode
+        )
+    }
+
+
+    @Test
+    fun testInvalidTxCodeDoesNotConsumePreAuthorizedCode() {
+        ConfigManager.testWithConfigs(testConfigs)
+        val ciTestProvider = CIProvider()
+
+        val validTxCode = "123456"
+
+        val issuanceSession = ciTestProvider.initializeCredentialOffer(
+            issuanceRequests = listOf(
+                IssuanceRequest(
+                    issuerKey = IssuerApiTest.jsonKeyObj,
+                    credentialData = IssuerApiTest.jsonVCObj,
+                    credentialConfigurationId = "VerifiableId",
+                    mapping = IssuerApiTest.jsonMappingObj,
+                    issuerDid = TEST_ISSUER_DID,
+                    authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+                )
+            ),
+            expiresIn = 5.minutes,
+            txCode = TxCode.makeFor(
+                pin = validTxCode,
+                description = "Enter the transaction code"
+            ),
+            txCodeValue = validTxCode
+        )
+
+        val preAuthorizedCode = issuanceSession
+            .credentialOffer!!
+            .grants[GrantType.pre_authorized_code.value]!!
+            .preAuthorizedCode!!
+
+        // Wrong txCode must fail
+        val wrongTxCodeError = assertFailsWith<TokenError> {
+            ciTestProvider.processTokenRequest(
+                TokenRequest.PreAuthorizedCode(
+                    preAuthorizedCode = preAuthorizedCode,
+                    txCode = "000000"
+                )
+            )
+        }
+
+        assertEquals(
+            TokenErrorCode.invalid_grant,
+            wrongTxCodeError.errorCode
+        )
+
+        // A failed txCode validation must NOT consume the pre-authorized code
+        val validResponse = ciTestProvider.processTokenRequest(
+            TokenRequest.PreAuthorizedCode(
+                preAuthorizedCode = preAuthorizedCode,
+                txCode = validTxCode
+            )
+        )
+
+        assertNotNull(validResponse.accessToken)
+
+        // After the successful exchange, the code is consumed
+        val reusedCodeError = assertFailsWith<TokenError> {
+            ciTestProvider.processTokenRequest(
+                TokenRequest.PreAuthorizedCode(
+                    preAuthorizedCode = preAuthorizedCode,
+                    txCode = validTxCode
+                )
+            )
+        }
+
+        assertEquals(
+            TokenErrorCode.invalid_grant,
+            reusedCodeError.errorCode
+        )
     }
 
     /*

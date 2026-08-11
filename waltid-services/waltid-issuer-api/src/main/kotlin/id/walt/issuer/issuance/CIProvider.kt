@@ -193,6 +193,14 @@ open class CIProvider(
     )
 
 
+    private val preAuthorizedCodeGrants = ConfiguredPersistence<String>(
+        "pre_authorized_code_grants",
+        defaultExpiration = 5.minutes,
+        encoding = { it },
+        decoding = { it },
+    )
+
+
     private val deferredCredentialRequests = ConfiguredPersistence<CredentialRequest>(
         "deferred_credential_requests", defaultExpiration = 5.minutes,
         encoding = { Json.encodeToString(it) },
@@ -800,6 +808,14 @@ open class CIProvider(
             callbackUrl = callbackUrl
         ).also {
             putSession(it.id, it, expiresIn)
+
+            if (issuanceRequests.first().authenticationMethod == AuthenticationMethod.PRE_AUTHORIZED) {
+                preAuthorizedCodeGrants.set(
+                    it.id,
+                    it.id,
+                    expiresIn
+                )
+            }
         }
     }
 
@@ -935,6 +951,18 @@ open class CIProvider(
                 errorCode = TokenErrorCode.invalid_grant,
                 message = "User PIN required for this issuance session has not been provided or PIN is wrong."
             )
+        }
+
+        if (tokenRequest is TokenRequest.PreAuthorizedCode) {
+            val grant = preAuthorizedCodeGrants.getAndRemove(sessionId)
+
+            if (grant == null) {
+                throw TokenError(
+                    tokenRequest = tokenRequest,
+                    errorCode = TokenErrorCode.invalid_grant,
+                    message = "Pre-authorized code has already been used."
+                )
+            }
         }
 
         // Expiration time required by EBSI
