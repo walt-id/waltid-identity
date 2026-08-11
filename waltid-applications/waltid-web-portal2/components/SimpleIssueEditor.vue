@@ -220,9 +220,9 @@ async function submit() {
         </button>
       </div>
       <p class="text-xs text-[--color-text-muted] mt-2">
-        QR shows an OpenID4VCI offer for wallets to scan. DC API hands the offer
-        to a platform wallet via
-        <code>navigator.credentials.create</code> (Chrome origin trial).
+        QR shows an OpenID4VCI offer for wallets to scan. DC API starts wallet
+        engagement via <code>navigator.credentials.create</code>; the result log
+        follows issuer OpenID4VCI events (Chrome origin trial).
       </p>
       <p
         v-if="deliveryMethod === 'dc_api' && !dcApiSupport.supported"

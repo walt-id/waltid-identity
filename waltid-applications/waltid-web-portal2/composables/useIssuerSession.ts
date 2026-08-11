@@ -88,14 +88,9 @@ export function useIssuerSession(issuerBase: string) {
         flowType: "dc_api",
       };
 
+      // Outcome is driven by issuer OpenID4VCI SSE only. Browser create() handoff
+      // often fails with NetworkError even when issuance succeeded.
       sse.open(`${issuerBase}/issuer2/sessions/${sessionId}/events`);
-      sse.addEvent({ event: "DC_API_ISSUANCE_STARTED", status: "STARTED" });
-      sse.addEvent({
-        event: "DC_API_OFFER_CREATED",
-        offerId,
-        sessionId,
-        credentialOffer,
-      });
 
       const offer = parseCredentialOfferFromUrl(credentialOffer);
       const [credentialIssuerMetadata, authorizationServerMetadata] =
@@ -113,37 +108,15 @@ export function useIssuerSession(issuerBase: string) {
         credentialIssuerMetadata,
         authorizationServerMetadata,
       );
-      sse.addEvent({
-        event: "DC_API_REQUEST_BUILT",
-        protocol: "openid4vci-v1",
-        request: enrichedOffer,
-      });
 
-      const handoffResult = await invokeDigitalCredentialsCreate(
+      // Kick off wallet engagement (Chrome proximity QR / local wallet picker),
+      // then stop waiting on create() — do not log or surface handoff errors.
+      void invokeDigitalCredentialsCreate(
         enrichedOffer,
         mediationRequired,
-      );
-      // create() resolved — treat as handoff success even if response serialization fails.
-      // DigitalCredential platform objects often JSON.stringify to "{}", so extract fields.
-      let responsePayload: unknown = null;
-      try {
-        responsePayload = serializeDigitalCredentialResult(handoffResult);
-      } catch (serializeError) {
-        responsePayload = {
-          serializeError: formatCredentialError(serializeError),
-        };
-      }
-      sse.addEvent({
-        event: "DC_API_HANDOFF_SUCCESS",
-        response: responsePayload,
-      });
+      ).catch(() => undefined);
     } catch (e) {
-      error.value = formatCredentialError(e);
-      sse.addEvent({
-        event: "DC_API_HANDOFF_FAILED",
-        status: "FAILED",
-        message: error.value,
-      });
+      error.value = e instanceof Error ? e.message : "Unknown error";
     } finally {
       loading.value = false;
     }
@@ -223,40 +196,4 @@ async function fetchJson<T>(url: string): Promise<T> {
   } catch {
     return { raw: text } as T;
   }
-}
-
-function serializeDigitalCredentialResult(result: unknown): unknown {
-  if (result == null) return null;
-  if (typeof result !== "object") return result;
-  const credential = result as {
-    type?: unknown;
-    protocol?: unknown;
-    data?: unknown;
-    id?: unknown;
-  };
-  if (
-    "protocol" in credential ||
-    "data" in credential ||
-    credential.type === "digital-credential" ||
-    credential.type === "DigitalCredential"
-  ) {
-    return {
-      type: credential.type ?? null,
-      id: credential.id ?? null,
-      protocol: credential.protocol ?? null,
-      data: credential.data ?? null,
-    };
-  }
-  return result;
-}
-
-function formatCredentialError(error: unknown): string {
-  if (typeof DOMException !== "undefined" && error instanceof DOMException) {
-    return `${error.name}: ${error.message || "(no message)"}`;
-  }
-  if (error instanceof Error) {
-    const name = error.name && error.name !== "Error" ? `${error.name}: ` : "";
-    return `${name}${error.message || "(no message)"}`;
-  }
-  return String(error);
 }

@@ -372,8 +372,8 @@ async function submit() {
       <p class="mt-1 text-xs text-blue-800">
         Creates a by-value OpenID4VCI offer, embeds issuer/AS metadata, and calls
         <code>navigator.credentials.create</code> with protocol
-        <code>openid4vci-v1</code>. Chrome may show its own proximity QR for
-        cross-device handoff.
+        <code>openid4vci-v1</code>. Progress is tracked via issuer session
+        events; browser create() handoff status is ignored.
       </p>
       <label
         v-if="useDcApi"

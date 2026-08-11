@@ -54,8 +54,8 @@ This portal enables users to:
 2. **Create Offer**: Portal calls the Issuer API to generate a credential offer
 3. **Deliver to wallet** using one of:
    - **QR / deep link**: A QR code is displayed for the wallet to scan (enter PIN if required)
-   - **Digital Credentials API**: The portal enriches the offer with issuer/AS metadata and calls `navigator.credentials.create` with protocol `openid4vci-v1`. The issuer stays standard OpenID4VCI — there is no issuer-side DC API protocol mode.
-4. **Monitor Events**: Real-time SSE events show each step (`OFFER_RECEIVED`, `CREDENTIAL_ISSUED`, etc.)
+   - **Digital Credentials API**: The portal enriches the offer with issuer/AS metadata and calls `navigator.credentials.create` with protocol `openid4vci-v1` to engage a wallet (Chrome may show a proximity QR). Browser create() handoff success/failure is ignored; the result log follows issuer OpenID4VCI SSE only. The issuer stays standard OpenID4VCI — there is no issuer-side DC API protocol mode.
+4. **Monitor Events**: Real-time SSE events show each issuer step (`requested_token`, `generated_mdoc`, `issuance_status`, etc.)
 5. **Wallet Receives**: User accepts the credential in their wallet
 
 #### Digital Credentials API issuance requirements

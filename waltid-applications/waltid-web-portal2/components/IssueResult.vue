@@ -28,14 +28,14 @@ const walletUrl = config.public.walletUrl as string;
       >
         <p class="font-semibold">Digital Credentials API issuance</p>
         <p class="mt-1">
-          Session <code>{{ session.result.value.sessionId }}</code> is running
-          through the browser Digital Credentials API
-          (<code>openid4vci-v1</code>.
+          Session <code>{{ session.result.value.sessionId }}</code> was started
+          via the browser Digital Credentials API
+          (<code>openid4vci-v1</code>).
         </p>
         <p class="mt-2 text-xs text-blue-800">
-          On desktop, Chrome may show its own proximity QR so a nearby Android
-          wallet can complete issuance. Watch the event log for handoff status
-          and OpenID4VCI progress.
+          On desktop, Chrome may show a proximity QR for a nearby Android
+          wallet. After the wallet engages, watch the result log for OpenID4VCI
+          issuance events from the issuer (not browser handoff status).
         </p>
       </div>
 
