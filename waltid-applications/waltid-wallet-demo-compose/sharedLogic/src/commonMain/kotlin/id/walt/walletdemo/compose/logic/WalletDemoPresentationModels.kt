@@ -93,25 +93,7 @@ data class WalletDemoPresentationDisclosureSelection(
 
 fun WalletDemoPresentationPreview.hasCompleteCredentialSelection(
     selectedCredentialOptions: Set<WalletDemoPresentationCredentialSelection>,
-): Boolean {
-    val optionBySelection = credentialOptions.associateBy { it.selection }
-    val selectedOptions = selectedCredentialOptions
-        .mapNotNull { selection -> optionBySelection[selection] }
-    if (selectedOptions.isEmpty()) return false
-    val selectedCountsByQuery = selectedOptions.groupingBy { it.queryId }.eachCount()
-    if (selectedOptions.any { option -> selectedCountsByQuery.getValue(option.queryId) > 1 && !option.multiple }) return false
-
-    val selectedQueryIds = selectedOptions
-        .map { it.queryId }
-        .toSet()
-
-    if (credentialRequirements.isEmpty()) return true
-    return credentialRequirements.all { requirement ->
-        requirement.options.any { option ->
-            option.isNotEmpty() && option.all { queryId -> queryId in selectedQueryIds }
-        }
-    }
-}
+): Boolean = hasCompleteCredentialSelection(credentialOptions, credentialRequirements, selectedCredentialOptions)
 
 fun Set<WalletDemoPresentationDisclosureSelection>.forSelectedCredentials(
     selectedCredentialOptions: Set<WalletDemoPresentationCredentialSelection>,
@@ -123,26 +105,8 @@ fun Set<WalletDemoPresentationDisclosureSelection>.forSelectedCredentials(
         .toSet()
 }
 
-fun WalletDemoPresentationPreview.defaultCredentialSelection(): Set<WalletDemoPresentationCredentialSelection> {
-    val firstSelectionByQuery = credentialOptions
-        .groupBy { it.queryId }
-        .mapValues { (_, options) -> options.first().selection }
-    if (firstSelectionByQuery.isEmpty()) return emptySet()
-    if (credentialRequirements.isEmpty()) return setOf(firstSelectionByQuery.values.first())
-
-    val selectedQueryIds = linkedSetOf<String>()
-    credentialRequirements.forEach { requirement ->
-        val queryIds = requirement.options.firstOrNull { option ->
-            option.isNotEmpty() && option.all { queryId -> queryId in firstSelectionByQuery }
-        }
-            ?: requirement.options.firstOrNull()
-                ?.filter { queryId -> queryId in firstSelectionByQuery }
-        queryIds?.let { selectedQueryIds += it }
-    }
-    return selectedQueryIds
-        .mapNotNull { queryId -> firstSelectionByQuery[queryId] }
-        .toSet()
-}
+fun WalletDemoPresentationPreview.defaultCredentialSelection(): Set<WalletDemoPresentationCredentialSelection> =
+    defaultCredentialSelection(credentialOptions, credentialRequirements)
 
 data class WalletDemoPresentationDisclosure(
     val label: String,

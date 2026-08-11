@@ -1,5 +1,6 @@
 import CodeScanner
 import SwiftUI
+import WalletDemoSharingUI
 
 struct UrlEditor: View {
     let title: String
