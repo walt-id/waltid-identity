@@ -29,88 +29,56 @@ runs:
       shell: bash
       run: git config --global core.longpaths true
 
-    - name: Determine ref for waltid-unified-build
-      id: ref_unified
+    - name: Determine refs
+      id: refs
       shell: bash
       env:
         REF: ${{ inputs.ref }}
         TOKEN: ${{ inputs.token }}
       run: |
-        REPO="walt-id/waltid-unified-build"
-        if [ -n "$REF" ] && git ls-remote --exit-code "https://${TOKEN}@github.com/${REPO}.git" "$REF"; then
-          echo "ref=$REF" >> "$GITHUB_OUTPUT"
-        else
-          echo "ref=main" >> "$GITHUB_OUTPUT"
-        fi
+        resolve_ref() {
+          local repo="$1" needs_token="$2" key="$3"
+          local url="https://github.com/${repo}.git"
+          [ "$needs_token" = "true" ] && url="https://${TOKEN}@github.com/${repo}.git"
+          if [ -n "$REF" ] && git ls-remote --exit-code "$url" "$REF"; then
+            echo "${key}=$REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "${key}=main" >> "$GITHUB_OUTPUT"
+          fi
+        }
+        resolve_ref "walt-id/waltid-unified-build" true unified
+        resolve_ref "walt-id/waltid-identity" false identity
+        resolve_ref "walt-id/waltid-identity-enterprise" true enterprise
+        resolve_ref "walt-id/waltid-identity-enterprise-license" true enterprise_license
 
     - name: Checkout waltid-unified-build
       uses: actions/checkout@v4
       with:
         repository: walt-id/waltid-unified-build
-        ref: ${{ steps.ref_unified.outputs.ref }}
+        ref: ${{ steps.refs.outputs.unified }}
         token: ${{ inputs.token }}
         path: ${{ inputs.checkoutUnifiedToRepoDir == 'true' && 'waltid-unified-build' || '.' }}
-
-    - name: Determine ref for waltid-identity
-      id: ref_identity
-      shell: bash
-      env:
-        REF: ${{ inputs.ref }}
-      run: |
-        REPO="walt-id/waltid-identity"
-        if [ -n "$REF" ] && git ls-remote --exit-code "https://github.com/${REPO}.git" "$REF"; then
-          echo "ref=$REF" >> "$GITHUB_OUTPUT"
-        else
-          echo "ref=main" >> "$GITHUB_OUTPUT"
-        fi
 
     - name: Checkout waltid-identity
       uses: actions/checkout@v4
       with:
         repository: walt-id/waltid-identity
-        ref: ${{ steps.ref_identity.outputs.ref }}
+        ref: ${{ steps.refs.outputs.identity }}
         token: ${{ inputs.token }}
         path: waltid-identity
-
-    - name: Determine ref for waltid-identity-enterprise
-      id: ref_enterprise
-      shell: bash
-      env:
-        REF: ${{ inputs.ref }}
-      run: |
-        REPO="walt-id/waltid-identity-enterprise"
-        if [ -n "$REF" ] && git ls-remote --exit-code "https://github.com/${REPO}.git" "$REF"; then
-          echo "ref=$REF" >> "$GITHUB_OUTPUT"
-        else
-          echo "ref=main" >> "$GITHUB_OUTPUT"
-        fi
 
     - name: Checkout waltid-identity-enterprise
       uses: actions/checkout@v4
       with:
         repository: walt-id/waltid-identity-enterprise
-        ref: ${{ steps.ref_enterprise.outputs.ref }}
+        ref: ${{ steps.refs.outputs.enterprise }}
         token: ${{ inputs.token }}
         path: waltid-identity-enterprise
-
-    - name: Determine ref for waltid-identity-enterprise-license
-      id: ref_enterprise_license
-      shell: bash
-      env:
-        REF: ${{ inputs.ref }}
-        TOKEN: ${{ inputs.token }}
-      run: |
-        REPO="walt-id/waltid-identity-enterprise-license"
-        if [ -n "$REF" ] && git ls-remote --exit-code "https://${TOKEN}@github.com/${REPO}.git" "$REF"; then
-          echo "ref=$REF" >> "$GITHUB_OUTPUT"
-        else
-          echo "ref=main" >> "$GITHUB_OUTPUT"
-        fi
 
     - name: Checkout waltid-identity-enterprise-license
       uses: actions/checkout@v4
       with:
         repository: walt-id/waltid-identity-enterprise-license
-        ref: ${{ steps.ref_enterprise_license.outputs.ref }}
+        ref: ${{ steps.refs.outputs.enterprise_license }}
         token: ${{ inputs.token }}
         path: waltid-identity-enterprise-license
