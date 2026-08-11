@@ -133,12 +133,14 @@ class Verifier2Crypto2EncryptedResponseTest {
         val origin = "https://verifier.example"
         val session = VerificationSessionCreator.createVerificationSession(
             setup = DcApiAnnexCFlowSetup(
-                requestedElements = mapOf(
-                    "org.iso.18013.5.1.mDL" to mapOf(
-                        "org.iso.18013.5.1" to listOf("family_name")
-                    )
+                coreFlow = GeneralFlowConfig(
+                    requestedElements = mapOf(
+                        "org.iso.18013.5.1.mDL" to mapOf(
+                            "org.iso.18013.5.1" to listOf("family_name")
+                        )
+                    ),
                 ),
-                origin = origin,
+                expectedOrigins = listOf(origin),
             ),
             clientId = null,
             urlPrefix = null,
