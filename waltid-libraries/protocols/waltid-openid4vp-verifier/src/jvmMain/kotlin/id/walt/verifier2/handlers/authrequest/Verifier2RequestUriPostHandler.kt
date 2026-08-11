@@ -111,6 +111,20 @@ object Verifier2RequestUriPostHandler {
         val existingHeaders = Json.parseToJsonElement(existingHeaderBytes.decodeToString()).jsonObject
         val existingPayload = Json.parseToJsonElement(existingPayloadBytes.decodeToString()).jsonObject
 
+        val clientId = verificationSession.authorizationRequest.clientId
+            ?: verificationSession.setup.core.clientId
+        val expectedKid = if (crypto2SigningKey != null) {
+            Verifier2RequestObjectKid.forClient(clientId, crypto2SigningKey)
+        } else {
+            Verifier2RequestObjectKid.forClient(clientId, requireNotNull(signingKey))
+        }
+        val existingKid = requireNotNull(existingHeaders["kid"]?.jsonPrimitive?.contentOrNull) {
+            "Existing signed request JWT is missing kid"
+        }
+        require(existingKid == expectedKid) {
+            "Existing signed request kid does not match session client_id / signing key"
+        }
+
         // Inject wallet_nonce into the payload (per spec §5.6 §response §wallet_nonce)
         val newPayload = buildJsonObject {
             existingPayload.forEach { (k, v) -> put(k, v) }
@@ -142,7 +156,6 @@ object Verifier2RequestUriPostHandler {
         payload: JsonObject,
         headers: JsonObject,
     ): String {
-        requireMatchingKeyId(headers, signingKey.getKeyId())
         val crypto2Key = resolveCrypto2Key(signingKey, setOf(KeyUsage.SIGN))
         return if (crypto2Key != null) {
             val algorithm = JwsAlgorithm.parse(
@@ -162,7 +175,6 @@ object Verifier2RequestUriPostHandler {
     @Deprecated("Use the Crypto2Key overload")
     internal suspend fun verifyExistingRequestObject(jwt: String, signingKey: Key) {
         val decoded = CompactJws.decodeUnverified(jwt)
-        requireMatchingKeyId(decoded.protectedHeader, signingKey.getKeyId())
         val algorithm = JwsAlgorithm.parse(
             requireNotNull(decoded.protectedHeader["alg"]?.jsonPrimitive?.contentOrNull) {
                 "Existing signed request JWT is missing alg"
@@ -181,7 +193,6 @@ object Verifier2RequestUriPostHandler {
         payload: JsonObject,
         headers: JsonObject,
     ): String {
-        requireMatchingKeyId(headers, signingKey.id.value)
         val algorithm = JwsAlgorithm.parse(
             requireNotNull(headers["alg"]?.jsonPrimitive?.contentOrNull) {
                 "Existing signed request JWT is missing alg"
@@ -197,7 +208,6 @@ object Verifier2RequestUriPostHandler {
 
     internal suspend fun verifyExistingRequestObject(jwt: String, signingKey: Crypto2Key) {
         val decoded = CompactJws.decodeUnverified(jwt)
-        requireMatchingKeyId(decoded.protectedHeader, signingKey.id.value)
         val algorithm = decoded.algorithm
         val publicJwk = requireNotNull(signingKey.capabilities.publicKeyExporter) {
             "Request signing key does not export public material"
@@ -212,15 +222,6 @@ object Verifier2RequestUriPostHandler {
             )
         )
         CompactJws.verify(jwt, verificationKey, algorithm)
-    }
-
-    private fun requireMatchingKeyId(headers: JsonObject, actualKeyId: String) {
-        val protectedKeyId = requireNotNull(headers["kid"]?.jsonPrimitive?.contentOrNull) {
-            "Existing signed request JWT is missing kid"
-        }
-        require(protectedKeyId == actualKeyId || protectedKeyId.endsWith("#$actualKeyId")) {
-            "Resolved signing key does not match the existing signed request kid"
-        }
     }
 
     private suspend fun resolveCrypto2Key(signingKey: Key, usages: Set<KeyUsage>) =

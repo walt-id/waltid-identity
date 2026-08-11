@@ -35,6 +35,7 @@ import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionDataStructure
 import id.walt.verifier2.data.*
+import id.walt.verifier2.handlers.authrequest.Verifier2RequestObjectKid
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
@@ -83,52 +84,9 @@ object VerificationSessionCreator {
     ): List<Policy> =
         if (!shouldInclude || any { it.id == policy.id || it.id in equivalentPolicyIds }) this else this + policy
 
-    /**
-     * Builds the JAR `kid` header for signed authorization requests.
-     *
-     * For `decentralized_identifier:did:key:…`, the verification method id is
-     * `did:key:<multibase>#<multibase>` (DID Key method). Using the raw KMS key id
-     * (e.g. an Azure Key Vault URL) produces a DID URL wallets reject.
-     *
-     * For other DIDs, prefer a stable public-key identifier and avoid absolute URLs
-     * (Azure embeds vault URLs as JWK `kid`) so the fragment remains a valid DID URL.
-     */
-    private suspend fun getKid(clientId: String?, key: VerifierSigningKey): String {
-        val prefix = "decentralized_identifier:"
-        val did = clientId
-            ?.takeIf { it.startsWith(prefix) }
-            ?.substringAfter(prefix)
-            ?.takeIf { it.isNotBlank() }
-            ?: return fragmentKeyId(key)
-
-        if (did.startsWith("did:key:")) {
-            val identifier = did.removePrefix("did:key:")
-            return "$did#$identifier"
-        }
-
-        return "$did#${fragmentKeyId(key)}"
-    }
-
-    private suspend fun fragmentKeyId(key: VerifierSigningKey): String = when (key) {
-        is VerifierSigningKey.Legacy -> {
-            val publicKey = key.key.getPublicKey()
-            val keyId = publicKey.getKeyId()
-            if (keyId.startsWith("http://") || keyId.startsWith("https://")) {
-                publicKey.getThumbprint()
-            } else {
-                keyId
-            }
-        }
-        is VerifierSigningKey.Crypto2 -> {
-            val keyId = key.key.id.value
-            if (keyId.startsWith("http://") || keyId.startsWith("https://")) {
-                val publicJwk = key.key.capabilities.publicKeyExporter
-                    ?.exportPublicKey() as? EncodedKey.Jwk
-                if (publicJwk != null) Jwk.sha256Thumbprint(publicJwk) else keyId
-            } else {
-                keyId
-            }
-        }
+    private suspend fun getKid(clientId: String?, key: VerifierSigningKey): String = when (key) {
+        is VerifierSigningKey.Legacy -> Verifier2RequestObjectKid.forClient(clientId, key.key)
+        is VerifierSigningKey.Crypto2 -> Verifier2RequestObjectKid.forClient(clientId, key.key)
     }
 
     @Deprecated("Use the crypto2 Key overload with explicit JWS and COSE algorithms for signed sessions")

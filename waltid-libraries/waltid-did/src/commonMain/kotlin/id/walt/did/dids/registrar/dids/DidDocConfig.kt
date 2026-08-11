@@ -2,6 +2,8 @@ package id.walt.did.dids.registrar.dids
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.PublicKeyIds.publicJwkForPublish
+import id.walt.crypto.keys.PublicKeyIds.publicKeyId
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.document.DidDocument
@@ -82,14 +84,14 @@ data class DidDocConfig(
             rootCustomProperties: Map<String, JsonElement>? = null,
         ) = DidDocConfig(
             context = context,
-            publicKeyMap = publicKeySet.associateBy { it.getKeyId() },
+            publicKeyMap = publicKeySet.associateBy { it.publicKeyId() },
             verificationConfigurationMap = publicKeySet.takeIf { it.isNotEmpty() }?.let {
                 VerificationRelationshipType
                     .entries
                     .associateWith {
                         publicKeySet.map { publicKey ->
                             VerificationMethodConfiguration(
-                                publicKeyId = publicKey.getKeyId(),
+                                publicKeyId = publicKey.publicKeyId(),
                             )
                         }.toSet()
                     }
@@ -114,7 +116,7 @@ data class DidDocConfig(
             verificationKeySetConfiguration: Map<VerificationRelationshipType, Set<Key>> = emptyMap(),
             serviceConfigurationSet: Set<ServiceConfiguration> = emptySet(),
             rootCustomProperties: Map<String, JsonElement>? = null,
-        ) = verificationKeySetConfiguration.values.flatten().associateBy { it.getKeyId() }.let { publicKeyMap ->
+        ) = verificationKeySetConfiguration.values.flatten().associateBy { it.publicKeyId() }.let { publicKeyMap ->
             DidDocConfig(
                 context = context,
                 publicKeyMap = publicKeyMap,
@@ -124,7 +126,7 @@ data class DidDocConfig(
                     .associate { (verRelType, verRelPublicKeySet) ->
                         verRelType to verRelPublicKeySet.map { publicKey ->
                             VerificationMethodConfiguration(
-                                publicKeyId = publicKey.getKeyId(),
+                                publicKeyId = publicKey.publicKeyId(),
                             )
                         }.toSet()
                     },
@@ -208,7 +210,7 @@ data class DidDocConfig(
             VerificationMethod(
                 id = "$did#${verConf.publicKeyId}",
                 type = VerificationMethodType.JsonWebKey2020,
-                material = VerificationMaterialType.PublicKeyJwk to key.exportJWKObject(),
+                material = VerificationMaterialType.PublicKeyJwk to key.publicJwkForPublish(),
                 controller = did,
                 customProperties = verConf.customProperties,
             )
