@@ -31,6 +31,14 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
 object MdocCredentialSigner {
+
+    /**
+     * The only data elements a wallet device-signs for transaction data, per OpenID4VP 1.0 §5.5.
+     * `transaction_data_hash_alg` is emitted only when the request carries
+     * `transaction_data_hashes_alg`, so both are authorized to cover either case.
+     */
+    private val TRANSACTION_DATA_HASH_ELEMENTS = listOf("transaction_data_hash", "transaction_data_hash_alg")
+
     @OptIn(ExperimentalSerializationApi::class)
     @Deprecated("Use the Crypto2Key overload")
     suspend fun generateMdocCredential(
@@ -176,15 +184,24 @@ object MdocCredentialSigner {
     }
 
     /**
-     * OpenID4VP carries a transaction_data type as the authorized MSO namespace, so each authorized
-     * type becomes a blanket `nameSpaces` entry. Without this the holder cannot sign transaction data
-     * at all, because presentation requires the type to appear in the MSO's KeyAuthorizations.
+     * Authorizes the device key to sign transaction data of the given types. Without this the holder
+     * cannot sign transaction data at all, because presentation requires the type to appear in the
+     * MSO's KeyAuthorizations.
+     *
+     * OpenID4VP does not define a transaction_data type as an mdoc namespace: it says each type
+     * defines the (NameSpace, DataElementIdentifier, DataElementValue) it contributes, and the issuer
+     * authorizes those elements. Using the type itself as the response namespace is our convention,
+     * matching what [id.waltid.openid4vp.wallet.presentation.MdocPresenter] emits.
+     *
+     * The grant is granular rather than a blanket `nameSpaces` entry, because the wallet only ever
+     * device-signs [TRANSACTION_DATA_HASH_ELEMENTS] under that namespace. Authorizing the whole
+     * namespace would also permit arbitrary future device-signed elements.
      */
     private fun List<String>?.toKeyAuthorizations(): KeyAuthorization? =
         this?.filter { it.isNotBlank() }
             ?.distinct()
             ?.takeIf { it.isNotEmpty() }
-            ?.let { types -> KeyAuthorization(namespaces = types) }
+            ?.let { types -> KeyAuthorization(dataElements = types.associateWith { TRANSACTION_DATA_HASH_ELEMENTS }) }
 
     suspend fun resolveHolderKey(credentialRequest: CredentialRequest): CoseKey {
         val jwtProof = credentialRequest.proofs?.jwt?.firstOrNull()
