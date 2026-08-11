@@ -1,6 +1,8 @@
 package id.walt.openid4vci.handlers.credential
 
+import id.walt.certificate.x509.X509Certificate
 import id.walt.crypto.keys.Key
+import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
@@ -9,19 +11,17 @@ import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialEndpoin
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
-import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.IssuedCredential
-import id.walt.mdoc.objects.mso.Status
 import id.walt.sdjwt.SDMap
-import id.walt.x509.CertificateDer
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.coroutines.CancellationException
 import kotlin.time.Instant
+import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 
 /**
  * W3C JWT VC credential response handler.
@@ -44,7 +44,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         credentialData: JsonObject,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
-        x5Chain: List<CertificateDer>?,
+        x5Chain: List<X509Certificate>?,
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
@@ -75,7 +75,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         credentialData: JsonObject,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
-        x5Chain: List<CertificateDer>?,
+        x5Chain: List<X509Certificate>?,
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,

@@ -1,7 +1,8 @@
 package id.walt.openid4vci.handlers.credential
 
+import id.walt.certificate.x509.X509Certificate
 import id.walt.crypto.keys.Key
-import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
@@ -12,14 +13,13 @@ import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.IssuedCredential
-import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
-import id.walt.mdoc.objects.mso.Status
 import id.walt.sdjwt.SDMap
-import id.walt.x509.CertificateDer
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.coroutines.CancellationException
 import kotlin.time.Instant
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 
 
 /**
@@ -44,7 +44,7 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
         credentialData: JsonObject,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
-        x5Chain: List<CertificateDer>?,
+        x5Chain: List<X509Certificate>?,
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
@@ -128,7 +128,7 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
         namespaceData: Map<String, JsonObject>,
         holderKey: Crypto2Key,
         issuerKey: Key,
-        x5Chain: List<CertificateDer>?,
+        x5Chain: List<X509Certificate>?,
         validityDays: Int,
     ): String
 }

@@ -1,5 +1,6 @@
 package id.walt.openid4vci.handlers.endpoints.credential
 
+import id.walt.certificate.x509.X509Certificate
 import id.walt.crypto.keys.Key
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.preferredJwsAlgorithm
@@ -17,7 +18,6 @@ import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.sdjwt.SDMap
 import id.walt.mdoc.objects.mso.Status
-import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Instant
 
@@ -33,7 +33,7 @@ fun interface CredentialEndpointHandler {
         credentialData: JsonObject,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
-        x5Chain: List<CertificateDer>?,
+        x5Chain: List<X509Certificate>?,
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
@@ -161,7 +161,7 @@ fun interface Crypto2CredentialEndpointHandler {
         credentialData: JsonObject,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
-        x5Chain: List<CertificateDer>?,
+        x5Chain: List<X509Certificate>?,
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,

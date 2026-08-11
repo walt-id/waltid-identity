@@ -1,5 +1,6 @@
 package id.walt.issuer2.service.openid4vci
 
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto2.CryptoRuntime
@@ -43,7 +44,7 @@ import id.walt.openid4vci.tokens.access.parseAccessTokenAuthorization
 import io.ktor.http.*
 import io.ktor.server.plugins.*
 import kotlinx.serialization.json.*
-import java.util.UUID
+import java.util.*
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
@@ -412,7 +413,7 @@ class OpenId4VciProtocolService(
             return failCredentialRequest(requestWithSession, session, e.toCredentialServerError())
         }
         val x5Chain = try {
-            session.x5Chain?.map { id.walt.x509.CertificateDer.fromPEMEncodedString(it) }
+            session.x5Chain?.map { X509CertificateUtil.parseCertificatePem(it) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
