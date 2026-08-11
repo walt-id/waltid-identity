@@ -34,8 +34,11 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertClaimValueVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextContainingVisibleAfterScrolling
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextContainingVisibleInForegroundWindow
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.foregroundWindowSnapshot
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.sendDeepLink
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
@@ -59,6 +62,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.security.MessageDigest
@@ -178,6 +182,94 @@ class DigitalCredentialSharingE2ETest {
             // Named explicitly because it is the policy that would silently not run if the verifier
             // stopped recognising the item.
             requiredPolicyIds = SD_JWT_REQUIRED_POLICIES + "dc+sd-jwt/transaction-data-hash-check",
+        )
+    }
+
+    /**
+     * The EUDI TS-12 SCA payment demo: an mdoc plus `urn:eudi:sca:payment:1` transaction data, whose
+     * payload nests (`payee.name`) where the walt.id payment-authorization type is flat.
+     *
+     * Three things only this shape exercises, each of which fails silently rather than loudly if broken:
+     *
+     * 1. The AndroidX matcher dispatches on the transaction data type. For `urn:eudi:sca:payment:1` it
+     *    reads `payload.payee.name` and `payload.currency`/`payload.amount`; pairing that payload with a
+     *    different type sends it down a flat-field branch, which finds nothing and produces a prompt with
+     *    no payment details. Asserted on Credential Manager's own prompt, not just the wallet's.
+     * 2. The wallet's review has to say what is being authorized, so nested leaves are qualified with the
+     *    object they came from - "Payee name", not a bare "Name".
+     * 3. Signing the transaction data requires its type to be authorized in the mdoc MSO's
+     *    KeyAuthorizations. Without that the wallet cannot sign, and
+     *    `mso_mdoc/transaction-data-hash-check` is what proves it did.
+     */
+    @Test
+    @Ignore(
+        "Enable once the urn:eudi:sca:payment:1 transaction data profile and the scaPaymentCardMdoc " +
+            "issuance profile from this branch are deployed to verifier2.demo.walt.id and " +
+            "issuer2.demo.walt.id. Until then the deployed verifier declares no SCA payment profile and " +
+            "the deployed issuer authorizes no transaction data type, so the session cannot be created.",
+    )
+    fun sharesMdocWithScaPaymentTransactionDataThroughCredentialManager() = runBlocking {
+        val fixture = start() ?: return@runBlocking
+        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "sca-payment-card" }
+        fixture.issue(scenario)
+
+        val transactionData = DemoTestBackend.scaPaymentTransactionData(credentialId = SCA_CREDENTIAL_QUERY_ID)
+        val session = DemoTestBackend.createDcApiVerifierSession(
+            credentialQueries = listOf(scenario.verifierCredentialQuery),
+            expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
+            transactionData = listOf(transactionData),
+        )
+
+        val credential = fixture.share(
+            requestJson = session.requestJson,
+            candidateText = SCA_DOC_TYPE,
+            onCredentialManagerPrompt = { device ->
+                // The matcher's own output. Anything it failed to extract from the nested payload is
+                // absent here while the wallet's review below would still look correct.
+                listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, SCA_AMOUNT_TEXT).forEach { expected ->
+                    assertTextContainingVisibleInForegroundWindow(
+                        device = device,
+                        substring = expected,
+                        message = "Credential Manager prompt did not show '$expected'",
+                    )
+                }
+            },
+            beforeShare = { device ->
+                // Labels as well as values: an unqualified "Name" row is the regression this guards.
+                assertClaimValueVisibleAfterScrolling(
+                    device = device,
+                    path = "transactionData[0].details.payload.payee.name",
+                    label = "Payee name",
+                    expectedValues = listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME),
+                    message = "SCA payee name missing from the wallet review",
+                )
+                assertClaimValueVisibleAfterScrolling(
+                    device = device,
+                    path = "transactionData[0].details.payload.amount",
+                    label = "Amount",
+                    expectedValues = listOf(SCA_AMOUNT_TEXT),
+                    message = "SCA payment amount missing from the wallet review",
+                )
+                assertClaimValueVisibleAfterScrolling(
+                    device = device,
+                    path = "transactionData[0].details.payload.currency",
+                    label = "Currency",
+                    expectedValues = listOf(DemoTestBackend.SCA_PAYMENT_CURRENCY),
+                    message = "SCA payment currency missing from the wallet review",
+                )
+            },
+        )
+
+        val responseJson = Json.parseToJsonElement(credential.credentialJson).jsonObject
+        assertEquals("openid4vp-v1-unsigned", responseJson["protocol"]?.jsonPrimitive?.content)
+
+        assertVerifierAccepted(
+            sessionId = session.sessionId,
+            responseJson = credential.credentialJson,
+            presentedCredentialId = SCA_CREDENTIAL_QUERY_ID,
+            // The transaction-data policy is the one that cannot pass unless the MSO authorized the type,
+            // so it is named rather than left to the default set.
+            requiredPolicyIds = MDOC_REQUIRED_POLICIES + "mso_mdoc/transaction-data-hash-check",
         )
     }
 
@@ -442,15 +534,18 @@ class DigitalCredentialSharingE2ETest {
      *   more than one alternative this is what identifies which one is being chosen.
      * @param clickCandidate Whether to select that candidate explicitly. Needed only when the picker
      *   offers a choice; with a single candidate the OS pre-selects it.
+     * @param onCredentialManagerPrompt Assertions to run on Credential Manager's own prompt, while it is
+     *   still up. This is the only place the matcher's output is observable.
      * @param beforeShare Assertions to run on the wallet's own consent surface, before it is accepted.
      */
     private suspend fun Fixture.share(
         requestJson: String,
         candidateText: String,
         clickCandidate: Boolean = false,
+        onCredentialManagerPrompt: (UiDevice) -> Unit = {},
         beforeShare: (UiDevice) -> Unit = {},
     ): DigitalCredential {
-        openProviderReview(requestJson, candidateText, clickCandidate)
+        openProviderReview(requestJson, candidateText, clickCandidate, onCredentialManagerPrompt)
 
         beforeShare(device)
 
@@ -471,6 +566,7 @@ class DigitalCredentialSharingE2ETest {
         requestJson: String,
         candidateText: String,
         clickCandidate: Boolean = false,
+        onCredentialManagerPrompt: (UiDevice) -> Unit = {},
     ) {
         DigitalCredentialTestVerifier.reset(requestJson)
         // The previous test's picker can still be up and showing candidate text, so wait it out:
@@ -483,6 +579,11 @@ class DigitalCredentialSharingE2ETest {
 
         val candidate = device.wait(Until.findObject(By.textContains(candidateText)), UI_ELEMENT_TIMEOUT)
         assertNotNull("Credential Manager did not surface a '$candidateText' candidate", candidate)
+
+        // Before any click: what the picker shows now is the matcher's output, and selecting a candidate
+        // can replace this window.
+        onCredentialManagerPrompt(device)
+
         // Re-resolved rather than reused: the picker may have recomposed since the wait above, and a
         // stale node throws instead of failing an assertion.
         if (clickCandidate) {
@@ -499,7 +600,7 @@ class DigitalCredentialSharingE2ETest {
         continueButton?.click()
 
         assertNotNull(
-            "Wallet provider review did not open",
+            "Wallet provider review did not open. ${foregroundWindowSnapshot(device)}",
             waitForResource(device, WALLET_SHARING_REVIEW_TAG, UI_ELEMENT_TIMEOUT),
         )
     }
@@ -676,6 +777,11 @@ class DigitalCredentialSharingE2ETest {
 
     private companion object {
         private const val MDL_DOC_TYPE = "org.iso.18013.5.1.mDL"
+        private const val SCA_DOC_TYPE = "eu.europa.ec.eudi.sca.payment_card.1"
+        private const val SCA_CREDENTIAL_QUERY_ID = "sca_payment_card"
+
+        /** How the amount reads once rendered, on the prompt and on the review alike. */
+        private const val SCA_AMOUNT_TEXT = "11.56"
         private const val MDL_NAMESPACE = "org.iso.18013.5.1"
         private val REQUESTED_MDL_ELEMENTS = listOf("family_name", "given_name")
         private const val PAYMENT_AUTHORIZATION_DISPLAY_NAME = "Payment Authorization"
