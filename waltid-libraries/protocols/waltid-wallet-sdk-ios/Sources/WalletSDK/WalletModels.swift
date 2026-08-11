@@ -22,6 +22,9 @@ public struct WalletConfiguration: Sendable {
 
     /// Ordered BCP 47 locale preferences used to select protocol display metadata.
     public var preferredLocales: [String]
+    /// Shared app/extension storage and Keychain configuration for IdentityDocumentServices.
+    public var crossProcessAccess: WalletCrossProcessAccess?
+
     /// Creates wallet configuration.
     ///
     /// - Parameters:
@@ -38,6 +41,8 @@ public struct WalletConfiguration: Sendable {
     ///     wallet accepts before previewing or submitting a presentation.
     ///   - preferredLocales: Ordered BCP 47 locale preferences used for issuer,
     ///     credential, and verifier display metadata.
+    ///   - crossProcessAccess: Optional shared app/extension storage and Keychain configuration
+    ///     for IdentityDocumentServices.
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
@@ -45,7 +50,8 @@ public struct WalletConfiguration: Sendable {
         clientIDTrustConfiguration: WalletClientIDTrustConfiguration = .init(),
         persistence: WalletPersistence = WalletPersistence(),
         transactionDataProfiles: [WalletTransactionDataProfile] = [],
-        preferredLocales: [String] = Locale.preferredLanguages
+        preferredLocales: [String] = Locale.preferredLanguages,
+        crossProcessAccess: WalletCrossProcessAccess? = nil
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
@@ -54,6 +60,27 @@ public struct WalletConfiguration: Sendable {
         self.persistence = persistence
         self.transactionDataProfiles = transactionDataProfiles
         self.preferredLocales = preferredLocales
+        self.crossProcessAccess = crossProcessAccess
+    }
+}
+
+/// Shared storage required when the wallet is opened from an iOS document-provider extension.
+public struct WalletCrossProcessAccess: Equatable, Sendable {
+    /// App Group identifier shared by the host app and provider extension.
+    public let appGroupIdentifier: String
+    /// Keychain access group shared by the host app and provider extension.
+    public let keychainAccessGroup: String
+
+    /// Creates shared host-app and provider-extension storage configuration.
+    ///
+    /// - Parameters:
+    ///   - appGroupIdentifier: App Group identifier shared by both processes.
+    ///   - keychainAccessGroup: Keychain access group shared by both processes.
+    public init(appGroupIdentifier: String, keychainAccessGroup: String) {
+        precondition(!appGroupIdentifier.isEmpty, "App Group identifier must not be empty")
+        precondition(!keychainAccessGroup.isEmpty, "Keychain access group must not be empty")
+        self.appGroupIdentifier = appGroupIdentifier
+        self.keychainAccessGroup = keychainAccessGroup
     }
 }
 

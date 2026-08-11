@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.id.walt.wallet.compose</string>
+	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)id.walt.wallet.compose.shared</string>
+	</array>
+	<!--
+	  Only doctypes this demo actually issues and can present. Apple also provisions
+	  org.iso.23220.photoid.1, which is deliberately absent: advertising a doctype the wallet cannot
+	  satisfy puts the wallet in the provider picker and then fails the presentation.
+	  Keep in sync with IdentityDocumentNamespace.demoDocumentTypes.
+	-->
+	<key>com.apple.developer.identity-document-services.document-provider.mobile-document-types</key>
+	<array>
+		<string>org.iso.18013.5.1.mDL</string>
+		<string>eu.europa.ec.eudi.pid.1</string>
+	</array>
+</dict>
+</plist>

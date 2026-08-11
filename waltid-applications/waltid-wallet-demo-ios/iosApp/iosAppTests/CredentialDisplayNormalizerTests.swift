@@ -1,7 +1,7 @@
 import Foundation
+import WalletDemoSharingUI
 import WalletSDK
 import XCTest
-@testable import iosApp
 
 final class CredentialDisplayNormalizerTests: XCTestCase {
 

@@ -56,6 +56,11 @@ kotlin {
 
             if (enableAndroidBuild) {
                 androidMain.get().dependsOn(mobileMain)
+                androidMain.dependencies {
+                    // The system back gesture is registered against the host Activity's own
+                    // dispatcher, so a provider surface can turn it into an Activity result.
+                    implementation(identityLibs.androidx.activity.compose)
+                }
             }
 
             if (enableIosBuild) {
