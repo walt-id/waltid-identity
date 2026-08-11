@@ -16,6 +16,7 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPER
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.setTextByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -75,6 +76,58 @@ class DigitalCredentialIssuanceE2ETest {
             "Wallet create offer review did not open",
             waitForResource(fixture.device, "wallet.offerReview", UI_ELEMENT_TIMEOUT),
         )
+        clickByTag(fixture.device, "wallet.offerAcceptButton")
+
+        val response = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) {
+            DigitalCredentialTestIssuer.await().getOrThrow()
+        }
+        assertIsCreateAck(response)
+    }
+
+    @Test
+    fun acceptsPreAuthorizedOfferWithTransactionCodeThroughCreateCredential() = runBlocking {
+        val fixture = start() ?: return@runBlocking
+        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
+        val offer = DemoTestBackend.createOffer(scenario, withGeneratedTransactionCode = true)
+        val txCode = requireNotNull(offer.txCode) { "Issuer did not return a transaction code" }
+        val offerJson = requireNotNull(Uri.parse(offer.offerUrl).getQueryParameter("credential_offer")) {
+            "Demo offer URL did not carry an inline credential_offer"
+        }
+
+        DigitalCredentialTestIssuer.reset(
+            requestJson = """
+                {"requests":[{"protocol":"openid4vci-v1","data":$offerJson}]}
+            """.trimIndent(),
+        )
+        fixture.device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT)
+        fixture.context.startActivity(
+            Intent(fixture.context, DigitalCredentialTestIssuerActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+
+        val candidate = fixture.device.wait(
+            Until.findObject(By.textContains("walt.id")),
+            UI_ELEMENT_TIMEOUT,
+        ) ?: fixture.device.wait(
+            Until.findObject(By.textContains("Wallet")),
+            UI_ELEMENT_TIMEOUT,
+        )
+        assertNotNull("Credential Manager did not surface the wallet create option", candidate)
+        candidate.click()
+
+        val continueButton = fixture.device.wait(Until.findObject(By.res("continue_button")), UI_ELEMENT_TIMEOUT)
+            ?: fixture.device.wait(Until.findObject(By.text("Continue")), UI_ELEMENT_TIMEOUT)
+        continueButton?.click()
+
+        assertNotNull(
+            "Wallet create offer review did not open",
+            waitForResource(fixture.device, "wallet.offerReview", UI_ELEMENT_TIMEOUT),
+        )
+        assertNotNull(
+            "Transaction code field was not shown",
+            waitForResource(fixture.device, "wallet.txCodeInput", UI_ELEMENT_TIMEOUT),
+        )
+        setTextByTag(fixture.device, "wallet.txCodeInput", txCode)
         clickByTag(fixture.device, "wallet.offerAcceptButton")
 
         val response = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) {

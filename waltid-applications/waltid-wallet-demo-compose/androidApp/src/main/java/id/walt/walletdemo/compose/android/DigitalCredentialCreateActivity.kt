@@ -12,7 +12,8 @@ import androidx.credentials.ExperimentalDigitalCredentialApi
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.AndroidDigitalCredentialCreateProvider
 import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.MobileWalletDigitalCredentialCreateResponse
+import id.walt.wallet2.mobile.AndroidDigitalCredentialCreateResponse
+import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceSession
@@ -31,7 +32,8 @@ import kotlinx.coroutines.launch
  *
  * Uses a translucent Activity + bottom sheet so receive feels in-tray (like CMWallet), while
  * Credential Manager still owns the system create-option picker before this Activity launches.
- * Authorization-code grants embed issuer/Keycloak sign-in in a WebView inside the sheet.
+ * Authorization-code grants open the system browser; [DigitalCredentialCreateAuthHandoff]
+ * returns the `openid://` callback to this Activity so the CREATE_CREDENTIAL result can finish.
  */
 @OptIn(ExperimentalDigitalCredentialApi::class)
 class DigitalCredentialCreateActivity : ComponentActivity() {
@@ -61,6 +63,7 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
                         if (sessionId != null) {
                             runCatching { wallet?.cancelIssuance(sessionId) }
                         }
+                        DigitalCredentialCreateAuthHandoff.clear(this@DigitalCredentialCreateActivity)
                         AndroidDigitalCredentialCreateProvider.setCancellation(resultIntent)
                         finishProviderResult()
                     }
@@ -70,11 +73,9 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
                 },
                 onCancelAuthorization = {
                     cancelPendingAuthorization()
+                    DigitalCredentialCreateAuthHandoff.clear(this@DigitalCredentialCreateActivity)
                     AndroidDigitalCredentialCreateProvider.setCancellation(resultIntent)
                     finishProviderResult()
-                },
-                onAuthorizationRedirect = { callbackUri ->
-                    continueAuthorizationFromRedirect(callbackUri)
                 },
             )
         }
@@ -92,7 +93,7 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
                 mobileWallet.bootstrap()
                 val started = mobileWallet.startIssuance(
                     MobileWalletIssuanceRequest(
-                        offerJson = input.request.offerJson,
+                        offer = MobileWalletCredentialOffer.InlineJson(input.request.offerJson),
                         redirectUri = CREATE_REDIRECT_URI,
                     )
                 ).toDemoIssuanceSession()
@@ -118,9 +119,16 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
                     }
                     WalletDemoIssuanceGrant.AuthorizationCode -> {
                         val authorization = mobileWallet.beginAuthorizationIssuance(started.id)
-                        uiState = WalletDemoOfferCreateUiState.Authorizing(
+                        DigitalCredentialCreateAuthHandoff.register(
+                            context = this@DigitalCredentialCreateActivity,
+                            sessionId = started.id,
+                        ) { callbackUri ->
+                            continueAuthorizationFromRedirect(callbackUri)
+                        }
+                        uiState = WalletDemoOfferCreateUiState.WaitingForAuthorization()
+                        DigitalCredentialCreateAuthHandoff.openExternalBrowser(
+                            context = this@DigitalCredentialCreateActivity,
                             authorizationUrl = authorization.url,
-                            redirectUri = authorization.redirectUri.ifBlank { CREATE_REDIRECT_URI },
                         )
                     }
                 }
@@ -133,19 +141,19 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
     private fun continueAuthorizationFromRedirect(callbackUri: String) {
         val mobileWallet = wallet ?: return reportFailure(IllegalStateException("Wallet is missing"))
         val sessionId = session?.id ?: return reportFailure(IllegalStateException("Issuance session is missing"))
-        val authorizing = uiState as? WalletDemoOfferCreateUiState.Authorizing
-        if (authorizing?.completing == true) return
-        if (authorizing != null) {
-            uiState = authorizing.copy(completing = true)
-        }
+        val waiting = uiState as? WalletDemoOfferCreateUiState.WaitingForAuthorization
+        if (waiting?.completing == true) return
+        uiState = WalletDemoOfferCreateUiState.WaitingForAuthorization(completing = true)
         scope.launch {
             runCatching {
                 val outcome = mobileWallet.continueAuthorizationIssuance(
                     sessionId = sessionId,
                     callbackUri = callbackUri,
                 )
+                DigitalCredentialCreateAuthHandoff.clear(this@DigitalCredentialCreateActivity)
                 completeOutcome(outcome)
             }.onFailure {
+                DigitalCredentialCreateAuthHandoff.clear(this@DigitalCredentialCreateActivity)
                 reportFailure(it)
             }
         }
@@ -168,8 +176,8 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
 
     private fun sendSuccessAck() {
         val protocol = requestProtocol
-            ?: MobileWalletDigitalCredentialCreateResponse.acknowledgment().protocol
-        val response = MobileWalletDigitalCredentialCreateResponse.acknowledgment(protocol)
+            ?: AndroidDigitalCredentialCreateResponse.acknowledgment().protocol
+        val response = AndroidDigitalCredentialCreateResponse.acknowledgment(protocol)
         AndroidDigitalCredentialCreateProvider.setResponse(resultIntent, response)
         finishProviderResult()
     }
@@ -183,6 +191,7 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
 
     private fun reportFailure(error: Throwable) {
         Log.e(TAG, "Digital credential issuance failed (${error::class.simpleName})", error)
+        DigitalCredentialCreateAuthHandoff.clear(this)
         AndroidDigitalCredentialCreateProvider.setFailure(resultIntent)
         finishProviderResult()
     }
@@ -194,6 +203,7 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
 
     private fun finishWithoutProviderResult() {
         cancelPendingAuthorization()
+        DigitalCredentialCreateAuthHandoff.clear(this)
         setResult(RESULT_CANCELED)
         finish()
     }

@@ -20,17 +20,45 @@ import java.security.MessageDigest
 /**
  * Verified Android Credential Manager create input after caller and protocol extraction.
  *
- * @property request Platform-neutral OpenID4VCI create request.
+ * @property request OpenID4VCI create request extracted from Credential Manager.
  * @property providerRequest Original Credential Manager create request.
  */
 public data class AndroidDigitalCredentialCreateProviderInput(
-    public val request: MobileWalletDigitalCredentialCreateRequest,
+    public val request: AndroidDigitalCredentialCreateRequest,
     public val providerRequest: ProviderCreateCredentialRequest,
 )
+
+/**
+ * Android CREATE_CREDENTIAL OpenID4VCI request after Credential Manager extraction.
+ *
+ * Kept on the Android adapter boundary rather than the common mobile SDK surface.
+ */
+public data class AndroidDigitalCredentialCreateRequest(
+    public val protocol: String,
+    public val offerJson: String,
+    public val verifiedOrigin: String,
+)
+
+/**
+ * Android CREATE_CREDENTIAL acknowledgement returned to Credential Manager after OpenID4VCI completes.
+ */
+public data class AndroidDigitalCredentialCreateResponse(
+    public val protocol: String = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+    public val dataJson: String = "{}",
+) {
+    public companion object {
+        public fun acknowledgment(
+            protocol: String = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+        ): AndroidDigitalCredentialCreateResponse =
+            AndroidDigitalCredentialCreateResponse(protocol = protocol, dataJson = "{}")
+    }
+}
 
 /** Android framework boundary for official holder CREATE_CREDENTIAL request and response handling. */
 @OptIn(ExperimentalDigitalCredentialApi::class)
 public object AndroidDigitalCredentialCreateProvider {
+    private const val OPENID4VCI_PROTOCOL = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1
+
     /**
      * Locates the OpenID4VCI create request and derives the origin from authenticated caller data.
      *
@@ -72,39 +100,29 @@ public object AndroidDigitalCredentialCreateProvider {
     }
 
     /**
-     * Resolves the first supported OpenID4VCI protocol alternative from a create-request envelope.
+     * Resolves the first `openid4vci-v1` protocol alternative from a standard create-request envelope.
      *
-     * Unsupported alternatives are skipped so an issuer that also offers an unknown protocol still
-     * reaches this wallet when an accepted OpenID4VCI alias is present.
+     * Only the Digital Credentials `requests` array shape is accepted. Unsupported alternatives are
+     * skipped so an issuer that also offers an unknown protocol still reaches this wallet when
+     * `openid4vci-v1` is present.
      */
     internal fun resolveCreateRequest(
         requestJson: String,
         verifiedOrigin: String,
-    ): MobileWalletDigitalCredentialCreateRequest {
+    ): AndroidDigitalCredentialCreateRequest {
         val requestObject = Json.parseToJsonElement(requestJson).jsonObject
         val requests = requestObject["requests"] as? JsonArray
-        val protocolRequests = when {
-            requests != null -> {
-                require(requests.isNotEmpty()) { "At least one protocol request is required" }
-                requests.map { it.jsonObject }
-            }
-            requestObject["protocol"] != null -> listOf(requestObject)
-            else -> throw IllegalArgumentException("Digital credential create request has no protocol request")
-        }
-        val selected = protocolRequests.firstOrNull { protocolRequest ->
-            val protocol = protocolRequest["protocol"]?.jsonPrimitive?.content
-            protocol != null && protocol in MobileWalletDigitalCredentialIssuanceProtocolAliases.ACCEPTED
+            ?: throw IllegalArgumentException("Digital credential create request must contain a requests array")
+        require(requests.isNotEmpty()) { "At least one protocol request is required" }
+        val selected = requests.map { it.jsonObject }.firstOrNull { protocolRequest ->
+            protocolRequest["protocol"]?.jsonPrimitive?.content == OPENID4VCI_PROTOCOL
         } ?: throw IllegalArgumentException(
-            "No supported OpenID4VCI Digital Credentials create protocol was offered",
+            "No openid4vci-v1 Digital Credentials create protocol was offered",
         )
         val data = selected["data"] as? JsonObject
             ?: throw IllegalArgumentException("Digital credential create request data must be an object")
-        // Echo the wire protocol alias in the create acknowledgement; some callers reject a
-        // normalized id that does not match the request (e.g. openid4vci vs openid4vci-v1).
-        val wireProtocol = selected["protocol"]?.jsonPrimitive?.content
-            ?: throw IllegalArgumentException("Digital credential create request protocol is required")
-        return MobileWalletDigitalCredentialCreateRequest(
-            protocol = wireProtocol,
+        return AndroidDigitalCredentialCreateRequest(
+            protocol = OPENID4VCI_PROTOCOL,
             offerJson = Json.encodeToString(JsonObject.serializer(), data),
             verifiedOrigin = verifiedOrigin,
         )
@@ -113,7 +131,7 @@ public object AndroidDigitalCredentialCreateProvider {
     /** Writes the official Credential Manager create result payload to [resultIntent]. */
     public fun setResponse(
         resultIntent: Intent,
-        response: MobileWalletDigitalCredentialCreateResponse = MobileWalletDigitalCredentialCreateResponse.acknowledgment(),
+        response: AndroidDigitalCredentialCreateResponse = AndroidDigitalCredentialCreateResponse.acknowledgment(),
     ) {
         val responseJson = Json.encodeToString(
             JsonObject.serializer(),

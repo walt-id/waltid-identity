@@ -57,6 +57,10 @@ android {
             jvmTarget.set(JvmTarget.fromTarget(javaVersion.toString()))
         }
     }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
@@ -68,6 +72,10 @@ dependencies {
     debugImplementation(identityLibs.androidx.credentials.play.services.auth)
     implementation(identityLibs.kotlinx.coroutines.android)
     implementation(identityLibs.kotlinx.serialization.json)
+
+    testImplementation(kotlin("test"))
+    testImplementation(identityLibs.junit)
+    testImplementation(identityLibs.robolectric)
 
     androidTestImplementation(identityLibs.androidx.test.ext.junit)
     androidTestImplementation(identityLibs.androidx.test.runner)

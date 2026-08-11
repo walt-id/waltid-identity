@@ -64,5 +64,9 @@ class AndroidVendoredMatcherTest {
 
         assertTrue(notice.contains("digitalcredentialsdev/CMWallet"), "notice lost its provenance")
         assertTrue(notice.contains("provision_hardcoded.wasm"), "notice lost the asset name")
+        assertTrue(notice.contains("6b350ff8cfc9ed49b301603c25eb56fcd2a904b1"), "notice lost the pinned commit")
+        assertTrue(notice.contains("matcher/issuance/provision.c"), "notice lost the C provision source path")
+        assertTrue(notice.contains("Do not attribute this binary to the Rust matcher"), "notice lost the Rust-mismatch clarification")
+        assertTrue(notice.contains("release"), "notice lost the redistribution release-gate note")
     }
 }

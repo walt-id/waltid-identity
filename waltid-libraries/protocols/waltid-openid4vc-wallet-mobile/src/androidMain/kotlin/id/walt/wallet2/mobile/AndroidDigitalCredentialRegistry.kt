@@ -169,12 +169,10 @@ public class AndroidDigitalCredentialRegistry(
                     matcher = applicationContext.assets.open(ANNEX_C_MATCHER_ASSET).use { it.readBytes() },
                 )
             )
-            registerOpenId4VciCreationOptions()
             registrationAvailable = true
             MobileWalletCredentialRegistrationResult(true, entries.size)
         }.getOrElse { error ->
             registrationAvailable = false
-            creationRegistrationAvailable = false
             MobileWalletCredentialRegistrationResult(
                 available = false,
                 registeredEntryCount = 0,
@@ -183,23 +181,53 @@ public class AndroidDigitalCredentialRegistry(
         }
     }
 
+    /**
+     * Advertises OpenID4VCI issuance capability to Credential Manager.
+     *
+     * Independent of [replace]: creation options describe what the wallet can receive, not which
+     * credentials it currently holds.
+     */
     @OptIn(ExperimentalDigitalCredentialApi::class)
-    private suspend fun registerOpenId4VciCreationOptions() {
-        val matcher = applicationContext.assets.open(OPENID4VCI_MATCHER_ASSET).use { it.readBytes() }
-        registryManager.registerCreationOptions(
-            object : RegisterCreationOptionsRequest(
-                creationOptions = encodeOpenId4VciCreationOptions(
-                    title = "walt.id Wallet",
-                    subtitle = "Save a credential to this wallet",
-                    iconPng = iconPng,
-                ),
-                matcher = matcher,
-                type = DigitalCredential.TYPE_DIGITAL_CREDENTIAL,
-                id = OPENID4VCI_CREATION_REGISTRY_ID,
-            ) {},
-        )
-        creationRegistrationAvailable = true
+    override suspend fun registerCreationOptions(): MobileWalletCredentialRegistrationResult {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            creationRegistrationAvailable = false
+            return MobileWalletCredentialRegistrationResult(
+                available = false,
+                registeredEntryCount = 0,
+                reason = "Credential Manager requires API 23",
+            )
+        }
+        return runCatching {
+            val matcher = applicationContext.assets.open(OPENID4VCI_MATCHER_ASSET).use { it.readBytes() }
+            registryManager.registerCreationOptions(
+                object : RegisterCreationOptionsRequest(
+                    creationOptions = encodeOpenId4VciCreationOptions(
+                        title = applicationDisplayName(),
+                        subtitle = "Save a credential to this wallet",
+                        iconPng = iconPng,
+                    ),
+                    matcher = matcher,
+                    type = DigitalCredential.TYPE_DIGITAL_CREDENTIAL,
+                    id = OPENID4VCI_CREATION_REGISTRY_ID,
+                ) {},
+            )
+            creationRegistrationAvailable = true
+            MobileWalletCredentialRegistrationResult(available = true, registeredEntryCount = 1)
+        }.getOrElse { error ->
+            creationRegistrationAvailable = false
+            MobileWalletCredentialRegistrationResult(
+                available = false,
+                registeredEntryCount = 0,
+                reason = error.message ?: error::class.simpleName ?: "Creation-option registration failed",
+            )
+        }
     }
+
+    private fun applicationDisplayName(): String =
+        applicationContext.packageManager
+            .getApplicationLabel(applicationContext.applicationInfo)
+            .toString()
+            .ifBlank { applicationContext.packageName }
 
     /**
      * Binary creation-options database understood by the vendored OpenID4VCI provision matcher.

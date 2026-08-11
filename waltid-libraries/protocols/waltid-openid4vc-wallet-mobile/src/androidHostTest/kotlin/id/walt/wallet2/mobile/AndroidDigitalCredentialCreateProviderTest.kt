@@ -49,18 +49,34 @@ class AndroidDigitalCredentialCreateProviderTest {
     }
 
     @Test
-    fun acceptsHistoricalOpenId4VciProtocolAliases() {
+    fun rejectsHistoricalOpenId4VciProtocolAliases() {
         for (protocol in listOf("openid4vci1.0", "openid4vci")) {
-            val request = AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
-                requestJson = """{"requests":[{"protocol":"$protocol","data":{"credential_issuer":"https://i.example","credential_configuration_ids":["c"]}}]}""",
-                verifiedOrigin = "android:apk-key-hash:abc",
-            )
-            assertEquals(protocol, request.protocol)
+            assertFailsWith<IllegalArgumentException> {
+                AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
+                    requestJson = """{"requests":[{"protocol":"$protocol","data":{"credential_issuer":"https://i.example","credential_configuration_ids":["c"]}}]}""",
+                    verifiedOrigin = "android:apk-key-hash:abc",
+                )
+            }
         }
     }
 
     @Test
-    fun skipsUnsupportedProtocolsUntilAnOpenId4VciAliasIsFound() {
+    fun rejectsTopLevelProtocolEnvelopeWithoutRequestsArray() {
+        assertFailsWith<IllegalArgumentException> {
+            AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
+                requestJson = """
+                    {
+                      "protocol":"openid4vci-v1",
+                      "data":{"credential_issuer":"https://i.example","credential_configuration_ids":["c"]}
+                    }
+                """.trimIndent(),
+                verifiedOrigin = "https://issuer.example",
+            )
+        }
+    }
+
+    @Test
+    fun skipsUnsupportedProtocolsUntilOpenId4VciV1IsFound() {
         val request = AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
             requestJson = """
                 {"requests":[
@@ -74,7 +90,7 @@ class AndroidDigitalCredentialCreateProviderTest {
     }
 
     @Test
-    fun rejectsCreateRequestsWithoutASupportedProtocol() {
+    fun rejectsCreateRequestsWithoutOpenId4VciV1() {
         assertFailsWith<IllegalArgumentException> {
             AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
                 requestJson = """{"requests":[{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}]}""",

@@ -45,15 +45,11 @@ sealed interface WalletDemoOfferCreateUiState {
     ) : WalletDemoOfferCreateUiState
 
     /**
-     * Authorization-code grant: issuer/Keycloak sign-in runs in an embedded WebView.
+     * Authorization-code grant: waiting while the shared external browser completes issuer/AS login.
      *
-     * @property authorizationUrl Authorization endpoint URL returned after the user accepts the offer.
-     * @property redirectUri Registered callback prefix (typically `openid://`).
-     * @property completing True after the redirect was captured and issuance is finishing.
+     * @property completing True after the `openid://` callback was delivered and issuance is finishing.
      */
-    data class Authorizing(
-        val authorizationUrl: String,
-        val redirectUri: String,
+    data class WaitingForAuthorization(
         val completing: Boolean = false,
     ) : WalletDemoOfferCreateUiState
 }
@@ -61,8 +57,8 @@ sealed interface WalletDemoOfferCreateUiState {
 /**
  * Bottom-sheet host for Digital Credentials create (OpenID4VCI) fulfillment.
  *
- * Covers offer review (including transaction-code entry), decline/dismiss, and in-sheet
- * authorization-code sign-in via [IssuerAuthorizationWebView].
+ * Covers offer review (including transaction-code entry), decline/dismiss, and a waiting state
+ * while authorization-code sign-in runs in the system browser.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,18 +68,17 @@ fun WalletDemoOfferCreateSheet(
     onDecline: () -> Unit,
     onDismiss: () -> Unit,
     onCancelAuthorization: () -> Unit,
-    onAuthorizationRedirect: (callbackUri: String) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val dismissEnabled = when (state) {
         is WalletDemoOfferCreateUiState.Review -> !state.submitting
         WalletDemoOfferCreateUiState.Loading -> true
-        is WalletDemoOfferCreateUiState.Authorizing -> !state.completing
+        is WalletDemoOfferCreateUiState.WaitingForAuthorization -> !state.completing
     }
 
     SystemBackHandler(enabled = dismissEnabled) {
         when (state) {
-            is WalletDemoOfferCreateUiState.Authorizing -> onCancelAuthorization()
+            is WalletDemoOfferCreateUiState.WaitingForAuthorization -> onCancelAuthorization()
             is WalletDemoOfferCreateUiState.Review -> if (!state.submitting) onDismiss()
             WalletDemoOfferCreateUiState.Loading -> onDismiss()
         }
@@ -99,7 +94,7 @@ fun WalletDemoOfferCreateSheet(
                 onDismissRequest = {
                     if (!dismissEnabled) return@ModalBottomSheet
                     when (state) {
-                        is WalletDemoOfferCreateUiState.Authorizing -> onCancelAuthorization()
+                        is WalletDemoOfferCreateUiState.WaitingForAuthorization -> onCancelAuthorization()
                         else -> onDismiss()
                     }
                 },
@@ -114,12 +109,9 @@ fun WalletDemoOfferCreateSheet(
                         onAccept = onAccept,
                         onDecline = onDecline,
                     )
-                    is WalletDemoOfferCreateUiState.Authorizing -> OfferCreateAuthorizingContent(
-                        authorizationUrl = state.authorizationUrl,
-                        redirectUri = state.redirectUri,
+                    is WalletDemoOfferCreateUiState.WaitingForAuthorization -> OfferCreateWaitingForAuthorizationContent(
                         completing = state.completing,
                         onCancel = onCancelAuthorization,
-                        onRedirect = onAuthorizationRedirect,
                     )
                 }
             }
@@ -188,45 +180,45 @@ private fun OfferCreateReviewContent(
 }
 
 @Composable
-private fun OfferCreateAuthorizingContent(
-    authorizationUrl: String,
-    redirectUri: String,
+private fun OfferCreateWaitingForAuthorizationContent(
     completing: Boolean,
     onCancel: () -> Unit,
-    onRedirect: (callbackUri: String) -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .padding(bottom = 20.dp)
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 28.dp)
             .testTag(WalletUiTestTags.OfferAuthorizationSection),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            if (completing) "Finishing issuance…" else "Verify your identity",
+            if (completing) "Finishing issuance…" else "Complete sign-in in your browser",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.fillMaxWidth(),
         )
-        if (completing) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                CircularProgressIndicator()
-            }
-        } else {
-            IssuerAuthorizationWebView(
-                authorizationUrl = authorizationUrl,
-                redirectUri = redirectUri,
-                onRedirect = onRedirect,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(480.dp),
-            )
+        Text(
+            if (completing) {
+                "Returning to Credential Manager…"
+            } else {
+                "After you authorize with the issuer, this wallet will finish saving the credential."
+            },
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            CircularProgressIndicator()
+        }
+        if (!completing) {
             TextButton(
                 onClick = onCancel,
                 modifier = Modifier.align(Alignment.End),

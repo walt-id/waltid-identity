@@ -12,6 +12,7 @@ import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletTransactionDataItem
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
+import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.WalletAttestationConfig
 
@@ -48,7 +49,7 @@ internal class MobileDemoWallet(
         did: String?,
     ): WalletDemoIssuanceSession = mobileWallet.startIssuance(
         MobileWalletIssuanceRequest(
-            offerUrl = offerUrl,
+            offer = MobileWalletCredentialOffer.Uri(offerUrl),
             redirectUri = redirectUri,
             did = did,
         )

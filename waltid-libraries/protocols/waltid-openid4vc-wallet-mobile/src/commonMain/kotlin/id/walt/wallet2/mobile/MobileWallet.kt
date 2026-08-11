@@ -323,8 +323,7 @@ public class MobileWallet internal constructor(
         request: MobileWalletIssuanceRequest,
     ): WalletIssuanceSession = issuanceSessions.start(
         newIssuanceRequest(
-            offerUrl = request.offerUrl?.trim()?.takeIf { it.isNotEmpty() },
-            offerJson = request.offerJson?.trim()?.takeIf { it.isNotEmpty() },
+            offer = request.offer,
             keyId = request.keyId,
             did = request.did,
             clientId = request.clientId,
@@ -400,8 +399,7 @@ public class MobileWallet internal constructor(
         }
 
     private suspend fun newIssuanceRequest(
-        offerUrl: String?,
-        offerJson: String?,
+        offer: MobileWalletCredentialOffer,
         clientId: String,
         redirectUri: String,
         keyId: String? = null,
@@ -410,15 +408,24 @@ public class MobileWallet internal constructor(
         val selectedKeyId = keyId ?: keyStore.listKeys().toList().firstOrNull()?.keyId
             ?: error("No holder key is available for credential issuance")
         val selectedDid = did ?: didStore.listDids().toList().firstOrNull()?.did
-        val offerJsonObject = offerJson?.let { Json.parseToJsonElement(it).jsonObject }
-        return WalletIssuanceSessionRequest(
-            offerUrl = offerUrl?.let { Url(it) },
-            offerJson = offerJsonObject,
-            keyId = selectedKeyId,
-            did = selectedDid,
-            clientId = clientId,
-            redirectUri = Url(redirectUri),
-        )
+        return when (offer) {
+            is MobileWalletCredentialOffer.Uri -> WalletIssuanceSessionRequest(
+                offerUrl = Url(offer.value.trim()),
+                offerJson = null,
+                keyId = selectedKeyId,
+                did = selectedDid,
+                clientId = clientId,
+                redirectUri = Url(redirectUri),
+            )
+            is MobileWalletCredentialOffer.InlineJson -> WalletIssuanceSessionRequest(
+                offerUrl = null,
+                offerJson = Json.parseToJsonElement(offer.value).jsonObject,
+                keyId = selectedKeyId,
+                did = selectedDid,
+                clientId = clientId,
+                redirectUri = Url(redirectUri),
+            )
+        }
     }
 
     /**
@@ -471,7 +478,7 @@ public class MobileWallet internal constructor(
      */
     public suspend fun refreshDigitalCredentialRegistration(): MobileWalletCredentialRegistrationResult {
         val records = registryRecords()
-        val result = runCatching {
+        val presentationResult = runCatching {
             credentialRegistry.replace(registryId = digitalCredentialRegistryId(), records = records)
         }.getOrElse { failure ->
             if (failure is CancellationException) throw failure
@@ -481,8 +488,15 @@ public class MobileWallet internal constructor(
                 reason = failure.message ?: failure::class.simpleName ?: "Credential registration failed",
             )
         }
-        lastRegistrationResult.value = result
-        return result
+        // Creation options advertise issuance capability and must not share the presentation
+        // replace lifecycle; failures here do not roll back a successful presentation projection.
+        runCatching {
+            credentialRegistry.registerCreationOptions()
+        }.onFailure { failure ->
+            if (failure is CancellationException) throw failure
+        }
+        lastRegistrationResult.value = presentationResult
+        return presentationResult
     }
 
     /**

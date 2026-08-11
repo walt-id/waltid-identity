@@ -15,21 +15,6 @@ public object MobileWalletDigitalCredentialProtocols {
 }
 
 /**
- * Protocol identifiers accepted at the Android CREATE_CREDENTIAL boundary for OpenID4VCI.
- *
- * Callers and matchers historically emit several aliases for the same offer shape. The wire alias
- * is preserved on [MobileWalletDigitalCredentialCreateRequest.protocol] so the create
- * acknowledgement can echo it.
- */
-public object MobileWalletDigitalCredentialIssuanceProtocolAliases {
-    public val ACCEPTED: Set<String> = setOf(
-        MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
-        "openid4vci1.0",
-        "openid4vci",
-    )
-}
-
-/**
  * Credential formats exposed through the platform Digital Credentials integration.
  *
  * @property identifier Stable credential format identifier reported in capability metadata, never
@@ -169,6 +154,18 @@ public interface MobileWalletCredentialRegistry {
         registryId: String,
         records: List<MobileWalletCredentialRegistryRecord>,
     ): MobileWalletCredentialRegistrationResult
+
+    /**
+     * Registers OpenID4VCI creation options (what the wallet can receive via CREATE_CREDENTIAL).
+     *
+     * Distinct from [replace], which projects currently stored credentials for presentation.
+     * Default is a no-op for platforms without an issuance-provider integration.
+     */
+    public suspend fun registerCreationOptions(): MobileWalletCredentialRegistrationResult =
+        MobileWalletCredentialRegistrationResult(
+            available = capabilities.registrationAvailable,
+            registeredEntryCount = 0,
+        )
 }
 
 /** Registry used when the current platform or application has no registration integration. */
@@ -207,41 +204,6 @@ public data class MobileWalletDigitalCredentialRequest(
     public val verifiedOrigin: String,
     public val selectedRegistryEntryIds: List<String> = emptyList(),
 )
-
-/**
- * Platform-neutral OpenID4VCI create request from Android Credential Manager.
- *
- * @property protocol Wire protocol identifier from the create request (an accepted OpenID4VCI alias).
- * @property offerJson Credential Offer JSON object from the create request `data` member.
- * @property verifiedOrigin Authenticated origin reported by the platform.
- */
-public data class MobileWalletDigitalCredentialCreateRequest(
-    public val protocol: String,
-    public val offerJson: String,
-    public val verifiedOrigin: String,
-)
-
-/**
- * Platform response acknowledging that the holder processed a Digital Credentials issuance request.
- *
- * The browser/issuer does not receive the credential itself; success means the wallet completed
- * OpenID4VCI for the offer (typically with an empty `data` object).
- *
- * @property protocol Wire protocol identifier echoed from the create request when available.
- * @property dataJson Protocol response payload encoded as JSON, typically `{}`.
- */
-public data class MobileWalletDigitalCredentialCreateResponse(
-    public val protocol: String = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
-    public val dataJson: String = "{}",
-) {
-    public companion object {
-        /** Acknowledgement returned after the wallet successfully processes an OpenID4VCI create request. */
-        public fun acknowledgment(
-            protocol: String = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
-        ): MobileWalletDigitalCredentialCreateResponse =
-            MobileWalletDigitalCredentialCreateResponse(protocol = protocol, dataJson = "{}")
-    }
-}
 
 /**
  * Verifier and transaction metadata extracted from an OpenID4VP request received through a

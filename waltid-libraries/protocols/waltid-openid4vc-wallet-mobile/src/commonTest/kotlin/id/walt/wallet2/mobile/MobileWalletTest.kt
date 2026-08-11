@@ -850,7 +850,9 @@ class MobileWalletTest {
             issuanceHttpClient = mockIssuer(),
         )
 
-        val session = wallet.startIssuance(MobileWalletIssuanceRequest(offerUrl = preAuthorizedOfferUrl()))
+        val session = wallet.startIssuance(
+            MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(preAuthorizedOfferUrl()))
+        )
         val outcome = assertIs<WalletIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(session.id))
 
         // The credential is in the wallet and reported as issued, both of which the registry cannot revoke.
@@ -885,7 +887,9 @@ class MobileWalletTest {
             issuanceHttpClient = mockIssuer(),
         )
 
-        val session = wallet.startIssuance(MobileWalletIssuanceRequest(offerJson = preAuthorizedOfferJson()))
+        val session = wallet.startIssuance(
+            MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.InlineJson(preAuthorizedOfferJson()))
+        )
         assertEquals(WalletIssuanceGrant.PRE_AUTHORIZED_CODE, session.offer.grant)
 
         val outcome = assertIs<WalletIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(session.id))
@@ -893,15 +897,12 @@ class MobileWalletTest {
     }
 
     @Test
-    fun issuanceRequestRequiresExactlyOneOfferSource() {
+    fun issuanceRequestRejectsBlankOffer() {
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletIssuanceRequest()
+            MobileWalletCredentialOffer.Uri("")
         }
         assertFailsWith<IllegalArgumentException> {
-            MobileWalletIssuanceRequest(
-                offerUrl = preAuthorizedOfferUrl(),
-                offerJson = preAuthorizedOfferJson(),
-            )
+            MobileWalletCredentialOffer.InlineJson("   ")
         }
     }
 

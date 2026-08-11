@@ -83,19 +83,17 @@ Backend E2E fixtures are intentionally shared:
 The demo registers a minimal NFC Host Card Emulation service with a proprietary AID in the
 `payment` category so Android lists **walt.id Wallet** under
 **Settings → Apps → Default apps → Wallet app** (`ROLE_WALLET`). That service declines APDUs; it
-exists only for Wallet-role discoverability and is unrelated to Credential Manager Digital
-Credentials issuance/presentation.
+is a **demo-only Wallet-role discoverability stub**, not a payments or contactless credential
+implementation, and is unrelated to Credential Manager Digital Credentials issuance/presentation.
 
 ## Digital Credentials API
 
 Android builds register with Credential Manager for:
 
 - **Presentation (`GET_CREDENTIAL`)** — OpenID4VP unsigned and ISO 18013-7 Annex C, via `DigitalCredentialProviderActivity` (full-screen consent for now).
-- **Issuance (`CREATE_CREDENTIAL`)** — OpenID4VCI (`openid4vci-v1` and common aliases), via `DigitalCredentialCreateActivity`.
+- **Issuance (`CREATE_CREDENTIAL`)** — OpenID4VCI (`openid4vci-v1`), via `DigitalCredentialCreateActivity`.
 
-Issuance uses a translucent create Activity and a Material bottom sheet for offer review (including transaction-code entry). Pre-authorized offers complete in that sheet. Authorization-code offers embed issuer/Keycloak sign-in in a WebView inside the same sheet and capture the `openid://` redirect without opening an external browser tab. The Credential Manager create-option picker remains system-owned; the sheet is wallet fulfillment UI after the user selects this wallet.
-
-Receive-tab authorization-code offers (outside Credential Manager) still use the system browser + `openid://` deep link.
+Issuance uses a translucent create Activity and a Material bottom sheet for offer review (including transaction-code entry). Pre-authorized offers complete in that sheet. Authorization-code offers use the same external-browser + `openid://` path as the Receive tab; `DigitalCredentialCreateAuthHandoff` returns the callback to the still-running create Activity (or completes wallet-side issuance if that Activity was destroyed). The Credential Manager create-option picker remains system-owned; the sheet is wallet fulfillment UI after the user selects this wallet.
 
 ### Manual Chrome origin-trial check
 
