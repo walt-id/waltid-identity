@@ -2,6 +2,8 @@ package id.walt.certificate.x509
 
 import id.walt.certificate.der.ByteArrayUtil.byteStringToBase64Pem
 import id.walt.crypto.utils.ShaUtils
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.keys.Key
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.toHexString
 import kotlin.time.Instant
@@ -28,6 +30,9 @@ interface X509Certificate {
 
     val encodedPem: String
         get() = byteStringToBase64Pem(encodedDer, "CERTIFICATE")
+
+    suspend fun restoreSubjectPublicKey(cryptoRuntime: CryptoRuntime): Key =
+        data.subjectPublicKeyInfo.restore(cryptoRuntime)
 
     interface CertificateData : Pkcs10CertificateSigningRequest.RequestedCertificateData {
         val version: Int

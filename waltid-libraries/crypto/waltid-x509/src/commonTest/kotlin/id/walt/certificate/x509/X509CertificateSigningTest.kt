@@ -56,7 +56,7 @@ class X509CertificateSigningTest {
             subjectDn = "CN=Test, OU=Walt.id, O=Walt.id, L=Graz, C=AT"
         })
             .also { cert ->
-                cert.data.subjectPublicKeyInfo.restore(TestKeyUtil.runtime).also {
+                cert.restoreSubjectPublicKey(TestKeyUtil.runtime).also {
                     assertEquals(issuerKey.spec, it.spec)
                 }
                 val result =
@@ -68,7 +68,7 @@ class X509CertificateSigningTest {
             subjectDn = "CN=Test Leaf, OU=Walt.id, O=Walt.id, L=Graz, C=AT"
             subjectPublicKey(issuerKey)
         }).also { cert ->
-            cert.data.subjectPublicKeyInfo.restore(TestKeyUtil.runtime).also {
+            cert.restoreSubjectPublicKey(TestKeyUtil.runtime).also {
                 assertEquals(issuerKey.spec, it.spec)
             }
             val result = X509CertificateUtil.validateCertificateChain(

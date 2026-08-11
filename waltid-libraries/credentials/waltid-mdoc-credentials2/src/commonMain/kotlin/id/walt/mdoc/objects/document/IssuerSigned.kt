@@ -133,7 +133,7 @@ data class IssuerSigned private constructor(
         val cert = X509CertificateUtil.parseCertificateDerEncoded(ByteString(signerCertificate.rawBytes))
         return ParsedIssuerAuthCrypto2(
             x5c = convertedX5c,
-            signerKey = cert.data.subjectPublicKeyInfo.restore(crypto2Runtime)
+            signerKey = cert.restoreSubjectPublicKey(crypto2Runtime)
         )
     }
 

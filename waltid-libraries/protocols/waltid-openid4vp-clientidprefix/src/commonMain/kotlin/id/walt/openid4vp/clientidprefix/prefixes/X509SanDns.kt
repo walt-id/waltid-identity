@@ -71,7 +71,7 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
         }
 
         // 2. Verify JWS signature using the leaf certificate's public key.
-        val key = leafCertificate.data.subjectPublicKeyInfo.restore(ClientIdCrypto2.runtime)
+        val key = leafCertificate.restoreSubjectPublicKey(ClientIdCrypto2.runtime)
         log.trace { "Imported key from leaf cert der for X509SanDns: $key" }
 
         try {

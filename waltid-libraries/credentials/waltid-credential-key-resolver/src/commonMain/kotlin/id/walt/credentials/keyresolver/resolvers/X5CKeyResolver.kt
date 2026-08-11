@@ -5,8 +5,6 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.Key
-import id.walt.x509.CertificateDer
-import id.walt.x509.crypto2PublicJwk
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.json.JsonArray
@@ -24,8 +22,9 @@ object X5CKeyResolver : BaseKeyResolver {
         if (x5c.isEmpty()) throw IllegalArgumentException("Certificate chain in 'x5c' must not be empty.")
         val certificateChainStrings = x5c.map { it.jsonPrimitive.content }
         val issuerCertificate = certificateChainStrings.first()
-        val jwk = CertificateDer(issuerCertificate.decodeFromBase64()).crypto2PublicJwk()
-        return JWKKey.importJWK(jwk.data.toByteArray().decodeToString()).getOrThrow()
+        val cert = X509CertificateUtil.parseCertificateDerEncoded(ByteString(issuerCertificate.decodeFromBase64()))
+        val pem = cert.data.subjectPublicKeyInfo.encodedPem
+        return JWKKey.importJWK(pem).getOrThrow()
     }
 
     suspend fun restoreKeyFromX5c(x5c: JsonArray, runtime: CryptoRuntime): Key {
@@ -35,6 +34,6 @@ object X5CKeyResolver : BaseKeyResolver {
         val certificateChainStrings = x5c.map { it.jsonPrimitive.content }
         val issuerCertificate = certificateChainStrings.first()
         val cert = X509CertificateUtil.parseCertificateDerEncoded(ByteString(issuerCertificate.decodeFromBase64()))
-        return cert.data.subjectPublicKeyInfo.restore(runtime)
+        return cert.restoreSubjectPublicKey(runtime)
     }
 }

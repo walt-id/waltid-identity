@@ -133,7 +133,7 @@ data class VerifierAttestation(val sub: String, override val rawValue: String) :
                 } else {
                     ClientIdCrypto2.verify(
                         attestationJwtString,
-                        leaf.data.subjectPublicKeyInfo.restore(ClientIdCrypto2.runtime)
+                        leaf.restoreSubjectPublicKey(ClientIdCrypto2.runtime)
                     )
                 }
             } else if (decodedAttestation.algorithm == JwsAlgorithm.ES256K) {

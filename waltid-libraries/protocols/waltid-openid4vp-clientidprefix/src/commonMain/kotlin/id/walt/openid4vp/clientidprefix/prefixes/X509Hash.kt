@@ -66,7 +66,7 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
             return error
         }
         try {
-            ClientIdCrypto2.verify(jws, leafCertificate.data.subjectPublicKeyInfo.restore(ClientIdCrypto2.runtime))
+            ClientIdCrypto2.verify(jws, leafCertificate.restoreSubjectPublicKey(ClientIdCrypto2.runtime))
         } catch (cause: CancellationException) {
             throw cause
         } catch (_: Exception) {

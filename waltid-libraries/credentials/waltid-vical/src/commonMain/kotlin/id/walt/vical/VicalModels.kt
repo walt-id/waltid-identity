@@ -109,7 +109,7 @@ data class CertificateInfo(
 
     suspend fun getCrypto2Key(): Crypto2Key =
         X509CertificateUtil.parseCertificateDerEncoded(KotlinByteString(certificate))
-            .data.subjectPublicKeyInfo.restore(crypto2Runtime)
+            .restoreSubjectPublicKey(crypto2Runtime)
 
     // Auto-generated equals/hashCode are not sufficient for ByteArray properties.
     override fun equals(other: Any?): Boolean {

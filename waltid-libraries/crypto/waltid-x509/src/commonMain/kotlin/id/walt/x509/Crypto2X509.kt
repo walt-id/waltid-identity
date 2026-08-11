@@ -4,11 +4,10 @@ import at.asitplus.signum.indispensable.CryptoPublicKey
 import at.asitplus.signum.indispensable.CryptoSignature
 import at.asitplus.signum.indispensable.josef.JsonWebKey
 import at.asitplus.signum.indispensable.josef.io.joseCompliantSerializer
-import at.asitplus.signum.indispensable.josef.toJsonWebKey
 import at.asitplus.signum.indispensable.pki.Pkcs10CertificationRequest
 import at.asitplus.signum.indispensable.pki.TbsCertificationRequest
-import at.asitplus.signum.indispensable.pki.X509Certificate
 import at.asitplus.signum.indispensable.toX509SignatureAlgorithm
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
@@ -23,21 +22,23 @@ import kotlinx.io.bytestring.ByteString
 import at.asitplus.signum.indispensable.SignatureAlgorithm as SignumSignatureAlgorithm
 import id.walt.crypto.keys.Key as LegacyKey
 
-fun CertificateDer.crypto2PublicJwk(): EncodedKey.Jwk {
-    val publicKey = X509Certificate.decodeFromDer(bytes.toByteArray()).decodedPublicKey.getOrThrow()
-    return publicKey.toCrypto2PublicJwk()
-}
+/**
+ * Restores the certificate's subject public key as a crypto2 key that may only verify signatures.
+ *
+ * Callers that have authenticated a certificate chain and now need to check a signature made by its
+ * leaf can ask for the key instead of assembling a stored-key record themselves; the key carries no
+ * private material and no usage other than [KeyUsage.VERIFY].
+ */
+@Deprecated(
+    "Don't use old X509 API",
+    ReplaceWith("id.walt.certificate.x509.X509Certificate.restoreSubjectPublicKey")
+)
+suspend fun CertificateDer.crypto2VerificationKey(): Key =
+    X509CertificateUtil.parseCertificateDerEncoded(bytes)
+        .restoreSubjectPublicKey(verificationKeyRuntime)
 
-fun CertificateSigningRequestDer.crypto2PublicJwk(): EncodedKey.Jwk =
-    Pkcs10CertificationRequest.decodeFromDer(bytes.toByteArray()).tbsCsr.publicKey.toCrypto2PublicJwk()
 
-internal fun CryptoPublicKey.toCrypto2PublicJwk(): EncodedKey.Jwk =
-    EncodedKey.Jwk(
-        data = BinaryData(
-            joseCompliantSerializer.encodeToString(toJsonWebKey()).encodeToByteArray()
-        ),
-        privateMaterial = false,
-    )
+private val verificationKeyRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
 
 internal suspend fun LegacyKey.toCrypto2PublicJwk(): EncodedKey.Jwk =
     EncodedKey.Jwk(
