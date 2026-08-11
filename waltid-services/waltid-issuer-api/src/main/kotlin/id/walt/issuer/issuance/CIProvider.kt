@@ -812,7 +812,7 @@ open class CIProvider(
             if (issuanceRequests.first().authenticationMethod == AuthenticationMethod.PRE_AUTHORIZED) {
                 preAuthorizedCodeGrants.set(
                     it.id,
-                    it.id,
+                    "1",
                     expiresIn
                 )
             }
@@ -960,7 +960,7 @@ open class CIProvider(
                 throw TokenError(
                     tokenRequest = tokenRequest,
                     errorCode = TokenErrorCode.invalid_grant,
-                    message = "Pre-authorized code has already been used."
+                    message = "Pre-authorized code is invalid or has already been used."
                 )
             }
         }

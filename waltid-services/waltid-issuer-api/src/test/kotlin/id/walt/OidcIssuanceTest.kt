@@ -13,8 +13,14 @@ import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.TokenErrorCode
 import kotlin.test.Test
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.minutes
 
@@ -87,6 +93,79 @@ class OidcIssuanceTest {
         val error = assertFailsWith<TokenError> {
             ciTestProvider.processTokenRequest(tokenRequest)
         }
+
+        assertEquals(
+            TokenErrorCode.invalid_grant,
+            error.errorCode
+        )
+    }
+
+
+    @Test
+    fun testConcurrentPreAuthorizedCodeRedemptionAllowsOnlyOneSuccess() {
+        ConfigManager.testWithConfigs(testConfigs)
+        val ciTestProvider = CIProvider()
+
+        val issuanceSession = ciTestProvider.initializeCredentialOffer(
+            issuanceRequests = listOf(
+                IssuanceRequest(
+                    issuerKey = IssuerApiTest.jsonKeyObj,
+                    credentialData = IssuerApiTest.jsonVCObj,
+                    credentialConfigurationId = "VerifiableId",
+                    mapping = IssuerApiTest.jsonMappingObj,
+                    issuerDid = TEST_ISSUER_DID,
+                    authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+                )
+            ),
+            expiresIn = 5.minutes
+        )
+
+        val preAuthorizedCode = issuanceSession
+            .credentialOffer!!
+            .grants[GrantType.pre_authorized_code.value]!!
+            .preAuthorizedCode!!
+
+        val tokenRequest = TokenRequest.PreAuthorizedCode(
+            preAuthorizedCode = preAuthorizedCode
+        )
+
+        val results = runBlocking {
+            val start = CompletableDeferred<Unit>()
+            val ready = List(2) { CompletableDeferred<Unit>() }
+
+            val attempts = List(2) { index ->
+                async(Dispatchers.Default) {
+                    ready[index].complete(Unit)
+                    start.await()
+
+                    runCatching {
+                        ciTestProvider.processTokenRequest(tokenRequest)
+                    }
+                }
+            }
+
+            // Wait until both attempts are ready, then release them together.
+            ready.forEach { it.await() }
+            start.complete(Unit)
+
+            attempts.awaitAll()
+        }
+
+        assertEquals(
+            1,
+            results.count { it.isSuccess },
+            "Exactly one concurrent redemption must succeed"
+        )
+
+        val failures = results.mapNotNull { it.exceptionOrNull() }
+
+        assertEquals(
+            1,
+            failures.size,
+            "Exactly one concurrent redemption must fail"
+        )
+
+        val error = assertIs<TokenError>(failures.single())
 
         assertEquals(
             TokenErrorCode.invalid_grant,
