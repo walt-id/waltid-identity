@@ -425,9 +425,9 @@ object Verifier2OpenApiExamples {
 
     /**
      * EUDI TS-12 style demo: SCA payment card + EU age verification over DC API,
-     * with `payment_details` transaction data bound to the SCA credential.
+     * with `urn:eudi:sca:payment:1` transaction data bound to the SCA credential.
      */
-    val openid4vpDcApiScaPaymentCardAndAgeVerificationPaymentDetails = DcApiAnnexDFlowSetup(
+    val openid4vpDcApiScaPaymentCardAndAgeVerificationScaPayment = DcApiAnnexDFlowSetup(
         core = GeneralFlowConfig(
             dcqlQuery = DcqlQuery(
                 credentials = listOf(
@@ -461,7 +461,7 @@ object Verifier2OpenApiExamples {
         openid = OpenId4VPConfig(
             transactionData = listOf(
                 buildJsonObject {
-                    put("type", "payment_details")
+                    put("type", "urn:eudi:sca:payment:1")
                     put("credential_ids", JsonArray(listOf(JsonPrimitive("sca_payment_card"))))
                     put("require_cryptographic_holder_binding", true)
                     put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
