@@ -44,10 +44,14 @@ class IssuerConformanceTestRunner(
     private val authorizationServer: String? = null,
     private val credentialProofTypeHint: String? = null,
     private val staticTxCode: String? = System.getenv("OPENID4VCI_CONFORMANCE_STATIC_TX_CODE")?.ifBlank { null },
-    private val credentialTrustAnchorPem: String? =
-        System.getenv("OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM")?.ifBlank { null },
-    private val statusListTrustAnchorPem: String? =
-        System.getenv("OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM")?.ifBlank { null },
+    private val credentialTrustAnchorPem: String? = resolvePemFromEnvironment(
+        inlinePemEnvironmentVariable = "OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM",
+        pemFileEnvironmentVariable = "OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE",
+    ),
+    private val statusListTrustAnchorPem: String? = resolvePemFromEnvironment(
+        inlinePemEnvironmentVariable = "OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM",
+        pemFileEnvironmentVariable = "OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE",
+    ),
     private val variantSelection: IssuerVariantSelection = IssuerVariantSelection.fromEnvironment(),
 ) {
     suspend fun run(): List<TestPlanResult> {

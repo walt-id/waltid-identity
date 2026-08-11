@@ -96,9 +96,10 @@ class IssuerTestPlanRunner(
         println("The conformance suite will call issuer: ${config.issuerUrl}")
 
         val variantModules = createTestPlanResponse.modules.filter { moduleAppliesToVariant(variant, it.variant) }
-        val selectedModules = moduleSelection.filter(variantModules) { it.testModule }
+        val selectedModules = variantModules.filter { moduleSelection.matches(it.testModule) }
         val excludedModules = selectedModules.mapNotNull { module ->
-            knownSuiteBugExclusionReason(variant, module.testModule)?.let { reason ->
+            (moduleSelection.exclusionReason(module.testModule)
+                ?: knownSuiteBugExclusionReason(variant, module.testModule))?.let { reason ->
                 module.testModule to reason
             }
         }
@@ -114,7 +115,7 @@ class IssuerTestPlanRunner(
                 status = IssuerVariantRunStatus.NOT_APPLICABLE,
                 planId = testPlanId,
                 error = if (selectedModules.isNotEmpty() && excludedModules.isNotEmpty()) {
-                    "All selected modules were excluded as known upstream suite bugs."
+                    "All selected conformance modules were excluded."
                 } else {
                     "No conformance modules matched ${moduleSelection.description}."
                 }
@@ -272,6 +273,7 @@ class IssuerTestPlanRunner(
             "user interaction" in message ||
             "oauth login" in message ||
             "credential offer" in message ||
+            "cloudflare quick tunnel" in message ||
             "timeout" in message
     }
 
@@ -530,12 +532,13 @@ class IssuerTestPlanRunner(
         URLDecoder.decode(value, StandardCharsets.UTF_8)
 }
 
-private data class IssuerModuleSelection(
+internal data class IssuerModuleSelection(
     val groups: Set<String> = emptySet(),
     val modules: Set<String> = emptySet(),
+    val excludedModules: Set<String> = emptySet(),
 ) {
     val isActive: Boolean
-        get() = groups.isNotEmpty() || modules.isNotEmpty()
+        get() = groups.isNotEmpty() || modules.isNotEmpty() || excludedModules.isNotEmpty()
 
     val description: String
         get() = buildList {
@@ -545,18 +548,16 @@ private data class IssuerModuleSelection(
             if (modules.isNotEmpty()) {
                 add("modules=${modules.joinToString(",")}")
             }
+            if (excludedModules.isNotEmpty()) {
+                add("excluded=${excludedModules.joinToString(",")}")
+            }
         }.joinToString("; ").ifBlank { "all modules" }
 
-    fun <T> filter(items: List<T>, moduleName: (T) -> String): List<T> {
-        if (!isActive) {
-            return items
-        }
+    fun matches(moduleName: String): Boolean =
+        groups.matchesGroup(moduleName) && modules.matchesName(moduleName)
 
-        return items.filter { item ->
-            val name = moduleName(item)
-            groups.matchesGroup(name) && modules.matchesName(name)
-        }
-    }
+    fun exclusionReason(moduleName: String): String? =
+        if (moduleName in excludedModules) "excluded by OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES" else null
 
     private fun Set<String>.matchesGroup(moduleName: String): Boolean =
         isEmpty() || groupFor(moduleName) in this
@@ -570,7 +571,6 @@ private data class IssuerModuleSelection(
         private val metadataModules = setOf(
             "oid4vci-1_0-issuer-metadata-test",
             "oid4vci-1_0-issuer-metadata-test-signed",
-            "fapi2-security-profile-final-discovery-end-point-verification",
         )
 
         private val positiveModules = setOf(
@@ -593,6 +593,7 @@ private data class IssuerModuleSelection(
             return IssuerModuleSelection(
                 groups = groups,
                 modules = csv("OPENID4VCI_CONFORMANCE_MODULES"),
+                excludedModules = csv("OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES"),
             )
         }
 
