@@ -1,7 +1,15 @@
 package id.walt.mobile.test.backend
 
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.serialization.BinaryData
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vci.wallet.metadata.MetadataSigner
@@ -54,6 +62,7 @@ object DemoTestBackend {
     const val SCA_PAYMENT_AMOUNT = 11.56
     const val SCA_PAYMENT_TRANSACTION_ID = "8D8AC610-566D-4EF0-9C22-186B2A5ED793"
     private val requiredPaymentAuthorizationFields = setOf("merchant_name", "amount", "currency")
+    private val metadataCryptoRuntime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
 
     val scenarios = listOf(
         CredentialScenario(
@@ -274,13 +283,13 @@ object DemoTestBackend {
         require(expectedCredentialIssuer == ISSUER_IDENTIFIER) {
             "Unexpected public demo Credential Issuer: $expectedCredentialIssuer"
         }
-        val decoded = compactJwt.decodeJws()
-        val algorithm = decoded.header[JwtHeaderParams.ALGORITHM]?.jsonPrimitive?.contentOrNull
+        val decoded = CompactJws.decodeUnverified(compactJwt)
+        val algorithm = decoded.protectedHeader[JwtHeaderParams.ALGORITHM]?.jsonPrimitive?.contentOrNull
             ?: error("Public demo signed metadata is missing alg")
         require(algorithm == "ES256") {
             "Unsupported public demo signed metadata algorithm: $algorithm"
         }
-        val jwk = decoded.header[JwtHeaderParams.JSON_WEB_KEY]?.jsonObject
+        val jwk = decoded.protectedHeader[JwtHeaderParams.JSON_WEB_KEY]?.jsonObject
             ?: error("Public demo signed metadata is missing jwk")
         require(jwk["kty"]?.jsonPrimitive?.contentOrNull == "EC") {
             "Public demo signed metadata jwk must use EC"
@@ -288,13 +297,19 @@ object DemoTestBackend {
         require(jwk["crv"]?.jsonPrimitive?.contentOrNull == "P-256") {
             "Public demo signed metadata jwk must use P-256"
         }
-        val verificationKey = JWKKey.importJWK(jwk.toString()).getOrThrow()
-        require(verificationKey.getPublicKey().getThumbprint() == ISSUER_METADATA_SIGNING_KEY_THUMBPRINT) {
+        val encodedVerificationKey = EncodedKey.Jwk(
+            data = BinaryData(jwk.toString().encodeToByteArray()),
+            privateMaterial = false,
+        )
+        require(Jwk.sha256Thumbprint(encodedVerificationKey) == ISSUER_METADATA_SIGNING_KEY_THUMBPRINT) {
             "Public demo signed metadata key is not the pinned issuer2 signing key"
         }
-        verificationKey.verifyJws(compactJwt).getOrThrow()
+        val verificationKey = metadataCryptoRuntime.restore(
+            encodedVerificationKey.toStoredSoftwareKey(KeyId("issuer2-metadata"), setOf(KeyUsage.VERIFY))
+        )
+        CompactJws.verify(compactJwt, verificationKey, JwsAlgorithm.ES256)
         MetadataSigner(
-            keyId = decoded.header[JwtHeaderParams.KEY_ID]?.jsonPrimitive?.contentOrNull,
+            keyId = decoded.protectedHeader[JwtHeaderParams.KEY_ID]?.jsonPrimitive?.contentOrNull,
             algorithm = algorithm,
             trustType = MetadataSignerTrustType.TRUSTED_ISSUER,
         )
