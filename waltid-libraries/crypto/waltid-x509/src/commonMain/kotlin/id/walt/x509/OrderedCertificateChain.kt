@@ -14,7 +14,10 @@ import kotlin.time.Instant
  * This is intentionally narrower than [validateCertificateChain]: it does not
  * build a PKIX path, check trust anchors, or consult platform/system trust.
  */
-@Deprecated("Use id.walt.certificate.x509.X509CertificateUtil.validateCertificateChain instead")
+@Deprecated(
+    message = "Old API",
+    replaceWith = ReplaceWith("id.walt.certificate.x509.X509CertificateUtil.validateCertificateChain")
+)
 @Throws(X509ValidationException::class)
 fun verifyOrderedCertificateChainSignatures(chain: List<CertificateDer>) {
     if (chain.size <= 1) return

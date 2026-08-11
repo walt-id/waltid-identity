@@ -26,9 +26,9 @@ kotlin {
         commonMain.dependencies {
             api(project(":waltid-libraries:crypto:waltid-crypto2"))
             api(project(":waltid-libraries:crypto:waltid-crypto"))
+            api(identityLibs.kotlinx.io.bytestring)
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.io.core)
-            implementation(identityLibs.kotlinx.io.bytestring)
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.whyoleg.cryptography.random)
 
