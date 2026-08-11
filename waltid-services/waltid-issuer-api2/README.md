@@ -97,18 +97,22 @@ Issuer sessions publish the same `KtorSessionUpdate` envelope to SSE and to an o
 
 | Stage | Events |
 |------|--------|
-| Offer | `credential_offer_created`, `resolved_credential_offer` |
+| Offer | `credential_offer_created`, `credential_offer_resolved` |
 | Pushed authorization | `pushed_authorization_request_received`, `pushed_authorization_request_failed` |
 | Authorization | `authorization_request_received`, `authorization_request_failed`, `authorization_code_issued` |
-| Token | `requested_token`, `tx_code_validation_failed`, `token_request_failed`, `access_token_refreshed` |
-| Credential and proof | `credential_request_received`, `dpop_proof_validation_failed`, `credential_request_proof_validation_failed`, `credential_request_failed` |
-| Credential result | `sdjwt_issue`, `jwt_issue`, `generated_mdoc`, `issuance_status` |
+| Token | `access_token_issued`, `tx_code_validation_failed`, `token_request_failed`, `access_token_refreshed` |
+| Credential and proof | `credential_request_received`, `dpop_proof_validation_failed`, `credential_proof_validation_failed`, `credential_request_failed` |
+| Credential result | `sd_jwt_issued`, `jwt_issued`, `mdoc_issued`, `issuance_status` |
+
+Kotlin enum constants are `SCREAMING_SNAKE_CASE`; webhook and SSE payloads use the lowercase `value` strings above.
 
 ### Emission rule
 
-An event is published whenever the issuer learns something new about a session: it becomes engaged at a stage (`*_received`), a stage produces its artifact (`*_issued`, `*_issue`), or a stage rejects the request (`*_failed`). Not every stage produces all three, so do not assume a symmetric triple per stage.
+An event is published whenever the issuer learns something new about a session: it becomes engaged at a stage (`*_received`), a stage produces its artifact (`*_issued`), or a stage rejects the request (`*_failed`). Not every stage produces all three, so do not assume a symmetric triple per stage.
 
 Events are emitted only after the request can be correlated with an issuance session. An unknown authorization code, an unparseable pre-authorized code or a malformed bearer token returns a protocol error without producing any event. Notification delivery is best effort and never changes the protocol response.
+
+A successful token exchange publishes either `access_token_issued` or `access_token_refreshed`, never both for the same request.
 
 ### Failure detail
 
@@ -127,11 +131,11 @@ Where an event name would otherwise be too coarse to act on, a dedicated event n
 
 Events raised while handling a single request are delivered in order, on both transports. Concurrent requests on the same session may interleave. `credential_offer_created` is effectively webhook-only: it is published before the session id is returned to the caller, so no SSE subscriber can exist yet.
 
-A `*_failed` event reports that a stage rejected the request; `issuance_status` reports that the session concluded, carrying `status`, `statusReason` and `isClosed`. The two are always separate, so no failure event shows a terminal session.
+On successful credential issuance the session is persisted as `SUCCESSFUL` before `*_issued` and `issuance_status` are published. A `*_failed` event reports that a stage rejected the request; `issuance_status` reports that the session concluded, carrying `status`, `statusReason` and `isClosed`. The two are always separate, so no failure event shows a terminal session.
 
 Only credential endpoint failures conclude a session. Earlier stages leave it usable, because the underlying grant remains valid — an incorrect `tx_code`, for example, does not consume the pre-authorized code, so the wallet can retry and complete the same session.
 
-The envelope contains the complete issuance session, including issuer key material and credential data. Use trusted webhook receivers and avoid exposing event payloads in public logs or screenshots.
+Published session payloads redact issuer signing key material (`issuerKey.type = "redacted"`). Credential data may still be present; use trusted webhook receivers and avoid exposing event payloads in public logs or screenshots.
 
 ## Creating a Credential Offer
 

@@ -56,7 +56,7 @@ class ExternalAuthorizationEventTest {
         service.processExternalAuthorizationCallback(authServerState = STATE, idToken = "not-a-jws")
 
         val update = received.await()
-        assertEquals(IssuanceSessionEvent.authorization_request_failed.toString(), update.event)
+        assertEquals(IssuanceSessionEvent.AUTHORIZATION_REQUEST_FAILED.value, update.event)
         // The event name covers six causes, so the error code is the only way to tell them apart.
         assertEquals(
             OAuthErrorCodes.INVALID_REQUEST,
@@ -77,7 +77,7 @@ class ExternalAuthorizationEventTest {
         service.processExternalAuthorizationCallback(authServerState = STATE, idToken = idToken)
 
         assertEquals(
-            IssuanceSessionEvent.authorization_code_issued.toString(),
+            IssuanceSessionEvent.AUTHORIZATION_CODE_ISSUED.value,
             received.await().event,
         )
     }

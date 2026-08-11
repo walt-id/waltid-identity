@@ -109,7 +109,7 @@ class CredentialOfferService(
         // BY_VALUE offers are never dereferenced, so this is their only offer-stage event.
         notificationService.notify(
             session = session,
-            event = IssuanceSessionEvent.credential_offer_created,
+            event = IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
         )
 
         val offerRequest = when (request.valueMode) {
@@ -135,7 +135,7 @@ class CredentialOfferService(
         val credentialOffer = session.credentialOffer ?: return null
         notificationService.notify(
             session = session,
-            event = IssuanceSessionEvent.resolved_credential_offer,
+            event = IssuanceSessionEvent.CREDENTIAL_OFFER_RESOLVED,
         )
         return credentialOffer
     }

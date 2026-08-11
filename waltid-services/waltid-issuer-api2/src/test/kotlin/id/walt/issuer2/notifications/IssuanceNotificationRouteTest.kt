@@ -98,30 +98,32 @@ class IssuanceNotificationRouteTest {
             assertJwtVcJsonCredentialPayload(credentialPayload)
 
             val expectedEvents = listOf(
-                IssuanceSessionEvent.credential_offer_created,
-                IssuanceSessionEvent.resolved_credential_offer,
-                IssuanceSessionEvent.requested_token,
-                IssuanceSessionEvent.credential_request_received,
-                IssuanceSessionEvent.jwt_issue,
-                IssuanceSessionEvent.issuance_status,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_RESOLVED,
+                IssuanceSessionEvent.ACCESS_TOKEN_ISSUED,
+                IssuanceSessionEvent.CREDENTIAL_REQUEST_RECEIVED,
+                IssuanceSessionEvent.JWT_ISSUED,
+                IssuanceSessionEvent.ISSUANCE_STATUS,
             )
             expectedEvents.forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
 
             val receivedUpdates = notificationServer.getReceivedUpdates()
                 .filter { it.target == createdOffer.offerId }
-            assertEquals(expectedEvents.map { it.toString() }, receivedUpdates.map { it.event })
+            assertEquals(expectedEvents.map { it.value }, receivedUpdates.map { it.event })
 
             val requestedToken = assertNotNull(
-                receivedUpdates.first { it.event == IssuanceSessionEvent.requested_token.toString() }
+                receivedUpdates.first { it.event == IssuanceSessionEvent.ACCESS_TOKEN_ISSUED.value }
                     .session
             )
             assertEquals(createdOffer.offerId, requestedToken["sessionId"]?.jsonPrimitive?.contentOrNull)
             assertEquals("OpenBadgeCredential_jwt_vc_json", requestedToken["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull)
 
-            val jwtIssue = receivedUpdates.first { it.event == IssuanceSessionEvent.jwt_issue.toString() }
+            val jwtIssue = receivedUpdates.first { it.event == IssuanceSessionEvent.JWT_ISSUED.value }
             assertEquals(createdOffer.offerId, jwtIssue.session["sessionId"]?.jsonPrimitive?.contentOrNull)
+            assertEquals("SUCCESSFUL", jwtIssue.session["status"]?.jsonPrimitive?.contentOrNull)
+            assertEquals("redacted", jwtIssue.session["issuerKey"]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull)
 
-            val status = receivedUpdates.first { it.event == IssuanceSessionEvent.issuance_status.toString() }
+            val status = receivedUpdates.first { it.event == IssuanceSessionEvent.ISSUANCE_STATUS.value }
             assertEquals("SUCCESSFUL", status.session["status"]?.jsonPrimitive?.contentOrNull)
             assertEquals("true", status.session["isClosed"]?.jsonPrimitive?.contentOrNull)
         } finally {
@@ -165,22 +167,22 @@ class IssuanceNotificationRouteTest {
             assertEquals(HttpStatusCode.BadRequest, tokenResponse.status, tokenResponse.bodyAsText())
 
             val expectedEvents = listOf(
-                IssuanceSessionEvent.credential_offer_created,
-                IssuanceSessionEvent.resolved_credential_offer,
-                IssuanceSessionEvent.tx_code_validation_failed,
-                IssuanceSessionEvent.token_request_failed,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_RESOLVED,
+                IssuanceSessionEvent.TX_CODE_VALIDATION_FAILED,
+                IssuanceSessionEvent.TOKEN_REQUEST_FAILED,
             )
             expectedEvents.forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
             val receivedUpdates = notificationServer.getReceivedUpdates()
                 .filter { it.target == createdOffer.offerId }
-            assertEquals(expectedEvents.map { it.toString() }, receivedUpdates.map { it.event })
+            assertEquals(expectedEvents.map { it.value }, receivedUpdates.map { it.event })
 
             // ACTIVE is the default and therefore omitted: the session is still usable for a retry.
-            val failure = receivedUpdates.single { it.event == IssuanceSessionEvent.token_request_failed.toString() }
+            val failure = receivedUpdates.single { it.event == IssuanceSessionEvent.TOKEN_REQUEST_FAILED.value }
             assertNull(failure.session["status"]?.jsonPrimitive?.contentOrNull)
 
             val txCodeFailure = receivedUpdates
-                .single { it.event == IssuanceSessionEvent.tx_code_validation_failed.toString() }
+                .single { it.event == IssuanceSessionEvent.TX_CODE_VALIDATION_FAILED.value }
             assertNull(txCodeFailure.session["status"]?.jsonPrimitive?.contentOrNull)
             assertEquals(
                 "invalid_grant",
@@ -237,17 +239,18 @@ class IssuanceNotificationRouteTest {
             // invalid_dpop_proof is answered with 401 and a DPoP challenge, per RFC 9449.
             assertEquals(HttpStatusCode.Unauthorized, credentialResponse.status, credentialResponse.bodyAsText())
 
-            notificationServer.awaitEvent(createdOffer.offerId, IssuanceSessionEvent.dpop_proof_validation_failed)
+            notificationServer.awaitEvent(createdOffer.offerId, IssuanceSessionEvent.DPOP_PROOF_VALIDATION_FAILED)
             val events = notificationServer.getReceivedUpdates()
                 .filter { it.target == createdOffer.offerId }
                 .map { it.event }
             assertEquals(
                 listOf(
-                    IssuanceSessionEvent.credential_offer_created,
-                    IssuanceSessionEvent.resolved_credential_offer,
-                    IssuanceSessionEvent.requested_token,
-                    IssuanceSessionEvent.dpop_proof_validation_failed,
-                ).map { it.toString() },
+                    IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
+                    IssuanceSessionEvent.CREDENTIAL_OFFER_RESOLVED,
+                    IssuanceSessionEvent.ACCESS_TOKEN_ISSUED,
+                    IssuanceSessionEvent.CREDENTIAL_REQUEST_RECEIVED,
+                    IssuanceSessionEvent.DPOP_PROOF_VALIDATION_FAILED,
+                ).map { it.value },
                 events,
             )
         } finally {
@@ -304,15 +307,14 @@ class IssuanceNotificationRouteTest {
             assertBearerAccessToken(refreshedResponse)
 
             val expectedEvents = listOf(
-                IssuanceSessionEvent.credential_offer_created,
-                IssuanceSessionEvent.resolved_credential_offer,
-                IssuanceSessionEvent.requested_token,
-                IssuanceSessionEvent.requested_token,
-                IssuanceSessionEvent.access_token_refreshed,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_RESOLVED,
+                IssuanceSessionEvent.ACCESS_TOKEN_ISSUED,
+                IssuanceSessionEvent.ACCESS_TOKEN_REFRESHED,
             )
             expectedEvents.distinct().forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
             assertEquals(
-                expectedEvents.map { it.toString() },
+                expectedEvents.map { it.value },
                 notificationServer.getReceivedUpdates()
                     .filter { it.target == createdOffer.offerId }
                     .map { it.event },
@@ -344,24 +346,24 @@ class IssuanceNotificationRouteTest {
             assertEquals(HttpStatusCode.BadRequest, credentialResponse.status, credentialResponse.bodyAsText())
 
             val expectedEvents = listOf(
-                IssuanceSessionEvent.credential_offer_created,
-                IssuanceSessionEvent.resolved_credential_offer,
-                IssuanceSessionEvent.requested_token,
-                IssuanceSessionEvent.credential_request_received,
-                IssuanceSessionEvent.credential_request_proof_validation_failed,
-                IssuanceSessionEvent.credential_request_failed,
-                IssuanceSessionEvent.issuance_status,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_RESOLVED,
+                IssuanceSessionEvent.ACCESS_TOKEN_ISSUED,
+                IssuanceSessionEvent.CREDENTIAL_REQUEST_RECEIVED,
+                IssuanceSessionEvent.CREDENTIAL_PROOF_VALIDATION_FAILED,
+                IssuanceSessionEvent.CREDENTIAL_REQUEST_FAILED,
+                IssuanceSessionEvent.ISSUANCE_STATUS,
             )
             expectedEvents.forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
             val receivedUpdates = notificationServer.getReceivedUpdates()
                 .filter { it.target == createdOffer.offerId }
-            assertEquals(expectedEvents.map { it.toString() }, receivedUpdates.map { it.event })
+            assertEquals(expectedEvents.map { it.value }, receivedUpdates.map { it.event })
             assertEquals(
                 "UNSUCCESSFUL",
                 receivedUpdates.last().session["status"]?.jsonPrimitive?.contentOrNull,
             )
             val failureUpdate = assertNotNull(
-                receivedUpdates.singleOrNull { it.event == IssuanceSessionEvent.credential_request_failed.toString() },
+                receivedUpdates.singleOrNull { it.event == IssuanceSessionEvent.CREDENTIAL_REQUEST_FAILED.value },
             )
             // Reports the rejected stage, not the concluded session: the terminal state is carried by
             // the issuance_status that follows, so every *_failed event has the same shape.
@@ -372,7 +374,7 @@ class IssuanceNotificationRouteTest {
             )
             val proofFailureUpdate = assertNotNull(
                 receivedUpdates.singleOrNull {
-                    it.event == IssuanceSessionEvent.credential_request_proof_validation_failed.toString()
+                    it.event == IssuanceSessionEvent.CREDENTIAL_PROOF_VALIDATION_FAILED.value
                 },
             )
             assertEquals(
@@ -447,14 +449,14 @@ class IssuanceNotificationRouteTest {
             assertEquals(HttpStatusCode.Found, authorizationResponse.status, authorizationResponse.bodyAsText())
 
             val expectedEvents = listOf(
-                IssuanceSessionEvent.credential_offer_created,
-                IssuanceSessionEvent.resolved_credential_offer,
-                IssuanceSessionEvent.pushed_authorization_request_received,
-                IssuanceSessionEvent.authorization_request_received,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_RESOLVED,
+                IssuanceSessionEvent.PUSHED_AUTHORIZATION_REQUEST_RECEIVED,
+                IssuanceSessionEvent.AUTHORIZATION_REQUEST_RECEIVED,
             )
             expectedEvents.forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
             assertEquals(
-                expectedEvents.map { it.toString() },
+                expectedEvents.map { it.value },
                 notificationServer.getReceivedUpdates()
                     .filter { it.target == createdOffer.offerId }
                     .map { it.event },
@@ -520,9 +522,9 @@ class IssuanceNotificationRouteTest {
 
             assertEquals(
                 listOf(
-                    IssuanceSessionEvent.credential_offer_created,
-                    IssuanceSessionEvent.resolved_credential_offer,
-                ).map { it.toString() },
+                    IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
+                    IssuanceSessionEvent.CREDENTIAL_OFFER_RESOLVED,
+                ).map { it.value },
                 notificationServer.getReceivedUpdates()
                     .filter { it.target == createdOffer.offerId }
                     .map { it.event },
@@ -544,7 +546,7 @@ class IssuanceNotificationRouteTest {
         }
 
         assertEquals(createdOffer.offerId, update.target)
-        assertEquals(IssuanceSessionEvent.resolved_credential_offer.toString(), update.event)
+        assertEquals(IssuanceSessionEvent.CREDENTIAL_OFFER_RESOLVED.value, update.event)
         assertEquals(createdOffer.offerId, update.session["sessionId"]?.jsonPrimitive?.contentOrNull)
         assertEquals("OpenBadgeCredential_jwt_vc_json", update.session["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull)
         assertEquals(
@@ -586,7 +588,7 @@ class IssuanceNotificationRouteTest {
         val holderDid = DidJwkRegistrar()
             .registerByKey(proofKey, DidJwkCreateOptions(KeyType.secp256r1))
             .did
-        val proofs = JwtProofBuilder().buildProof(
+        val validProofs = JwtProofBuilder().buildProof(
             key = proofKey,
             audience = issuerMetadata.credentialIssuer,
             nonce = nonce,

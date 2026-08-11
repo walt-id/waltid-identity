@@ -7,6 +7,9 @@ import id.walt.ktornotifications.core.KtorSessionUpdate
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.Url
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlin.coroutines.cancellation.CancellationException
@@ -33,15 +36,18 @@ class IssuanceNotificationService {
     suspend fun emitIssuanceStatus(session: IssuanceSession) =
         notify(
             session = session,
-            event = IssuanceSessionEvent.issuance_status,
+            event = IssuanceSessionEvent.ISSUANCE_STATUS,
         )
 
     private fun IssuanceSession.toSessionUpdate(event: IssuanceSessionEvent) =
         KtorSessionUpdate(
             target = sessionId,
-            event = event.toString(),
-            session = Json.encodeToJsonElement(this).jsonObject,
+            event = event.value,
+            session = Json.encodeToJsonElement(forNotificationPayload()).jsonObject,
         )
+
+    private fun IssuanceSession.forNotificationPayload(): IssuanceSession =
+        copy(issuerKey = REDACTED_ISSUER_KEY)
 
     private fun IssuanceNotifications?.toKtorSessionNotifications(): KtorSessionNotifications? =
         this?.webhook?.let { webhook ->
@@ -51,4 +57,10 @@ class IssuanceNotificationService {
                 ),
             )
         }
+
+    companion object {
+        private val REDACTED_ISSUER_KEY: JsonObject = buildJsonObject {
+            put("type", JsonPrimitive("redacted"))
+        }
+    }
 }

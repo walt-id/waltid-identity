@@ -11,6 +11,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
@@ -35,14 +36,15 @@ class IssuanceNotificationServiceTest {
             }
         }
 
-        service.notify(session, IssuanceSessionEvent.requested_token)
+        service.notify(session, IssuanceSessionEvent.ACCESS_TOKEN_ISSUED)
 
         val payload = received.await()
         assertEquals("session-123", payload.target)
-        assertEquals("requested_token", payload.event)
+        assertEquals("access_token_issued", payload.event)
         assertEquals("session-123", payload.session["sessionId"]?.jsonPrimitive?.contentOrNull)
         assertEquals("identity_credential", payload.session["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull)
         assertEquals("PRE_AUTHORIZED", payload.session["authenticationMethod"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("redacted", payload.session["issuerKey"]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull)
     }
 
     @Test
@@ -51,7 +53,7 @@ class IssuanceNotificationServiceTest {
 
         service.notify(
             session = testSession(webhookUrl = "http://127.0.0.1:9/issuer2"),
-            event = IssuanceSessionEvent.issuance_status,
+            event = IssuanceSessionEvent.ISSUANCE_STATUS,
         )
     }
 
@@ -59,7 +61,7 @@ class IssuanceNotificationServiceTest {
     fun webhookRoutePayloadCanBeDecodedAsCommonSessionUpdate() {
         val payload = KtorSessionUpdate(
             target = "session-123",
-            event = IssuanceSessionEvent.jwt_issue.toString(),
+            event = IssuanceSessionEvent.JWT_ISSUED.value,
             session = buildJsonObject {
                 put("sessionId", "session-123")
                 put("credentialConfigurationId", "identity_credential")
