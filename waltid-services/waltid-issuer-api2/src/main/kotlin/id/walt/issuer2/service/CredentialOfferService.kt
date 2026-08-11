@@ -98,6 +98,8 @@ class CredentialOfferService(
             idTokenClaimsMapping = idTokenClaimsMapping,
             mDocNameSpacesDataMappingConfig =
                 overrides?.mDocNameSpacesDataMappingConfig ?: profile.mDocNameSpacesDataMappingConfig,
+            authorizedTransactionDataTypes =
+                overrides?.authorizedTransactionDataTypes ?: profile.authorizedTransactionDataTypes,
             x5Chain = overrides?.x5Chain ?: profile.x5Chain,
             issuerDid = issuerDid,
             credentialOffer = credentialOffer,

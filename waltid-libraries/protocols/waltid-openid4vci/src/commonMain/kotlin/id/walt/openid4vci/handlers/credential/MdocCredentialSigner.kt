@@ -14,6 +14,7 @@ import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.mdoc.dataelement.DataElement as LegacyMdocDataElement
 import id.walt.mdoc.issuance.MdocIssuer
+import id.walt.mdoc.objects.mso.KeyAuthorization
 import id.walt.mdoc.objects.mso.Status
 import id.walt.mdoc.schema.MdocsSchemaMappingFunction.toCborElement
 import id.walt.openid4vci.proofs.VerifiedCredentialProof
@@ -43,6 +44,7 @@ object MdocCredentialSigner {
         status: Status? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
         verifiedProof: VerifiedCredentialProof? = null,
+        authorizedTransactionDataTypes: List<String>? = null,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -60,6 +62,7 @@ object MdocCredentialSigner {
         status = status,
         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
         verifiedProof = verifiedProof,
+        authorizedTransactionDataTypes = authorizedTransactionDataTypes,
         valueMappingFunction = valueMappingFunction,
     )
 
@@ -76,6 +79,7 @@ object MdocCredentialSigner {
         status: Status? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
         verifiedProof: VerifiedCredentialProof? = null,
+        authorizedTransactionDataTypes: List<String>? = null,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -93,6 +97,7 @@ object MdocCredentialSigner {
         status = status,
         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
         verifiedProof = verifiedProof,
+        authorizedTransactionDataTypes = authorizedTransactionDataTypes,
         valueMappingFunction = valueMappingFunction,
     )
 
@@ -108,6 +113,7 @@ object MdocCredentialSigner {
         status: Status?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         verifiedProof: VerifiedCredentialProof?,
+        authorizedTransactionDataTypes: List<String>?,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -136,6 +142,7 @@ object MdocCredentialSigner {
             }
 
         val issuanceData = MdocIssuer.MdocUniversalIssuanceData(namespaces)
+        val keyAuthorizations = authorizedTransactionDataTypes.toKeyAuthorizations()
         val issuedCredential = when (issuerSigningKey) {
             is IssuerSigningKey.Legacy -> MdocIssuer.issueUniversal(
                 issuerKey = issuerSigningKey.key,
@@ -146,6 +153,7 @@ object MdocCredentialSigner {
                 validFrom = validFrom,
                 validUntil = validUntil,
                 status = status,
+                keyAuthorizations = keyAuthorizations,
                 valueMappingFunction = effectiveValueMappingFunction,
             )
 
@@ -159,12 +167,24 @@ object MdocCredentialSigner {
                 validFrom = validFrom,
                 validUntil = validUntil,
                 status = status,
+                keyAuthorizations = keyAuthorizations,
                 valueMappingFunction = effectiveValueMappingFunction,
             )
         }
 
         return coseCompliantCbor.encodeToByteArray(issuedCredential).encodeToBase64Url()
     }
+
+    /**
+     * OpenID4VP carries a transaction_data type as the authorized MSO namespace, so each authorized
+     * type becomes a blanket `nameSpaces` entry. Without this the holder cannot sign transaction data
+     * at all, because presentation requires the type to appear in the MSO's KeyAuthorizations.
+     */
+    private fun List<String>?.toKeyAuthorizations(): KeyAuthorization? =
+        this?.filter { it.isNotBlank() }
+            ?.distinct()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { types -> KeyAuthorization(namespaces = types) }
 
     suspend fun resolveHolderKey(credentialRequest: CredentialRequest): CoseKey {
         val jwtProof = credentialRequest.proofs?.jwt?.firstOrNull()
