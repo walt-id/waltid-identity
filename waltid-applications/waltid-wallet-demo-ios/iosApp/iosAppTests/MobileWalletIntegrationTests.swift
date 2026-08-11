@@ -334,8 +334,9 @@ final class MobileWalletIntegrationTests: XCTestCase {
             return XCTFail("Expected signed issuer metadata provenance")
         }
         XCTAssertFalse(issuerProvenance.compactJWT.isEmpty)
-        XCTAssertFalse(issuerProvenance.algorithm.isEmpty)
+        XCTAssertEqual("ES256", issuerProvenance.algorithm)
         XCTAssertNotNil(issuerProvenance.keyID)
+        XCTAssertEqual(.trustedIssuer, issuerProvenance.trustType)
 
         let outcome = try await wallet.continuePreAuthorizedIssuance(
             sessionID: issuanceSession.id,
@@ -349,12 +350,13 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let signedSession = try await DemoBackend.shared.createVerifierSession(scenario: scenario, signedRequest: true)
         let presentationURL = try XCTUnwrap(URL(string: signedSession.authorizationRequestUri))
         let preview = try requireReadyPreview(try await wallet.previewPresentation(request: presentationURL))
-        guard case let .signedRequest(verifierProvenance) = preview.request.verifierMetadataProvenance else {
-            return XCTFail("Expected signed verifier request provenance")
+        guard case let .authenticated(compactRequestObject, algorithm, keyID, clientIDScheme) = preview.request.requestAuthentication else {
+            return XCTFail("Expected authenticated signed verifier request")
         }
-        XCTAssertFalse(verifierProvenance.compactRequestObject.isEmpty)
-        XCTAssertFalse(verifierProvenance.algorithm.isEmpty)
-        XCTAssertNotNil(verifierProvenance.keyID)
+        XCTAssertFalse(compactRequestObject.isEmpty)
+        XCTAssertEqual("ES256", algorithm)
+        XCTAssertNotNil(keyID)
+        XCTAssertEqual(.preRegistered, clientIDScheme)
 
         let result = try await wallet.submitPresentation(
             previewHandle: preview.previewHandle,

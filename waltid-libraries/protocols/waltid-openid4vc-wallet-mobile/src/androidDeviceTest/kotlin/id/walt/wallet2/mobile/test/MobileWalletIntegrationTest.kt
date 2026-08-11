@@ -9,6 +9,7 @@ import id.walt.dcql.models.meta.NoMeta
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.wallet2.handlers.WalletIssuanceMetadataProvenance
@@ -27,7 +28,8 @@ import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
-import id.walt.wallet2.mobile.MobileWalletVerifierMetadataProvenance
+import id.walt.wallet2.mobile.MobileWalletRequestAuthentication
+import id.walt.wallet2.mobile.MobileWalletClientIdScheme
 import id.walt.x509.CertificateDer
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -154,7 +156,8 @@ class MobileWalletIntegrationTest {
             issuanceSession.offer.issuer.metadataProvenance,
         )
         assertTrue(issuerProvenance.compactJwt.isNotBlank())
-        assertTrue(issuerProvenance.algorithm.isNotBlank())
+        assertEquals("ES256", issuerProvenance.algorithm)
+        assertEquals(MetadataSignerTrustType.TRUSTED_ISSUER, issuerProvenance.trustType)
         assertNotNull(issuerProvenance.keyId)
 
         val credentialIds = client.continuePreAuthorizedIssuance(issuanceSession.id, offer.txCode).storedCredentialIds()
@@ -162,12 +165,13 @@ class MobileWalletIntegrationTest {
 
         val signedSession = DemoTestBackend.createVerifierSession(scenario, signedRequest = true)
         val preview = client.previewPresentation(signedSession.authorizationRequestUri).requireReadyPreview()
-        val verifierProvenance = assertIs<MobileWalletVerifierMetadataProvenance.SignedRequest>(
-            preview.request.verifierMetadataProvenance,
+        val verifierAuthentication = assertIs<MobileWalletRequestAuthentication.Authenticated>(
+            preview.request.requestAuthentication,
         )
-        assertTrue(verifierProvenance.compactRequestObject.isNotBlank())
-        assertTrue(verifierProvenance.algorithm.isNotBlank())
-        assertNotNull(verifierProvenance.keyId)
+        assertTrue(verifierAuthentication.compactRequestObject.isNotBlank())
+        assertEquals("ES256", verifierAuthentication.algorithm)
+        assertNotNull(verifierAuthentication.keyId)
+        assertEquals(MobileWalletClientIdScheme.PRE_REGISTERED, verifierAuthentication.clientIdScheme)
 
         val result = client.submitPresentation(
             previewHandle = preview.previewHandle,
