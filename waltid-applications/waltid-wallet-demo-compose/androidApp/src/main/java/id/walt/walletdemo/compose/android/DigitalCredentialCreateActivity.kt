@@ -9,9 +9,11 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.credentials.ExperimentalDigitalCredentialApi
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.AndroidDigitalCredentialCreateProvider
 import id.walt.wallet2.mobile.MobileWallet
+import id.walt.wallet2.mobile.MobileWalletDigitalCredentialCreateResponse
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceSession
@@ -32,11 +34,13 @@ import kotlinx.coroutines.launch
  * Separate from [MainActivity]: Credential Manager owns this task's lifecycle and expects exactly one
  * create result from it.
  */
+@OptIn(ExperimentalDigitalCredentialApi::class)
 class DigitalCredentialCreateActivity : ComponentActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val resultIntent = Intent()
     private var wallet: MobileWallet? = null
     private var session: WalletDemoIssuanceSession? = null
+    private var requestProtocol: String? = null
     private var uiState by mutableStateOf<CreateUiState>(CreateUiState.Loading)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,7 +63,9 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
                             finishProviderResult()
                         }
                     },
-                    onBackAtRoot = ::finishWithoutProviderResult,
+                    onBackAtRoot = {
+                        finishWithoutProviderResult()
+                    },
                 )
                 CreateUiState.WaitingForAuthorization -> WalletDemoOfferWaitingForAuthorizationScreen(
                     onCancel = {
@@ -74,6 +80,7 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
             runCatching {
                 val allowlist = assets.open("privileged_apps.json").bufferedReader().use { it.readText() }
                 val input = AndroidDigitalCredentialCreateProvider.extract(intent, allowlist)
+                requestProtocol = input.request.protocol
                 val created = createAndroidDemoMobileWallet(
                     context = applicationContext,
                     config = demoWalletConfig(),
@@ -101,24 +108,22 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
             runCatching {
                 when (started.grant) {
                     WalletDemoIssuanceGrant.PreAuthorizedCode -> {
-                        completeOutcome(
-                            mobileWallet.continuePreAuthorizedIssuance(
-                                sessionId = started.id,
-                                transactionCode = txCode,
-                            )
+                        val outcome = mobileWallet.continuePreAuthorizedIssuance(
+                            sessionId = started.id,
+                            transactionCode = txCode,
                         )
+                        completeOutcome(outcome)
                     }
                     WalletDemoIssuanceGrant.AuthorizationCode -> {
                         val authorization = mobileWallet.beginAuthorizationIssuance(started.id)
                         DigitalCredentialCreateAuthHandoff.begin(started.id) { callbackUri ->
                             scope.launch {
                                 runCatching {
-                                    completeOutcome(
-                                        mobileWallet.continueAuthorizationIssuance(
-                                            sessionId = started.id,
-                                            callbackUri = callbackUri,
-                                        )
+                                    val outcome = mobileWallet.continueAuthorizationIssuance(
+                                        sessionId = started.id,
+                                        callbackUri = callbackUri,
                                     )
+                                    completeOutcome(outcome)
                                 }.onFailure { reportFailure(it) }
                             }
                         }
@@ -135,14 +140,13 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
         }
     }
 
-    private fun completeOutcome(outcome: WalletIssuanceOutcome) {
+    private suspend fun completeOutcome(outcome: WalletIssuanceOutcome) {
         when (outcome) {
             is WalletIssuanceOutcome.Stored,
             is WalletIssuanceOutcome.Deferred,
             -> {
                 DigitalCredentialCreateAuthHandoff.clear(session?.id)
-                AndroidDigitalCredentialCreateProvider.setResponse(resultIntent)
-                finishProviderResult()
+                sendSuccessAck()
             }
             is WalletIssuanceOutcome.Cancelled -> {
                 DigitalCredentialCreateAuthHandoff.clear(session?.id)
@@ -153,6 +157,14 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
                 reportFailure(IllegalStateException(outcome.error.message))
             }
         }
+    }
+
+    private fun sendSuccessAck() {
+        val protocol = requestProtocol
+            ?: MobileWalletDigitalCredentialCreateResponse.acknowledgment().protocol
+        val response = MobileWalletDigitalCredentialCreateResponse.acknowledgment(protocol)
+        AndroidDigitalCredentialCreateProvider.setResponse(resultIntent, response)
+        finishProviderResult()
     }
 
     private fun cancelPendingAuthorization() {

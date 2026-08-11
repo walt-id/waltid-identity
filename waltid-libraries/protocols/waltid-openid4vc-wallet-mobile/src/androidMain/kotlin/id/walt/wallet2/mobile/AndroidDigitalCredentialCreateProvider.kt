@@ -21,7 +21,7 @@ import java.security.MessageDigest
  * Verified Android Credential Manager create input after caller and protocol extraction.
  *
  * @property request Platform-neutral OpenID4VCI create request.
- * @property providerRequest Original Credential Manager create request kept for diagnostics.
+ * @property providerRequest Original Credential Manager create request.
  */
 public data class AndroidDigitalCredentialCreateProviderInput(
     public val request: MobileWalletDigitalCredentialCreateRequest,
@@ -99,8 +99,12 @@ public object AndroidDigitalCredentialCreateProvider {
         )
         val data = selected["data"] as? JsonObject
             ?: throw IllegalArgumentException("Digital credential create request data must be an object")
+        // Echo the wire protocol alias in the create acknowledgement; some callers reject a
+        // normalized id that does not match the request (e.g. openid4vci vs openid4vci-v1).
+        val wireProtocol = selected["protocol"]?.jsonPrimitive?.content
+            ?: throw IllegalArgumentException("Digital credential create request protocol is required")
         return MobileWalletDigitalCredentialCreateRequest(
-            protocol = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+            protocol = wireProtocol,
             offerJson = Json.encodeToString(JsonObject.serializer(), data),
             verifiedOrigin = verifiedOrigin,
         )

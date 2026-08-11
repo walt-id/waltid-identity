@@ -43,6 +43,13 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (!::controller.isInitialized) return
+        // CreateActivity stores into the shared DB; reload so Credentials tab does not stay stale.
+        controller.refreshCredentialsFromStore()
+    }
+
     private fun handleIntent(intent: Intent?) {
         val deepLink = intent?.data?.toString() ?: return
         if (DigitalCredentialCreateAuthHandoff.deliver(deepLink)) return

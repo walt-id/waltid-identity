@@ -17,8 +17,9 @@ public object MobileWalletDigitalCredentialProtocols {
 /**
  * Protocol identifiers accepted at the Android CREATE_CREDENTIAL boundary for OpenID4VCI.
  *
- * Callers and matchers historically emit several aliases for the same offer shape; the wallet
- * normalizes them to [MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1].
+ * Callers and matchers historically emit several aliases for the same offer shape. The wire alias
+ * is preserved on [MobileWalletDigitalCredentialCreateRequest.protocol] so the create
+ * acknowledgement can echo it.
  */
 public object MobileWalletDigitalCredentialIssuanceProtocolAliases {
     public val ACCEPTED: Set<String> = setOf(
@@ -210,7 +211,7 @@ public data class MobileWalletDigitalCredentialRequest(
 /**
  * Platform-neutral OpenID4VCI create request from Android Credential Manager.
  *
- * @property protocol Canonical protocol identifier ([MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1]).
+ * @property protocol Wire protocol identifier from the create request (an accepted OpenID4VCI alias).
  * @property offerJson Credential Offer JSON object from the create request `data` member.
  * @property verifiedOrigin Authenticated origin reported by the platform.
  */
@@ -221,12 +222,12 @@ public data class MobileWalletDigitalCredentialCreateRequest(
 )
 
 /**
- * Platform response acknowledging that the holder accepted a Digital Credentials issuance request.
+ * Platform response acknowledging that the holder processed a Digital Credentials issuance request.
  *
- * The browser/issuer does not receive the credential itself; success means the wallet processed the
- * offer (stored credentials and/or accepted the handoff).
+ * The browser/issuer does not receive the credential itself; success means the wallet completed
+ * OpenID4VCI for the offer (typically with an empty `data` object).
  *
- * @property protocol Protocol identifier returned to the platform.
+ * @property protocol Wire protocol identifier echoed from the create request when available.
  * @property dataJson Protocol response payload encoded as JSON, typically `{}`.
  */
 public data class MobileWalletDigitalCredentialCreateResponse(

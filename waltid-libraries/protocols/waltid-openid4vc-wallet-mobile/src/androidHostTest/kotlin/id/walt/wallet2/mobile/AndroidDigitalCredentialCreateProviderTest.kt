@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 @Config(sdk = [35])
 class AndroidDigitalCredentialCreateProviderTest {
     @Test
-    fun resolvesOpenId4VciV1CreateRequestAndNormalizesProtocol() {
+    fun resolvesOpenId4VciV1CreateRequest() {
         val request = AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
             requestJson = """
                 {"requests":[{
@@ -55,7 +55,7 @@ class AndroidDigitalCredentialCreateProviderTest {
                 requestJson = """{"requests":[{"protocol":"$protocol","data":{"credential_issuer":"https://i.example","credential_configuration_ids":["c"]}}]}""",
                 verifiedOrigin = "android:apk-key-hash:abc",
             )
-            assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1, request.protocol)
+            assertEquals(protocol, request.protocol)
         }
     }
 
