@@ -123,12 +123,22 @@ export function useIssuerSession(issuerBase: string) {
         enrichedOffer,
         mediationRequired,
       );
+      // create() resolved — treat as handoff success even if response serialization fails.
+      // DigitalCredential platform objects often JSON.stringify to "{}", so extract fields.
+      let responsePayload: unknown = null;
+      try {
+        responsePayload = serializeDigitalCredentialResult(handoffResult);
+      } catch (serializeError) {
+        responsePayload = {
+          serializeError: formatCredentialError(serializeError),
+        };
+      }
       sse.addEvent({
         event: "DC_API_HANDOFF_SUCCESS",
-        response: handoffResult ?? null,
+        response: responsePayload,
       });
     } catch (e) {
-      error.value = e instanceof Error ? e.message : "Unknown error";
+      error.value = formatCredentialError(e);
       sse.addEvent({
         event: "DC_API_HANDOFF_FAILED",
         status: "FAILED",
@@ -213,4 +223,40 @@ async function fetchJson<T>(url: string): Promise<T> {
   } catch {
     return { raw: text } as T;
   }
+}
+
+function serializeDigitalCredentialResult(result: unknown): unknown {
+  if (result == null) return null;
+  if (typeof result !== "object") return result;
+  const credential = result as {
+    type?: unknown;
+    protocol?: unknown;
+    data?: unknown;
+    id?: unknown;
+  };
+  if (
+    "protocol" in credential ||
+    "data" in credential ||
+    credential.type === "digital-credential" ||
+    credential.type === "DigitalCredential"
+  ) {
+    return {
+      type: credential.type ?? null,
+      id: credential.id ?? null,
+      protocol: credential.protocol ?? null,
+      data: credential.data ?? null,
+    };
+  }
+  return result;
+}
+
+function formatCredentialError(error: unknown): string {
+  if (typeof DOMException !== "undefined" && error instanceof DOMException) {
+    return `${error.name}: ${error.message || "(no message)"}`;
+  }
+  if (error instanceof Error) {
+    const name = error.name && error.name !== "Error" ? `${error.name}: ` : "";
+    return `${name}${error.message || "(no message)"}`;
+  }
+  return String(error);
 }
