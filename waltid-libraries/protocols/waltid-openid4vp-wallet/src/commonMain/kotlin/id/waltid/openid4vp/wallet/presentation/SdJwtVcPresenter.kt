@@ -26,6 +26,7 @@ object SdJwtVcPresenter {
         authorizationRequest: AuthorizationRequest,
         holderKey: Key,
         holderDid: String?,
+        holderBindingAudience: String? = null,
     ): JsonPrimitive = presentSdJwtVcWithKey(
         digitalCredential,
         matchResult,
@@ -33,6 +34,7 @@ object SdJwtVcPresenter {
         holderKey,
         holderDid,
         null,
+        holderBindingAudience,
     )
 
     suspend fun presentSdJwtVc(
@@ -41,6 +43,7 @@ object SdJwtVcPresenter {
         authorizationRequest: AuthorizationRequest,
         holderKey: Crypto2Key,
         holderDid: String?,
+        holderBindingAudience: String? = null,
     ): JsonPrimitive = presentSdJwtVcWithKey(
         digitalCredential,
         matchResult,
@@ -48,6 +51,7 @@ object SdJwtVcPresenter {
         null,
         holderDid,
         holderKey,
+        holderBindingAudience,
     )
 
     @Deprecated("Use the Crypto2Key overload")
@@ -58,6 +62,7 @@ object SdJwtVcPresenter {
         holderKey: Key,
         holderDid: String?,
         holderCrypto2Key: Crypto2Key?,
+        holderBindingAudience: String? = null,
     ): JsonPrimitive = presentSdJwtVcWithKey(
         digitalCredential,
         matchResult,
@@ -65,6 +70,7 @@ object SdJwtVcPresenter {
         holderKey,
         holderDid,
         holderCrypto2Key,
+        holderBindingAudience,
     )
 
     private suspend fun presentSdJwtVcWithKey(
@@ -74,6 +80,7 @@ object SdJwtVcPresenter {
         holderKey: Key?,
         holderDid: String?,
         holderCrypto2Key: Crypto2Key?,
+        holderBindingAudience: String? = null,
     ): JsonPrimitive {
         val selectedClaimsMap = matchResult.selectedDisclosures
 
@@ -106,11 +113,13 @@ object SdJwtVcPresenter {
             transactionData = authorizationRequest.transactionData,
             credentialId = matchResult.originalQuery.id,
         )
+        // DC API binds the holder to the platform-asserted origin, not to client_id.
+        val audience = holderBindingAudience ?: authorizationRequest.clientId
         val kbJwtString = holderCrypto2Key?.let {
             createKeyBindingJwt(
                 disclosed,
                 authorizationRequest.nonce!!,
-                authorizationRequest.clientId,
+                audience,
                 disclosuresToPresent,
                 it,
                 transactionData,
@@ -119,7 +128,7 @@ object SdJwtVcPresenter {
         } ?: createKeyBindingJwt(
             disclosed,
             authorizationRequest.nonce!!,
-            authorizationRequest.clientId,
+            audience,
             disclosuresToPresent,
             requireNotNull(holderKey),
             transactionData,

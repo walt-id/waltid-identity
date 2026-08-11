@@ -1,4 +1,5 @@
 import SwiftUI
+import WalletDemoSharingUI
 import WalletSDK
 
 struct CredentialsTabView: View {

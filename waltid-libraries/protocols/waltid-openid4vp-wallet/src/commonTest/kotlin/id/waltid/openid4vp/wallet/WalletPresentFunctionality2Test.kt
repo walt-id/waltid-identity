@@ -2,6 +2,7 @@ package id.waltid.openid4vp.wallet
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.KeyId
@@ -27,6 +28,9 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.io.encoding.Base64
 import kotlin.test.*
@@ -205,6 +209,26 @@ class WalletPresentFunctionality2Test {
         }
 
         assertEquals(0, fallbackInvocations)
+    }
+
+    @Test
+    fun dcApiHolderBindingAudienceIsEncodedInSdJwtKeyBindingJwt() = runTest {
+        val issuerJwt = JWKKey.generate(KeyType.Ed25519).signJws(
+            buildJsonObject { put("_sd_alg", "sha-256") }.toString().encodeToByteArray()
+        )
+        val keyBindingJwt = WalletPresentFunctionality2.createKeyBindingJwt(
+            disclosed = "$issuerJwt~",
+            nonce = "nonce-123",
+            audience = "origin:https://verifier.example",
+            selectedDisclosures = emptyList(),
+            holderKey = JWKKey.generate(KeyType.Ed25519),
+        )
+        val payload = Json.parseToJsonElement(
+            keyBindingJwt.split('.')[1].decodeFromBase64Url().decodeToString()
+        ).jsonObject
+
+        assertEquals("origin:https://verifier.example", payload["aud"]?.jsonPrimitive?.content)
+        assertEquals("nonce-123", payload["nonce"]?.jsonPrimitive?.content)
     }
 
     @Test

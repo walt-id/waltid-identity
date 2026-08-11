@@ -46,7 +46,8 @@ object SelfIssuedIdTokenBuilder {
         authorizationRequest: AuthorizationRequest,
         holderKey: Crypto2Key,
         holderDid: String?,
-    ): String = buildWithKey(authorizationRequest, null, holderDid, holderKey)
+        holderBindingAudience: String? = null,
+    ): String = buildWithKey(authorizationRequest, null, holderDid, holderKey, holderBindingAudience)
 
     /**
      * Creates a signed Self-Issued ID Token for the given authorization request.
@@ -62,13 +63,15 @@ object SelfIssuedIdTokenBuilder {
         holderKey: Key,
         holderDid: String?,
         holderCrypto2Key: Crypto2Key?,
-    ): String = buildWithKey(authorizationRequest, holderKey, holderDid, holderCrypto2Key)
+        holderBindingAudience: String? = null,
+    ): String = buildWithKey(authorizationRequest, holderKey, holderDid, holderCrypto2Key, holderBindingAudience)
 
     private suspend fun buildWithKey(
         authorizationRequest: AuthorizationRequest,
         holderKey: Key?,
         holderDid: String?,
         holderCrypto2Key: Crypto2Key?,
+        holderBindingAudience: String? = null,
     ): String {
         val crypto2Key = holderCrypto2Key ?: holderKey?.let { WalletCrypto2KeyAdapter.signingKey(it) }
         require(crypto2Key != null || holderKey != null) { "A holder signing key is required" }
@@ -139,7 +142,7 @@ object SelfIssuedIdTokenBuilder {
             // iss = sub per SIOPv2 §6: "this claim MUST be set to the value of the sub claim"
             put("iss", sub)
             put("sub", sub)
-            put("aud", JsonPrimitive(authorizationRequest.clientId))
+            put("aud", JsonPrimitive(holderBindingAudience ?: authorizationRequest.clientId))
             put("nonce", JsonPrimitive(authorizationRequest.nonce))
             put("iat", JsonPrimitive(now.epochSeconds))
             put("exp", JsonPrimitive(exp.epochSeconds))
@@ -150,7 +153,7 @@ object SelfIssuedIdTokenBuilder {
             }
         }
 
-        log.trace { "Building Self-Issued ID Token: sub=$sub, aud=${authorizationRequest.clientId}" }
+        log.trace { "Building Self-Issued ID Token: sub=$sub, aud=${holderBindingAudience ?: authorizationRequest.clientId}" }
 
         return if (crypto2Key != null) {
             CompactJws.sign(

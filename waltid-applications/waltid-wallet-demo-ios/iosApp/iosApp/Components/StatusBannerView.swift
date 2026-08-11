@@ -1,4 +1,5 @@
 import SwiftUI
+import WalletDemoSharingUI
 
 struct StatusBannerView: View {
     let message: String
