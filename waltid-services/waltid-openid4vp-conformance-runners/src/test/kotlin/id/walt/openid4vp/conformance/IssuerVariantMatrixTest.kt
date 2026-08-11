@@ -2,6 +2,7 @@ package id.walt.openid4vp.conformance
 
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariant
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantMatrix
+import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantSelection
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -81,5 +82,27 @@ class IssuerVariantMatrixTest {
                 "vci_credential_encryption=plain",
             variant.description,
         )
+    }
+
+    @Test
+    fun selectsTheTwelveBasicCiVariants() {
+        val selected = IssuerVariantSelection(
+            fapiProfiles = setOf("vci"),
+            credentialFormats = setOf("sd_jwt_vc", "mdoc"),
+            grantTypes = setOf("authorization_code", "pre_authorization_code"),
+            authorizationCodeFlowVariants = setOf("issuer_initiated", "wallet_initiated"),
+            clientAuthTypes = setOf("client_attestation"),
+            senderConstrains = setOf("dpop"),
+            authorizationRequestTypes = setOf("simple"),
+            requestMethods = setOf("unsigned"),
+            credentialEncryptions = setOf("plain", "encrypted"),
+        ).select(IssuerVariantMatrix.base())
+
+        assertEquals(12, selected.size)
+        assertTrue(selected.all { it.fapiProfile == "vci" })
+        assertFalse(selected.any {
+            it.grantType == "pre_authorization_code" &&
+                it.authorizationCodeFlowVariant == "wallet_initiated"
+        })
     }
 }
