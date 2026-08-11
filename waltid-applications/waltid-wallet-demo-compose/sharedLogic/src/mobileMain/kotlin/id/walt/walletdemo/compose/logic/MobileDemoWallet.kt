@@ -274,7 +274,7 @@ private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentat
         },
     )
 
-private fun List<MobileWalletTransactionDataItem>.toDemoTransactionDataGroups(): List<ClaimGroup> =
+internal fun List<MobileWalletTransactionDataItem>.toDemoTransactionDataGroups(): List<ClaimGroup> =
     CredentialDisplayNormalizer.transactionDataGroups(
         map { item ->
             WalletDemoTransactionDataItem(
@@ -299,7 +299,7 @@ private fun MobileWalletResponseEncryption.toDemoResponseEncryption(): WalletDem
         )
     }
 
-private fun MobileWalletMetadataDisplay.toDemoMetadataDisplay(): WalletDemoMetadataDisplay =
+internal fun MobileWalletMetadataDisplay.toDemoMetadataDisplay(): WalletDemoMetadataDisplay =
     WalletDemoMetadataDisplay(
         name = name,
         logoUri = logoUri,
@@ -318,7 +318,7 @@ private fun WalletIssuanceTransactionCode.toDemoRequirement(): WalletDemoTransac
         description = descriptionText,
     )
 
-private fun MobileWalletVerifierMetadata.toDemoMetadata(): WalletDemoVerifierMetadata =
+internal fun MobileWalletVerifierMetadata.toDemoMetadata(): WalletDemoVerifierMetadata =
     WalletDemoVerifierMetadata(
         display = display?.toDemoMetadataDisplay(),
         clientUri = clientUri,

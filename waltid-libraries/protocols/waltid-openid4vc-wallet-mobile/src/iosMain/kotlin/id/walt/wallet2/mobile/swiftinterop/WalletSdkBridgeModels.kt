@@ -10,6 +10,7 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.handlers.PreviewSessionException
 import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletPersistence
@@ -40,6 +41,8 @@ import kotlin.time.Instant
  * @property preferredLocales Ordered BCP 47 locale preferences used to select display metadata.
  * @property transactionDataProfiles Transaction data profiles this wallet accepts.
  * @property clientIdTrustConfiguration Trust anchors used to authenticate verifier Request Objects.
+ * @property appGroupIdentifier Shared container used by the app and document-provider extension.
+ * @property keychainAccessGroup Shared Keychain access group used for database and signing keys.
  */
 public data class WalletBridgeConfiguration(
     public val walletId: String = "default",
@@ -50,6 +53,8 @@ public data class WalletBridgeConfiguration(
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     public val clientIdTrustConfiguration: WalletBridgeClientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(),
+    public val appGroupIdentifier: String? = null,
+    public val keychainAccessGroup: String? = null,
 )
 
 /**
@@ -66,14 +71,25 @@ internal fun WalletBridgeClientIdTrustConfiguration.toClientIdTrustConfiguration
         x509TrustAnchors = x509TrustAnchorsPem.map(CertificateDer::fromPEMEncodedString),
     )
 
-internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConfig(
-    walletId = walletId,
-    defaultKeyType = defaultKeyType,
-    attestationConfig = attestation,
-    persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
-    preferredLocales = preferredLocales,
-    transactionDataProfiles = transactionDataProfiles,
-)
+internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfig {
+    require((appGroupIdentifier == null) == (keychainAccessGroup == null)) {
+        "App Group and Keychain access group must be configured together"
+    }
+    return MobileWalletConfig(
+        walletId = walletId,
+        defaultKeyType = defaultKeyType,
+        attestationConfig = attestation,
+        persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
+        preferredLocales = preferredLocales,
+        transactionDataProfiles = transactionDataProfiles,
+        crossProcessAccess = appGroupIdentifier?.let { appGroup ->
+            MobileWalletCrossProcessAccess(
+                appGroupIdentifier = appGroup,
+                keychainAccessGroup = requireNotNull(keychainAccessGroup),
+            )
+        },
+    )
+}
 
 /**
  * Persistence configuration exposed to the Swift wallet bridge.
