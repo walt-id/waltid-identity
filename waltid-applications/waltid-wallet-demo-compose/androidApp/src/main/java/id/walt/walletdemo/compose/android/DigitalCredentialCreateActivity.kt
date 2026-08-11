@@ -1,7 +1,6 @@
 package id.walt.walletdemo.compose.android
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -32,6 +31,7 @@ import kotlinx.coroutines.launch
  *
  * Uses a translucent Activity + bottom sheet so receive feels in-tray (like CMWallet), while
  * Credential Manager still owns the system create-option picker before this Activity launches.
+ * Authorization-code grants embed issuer/Keycloak sign-in in a WebView inside the sheet.
  */
 @OptIn(ExperimentalDigitalCredentialApi::class)
 class DigitalCredentialCreateActivity : ComponentActivity() {
@@ -73,6 +73,9 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
                     AndroidDigitalCredentialCreateProvider.setCancellation(resultIntent)
                     finishProviderResult()
                 },
+                onAuthorizationRedirect = { callbackUri ->
+                    continueAuthorizationFromRedirect(callbackUri)
+                },
             )
         }
         scope.launch {
@@ -90,7 +93,7 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
                 val started = mobileWallet.startIssuance(
                     MobileWalletIssuanceRequest(
                         offerJson = input.request.offerJson,
-                        redirectUri = "openid://",
+                        redirectUri = CREATE_REDIRECT_URI,
                     )
                 ).toDemoIssuanceSession()
                 session = started
@@ -115,24 +118,33 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
                     }
                     WalletDemoIssuanceGrant.AuthorizationCode -> {
                         val authorization = mobileWallet.beginAuthorizationIssuance(started.id)
-                        DigitalCredentialCreateAuthHandoff.begin(started.id) { callbackUri ->
-                            scope.launch {
-                                runCatching {
-                                    val outcome = mobileWallet.continueAuthorizationIssuance(
-                                        sessionId = started.id,
-                                        callbackUri = callbackUri,
-                                    )
-                                    completeOutcome(outcome)
-                                }.onFailure { reportFailure(it) }
-                            }
-                        }
-                        uiState = WalletDemoOfferCreateUiState.WaitingForAuthorization
-                        startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse(authorization.url))
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        uiState = WalletDemoOfferCreateUiState.Authorizing(
+                            authorizationUrl = authorization.url,
+                            redirectUri = authorization.redirectUri.ifBlank { CREATE_REDIRECT_URI },
                         )
                     }
                 }
+            }.onFailure {
+                reportFailure(it)
+            }
+        }
+    }
+
+    private fun continueAuthorizationFromRedirect(callbackUri: String) {
+        val mobileWallet = wallet ?: return reportFailure(IllegalStateException("Wallet is missing"))
+        val sessionId = session?.id ?: return reportFailure(IllegalStateException("Issuance session is missing"))
+        val authorizing = uiState as? WalletDemoOfferCreateUiState.Authorizing
+        if (authorizing?.completing == true) return
+        if (authorizing != null) {
+            uiState = authorizing.copy(completing = true)
+        }
+        scope.launch {
+            runCatching {
+                val outcome = mobileWallet.continueAuthorizationIssuance(
+                    sessionId = sessionId,
+                    callbackUri = callbackUri,
+                )
+                completeOutcome(outcome)
             }.onFailure {
                 reportFailure(it)
             }
@@ -143,12 +155,8 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
         when (outcome) {
             is WalletIssuanceOutcome.Stored,
             is WalletIssuanceOutcome.Deferred,
-            -> {
-                DigitalCredentialCreateAuthHandoff.clear(session?.id)
-                sendSuccessAck()
-            }
+            -> sendSuccessAck()
             is WalletIssuanceOutcome.Cancelled -> {
-                DigitalCredentialCreateAuthHandoff.clear(session?.id)
                 AndroidDigitalCredentialCreateProvider.setCancellation(resultIntent)
                 finishProviderResult()
             }
@@ -167,18 +175,14 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
     }
 
     private fun cancelPendingAuthorization() {
-        val sessionId = session?.id
-        DigitalCredentialCreateAuthHandoff.clear(sessionId)
-        if (sessionId != null) {
-            scope.launch {
-                runCatching { wallet?.cancelIssuance(sessionId) }
-            }
+        val sessionId = session?.id ?: return
+        scope.launch {
+            runCatching { wallet?.cancelIssuance(sessionId) }
         }
     }
 
     private fun reportFailure(error: Throwable) {
         Log.e(TAG, "Digital credential issuance failed (${error::class.simpleName})", error)
-        DigitalCredentialCreateAuthHandoff.clear(session?.id)
         AndroidDigitalCredentialCreateProvider.setFailure(resultIntent)
         finishProviderResult()
     }
@@ -195,14 +199,12 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        if (isFinishing) {
-            DigitalCredentialCreateAuthHandoff.clear(session?.id)
-        }
         scope.cancel()
         super.onDestroy()
     }
 
     private companion object {
         private const val TAG = "WaltDigitalCredentials"
+        private const val CREATE_REDIRECT_URI = "openid://"
     }
 }

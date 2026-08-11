@@ -85,7 +85,9 @@ Android builds register with Credential Manager for:
 - **Presentation (`GET_CREDENTIAL`)** — OpenID4VP unsigned and ISO 18013-7 Annex C, via `DigitalCredentialProviderActivity` (full-screen consent for now).
 - **Issuance (`CREATE_CREDENTIAL`)** — OpenID4VCI (`openid4vci-v1` and common aliases), via `DigitalCredentialCreateActivity`.
 
-Issuance uses a translucent create Activity and a Material bottom sheet for offer review (including transaction-code entry). Pre-authorized offers complete in that sheet. Authorization-code offers keep the sheet in a “waiting for issuer sign-in” state, open the system browser, and finish when the existing `openid://` deep link returns (forwarded from `MainActivity` while a create flow is pending). The Credential Manager create-option picker remains system-owned; the sheet is wallet fulfillment UI after the user selects this wallet.
+Issuance uses a translucent create Activity and a Material bottom sheet for offer review (including transaction-code entry). Pre-authorized offers complete in that sheet. Authorization-code offers embed issuer/Keycloak sign-in in a WebView inside the same sheet and capture the `openid://` redirect without opening an external browser tab. The Credential Manager create-option picker remains system-owned; the sheet is wallet fulfillment UI after the user selects this wallet.
+
+Receive-tab authorization-code offers (outside Credential Manager) still use the system browser + `openid://` deep link.
 
 ### Manual Chrome origin-trial check
 

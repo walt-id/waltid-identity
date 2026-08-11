@@ -52,7 +52,6 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         val deepLink = intent?.data?.toString() ?: return
-        if (DigitalCredentialCreateAuthHandoff.deliver(deepLink)) return
         controller.handleDeepLink(deepLink)
     }
 }
