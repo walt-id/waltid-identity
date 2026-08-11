@@ -106,7 +106,9 @@ public data class MobileWalletPresentationCredentialRequirement(
 /**
  * Verifier and transaction metadata extracted from a presentation request.
  *
- * @property clientId Required OpenID4VP `client_id` value.
+ * @property clientId Required OpenID4VP `client_id` value identifying the verifier. Digital
+ * Credentials API previews use [MobileWalletDigitalCredentialRequestInfo] instead because
+ * unsigned requests intentionally have no trusted request-supplied `client_id`.
  * @property verifierMetadata Typed verifier metadata supplied by the OpenID4VP client, when available.
  * @property responseUri Verifier response URI to which the wallet will submit the presentation, when provided.
  * @property state OpenID4VP state value supplied by the verifier, when provided.

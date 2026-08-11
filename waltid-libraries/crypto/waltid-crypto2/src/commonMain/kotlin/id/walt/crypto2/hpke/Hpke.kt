@@ -81,6 +81,23 @@ object Hpke {
         return aesKey.cipher().decryptWithIv(context.baseNonce, encrypted, aad)
     }
 
+    /**
+     * Checks that [recipientPublicKey] is usable as an HPKE recipient key before any plaintext exists.
+     *
+     * Callers that learn the recipient key earlier than they seal - for example a wallet that must
+     * reject malformed encryption metadata before asking the user to consent - can run exactly the
+     * validation [sealBase] performs instead of re-deriving key-shape rules of their own.
+     *
+     * @throws IllegalArgumentException if the key carries private material, declares metadata that
+     * contradicts key derivation, or is not a canonical point on the suite's P-256 curve.
+     */
+    suspend fun validateRecipientPublicKey(
+        recipientPublicKey: EncodedKey.Jwk,
+        provider: CryptographyProvider = CryptographyProvider.Default,
+    ) {
+        decodeRecipientPublicKey(recipientPublicKey, provider)
+    }
+
     suspend fun sealBase(
         recipientPublicKey: EncodedKey.Jwk,
         plaintext: ByteArray,
@@ -88,22 +105,38 @@ object Hpke {
         aad: ByteArray = byteArrayOf(),
         provider: CryptographyProvider = CryptographyProvider.Default,
     ): HpkeCiphertext {
-        require(!recipientPublicKey.privateMaterial) { "HPKE recipient key must contain public material only" }
-        validatePublicJwkMetadata(recipientPublicKey)
-        val recipientRaw = rawP256PublicKey(recipientPublicKey)
-        val ecdh = provider.get(ECDH)
-        val recipient = ecdh.publicKeyDecoder(EC.Curve.P256)
-            .decodeFromByteArray(EC.PublicKey.Format.RAW, recipientRaw)
-        val ephemeral = ecdh.keyPairGenerator(EC.Curve.P256).generateKey()
+        val recipient = decodeRecipientPublicKey(recipientPublicKey, provider)
+        val ephemeral = provider.get(ECDH).keyPairGenerator(EC.Curve.P256).generateKey()
         val encapsulatedKey = ephemeral.publicKey.encodeToByteArray(EC.PublicKey.Format.RAW)
-        val dh = ephemeral.privateKey.sharedSecretGenerator().generateSharedSecretToByteArray(recipient)
+        val dh = ephemeral.privateKey.sharedSecretGenerator().generateSharedSecretToByteArray(recipient.key)
         require(dh.size == HASH_SIZE) { "P-256 ECDH shared secret must be 32 bytes" }
-        val context = deriveContext(dh, encapsulatedKey, recipientRaw, info, provider)
+        val context = deriveContext(dh, encapsulatedKey, recipient.raw, info, provider)
         val aesKey = provider.get(AES.GCM).keyDecoder().decodeFromByteArray(AES.Key.Format.RAW, context.key)
         return HpkeCiphertext(
             suite = P256_HKDF_SHA256_AES_128_GCM,
             encapsulatedKey = BinaryData(encapsulatedKey),
             ciphertext = BinaryData(aesKey.cipher().encryptWithIv(context.baseNonce, plaintext, aad)),
+        )
+    }
+
+    /**
+     * Decodes a recipient JWK into the suite's P-256 public key, rejecting anything the KEM cannot use.
+     *
+     * Shared by [validateRecipientPublicKey] and [sealBase] so a pre-flight check cannot drift from
+     * the rules actually enforced at sealing time.
+     */
+    private suspend fun decodeRecipientPublicKey(
+        recipientPublicKey: EncodedKey.Jwk,
+        provider: CryptographyProvider,
+    ): Recipient {
+        require(!recipientPublicKey.privateMaterial) { "HPKE recipient key must contain public material only" }
+        validatePublicJwkMetadata(recipientPublicKey)
+        val raw = rawP256PublicKey(recipientPublicKey)
+        return Recipient(
+            key = provider.get(ECDH)
+                .publicKeyDecoder(EC.Curve.P256)
+                .decodeFromByteArray(EC.PublicKey.Format.RAW, raw),
+            raw = raw,
         )
     }
 
@@ -280,6 +313,12 @@ object Hpke {
     private data class Context(
         val key: ByteArray,
         val baseNonce: ByteArray,
+    )
+
+    /** A decoded recipient key alongside the raw encoding the KEM key schedule mixes in. */
+    private class Recipient(
+        val key: ECDH.PublicKey,
+        val raw: ByteArray,
     )
 
     private const val MODE_BASE: Byte = 0

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  A namespace of its own, not the native demo's: both demos can be installed side by side, and a
+	  shared App Group would make them silently open the same wallet database.
+	-->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.id.walt.wallet.compose</string>
+	</array>
+	<!--
+	  The shared group is listed first on purpose: iOS uses the first entry as the default access
+	  group for any keychain item written without an explicit kSecAttrAccessGroup. Signum's
+	  IosKeychainProvider does not expose that attribute, so this ordering is what puts the wallet
+	  signing key and its metadata where the document-provider extension can read them.
+	-->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)id.walt.wallet.compose.shared</string>
+		<string>$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	</array>
+	<!--
+	  The host app - not only the extension - reads and mutates
+	  IdentityDocumentProviderRegistrationStore, so it needs the Mobile Document Provider capability
+	  too. The App ID must have it enabled in the developer portal for both Debug and Release
+	  provisioning profiles; without that, signing fails on this key rather than at runtime.
+	-->
+	<key>com.apple.developer.identity-document-services.document-provider.mobile-document-types</key>
+	<array>
+		<string>org.iso.18013.5.1.mDL</string>
+		<string>eu.europa.ec.eudi.pid.1</string>
+	</array>
+</dict>
+</plist>
