@@ -33,8 +33,10 @@ import kotlin.time.Instant
 object MdocCredentialSigner {
 
     /**
-     * The only data elements a wallet device-signs for transaction data, per OpenID4VP 1.0 §5.5.
-     * `transaction_data_hash_alg` is emitted only when the request carries
+     * The data elements our own [id.waltid.openid4vp.wallet.presentation.MdocPresenter] device-signs
+     * for transaction data. OpenID4VP 1.0 Appendix B.2.1 deliberately defines no element names: each
+     * transaction data type defines the (NameSpace, DataElementIdentifier, DataElementValue) it
+     * contributes. `transaction_data_hash_alg` is emitted only when the request carries
      * `transaction_data_hashes_alg`, so both are authorized to cover either case.
      */
     private val TRANSACTION_DATA_HASH_ELEMENTS = listOf("transaction_data_hash", "transaction_data_hash_alg")
@@ -188,12 +190,12 @@ object MdocCredentialSigner {
      * cannot sign transaction data at all, because presentation requires the type to appear in the
      * MSO's KeyAuthorizations.
      *
-     * OpenID4VP does not define a transaction_data type as an mdoc namespace: it says each type
-     * defines the (NameSpace, DataElementIdentifier, DataElementValue) it contributes, and the issuer
-     * authorizes those elements. Using the type itself as the response namespace is our convention,
-     * matching what [id.waltid.openid4vp.wallet.presentation.MdocPresenter] emits.
+     * OpenID4VP Appendix B.2.1 leaves the concrete namespace and data element mapping to the
+     * transaction data type. Using the type itself as the response namespace is the walt.id
+     * convention, matching what [id.waltid.openid4vp.wallet.presentation.MdocPresenter] emits, so that
+     * is what gets authorized here.
      *
-     * The grant is granular rather than a blanket `nameSpaces` entry, because the wallet only ever
+     * The grant is granular rather than a blanket `nameSpaces` entry, because our presenter only ever
      * device-signs [TRANSACTION_DATA_HASH_ELEMENTS] under that namespace. Authorizing the whole
      * namespace would also permit arbitrary future device-signed elements.
      */

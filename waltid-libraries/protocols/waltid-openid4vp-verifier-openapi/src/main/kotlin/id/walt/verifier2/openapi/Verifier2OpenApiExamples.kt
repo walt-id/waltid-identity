@@ -498,15 +498,17 @@ object Verifier2OpenApiExamples {
      * shape for. The transaction data binds to the payment card alone: `credential_ids` names only it,
      * so the age credential is presented without device-signing the transaction data hash.
      *
-     * **Not presentable through Android Credential Manager**, in this or any other shape; use
-     * [openid4vpDcApiScaPaymentCardScaPayment] there. The limitation is in the matcher AndroidX
-     * embeds, not in the request: it compares a candidate only against the *first* entry of
+     * **Not presentable through Android Credential Manager**; use
+     * [openid4vpDcApiScaPaymentCardScaPayment] there. Its embedded matcher cannot handle this
+     * transaction data prompt and a second credential at the same time, whichever way the request is
+     * shaped: it compares a candidate only against the *first* entry of
      * `transaction_data[0].credential_ids`, and skips transaction data entirely unless
-     * `transaction_data` holds exactly one entry. Combining transaction data with a second credential
-     * therefore yields zero candidates, and splitting into one entry per credential surfaces both
-     * credentials but renders no transaction data. The matcher's transaction-data handling never
-     * learns a candidate's format, so no credential format escapes it. Browsers on other platforms,
-     * and the wallet's own review screen, are unaffected: they build the prompt from the request.
+     * `transaction_data` holds exactly one entry. So this request yields zero candidates, while
+     * splitting into one transaction data entry per credential surfaces both credentials and renders
+     * no transaction data. Two credentials without transaction data are fine. The matcher's
+     * transaction data handling never learns a candidate's format, so no credential format escapes it.
+     * Browsers on other platforms, and the wallet's own review screen, are unaffected: they build the
+     * prompt from the request.
      */
     val openid4vpDcApiScaPaymentCardAndAgeVerificationScaPayment = DcApiAnnexDFlowSetup(
         core = GeneralFlowConfig(
