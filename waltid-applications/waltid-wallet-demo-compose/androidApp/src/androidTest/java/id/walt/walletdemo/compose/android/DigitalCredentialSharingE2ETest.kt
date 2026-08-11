@@ -327,9 +327,11 @@ class DigitalCredentialSharingE2ETest {
      *    reach the picker, so an Annex C entry ahead of a *matchable* OpenID4VP one is matched and
      *    dropped.
      *
-     * Neither is reachable from wallet code: the AndroidX OpenID4VP matcher is embedded in
-     * `androidx.credentials.registry` and `OpenId4VpRegistry` accepts no replacement. Mixed
-     * OpenID4VP/Annex C envelopes are covered by host tests, which need no platform picker.
+     * Neither is reachable from wallet code. `OpenId4VpRegistry` hard-codes the matcher AndroidX
+     * embeds, and while `DigitalCredentialRegistry` does take one as a constructor parameter - which is
+     * how `AndroidAnnexCRegistry` supplies Multipaz's - substituting Multipaz's here would not help:
+     * it implements OpenID4VP and DCQL but no `transaction_data` at all. Mixed OpenID4VP/Annex C
+     * envelopes are covered by host tests, which need no platform picker.
      */
     @Test
     fun selectsNonZeroAnnexCAlternativeFromMultiProtocolRequest() = runBlocking {

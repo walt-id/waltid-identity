@@ -6,6 +6,12 @@ ships no Annex C registry or matcher, so `AndroidDigitalCredentialRegistry` regi
 `DigitalCredentialRegistry` and supplies the binary itself. OpenID4VP is unaffected: it uses
 `OpenId4VpRegistry` with the matcher AndroidX embeds.
 
+This binary is not limited to Annex C - it also implements OpenID4VP (all three `openid4vp-v1-*`
+protocols) and DCQL, for both `mso_mdoc` and `dc+sd-jwt`. We register it only for Annex C because
+that is the gap AndroidX leaves. Note before reaching for it as a substitute in the OpenID4VP
+registry: it implements **no** `transaction_data`, so it would drop the payment prompt that
+`urn:eudi:sca:payment:1` requests render today.
+
 ## Why it is vendored
 
 It was previously obtained by declaring `org.multipaz:multipaz-dcapi-android`, which is a dependency
