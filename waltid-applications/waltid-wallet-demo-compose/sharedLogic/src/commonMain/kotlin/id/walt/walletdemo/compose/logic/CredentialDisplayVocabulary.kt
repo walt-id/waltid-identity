@@ -145,6 +145,11 @@ internal object CredentialDisplayVocabulary {
         "validFrom",
         "validUntil",
     ).map(NormalizedClaimKey::from).toSet()
+    // Containers that only wrap a transaction data payload; prefixing rows with them adds no meaning.
+    private val transactionDataTransparentContainerNames = setOf(
+        TransactionDataField.Details.id,
+        "payload",
+    ).map(NormalizedClaimKey::from).toSet()
     private val technicalContainerNames = setOf(
         "@context",
         "credentialSchema",
@@ -182,6 +187,24 @@ internal object CredentialDisplayVocabulary {
 
     fun humanizedClaimLabel(key: String): String =
         descriptorFor(key)?.label ?: ClaimLabelFormatter.humanize(key)
+
+    /**
+     * Transaction data payloads nest freely (`payee.name`, `payee.id`), and a bare "Name" row on the
+     * sharing screen does not say what is being authorized. Credential claims keep their plain labels,
+     * because their vocabulary already disambiguates them (`resident_address.locality` -> "Locality").
+     */
+    fun qualifiesNestedClaimLabels(parentPath: ClaimPath): Boolean =
+        parentPath.topLevel == ClaimPathRoot.TransactionData.id &&
+                NormalizedClaimKey.from(parentPath.leaf) !in transactionDataTransparentContainerNames
+
+    fun qualifiedClaimLabel(parentLabel: String, childLabel: String): String {
+        val parent = parentLabel.trim()
+        val child = childLabel.trim()
+        if (parent.isEmpty()) return child
+        if (child.isEmpty()) return parent
+        if (child.startsWith(parent, ignoreCase = true)) return child
+        return "$parent ${child.replaceFirstChar { it.lowercaseChar() }}"
+    }
 
     fun disclosureLabel(name: String?, path: String): String =
         name
