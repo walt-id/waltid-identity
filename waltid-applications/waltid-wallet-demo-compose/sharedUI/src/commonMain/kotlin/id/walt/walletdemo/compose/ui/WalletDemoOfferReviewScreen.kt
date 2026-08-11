@@ -1,17 +1,20 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,123 +28,168 @@ import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
 import id.walt.walletdemo.compose.ui.components.OfferReviewSection
 
 /**
- * Standalone offer-review screen for a platform-invoked Digital Credentials create flow.
+ * UI states for the Credential Manager CREATE_CREDENTIAL fulfillment sheet.
  *
- * The host owns the Credential Manager result; this screen owns tx-code entry and the user's
- * accept/decline choice.
+ * Drawn as a [ModalBottomSheet] over a translucent provider Activity so issuance feels in-tray
+ * rather than opening the full wallet app.
  */
+sealed interface WalletDemoOfferCreateUiState {
+    data object Loading : WalletDemoOfferCreateUiState
+
+    data class Review(
+        val preview: WalletDemoOfferPreview,
+        val title: String = "Accept digital credential?",
+        val submitting: Boolean = false,
+    ) : WalletDemoOfferCreateUiState
+
+    data object WaitingForAuthorization : WalletDemoOfferCreateUiState
+}
+
+/**
+ * Bottom-sheet host for Digital Credentials create (OpenID4VCI) fulfillment.
+ *
+ * Covers offer review (including transaction-code entry), decline/dismiss, and the
+ * authorization-code waiting state after the system browser is opened.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WalletDemoOfferReviewScreen(
-    preview: WalletDemoOfferPreview,
-    title: String,
+fun WalletDemoOfferCreateSheet(
+    state: WalletDemoOfferCreateUiState,
     onAccept: (txCode: String?) -> Unit,
     onDecline: () -> Unit,
-    enabled: Boolean = true,
-    onBackAtRoot: (() -> Unit)? = null,
+    onDismiss: () -> Unit,
+    onCancelAuthorization: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val dismissEnabled = when (state) {
+        is WalletDemoOfferCreateUiState.Review -> !state.submitting
+        WalletDemoOfferCreateUiState.Loading -> true
+        WalletDemoOfferCreateUiState.WaitingForAuthorization -> true
+    }
+
+    SystemBackHandler(enabled = dismissEnabled) {
+        when (state) {
+            WalletDemoOfferCreateUiState.WaitingForAuthorization -> onCancelAuthorization()
+            is WalletDemoOfferCreateUiState.Review -> if (!state.submitting) onDismiss()
+            WalletDemoOfferCreateUiState.Loading -> onDismiss()
+        }
+    }
+
+    MaterialTheme {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .exportTestTagsForPlatformAutomation(),
+        ) {
+            ModalBottomSheet(
+                onDismissRequest = {
+                    if (!dismissEnabled) return@ModalBottomSheet
+                    when (state) {
+                        WalletDemoOfferCreateUiState.WaitingForAuthorization -> onCancelAuthorization()
+                        else -> onDismiss()
+                    }
+                },
+                sheetState = sheetState,
+            ) {
+                when (state) {
+                    WalletDemoOfferCreateUiState.Loading -> OfferCreateLoadingContent()
+                    is WalletDemoOfferCreateUiState.Review -> OfferCreateReviewContent(
+                        preview = state.preview,
+                        title = state.title,
+                        enabled = !state.submitting,
+                        onAccept = onAccept,
+                        onDecline = onDecline,
+                    )
+                    WalletDemoOfferCreateUiState.WaitingForAuthorization ->
+                        OfferCreateWaitingForAuthorizationContent(onCancel = onCancelAuthorization)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfferCreateLoadingContent() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        CircularProgressIndicator()
+        Text(
+            "Preparing credential offer…",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+@Composable
+private fun OfferCreateReviewContent(
+    preview: WalletDemoOfferPreview,
+    title: String,
+    enabled: Boolean,
+    onAccept: (txCode: String?) -> Unit,
+    onDecline: () -> Unit,
 ) {
     var txCode by remember(preview) { mutableStateOf("") }
     val scrollState = rememberScrollState()
     val txRequirement = preview.transactionCode
     val acceptEnabled = enabled && (txRequirement == null || txRequirement.accepts(txCode))
 
-    SystemBackHandler(enabled = !enabled || onBackAtRoot != null) {
-        when {
-            !enabled -> Unit
-            else -> onBackAtRoot?.invoke()
-        }
-    }
-
-    MaterialTheme {
-        Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .exportTestTagsForPlatformAutomation(),
-            color = MaterialTheme.colorScheme.background,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .safeDrawingPadding()
-                    .verticalScroll(scrollState)
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                OfferReviewSection(
-                    preview = preview,
-                    acceptEnabled = acceptEnabled,
-                    reviewEnabled = enabled,
-                    txCode = txCode,
-                    onTxCodeChange = { value ->
-                        txCode = txRequirement?.normalizeInput(value) ?: value
-                    },
-                    onAccept = {
-                        onAccept(txCode.trim().ifBlank { null })
-                    },
-                    onDecline = onDecline,
-                )
-            }
-        }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(scrollState)
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+        )
+        OfferReviewSection(
+            preview = preview,
+            acceptEnabled = acceptEnabled,
+            reviewEnabled = enabled,
+            txCode = txCode,
+            onTxCodeChange = { value ->
+                txCode = txRequirement?.normalizeInput(value) ?: value
+            },
+            onAccept = {
+                onAccept(txCode.trim().ifBlank { null })
+            },
+            onDecline = onDecline,
+        )
     }
 }
 
-/** Busy state while a platform create request is being resolved. */
 @Composable
-fun WalletDemoOfferLoadingScreen() {
-    MaterialTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .safeDrawingPadding()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                CircularProgressIndicator()
-            }
-        }
-    }
-}
-
-/** Waiting state while an authorization-code create flow is in the browser. */
-@Composable
-fun WalletDemoOfferWaitingForAuthorizationScreen(onCancel: () -> Unit) {
-    MaterialTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .safeDrawingPadding()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    "Waiting for issuer sign-in",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    "Complete sign-in in the browser. This screen finishes when the issuer redirects back to the wallet.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                CircularProgressIndicator()
-                TextButton(onClick = onCancel) {
-                    Text("Cancel")
-                }
-            }
+private fun OfferCreateWaitingForAuthorizationContent(onCancel: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            "Waiting for issuer sign-in",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            "Complete sign-in in the browser. This sheet finishes when the issuer redirects back to the wallet.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        CircularProgressIndicator()
+        TextButton(onClick = onCancel) {
+            Text("Cancel")
         }
     }
 }

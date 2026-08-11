@@ -19,9 +19,8 @@ import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceSession
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import id.walt.walletdemo.compose.logic.toDemoIssuanceSession
-import id.walt.walletdemo.compose.ui.WalletDemoOfferLoadingScreen
-import id.walt.walletdemo.compose.ui.WalletDemoOfferReviewScreen
-import id.walt.walletdemo.compose.ui.WalletDemoOfferWaitingForAuthorizationScreen
+import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateSheet
+import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateUiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,8 +30,8 @@ import kotlinx.coroutines.launch
 /**
  * Credential Manager create-provider entry point for OpenID4VCI issuance.
  *
- * Separate from [MainActivity]: Credential Manager owns this task's lifecycle and expects exactly one
- * create result from it.
+ * Uses a translucent Activity + bottom sheet so receive feels in-tray (like CMWallet), while
+ * Credential Manager still owns the system create-option picker before this Activity launches.
  */
 @OptIn(ExperimentalDigitalCredentialApi::class)
 class DigitalCredentialCreateActivity : ComponentActivity() {
@@ -41,40 +40,40 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
     private var wallet: MobileWallet? = null
     private var session: WalletDemoIssuanceSession? = null
     private var requestProtocol: String? = null
-    private var uiState by mutableStateOf<CreateUiState>(CreateUiState.Loading)
+    private var uiState by mutableStateOf<WalletDemoOfferCreateUiState>(
+        WalletDemoOfferCreateUiState.Loading,
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            when (val state = uiState) {
-                CreateUiState.Loading -> WalletDemoOfferLoadingScreen()
-                is CreateUiState.Review -> WalletDemoOfferReviewScreen(
-                    preview = state.session.preview,
-                    title = "Accept digital credential?",
-                    enabled = !state.submitting,
-                    onAccept = { txCode ->
-                        uiState = state.copy(submitting = true)
-                        acceptOffer(state.session, txCode)
-                    },
-                    onDecline = {
-                        scope.launch {
-                            runCatching { wallet?.cancelIssuance(state.session.id) }
-                            AndroidDigitalCredentialCreateProvider.setCancellation(resultIntent)
-                            finishProviderResult()
+            WalletDemoOfferCreateSheet(
+                state = uiState,
+                onAccept = { txCode ->
+                    val review = uiState as? WalletDemoOfferCreateUiState.Review ?: return@WalletDemoOfferCreateSheet
+                    val started = session ?: return@WalletDemoOfferCreateSheet
+                    uiState = review.copy(submitting = true)
+                    acceptOffer(started, txCode)
+                },
+                onDecline = {
+                    val sessionId = session?.id
+                    scope.launch {
+                        if (sessionId != null) {
+                            runCatching { wallet?.cancelIssuance(sessionId) }
                         }
-                    },
-                    onBackAtRoot = {
-                        finishWithoutProviderResult()
-                    },
-                )
-                CreateUiState.WaitingForAuthorization -> WalletDemoOfferWaitingForAuthorizationScreen(
-                    onCancel = {
-                        cancelPendingAuthorization()
                         AndroidDigitalCredentialCreateProvider.setCancellation(resultIntent)
                         finishProviderResult()
-                    },
-                )
-            }
+                    }
+                },
+                onDismiss = {
+                    finishWithoutProviderResult()
+                },
+                onCancelAuthorization = {
+                    cancelPendingAuthorization()
+                    AndroidDigitalCredentialCreateProvider.setCancellation(resultIntent)
+                    finishProviderResult()
+                },
+            )
         }
         scope.launch {
             runCatching {
@@ -95,7 +94,7 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
                     )
                 ).toDemoIssuanceSession()
                 session = started
-                uiState = CreateUiState.Review(started)
+                uiState = WalletDemoOfferCreateUiState.Review(preview = started.preview)
             }.onFailure {
                 reportFailure(it)
             }
@@ -127,7 +126,7 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
                                 }.onFailure { reportFailure(it) }
                             }
                         }
-                        uiState = CreateUiState.WaitingForAuthorization
+                        uiState = WalletDemoOfferCreateUiState.WaitingForAuthorization
                         startActivity(
                             Intent(Intent.ACTION_VIEW, Uri.parse(authorization.url))
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -201,15 +200,6 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
         }
         scope.cancel()
         super.onDestroy()
-    }
-
-    private sealed interface CreateUiState {
-        data object Loading : CreateUiState
-        data class Review(
-            val session: WalletDemoIssuanceSession,
-            val submitting: Boolean = false,
-        ) : CreateUiState
-        data object WaitingForAuthorization : CreateUiState
     }
 
     private companion object {

@@ -62,7 +62,7 @@
             android:name=".DigitalCredentialCreateActivity"
             android:exported="true"
             android:excludeFromRecents="true"
-            android:theme="@style/Theme.WalletDemoCompose">
+            android:theme="@style/Theme.WalletDemoCompose.Translucent">
             <intent-filter>
                 <action android:name="androidx.credentials.registry.provider.action.CREATE_CREDENTIAL" />
                 <category android:name="android.intent.category.DEFAULT" />
