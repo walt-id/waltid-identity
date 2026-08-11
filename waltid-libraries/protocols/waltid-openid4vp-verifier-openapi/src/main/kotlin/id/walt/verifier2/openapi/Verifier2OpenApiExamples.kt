@@ -423,26 +423,96 @@ object Verifier2OpenApiExamples {
         )
     )
 
+    private const val SCA_PAYMENT_CARD_DOCTYPE = "eu.europa.ec.eudi.sca.payment_card.1"
+
+    /** The demo SCA payment card mdoc, as issuer2's `scaPaymentCardMdoc` profile issues it. */
+    private val scaPaymentCardCredentialQuery = CredentialQuery(
+        id = "sca_payment_card",
+        format = CredentialFormat.MSO_MDOC,
+        meta = MsoMdocMeta(doctypeValue = SCA_PAYMENT_CARD_DOCTYPE),
+        claims = listOf(
+            ClaimsQuery(pathStrings = listOf(SCA_PAYMENT_CARD_DOCTYPE, "card_scheme")),
+            ClaimsQuery(pathStrings = listOf(SCA_PAYMENT_CARD_DOCTYPE, "card_last4")),
+            ClaimsQuery(pathStrings = listOf(SCA_PAYMENT_CARD_DOCTYPE, "pan_reference")),
+            ClaimsQuery(pathStrings = listOf(SCA_PAYMENT_CARD_DOCTYPE, "card_holder_name")),
+            ClaimsQuery(pathStrings = listOf(SCA_PAYMENT_CARD_DOCTYPE, "expiry_date")),
+        )
+    )
+
     /**
-     * EUDI TS-12 style demo: SCA payment card + EU age verification over DC API,
-     * with `urn:eudi:sca:payment:1` transaction data bound to the SCA credential.
+     * One `urn:eudi:sca:payment:1` entry bound to [scaPaymentCardCredentialQuery], carrying the nested
+     * `transaction_id`, `payee` (`name` and `id`), `currency` and numeric `amount` payload of the EUDI
+     * TS-12 payment data model. `amount` is a JSON number, which is how the type defines it.
+     */
+    private val scaPaymentTransactionData = OpenId4VPConfig(
+        transactionData = listOf(
+            buildJsonObject {
+                put("type", "urn:eudi:sca:payment:1")
+                put("credential_ids", JsonArray(listOf(JsonPrimitive("sca_payment_card"))))
+                put("require_cryptographic_holder_binding", true)
+                put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
+                put(
+                    "payload",
+                    buildJsonObject {
+                        put("transaction_id", "8D8AC610-566D-4EF0-9C22-186B2A5ED793")
+                        put(
+                            "payee",
+                            buildJsonObject {
+                                put("name", "Super Store")
+                                put("id", "merchant-001")
+                            }
+                        )
+                        put("currency", "EUR")
+                        put("amount", 11.56)
+                    }
+                )
+            }
+        )
+    )
+
+    /**
+     * SCA payment over DC API: one demo SCA payment card mdoc plus `urn:eudi:sca:payment:1`
+     * transaction data.
+     *
+     * Requesting a single credential is what makes this the SCA example that runs through Android
+     * Credential Manager - see [openid4vpDcApiScaPaymentCardAndAgeVerificationScaPayment] for why the
+     * combined one does not. Transaction data on an mdoc additionally has to be authorized at
+     * issuance: the type must appear in the credential's MSO `KeyAuthorizations` for the holder to
+     * sign it, which issuer2's `scaPaymentCardMdoc` profile does.
+     */
+    val openid4vpDcApiScaPaymentCardScaPayment = DcApiAnnexDFlowSetup(
+        core = GeneralFlowConfig(
+            dcqlQuery = DcqlQuery(credentials = listOf(scaPaymentCardCredentialQuery)),
+            signedRequest = false,
+            encryptedResponse = false,
+        ),
+        expectedOrigins = listOf("https://digital-credentials.walt.id"),
+        haip = false,
+        openid = scaPaymentTransactionData,
+    )
+
+    /**
+     * SCA payment card + EU age verification over DC API, with `urn:eudi:sca:payment:1` transaction
+     * data bound to the payment card credential. Combined presentation - payment attributes plus a
+     * second, non-payment credential in one request - is a reference use case worth having a request
+     * shape for. The transaction data binds to the payment card alone: `credential_ids` names only it,
+     * so the age credential is presented without device-signing the transaction data hash.
+     *
+     * **Not presentable through Android Credential Manager**, in this or any other shape; use
+     * [openid4vpDcApiScaPaymentCardScaPayment] there. The limitation is in the matcher AndroidX
+     * embeds, not in the request: it compares a candidate only against the *first* entry of
+     * `transaction_data[0].credential_ids`, and skips transaction data entirely unless
+     * `transaction_data` holds exactly one entry. Combining transaction data with a second credential
+     * therefore yields zero candidates, and splitting into one entry per credential surfaces both
+     * credentials but renders no transaction data. The matcher's transaction-data handling never
+     * learns a candidate's format, so no credential format escapes it. Browsers on other platforms,
+     * and the wallet's own review screen, are unaffected: they build the prompt from the request.
      */
     val openid4vpDcApiScaPaymentCardAndAgeVerificationScaPayment = DcApiAnnexDFlowSetup(
         core = GeneralFlowConfig(
             dcqlQuery = DcqlQuery(
                 credentials = listOf(
-                    CredentialQuery(
-                        id = "sca_payment_card",
-                        format = CredentialFormat.MSO_MDOC,
-                        meta = MsoMdocMeta(doctypeValue = "eu.europa.ec.eudi.sca.payment_card.1"),
-                        claims = listOf(
-                            ClaimsQuery(pathStrings = listOf("eu.europa.ec.eudi.sca.payment_card.1", "card_scheme")),
-                            ClaimsQuery(pathStrings = listOf("eu.europa.ec.eudi.sca.payment_card.1", "card_last4")),
-                            ClaimsQuery(pathStrings = listOf("eu.europa.ec.eudi.sca.payment_card.1", "pan_reference")),
-                            ClaimsQuery(pathStrings = listOf("eu.europa.ec.eudi.sca.payment_card.1", "card_holder_name")),
-                            ClaimsQuery(pathStrings = listOf("eu.europa.ec.eudi.sca.payment_card.1", "expiry_date")),
-                        )
-                    ),
+                    scaPaymentCardCredentialQuery,
                     CredentialQuery(
                         id = "proof_of_age",
                         format = CredentialFormat.MSO_MDOC,
@@ -458,31 +528,7 @@ object Verifier2OpenApiExamples {
         ),
         expectedOrigins = listOf("https://digital-credentials.walt.id"),
         haip = false,
-        openid = OpenId4VPConfig(
-            transactionData = listOf(
-                buildJsonObject {
-                    put("type", "urn:eudi:sca:payment:1")
-                    put("credential_ids", JsonArray(listOf(JsonPrimitive("sca_payment_card"))))
-                    put("require_cryptographic_holder_binding", true)
-                    put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
-                    put(
-                        "payload",
-                        buildJsonObject {
-                            put("transaction_id", "8D8AC610-566D-4EF0-9C22-186B2A5ED793")
-                            put(
-                                "payee",
-                                buildJsonObject {
-                                    put("name", "Super Store")
-                                    put("id", "merchant-001")
-                                }
-                            )
-                            put("currency", "EUR")
-                            put("amount", 11.56)
-                        }
-                    )
-                }
-            )
-        )
+        openid = scaPaymentTransactionData,
     )
 
     // ISO Examples

@@ -117,7 +117,13 @@ object VerificationSessionCreateOpenApi {
                 example("[openid4vp-dc_api][iso mdl] signed & encrypted") { value = DcApiAnnexDFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_MDL }
                 example("[openid4vp-dc_api][iso photo-id] signed & encrypted") { value = DcApiAnnexDFlowSetup.EX_SIGNED_ENCRYPTED_PHOTOID }
                 example("[openid4vp-dc_api][iso pid] signed & encrypted") { value = DcApiAnnexDFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_PID }
-                example("[openid4vp-dc_api][sca + age] urn:eudi:sca:payment:1") {
+                example("[openid4vp-dc_api][sca] urn:eudi:sca:payment:1") {
+                    value = Verifier2OpenApiExamples.openid4vpDcApiScaPaymentCardScaPayment
+                }
+                // The combined one is labelled: transaction data plus a second credential yields zero
+                // candidates in Android's Credential Manager, so a user reaching for it needs to know
+                // before the picker comes up empty. See its KDoc for the matcher detail.
+                example("[openid4vp-dc_api][sca + age] urn:eudi:sca:payment:1 (not on Android)") {
                     value = Verifier2OpenApiExamples.openid4vpDcApiScaPaymentCardAndAgeVerificationScaPayment
                 }
 
