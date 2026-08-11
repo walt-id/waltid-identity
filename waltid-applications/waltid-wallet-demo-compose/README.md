@@ -78,6 +78,14 @@ Backend E2E fixtures are intentionally shared:
 - iOS UI tests use the shared Swift `TestHelpers` backend fixtures from `../mobile-e2e-fixtures/ios/TestHelpers`.
 - Public demo UI tests run through the normal Android instrumentation and XCTest runners.
 
+## Default wallet app (Android 15+)
+
+The demo registers a minimal NFC Host Card Emulation service with a proprietary AID in the
+`payment` category so Android lists **walt.id Wallet** under
+**Settings → Apps → Default apps → Wallet app** (`ROLE_WALLET`). That service declines APDUs; it
+exists only for Wallet-role discoverability and is unrelated to Credential Manager Digital
+Credentials issuance/presentation.
+
 ## Digital Credentials API
 
 Android builds register with Credential Manager for:

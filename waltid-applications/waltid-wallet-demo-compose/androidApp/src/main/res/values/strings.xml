@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">walt.id</string>
+    <string name="app_name">walt.id Wallet</string>
+    <string name="wallet_hce_service_description">walt.id Wallet</string>
+    <string name="wallet_hce_aid_group_description">walt.id digital wallet</string>
 </resources>
