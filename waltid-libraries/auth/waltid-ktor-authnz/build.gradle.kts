@@ -30,6 +30,8 @@ dependencies {
 
     // JWT
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
+    implementation(project(":waltid-libraries:crypto:waltid-jose"))
     implementation(project(":waltid-services:waltid-service-commons"))
     implementation(identityLibs.nimbus.jose.jwt)
 
@@ -118,7 +120,7 @@ configurations.all {
     resolutionStrategy.force(
         identityLibs.jackson.core.tools,
         identityLibs.jackson.core,
-        identityLibs.bcprov.jdk18on,
+        identityLibs.bouncycastle.prov,
         identityLibs.netty.codec.compression,
         identityLibs.netty.codec.http.v2,
         identityLibs.netty.transport.classes.epoll,

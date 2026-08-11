@@ -2,17 +2,18 @@
 
 package id.walt.wallet2.mobile
 
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
+import id.walt.crypto2.keys.Key
+import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
-import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
+import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.handlers.WalletIssuanceSessionStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.PresentationCredentialOption
@@ -23,25 +24,44 @@ import id.walt.wallet2.handlers.PresentationPreviewHandle
 import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.handlers.PreviewPresentationResult
 import id.walt.wallet2.handlers.RejectPresentationRequest
-import id.walt.wallet2.handlers.ReceiveCredentialRequest
-import id.walt.wallet2.handlers.ReceiveCredentialFromPreviewRequest
-import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.SubmitPresentationRequest
-import id.walt.wallet2.handlers.WalletIssuanceHandler
+import id.walt.wallet2.handlers.WalletIssuanceAuthorizationCallback
+import id.walt.wallet2.handlers.WalletIssuanceAuthorization
+import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.handlers.WalletIssuanceSession
+import id.walt.wallet2.handlers.WalletIssuanceSessionRequest
+import id.walt.wallet2.handlers.WalletIssuanceSessionService
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.ktor.http.Url
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+
+private object MobileDidSupport {
+    private val initializationMutex = Mutex()
+    private var initialized = false
+
+    suspend fun ensureInitialized() = initializationMutex.withLock {
+        if (!initialized) {
+            DidService.minimalInit()
+            initialized = true
+        }
+    }
+}
 
 /**
  * Result returned after a mobile wallet has been initialized with signing material and a DID.
@@ -68,6 +88,7 @@ public data class MobileWalletBootstrapResult(
  * @property label Optional display label stored with the credential.
  * @property addedAt ISO-8601 timestamp string for when the credential was added, when known.
  * @property credentialDataJson Parsed credential data encoded as JSON for app-side display.
+ * @property metadataJson Optional arbitrary metadata stored alongside the credential as JSON.
  */
 public data class MobileWalletCredential(
     public val id: String,
@@ -77,21 +98,8 @@ public data class MobileWalletCredential(
     public val label: String?,
     public val addedAt: String?,
     public val credentialDataJson: String,
+    public val metadataJson: String? = null,
 )
-
-/**
- * Opaque issuance preview handle. It is valid only for the wallet that created it.
- *
- * @property value Opaque identifier returned by [MobileWallet.resolveOffer].
- */
-public data class MobileWalletIssuancePreviewHandle(public val value: String) {
-    init {
-        require(value.isNotBlank()) { "Issuance preview handle must not be blank" }
-    }
-
-    /** Returns a redacted representation that does not reveal [value]. */
-    public override fun toString(): String = "MobileWalletIssuancePreviewHandle(<redacted>)"
-}
 
 /**
  * Result of answering an OpenID4VP presentation request.
@@ -164,11 +172,14 @@ public class MobileWallet internal constructor(
     private val keyStore: WalletKeyStore,
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
-    private val keyGenerator: suspend (KeyType) -> Key,
+    private val issuanceSessionStore: WalletIssuanceSessionStore? = null,
+    private val generateAndPersistKey: suspend (MobileWalletKeyType) -> Key,
+    private val didService: Crypto2DidService = Crypto2DidService,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     attestationConfig: WalletAttestationConfig? = null,
     private val preferredLocales: List<String> = emptyList(),
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    private val clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {
@@ -197,6 +208,13 @@ public class MobileWallet internal constructor(
         credentialStores = listOf(credentialStore),
     )
 
+    private val issuanceSessions = WalletIssuanceSessionService(
+        wallet = wallet,
+        attestationAssembler = attestationAssembler,
+        onEvent = ::emitSessionEvent,
+        sessionStore = issuanceSessionStore,
+    )
+
     /**
      * Initializes the wallet by creating or reusing platform-backed key material and a DID.
      *
@@ -211,109 +229,141 @@ public class MobileWallet internal constructor(
         keyType: MobileWalletKeyType? = null,
         didMethod: String = "key",
     ): MobileWalletBootstrapResult {
+        MobileDidSupport.ensureInitialized()
         val existingDids = didStore.listDids().toList()
         if (existingDids.isNotEmpty()) {
             val existingKeys = keyStore.listKeys().toList()
             require(existingKeys.isNotEmpty()) {
                 "Wallet '${wallet.id}' has persisted DIDs but no persisted keys"
             }
+            val existingKey = existingKeys.first()
+            val keyAvailable = keyStore.getCrypto2Key(existingKey.keyId) != null
+            require(keyAvailable) {
+                "Wallet '${wallet.id}' persisted key '${existingKey.keyId}' is unavailable"
+            }
             return MobileWalletBootstrapResult(
-                keyId = existingKeys.first().keyId,
+                keyId = existingKey.keyId,
                 did = existingDids.first().did,
             )
         }
 
         val effectiveKeyType = keyType ?: defaultKeyType
-        val key = keyGenerator(effectiveKeyType.toKeyType())
-        val keyId = keyStore.addKey(key)
-        val didResult = registerDidByKey(didMethod, key)
+        return createKeyAndDid(effectiveKeyType, didMethod)
+    }
 
-        didStore.addDid(
-            WalletDidEntry(
-                did = didResult.did,
-                document = didResult.didDocument.toJsonObject(),
+    private suspend fun createKeyAndDid(
+        keyType: MobileWalletKeyType,
+        didMethod: String,
+    ): MobileWalletBootstrapResult {
+        val normalizedMethod = didMethod.lowercase()
+        val options = when (normalizedMethod) {
+            "key" -> DidKeyCreateOptions()
+            "jwk" -> DidJwkCreateOptions()
+            else -> throw IllegalArgumentException("Mobile bootstrap supports only did:key and did:jwk")
+        }
+        val key = generateAndPersistKey(keyType)
+        try {
+            val didResult = didService.registerByKey(normalizedMethod, key, options)
+            didStore.addDid(
+                WalletDidEntry(
+                    did = didResult.did,
+                    document = didResult.didDocument.toJsonObject(),
+                )
+            )
+            return MobileWalletBootstrapResult(keyId = key.id.value, did = didResult.did)
+        } catch (cause: Throwable) {
+            try {
+                withContext(NonCancellable) {
+                    check(keyStore.removeKey(key.id.value)) { "Failed to remove signing key after DID bootstrap failure" }
+                }
+            } catch (cleanupFailure: Throwable) {
+                cause.addSuppressed(cleanupFailure)
+            }
+            throw cause
+        }
+    }
+
+    /**
+     * Resolves an offer and starts a bound OpenID4VCI 1.0 issuance session.
+     *
+     * This operation only resolves and previews the offer. For authorization-code offers,
+     * [beginAuthorizationIssuance] creates the browser request after the user accepts the offer.
+     */
+    public suspend fun startIssuance(
+        request: MobileWalletIssuanceRequest,
+    ): WalletIssuanceSession = issuanceSessions.start(
+        newIssuanceRequest(
+            offerUrl = request.offerUrl.trim(),
+            keyId = request.keyId,
+            did = request.did,
+            clientId = request.clientId,
+            redirectUri = request.redirectUri.trim(),
+        )
+    )
+
+    /**
+     * Starts the authorization-code browser request for an accepted issuance session.
+     *
+     * State, PKCE, PAR, client attestation, and the callback continuation are created only by
+     * this explicit acceptance transition.
+     */
+    public suspend fun beginAuthorizationIssuance(
+        sessionId: String,
+    ): WalletIssuanceAuthorization = issuanceSessions.beginAuthorization(sessionId)
+
+    /** Continues a pre-authorized session after review and optional transaction-code collection. */
+    public suspend fun continuePreAuthorizedIssuance(
+        sessionId: String,
+        transactionCode: String? = null,
+    ): WalletIssuanceOutcome =
+        issuanceSessions.continuePreAuthorized(
+            sessionId = sessionId,
+            transactionCode = transactionCode?.ifBlank { null },
+        )
+
+    /**
+     * Validates and consumes a browser callback bound to an authorization-code session.
+     *
+     * The callback target, OAuth state, authorization code, PKCE verifier, issuer metadata, and
+     * selected holder key are all taken from or checked against the authoritative session record.
+     */
+    public suspend fun continueAuthorizationIssuance(
+        sessionId: String,
+        callbackUri: String,
+    ): WalletIssuanceOutcome =
+        issuanceSessions.continueAuthorization(
+            WalletIssuanceAuthorizationCallback(
+                sessionId = sessionId,
+                callbackUri = callbackUri,
             )
         )
 
-        return MobileWalletBootstrapResult(
-            keyId = keyId,
-            did = didResult.did,
-        )
-    }
+    /** Cancels an active issuance session and discards its protocol continuation material. */
+    public suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome =
+        issuanceSessions.cancel(sessionId)
 
-    private suspend fun registerDidByKey(didMethod: String, key: Key) =
-        when (didMethod.lowercase()) {
-            "key" -> DidKeyRegistrar().registerByKey(key, DidKeyCreateOptions(keyType = key.keyType))
-            else -> {
-                DidService.minimalInit()
-                DidService.registerByKey(didMethod, key)
-            }
-        }
+    /** Polls a typed deferred credential result returned by a previous issuance continuation. */
+    public suspend fun resumeDeferredIssuance(
+        deferredCredentialId: String,
+    ): WalletIssuanceOutcome =
+        issuanceSessions.resumeDeferred(deferredCredentialId)
 
-    /**
-     * Resolves a credential offer and reports any transaction code the app must collect.
-     *
-     * Apps use [MobileWalletOfferResolution.previewHandle] with the reviewed [receive] overload.
-     * The handle retains this exact resolution while the app collects any required code.
-     *
-     * @param offerUrl Credential offer URL, including `openid-credential-offer://` URLs.
-     * @return Issuer, offered credential, and transaction-code metadata for app-side review.
-     */
-    public suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution =
-        WalletIssuanceHandler.previewOffer(
-            wallet = wallet,
-            request = ResolveOfferRequest(offerUrl = Url(offerUrl.trim())),
-        ).toMobileOfferResolution(preferredLocales)
-
-    /**
-     * Receives credentials from an OpenID4VCI credential offer.
-     *
-     * This immediate path resolves the offer as part of the call. Review UIs should use
-     * [resolveOffer] followed by the handle-based [receive] overload.
-     *
-     * @param offerUrl Credential offer URL, including `openid-credential-offer://` URLs.
-     * @param txCode Optional transaction code for pre-authorized offers.
-     * @param clientId Client identifier sent to the issuer.
-     * @return Wallet-local identifiers of the stored credentials.
-     */
-    public suspend fun receive(
+    private suspend fun newIssuanceRequest(
         offerUrl: String,
-        txCode: String? = null,
-        clientId: String = "wallet-client",
-    ): List<String> =
-        WalletIssuanceHandler.receiveCredential(
-            wallet = wallet,
-            request = ReceiveCredentialRequest(
-                offerUrl = Url(offerUrl.trim()),
-                txCode = txCode?.ifBlank { null },
-                clientId = clientId,
-            ),
-            attestationAssembler = attestationAssembler,
-            onEvent = ::emitSessionEvent,
-        ).credentialIds
-
-    /** Receives credentials using exactly one reviewed offer preview. */
-    public suspend fun receive(
-        previewHandle: MobileWalletIssuancePreviewHandle,
-        txCode: String? = null,
-        clientId: String = "wallet-client",
-    ): List<String> =
-        WalletIssuanceHandler.receiveCredential(
-            wallet = wallet,
-            request = ReceiveCredentialFromPreviewRequest(
-                previewHandle = id.walt.wallet2.handlers.IssuancePreviewHandle(previewHandle.value),
-                txCode = txCode?.ifBlank { null },
-                clientId = clientId,
-            ),
-            attestationAssembler = attestationAssembler,
-            onEvent = ::emitSessionEvent,
-        ).credentialIds
-
-    /** Discards a reviewed issuance preview after local dismissal. */
-    public suspend fun discardIssuancePreview(previewHandle: MobileWalletIssuancePreviewHandle) {
-        WalletIssuanceHandler.discardPreview(
-            wallet = wallet,
-            handle = id.walt.wallet2.handlers.IssuancePreviewHandle(previewHandle.value),
+        clientId: String,
+        redirectUri: String,
+        keyId: String? = null,
+        did: String? = null,
+    ): WalletIssuanceSessionRequest {
+        val selectedKeyId = keyId ?: keyStore.listKeys().toList().firstOrNull()?.keyId
+            ?: error("No holder key is available for credential issuance")
+        val selectedDid = did ?: didStore.listDids().toList().firstOrNull()?.did
+        return WalletIssuanceSessionRequest(
+            offerUrl = Url(offerUrl),
+            keyId = selectedKeyId,
+            did = selectedDid,
+            clientId = clientId,
+            redirectUri = Url(redirectUri),
         )
     }
 
@@ -333,6 +383,7 @@ public class MobileWallet internal constructor(
                 label = meta.label,
                 addedAt = meta.addedAt?.toString(),
                 credentialDataJson = credential.credential.credentialData.encodeJsonObject(),
+                metadataJson = credential.metadata?.let { Json.encodeToString(JsonObject.serializer(), it) },
             )
         }
 
@@ -354,7 +405,7 @@ public class MobileWallet internal constructor(
         did: String? = null,
         runPolicies: Boolean? = null,
     ): MobileWalletPresentationResult {
-        val result = WalletPresentationHandler.presentCredential(
+        val result = WalletPresentationHandler.presentCredentialWithTrust(
             wallet = wallet,
             request = PresentCredentialRequest(
                 requestUrl = Url(requestUrl.trim()),
@@ -362,6 +413,7 @@ public class MobileWallet internal constructor(
                 runPolicies = runPolicies,
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
             onEvent = ::emitSessionEvent,
         )
 
@@ -374,12 +426,13 @@ public class MobileWallet internal constructor(
      * Resolution or validation failures that cannot be answered safely remain local exceptions.
      */
     public suspend fun previewPresentation(requestUrl: String): MobileWalletPresentationPreviewResult {
-        val result = WalletPresentationHandler.previewPresentation(
+        val result = WalletPresentationHandler.previewPresentationWithTrust(
             wallet = wallet,
             request = PreviewPresentationRequest(
                 requestUrl = Url(requestUrl.trim()),
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
             onEvent = ::emitSessionEvent,
         )
 
@@ -481,12 +534,13 @@ public class MobileWallet internal constructor(
     /**
      * Deletes local wallet material owned by this mobile wallet instance.
      *
-     * The active key, credential, and DID stores receive store-level remove calls. The wallet then closes
-     * and deletes the encrypted local database and deletes the configured database key.
+     * Active issuance continuations are invalidated before the key, credential, and DID stores receive
+     * store-level remove calls. The wallet then closes and deletes the encrypted local database and deletes
+     * the configured database key.
      */
     public suspend fun deleteWallet() {
-        WalletIssuanceHandler.clearPreviews(wallet)
         WalletPresentationHandler.clearPreviews(wallet)
+        issuanceSessions.clearSessions()
         keyStore.listKeys().toList().forEach { key ->
             keyStore.removeKey(key.keyId)
         }
@@ -539,6 +593,7 @@ public class MobileWallet internal constructor(
             is JsonPrimitive -> contentOrNull
             else -> toString()
         }
+
 }
 
 internal fun WalletPresentResult.toMobilePresentationResult(): MobileWalletPresentationResult =

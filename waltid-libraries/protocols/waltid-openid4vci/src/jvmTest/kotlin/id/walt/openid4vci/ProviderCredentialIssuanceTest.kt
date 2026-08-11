@@ -1,37 +1,44 @@
 package id.walt.openid4vci
 
+import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.jose.defaultJwsAlgorithm
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.did.dids.DidService
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
+import id.walt.openid4vci.metadata.issuer.SigningAlgId
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.CredentialOfferRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
-import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
+import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
-import io.ktor.http.Url
-import io.ktor.util.toMap
+import io.ktor.http.*
+import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlinx.serialization.json.*
+import kotlin.test.*
 
 class ProviderCredentialIssuanceTest {
+    private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
     fun `unsupported credential handler is rejected`() = runBlocking {
@@ -134,13 +141,19 @@ class ProviderCredentialIssuanceTest {
 
         // Wallet constructs a proof JWT to bind the credential to its key.
         val holderKey = JWKKey.generate(KeyType.Ed25519)
+        DidService.minimalInit()
+        val holderDid = DidService.registerByKey("key", holderKey).did
+        val holderKid = "$holderDid#${holderDid.removePrefix("did:key:")}"
+        assertFailsWith<NoSuchElementException> {
+            Crypto2JwtKeyResolver().resolveFromDid(holderDid, "$holderDid#unknown")
+        }
         val proofPayload = buildJsonObject {
             put("aud", issuerId)
             put("nonce", "nonce")
         }
         val proofJwt = holderKey.signJws(
             plaintext = proofPayload.toString().toByteArray(),
-            headers = mapOf("jwk" to holderKey.getPublicKey().exportJWKObject()),
+            headers = mapOf("kid" to JsonPrimitive(holderKid)),
         )
         val proofParam = buildJsonObject {
             put("jwt", JsonArray(listOf(JsonPrimitive(proofJwt))))
@@ -158,7 +171,13 @@ class ProviderCredentialIssuanceTest {
         val credentialRequest = credentialRequestResult.request.withIssuer(issuerId)
 
         // Issuer signs and returns the SD-JWT credential.
-        val issuerKey = JWKKey.generate(KeyType.Ed25519)
+        val issuerKey = crypto2Runtime.generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("credential-issuer"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
         val credentialData = buildJsonObject {
             put("given_name", "Alice")
             put("family_name", "Doe")
@@ -180,7 +199,7 @@ class ProviderCredentialIssuanceTest {
         val credentialResponse = provider.createCredentialResponse(
             request = credentialRequest,
             configuration = configuration,
-            issuerKey = issuerKey,
+            issuerKey = Crypto2CredentialSigningKey.select(issuerKey, configuration),
             issuerId = issuerId,
             credentialData = credentialData,
         )
@@ -195,8 +214,57 @@ class ProviderCredentialIssuanceTest {
         assertTrue(credential.isNotBlank())
 
         val jwtPart = credential.substringBefore("~")
-        val verificationResult = issuerKey.getPublicKey().verifyJws(jwtPart)
-        assertTrue(verificationResult.isSuccess)
+        assertTrue(CompactJws.verify(jwtPart, issuerKey, JwsAlgorithm.ES256).payload.isNotEmpty())
+    }
+
+    @Test
+    fun `credential signing key selects compatible configured algorithm`() = runBlocking {
+        val key = crypto2Runtime.generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("algorithm-selection"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        val mdocConfiguration = CredentialConfiguration(
+            format = CredentialFormat.MSO_MDOC,
+            doctype = "org.iso.18013.5.1.mDL",
+            credentialSigningAlgValuesSupported = linkedSetOf(
+                SigningAlgId.CoseValue(-9),
+                SigningAlgId.CoseValue(-7),
+            ),
+        )
+
+        assertEquals(
+            SigningAlgId.CoseValue(-7),
+            Crypto2CredentialSigningKey.select(key, mdocConfiguration).algorithm,
+        )
+        assertEquals(JwsAlgorithm.RS384, KeySpec.Rsa(3072).defaultJwsAlgorithm())
+        assertFailsWith<IllegalArgumentException> {
+            Crypto2CredentialSigningKey.select(
+                key,
+                CredentialConfiguration(
+                    format = CredentialFormat.SD_JWT_VC,
+                    vct = "ExampleCredential",
+                    credentialSigningAlgValuesSupported = setOf(SigningAlgId.Jose("EdDSA")),
+                ),
+            )
+        }
+        val p384Key = crypto2Runtime.generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("incompatible-mdoc-key"),
+                spec = KeySpec.Ec(EcCurve.P384),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        assertFailsWith<IllegalArgumentException> {
+            Crypto2CredentialSigningKey.select(
+                p384Key,
+                mdocConfiguration.copy(
+                    credentialSigningAlgValuesSupported = setOf(SigningAlgId.CoseValue(-35)),
+                ),
+            )
+        }
     }
 
     @Test

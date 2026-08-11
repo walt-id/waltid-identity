@@ -43,6 +43,7 @@ class DidWebResolver(private val fetcher: WebDataFetcher) : LocalResolverMethod(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Deprecated("Use Crypto2DidKeyResolver or Crypto2DidService for key resolution")
     override suspend fun resolveToKey(did: String): Result<Key> {
         // For backward compatibility, return the first key
         return resolveToKeys(did).map { it.firstOrNull() ?: throw NoSuchElementException("No key could be imported") }
@@ -52,6 +53,7 @@ class DidWebResolver(private val fetcher: WebDataFetcher) : LocalResolverMethod(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    @Deprecated("Use Crypto2DidKeyResolver or Crypto2DidService for key resolution")
     override suspend fun resolveToKeys(did: String): Result<Set<Key>> {
         val didDocumentResult = resolve(did)
         if (didDocumentResult.isFailure) return Result.failure(didDocumentResult.exceptionOrNull()!!)

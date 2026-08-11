@@ -24,42 +24,62 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 @Composable
 internal fun CredentialOverviewSection(details: CredentialDetails, modifier: Modifier = Modifier) {
     val display = details.toCardDisplayData()
+    val issuerFallback = details.summary.issuer?.takeIf { it.isNotBlank() } ?: display.issuer
 
-    Row(
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .testTag(WalletUiTestTags.credentialOverview(display.id))
             .padding(14.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.Top,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        CredentialPortrait(portrait = display.portrait, size = 72.dp)
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top,
         ) {
-            Text(
-                display.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            display.credentialType?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-            }
-            display.holderName?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Text("Issuer: ${display.issuer}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(display.format, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                display.validity?.let {
-                    Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            CredentialPortrait(portrait = display.portrait, size = 72.dp)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    display.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                display.credentialType?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                }
+                display.holderName?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(display.format, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    display.validity?.let {
+                        Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
+        }
+
+        val issuerDisplay = details.issuerDisplay
+        if (issuerDisplay != null) {
+            MetadataIdentityRow(
+                display = issuerDisplay,
+                fallbackName = issuerFallback,
+                supportingText = details.summary.issuer
+                    ?.takeIf { it.isNotBlank() && it != issuerDisplay.name },
+            )
+        } else {
+            Text(
+                "Issuer: $issuerFallback",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

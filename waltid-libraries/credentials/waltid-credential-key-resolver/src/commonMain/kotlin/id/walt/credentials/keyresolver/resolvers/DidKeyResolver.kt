@@ -7,6 +7,13 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 object DidKeyResolver : BaseKeyResolver {
     private val log = KotlinLogging.logger { }
 
+    @Deprecated(
+        "Use Crypto2JwtKeyResolver.resolveFromDid",
+        ReplaceWith(
+            "Crypto2JwtKeyResolver().resolveFromDid(issuerId, kid)",
+            "id.walt.credentials.keyresolver.Crypto2JwtKeyResolver",
+        ),
+    )
     suspend fun resolveKeyFromDid(issuerId: String, kid: String? = null): Key {
         log.debug { "Resolving key via DID: $issuerId (kid=$kid)" }
         val keys = DidService.resolveToKeys(issuerId).getOrThrow()
@@ -14,14 +21,15 @@ object DidKeyResolver : BaseKeyResolver {
         if (keys.isEmpty()) throw Exception("No valid key found in DID document for $issuerId")
 
         if (!kid.isNullOrBlank()) {
-            val matched = findMatchingKey(keys, issuerId, kid)
+            val selfIdentifyingKid = kid == selfIdentifyingVerificationMethod(issuerId) ||
+                kid == issuerId && (issuerId.startsWith("did:key:") || issuerId.startsWith("did:jwk:"))
+            if (keys.size == 1 && selfIdentifyingKid) {
+                return keys.first()
+            }
+            val matched = findMatchingKey(keys, kid)
             if (matched != null) {
                 log.debug { "Matched key by kid '$kid' in DID document for $issuerId" }
                 return matched
-            }
-            if (keys.size == 1) {
-                log.debug { "No key with kid '$kid' found in single-key DID document for $issuerId, using the only key" }
-                return keys.first()
             }
             throw NoSuchElementException("No key with kid '$kid' found in DID document for $issuerId")
         }
@@ -37,12 +45,11 @@ object DidKeyResolver : BaseKeyResolver {
      * - Azure Key Vault URLs: https://vault.azure.net/keys/xxx
      * - Full verification method ID: did:web:example.com#https://vault.azure.net/keys/xxx
      */
-    private suspend fun findMatchingKey(keys: Set<Key>, issuerId: String, kid: String): Key? {
+    private suspend fun findMatchingKey(keys: Set<Key>, kid: String): Key? {
         val kidCandidates = idCandidates(kid)
         return keys.firstOrNull { key ->
             val keyId = key.getKeyId()
-            idCandidates(keyId).any { it in kidCandidates } ||
-                (keyId == issuerId && removeFragment(kid) == issuerId)
+            idCandidates(keyId).any { it in kidCandidates }
         }
     }
 
@@ -58,6 +65,9 @@ object DidKeyResolver : BaseKeyResolver {
         }
     }
 
-    private fun removeFragment(didUrl: String): String =
-        didUrl.substringBefore('#')
+    private fun selfIdentifyingVerificationMethod(did: String): String? = when {
+        did.startsWith("did:key:") -> "$did#${did.removePrefix("did:key:")}"
+        did.startsWith("did:jwk:") -> "$did#0"
+        else -> null
+    }
 }

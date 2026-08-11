@@ -36,6 +36,7 @@ suspend fun main(args: Array<String>) {
                 }
                 // Wire trusted_authorities checker per OID4VP §6.1.1 (AKI-based trust chain)
                 Verifier2VPDirectPostHandler.trustedAuthoritiesChecker = DcqlTrustedAuthoritiesChecker.checker
+                OSSVerifier2Manager.initialize()
             },
             run = WebService(Application::verifierModule).run()
         )

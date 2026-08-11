@@ -12,7 +12,7 @@ plugins {
 group = "id.walt.credentials"
 
 kotlin {
-    js(IR) {
+    js {
         outputModuleName.set("digital-credentials")
     }
 
@@ -33,6 +33,8 @@ kotlin {
 
             // walt.id
             api(project(":waltid-libraries:crypto:waltid-crypto"))
+            api(project(":waltid-libraries:crypto:waltid-crypto2"))
+            api(project(":waltid-libraries:crypto:waltid-jose"))
             api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
             api(project(":waltid-libraries:credentials:waltid-credential-key-resolver"))
             api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))

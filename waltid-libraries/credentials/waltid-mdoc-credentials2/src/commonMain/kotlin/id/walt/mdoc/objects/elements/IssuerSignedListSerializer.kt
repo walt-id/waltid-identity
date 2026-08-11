@@ -58,9 +58,11 @@ open class IssuerSignedListSerializer(private val namespace: String) : KSerializ
             value.entries.forEachIndexed { idx, it ->
                 // NOTE: The specification requires each item in the list to be an `IssuerSignedItemBytes`,
                 // which is defined as `#6.24(bstr.cbor IssuerSignedItem)`.
-                // This implementation serializes the IssuerSignedItem to a byte array. The framework is
-                // expected to apply the tag based on the descriptor's annotations.
-                encodeSerializableElement(descriptor, idx, ByteArraySerializer(), it.value.serialize(namespace))
+                // Received items reuse their original bytes; newly created items are serialized here.
+                // The framework applies the tag based on the descriptor's annotations.
+                val serialized = it.serialized.takeIf { bytes -> bytes.isNotEmpty() }
+                    ?: it.value.serialize(namespace)
+                encodeSerializableElement(descriptor, idx, ByteArraySerializer(), serialized)
             }
         }
     }

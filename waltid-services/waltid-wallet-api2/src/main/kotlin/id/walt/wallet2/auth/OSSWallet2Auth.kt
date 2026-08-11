@@ -2,9 +2,21 @@ package id.walt.wallet2.auth
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
-import id.walt.wallet2.server.WalletResolver
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.hours
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.jose.preferredJwsAlgorithm
+import id.walt.crypto2.jose.supportsJwsAlgorithm
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toPublicJwk
+import id.walt.crypto2.migration.v1.V1KeyMigration
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.crypto2.serialization.BinaryData
+import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.Account
@@ -21,6 +33,7 @@ import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
 import id.walt.ktorauthnz.methods.storeddata.EmailPassStoredData
 import id.walt.ktorauthnz.tokens.jwttoken.JwtTokenHandler
 import id.walt.wallet2.OSSWallet2AuthConfig
+import id.walt.wallet2.server.WalletResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -29,8 +42,13 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 private val authLog = KotlinLogging.logger {}
 
@@ -119,6 +137,7 @@ object OSSWallet2AccountStore : EditableAccountStore {
 
 @Serializable
 data class RegisterRequest(val email: String, val password: String)
+
 @Serializable
 data class AccountInfoResponse(
     val accountId: String,
@@ -136,34 +155,104 @@ data class AccountInfoResponse(
  * exactly once by the WebService wrapper.
  *
  * Reads [OSSWallet2AuthConfig] from the config manager:
- * - [OSSWallet2AuthConfig.signingKey]: waltid-crypto key used to sign and verify JWT
- *   session tokens. Must be identical on every replica (HA-safe).
+ * - [OSSWallet2AuthConfig.signingStoredKey]: preferred crypto2 key used to sign and verify JWT
+ *   session tokens. Sufficient on its own, and the only way to configure a managed key.
+ * - [OSSWallet2AuthConfig.signingKey]: legacy sidecar and in-memory migration source.
  * - [OSSWallet2AuthConfig.tokenExpiry]: JWT `exp` lifetime as a [Duration].
+ *
+ * [cryptoRuntime] resolves the configured StoredKey. The default carries software providers only;
+ * pass a runtime holding the matching [id.walt.crypto2.providers.ManagedKeyProvider] to run auth off
+ * a KMS/HSM key.
  *
  * Returns the loaded [OSSWallet2AuthConfig] so the caller can pass
  * [OSSWallet2AuthConfig.tokenExpiry] to [registerWallet2AuthRoutes].
  *
  * Called from Main.kt when the auth optional feature is enabled.
  */
-suspend fun Application.configureWallet2Auth(): OSSWallet2AuthConfig {
+suspend fun Application.configureWallet2Auth(
+    cryptoRuntime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
+): OSSWallet2AuthConfig {
     val config = ConfigManager.getConfig<OSSWallet2AuthConfig>()
 
-    // signingKey is a DirectSerializedKey - the Key is already resolved by deserialization.
-    val signingKey = config.signingKey.key
+    val signingKey = resolveWallet2AuthSigningKey(config, cryptoRuntime)
 
     KtorAuthnzManager.accountStore = OSSWallet2AccountStore
-    KtorAuthnzManager.tokenHandler = JwtTokenHandler().apply {
-        this.signingKey = signingKey
-        verificationKey = signingKey
-    }
+    KtorAuthnzManager.tokenHandler = JwtTokenHandler.crypto2(
+        signingKey = signingKey.key,
+        algorithm = signingKey.algorithm,
+    )
 
     AuthenticationServiceModule.AuthenticationServiceConfig.customAuthentication = {
         ktorAuthnz("ktor-authnz") { }
     }
 
-    authLog.info { "Wallet2 auth configured: JWT tokens (keyType=${signingKey.keyType}, expiry=${config.tokenExpiry})" }
+    authLog.info { "Wallet2 auth configured: JWT tokens (keySpec=${signingKey.key.spec}, expiry=${config.tokenExpiry})" }
     return config
 }
+
+/**
+ * Resolves the auth signing key through [cryptoRuntime].
+ *
+ * A standalone [OSSWallet2AuthConfig.signingStoredKey] is sufficient and is the only way to configure
+ * a managed (KMS/HSM) key - pass a runtime carrying the matching provider for those. The legacy
+ * [OSSWallet2AuthConfig.signingKey], when present, is migrated in memory and cross-checked against
+ * the StoredKey; it also fixes the JWS algorithm, which is otherwise taken from the StoredKey.
+ */
+internal suspend fun resolveWallet2AuthSigningKey(
+    config: OSSWallet2AuthConfig,
+    cryptoRuntime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
+): Wallet2AuthSigningKey {
+    val legacyKey = config.signingKey?.key
+    val storedKey = config.signingStoredKey?.let(StoredKeyCodec::decodeFromString)
+        ?: V1KeyMigration().migrate(
+            recordId = KeyId(requireNotNull(legacyKey).getKeyId()),
+            serialized = KeySerialization.serializeKeyToJson(legacyKey).jsonObject,
+            usages = walletAuthKeyUsages,
+        )
+    require(storedKey.usages == walletAuthKeyUsages) {
+        "Wallet auth signing StoredKey usages must be exactly $walletAuthKeyUsages"
+    }
+    val key = cryptoRuntime.restore(storedKey)
+    require(key.usages == walletAuthKeyUsages) {
+        "Wallet auth signing StoredKey usages must be exactly $walletAuthKeyUsages"
+    }
+    require(key.capabilities.signer != null && key.capabilities.verifier != null) {
+        "Wallet auth signing StoredKey must support signing and verification"
+    }
+    val algorithm = legacyKey?.let { JwsAlgorithm.parse(it.keyType.jwsAlg) } ?: key.preferredJwsAlgorithm()
+    legacyKey?.let { validateWallet2AuthSidecar(it, key, algorithm) }
+    return Wallet2AuthSigningKey(key, algorithm)
+}
+
+private suspend fun validateWallet2AuthSidecar(
+    legacyKey: Key,
+    crypto2Key: Crypto2Key,
+    algorithm: JwsAlgorithm,
+) {
+    require(crypto2Key.id.value == legacyKey.getKeyId()) {
+        "Wallet auth signingStoredKey ID does not match signingKey"
+    }
+    require(crypto2Key.spec.supportsJwsAlgorithm(algorithm)) {
+        "Wallet auth signingStoredKey algorithm does not match signingKey"
+    }
+    val legacyPublicJwk = EncodedKey.Jwk(
+        data = BinaryData(Json.encodeToString(legacyKey.getPublicKey().exportJWKObject()).encodeToByteArray()),
+        privateMaterial = false,
+    )
+    val crypto2PublicJwk = requireNotNull(crypto2Key.capabilities.publicKeyExporter) {
+        "Wallet auth signingStoredKey does not export public material"
+    }.exportPublicKey().toPublicJwk(crypto2Key.spec)
+    require(Jwk.sha256Thumbprint(legacyPublicJwk) == Jwk.sha256Thumbprint(crypto2PublicJwk)) {
+        "Wallet auth signingStoredKey does not match signingKey"
+    }
+}
+
+internal data class Wallet2AuthSigningKey(
+    val key: Crypto2Key,
+    val algorithm: JwsAlgorithm,
+)
+
+private val walletAuthKeyUsages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
 
 /**
  * Registers /auth/[*] routes.
@@ -234,10 +323,10 @@ fun Route.registerWallet2AuthRoutes(tokenExpiry: Duration = 24.hours, walletReso
             }
 
             post("/account/wallets/{walletId}") {
-                val accountId = call.getAuthenticatedAccount()
-                val walletId = call.parameters["walletId"]!!
-                walletResolver.linkWalletToAccount(accountId, walletId)
-                call.respond(HttpStatusCode.OK, mapOf("status" to "linked"))
+                call.respond(
+                    HttpStatusCode.Forbidden,
+                    mapOf("error" to "Manual wallet linking is disabled; wallets are linked when created"),
+                )
             }
         }
     }
