@@ -2,6 +2,7 @@
 
 package id.waltid.openid4vp.wallet.request
 
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -78,7 +79,7 @@ class AuthorizationRequestResolverJvmTest {
             AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
                 vpFormatsSupported = jsonObjectOf(),
                 trustConfiguration = ClientIdTrustConfiguration(
-                    x509TrustAnchors = listOf(CertificateDer(byteArrayOf(1))),
+                    x509TrustAnchors = InMemoryTrustStore(),
                     trustedVerifierAttestationIssuers = setOf("did:example:attester"),
                 ),
             )

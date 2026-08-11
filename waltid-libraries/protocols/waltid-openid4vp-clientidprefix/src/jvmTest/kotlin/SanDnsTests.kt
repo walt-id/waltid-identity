@@ -1,15 +1,25 @@
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
+import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension.Companion.extensionExtendedKeyUsage
+import id.walt.certificate.x509.extension.KeyUsageExtension
+import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
+import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.algorithms.DigestAlgorithm
+import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
+import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.*
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.openid4vp.clientidprefix.*
 import id.walt.openid4vp.clientidprefix.prefixes.X509SanDns
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.x509.GenericX509CertificateBuilder
-import id.walt.x509.GenericX509CertificateProfileData
-import id.walt.x509.X509DistinguishedName
-import id.walt.x509.X509KeyUsage
-import id.walt.x509.X509SubjectAlternativeNames
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,39 +32,45 @@ class SanDnsTests {
 
     @Test
     fun `x509_san_dns validates trusted chain signature and SAN`() = runTest {
-        val rootName = X509DistinguishedName("Test Root")
-        val rootKey = JWKKey.generate(KeyType.secp256r1)
-        val rootCertificate = GenericX509CertificateBuilder().build(
-            profileData = GenericX509CertificateProfileData(
-                subjectName = rootName,
-                isCertificateAuthority = true,
-                pathLengthConstraint = 0,
-                keyUsage = setOf(X509KeyUsage.KeyCertSign, X509KeyUsage.CRLSign),
-            ),
-            subjectPublicKey = rootKey.getPublicKey(),
-            signingKey = rootKey,
-        ).certificateDer
-        val leafKey = JWKKey.generate(KeyType.secp256r1)
-        val leafCertificate = GenericX509CertificateBuilder().build(
-            profileData = GenericX509CertificateProfileData(
-                subjectName = X509DistinguishedName("verifier.example.com"),
-                issuerName = rootName,
-                keyUsage = setOf(X509KeyUsage.DigitalSignature),
-                extendedKeyUsageOids = setOf("1.3.6.1.5.5.7.3.2"),
-                subjectAlternativeNames = X509SubjectAlternativeNames(dnsNames = listOf("verifier.example.com")),
-            ),
-            subjectPublicKey = leafKey.getPublicKey(),
-            signingKey = rootKey,
-        ).certificateDer
-        val requestObject = leafKey.signJws(
+        val sigAlg = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
+        val rootKey = genKey("rootCa")
+        val rootCertificate = X509CertificateUtil.createSelfSignedCertificate(rootKey, sigAlg) {
+            subjectDn = "cn=Test Root"
+            extensionBasicConstraints {
+                cA = true
+                pathLenConstraint = 0
+            }
+            extensionKeyUsage {
+                addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign, KeyUsageExtension.KeyUsage.cRLSign)
+            }
+        }
+        val leafKey = genKey("leaf")
+        val leafCertificate = X509CertificateUtil.createCertificate(rootKey, rootCertificate, sigAlg) {
+            subjectDn = "cn=verifier.example.com"
+            subjectPublicKey(leafKey)
+            extensionKeyUsage {
+                addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature)
+            }
+            extensionExtendedKeyUsage {
+                addKeyUsage("1.3.6.1.5.5.7.3.2")
+            }
+            extensionSan {
+                addDnsName("verifier.example.com")
+            }
+        }
+
+        val requestObject = CompactJws.sign(
             "{}".encodeToByteArray(),
-            mapOf(
-                "x5c" to JsonArray(
-                    listOf(leafCertificate, rootCertificate).map {
-                        JsonPrimitive(Base64.Default.encode(it.bytes.toByteArray()))
-                    }
-                )
-            ),
+            leafKey,
+            JwsAlgorithm.ES256,
+            buildJsonObject {
+                put(
+                    "x5c", JsonArray(
+                        listOf(leafCertificate, rootCertificate).map {
+                            JsonPrimitive(Base64.Default.encode(it.encodedDer.toByteArray()))
+                        }
+                    ))
+            }
         )
         val context = RequestContext(
             clientId = "x509_san_dns:verifier.example.com",
@@ -64,8 +80,7 @@ class SanDnsTests {
         )
         val clientId = X509SanDns("verifier.example.com", context.clientId)
         val wrongClientId = X509SanDns("wrong.example.com", "wrong.example.com")
-        val trust = ClientIdTrustConfiguration(x509TrustAnchors = listOf(rootCertificate))
-
+        val trust = ClientIdTrustConfiguration(x509TrustAnchors = InMemoryTrustStore(listOf(rootCertificate)))
         assertIs<ClientValidationResult.Success>(clientId.authenticateX509SanDns(clientId, context, trust))
         assertIs<ClientValidationResult.Failure>(
             wrongClientId.authenticateX509SanDns(wrongClientId, context, trust)
@@ -123,4 +138,16 @@ class SanDnsTests {
         assertEquals(ClientIdError.MissingX509TrustAnchors, result.error)
     }
 
+    companion object {
+        suspend fun genKey(keyId: String): Key =
+            runtime.generateSoftwareKey(
+                GenerateSoftwareKeyRequest(
+                    KeyId(keyId),
+                    KeySpec.Ec(EcCurve.P256),
+                    setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                )
+            )
+
+        val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
+    }
 }
