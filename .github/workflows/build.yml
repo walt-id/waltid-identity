@@ -46,6 +46,15 @@ jobs:
       pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
       pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
       pr-draft: ${{ github.event.pull_request.draft || false }}
+  issuer-conformance-eligibility:
+    uses: ./.github/workflows/issuer-conformance-eligibility.yml
+    with:
+      event-name: ${{ github.event_name }}
+      ref: ${{ github.ref }}
+      pr-number: ${{ github.event.pull_request.number || '' }}
+      pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
+      pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
+      pr-draft: ${{ github.event.pull_request.draft || false }}
   crypto2-eligibility:
     uses: ./.github/workflows/platform-eligibility.yml
     with:
@@ -102,9 +111,9 @@ jobs:
   gradle-build:
     uses: ./.github/workflows/gradle.yml
     secrets: inherit
-    needs: android-eligibility
+    needs: [android-eligibility, issuer-conformance-eligibility]
     with:
       enable-android-build: ${{ needs.android-eligibility.outputs.should-run == 'true' }}
       report-check-name: 'gradle-build / gradle (ubuntu-22.04)'
-      run-issuer-conformance: true
-      run-haip-conformance: true
+      run-issuer-conformance: ${{ needs.issuer-conformance-eligibility.outputs.should-run == 'true' }}
+      run-haip-conformance: ${{ needs.issuer-conformance-eligibility.outputs.should-run == 'true' }}
