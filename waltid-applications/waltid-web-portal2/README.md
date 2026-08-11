@@ -60,7 +60,10 @@ This portal enables users to:
 
 #### Digital Credentials API issuance requirements
 
-DC API issuance is experimental (Chrome origin trial). To try it:
+DC API issuance is experimental (Chrome origin trial). Official setup guide:
+[Digital Credentials API for credential issuance](https://developer.chrome.com/blog/digital-credentials-api-143-issuance-ot).
+
+To try it:
 
 - Chrome 143+ on desktop and/or Android
 - Enable `chrome://flags/#web-identity-digital-credentials-creation`
@@ -68,7 +71,7 @@ DC API issuance is experimental (Chrome origin trial). To try it:
 - Prefer HTTPS (or localhost) so the page is a secure context
 - Hosted demos may also need a Chrome origin-trial token for the site origin
 
-If DC API is unavailable, use QR / deep link delivery — the issuer API is unchanged.
+If DC API is unavailable, the portal disables that delivery option and links to the docs above — use QR / deep link instead. The issuer API is unchanged.
 
 ### Credential Verification Flow
 

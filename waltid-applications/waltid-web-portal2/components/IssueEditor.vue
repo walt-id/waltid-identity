@@ -2,7 +2,10 @@
 import type { useSwaggerExamples } from "~/composables/useSwaggerExamples";
 import type { useIssuerSession } from "~/composables/useIssuerSession";
 import type { useProfiles } from "~/composables/useProfiles";
-import { getDcApiIssuanceSupport } from "~/utils/dcApiIssuance";
+import {
+  DC_API_ISSUANCE_DOCS_URL,
+  getDcApiIssuanceSupport,
+} from "~/utils/dcApiIssuance";
 
 const props = defineProps<{
   swagger: ReturnType<typeof useSwaggerExamples>;
@@ -42,7 +45,11 @@ const canSubmit = computed(() => {
   }
 });
 const submitDisabled = computed(
-  () => !canSubmit.value || !!optionsError.value || props.session.loading.value,
+  () =>
+    !canSubmit.value ||
+    !!optionsError.value ||
+    props.session.loading.value ||
+    (useDcApi.value && !dcApiSupport.value.supported),
 );
 
 function readPayload(): Record<string, unknown> {
@@ -372,8 +379,8 @@ async function submit() {
       <p class="mt-1 text-xs text-blue-800">
         Creates a by-value OpenID4VCI offer, embeds issuer/AS metadata, and calls
         <code>navigator.credentials.create</code> with protocol
-        <code>openid4vci-v1</code>. Progress is tracked via issuer session
-        events; browser create() handoff status is ignored.
+        <code>openid4vci-v1</code>. If the browser handoff fails, the portal
+        shows an error and falls back to the offer QR.
       </p>
       <label
         v-if="useDcApi"
@@ -382,12 +389,26 @@ async function submit() {
         <input v-model="dcApiMediationRequired" type="checkbox" />
         mediation: required
       </label>
-      <p
+      <div
         v-if="useDcApi && !dcApiSupport.supported"
-        class="mt-2 text-xs text-amber-800 rounded-md border border-amber-200 bg-amber-50 p-2"
+        class="mt-2 text-xs text-amber-900 rounded-md border border-amber-200 bg-amber-50 p-3 space-y-2"
       >
-        {{ dcApiSupport.reason }}
-      </p>
+        <p class="font-medium">
+          Digital Credentials API issuance is not available in this browser.
+        </p>
+        <p>{{ dcApiSupport.reason }}</p>
+        <p>
+          Uncheck DC API delivery to use QR / deep link, or see the
+          <a
+            :href="DC_API_ISSUANCE_DOCS_URL"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="underline font-medium"
+          >
+            Chrome Digital Credentials API issuance docs
+          </a>.
+        </p>
+      </div>
     </div>
 
     <div class="flex items-center gap-3">

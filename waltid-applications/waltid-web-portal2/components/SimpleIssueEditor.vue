@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { useIssuerSession } from "~/composables/useIssuerSession";
-import { getDcApiIssuanceSupport } from "~/utils/dcApiIssuance";
+import {
+  DC_API_ISSUANCE_DOCS_URL,
+  getDcApiIssuanceSupport,
+} from "~/utils/dcApiIssuance";
 
 type AuthMethod = "AUTHORIZED" | "PRE_AUTHORIZED";
 type DeliveryMethod = "qr" | "dc_api";
@@ -47,6 +50,12 @@ watch(
 );
 
 const canSubmit = computed(() => {
+  if (
+    deliveryMethod.value === "dc_api" &&
+    !dcApiSupport.value.supported
+  ) {
+    return false;
+  }
   if (!credentialDataJson.value.trim()) return true;
   try {
     JSON.parse(credentialDataJson.value);
@@ -224,14 +233,27 @@ async function submit() {
         engagement via <code>navigator.credentials.create</code>; the result log
         follows issuer OpenID4VCI events (Chrome origin trial).
       </p>
-      <p
+      <div
         v-if="deliveryMethod === 'dc_api' && !dcApiSupport.supported"
-        class="text-xs text-amber-700 mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2"
+        class="text-xs text-amber-800 mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2"
       >
-        {{ dcApiSupport.reason }}
-        You can still create the offer; the browser call will fail until the
-        prerequisites are met. QR delivery remains available.
-      </p>
+        <p class="font-medium">
+          Digital Credentials API issuance is not available in this browser.
+        </p>
+        <p>{{ dcApiSupport.reason }}</p>
+        <p>
+          Switch to <strong>QR / deep link</strong>, or follow the
+          <a
+            :href="DC_API_ISSUANCE_DOCS_URL"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="underline font-medium text-amber-950"
+          >
+            Chrome Digital Credentials API issuance docs
+          </a>
+          (Chrome 143+, issuance flag, Android wallet).
+        </p>
+      </div>
     </section>
 
     <section>

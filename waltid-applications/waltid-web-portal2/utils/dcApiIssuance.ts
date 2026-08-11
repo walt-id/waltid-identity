@@ -1,5 +1,9 @@
 export const OPENID4VCI_DC_API_PROTOCOL = "openid4vci-v1";
 
+/** Chrome origin-trial docs for Digital Credentials API issuance. */
+export const DC_API_ISSUANCE_DOCS_URL =
+  "https://developer.chrome.com/blog/digital-credentials-api-143-issuance-ot";
+
 type DigitalCredentialGlobal = {
   userAgentAllowsProtocol?: (protocol: string) => boolean;
 };
@@ -13,48 +17,71 @@ type DigitalCredentialsNavigator = Navigator & {
 export type DcApiIssuanceSupport = {
   supported: boolean;
   reason?: string;
+  docsUrl: string;
 };
+
+function unsupported(reason: string): DcApiIssuanceSupport {
+  return {
+    supported: false,
+    reason,
+    docsUrl: DC_API_ISSUANCE_DOCS_URL,
+  };
+}
 
 export function getDcApiIssuanceSupport(): DcApiIssuanceSupport {
   if (typeof window === "undefined" || typeof navigator === "undefined") {
-    return {
-      supported: false,
-      reason: "Digital Credentials API issuance requires a browser context.",
-    };
+    return unsupported(
+      "Digital Credentials API issuance requires a browser context.",
+    );
   }
 
   if (!window.isSecureContext) {
-    return {
-      supported: false,
-      reason:
-        "Digital Credentials API issuance requires a secure context (HTTPS or localhost).",
-    };
-  }
-
-  const nav = navigator as DigitalCredentialsNavigator;
-  if (typeof nav.credentials?.create !== "function") {
-    return {
-      supported: false,
-      reason:
-        "Digital Credentials API issuance is unavailable (navigator.credentials.create missing). Use Chrome 143+ with chrome://flags/#web-identity-digital-credentials-creation enabled.",
-    };
+    return unsupported(
+      "Digital Credentials API issuance requires a secure context (HTTPS or localhost).",
+    );
   }
 
   const digitalCredential = (window as Window & {
     DigitalCredential?: DigitalCredentialGlobal;
   }).DigitalCredential;
 
-  if (
-    typeof digitalCredential?.userAgentAllowsProtocol === "function" &&
-    !digitalCredential.userAgentAllowsProtocol(OPENID4VCI_DC_API_PROTOCOL)
-  ) {
-    return {
-      supported: false,
-      reason: `This browser does not allow the ${OPENID4VCI_DC_API_PROTOCOL} protocol for Digital Credentials API issuance.`,
-    };
+  // Match Chrome's documented check: DigitalCredential + protocol allow-list.
+  // navigator.credentials.create alone is not enough (WebAuthn always provides it).
+  if (!digitalCredential) {
+    return unsupported(
+      "This browser does not support Digital Credentials API issuance. Use Chrome 143+ with chrome://flags/#web-identity-digital-credentials-creation enabled, then retry.",
+    );
   }
 
-  return { supported: true };
+  if (typeof digitalCredential.userAgentAllowsProtocol !== "function") {
+    return unsupported(
+      "This browser exposes DigitalCredential but cannot verify protocol support for issuance.",
+    );
+  }
+
+  if (!digitalCredential.userAgentAllowsProtocol(OPENID4VCI_DC_API_PROTOCOL)) {
+    return unsupported(
+      `This browser does not allow the ${OPENID4VCI_DC_API_PROTOCOL} protocol for Digital Credentials API issuance. Enable the Chrome issuance flag or use QR / deep link delivery instead.`,
+    );
+  }
+
+  const nav = navigator as DigitalCredentialsNavigator;
+  if (typeof nav.credentials?.create !== "function") {
+    return unsupported(
+      "Digital Credentials API issuance is unavailable (navigator.credentials.create missing).",
+    );
+  }
+
+  return { supported: true, docsUrl: DC_API_ISSUANCE_DOCS_URL };
+}
+
+export function formatDcApiIssuanceUnsupportedMessage(
+  support: DcApiIssuanceSupport = getDcApiIssuanceSupport(),
+): string {
+  const reason =
+    support.reason ??
+    "Digital Credentials API issuance is not supported in this browser.";
+  return `${reason} See ${support.docsUrl} for setup requirements. QR / deep link delivery remains available.`;
 }
 
 export function parseCredentialOfferFromUrl(
@@ -105,7 +132,7 @@ export async function invokeDigitalCredentialsCreate(
 ): Promise<unknown> {
   const support = getDcApiIssuanceSupport();
   if (!support.supported) {
-    throw new Error(support.reason ?? "Digital Credentials API is unavailable.");
+    throw new Error(formatDcApiIssuanceUnsupportedMessage(support));
   }
 
   const nav = navigator as DigitalCredentialsNavigator;
@@ -122,5 +149,20 @@ export async function invokeDigitalCredentialsCreate(
 
   if (mediationRequired) dcRequestPayload.mediation = "required";
 
-  return nav.credentials!.create!(dcRequestPayload);
+  try {
+    return await nav.credentials!.create!(dcRequestPayload);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    // Browsers without issuance support often surface cryptic CredentialsContainer errors.
+    if (
+      /CredentialsContainer|DigitalCredential|Required member is undefined|NotSupportedError|is not a valid/i.test(
+        message,
+      )
+    ) {
+      throw new Error(
+        `Digital Credentials API issuance failed in this browser. ${formatDcApiIssuanceUnsupportedMessage(support)}`,
+      );
+    }
+    throw e instanceof Error ? e : new Error(message);
+  }
 }
