@@ -55,6 +55,8 @@ jobs:
       pr-draft: ${{ inputs.pr-draft }}
       platform-name: Issuer conformance
       platform-label: ci:issuer-conformance
+      # Keep this aligned with Issuer2/OpenID4VCI conformance-sensitive implementation dependencies;
+      # intentionally not a complete transitive Gradle dependency closure.
       path-patterns: |
         [
           ".github/workflows/build.yml",
