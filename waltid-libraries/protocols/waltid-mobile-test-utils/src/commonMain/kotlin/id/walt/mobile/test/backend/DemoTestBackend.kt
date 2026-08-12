@@ -35,6 +35,13 @@ object DemoTestBackend {
     const val TRANSACTION_DATA_PROFILES_URL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
     private const val EUDI_PID_SD_JWT_VCT = "$ISSUER_BASE_URL/openid4vci/urn:eudi:pid:1"
     private const val PAYMENT_AUTHORIZATION_TYPE = "org.waltid.transaction-data.payment-authorization"
+
+    /** EUDI TS-12 SCA payment, the type whose payload the Credential Manager matcher reads as a nested object. */
+    const val SCA_PAYMENT_TYPE = "urn:eudi:sca:payment:1"
+    const val SCA_PAYMENT_PAYEE_NAME = "Super Store"
+    const val SCA_PAYMENT_CURRENCY = "EUR"
+    const val SCA_PAYMENT_AMOUNT = 11.56
+    const val SCA_PAYMENT_TRANSACTION_ID = "8D8AC610-566D-4EF0-9C22-186B2A5ED793"
     // The fields the currently deployed profile declares, not the ones #2062 configures.
     private val requiredPaymentAuthorizationFields = setOf("amount", "currency", "payee")
 
@@ -61,6 +68,32 @@ object DemoTestBackend {
                 doctype = "eu.europa.ec.eudi.pid.1",
                 namespace = "eu.europa.ec.eudi.pid.1",
                 claims = listOf("given_name", "family_name"),
+            ),
+        ),
+        CredentialScenario(
+            id = "sca-payment-card",
+            displayName = "SCA Payment Card",
+            profileId = "scaPaymentCardMdoc",
+            credentialConfigurationId = "sca_payment_card_mso_mdoc",
+            format = "mso_mdoc",
+            verifierCredentialQuery = mdocQuery(
+                id = "sca_payment_card",
+                doctype = "eu.europa.ec.eudi.sca.payment_card.1",
+                namespace = "eu.europa.ec.eudi.sca.payment_card.1",
+                claims = listOf("card_scheme", "card_last4", "card_holder_name"),
+            ),
+        ),
+        CredentialScenario(
+            id = "eu-age-verification",
+            displayName = "EU Age Verification",
+            profileId = "euAgeVerificationMdoc",
+            credentialConfigurationId = "eu.europa.ec.av.1",
+            format = "mso_mdoc",
+            verifierCredentialQuery = mdocQuery(
+                id = "proof_of_age",
+                doctype = "eu.europa.ec.av.1",
+                namespace = "eu.europa.ec.av.1",
+                claims = listOf("age_over_18"),
             ),
         ),
         CredentialScenario(
@@ -196,6 +229,44 @@ object DemoTestBackend {
         return paymentAuthorizationTransactionData(credentialId, fields)
     }
 
+    /**
+     * One `urn:eudi:sca:payment:1` item bound to [credentialId], shaped as the type requires: a nested
+     * `payload`, not the flat fields the walt.id payment-authorization type uses.
+     *
+     * The values are those of the SCA demo request in `Verifier2OpenApiExamples`, so a test can assert
+     * the same strings on the Credential Manager prompt and on the wallet's own review. `amount` is a
+     * JSON number because the Credential Manager matcher reads it as one for this type and skips the
+     * entry if it is a string.
+     *
+     * The profile is fetched rather than assumed so that a deployment which still declares the old
+     * `payment_details` type fails here, instead of producing an item the matcher silently drops.
+     */
+    suspend fun scaPaymentTransactionData(credentialId: String): JsonObject {
+        val fields = transactionDataProfileFields(SCA_PAYMENT_TYPE)
+        check(fields.contains("payload")) {
+            "Demo transaction data profile '$SCA_PAYMENT_TYPE' does not declare 'payload': $fields"
+        }
+        return buildJsonObject {
+            put("type", JsonPrimitive(SCA_PAYMENT_TYPE))
+            putJsonArray("credential_ids") {
+                add(JsonPrimitive(credentialId))
+            }
+            put("require_cryptographic_holder_binding", JsonPrimitive(true))
+            putJsonArray("transaction_data_hashes_alg") {
+                add(JsonPrimitive("sha-256"))
+            }
+            putJsonObject("payload") {
+                put("transaction_id", JsonPrimitive(SCA_PAYMENT_TRANSACTION_ID))
+                putJsonObject("payee") {
+                    put("name", JsonPrimitive(SCA_PAYMENT_PAYEE_NAME))
+                    put("id", JsonPrimitive("merchant-001"))
+                }
+                put("currency", JsonPrimitive(SCA_PAYMENT_CURRENCY))
+                put("amount", JsonPrimitive(SCA_PAYMENT_AMOUNT))
+            }
+        }
+    }
+
     suspend fun transactionDataProfileFields(type: String): Set<String> {
         val response = client.get(TRANSACTION_DATA_PROFILES_URL) {
             accept(ContentType.Application.Json)
@@ -298,10 +369,10 @@ object DemoTestBackend {
         require(credentialQueries.isNotEmpty()) { "DC API sessions require at least one DCQL credential query" }
 
         val payload = buildJsonObject {
-            // "dc_api" is the @SerialName of DcApiAnnexDFlowSetup; unlike cross_device this flow
-            // spells its core config "core", and it takes no url_config.
-            put("flow_type", "dc_api")
-            putJsonObject("core") {
+            // "dc_api_openid4vp" is the @SerialName of DcApiAnnexDFlowSetup, and unlike cross_device
+            // this flow takes no url_config.
+            put("flow_type", "dc_api_openid4vp")
+            putJsonObject("core_flow") {
                 putJsonObject("dcql_query") {
                     putJsonArray("credentials") {
                         credentialQueries.forEach { add(it) }
