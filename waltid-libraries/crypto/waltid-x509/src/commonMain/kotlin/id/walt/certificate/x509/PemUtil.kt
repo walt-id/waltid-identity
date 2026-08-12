@@ -9,17 +9,21 @@ object PemUtil {
 
     fun spitPemChain(pemChainString: String): Collection<String> =
         CERTIFICATE_CHAIN_PEM_REGEX.findAll(pemChainString)
-            .map { normalizePem(it.value) } // Clean up trailing line breaks
+            .map { normalizePem(it) } // Clean up trailing line breaks
             .toList()
 
     fun normalizePem(pem: String): String {
         val match = requireNotNull(CERTIFICATE_CHAIN_PEM_REGEX.find(pem)) {
             "Invalid PEM: '$pem'"
         }
+        return normalizePem(match)
+    }
+
+    private fun normalizePem(match: MatchResult): String {
         val beginType = match.groupValues[1].trim()
         val base64Payload = match.groupValues[2].replace("\\s".toRegex(), "")
         val endType = match.groupValues[3].trim()
-        require(beginType == endType) { "Begin type '$beginType' does not match end type '$endType' in PEM: '$pem'" }
+        require(beginType == endType) { "Begin type '$beginType' does not match end type '$endType' in PEM: '${match.value}'" }
         return base64ToPem(base64Payload, beginType)
     }
 
