@@ -2,6 +2,7 @@ package id.walt.wallet2.mobile.test
 
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
@@ -441,7 +442,7 @@ class MobileWalletIntegrationTest {
 
     @OptIn(ExperimentalSerializationApi::class)
     private val eudiVerifierTrust = ClientIdTrustConfiguration(
-        x509TrustAnchors = listOf(CertificateDer.fromPEMEncodedString(EudiTestBackend.verifierTrustAnchorPem)),
+        x509TrustAnchors = listOf(X509CertificateUtil.parseCertificatePem(EudiTestBackend.verifierTrustAnchorPem)),
     )
 
     private suspend fun createEudiWallet(config: MobileWalletConfig) =
