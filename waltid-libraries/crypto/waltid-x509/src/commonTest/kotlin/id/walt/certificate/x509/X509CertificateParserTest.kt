@@ -1,5 +1,6 @@
 package id.walt.certificate.x509
 
+import id.walt.certificate.TestData
 import id.walt.certificate.TestKeys.opensslHexFormat
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
@@ -12,6 +13,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class X509CertificateParserTest {
+
+    @Test
+    fun shouldParsePemWhichIsNotAccordingSpec() {
+        val cert = X509CertificateUtil.parseCertificatePem(TestData.STRANGE_PEM)
+        assertNotNull(cert)
+    }
 
     @Test
     fun extractsKeyIdentifiersFromCertificateDer() {

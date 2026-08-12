@@ -1,5 +1,6 @@
 package id.walt.certificate.x509
 
+import id.walt.certificate.x509.PemUtil.normalizePem
 import id.walt.certificate.x509.builder.Pkcs10CertificateSigningRequestBuilder
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
@@ -21,10 +22,10 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
     fun nextSerialNumber(): ByteString = services.serialNumberGenerator.next()
 
     fun parseCsrPem(pem: String): Pkcs10CertificateSigningRequest =
-        services.csrParser.parseCertificateSigningRequestPem(pem)
+        services.csrParser.parseCertificateSigningRequestPem(normalizePem(pem))
 
     fun parseCertificatePem(pem: String): X509Certificate =
-        services.certificateParser.parseCertificatePem(pem)
+        services.certificateParser.parseCertificatePem(normalizePem(pem))
 
     fun parseCertificateDerEncoded(derEncoded: ByteString): X509Certificate =
         services.certificateParser.parseCertificateDerEncoded(derEncoded)
@@ -131,16 +132,14 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         return services.certificateSigner.signCertificate(issuerKey, builder)
     }
 
-    val CERTIFICATE_CHAIN_PEM_REGEX = "-----BEGIN CERTIFICATE-----[\\s\\S]*?-----END CERTIFICATE-----".toRegex()
-
     suspend fun validatePemCertificateChain(
         certificateChainPem: String,
         additionalTrust: X509CertificateTrustStore? = null
     ): ValidationResult {
-        val certificates = CERTIFICATE_CHAIN_PEM_REGEX.findAll(certificateChainPem)
-            .map { it.value.trim() } // Clean up trailing line breaks
-            .map { services.certificateParser.parseCertificatePem(it) }
-            .toList()
+        val certificates =
+            PemUtil.spitPemChain(certificateChainPem)
+                .map { services.certificateParser.parseCertificatePem(it) }
+                .toList()
         services.certificateChainValidator.trustStore.findCertificateBySubjectDn("First Atmept")
         return validateCertificateChain(certificates, additionalTrust)
     }

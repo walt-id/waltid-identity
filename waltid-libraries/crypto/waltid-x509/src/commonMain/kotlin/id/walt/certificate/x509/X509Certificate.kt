@@ -1,6 +1,6 @@
 package id.walt.certificate.x509
 
-import id.walt.certificate.der.ByteArrayUtil.byteStringToBase64Pem
+import id.walt.certificate.x509.PemUtil.byteStringToBase64Pem
 import id.walt.crypto.utils.ShaUtils
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.Key

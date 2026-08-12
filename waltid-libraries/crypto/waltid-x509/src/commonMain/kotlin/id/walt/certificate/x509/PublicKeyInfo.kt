@@ -1,7 +1,6 @@
 package id.walt.certificate.x509
 
-import id.walt.certificate.der.ByteArrayUtil
-import id.walt.certificate.der.ByteArrayUtil.byteStringToBase64Pem
+import id.walt.certificate.x509.PemUtil.byteStringToBase64Pem
 import id.walt.crypto.utils.ShaUtils
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.*
@@ -9,6 +8,7 @@ import id.walt.crypto2.keys.StoredKey.Companion.CURRENT_VERSION
 import id.walt.crypto2.serialization.BinaryData
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.toHexString
+import kotlin.io.encoding.Base64
 
 /**
  * Represents X.509 Subject Public Key Info specified
@@ -32,7 +32,7 @@ interface PublicKeyInfo {
     val keyValueHex: String
         get() = keyValueRaw.toHexString()
     val keyValueBase64: String
-        get() = ByteArrayUtil.byteArrayToBase64(keyValueRaw.toByteArray())
+        get() = Base64.Default.encode(keyValueRaw.toByteArray())
 
     /**
      * SHA-1 hash of publicKeyRaw (SubjectPublicKeyInfo.subjectPublicKey)
