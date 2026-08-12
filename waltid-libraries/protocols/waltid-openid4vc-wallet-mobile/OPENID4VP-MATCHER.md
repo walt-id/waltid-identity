@@ -80,8 +80,8 @@ cp target/wasm32-unknown-unknown/release/presentation.wasm \
 
 So the maintenance model is:
 
-- **The committed binary** is verified by the SHA-256 that `AndroidVendoredMatcherTest` pins. Nothing
-  else needs to hold for it to keep working, and an accidental swap cannot go unnoticed.
+- **The committed binary**: the SHA-256 that `AndroidVendoredMatcherTest` pins verifies its identity, so
+  an accidental swap cannot go unnoticed. The runtime compatibility assumptions below still have to hold.
 - **An intentional update** picks an upstream commit, builds it with a toolchain recorded here, runs
   upstream's own test suite at that commit, runs the Android matcher regressions in
   `DigitalCredentialSharingE2ETest`, and then updates the asset, the pinned hash and this table

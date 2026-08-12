@@ -46,7 +46,7 @@ class AndroidVendoredMatcherTest {
     }
 
     @Test
-    fun openId4VpMatcherAssetIsThePinnedGoogleBinary() {
+    fun openId4VpMatcherAssetIsThePinnedVendoredBuild() {
         val matcher = assets.open("id/walt/wallet2/mobile/openid4vpmatcher.wasm")
             .use { it.readBytes() }
 
