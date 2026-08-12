@@ -1,4 +1,4 @@
-name: macOS eligibility
+name: Issuer conformance eligibility
 
 on:
   workflow_call:
@@ -33,7 +33,7 @@ on:
         default: false
     outputs:
       should-run:
-        description: "Whether macOS jobs should run"
+        description: "Whether issuer conformance jobs should run"
         value: ${{ jobs.decide.outputs.should-run }}
       reason:
         description: "Human-readable decision reason"
@@ -53,39 +53,36 @@ jobs:
       pr-head-repo: ${{ inputs.pr-head-repo }}
       pr-labels: ${{ inputs.pr-labels }}
       pr-draft: ${{ inputs.pr-draft }}
-      additional-labels: '["ci:mobile"]'
-      platform-name: iOS
-      platform-label: ci:macos
+      platform-name: Issuer conformance
+      platform-label: ci:issuer-conformance
+      # Keep this aligned with Issuer2/OpenID4VCI conformance-sensitive implementation dependencies;
+      # intentionally not a complete transitive Gradle dependency closure.
       path-patterns: |
         [
-          ".github/workflows/gradle-macos.yml",
-          ".github/workflows/mobile-sdk-docs.yml",
-          ".github/workflows/macos-eligibility.yml",
+          ".github/workflows/build.yml",
+          ".github/workflows/gradle.yml",
+          ".github/workflows/issuer-conformance-eligibility.yml",
           ".github/workflows/platform-eligibility.yml",
           ".github/actions/checkout-repos/*",
-          ".github/actions/gradle-ios/*",
-          ".github/actions/gradle-mobile-sdk-docs/*",
           ".github/actions/gradle-setup-action/*",
-          ".github/actions/ios-build-setup/*",
-          ".github/actions/set-properties/*",
-          "scripts/check-mobile-swift-parity-decision.sh",
           "build-logic/*",
           "build.gradle.kts",
-          "gradle/*",
-          "gradle.properties",
-          "gradlew",
           "settings.gradle.kts",
-          "gradle/libs.versions.toml",
-          "*/Package.swift",
-          "*/src/commonMain/*",
-          "*/src/commonTest/*",
-          "*/src/iosMain/*",
-          "*/src/iosTest/*",
-          "waltid-applications/waltid-wallet-demo-compose/*",
-          "waltid-applications/waltid-wallet-demo-ios/*",
-          "waltid-libraries/*/build.gradle.kts",
-          "waltid-libraries/*/*/build.gradle.kts",
-          "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
-          "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
-          "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"
+          "gradle.properties",
+          "gradle/*",
+          "gradlew",
+          "waltid-services/waltid-issuer-api2/*",
+          "waltid-services/waltid-openid4vp-conformance-runners/*",
+          "waltid-services/waltid-service-commons/*",
+          "waltid-libraries/protocols/waltid-openid4vci*/*",
+          "waltid-libraries/crypto/waltid-crypto*/*",
+          "waltid-libraries/crypto/waltid-cose/*",
+          "waltid-libraries/crypto/waltid-jose/*",
+          "waltid-libraries/crypto/waltid-x509/*",
+          "waltid-libraries/credentials/waltid-credential-key-resolver/*",
+          "waltid-libraries/credentials/waltid-mdoc-credentials*/*",
+          "waltid-libraries/credentials/waltid-w3c-credentials/*",
+          "waltid-libraries/sdjwt/waltid-sdjwt/*",
+          "waltid-libraries/waltid-did/*",
+          "waltid-libraries/web/waltid-ktor-notifications*/*"
         ]
