@@ -29,6 +29,33 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import id.walt.ktorauthnz.methods.OIDC
+import id.walt.ktorauthnz.methods.config.OidcAuthConfiguration
+import id.walt.ktorauthnz.sessions.AuthSessionNextStepRedirectData
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toPublicJwk
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import io.ktor.server.cio.*
+import io.ktor.server.engine.*
+import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import io.ktor.serialization.kotlinx.json.*
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import io.ktor.server.application.install
+import kotlinx.serialization.json.buildJsonArray
+
 
 /**
  * Integration tests for the OSS Wallet2 optional auth feature.
@@ -48,6 +75,303 @@ class Wallet2AuthIntegrationTest {
 
     private val host = "127.0.0.1"
     private val port = 17050
+
+    @Test
+    fun testOidcAuthenticationFlow() {
+        val oidcPort = 17051
+        val idpPort = 17052
+
+        val idpBase = "http://$host:$idpPort"
+        val idpKid = "wallet2-test-idp-key"
+        val oidcSubject = "oidc-user-1"
+
+        val signingKey = runBlocking { JWKKey.generate(KeyType.secp256r1) }
+
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+
+        val idpKey = runBlocking {
+            runtime.generateSoftwareKey(
+                GenerateSoftwareKeyRequest(
+                    id = KeyId(idpKid),
+                    spec = KeySpec.Ec(EcCurve.P256),
+                    usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                )
+            )
+        }
+
+        val publicEncoded = runBlocking {
+            requireNotNull(idpKey.capabilities.publicKeyExporter)
+                .exportPublicKey()
+                .toPublicJwk(idpKey.spec)
+        }
+
+        val publicJwk = Json
+            .parseToJsonElement(
+                publicEncoded.data.toByteArray().decodeToString()
+            )
+            .jsonObject
+            .let { jwk ->
+                buildJsonObject {
+                    jwk.forEach { (name, value) ->
+                        put(name, value)
+                    }
+                    put("kid", JsonPrimitive(idpKid))
+                }
+            }
+
+        var expectedNonce: String? = null
+        var expectedState: String? = null
+
+        val oidcConfig = OidcAuthConfiguration(
+            openIdConfiguration = OIDC.OpenIdConfiguration(
+                issuer = idpBase,
+                authorizationEndpoint = "$idpBase/authorize",
+                tokenEndpoint = "$idpBase/token",
+                userinfoEndpoint = "$idpBase/userinfo",
+                jwksUri = "$idpBase/jwks",
+                idTokenSigningAlgValuesSupported = listOf("ES256"),
+            ),
+            clientId = "wallet2-test",
+            clientSecret = "wallet2-secret",
+            callbackUri = "http://$host:$oidcPort/auth/oidc/callback",
+            pkceEnabled = true,
+        )
+
+        val authConfig = OSSWallet2AuthConfig(
+            signingKey = DirectSerializedKey(signingKey),
+            tokenExpiry = 1.hours,
+            oidc = oidcConfig,
+        )
+
+        val idpServer = embeddedServer(
+            CIO,
+            host = host,
+            port = idpPort,
+        ) {
+            install(ContentNegotiation) {
+                json()
+            }
+
+            routing {
+                post("/token") {
+                    val params = call.receiveParameters()
+
+                    assertEquals(
+                        "authorization_code",
+                        params["grant_type"]
+                    )
+                    assertEquals(
+                        "test-code",
+                        params["code"]
+                    )
+                    assertEquals(
+                        "http://$host:$oidcPort/auth/oidc/callback",
+                        params["redirect_uri"]
+                    )
+                    assertTrue(
+                        !params["code_verifier"].isNullOrBlank(),
+                        "OIDC token request must contain PKCE code_verifier"
+                    )
+
+                    val nonce = requireNotNull(expectedNonce) {
+                        "Expected nonce was not captured before token exchange"
+                    }
+
+                    val now = Clock.System.now()
+
+                    val idTokenPayload = buildJsonObject {
+                        put("iss", JsonPrimitive(idpBase))
+                        put("sub", JsonPrimitive(oidcSubject))
+                        put("aud", JsonPrimitive("wallet2-test"))
+                        put(
+                            "exp",
+                            JsonPrimitive((now + 5.minutes).epochSeconds)
+                        )
+                        put("iat", JsonPrimitive(now.epochSeconds))
+                        put("nonce", JsonPrimitive(nonce))
+                        put("sid", JsonPrimitive("oidc-session-1"))
+                    }
+
+                    val idToken = CompactJws.sign(
+                        payload = idTokenPayload.toString().encodeToByteArray(),
+                        key = idpKey,
+                        algorithm = JwsAlgorithm.ES256,
+                        protectedHeader = buildJsonObject {
+                            put("kid", JsonPrimitive(idpKid))
+                        },
+                    )
+
+                    call.respond(
+                        buildJsonObject {
+                            put("id_token", JsonPrimitive(idToken))
+                            put(
+                                "access_token",
+                                JsonPrimitive("test-access-token")
+                            )
+                            put("token_type", JsonPrimitive("Bearer"))
+                        }
+                    )
+                }
+
+                get("/jwks") {
+                    call.respond(
+                        buildJsonObject {
+                            put(
+                                "keys",
+                                buildJsonArray {
+                                    add(publicJwk)
+                                }
+                            )
+                        }
+                    )
+                }
+
+                get("/userinfo") {
+                    call.respond(
+                        buildJsonObject {
+                            put("sub", JsonPrimitive(oidcSubject))
+                            put(
+                                "email",
+                                JsonPrimitive("oidc-user@example.com")
+                            )
+                        }
+                    )
+                }
+            }
+        }.start(wait = false)
+
+        try {
+            OSSWallet2Service.configureInMemory()
+
+            E2ETest(host, oidcPort, failEarly = true).testBlock(
+                features = listOf(OSSWallet2FeatureCatalog),
+                featureAmendments = mapOf(
+                    CommonsFeatureCatalog.authenticationServiceFeature to suspend {
+                        AuthenticationServiceModule.AuthenticationServiceConfig.customAuthentication = {
+                            ktorAuthnz("ktor-authnz") { }
+                        }
+                    }
+                ),
+                preload = {
+                    ConfigManager.preloadConfig(
+                        "_features",
+                        FeatureConfig(enabledFeatures = listOf("auth"))
+                    )
+                    ConfigManager.preloadConfig(
+                        "wallet-service",
+                        OSSWallet2ServiceConfig(
+                            publicBaseUrl = Url("http://$host:$oidcPort")
+                        )
+                    )
+                    ConfigManager.preloadConfig("auth", authConfig)
+                },
+                init = {
+                    DidService.minimalInit()
+                },
+                module = {
+                    val loadedAuthConfig = runBlocking { configureWallet2Auth() }
+                    wallet2Module(
+                        withPlugins = false,
+                        authConfig = loadedAuthConfig
+                    )
+                },
+            ) {
+                val http = testHttpClient()
+
+                testAndReturn("OIDC authentication endpoint returns configured authorization URL") {
+                    val response = http.get("/auth/oidc/auth")
+                        .also { assertEquals(HttpStatusCode.OK, it.status) }
+
+                    val session = response.body<AuthSessionInformation>()
+
+                    assertEquals(AuthSessionStatus.CONTINUE_NEXT_STEP, session.status)
+                    assertEquals(OIDC.id, session.currentlyActiveMethod)
+
+                    val redirect = session.nextStep as? AuthSessionNextStepRedirectData
+                    assertNotNull(redirect, "Expected OIDC authentication to return a redirect next step")
+
+                    val authUrl = redirect.url
+
+                    assertEquals(URLProtocol.HTTP, authUrl.protocol)
+                    assertEquals(host, authUrl.host)
+                    assertEquals(idpPort, authUrl.port)
+                    assertEquals("/authorize", authUrl.encodedPath)
+
+                    assertEquals("code", authUrl.parameters["response_type"])
+                    assertEquals("openid profile email", authUrl.parameters["scope"])
+                    assertEquals("wallet2-test", authUrl.parameters["client_id"])
+                    assertEquals(
+                        "http://$host:$oidcPort/auth/oidc/callback",
+                        authUrl.parameters["redirect_uri"]
+                    )
+
+                    assertTrue(
+                        !authUrl.parameters["state"].isNullOrBlank(),
+                        "OIDC authorization URL must contain a state parameter"
+                    )
+                    assertTrue(
+                        !authUrl.parameters["nonce"].isNullOrBlank(),
+                        "OIDC authorization URL must contain a nonce parameter"
+                    )
+
+                    expectedState = authUrl.parameters["state"]
+                    expectedNonce = authUrl.parameters["nonce"]
+
+                    assertTrue(
+                        !authUrl.parameters["code_challenge"].isNullOrBlank(),
+                        "OIDC authorization URL must contain a PKCE code challenge"
+                    )
+                    assertEquals(
+                        "S256",
+                        authUrl.parameters["code_challenge_method"]
+                    )
+                }
+                val state = requireNotNull(expectedState) {
+                    "OIDC state was not captured from authorization URL"
+                }
+
+                val callbackSession = testAndReturn("OIDC callback issues Wallet2 JWT") {
+                    http.get("/auth/oidc/callback") {
+                        parameter("code", "test-code")
+                        parameter("state", state)
+                    }
+                        .also {
+                            assertEquals(HttpStatusCode.OK, it.status)
+                        }
+                        .body<AuthSessionInformation>()
+                }
+
+                assertEquals(
+                    AuthSessionStatus.SUCCESS,
+                    callbackSession.status
+                )
+
+                val token = assertNotNull(
+                    callbackSession.token,
+                    "OIDC authentication succeeded but Wallet2 JWT was not issued"
+                )
+
+                assertEquals(
+                    3,
+                    token.split(".").size,
+                    "Expected Wallet2 authentication token to be a JWT"
+                )
+
+                testAndReturn("OIDC Wallet2 JWT authenticates account requests") {
+                    http.get("/auth/account/wallets") {
+                        bearerAuth(token)
+                    }.also {
+                        assertEquals(HttpStatusCode.OK, it.status)
+                    }
+                }
+            }
+        } finally {
+            idpServer.stop(
+                gracePeriodMillis = 1000,
+                timeoutMillis = 3000,
+            )
+        }
+    }
 
     @Test
     fun testAuthFlow() {
