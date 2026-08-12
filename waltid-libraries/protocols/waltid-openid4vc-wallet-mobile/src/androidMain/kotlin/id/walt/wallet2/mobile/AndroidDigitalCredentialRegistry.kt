@@ -121,11 +121,18 @@ public class AndroidDigitalCredentialRegistry(
         return runCatching {
             // Registering only the unsigned protocol makes Credential Manager ignore signed and
             // multisigned requests rather than route them here to be rejected.
+            val openId4Vp = OpenId4VpRegistry(
+                credentialEntries = entries,
+                id = registryId,
+                supportedProtocols = listOf(OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_UNSIGNED),
+            )
+            // Same registry bytes, different matcher. See OPENID4VP-MATCHER.md for why AndroidX's
+            // embedded matcher cannot serve a transaction data request alongside a second credential.
             registryManager.registerCredentials(
-                OpenId4VpRegistry(
-                    credentialEntries = entries,
+                AndroidOpenId4VpRegistry(
                     id = registryId,
-                    supportedProtocols = listOf(OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_UNSIGNED),
+                    credentials = openId4Vp.credentials,
+                    matcher = applicationContext.assets.open(OPENID4VP_MATCHER_ASSET).use { it.readBytes() },
                 )
             )
             registryManager.registerCredentials(
@@ -255,6 +262,9 @@ public class AndroidDigitalCredentialRegistry(
         // Vendored, not a dependency; package-qualified so it cannot collide with another library's
         // copy in the application asset merge. See ANNEX-C-MATCHER.md.
         private const val ANNEX_C_MATCHER_ASSET = "id/walt/wallet2/mobile/identitycredentialmatcher.wasm"
+
+        // Vendored, not a dependency. See OPENID4VP-MATCHER.md.
+        internal const val OPENID4VP_MATCHER_ASSET = "id/walt/wallet2/mobile/openid4vpmatcher.wasm"
         private const val MAX_MATCHER_VALUE_LENGTH = 128
         private const val SIGNED_UNSUPPORTED_REASON =
             "The wallet accepts only the unsigned OpenID4VP Digital Credentials protocol"
@@ -266,6 +276,16 @@ public class AndroidDigitalCredentialRegistry(
 
 /** Raw registry request because AndroidX does not yet ship an Annex C registry builder. */
 private class AndroidAnnexCRegistry(
+    id: String,
+    credentials: ByteArray,
+    matcher: ByteArray,
+) : DigitalCredentialRegistry(id = id, credentials = credentials, matcher = matcher)
+
+/**
+ * AndroidX's OpenID4VP registry bytes with a different matcher. Keeps `OpenId4VpRegistry` as the sole
+ * serializer of the registry format, so only the matcher binary is ours. See OPENID4VP-MATCHER.md.
+ */
+private class AndroidOpenId4VpRegistry(
     id: String,
     credentials: ByteArray,
     matcher: ByteArray,
