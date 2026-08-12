@@ -375,8 +375,17 @@ class DigitalCredentialSharingE2ETest {
      * The wallet registers only `openid4vp-v1-unsigned`, and the vendored matcher honours that: a signed
      * or multisigned request must not surface this wallet at all, because it cannot fulfill one.
      *
+     * Each unsupported request carries the *same* OpenID4VP payload that
+     * [sharesMdocThroughClearOpenId4VpDcApi] matches successfully, re-wrapped into the structurally valid
+     * signed and multisigned shapes the matcher's own parsers accept (see [signedDcApiRequest] and
+     * [multisignedDcApiRequest]). That is what makes this decisive rather than incidental: relabelling
+     * the protocol alone would also pass simply because the payload no longer parses. Here, if protocol
+     * filtering stopped working - the registry advertising a signed protocol, or the matcher ignoring
+     * `supported_protocols` - the matcher would decode these payloads, run the same mDL DCQL query, and
+     * surface the issued mDL, failing this test.
+     *
      * Asserted through the real caller rather than the picker, because "no provider" is what the caller
-     * observes; the request is otherwise identical to [sharesMdocThroughClearOpenId4VpDcApi]'s.
+     * observes.
      */
     @Test
     fun doesNotSurfaceForSignedOrMultisignedRequests() = runBlocking {
@@ -387,27 +396,16 @@ class DigitalCredentialSharingE2ETest {
             scenario = scenario,
             expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
         )
-        val unsignedRequest = Json.parseToJsonElement(session.requestJson).jsonObject
+        // The payload a matchable unsigned request carries, transplanted verbatim below.
+        val openId4VpPayload = requireNotNull(
+            Json.parseToJsonElement(session.requestJson).jsonObject["requests"]
+                ?.jsonArray?.firstOrNull()?.jsonObject?.get("data")?.jsonObject,
+        ) { "Unsigned DC API request carries no object 'data': ${session.requestJson}" }
 
-        listOf("openid4vp-v1-signed", "openid4vp-v1-multisigned").forEach { protocol ->
-            val request = Json.encodeToString(
-                JsonObject.serializer(),
-                buildJsonObject {
-                    put(
-                        "requests",
-                        buildJsonArray {
-                            unsignedRequest["requests"]!!.jsonArray.forEach { entry ->
-                                add(
-                                    buildJsonObject {
-                                        entry.jsonObject.forEach { (key, value) -> put(key, value) }
-                                        put("protocol", JsonPrimitive(protocol))
-                                    },
-                                )
-                            }
-                        },
-                    )
-                },
-            )
+        listOf(
+            "openid4vp-v1-signed" to signedDcApiRequest(openId4VpPayload),
+            "openid4vp-v1-multisigned" to multisignedDcApiRequest(openId4VpPayload),
+        ).forEach { (protocol, request) ->
             DigitalCredentialTestVerifier.reset(request)
             fixture.context.startActivity(
                 Intent(fixture.context, DigitalCredentialTestVerifierActivity::class.java)
@@ -900,6 +898,59 @@ class DigitalCredentialSharingE2ETest {
             },
         )
     }
+
+    /**
+     * A `openid4vp-v1-signed` DC API request carrying [payload] as the payload of a dummy compact JWS.
+     *
+     * The matcher does not verify the signature while matching: it splits `data.request` on `.` and
+     * base64url-decodes segment 1, so an unsigned `alg: none` header and a placeholder signature are
+     * enough for it to reach the very same DCQL query. Deliberately not real signing infrastructure -
+     * the point is that the payload is *matchable*, not that it is authentic.
+     */
+    private fun signedDcApiRequest(payload: JsonObject): String {
+        val jws = listOf(
+            base64Url(buildJsonObject { put("alg", JsonPrimitive("none")) }.toString().encodeToByteArray()),
+            base64Url(payload.toString().encodeToByteArray()),
+            base64Url("dummy-signature".encodeToByteArray()),
+        ).joinToString(".")
+        return dcApiRequest("openid4vp-v1-signed", buildJsonObject { put("request", JsonPrimitive(jws)) })
+    }
+
+    /**
+     * A `openid4vp-v1-multisigned` DC API request carrying [payload] under `request.payload`.
+     *
+     * `data` is a JSON *string* holding `{"request":{"payload":"<base64url>"}}`, which is the shape the
+     * pinned matcher's `extract_multisigned_payload` accepts and the one its own unit tests use. No
+     * multisignature verification is involved in matching.
+     */
+    private fun multisignedDcApiRequest(payload: JsonObject): String {
+        val multisigned = buildJsonObject {
+            put(
+                "request",
+                buildJsonObject { put("payload", JsonPrimitive(base64Url(payload.toString().encodeToByteArray()))) },
+            )
+        }
+        return dcApiRequest("openid4vp-v1-multisigned", JsonPrimitive(multisigned.toString()))
+    }
+
+    /** The `digital` request object Credential Manager routes, with a single `requests[]` entry. */
+    private fun dcApiRequest(protocol: String, data: JsonElement): String = buildJsonObject {
+        put(
+            "requests",
+            buildJsonArray {
+                add(
+                    buildJsonObject {
+                        put("protocol", JsonPrimitive(protocol))
+                        put("data", data)
+                    },
+                )
+            },
+        )
+    }.toString()
+
+    /** Unpadded base64url, the only alphabet the matcher's decoder accepts. */
+    private fun base64Url(bytes: ByteArray): String =
+        Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
 
     /** The claims of an SD-JWT VC presentation's key binding JWT, which is its final `~` segment. */
     private fun keyBindingJwtClaims(presentation: String): JsonObject {
