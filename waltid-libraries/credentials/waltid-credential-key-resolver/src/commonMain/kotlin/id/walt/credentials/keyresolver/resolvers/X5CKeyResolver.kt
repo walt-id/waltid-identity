@@ -24,7 +24,7 @@ object X5CKeyResolver : BaseKeyResolver {
         val issuerCertificate = certificateChainStrings.first()
         val cert = X509CertificateUtil.parseCertificateDerEncoded(ByteString(issuerCertificate.decodeFromBase64()))
         val pem = cert.data.subjectPublicKeyInfo.encodedPem
-        return JWKKey.importJWK(pem).getOrThrow()
+        return JWKKey.importPEM(pem).getOrThrow()
     }
 
     suspend fun restoreKeyFromX5c(x5c: JsonArray, runtime: CryptoRuntime): Key {
