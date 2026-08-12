@@ -4,13 +4,21 @@ package id.waltid.openid4vp.wallet.presentation
 
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
+import id.walt.cose.acceptsCoseAlgorithm
 import id.walt.cose.coseCompliantCbor
+import id.walt.cose.createAndSignDetached
+import id.walt.cose.protectedAlgorithm
+import id.walt.cose.selectCoseSignatureAlgorithm
 import id.walt.cose.toCoseAlgorithm
 import id.walt.cose.toCoseSigner
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.KeySpec
 import id.walt.dcql.DcqlMatcher
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.encoding.ByteStringWrapper
@@ -25,6 +33,7 @@ import id.walt.mdoc.objects.elements.DeviceSignedItem
 import id.walt.mdoc.objects.elements.DeviceSignedItemList
 import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.handover.OpenID4VPHandover
+import id.walt.mdoc.objects.handover.OpenID4VPDCAPIHandoverInfo
 import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
@@ -38,6 +47,9 @@ import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentia
 import id.walt.verifier.openid.transactiondata.normalizeHashAlgorithm
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier.openid.transactiondata.resolveHashAlgorithm
+import id.waltid.openid4vp.wallet.WalletCrypto2KeyAdapter
+import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
+import id.waltid.openid4vp.wallet.supportedPresentationAlgorithms
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
@@ -50,13 +62,79 @@ object MdocPresenter {
 
     suspend fun buildSessionTranscript(
         authorizationRequest: AuthorizationRequest,
-        responseUri: String
+        responseUri: String,
+    ): SessionTranscript = buildSessionTranscriptWithThumbprint(
+        authorizationRequest,
+        responseUri,
+        ResponseEncryption.resolveCrypto2(authorizationRequest)?.thumbprintBytes(),
+    )
+
+    fun buildSessionTranscript(
+        authorizationRequest: AuthorizationRequest,
+        responseUri: String,
+        verifierJwkThumbprint: String?,
+    ): SessionTranscript = buildSessionTranscriptWithThumbprint(
+        authorizationRequest,
+        responseUri,
+        verifierJwkThumbprint?.decodeFromBase64Url(),
+    )
+
+    @Deprecated("Use the Crypto2Key overload")
+    suspend fun buildDeviceAuth(
+        sessionTranscript: SessionTranscript,
+        credential: MdocsCredential,
+        disclosedDeviceNamespaces: DeviceNameSpaces,
+        holderKey: Key,
+    ): DeviceAuth = buildDeviceAuthWithKey(
+        sessionTranscript,
+        credential,
+        disclosedDeviceNamespaces,
+        holderKey,
+        null,
+        null,
+    )
+
+    @Deprecated("Use the Crypto2Key overload")
+    suspend fun buildDeviceAuth(
+        sessionTranscript: SessionTranscript,
+        credential: MdocsCredential,
+        disclosedDeviceNamespaces: DeviceNameSpaces,
+        holderKey: Key,
+        allowedAlgorithms: Set<Int>? = null,
+    ): DeviceAuth = buildDeviceAuthWithKey(
+        sessionTranscript,
+        credential,
+        disclosedDeviceNamespaces,
+        holderKey,
+        allowedAlgorithms,
+        null,
+    )
+
+    suspend fun buildDeviceAuth(
+        sessionTranscript: SessionTranscript,
+        credential: MdocsCredential,
+        disclosedDeviceNamespaces: DeviceNameSpaces,
+        holderKey: Crypto2Key,
+        allowedAlgorithms: Set<Int>? = null,
+    ): DeviceAuth = buildDeviceAuthWithKey(
+        sessionTranscript,
+        credential,
+        disclosedDeviceNamespaces,
+        null,
+        allowedAlgorithms,
+        holderKey,
+    )
+
+    private fun buildSessionTranscriptWithThumbprint(
+        authorizationRequest: AuthorizationRequest,
+        responseUri: String,
+        verifierJwkThumbprint: ByteArray?,
     ): SessionTranscript {
         requireNotNull(authorizationRequest.clientId) { "Missing client id in authorization request - is this a DC API flow?" }
         val handoverInfo = OpenID4VPHandoverInfo(
             clientId = authorizationRequest.clientId!!,
             nonce = authorizationRequest.nonce!!,
-            jwkThumbprint = ResponseEncryption.resolve(authorizationRequest)?.thumbprintBytes(),
+            jwkThumbprint = verifierJwkThumbprint,
             responseUri = responseUri
         )
         log.trace { "Client side session transaction openid4vp handover info: $handoverInfo" }
@@ -77,11 +155,54 @@ object MdocPresenter {
         return sessionTranscript
     }
 
+    /**
+     * Builds the OpenID4VP DC API session transcript (OID4VP 1.0 Appendix B.2.6.2).
+     *
+     * Unlike [buildSessionTranscript], the handover binds the platform-asserted [origin] instead of
+     * a `response_uri`: DC API has no wallet-observable response endpoint.
+     */
+    fun buildDcApiSessionTranscript(
+        origin: String,
+        nonce: String,
+        encryptionKeyThumbprint: String?,
+    ): SessionTranscript {
+        val handoverInfo = OpenID4VPDCAPIHandoverInfo(
+            origin = origin,
+            nonce = nonce,
+            jwkThumbprint = encryptionKeyThumbprint?.decodeFromBase64Url(),
+        )
+        val handoverInfoCbor = coseCompliantCbor.encodeToByteArray(handoverInfo)
+        val handover = OpenID4VPHandover(
+            identifier = "OpenID4VPDCAPIHandover",
+            infoHash = handoverInfoCbor.sha256(),
+        )
+        return SessionTranscript.forOpenId(handover)
+    }
+
+    @Deprecated("Use the Crypto2Key overload")
     suspend fun buildDeviceAuth(
         sessionTranscript: SessionTranscript,
         credential: MdocsCredential,
         disclosedDeviceNamespaces: DeviceNameSpaces,
-        holderKey: Key
+        holderKey: Key,
+        allowedAlgorithms: Set<Int>? = null,
+        holderCrypto2Key: Crypto2Key?,
+    ): DeviceAuth = buildDeviceAuthWithKey(
+        sessionTranscript,
+        credential,
+        disclosedDeviceNamespaces,
+        holderKey,
+        allowedAlgorithms,
+        holderCrypto2Key,
+    )
+
+    private suspend fun buildDeviceAuthWithKey(
+        sessionTranscript: SessionTranscript,
+        credential: MdocsCredential,
+        disclosedDeviceNamespaces: DeviceNameSpaces,
+        holderKey: Key?,
+        allowedAlgorithms: Set<Int>?,
+        holderCrypto2Key: Crypto2Key?,
     ): DeviceAuth {
         // Create the DeviceAuthentication structure to be signed
         val deviceAuthBytes = MdocCryptoHelper.buildDeviceAuthenticationBytes(
@@ -89,22 +210,117 @@ object MdocPresenter {
         )
 
         // Sign using the detached payload function
-        val deviceSignature = CoseSign1.createAndSignDetached(
-            protectedHeaders = CoseHeaders(algorithm = holderKey.keyType.toCoseAlgorithm()),
-            detachedPayload = deviceAuthBytes,
-            signer = holderKey.toCoseSigner()
-        )
+        val crypto2Key = holderCrypto2Key ?: holderKey?.let { WalletCrypto2KeyAdapter.signingKey(it) }
+        val algorithm = crypto2Key?.selectCoseSignatureAlgorithm(allowedAlgorithms)
+            ?: requireNotNull(requireNotNull(holderKey).keyType.toCoseAlgorithm()) {
+                "Holder key type ${holderKey.keyType} does not support COSE signing"
+            }
+        val p256Key = crypto2Key?.spec == KeySpec.Ec(EcCurve.P256) || holderKey?.keyType == KeyType.secp256r1
+        require(allowedAlgorithms == null || allowedAlgorithms.acceptsCoseAlgorithm(algorithm, p256Key)) {
+            "Verifier does not support mdoc device authentication algorithm $algorithm"
+        }
+        val deviceSignature = if (crypto2Key != null) {
+            CoseSign1.createAndSignDetached(
+                protectedHeaders = CoseHeaders(algorithm = algorithm),
+                detachedPayload = deviceAuthBytes,
+                key = crypto2Key,
+            )
+        } else {
+            CoseSign1.createAndSignDetached(
+                protectedHeaders = CoseHeaders(algorithm = algorithm),
+                detachedPayload = deviceAuthBytes,
+                signer = requireNotNull(holderKey).toCoseSigner(),
+            )
+        }
         val deviceAuth = DeviceAuth(deviceSignature = deviceSignature)
 
         return deviceAuth
     }
 
+    @Deprecated("Use the Crypto2Key overload")
     suspend fun presentMdoc(
         digitalCredential: DigitalCredential,
         matchResult: DcqlMatcher.DcqlMatchResult,
         authorizationRequest: AuthorizationRequest,
         holderKey: Key,
         typeRegistry: TransactionDataTypeRegistry,
+    ): JsonPrimitive = presentMdocWithKey(
+        digitalCredential,
+        matchResult,
+        authorizationRequest,
+        holderKey,
+        typeRegistry,
+        null,
+        null,
+    )
+
+    @Deprecated("Use the Crypto2Key overload")
+    suspend fun presentMdoc(
+        digitalCredential: DigitalCredential,
+        matchResult: DcqlMatcher.DcqlMatchResult,
+        authorizationRequest: AuthorizationRequest,
+        holderKey: Key,
+        typeRegistry: TransactionDataTypeRegistry,
+        verifierJwkThumbprint: String?,
+    ): JsonPrimitive = presentMdocWithKey(
+        digitalCredential,
+        matchResult,
+        authorizationRequest,
+        holderKey,
+        typeRegistry,
+        verifierJwkThumbprint,
+        null,
+    )
+
+    suspend fun presentMdoc(
+        digitalCredential: DigitalCredential,
+        matchResult: DcqlMatcher.DcqlMatchResult,
+        authorizationRequest: AuthorizationRequest,
+        holderKey: Crypto2Key,
+        typeRegistry: TransactionDataTypeRegistry,
+        verifierJwkThumbprint: String? = null,
+        dcApiOrigin: String? = null,
+    ): JsonPrimitive = presentMdocWithKey(
+        digitalCredential,
+        matchResult,
+        authorizationRequest,
+        null,
+        typeRegistry,
+        verifierJwkThumbprint,
+        holderKey,
+        dcApiOrigin,
+    )
+
+    @Deprecated("Use the Crypto2Key overload")
+    suspend fun presentMdoc(
+        digitalCredential: DigitalCredential,
+        matchResult: DcqlMatcher.DcqlMatchResult,
+        authorizationRequest: AuthorizationRequest,
+        holderKey: Key,
+        typeRegistry: TransactionDataTypeRegistry,
+        verifierJwkThumbprint: String?,
+        holderCrypto2Key: Crypto2Key?,
+        dcApiOrigin: String? = null,
+    ): JsonPrimitive = presentMdocWithKey(
+        digitalCredential,
+        matchResult,
+        authorizationRequest,
+        holderKey,
+        typeRegistry,
+        verifierJwkThumbprint,
+        holderCrypto2Key,
+        dcApiOrigin,
+    )
+
+    private suspend fun presentMdocWithKey(
+        digitalCredential: DigitalCredential,
+        matchResult: DcqlMatcher.DcqlMatchResult,
+        authorizationRequest: AuthorizationRequest,
+        holderKey: Key?,
+        typeRegistry: TransactionDataTypeRegistry,
+        verifierJwkThumbprint: String?,
+        holderCrypto2Key: Crypto2Key?,
+        dcApiOrigin: String? = null,
     ): JsonPrimitive {
         log.debug { "Handling mso_mdoc credential" }
 
@@ -112,14 +328,46 @@ object MdocPresenter {
         val responseUri = when (authorizationRequest.responseMode) {
             OpenID4VPResponseMode.DIRECT_POST, OpenID4VPResponseMode.DIRECT_POST_JWT ->
                 authorizationRequest.responseUri
+            OpenID4VPResponseMode.DC_API, OpenID4VPResponseMode.DC_API_JWT -> null
             else -> authorizationRequest.redirectUri
-        } ?: throw IllegalArgumentException("A response_uri or redirect_uri is required for mso_mdoc presentation")
+        }
 
         val document: Document = mdocsCredential.document
         val issuerSigned: IssuerSigned = document.issuerSigned
+        val format = WalletPresentationFormatRegistry.SupportedFormat.MSO_MDOC
+        val allowedIssuerAlgorithms = authorizationRequest.supportedPresentationAlgorithms(
+            format,
+            "issuerauth_alg_values",
+        )?.mapTo(mutableSetOf(), String::toInt)
+        val issuerAlgorithm = issuerSigned.issuerAuth.protectedAlgorithm()
+        val issuerKey = issuerSigned.getParsedIssuerAuthCrypto2().signerKey
+        require(
+            allowedIssuerAlgorithms == null || allowedIssuerAlgorithms.acceptsCoseAlgorithm(
+                issuerAlgorithm,
+                issuerKey.spec == KeySpec.Ec(EcCurve.P256),
+            )
+        ) { "Verifier does not support mdoc issuer authentication algorithm $issuerAlgorithm" }
+        val allowedDeviceAlgorithms = authorizationRequest.supportedPresentationAlgorithms(
+            format,
+            "deviceauth_alg_values",
+        )?.mapTo(mutableSetOf(), String::toInt)
 
         // Build OpenID4VPHandover (OID4VP Appendix B.2.6.1) without ISO-specific wallet nonce
-        val sessionTranscript = buildSessionTranscript(authorizationRequest, responseUri)
+        val sessionTranscript = if (authorizationRequest.responseMode in OpenID4VPResponseMode.DC_API_RESPONSES) {
+            // DC API replaces the response_uri handover with the platform-asserted origin.
+            buildDcApiSessionTranscript(
+                origin = requireNotNull(dcApiOrigin) { "A platform-asserted origin is required for a DC API mdoc presentation" },
+                nonce = requireNotNull(authorizationRequest.nonce),
+                encryptionKeyThumbprint = verifierJwkThumbprint,
+            )
+        } else {
+            val uri = requireNotNull(responseUri) {
+                "A response_uri or redirect_uri is required for mso_mdoc presentation"
+            }
+            verifierJwkThumbprint
+                ?.let { buildSessionTranscript(authorizationRequest, uri, it) }
+                ?: buildSessionTranscript(authorizationRequest, uri)
+        }
 
         // Determine which namespaces and elements to disclose based on the DCQL match
         val disclosedDeviceNamespaces = buildTransactionDataNamespaces(
@@ -131,11 +379,15 @@ object MdocPresenter {
             typeRegistry = typeRegistry,
         )
 
-        val deviceAuth = buildDeviceAuth(
-            sessionTranscript = sessionTranscript,
-            credential = mdocsCredential,
-            disclosedDeviceNamespaces = disclosedDeviceNamespaces,
-            holderKey = holderKey
+        val deviceAuth = holderCrypto2Key?.let {
+            buildDeviceAuth(sessionTranscript, mdocsCredential, disclosedDeviceNamespaces, it, allowedDeviceAlgorithms)
+        } ?: buildDeviceAuthWithKey(
+            sessionTranscript,
+            mdocsCredential,
+            disclosedDeviceNamespaces,
+            requireNotNull(holderKey),
+            allowedDeviceAlgorithms,
+            null,
         )
         log.trace { "Wallet-created device auth: $deviceAuth" }
 
@@ -172,19 +424,19 @@ object MdocPresenter {
                         ?: throw IllegalArgumentException("Namespace does not exist in issuer-signed namespaces for DCQL query claim: $sdNamespace")
 
                     val matchedIssuerSignedItem =
-                        selectedNamespace.entries.find { it.value.elementIdentifier == sdElementIdentifier }?.value
+                        selectedNamespace.entries.find { it.value.elementIdentifier == sdElementIdentifier }
                             ?: throw IllegalArgumentException("Could not find item for DCQL query: namespace = $sdNamespace, element = $sdElementIdentifier")
 
-                    log.trace { "Mapped sd claim $claimsQuery to ${matchedIssuerSignedItem.elementIdentifier} of namespace $sdNamespace" }
+                    log.trace { "Mapped sd claim $claimsQuery to ${matchedIssuerSignedItem.value.elementIdentifier} of namespace $sdNamespace" }
 
                     matchedIssuerSignedItem
-                }.distinctBy { it.elementIdentifier } // 3. Prevent duplicate disclosures if multiple deep paths hit the same element
+                }.distinctBy { it.value.elementIdentifier } // 3. Prevent duplicate disclosures if multiple deep paths hit the same element
             }
         log.trace { "Selected disclosures: ${matchResult.selectedDisclosures}" }
 
         val issuerSignedWithSelectedNamespaceItems =
-            IssuerSigned.fromIssuerSignedItems(
-                namespacedItems = selectedIssuerSignedItems,
+            IssuerSigned.fromIssuerSignedLists(
+                namespaces = selectedIssuerSignedItems.mapValues { IssuerSignedList(it.value) },
                 issuerAuth = issuerSigned.issuerAuth
             )
         //--- SD END
@@ -206,6 +458,51 @@ object MdocPresenter {
         // 6. CBOR-encode and base64url-encode the response string
         val deviceResponseBytes = coseCompliantCbor.encodeToByteArray(deviceResponse)
         return JsonPrimitive(deviceResponseBytes.encodeToBase64Url())
+    }
+
+    /**
+     * Builds one selectively disclosed Annex C document using the same device-authentication
+     * implementation as OpenID4VP. The native platform adapter never handles signing or claims.
+     *
+     * Annex C is reached only through the mobile Digital Credentials adapters, whose signing keys are
+     * always platform-managed, so there is no legacy-key overload: this path is crypto2-only.
+     */
+    suspend fun buildAnnexCDocument(
+        digitalCredential: DigitalCredential,
+        requestedElements: Map<String, List<String>>,
+        sessionTranscript: SessionTranscript,
+        holderKey: Crypto2Key,
+    ): Document {
+        val credential = digitalCredential as? MdocsCredential
+            ?: throw IllegalArgumentException("ISO 18013-7 Annex C requires an mdoc credential")
+        val issuerSigned = credential.document.issuerSigned
+        val selectedItems = requestedElements
+            .filterValues { it.isNotEmpty() }
+            .mapValues { (namespace, elementNames) ->
+                val available = issuerSigned.namespaces?.get(namespace)
+                    ?: throw IllegalArgumentException("Requested mdoc namespace is unavailable: $namespace")
+                elementNames.distinct().map { elementName ->
+                    available.entries.firstOrNull { it.value.elementIdentifier == elementName }?.value
+                        ?: throw IllegalArgumentException("Requested mdoc element is unavailable: $namespace.$elementName")
+                }
+            }
+        val disclosedDeviceNamespaces = DeviceNameSpaces(emptyMap())
+        val deviceAuth = buildDeviceAuthWithKey(
+            sessionTranscript = sessionTranscript,
+            credential = credential,
+            disclosedDeviceNamespaces = disclosedDeviceNamespaces,
+            holderKey = null,
+            allowedAlgorithms = null,
+            holderCrypto2Key = holderKey,
+        )
+        return Document(
+            docType = credential.docType,
+            issuerSigned = IssuerSigned.fromIssuerSignedItems(
+                namespacedItems = selectedItems,
+                issuerAuth = issuerSigned.issuerAuth,
+            ),
+            deviceSigned = DeviceSigned(ByteStringWrapper(disclosedDeviceNamespaces), deviceAuth),
+        )
     }
 
     private fun buildTransactionDataNamespaces(

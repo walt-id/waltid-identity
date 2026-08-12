@@ -55,6 +55,31 @@ Modern cryptographic library implementation with improved API design and structu
 
 **Use when:** Not recommended.
 
+### WIP: [🔨 waltid-crypto2-kms](./waltid-crypto2-kms)
+Multiplatform REST KMS providers for `waltid-crypto2`, with injected HTTP clients and externally resolved credential references.
+
+**Use when:** Migrating managed keys to crypto2.
+
+### WIP: [🔨 waltid-crypto2-kms-aws-sdk](./waltid-crypto2-kms-aws-sdk)
+Optional JVM AWS SDK provider for default credentials, aliases, tags, multi-region replicas, and regional failover.
+
+### WIP: [🔨 waltid-crypto2-kms-azure-identity](./waltid-crypto2-kms-azure-identity)
+Optional JVM Azure Identity token bridge for managed, workload, and default credentials with the crypto2 Key Vault REST provider.
+
+### WIP: [🔨 waltid-crypto2-signum](./waltid-crypto2-signum)
+Android KeyStore and iOS Keychain/Secure Enclave managed-key provider with persisted hardware, authentication, ECDH, and attestation policy.
+
+### WIP: [🔨 waltid-crypto2-pkcs11](./waltid-crypto2-pkcs11)
+JVM PKCS#11 provider tested with SoftHSM, with an opt-in Thales Luna conformance smoke test.
+
+### WIP: [🔨 waltid-crypto2-migration-v1](./waltid-crypto2-migration-v1)
+One-way parser and provider migration boundary for persisted `waltid-crypto` v1 keys.
+
+### WIP: [🔨 waltid-jose](./waltid-jose)
+Multiplatform JWK, JWS, and JWE implementation built on `waltid-crypto2`, without platform-specific JOSE libraries.
+
+**Use when:** Migrating current-stack JOSE operations to crypto2.
+
 ### [🟢 waltid-cose](./waltid-cose)
 CBOR Object Signing and Encryption (COSE) implementation. Provides support for COSE message formats used in mdoc credentials and other CBOR-based cryptographic protocols.
 

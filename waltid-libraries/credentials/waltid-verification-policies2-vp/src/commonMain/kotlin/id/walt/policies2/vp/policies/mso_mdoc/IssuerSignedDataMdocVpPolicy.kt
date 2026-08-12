@@ -1,10 +1,11 @@
 @file:Suppress("PackageDirectoryMismatch")
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 
 package id.walt.policies2.vp.policies
 
-import id.walt.mdoc.objects.digest.ValueDigest
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
+import id.walt.mdoc.verification.verifyIssuerSignedItemDigests
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -35,68 +36,22 @@ class IssuerSignedDataMdocVpPolicy : MdocVPPolicy() {
             addResult("no_issuer_signed_namespaces", true)
         }
 
-        issuerSignedNamespaces?.forEach { (namespace, issuerSignedItems) ->
-            log.trace { "Namespace: $namespace" }
-            val msoDigestsForNamespace = mso.valueDigests[namespace]
-                ?: throw IllegalArgumentException("MSO is missing value digests for namespace: $namespace (only has digests for: ${mso.valueDigests.keys})")
-            issuerSignedItems.entries.forEach { issuerSignedItemWrapped ->
-                val issuerSignedItem = issuerSignedItemWrapped.value
-                val serialized = issuerSignedItemWrapped.serialized
-
-                log.trace { "  ${issuerSignedItem.elementIdentifier} (digestId=${issuerSignedItem.digestId}): ${issuerSignedItem.elementValue} (${issuerSignedItem.elementValue::class.simpleName ?: "?"}) (random hex=${issuerSignedItem.random.toHexString()}) => serialized hex = ${serialized.toHexString()}" }
-                addHashListResult(
-                    "namespace", namespace, mapOf(
-                        "id" to issuerSignedItem.elementIdentifier,
-                        "digest_id" to issuerSignedItem.digestId,
-                        "value" to issuerSignedItem.elementValue,
-                        "value_type" to (issuerSignedItem.elementValue::class.simpleName ?: "?"),
-                        "random_hex" to issuerSignedItem.random.toHexString(),
-                        "serialized_hex" to serialized.toHexString()
-                    )
+        verifyIssuerSignedItemDigests(document, mso).forEach { verification ->
+            val item = verification.item
+            addHashListResult(
+                "namespace", verification.namespace, mapOf(
+                    "id" to item.elementIdentifier,
+                    "digest_id" to item.digestId,
+                    "value" to item.elementValue,
+                    "value_type" to (item.elementValue::class.simpleName ?: "?"),
+                    "random_hex" to item.random.toHexString(),
+                    "serialized_hex" to verification.serialized.toHexString(),
                 )
-
-                // IMPORTANT: compute the digest from the original IssuerSignedItemBytes (as received),
-                // not by re-serializing the IssuerSignedItem object.
-                // Re-serialization can differ between issuers (e.g., different CBOR map key ordering),
-                // and would incorrectly fail digest verification for valid credentials.
-                val issuerSignedItemValueDigest =
-                    ValueDigest.fromIssuerSignedItemBytes(issuerSignedItem.digestId, serialized, mso.digestAlgorithm)
-
-                val issuerSignedItemHash = issuerSignedItemValueDigest.value
-                log.trace { "  Issuer signed item value digest: DigestID = ${issuerSignedItemValueDigest.key}, hash (hex) = ${issuerSignedItemHash.toHexString()}" }
-
-                log.trace {
-                    "Finding matching digest in MSO Digests for namespace: ${
-                        msoDigestsForNamespace.entries.mapIndexed { idx, msoDigest -> "Option $idx: DigestID=${msoDigest.key} Hash=${msoDigest.value.toHexString()}" }
-                            .joinToString()
-                    }"
-                }
-                val matchingDigest = msoDigestsForNamespace.entries.find { (digestId, _) -> issuerSignedItem.digestId == digestId }
-                    ?: throw IllegalArgumentException("MSO does not contain value digest for this signed item!")
-
-                log.trace { "Matching MSO Digest (${matchingDigest.key}): ${matchingDigest.value.toHexString()}" }
-                log.trace { "IssuerSignedItem (${issuerSignedItemValueDigest.key}):    ${issuerSignedItemHash.toHexString()}" }
-
-                val hashesMatch = matchingDigest.value.contentEquals(issuerSignedItemHash)
-
-                if (hashesMatch) {
-                    log.trace { "Hashes match for $namespace - ${issuerSignedItem.elementIdentifier}" }
-                    addHashListResult("matching_digest", namespace, issuerSignedItem.elementIdentifier)
-                } else {
-                    addHashListResult("unmatched_digests", namespace, issuerSignedItem.elementIdentifier)
-                    throw IllegalArgumentException("Value digest does not match! Has data been tampered with? Matching digest from MSO: $matchingDigest - issuer signed item: digest id: \"${issuerSignedItem.digestId}\", element identifier \"${issuerSignedItem.elementIdentifier}\" (namespace \"$namespace\"), random: \"${issuerSignedItem.random.toHexString()}\"")
-
-                    /*
-                    val elementValueType = issuerSignedItem.elementValue::class.simpleName
-                    if (elementValueType !in listOf("String", "Long", "Boolean", "UInt")) {
-                        log.warn { "Hash does not match for non primitive type: $namespace - ${issuerSignedItem.elementIdentifier} has invalid hash for value: ${issuerSignedItem.elementValue} ($elementValueType). Does the Issuer support this non-primitive type?" }
-                        addHashListResult("unmatched_non_primitive", namespace, issuerSignedItem.elementIdentifier)
-                    } else {
-                        throw IllegalArgumentException("Value digest does not match! Has data been tampered with? Matching digest from MSO: $matchingDigest, IssuerSignedItem: $issuerSignedItemWrapped")
-                    }
-                    */
-                }
-
+            )
+            addHashListResult("matching_digest", verification.namespace, item.elementIdentifier)
+            log.trace {
+                "Hashes match for ${verification.namespace} - ${item.elementIdentifier} " +
+                    "(DigestID=${item.digestId}, hash=${verification.calculatedDigest.toHexString()})"
             }
         }
         return success()

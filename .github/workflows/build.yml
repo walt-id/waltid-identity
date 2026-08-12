@@ -46,6 +46,44 @@ jobs:
       pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
       pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
       pr-draft: ${{ github.event.pull_request.draft || false }}
+  issuer-conformance-eligibility:
+    uses: ./.github/workflows/issuer-conformance-eligibility.yml
+    with:
+      event-name: ${{ github.event_name }}
+      ref: ${{ github.ref }}
+      pr-number: ${{ github.event.pull_request.number || '' }}
+      pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
+      pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
+      pr-draft: ${{ github.event.pull_request.draft || false }}
+  crypto2-eligibility:
+    uses: ./.github/workflows/platform-eligibility.yml
+    with:
+      event-name: ${{ github.event_name }}
+      ref: ${{ github.ref }}
+      pr-number: ${{ github.event.pull_request.number || '' }}
+      pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
+      pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
+      pr-draft: ${{ github.event.pull_request.draft || false }}
+      platform-name: Crypto2
+      platform-label: ci:crypto2
+      path-patterns: |
+        [
+          ".github/workflows/build.yml",
+          ".github/workflows/crypto2-platforms.yml",
+          ".github/workflows/platform-eligibility.yml",
+          ".github/actions/checkout-repos/*",
+          ".github/actions/gradle-setup-action/*",
+          "build-logic/*",
+          "build.gradle.kts",
+          "gradle/*",
+          "gradle.properties",
+          "gradlew",
+          "settings.gradle.kts",
+          "waltid-libraries/crypto/waltid-crypto2/*",
+          "waltid-libraries/crypto/waltid-crypto2-*/*",
+          "waltid-libraries/crypto/waltid-jose/*",
+          "waltid-libraries/crypto/waltid-cose/*"
+        ]
   sdk-docs:
     uses: ./.github/workflows/mobile-sdk-docs.yml
     needs: macos-eligibility
@@ -65,10 +103,17 @@ jobs:
     secrets: inherit
     with:
       job_name_prefix: android-device-tests
+  crypto2-platform-tests:
+    uses: ./.github/workflows/crypto2-platforms.yml
+    needs: crypto2-eligibility
+    if: ${{ needs.crypto2-eligibility.outputs.should-run == 'true' }}
+    secrets: inherit
   gradle-build:
     uses: ./.github/workflows/gradle.yml
     secrets: inherit
-    needs: android-eligibility
+    needs: [android-eligibility, issuer-conformance-eligibility]
     with:
       enable-android-build: ${{ needs.android-eligibility.outputs.should-run == 'true' }}
       report-check-name: 'gradle-build / gradle (ubuntu-22.04)'
+      run-issuer-conformance: ${{ needs.issuer-conformance-eligibility.outputs.should-run == 'true' }}
+      run-haip-conformance: ${{ needs.issuer-conformance-eligibility.outputs.should-run == 'true' }}

@@ -26,7 +26,6 @@ data class CredentialNonceBinding(
 
 data class IssuedCredentialNonce(
     val nonce: String,
-    val expiresInSeconds: Long,
 )
 
 data class CredentialNonceValidationContext(

@@ -1,4 +1,5 @@
 import SwiftUI
+import WalletDemoSharingUI
 
 @main
 struct WalletDemoApp: App {
@@ -43,12 +44,24 @@ struct WalletDemoApp: App {
         )
     }()
 
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             ContentView(viewModel: viewModel)
             .tint(.waltBlue)
             .onOpenURL { url in
                 viewModel.handleDeepLink(url)
+            }
+            .onChange(of: scenePhase) { phase in
+                // Reconciling requests authorization on a first run, and afterwards picks up a status
+                // the user changed in Settings - Apple sends no notification either way. Becoming
+                // active is the first moment the app can act on it, so it reconciles here rather
+                // than polling.
+                guard phase == .active else { return }
+                if #available(iOS 26.0, *) {
+                    Task { await DemoIdentityDocumentRegistration.updateFromPlatformCallback() }
+                }
             }
         }
     }

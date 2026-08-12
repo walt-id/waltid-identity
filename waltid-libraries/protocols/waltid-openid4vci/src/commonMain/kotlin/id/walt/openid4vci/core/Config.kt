@@ -22,7 +22,7 @@ import id.walt.openid4vci.tokens.refresh.RefreshTokenIssuer
 import id.walt.openid4vci.tokens.refresh.RefreshTokenVerifier
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
 import id.walt.openid4vci.responses.credential.encryption.CredentialResponseEncryptor
-import id.walt.openid4vci.responses.credential.encryption.JweCredentialResponseEncryptor
+import id.walt.openid4vci.responses.credential.encryption.Crypto2JweCredentialResponseEncryptor
 import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.CredentialRequestValidator
@@ -75,7 +75,7 @@ data class OAuth2ProviderConfig(
     val credentialRequestDecryptor: CredentialRequestDecryptor? = null,
     val credentialProofVerifier: CredentialProofVerifier? = DefaultCredentialProofVerifier(),
     val credentialEndpointHandlers: CredentialEndpointHandlers,
-    val credentialResponseEncryptor: CredentialResponseEncryptor = JweCredentialResponseEncryptor,
+    val credentialResponseEncryptor: CredentialResponseEncryptor = Crypto2JweCredentialResponseEncryptor,
 )
 
 data class PushedAuthorizationConfig(

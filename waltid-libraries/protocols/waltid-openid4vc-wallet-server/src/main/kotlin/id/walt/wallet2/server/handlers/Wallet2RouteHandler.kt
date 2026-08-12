@@ -1,19 +1,62 @@
 package id.walt.wallet2.server.handlers
 
+import id.walt.commons.web.WebException
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.did.dids.DidService
 import id.walt.openid4vci.errors.CredentialError
-import id.walt.wallet2.data.*
-import id.walt.wallet2.handlers.*
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.StoredCredentialMetadata
+import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.WalletCredentialStore
+import id.walt.wallet2.data.WalletDidEntry
+import id.walt.wallet2.data.WalletDidStore
+import id.walt.wallet2.data.WalletKeyInfo
+import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.handlers.BuildVpTokenRequest
+import id.walt.wallet2.handlers.BuildVpTokenResult
+import id.walt.wallet2.handlers.CredentialEndpointException
+import id.walt.wallet2.handlers.ExchangeCodeRequest
+import id.walt.wallet2.handlers.FetchCredentialRequest
+import id.walt.wallet2.handlers.FetchCredentialResult
+import id.walt.wallet2.handlers.GenerateAuthorizationUrlRequest
+import id.walt.wallet2.handlers.GenerateAuthorizationUrlResult
+import id.walt.wallet2.handlers.ImportCredentialRequest
+import id.walt.wallet2.handlers.MatchCredentialsFromStoreRequest
+import id.walt.wallet2.handlers.MatchCredentialsRequest
+import id.walt.wallet2.handlers.MatchCredentialsResult
+import id.walt.wallet2.handlers.PollDeferredRequest
+import id.walt.wallet2.handlers.PresentCredentialIsolatedRequest
+import id.walt.wallet2.handlers.PresentCredentialRequest
+import id.walt.wallet2.handlers.PreviewPresentationRequest
+import id.walt.wallet2.handlers.ReceiveCredentialRequest
+import id.walt.wallet2.handlers.ReceiveCredentialResult
+import id.walt.wallet2.handlers.RejectPresentationByRequestUrlRequest
+import id.walt.wallet2.handlers.RequestNonceRequest
+import id.walt.wallet2.handlers.RequestNonceResult
+import id.walt.wallet2.handlers.RequestTokenRequest
+import id.walt.wallet2.handlers.RequestTokenResult
+import id.walt.wallet2.handlers.ResolveOfferRequest
+import id.walt.wallet2.handlers.ResolveOfferResult
+import id.walt.wallet2.handlers.ResolveVpRequestRequest
+import id.walt.wallet2.handlers.ResolveVpRequestResult
+import id.walt.wallet2.handlers.SendAuthorizationResponseRequest
+import id.walt.wallet2.handlers.SignProofRequest
+import id.walt.wallet2.handlers.SignProofResult
+import id.walt.wallet2.handlers.WalletCredentialHandler
+import id.walt.wallet2.handlers.WalletIssuanceHandler
+import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.walt.wallet2.server.WalletResolver
+import id.walt.wallet2.server.models.PresentationPreviewResponse
+import id.walt.wallet2.server.models.ResolveOfferDetailedResponse
+import id.walt.wallet2.server.models.toDetailedResponse
+import id.walt.wallet2.server.models.toPreviewResponse
 import id.walt.wallet2.server.openapi.Wallet2OpenApiDocs
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
-import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
-import id.walt.wallet2.stores.inmemory.InMemoryDidStore
-import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
+import id.waltid.openid4vci.wallet.token.TokenRequestException
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.delete
 import io.github.smiley4.ktoropenapi.get
@@ -33,6 +76,15 @@ import kotlinx.serialization.json.jsonObject
 import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
+
+internal fun TokenRequestException.toWebException(): WebException {
+    val status = if (statusCode in 400..499) {
+        HttpStatusCode.fromValue(statusCode)
+    } else {
+        HttpStatusCode.BadGateway
+    }
+    return WebException(status.value, oauthError ?: "token_request_failed").also { it.initCause(this) }
+}
 
 // ---------------------------------------------------------------------------
 // Wallet management request / response types
@@ -129,12 +181,26 @@ object Wallet2RouteHandler {
          */
         getAccountId: (suspend RoutingCall.() -> String?)? = null,
         attestationAssembler: ClientAttestationAssembler? = null,
+    ) = registerWallet2Routes(
+        resolver,
+        getAccountId,
+        attestationAssembler,
+        ClientIdTrustConfiguration(),
+    )
+
+    fun Route.registerWallet2Routes(
+        resolver: WalletResolver,
+        getAccountId: (suspend RoutingCall.() -> String?)?,
+        attestationAssembler: ClientAttestationAssembler?,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
     ) {
-        route("/wallet") {
-            registerWalletManagementRoutes(resolver, getAccountId, attestationAssembler)
+        route("/wallet", { tags = listOf(WALLET_MANAGEMENT_TAG) }) {
+            registerWalletManagementRoutes(resolver, getAccountId, attestationAssembler, clientIdTrustConfiguration)
         }
-        route("/stores", { tags = listOf("Named Store Management") }) {
-            registerNamedStoreRoutes(resolver)
+        if (getAccountId == null) {
+            route("/stores", { tags = listOf("Named Store Management") }) {
+                registerNamedStoreRoutes(resolver)
+            }
         }
     }
 
@@ -146,11 +212,20 @@ object Wallet2RouteHandler {
         resolver: WalletResolver,
         getAccountId: (suspend RoutingCall.() -> String?)?,
         attestationAssembler: ClientAttestationAssembler?,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
     ) {
 
         post("", Wallet2OpenApiDocs.createWallet()) {
             val req = runCatching { call.receive<CreateWalletRequest>() }
                 .getOrElse { CreateWalletRequest() }
+            if (getAccountId != null &&
+                (req.keyStoreIds != null || req.credentialStoreIds != null || req.didStoreId != null)
+            ) {
+                return@post call.respond(
+                    HttpStatusCode.BadRequest,
+                    "Authenticated wallets cannot attach global named stores",
+                )
+            }
             val id = Uuid.random().toString()
 
             // Auto-created stores are registered under a generated store ID so that:
@@ -175,7 +250,7 @@ object Wallet2RouteHandler {
                     }
 
                 req.staticKey != null -> emptyList()
-                else -> listOf(resolver.keyStoreFactory("$id-keys").also { resolver.storeKeyStore("$id-keys", it) })
+                else -> listOf(resolver.createKeyStore("$id-keys"))
             }
 
             val credentialStores: List<WalletCredentialStore> = when {
@@ -184,9 +259,7 @@ object Wallet2RouteHandler {
                         require(storeId in registeredCredentialStoreIds) { "Credential store '$storeId' not found" }
                         requireNotNull(resolver.resolveCredentialStore(storeId)) { "Credential store '$storeId' disappeared between validation and use" }
                     }
-
-                else -> listOf(
-                    resolver.credentialStoreFactory("$id-credentials").also { resolver.storeCredentialStore("$id-credentials", it) })
+                else -> listOf(resolver.createCredentialStore("$id-credentials"))
             }
 
             val didStore: WalletDidStore? = when {
@@ -197,7 +270,7 @@ object Wallet2RouteHandler {
                 }
 
                 req.staticDid != null -> null
-                else -> resolver.didStoreFactory("$id-dids").also { resolver.storeDidStore("$id-dids", it) }
+                else -> resolver.createDidStore("$id-dids")
             }
 
             val staticKey = req.staticKey?.let { KeyManager.resolveSerializedKey(it.toString()) }
@@ -277,9 +350,8 @@ object Wallet2RouteHandler {
                     HttpStatusCode.NotFound to { description = "Wallet not found" }
                 }
             }) {
-                val walletId = call.parameters["walletId"] ?: return@delete
-                call.resolveOrRespond(resolver, getAccountId) ?: return@delete
-                resolver.deleteWallet(walletId)
+                val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@delete
+                resolver.deleteWallet(wallet.id)
                 call.respond(HttpStatusCode.NoContent)
             }
 
@@ -558,25 +630,23 @@ object Wallet2RouteHandler {
                                 attestationAssembler = attestationAssembler,
                             )
                             call.respond(result)
-                        } catch (e: Exception) {
-                            // TokenRequestBuilder throws a plain Exception with this prefix when the
-                            // token endpoint returns 4xx (e.g. wrong PIN / tx_code). Reclassify as
-                            // IllegalArgumentException so the status pages handler maps it to 400.
-                            // TODO: Replace once TokenRequestBuilder throws a typed exception.
-                            if (e.message?.startsWith("Token request failed") == true) {
-                                throw IllegalArgumentException(e.message, e)
-                            }
-                            throw e
+                        } catch (e: TokenRequestException) {
+                            throw e.toWebException()
                         }
                     }
 
                     post("/resolve-offer", {
                         summary = "Isolated: resolve a credential offer"
+                        description =
+                            "Resolves the credential offer and returns grant/endpoint summary together with " +
+                                    "issuer display metadata and offered-credential display/claims for a " +
+                                    "consent-first UI. Does not retain a preview handle; complete issuance by " +
+                                    "re-sending the offer to the pre-authorized or authorization-code endpoints."
                         request { pathParameter<String>("walletId"); body<ResolveOfferRequest>() }
-                        response { HttpStatusCode.OK to { body<ResolveOfferResult>() } }
+                        response { HttpStatusCode.OK to { body<ResolveOfferDetailedResponse>() } }
                     }) {
                         val req = call.receive<ResolveOfferRequest>()
-                        call.respond(WalletIssuanceHandler.resolveOffer(req))
+                        call.respond(WalletIssuanceHandler.resolveOfferDetailed(req).toDetailedResponse())
                     }
 
                     post("/request-token", {
@@ -586,13 +656,17 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<RequestTokenRequest>()
-                        call.respond(
-                            WalletIssuanceHandler.requestToken(
-                                wallet = wallet,
-                                request = req,
-                                attestationAssembler = attestationAssembler,
+                        try {
+                            call.respond(
+                                WalletIssuanceHandler.requestToken(
+                                    wallet = wallet,
+                                    request = req,
+                                    attestationAssembler = attestationAssembler,
+                                )
                             )
-                        )
+                        } catch (e: TokenRequestException) {
+                            throw e.toWebException()
+                        }
                     }
 
                     post("/request-nonce", {
@@ -620,6 +694,8 @@ object Wallet2RouteHandler {
                         summary = "Isolated: fetch a credential from the issuer's credential endpoint"
                         description = "When storeInWallet is true the fetched credential(s) are automatically " +
                                 "stored in the wallet, removing the need to call the import endpoint afterwards. " +
+                                "Pass credentialIssuerBaseUrl when storing so issuer display metadata and labels " +
+                                "are persisted like the full receive path. " +
                                 "If the issuer returns invalid_nonce, request a fresh nonce, sign a new proof, " +
                                 "and repeat this isolated fetch step."
                         request { pathParameter<String>("walletId"); body<FetchCredentialRequest>() }
@@ -665,20 +741,26 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ExchangeCodeRequest>()
-                        call.respond(
-                            WalletIssuanceHandler.exchangeCode(
-                                wallet = wallet,
-                                request = req,
-                                attestationAssembler = attestationAssembler,
+                        try {
+                            call.respond(
+                                WalletIssuanceHandler.exchangeCode(
+                                    wallet = wallet,
+                                    request = req,
+                                    attestationAssembler = attestationAssembler,
+                                )
                             )
-                        )
+                        } catch (e: TokenRequestException) {
+                            throw e.toWebException()
+                        }
                     }
 
                     post("/deferred", {
                         summary = "Poll deferred credential endpoint"
                         description =
                             "Polls the issuer's deferred credential endpoint for a previously " +
-                                    "deferred credential. Returns immediately with empty list if still pending."
+                                    "deferred credential. Returns immediately with empty list if still pending. " +
+                                    "Pass credentialIssuerBaseUrl (and optionally credentialConfigurationId) so " +
+                                    "issuer display metadata and labels are stored like the full receive path."
                         request { pathParameter<String>("walletId"); body<PollDeferredRequest>() }
                         response { HttpStatusCode.OK to { body<ReceiveCredentialResult>() } }
                     }) {
@@ -706,10 +788,11 @@ object Wallet2RouteHandler {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<PresentCredentialRequest>()
                         call.respond(
-                            WalletPresentationHandler.presentCredential(
+                            WalletPresentationHandler.presentCredentialWithTrust(
                                 wallet = wallet,
                                 request = req,
                                 transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                                clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )
                         )
                     }
@@ -722,10 +805,11 @@ object Wallet2RouteHandler {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<PresentCredentialIsolatedRequest>()
                         call.respond(
-                            WalletPresentationHandler.presentCredentialIsolated(
+                            WalletPresentationHandler.presentCredentialIsolatedWithTrust(
                                 wallet = wallet,
                                 request = req,
                                 transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                                clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )
                         )
                     }
@@ -766,30 +850,89 @@ object Wallet2RouteHandler {
                     post("/build-vp-token", {
                         summary = "Build VP token from selected credentials"
                         description =
-                            "Step 3 of the manual presentation flow. " +
-                                    "Takes the resolved authorization request (from /resolve-request) and the " +
-                                    "credential IDs selected by the user (from /match-credentials-from-store), " +
-                                    "then builds and signs the vp_token. " +
+                            "Re-resolves and revalidates the original requestUrl, then builds and signs " +
+                                    "the vp_token from the credential options (and optional claim disclosures) " +
+                                    "selected after /preview, or from selectedCredentialIds after " +
+                                    "/match-credentials-from-store. Do not echo the preview authorizationRequest — " +
+                                    "pass the same requestUrl used for /preview. " +
                                     "Pass the result to /send-response to complete the flow."
                         request { pathParameter<String>("walletId"); body<BuildVpTokenRequest>() }
                         response { HttpStatusCode.OK to { body<BuildVpTokenResult>() } }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<BuildVpTokenRequest>()
-                        call.respond(WalletPresentationHandler.buildVpToken(wallet, req))
+                        call.respond(
+                            WalletPresentationHandler.buildVpToken(
+                                wallet = wallet,
+                                request = req,
+                                clientIdTrustConfiguration = clientIdTrustConfiguration,
+                            )
+                        )
                     }
 
                     post("/send-response", {
                         summary = "Send authorization response to the verifier"
                         description =
-                            "Step 4 of the manual presentation flow. " +
-                                    "Transmits the vp_token (from /build-vp-token) to the verifier " +
-                                    "according to the response_mode in the authorization request."
+                            "Re-resolves and revalidates the original requestUrl, then transmits the " +
+                                    "vp_token (from /build-vp-token) to the verifier according to the " +
+                                    "response_mode / response_uri / encryption from that freshly resolved request. " +
+                                    "Do not echo the preview authorizationRequest."
                         request { pathParameter<String>("walletId"); body<SendAuthorizationResponseRequest>() }
                         response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<SendAuthorizationResponseRequest>()
-                        call.respond(WalletPresentationHandler.sendAuthorizationResponse(req))
+                        call.respond(
+                            WalletPresentationHandler.sendAuthorizationResponse(
+                                wallet = wallet,
+                                request = req,
+                                clientIdTrustConfiguration = clientIdTrustConfiguration,
+                            )
+                        )
+                    }
+
+                    post("/preview", {
+                        summary = "Preview an OpenID4VP request for consent"
+                        description =
+                            "Resolves and validates the VP request and returns the authorization request " +
+                                    "(display-only), verifier metadata, transaction data, response-encryption " +
+                                    "state, and the wallet credentials that satisfy each DCQL query with their " +
+                                    "per-claim selective-disclosure options. Optional request keyId selects the " +
+                                    "signing key for capability checks; Ready responses include that keyId. " +
+                                    "Stateless: no preview handle is retained. Complete with /build-vp-token + " +
+                                    "/send-response using the original requestUrl and the preview keyId " +
+                                    "(do not echo authorizationRequest), or /reject with requestUrl. " +
+                                    "If the request is invalid but a response can still be sent, the result has " +
+                                    "valid=false and an error."
+                        request { pathParameter<String>("walletId"); body<PreviewPresentationRequest>() }
+                        response { HttpStatusCode.OK to { body<PresentationPreviewResponse>() } }
+                    }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
+                        val req = call.receive<PreviewPresentationRequest>()
+                        val result = WalletPresentationHandler.previewPresentationStateless(
+                            wallet = wallet,
+                            request = req,
+                            transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                            clientIdTrustConfiguration = clientIdTrustConfiguration,
+                        )
+                        call.respond(result.toPreviewResponse())
+                    }
+
+                    post("/reject", {
+                        summary = "Reject a presentation request"
+                        description =
+                            "Re-resolves the OpenID4VP request from requestUrl and returns the wallet's error " +
+                                    "response to the verifier when a response channel is available. No preview handle."
+                        request { pathParameter<String>("walletId"); body<RejectPresentationByRequestUrlRequest>() }
+                        response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
+                    }) {
+                        val req = call.receive<RejectPresentationByRequestUrlRequest>()
+                        call.respond(
+                            WalletPresentationHandler.rejectPresentationByRequestUrl(
+                                request = req,
+                                clientIdTrustConfiguration = clientIdTrustConfiguration,
+                            )
+                        )
                     }
                 }
             }
@@ -821,8 +964,7 @@ object Wallet2RouteHandler {
                 if (resolver.listKeyStoreIds().toList().contains(storeId)) {
                     return@post call.respond(HttpStatusCode.Conflict, "Key store '$storeId' already exists")
                 }
-                val store = resolver.keyStoreFactory(storeId)
-                resolver.storeKeyStore(storeId, store)
+                resolver.createKeyStore(storeId)
                 call.respond(HttpStatusCode.Created, mapOf("storeId" to storeId))
             }
         }
@@ -846,8 +988,7 @@ object Wallet2RouteHandler {
                 if (resolver.listCredentialStoreIds().toList().contains(storeId)) {
                     return@post call.respond(HttpStatusCode.Conflict, "Credential store '$storeId' already exists")
                 }
-                val store = resolver.credentialStoreFactory(storeId)
-                resolver.storeCredentialStore(storeId, store)
+                resolver.createCredentialStore(storeId)
                 call.respond(HttpStatusCode.Created, mapOf("storeId" to storeId))
             }
         }
@@ -871,8 +1012,7 @@ object Wallet2RouteHandler {
                 if (resolver.listDidStoreIds().toList().contains(storeId)) {
                     return@post call.respond(HttpStatusCode.Conflict, "DID store '$storeId' already exists")
                 }
-                val store = resolver.didStoreFactory(storeId)
-                resolver.storeDidStore(storeId, store)
+                resolver.createDidStore(storeId)
                 call.respond(HttpStatusCode.Created, mapOf("storeId" to storeId))
             }
         }

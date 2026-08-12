@@ -1,4 +1,5 @@
 import SwiftUI
+import WalletDemoSharingUI
 
 struct CredentialDetailsDestination: View {
     let detailsID: String

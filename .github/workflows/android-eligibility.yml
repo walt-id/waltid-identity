@@ -45,7 +45,7 @@ permissions:
 
 jobs:
   decide:
-    uses: ./.github/workflows/mobile-eligibility.yml
+    uses: ./.github/workflows/platform-eligibility.yml
     with:
       event-name: ${{ inputs.event-name }}
       ref: ${{ inputs.ref }}
@@ -53,13 +53,14 @@ jobs:
       pr-head-repo: ${{ inputs.pr-head-repo }}
       pr-labels: ${{ inputs.pr-labels }}
       pr-draft: ${{ inputs.pr-draft }}
+      additional-labels: '["ci:mobile"]'
       platform-name: Android
       platform-label: ci:android
       path-patterns: |
         [
           ".github/workflows/android-device-tests.yml",
           ".github/workflows/android-eligibility.yml",
-          ".github/workflows/mobile-eligibility.yml",
+          ".github/workflows/platform-eligibility.yml",
           ".github/workflows/gradle.yml",
           ".github/actions/checkout-repos/*",
           ".github/actions/gradle-setup-action/*",
@@ -77,6 +78,7 @@ jobs:
           "*/src/androidMain/*",
           "*/src/androidTest/*",
           "*/src/androidDeviceTest/*",
+          "*/src/androidHostTest/*",
           "*/src/androidUnitTest/*",
           "*/src/androidInstrumentedTest/*",
           "waltid-applications/waltid-wallet-demo-compose/*",

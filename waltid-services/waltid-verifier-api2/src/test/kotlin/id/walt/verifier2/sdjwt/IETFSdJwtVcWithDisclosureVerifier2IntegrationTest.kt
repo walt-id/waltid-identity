@@ -219,7 +219,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
             "signature": "FRi4y983m4c9u9VrmJDa7KY6o--7HPpHZW3nLGmv_yT5OTLszFn-nTlON9BeN3CzqDDvwDI9X41vm8h3m1fPSg",
             "jwtHeader": {
               "x5c": [
-                "-----BEGIN CERTIFICATE-----\nMIIBeTCCAR8CFHrWgrGl5KdefSvRQhR+aoqdf48+MAoGCCqGSM49BAMCMBcxFTATBgNVBAMMDE1ET0MgUk9PVCBDQTAgFw0yNTA1MTQxNDA4MDlaGA8yMDc1MDUwMjE0MDgwOVowZTELMAkGA1UEBhMCQVQxDzANBgNVBAgMBlZpZW5uYTEPMA0GA1UEBwwGVmllbm5hMRAwDgYDVQQKDAd3YWx0LmlkMRAwDgYDVQQLDAd3YWx0LmlkMRAwDgYDVQQDDAd3YWx0LmlzMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG0RINBiF+oQUD3d5DGnegQuXenI29JDaMGoMvioKRBN53d4UazakS2unu8BnsEtxutS2kqRhYBPYk9RAriU3gTAKBggqhkjOPQQDAgNIADBFAiAOMwM7hH7q9Di+mT6qCi4LvB+kH8OxMheIrZ2eRPxtDQIhALHzTxwvN8Udt0Z2Cpo8JBihqacfeXkIxVAO8XkxmXhB\n-----END CERTIFICATE-----"
+                "-----BEGIN CERTIFICATE-----\nMIICETCCAbegAwIBAgIUMJAkGLbeyDnDaACHF2MwwUs/j1kwCgYIKoZIzj0EAwIwJDEVMBMGA1UEAwwMV2FsdCBJRCBSb290MQswCQYDVQQGEwJBVDAeFw0yNjA4MTAxMjUyNDdaFw0yNzExMTAxMjUyNDdaMCYxFzAVBgNVBAMMDldhbHQgSUQgbURMIERTMQswCQYDVQQGEwJBVDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABBtESDQYhfqEFA93eQxp3oELl3pyNvSQ2jBqDL4qCkQTed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4GjgcQwgcEwHQYDVR0OBBYEFLm7A+B7z8CQmFznE976TVpzBwXaMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCoGA1UdEgQjMCGBDm9mZmljZUB3YWx0Lmlkhg9odHRwczovL3dhbHQuaWQwLAYDVR0fBCUwIzAhoB+gHYYbaHR0cHM6Ly9jcmwud2FsdC5pZC9jcmwuZGVyMB8GA1UdIwQYMBaAFLm7A+B7z8CQmFznE976TVpzBwXaMAoGCCqGSM49BAMCA0gAMEUCIQD44E8Mukk3WwFeHbB6RZZPy85lVEyNqFZs6aNLq2kq4QIgXrURrzy1iLEYmsnna6YYhRrvGaYEjk1GqCn2w+skfmw=\n-----END CERTIFICATE-----"
               ],
               "kid": "9vuaJyUxRx4KmHyoZ9kjJxMs_mjpnnf-mPM9nPMG51A",
               "typ": "vc+sd-jwt",
@@ -457,8 +457,11 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
 
                 val resp = presentationResult.getOrThrow()
                 println("Response: $resp")
-                assertTrue("Transmission success is false") { resp.transmissionSuccess == true }
-                assertTrue { resp.verifierResponse!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
+                assertTrue("Pre-final SD-JWT fixture must be rejected: $resp") { resp.transmissionSuccess == false }
+                assertTrue {
+                    resp.verifierResponse!!.jsonObject["error_description"]!!.jsonPrimitive.content
+                        .contains("sd_hash-check")
+                }
             }
 
 
@@ -476,31 +479,10 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
             // Check created session
             test("Check Verification Session after presentation") {
                 assertTrue { info2.attempted }
-                assertTrue { info2.status == Verification2Session.VerificationSessionStatus.SUCCESSFUL }
-
-                assertNotNull(info2.presentedCredentials)
-                assertEquals(info2.presentedCredentials!!.size, 1)
-                assertNotNull(info2.presentedCredentials!!["my_pid"])
-                assertTrue { info2.presentedCredentials!!["my_pid"]!!.size == 1 }
+                assertTrue { info2.status == Verification2Session.VerificationSessionStatus.FAILED }
 
             }
 
-            test("Policy results") {
-                println("Parsed policy results: ${info2.policyResults}")
-
-                info2.policyResults?.vcPolicies?.forEach {
-                    println("${it.policy.id}: ${it.success}")
-                }
-
-                assertNotNull(info2.policyResults)
-                assertTrue { info2.policyResults!!.overallSuccess }
-
-                assertTrue { info2.policyResults!!.vcPolicies.size == additionalSdjwtvcPolicies.vc_policies?.policies?.size }
-                assertTrue {
-                    info2.policyResults!!.vpPolicies["my_pid"]
-                        ?.get("dc+sd-jwt/transaction-data-hash-check")?.success == true
-                }
-            }
         }
     }
 

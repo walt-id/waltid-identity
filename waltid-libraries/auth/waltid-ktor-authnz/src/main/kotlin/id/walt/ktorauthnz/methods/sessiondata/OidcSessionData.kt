@@ -47,3 +47,23 @@ data class OidcSessionAuthenticatedData(
     }
 
 }
+
+@Serializable
+@SerialName("oidc-token-validation-v2")
+data class OidcTokenValidationPolicyData(
+    val idpJwksUrl: String,
+    val idpIss: String,
+    val idTokenSigningAlgorithms: Set<String>,
+) : SessionData {
+    init {
+        require(idTokenSigningAlgorithms.isNotEmpty()) {
+            "OpenID Provider metadata must advertise ID Token signing algorithms"
+        }
+    }
+
+    constructor(openIdConfiguration: OIDC.OpenIdConfiguration) : this(
+        idpJwksUrl = openIdConfiguration.jwksUri,
+        idpIss = openIdConfiguration.issuer,
+        idTokenSigningAlgorithms = openIdConfiguration.idTokenSigningAlgValuesSupported.toSet(),
+    )
+}

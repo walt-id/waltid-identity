@@ -2,9 +2,21 @@ package id.walt.wallet2.data
 
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.inferKeySpec
+import id.walt.crypto2.keys.toPublicJwk
+import id.walt.crypto2.serialization.BinaryData
+import id.walt.wallet2.handlers.WalletIssuanceHandler
+import id.walt.wallet2.handlers.WalletPresentationHandler
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.toList
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 /**
  * Represents a wallet instance composed of its storage backends.
@@ -68,6 +80,8 @@ data class Wallet(
      */
     val defaultDidId: String? = null,
 ) {
+    private var resolvedStaticCrypto2Key: Crypto2Key? = null
+
     // ---------------------------------------------------------------------------
     // Aggregate helpers
     // ---------------------------------------------------------------------------
@@ -92,6 +106,22 @@ data class Wallet(
         else -> defaultKey()
     }
 
+    /** Finds a crypto2 key by ID across all key stores, then the static-key sidecar. */
+    suspend fun findCrypto2Key(keyId: String, usages: Set<KeyUsage> = emptySet()): Crypto2Key? =
+        keyStores.firstNotNullOfOrNull { it.getCrypto2Key(keyId, usages) }
+            ?: resolvedStaticCrypto2Key?.takeIf { it.id.value == keyId }?.also { key ->
+                require(usages.all(key.usages::contains)) { "Wallet crypto2 static key does not permit requested usages" }
+            }
+
+    suspend fun resolveCrypto2Key(
+        keyId: String? = null,
+        usages: Set<KeyUsage> = emptySet(),
+    ): Crypto2Key? = when {
+        keyId != null -> findCrypto2Key(keyId, usages)
+            ?: error("Crypto2 key '$keyId' not found in any wallet key store")
+        else -> defaultCrypto2Key(usages)
+    }
+
     /**
      * Returns the default key.
      * If [defaultKeyId] is set, that key is returned (looked up across all stores).
@@ -101,6 +131,42 @@ data class Wallet(
         defaultKeyId?.let { findKey(it) }
             ?: keyStores.firstNotNullOfOrNull { it.getDefaultKey() }
             ?: staticKey
+
+    suspend fun defaultCrypto2Key(usages: Set<KeyUsage> = emptySet()): Crypto2Key? =
+        defaultKeyId?.let { findCrypto2Key(it, usages) }
+            ?: keyStores.firstNotNullOfOrNull { it.getDefaultCrypto2Key(usages) }
+            ?: resolvedStaticCrypto2Key?.also { key ->
+                require(usages.all(key.usages::contains)) { "Wallet crypto2 static key does not permit requested usages" }
+            }
+
+    /** Attaches a validated runtime crypto2 counterpart without changing the published constructor. */
+    suspend fun attachStaticCrypto2Key(key: Crypto2Key): Wallet = apply {
+        val legacyKey = requireNotNull(staticKey) { "A crypto2 static key requires serialized legacy key material" }
+        val legacyPublicJwk = EncodedKey.Jwk(
+            BinaryData(Json.encodeToString(legacyKey.getPublicKey().exportJWKObject()).encodeToByteArray()),
+            privateMaterial = false,
+        )
+        val crypto2PublicJwk = requireNotNull(key.capabilities.publicKeyExporter) {
+            "Wallet crypto2 static key does not export public material"
+        }.exportPublicKey().toPublicJwk(key.spec)
+        val expectedUsages = if (legacyKey.hasPrivateKey) {
+            setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
+        } else {
+            setOf(KeyUsage.VERIFY)
+        }
+        require(key.id.value == legacyKey.getKeyId()) { "Wallet crypto2 static key ID does not match the legacy key" }
+        require(key.spec == legacyPublicJwk.inferKeySpec()) {
+            "Wallet crypto2 static key specification does not match the legacy key"
+        }
+        require(key.usages == expectedUsages) { "Wallet crypto2 static key usages do not match the legacy key" }
+        require(Jwk.sha256Thumbprint(legacyPublicJwk) == Jwk.sha256Thumbprint(crypto2PublicJwk)) {
+            "Wallet crypto2 static key public material does not match the legacy key"
+        }
+        resolvedStaticCrypto2Key = key
+    }
+
+    /** Returns the attached runtime sidecar without exposing it as a serializable bean property. */
+    fun attachedStaticCrypto2Key(): Crypto2Key? = resolvedStaticCrypto2Key
 
     /** Lists all keys across all key stores, in store order. */
     suspend fun listAllKeys(): List<WalletKeyInfo> {
@@ -142,4 +208,51 @@ data class Wallet(
         defaultDidId
             ?: didStore?.getDefaultDid()
             ?: staticDid
+}
+
+internal suspend fun Wallet.resolveKeyMaterial(
+    keyId: String?,
+    crypto2Usages: Set<KeyUsage>,
+): WalletKeyStoreEntry? {
+    val preferredKeyId = keyId ?: defaultKeyId
+    if (preferredKeyId != null) {
+        keyStores.forEach { store ->
+            store.getKeyMaterial(preferredKeyId, crypto2Usages)?.let { material ->
+                requireMatchingKeyMaterial(material.legacyKey, material.crypto2Key)
+                return material
+            }
+        }
+        staticKey?.takeIf { it.getKeyId() == preferredKeyId }
+            ?.let { return staticKeyMaterial(crypto2Usages) }
+        if (keyId != null) return null
+    }
+    keyStores.forEach { store ->
+        val defaultKeyId = store.listKeys().firstOrNull()?.keyId ?: return@forEach
+        store.getKeyMaterial(defaultKeyId, crypto2Usages)?.let { material ->
+            requireMatchingKeyMaterial(material.legacyKey, material.crypto2Key)
+            return material
+        }
+    }
+    return staticKeyMaterial(crypto2Usages)
+}
+
+private suspend fun Wallet.staticKeyMaterial(usages: Set<KeyUsage>): WalletKeyStoreEntry? = staticKey?.let { legacyKey ->
+    val crypto2Key = attachedStaticCrypto2Key()?.also { key ->
+        require(usages.all(key.usages::contains)) { "Wallet crypto2 static key does not permit requested usages" }
+    }
+    WalletKeyStoreEntry(legacyKey.getKeyId(), legacyKey, crypto2Key)
+}
+
+private suspend fun requireMatchingKeyMaterial(legacyKey: Key?, crypto2Key: Crypto2Key?) {
+    if (legacyKey == null || crypto2Key == null) return
+    val legacyJwk = EncodedKey.Jwk(
+        BinaryData(Json.encodeToString(legacyKey.getPublicKey().exportJWKObject()).encodeToByteArray()),
+        privateMaterial = false,
+    )
+    val crypto2Jwk = requireNotNull(crypto2Key.capabilities.publicKeyExporter) {
+        "Wallet crypto2 key does not export public material"
+    }.exportPublicKey().toPublicJwk(crypto2Key.spec)
+    require(Jwk.sha256Thumbprint(legacyJwk) == Jwk.sha256Thumbprint(crypto2Jwk)) {
+        "Wallet legacy and crypto2 key material do not match"
+    }
 }

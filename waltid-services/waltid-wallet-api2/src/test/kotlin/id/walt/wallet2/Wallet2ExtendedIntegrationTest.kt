@@ -44,6 +44,7 @@ import id.walt.wallet2.handlers.*
 import id.walt.wallet2.server.handlers.CreateWalletRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import id.walt.wallet2.server.handlers.WalletInfoResponse
+import id.walt.wallet2.server.models.ResolveOfferDetailedResponse
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -411,13 +412,27 @@ class Wallet2ExtendedIntegrationTest {
                     call.response.header(HttpHeaders.CacheControl, "no-store")
                     call.respond(buildJsonObject {
                         put("c_nonce", nonce.nonce)
-                        put("c_nonce_expires_in", nonce.expiresInSeconds)
                     })
                 }
                 post("/token") {
                     val params = call.receiveParameters()
                     val code = params["pre-authorized_code"] ?: return@post call.respond(
                         HttpStatusCode.BadRequest, buildJsonObject { put("error", "invalid_request") }
+                    )
+                    if (code == "invalid-pre-authorized-code") return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        buildJsonObject {
+                            put("error", "invalid_grant")
+                            put("error_description", "do-not-leak")
+                        },
+                    )
+                    if (code == "unauthorized-pre-authorized-code") return@post call.respond(
+                        HttpStatusCode.Unauthorized,
+                        buildJsonObject { put("error", "invalid_client") },
+                    )
+                    if (code == "server-failure-pre-authorized-code") return@post call.respond(
+                        HttpStatusCode.InternalServerError,
+                        buildJsonObject { put("error", "server_error") },
                     )
                     val tokenRequest = provider.createAccessTokenRequest(
                         mapOf(
@@ -515,12 +530,14 @@ class Wallet2ExtendedIntegrationTest {
                         contentType(ContentType.Application.Json)
                         setBody(ResolveOfferRequest(offerUrl = Url(offerUri)))
                     }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-                        .body<ResolveOfferResult>()
+                        .body<ResolveOfferDetailedResponse>()
                 }
                 assertEquals(issuerBase, resolveResult.credentialIssuer)
                 assertEquals("$issuerBase/token", resolveResult.tokenEndpoint?.toString())
                 assertEquals(preAuthCode, resolveResult.preAuthorizedCode)
+                assertTrue(resolveResult.credentialConfigurationIds.isNotEmpty())
                 assertTrue(resolveResult.offeredCredentials.isNotEmpty())
+                assertEquals(issuerBase, resolveResult.issuer.credentialIssuer)
 
                 // -- Isolated step 2: Request token --
                 val tokenResult = testAndReturn("Isolated: request-token") {
@@ -535,6 +552,68 @@ class Wallet2ExtendedIntegrationTest {
                         .body<RequestTokenResult>()
                 }
                 assertNotNull(tokenResult.accessToken)
+
+                val rejectedToken = testAndReturn("Isolated: invalid token request maps upstream 4xx") {
+                    http.post("/wallet/$walletId/credentials/receive/request-token") {
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            RequestTokenRequest(
+                                tokenEndpoint = requireNotNull(resolveResult.tokenEndpoint),
+                                preAuthorizedCode = "invalid-pre-authorized-code",
+                                credentialIssuer = resolveResult.credentialIssuer,
+                            )
+                        )
+                    }.also {
+                        assertEquals(HttpStatusCode.BadRequest, it.status, it.bodyAsText())
+                    }
+                }
+                val rejectedTokenBody = rejectedToken.bodyAsText()
+                assertTrue("invalid_grant" in rejectedTokenBody || "Token request failed" in rejectedTokenBody)
+                assertTrue("do-not-leak" !in rejectedTokenBody)
+
+                testAndReturn("Isolated: upstream 401 is preserved") {
+                    http.post("/wallet/$walletId/credentials/receive/request-token") {
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            RequestTokenRequest(
+                                tokenEndpoint = requireNotNull(resolveResult.tokenEndpoint),
+                                preAuthorizedCode = "unauthorized-pre-authorized-code",
+                                credentialIssuer = resolveResult.credentialIssuer,
+                            )
+                        )
+                    }.also {
+                        assertEquals(HttpStatusCode.Unauthorized, it.status, it.bodyAsText())
+                    }
+                }
+
+                testAndReturn("Isolated: upstream 5xx maps to 502") {
+                    http.post("/wallet/$walletId/credentials/receive/request-token") {
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            RequestTokenRequest(
+                                tokenEndpoint = requireNotNull(resolveResult.tokenEndpoint),
+                                preAuthorizedCode = "server-failure-pre-authorized-code",
+                                credentialIssuer = resolveResult.credentialIssuer,
+                            )
+                        )
+                    }.also {
+                        assertEquals(HttpStatusCode.BadGateway, it.status, it.bodyAsText())
+                    }
+                }
+
+                testAndReturn("Isolated: token transport failure maps to 502") {
+                    http.post("/wallet/$walletId/credentials/receive/request-token") {
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            RequestTokenRequest(
+                                tokenEndpoint = Url("http://127.0.0.1:1/token"),
+                                preAuthorizedCode = "unreachable",
+                            )
+                        )
+                    }.also {
+                        assertEquals(HttpStatusCode.BadGateway, it.status, it.bodyAsText())
+                    }
+                }
 
                 // -- Isolated step 3: Obtain a fresh proof nonce --
                 val nonceResult = testAndReturn("Isolated: request-nonce") {
@@ -552,6 +631,7 @@ class Wallet2ExtendedIntegrationTest {
                         setBody(
                             SignProofRequest(
                                 issuerUrl = Url(issuerBase),
+                                credentialConfigurationId = credentialConfigId,
                                 nonce = nonceResult.nonce,
                                 keyId = keyInfo.keyId
                             )
@@ -594,6 +674,7 @@ class Wallet2ExtendedIntegrationTest {
                                 credentialConfigurationId = credentialConfigId,
                                 proofJwt = signResult.proofJwt,
                                 storeInWallet = true,
+                                credentialIssuerBaseUrl = issuerBase,
                             )
                         )
                     }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }

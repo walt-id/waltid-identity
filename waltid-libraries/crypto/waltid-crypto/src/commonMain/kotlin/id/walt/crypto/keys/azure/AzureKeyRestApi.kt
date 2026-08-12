@@ -27,7 +27,6 @@ import kotlinx.serialization.json.*
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
-import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.random.Random
@@ -150,8 +149,8 @@ class AzureKeyRestApi(
         require(!auth?.clientSecret.isNullOrBlank()) { "Azure clientSecret is required for signing operations" }
         ensureAccessTokenValid()
 
-        val sha256Digest: ByteArray = SHA256().digest(plaintext)
-        val base64UrlEncoded: String = sha256Digest.encodeToBase64Url()
+        val digest = keyType.digestForSignature(plaintext)
+        val base64UrlEncoded = digest.encodeToBase64Url()
 
         val signingAlgorithm = keyType.jwsAlg
 
@@ -289,7 +288,8 @@ class AzureKeyRestApi(
                 else -> type.jwkKty to type.jwkCurve
             }
 
-        internal fun azureKeyToKeyTypeMapping(crv: String, kty: String): KeyType = KeyTypes.getKeyTypeByJwkId(jwkKty = kty, jwkCrv = crv)
+        internal fun azureKeyToKeyTypeMapping(crv: String?, kty: String): KeyType =
+            KeyTypes.getKeyTypeByJwkId(jwkKty = kty, jwkCrv = crv)
 
         data class ParsedAzurePublicKey(
             val kid: String,
@@ -308,7 +308,11 @@ class AzureKeyRestApi(
             val publicKey = JWKKey.importJWK(publicKeyJsonModified.toMap().toJsonElement().toString())
                 .getOrElse { exception -> throw IllegalArgumentException("Invalid JWK in public key: $publicKeyJson", exception) }
 
-            val keyType = azureKeyToKeyTypeMapping(crvFromResponse ?: "", azureKeyType)
+            val keyType = if (azureKeyType == "RSA") {
+                publicKey.keyType
+            } else {
+                azureKeyToKeyTypeMapping(crvFromResponse, azureKeyType)
+            }
 
             return ParsedAzurePublicKey(kid, azureKeyType, crvFromResponse, keyType, publicKey)
         }
@@ -418,7 +422,11 @@ class AzureKeyRestApi(
                 val keyRequestBody = if (kty == "RSA") {
                     KeyCreateRequest(
                         kty = kty,
-                        keySize = 2048
+                        keySize = when (type) {
+                            KeyType.RSA3072 -> 3072
+                            KeyType.RSA4096 -> 4096
+                            else -> 2048
+                        }
                     )
                 } else {
                     KeyCreateRequest(
@@ -439,7 +447,8 @@ class AzureKeyRestApi(
                 val createdKey = AzureKeyRestApi(
                     id = keyId,
                     auth = metadata.auth,
-                    _keyType = parsedAzurePublicKey.keyType,
+                    // Prefer requested type: Azure kty/crv cannot distinguish RSA key sizes.
+                    _keyType = type,
                     _publicKey = DirectSerializedKey(parsedAzurePublicKey.publicKey)
                 )
                 createdKey.auth?.clientSecret = metadata.auth.clientSecret

@@ -5,10 +5,12 @@ protocol WalletCoreBridge: Sendable {
     var events: AsyncStream<WalletEvent> { get }
 
     func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult
-    func resolveOffer(offer: URL) async throws -> OfferResolution
-    func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String]
-    func receive(previewHandle: IssuancePreviewHandle, txCode: String?, clientID: String) async throws -> [String]
-    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws
+    func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession
+    func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization
+    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome
+    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome
+    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
+    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome
     func credentials() async throws -> [Credential]
     func deleteLocalData() async throws
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
@@ -26,6 +28,19 @@ protocol WalletCoreBridge: Sendable {
         errorDescription: String?
     ) async throws -> PresentationResult
     func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws
+    func digitalCredentialCapabilities() -> DigitalCredentialCapabilities
+    func previewAnnexCPresentation(
+        parsedRequest: AnnexCParsedRequest,
+        verifiedOrigin: String,
+        selectedRegistryEntryIDs: [String]
+    ) async throws -> AnnexCPresentationPreview
+    func submitAnnexCPresentation(
+        requestID: String,
+        verifiedOrigin: String,
+        deviceRequestBase64URL: String,
+        encryptionInfoBase64URL: String,
+        selectedCredentialOptions: [PresentationCredentialSelection]
+    ) async throws -> DigitalCredentialResponse
 }
 
 @available(macOS 10.15, *)
@@ -51,19 +66,30 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         throw unavailableError()
     }
 
-    func resolveOffer(offer: URL) async throws -> OfferResolution {
+    func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
         throw unavailableError()
     }
 
-    func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String] {
+    func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization {
         throw unavailableError()
     }
 
-    func receive(previewHandle: IssuancePreviewHandle, txCode: String?, clientID: String) async throws -> [String] {
+    func continuePreAuthorizedIssuance(
+        sessionID: String,
+        transactionCode: String?
+    ) async throws -> IssuanceOutcome {
         throw unavailableError()
     }
 
-    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
+    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome {
+        throw unavailableError()
+    }
+
+    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
+        throw unavailableError()
+    }
+
+    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
         throw unavailableError()
     }
 
@@ -104,6 +130,30 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
         throw unavailableError()
     }
+    func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
+        DigitalCredentialCapabilities(
+            platform: "unavailable",
+            platformAvailable: false,
+            minimumOSVersion: "iOS 26",
+            registrationAvailable: false,
+            capabilities: []
+        )
+    }
+
+    func previewAnnexCPresentation(
+        parsedRequest: AnnexCParsedRequest,
+        verifiedOrigin: String,
+        selectedRegistryEntryIDs: [String]
+    ) async throws -> AnnexCPresentationPreview { throw unavailableError() }
+
+    func submitAnnexCPresentation(
+        requestID: String,
+        verifiedOrigin: String,
+        deviceRequestBase64URL: String,
+        encryptionInfoBase64URL: String,
+        selectedCredentialOptions: [PresentationCredentialSelection]
+    ) async throws -> DigitalCredentialResponse { throw unavailableError() }
+
     private func unavailableError() -> WalletError {
         .internalFailure("WalletCore is only available when the iOS XCFramework is linked.")
     }

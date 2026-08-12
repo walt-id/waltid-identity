@@ -11,6 +11,17 @@
 		2185E0068DD9855D00602730 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 519D794773D1421EEC9493DE /* WalletSDK */; };
 		71E100012FDAE00000000001 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 519D794773D1421EEC9493DE /* WalletSDK */; };
 		71E100022FDAE00000000002 /* TestHelpers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; };
+		A7520000000000000000000A /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 256D4E3F703216DC04F0C650 /* WalletSDK */; };
+		A75200000000000000000024 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A75200000000000000000021 /* WalletDemoIdentityDocumentSupport */; };
+		A75200000000000000000043 /* WalletDemoSharingUI in Frameworks */ = {isa = PBXBuildFile; productRef = A75200000000000000000040 /* WalletDemoSharingUI */; };
+		A75200000000000000000044 /* WalletDemoSharingUI in Frameworks */ = {isa = PBXBuildFile; productRef = A75200000000000000000041 /* WalletDemoSharingUI */; };
+		A75200000000000000000045 /* WalletDemoSharingUI in Frameworks */ = {isa = PBXBuildFile; productRef = A75200000000000000000042 /* WalletDemoSharingUI */; };
+		A75200000000000000000025 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A75200000000000000000022 /* WalletDemoIdentityDocumentSupport */; };
+		A75200000000000000000026 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A75200000000000000000023 /* WalletDemoIdentityDocumentSupport */; };
+		A75200000000000000000031 /* SharedWalletConfigurationAssertions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000030 /* SharedWalletConfigurationAssertions.swift */; };
+		A7520000000000000000000C /* IdentityDocumentProvider.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = A75200000000000000000002 /* IdentityDocumentProvider.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A75200000000000000000011 /* IdentityDocumentRegistrationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000010 /* IdentityDocumentRegistrationCoordinator.swift */; };
+		A75200000000000000000012 /* IdentityDocumentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000013 /* IdentityDocumentProvider.swift */; };
 		A1000500AAAA000100000050 /* CodeScanner in Frameworks */ = {isa = PBXBuildFile; productRef = A1000501AAAA000000000051 /* CodeScanner */; };
 		A1000001AAAA000100000001 /* WalletViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001AAAA000000000001 /* WalletViewModel.swift */; };
 		A1000420AAAA000100000020 /* WalletClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000420AAAA000000000020 /* WalletClient.swift */; };
@@ -21,36 +32,45 @@
 		A1000422AAAA000100000022 /* CredentialsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000422AAAA000000000022 /* CredentialsTabView.swift */; };
 		A1000423AAAA000100000023 /* CredentialDetailsDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000423AAAA000000000023 /* CredentialDetailsDestination.swift */; };
 		A1000006AAAA000100000006 /* StatusBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006AAAA000000000006 /* StatusBannerView.swift */; };
-		A1000007AAAA000100000007 /* CredentialCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000007AAAA000000000007 /* CredentialCardView.swift */; };
-		A1000008AAAA000100000008 /* WalletColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000008AAAA000000000008 /* WalletColors.swift */; };
 		A1000424AAAA000100000024 /* EmptyCredentialsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000424AAAA000000000024 /* EmptyCredentialsView.swift */; };
 		A1000425AAAA000100000025 /* UrlEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000425AAAA000000000025 /* UrlEditor.swift */; };
-		A1000426AAAA000100000026 /* VerifierReviewSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000426AAAA000000000026 /* VerifierReviewSections.swift */; };
-		A1000427AAAA000100000027 /* PresentationReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000427AAAA000000000027 /* PresentationReviewView.swift */; };
 		A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000430AAAA000000000030 /* OfferReviewView.swift */; };
-		A1000431AAAA000100000031 /* ReviewMetadataComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000431AAAA000000000031 /* ReviewMetadataComponents.swift */; };
-		A1000428AAAA000100000028 /* ClaimPathExpression.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000428AAAA000000000028 /* ClaimPathExpression.swift */; };
-		A1000301AAAA000100000001 /* ClaimGroupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000301AAAA000000000001 /* ClaimGroupView.swift */; };
-		A1000302AAAA000100000002 /* ClaimValueRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000302AAAA000000000002 /* ClaimValueRow.swift */; };
-		A1000303AAAA000100000003 /* CredentialDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000303AAAA000000000003 /* CredentialDetailsView.swift */; };
-		A1000304AAAA000100000004 /* CredentialDisplayModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000304AAAA000000000004 /* CredentialDisplayModels.swift */; };
-		A1000305AAAA000100000005 /* CredentialDisplayNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000305AAAA000000000005 /* CredentialDisplayNormalizer.swift */; };
-		A1000306AAAA000100000006 /* CredentialDisplayValueDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000306AAAA000000000006 /* CredentialDisplayValueDecoder.swift */; };
-		A1000307AAAA000100000007 /* CredentialDisplayVocabulary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000307AAAA000000000007 /* CredentialDisplayVocabulary.swift */; };
-		A1000308AAAA000100000008 /* CredentialTypeIdentifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000308AAAA000000000008 /* CredentialTypeIdentifier.swift */; };
-		A1000309AAAA000100000009 /* CredentialCardSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000309AAAA000000000009 /* CredentialCardSummary.swift */; };
 		A1000310AAAA000100000010 /* CredentialDetailsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000310AAAA000000000010 /* CredentialDetailsScreen.swift */; };
-		A1000311AAAA000100000011 /* WalletAccessibilityID.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000311AAAA000000000011 /* WalletAccessibilityID.swift */; };
-		A1000312AAAA000100000012 /* CredentialSystemInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000312AAAA000000000012 /* CredentialSystemInfo.swift */; };
 		B33B17EA2C2C394F001A32F7 /* WalletDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17E92C2C394F001A32F7 /* WalletDemoApp.swift */; };
 		B33B17EC2C2C394F001A32F7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17EB2C2C394F001A32F7 /* ContentView.swift */; };
 		B33B17EE2C2C3957001A32F7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B33B17ED2C2C3957001A32F7 /* Assets.xcassets */; };
 		D69044562FDAA61A009AB1FB /* TestHelpers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; };
 		D69044582FDAA6DB009AB1FB /* TestHelpers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; };
+		D690445A2FDAA6DB009AB1FB /* TestHelpers.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		E2E00002AAAA000100000002 /* PublicDemoBackendE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00002AAAA000000000002 /* PublicDemoBackendE2ETests.swift */; };
 		E2E00003AAAA000100000003 /* WalletE2EHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00003AAAA000000000003 /* WalletE2EHelpers.swift */; };
 		E2E00014AAAA000100000014 /* MockWalletUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00014AAAA000000000014 /* MockWalletUITests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A7520000000000000000000B /* Embed ExtensionKit Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(EXTENSIONS_FOLDER_PATH)";
+			dstSubfolderSpec = 16;
+			files = (
+				A7520000000000000000000C /* IdentityDocumentProvider.appex in Embed ExtensionKit Extensions */,
+			);
+			name = "Embed ExtensionKit Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D690445B2FDAA6DB009AB1FB /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				D690445A2FDAA6DB009AB1FB /* TestHelpers.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXContainerItemProxy section */
 		D6B7A34E2FD94CC3009C69E7 /* PBXContainerItemProxy */ = {
@@ -74,6 +94,13 @@
 			remoteGlobalIDString = B33B17E52C2C394F001A32F7;
 			remoteInfo = iosApp;
 		};
+		A7520000000000000000000E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B33B17DE2C2C394F001A32F7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A75200000000000000000003;
+			remoteInfo = IdentityDocumentProvider;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -86,27 +113,10 @@
 		A1000422AAAA000000000022 /* CredentialsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialsTabView.swift; sourceTree = "<group>"; };
 		A1000423AAAA000000000023 /* CredentialDetailsDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDetailsDestination.swift; sourceTree = "<group>"; };
 		A1000006AAAA000000000006 /* StatusBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBannerView.swift; sourceTree = "<group>"; };
-		A1000007AAAA000000000007 /* CredentialCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialCardView.swift; sourceTree = "<group>"; };
-		A1000008AAAA000000000008 /* WalletColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletColors.swift; sourceTree = "<group>"; };
 		A1000424AAAA000000000024 /* EmptyCredentialsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyCredentialsView.swift; sourceTree = "<group>"; };
 		A1000425AAAA000000000025 /* UrlEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UrlEditor.swift; sourceTree = "<group>"; };
-		A1000426AAAA000000000026 /* VerifierReviewSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifierReviewSections.swift; sourceTree = "<group>"; };
-		A1000427AAAA000000000027 /* PresentationReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationReviewView.swift; sourceTree = "<group>"; };
 		A1000430AAAA000000000030 /* OfferReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfferReviewView.swift; sourceTree = "<group>"; };
-		A1000431AAAA000000000031 /* ReviewMetadataComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewMetadataComponents.swift; sourceTree = "<group>"; };
-		A1000428AAAA000000000028 /* ClaimPathExpression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaimPathExpression.swift; sourceTree = "<group>"; };
-		A1000301AAAA000000000001 /* ClaimGroupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaimGroupView.swift; sourceTree = "<group>"; };
-		A1000302AAAA000000000002 /* ClaimValueRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaimValueRow.swift; sourceTree = "<group>"; };
-		A1000303AAAA000000000003 /* CredentialDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDetailsView.swift; sourceTree = "<group>"; };
-		A1000304AAAA000000000004 /* CredentialDisplayModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDisplayModels.swift; sourceTree = "<group>"; };
-		A1000305AAAA000000000005 /* CredentialDisplayNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDisplayNormalizer.swift; sourceTree = "<group>"; };
-		A1000306AAAA000000000006 /* CredentialDisplayValueDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDisplayValueDecoder.swift; sourceTree = "<group>"; };
-		A1000307AAAA000000000007 /* CredentialDisplayVocabulary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDisplayVocabulary.swift; sourceTree = "<group>"; };
-		A1000308AAAA000000000008 /* CredentialTypeIdentifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialTypeIdentifier.swift; sourceTree = "<group>"; };
-		A1000309AAAA000000000009 /* CredentialCardSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialCardSummary.swift; sourceTree = "<group>"; };
 		A1000310AAAA000000000010 /* CredentialDetailsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDetailsScreen.swift; sourceTree = "<group>"; };
-		A1000311AAAA000000000011 /* WalletAccessibilityID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletAccessibilityID.swift; sourceTree = "<group>"; };
-		A1000312AAAA000000000012 /* CredentialSystemInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialSystemInfo.swift; sourceTree = "<group>"; };
 		B30E22802C2D8AD700D4781C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B33B17E62C2C394F001A32F7 /* iosApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B33B17E92C2C394F001A32F7 /* WalletDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletDemoApp.swift; sourceTree = "<group>"; };
@@ -119,6 +129,13 @@
 		E2E00003AAAA000000000003 /* WalletE2EHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletE2EHelpers.swift; sourceTree = "<group>"; };
 		E2E00014AAAA000000000014 /* MockWalletUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockWalletUITests.swift; sourceTree = "<group>"; };
 		E2E00004AAAA000000000004 /* iosAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A75200000000000000000002 /* IdentityDocumentProvider.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = IdentityDocumentProvider.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A75200000000000000000010 /* IdentityDocumentRegistrationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityDocumentRegistrationCoordinator.swift; sourceTree = "<group>"; };
+		A75200000000000000000013 /* IdentityDocumentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityDocumentProvider.swift; sourceTree = "<group>"; };
+		A75200000000000000000014 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A75200000000000000000015 /* IdentityDocumentProvider.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IdentityDocumentProvider.entitlements; sourceTree = "<group>"; };
+		A75200000000000000000030 /* SharedWalletConfigurationAssertions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedWalletConfigurationAssertions.swift; sourceTree = "<group>"; };
+		A75200000000000000000016 /* iosApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iosApp.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -163,6 +180,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				0221E8E7784E493B08CF5888 /* WalletSDK in Frameworks */,
+				A75200000000000000000024 /* WalletDemoIdentityDocumentSupport in Frameworks */,
+				A75200000000000000000043 /* WalletDemoSharingUI in Frameworks */,
 				A1000500AAAA000100000050 /* CodeScanner in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -196,7 +215,19 @@
 			buildActionMask = 2147483647;
 			files = (
 				2185E0068DD9855D00602730 /* WalletSDK in Frameworks */,
+				A75200000000000000000026 /* WalletDemoIdentityDocumentSupport in Frameworks */,
+				A75200000000000000000045 /* WalletDemoSharingUI in Frameworks */,
 				D69044562FDAA61A009AB1FB /* TestHelpers.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A75200000000000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A7520000000000000000000A /* WalletSDK in Frameworks */,
+				A75200000000000000000025 /* WalletDemoIdentityDocumentSupport in Frameworks */,
+				A75200000000000000000044 /* WalletDemoSharingUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -238,50 +269,22 @@
 			children = (
 				A1000006AAAA000000000006 /* StatusBannerView.swift */,
 				A1000425AAAA000000000025 /* UrlEditor.swift */,
-				A1000007AAAA000000000007 /* CredentialCardView.swift */,
 				A1000424AAAA000000000024 /* EmptyCredentialsView.swift */,
-				A1000301AAAA000000000001 /* ClaimGroupView.swift */,
-				A1000302AAAA000000000002 /* ClaimValueRow.swift */,
-				A1000303AAAA000000000003 /* CredentialDetailsView.swift */,
-				A1000426AAAA000000000026 /* VerifierReviewSections.swift */,
-				A1000427AAAA000000000027 /* PresentationReviewView.swift */,
 				A1000430AAAA000000000030 /* OfferReviewView.swift */,
-				A1000431AAAA000000000031 /* ReviewMetadataComponents.swift */,
 			);
 			path = Components;
-			sourceTree = "<group>";
-		};
-		A1000013AAAA000000000013 /* Theme */ = {
-			isa = PBXGroup;
-			children = (
-				A1000008AAAA000000000008 /* WalletColors.swift */,
-			);
-			path = Theme;
-			sourceTree = "<group>";
-		};
-		A1000320AAAA000000000020 /* Display */ = {
-			isa = PBXGroup;
-			children = (
-				A1000309AAAA000000000009 /* CredentialCardSummary.swift */,
-				A1000304AAAA000000000004 /* CredentialDisplayModels.swift */,
-				A1000428AAAA000000000028 /* ClaimPathExpression.swift */,
-				A1000305AAAA000000000005 /* CredentialDisplayNormalizer.swift */,
-				A1000306AAAA000000000006 /* CredentialDisplayValueDecoder.swift */,
-				A1000307AAAA000000000007 /* CredentialDisplayVocabulary.swift */,
-				A1000308AAAA000000000008 /* CredentialTypeIdentifier.swift */,
-				A1000312AAAA000000000012 /* CredentialSystemInfo.swift */,
-			);
-			path = Display;
 			sourceTree = "<group>";
 		};
 		B33B17DD2C2C394F001A32F7 = {
 			isa = PBXGroup;
 			children = (
 				B33B17E82C2C394F001A32F7 /* iosApp */,
+				A75200000000000000000001 /* IdentityDocumentProvider */,
 				E2E00010AAAA000000000010 /* iosAppUITests */,
 				D6B7A34B2FD94CC3009C69E7 /* iosAppTests */,
 				71E100062FDAE00000000006 /* iosAppEnterpriseTests */,
 				D690444B2FDAA5D2009AB1FB /* ../../mobile-e2e-fixtures/ios/TestHelpers */,
+				A75200000000000000000032 /* ../../mobile-e2e-fixtures/ios/IdentityDocumentTests */,
 				B33B17E72C2C394F001A32F7 /* Products */,
 				76E29D6CBD9A178AFD844515 /* Frameworks */,
 			);
@@ -295,6 +298,7 @@
 				D6B7A34A2FD94CC3009C69E7 /* iosAppTests.xctest */,
 				71E100052FDAE00000000005 /* iosAppEnterpriseTests.xctest */,
 				D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */,
+				A75200000000000000000002 /* IdentityDocumentProvider.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -303,17 +307,35 @@
 			isa = PBXGroup;
 			children = (
 				B30E22802C2D8AD700D4781C /* Info.plist */,
+				A75200000000000000000016 /* iosApp.entitlements */,
 				B33B17E92C2C394F001A32F7 /* WalletDemoApp.swift */,
+				A75200000000000000000010 /* IdentityDocumentRegistrationCoordinator.swift */,
 				B33B17EB2C2C394F001A32F7 /* ContentView.swift */,
-				A1000311AAAA000000000011 /* WalletAccessibilityID.swift */,
 				A1000010AAAA000000000010 /* ViewModels */,
 				A1000011AAAA000000000011 /* Views */,
 				A1000012AAAA000000000012 /* Components */,
-				A1000320AAAA000000000020 /* Display */,
-				A1000013AAAA000000000013 /* Theme */,
 				B33B17ED2C2C3957001A32F7 /* Assets.xcassets */,
 			);
 			path = iosApp;
+			sourceTree = "<group>";
+		};
+		A75200000000000000000001 /* IdentityDocumentProvider */ = {
+			isa = PBXGroup;
+			children = (
+				A75200000000000000000013 /* IdentityDocumentProvider.swift */,
+				A75200000000000000000014 /* Info.plist */,
+				A75200000000000000000015 /* IdentityDocumentProvider.entitlements */,
+			);
+			path = IdentityDocumentProvider;
+			sourceTree = "<group>";
+		};
+		A75200000000000000000032 /* ../../mobile-e2e-fixtures/ios/IdentityDocumentTests */ = {
+			isa = PBXGroup;
+			children = (
+				A75200000000000000000030 /* SharedWalletConfigurationAssertions.swift */,
+			);
+			name = "../../mobile-e2e-fixtures/ios/IdentityDocumentTests";
+			path = "../../mobile-e2e-fixtures/ios/IdentityDocumentTests";
 			sourceTree = "<group>";
 		};
 		E2E00010AAAA000000000010 /* iosAppUITests */ = {
@@ -346,19 +368,45 @@
 				B33B17E22C2C394F001A32F7 /* Sources */,
 				B33B17E32C2C394F001A32F7 /* Frameworks */,
 				B33B17E42C2C394F001A32F7 /* Resources */,
+				A7520000000000000000000B /* Embed ExtensionKit Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A7520000000000000000000D /* PBXTargetDependency */,
 			);
 			name = iosApp;
 			packageProductDependencies = (
 				256D4E3F703216DC04F0C650 /* WalletSDK */,
+				A75200000000000000000021 /* WalletDemoIdentityDocumentSupport */,
+				A75200000000000000000040 /* WalletDemoSharingUI */,
 				A1000501AAAA000000000051 /* CodeScanner */,
 			);
 			productName = iosApp;
 			productReference = B33B17E62C2C394F001A32F7 /* iosApp.app */;
 			productType = "com.apple.product-type.application";
+		};
+		A75200000000000000000003 /* IdentityDocumentProvider */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A75200000000000000000007 /* Build configuration list for PBXNativeTarget "IdentityDocumentProvider" */;
+			buildPhases = (
+				A75200000000000000000004 /* Sources */,
+				A75200000000000000000005 /* Frameworks */,
+				A75200000000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = IdentityDocumentProvider;
+			packageProductDependencies = (
+				256D4E3F703216DC04F0C650 /* WalletSDK */,
+				A75200000000000000000022 /* WalletDemoIdentityDocumentSupport */,
+				A75200000000000000000041 /* WalletDemoSharingUI */,
+			);
+			productName = IdentityDocumentProvider;
+			productReference = A75200000000000000000002 /* IdentityDocumentProvider.appex */;
+			productType = "com.apple.product-type.extensionkit-extension";
 		};
 		D69044492FDAA5D2009AB1FB /* TestHelpers */ = {
 			isa = PBXNativeTarget;
@@ -412,6 +460,7 @@
 				D6B7A3462FD94CC3009C69E7 /* Sources */,
 				D6B7A3472FD94CC3009C69E7 /* Frameworks */,
 				D6B7A3482FD94CC3009C69E7 /* Resources */,
+				D690445B2FDAA6DB009AB1FB /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -424,6 +473,8 @@
 			name = iosAppTests;
 			packageProductDependencies = (
 				519D794773D1421EEC9493DE /* WalletSDK */,
+				A75200000000000000000023 /* WalletDemoIdentityDocumentSupport */,
+				A75200000000000000000042 /* WalletDemoSharingUI */,
 			);
 			productName = iosAppTests;
 			productReference = D6B7A34A2FD94CC3009C69E7 /* iosAppTests.xctest */;
@@ -456,6 +507,9 @@
 				LastSwiftUpdateCheck = 2650;
 				LastUpgradeCheck = 1520;
 				TargetAttributes = {
+					A75200000000000000000003 = {
+						CreatedOnToolsVersion = 26.5;
+					};
 					B33B17E52C2C394F001A32F7 = {
 						CreatedOnToolsVersion = 15.2;
 					};
@@ -487,6 +541,7 @@
 			mainGroup = B33B17DD2C2C394F001A32F7;
 			packageReferences = (
 				8A81DD79791BBF3F1CFF90A1 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */,
+				A75200000000000000000020 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */,
 				A1000502AAAA000000000052 /* XCRemoteSwiftPackageReference "CodeScanner" */,
 			);
 			productRefGroup = B33B17E72C2C394F001A32F7 /* Products */;
@@ -494,6 +549,7 @@
 			projectRoot = "";
 			targets = (
 				B33B17E52C2C394F001A32F7 /* iosApp */,
+				A75200000000000000000003 /* IdentityDocumentProvider */,
 				E2E00030AAAA000000000030 /* iosAppUITests */,
 				D6B7A3492FD94CC3009C69E7 /* iosAppTests */,
 				71E100082FDAE00000000008 /* iosAppEnterpriseTests */,
@@ -532,6 +588,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A75200000000000000000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -551,26 +614,18 @@
 				A1000423AAAA000100000023 /* CredentialDetailsDestination.swift in Sources */,
 				A1000006AAAA000100000006 /* StatusBannerView.swift in Sources */,
 				A1000425AAAA000100000025 /* UrlEditor.swift in Sources */,
-				A1000007AAAA000100000007 /* CredentialCardView.swift in Sources */,
 				A1000424AAAA000100000024 /* EmptyCredentialsView.swift in Sources */,
-				A1000008AAAA000100000008 /* WalletColors.swift in Sources */,
-				A1000428AAAA000100000028 /* ClaimPathExpression.swift in Sources */,
-				A1000301AAAA000100000001 /* ClaimGroupView.swift in Sources */,
-				A1000302AAAA000100000002 /* ClaimValueRow.swift in Sources */,
-				A1000303AAAA000100000003 /* CredentialDetailsView.swift in Sources */,
-				A1000426AAAA000100000026 /* VerifierReviewSections.swift in Sources */,
-				A1000427AAAA000100000027 /* PresentationReviewView.swift in Sources */,
 				A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */,
-				A1000431AAAA000100000031 /* ReviewMetadataComponents.swift in Sources */,
-				A1000304AAAA000100000004 /* CredentialDisplayModels.swift in Sources */,
-				A1000305AAAA000100000005 /* CredentialDisplayNormalizer.swift in Sources */,
-				A1000306AAAA000100000006 /* CredentialDisplayValueDecoder.swift in Sources */,
-				A1000307AAAA000100000007 /* CredentialDisplayVocabulary.swift in Sources */,
-				A1000308AAAA000100000008 /* CredentialTypeIdentifier.swift in Sources */,
-				A1000309AAAA000100000009 /* CredentialCardSummary.swift in Sources */,
 				A1000310AAAA000100000010 /* CredentialDetailsScreen.swift in Sources */,
-				A1000311AAAA000100000011 /* WalletAccessibilityID.swift in Sources */,
-				A1000312AAAA000100000012 /* CredentialSystemInfo.swift in Sources */,
+				A75200000000000000000011 /* IdentityDocumentRegistrationCoordinator.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A75200000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A75200000000000000000012 /* IdentityDocumentProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -592,6 +647,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A75200000000000000000031 /* SharedWalletConfigurationAssertions.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -623,9 +679,54 @@
 			target = B33B17E52C2C394F001A32F7 /* iosApp */;
 			targetProxy = E2E00040AAAA000000000040 /* PBXContainerItemProxy */;
 		};
+		A7520000000000000000000D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A75200000000000000000003 /* IdentityDocumentProvider */;
+			targetProxy = A7520000000000000000000E /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		A75200000000000000000008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = IdentityDocumentProvider/IdentityDocumentProvider.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = IdentityDocumentProvider/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.wallet.native.identitydocumentprovider;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A75200000000000000000009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = IdentityDocumentProvider/IdentityDocumentProvider.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = IdentityDocumentProvider/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.wallet.native.identitydocumentprovider;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		B33B17F22C2C3957001A32F7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -659,8 +760,10 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 9BB78CFW7Y;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -722,8 +825,10 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 9BB78CFW7Y;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -749,6 +854,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -766,7 +872,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = waltid.iosApp;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.wallet.native;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -778,6 +884,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -795,7 +902,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = waltid.iosApp;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.wallet.native;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -825,7 +932,7 @@
 				MARKETING_VERSION = 1.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
-				PRODUCT_BUNDLE_IDENTIFIER = id.walt.TestHelpers;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.wallet.native.testhelpers;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -863,7 +970,7 @@
 				MARKETING_VERSION = 1.0;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
-				PRODUCT_BUNDLE_IDENTIFIER = id.walt.TestHelpers;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.wallet.native.testhelpers;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -885,7 +992,6 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = X23DCM8Q83;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PLATFORM_DIR)/Developer/Library/Frameworks",
@@ -893,7 +999,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.4;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = id.walt.iosAppEnterpriseTests;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.wallet.native.enterprisetests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -911,7 +1017,6 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = X23DCM8Q83;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PLATFORM_DIR)/Developer/Library/Frameworks",
@@ -919,7 +1024,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.4;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = id.walt.iosAppEnterpriseTests;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.wallet.native.enterprisetests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -937,7 +1042,6 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = X23DCM8Q83;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PLATFORM_DIR)/Developer/Library/Frameworks",
@@ -945,7 +1049,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.4;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = id.walt.iosAppTests;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.wallet.native.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -963,7 +1067,6 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = X23DCM8Q83;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PLATFORM_DIR)/Developer/Library/Frameworks",
@@ -971,7 +1074,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.4;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = id.walt.iosAppTests;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.wallet.native.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -995,7 +1098,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = waltid.iosAppUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.wallet.native.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
@@ -1016,7 +1119,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = waltid.iosAppUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.wallet.native.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
@@ -1028,6 +1131,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		A75200000000000000000007 /* Build configuration list for PBXNativeTarget "IdentityDocumentProvider" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A75200000000000000000008 /* Debug */,
+				A75200000000000000000009 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		B33B17E12C2C394F001A32F7 /* Build configuration list for PBXProject "iosApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -1089,6 +1201,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios";
 		};
+		A75200000000000000000020 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../../waltid-wallet-demo-shared-ios";
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -1117,6 +1233,36 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 8A81DD79791BBF3F1CFF90A1 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */;
 			productName = WalletSDK;
+		};
+		A75200000000000000000021 /* WalletDemoIdentityDocumentSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A75200000000000000000020 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */;
+			productName = WalletDemoIdentityDocumentSupport;
+		};
+		A75200000000000000000022 /* WalletDemoIdentityDocumentSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A75200000000000000000020 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */;
+			productName = WalletDemoIdentityDocumentSupport;
+		};
+		A75200000000000000000023 /* WalletDemoIdentityDocumentSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A75200000000000000000020 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */;
+			productName = WalletDemoIdentityDocumentSupport;
+		};
+		A75200000000000000000040 /* WalletDemoSharingUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A75200000000000000000020 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */;
+			productName = WalletDemoSharingUI;
+		};
+		A75200000000000000000041 /* WalletDemoSharingUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A75200000000000000000020 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */;
+			productName = WalletDemoSharingUI;
+		};
+		A75200000000000000000042 /* WalletDemoSharingUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A75200000000000000000020 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */;
+			productName = WalletDemoSharingUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

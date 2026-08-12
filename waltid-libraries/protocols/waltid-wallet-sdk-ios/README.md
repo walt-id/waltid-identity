@@ -77,13 +77,18 @@ let wallet = try await Wallet(
 )
 
 let bootstrap = try await wallet.bootstrap(didMethod: "key")
-let resolution = try await wallet.resolveOffer(offer: credentialOfferURL)
-let transactionCode = resolution.transactionCode == nil
+let session = try await wallet.startIssuance(
+    IssuanceRequest(
+        offer: credentialOfferURL,
+        redirectURI: URL(string: "openid://")!
+    )
+)
+let transactionCode = session.offer.transactionCode == nil
     ? nil
     : userEnteredTransactionCode
-let credentialIDs = try await wallet.receive(
-    offer: credentialOfferURL,
-    txCode: transactionCode
+let outcome = try await wallet.continuePreAuthorizedIssuance(
+    sessionID: session.id,
+    transactionCode: transactionCode
 )
 let credentials = try await wallet.credentials()
 let presentation = try await wallet.present(
@@ -92,9 +97,13 @@ let presentation = try await wallet.present(
 )
 ```
 
-`resolution.issuer` and `resolution.offeredCredentials` provide localized,
-typed metadata for the app's review UI. `WalletConfiguration` uses
+`session.offer` provides typed issuer, credential, and transaction-code metadata
+for the app's review UI. `WalletConfiguration` uses
 `Locale.preferredLanguages` by default and also accepts an explicit locale order.
+
+Issuance uses DPoP consistently for authorization binding, token exchange, and
+protected credential requests whenever the authorization server advertises
+supported DPoP signing algorithms.
 
 ## Local persistence
 
@@ -159,63 +168,47 @@ let wallet = try await Wallet(
     configuration: WalletConfiguration(
         walletID: "consumer-wallet",
         persistence: WalletPersistence(
-            stores: WalletStores(credentials: AppCredentialStore())
+            credentialStore: AppCredentialStore()
         )
     )
 )
 ```
 <!-- doc-snippet:end swift-custom-credential-store -->
 
-Apps that own more wallet durability can also provide DID and signing-key stores. Omitted credential and DID stores use the encrypted local database, while an omitted key store uses platform signing-key persistence and generation. Signing-key overrides are configured through `WalletKeys` so the app-owned `WalletKeyStore` and generator are supplied atomically. This example assumes `AppDidStore` and `AppKeyStore` implement the corresponding store protocols, and that `AppKeyStore` exposes app-owned key generation.
+Apps that own more wallet durability can also provide a DID store. Omitted credential and DID stores use the encrypted local database. Signing keys are always platform-managed and remain in the iOS Keychain. This example assumes `AppDidStore` implements the corresponding store protocol.
 
 <!-- doc-snippet:start swift-full-store-overrides -->
 ```swift
-let keyStore = AppKeyStore()
-
 let wallet = try await Wallet(
     configuration: WalletConfiguration(
         walletID: "consumer-wallet",
         persistence: WalletPersistence(
-            stores: WalletStores(
-                credentials: AppCredentialStore(),
-                dids: AppDidStore(),
-                keys: WalletKeys(store: keyStore) { keyType in
-                    try await keyStore.generateKey(type: keyType)
-                }
-            )
+            credentialStore: AppCredentialStore(),
+            didStore: AppDidStore()
         )
     )
 )
 ```
 <!-- doc-snippet:end swift-full-store-overrides -->
 
-`StoredKey.serializedKeyJSON` is a walt.id serialized key payload and may contain private signing material. Treat it like a secret and store it only in app-owned secure storage.
-
 Provided database keys and custom stores can be combined when an app owns both database-key recovery and wallet-record durability:
 
 <!-- doc-snippet:start swift-combined-persistence -->
 ```swift
-let keyStore = AppKeyStore()
-
 let wallet = try await Wallet(
     configuration: WalletConfiguration(
         walletID: "consumer-wallet",
         persistence: WalletPersistence(
             databaseKey: .provided(KMSDatabaseKeyProvider()),
-            stores: WalletStores(
-                credentials: AppCredentialStore(),
-                dids: AppDidStore(),
-                keys: WalletKeys(store: keyStore) { keyType in
-                    try await keyStore.generateKey(type: keyType)
-                }
-            )
+            credentialStore: AppCredentialStore(),
+            didStore: AppDidStore()
         )
     )
 )
 ```
 <!-- doc-snippet:end swift-combined-persistence -->
 
-Call `try await wallet.deleteLocalData()` to remove local material for that wallet. The active credential, DID, and key stores receive their remove calls; the SDK then removes encrypted database files and sidecars plus the configured database key. Local development databases created before encrypted persistence may fail to open; reset the app by calling `deleteLocalData()`, uninstalling the app, or deleting local app data.
+Call `try await wallet.deleteLocalData()` to remove local material for that wallet. The active credential and DID stores receive their remove calls; the SDK removes platform-managed signing keys, encrypted database files and sidecars, plus the configured database key. Local development databases created before encrypted persistence may fail to open; reset the app by calling `deleteLocalData()`, uninstalling the app, or deleting local app data.
 
 ## Native iOS Consumer
 

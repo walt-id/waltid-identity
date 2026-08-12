@@ -56,58 +56,43 @@ final class WalletPersistenceSnippetsTests: XCTestCase {
             configuration: WalletConfiguration(
                 walletID: "consumer-wallet",
                 persistence: WalletPersistence(
-                    stores: WalletStores(credentials: AppCredentialStore())
+                    credentialStore: AppCredentialStore()
                 )
             )
         )
         // doc-snippet:end swift-custom-credential-store
 
         let configuration = await wallet.configuration
-        XCTAssertNotNil(configuration.persistence.stores.credentials)
+        XCTAssertNotNil(configuration.persistence.credentialStore)
     }
 
-    func testFullStoreOverridesSnippetCompiles() async throws {
+    func testCredentialAndDidStoreOverridesSnippetCompiles() async throws {
         // doc-snippet:start swift-full-store-overrides
-        let keyStore = AppKeyStore()
-
         let wallet = try await Wallet(
             configuration: WalletConfiguration(
                 walletID: "consumer-wallet",
                 persistence: WalletPersistence(
-                    stores: WalletStores(
-                        credentials: AppCredentialStore(),
-                        dids: AppDidStore(),
-                        keys: WalletKeys(store: keyStore) { keyType in
-                            try await keyStore.generateKey(type: keyType)
-                        }
-                    )
+                    credentialStore: AppCredentialStore(),
+                    didStore: AppDidStore()
                 )
             )
         )
         // doc-snippet:end swift-full-store-overrides
 
         let configuration = await wallet.configuration
-        XCTAssertNotNil(configuration.persistence.stores.credentials)
-        XCTAssertNotNil(configuration.persistence.stores.dids)
-        XCTAssertNotNil(configuration.persistence.stores.keys)
+        XCTAssertNotNil(configuration.persistence.credentialStore)
+        XCTAssertNotNil(configuration.persistence.didStore)
     }
 
-    func testCombinedProvidedDatabaseKeyAndStoresSnippetCompiles() async throws {
+    func testCombinedProvidedDatabaseKeyAndOverridesSnippetCompiles() async throws {
         // doc-snippet:start swift-combined-persistence
-        let keyStore = AppKeyStore()
-
         let wallet = try await Wallet(
             configuration: WalletConfiguration(
                 walletID: "consumer-wallet",
                 persistence: WalletPersistence(
                     databaseKey: .provided(KMSDatabaseKeyProvider()),
-                    stores: WalletStores(
-                        credentials: AppCredentialStore(),
-                        dids: AppDidStore(),
-                        keys: WalletKeys(store: keyStore) { keyType in
-                            try await keyStore.generateKey(type: keyType)
-                        }
-                    )
+                    credentialStore: AppCredentialStore(),
+                    didStore: AppDidStore()
                 )
             )
         )
@@ -115,9 +100,8 @@ final class WalletPersistenceSnippetsTests: XCTestCase {
 
         let configuration = await wallet.configuration
         XCTAssertTrue(configuration.persistence.databaseKey.isProvided)
-        XCTAssertNotNil(configuration.persistence.stores.credentials)
-        XCTAssertNotNil(configuration.persistence.stores.dids)
-        XCTAssertNotNil(configuration.persistence.stores.keys)
+        XCTAssertNotNil(configuration.persistence.credentialStore)
+        XCTAssertNotNil(configuration.persistence.didStore)
     }
 }
 
@@ -172,33 +156,6 @@ private actor AppDidStore: WalletDidStore {
     }
 }
 
-private actor AppKeyStore: WalletKeyStore {
-    private var entries: [String: StoredKey] = [:]
-
-    func key(id: String) async throws -> StoredKey? {
-        entries[id]
-    }
-
-    func keys() async throws -> [WalletKeyInfo] {
-        entries.values.map {
-            WalletKeyInfo(keyID: $0.keyID, keyType: $0.keyType, algorithm: $0.algorithm)
-        }
-    }
-
-    func addKey(_ key: StoredKey) async throws -> String {
-        entries[key.id] = key
-        return key.keyID
-    }
-
-    func removeKey(id: String) async throws -> Bool {
-        entries.removeValue(forKey: id) != nil
-    }
-
-    func generateKey(type: WalletKeyType) async throws -> StoredKey {
-        try await createSerializedWalletKey(type: type)
-    }
-}
-
 private func loadOrCreateKeyData(walletID: String, databaseName: String) async throws -> Data {
     precondition(!walletID.isEmpty)
     precondition(!databaseName.isEmpty)
@@ -208,15 +165,6 @@ private func loadOrCreateKeyData(walletID: String, databaseName: String) async t
 private func deleteKeyData(walletID: String, databaseName: String) async throws {
     precondition(!walletID.isEmpty)
     precondition(!databaseName.isEmpty)
-}
-
-private func createSerializedWalletKey(type: WalletKeyType) async throws -> StoredKey {
-    StoredKey(
-        keyID: "generated-\(type)",
-        keyType: type,
-        algorithm: nil,
-        serializedKeyJSON: #"{"type":"jwk","jwk":{"kid":"generated"}}"#
-    )
 }
 
 private extension WalletDatabaseKeyConfiguration {

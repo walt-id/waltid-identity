@@ -1,5 +1,9 @@
 package id.walt.openid4vci.tokens.jwt.refresh
 
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.Key
+import id.walt.openid4vci.tokens.jwt.Crypto2JwtVerificationKey
+import id.walt.openid4vci.tokens.jwt.Crypto2JwtVerificationKeyResolver
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import id.walt.openid4vci.tokens.jwt.JwtTokenVerifier
 import id.walt.openid4vci.tokens.jwt.JwtVerificationKeyResolver
@@ -14,10 +18,18 @@ import kotlinx.serialization.json.longOrNull
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-class JwtRefreshTokenVerifier(
-    verificationKeyResolver: JwtVerificationKeyResolver,
+class JwtRefreshTokenVerifier private constructor(
+    private val verifier: JwtTokenVerifier,
 ) : RefreshTokenVerifier {
-    private val verifier = JwtTokenVerifier(verificationKeyResolver)
+
+    @Deprecated("Use the Crypto2Key constructor or crypto2 resolver factory")
+    constructor(verificationKeyResolver: JwtVerificationKeyResolver) : this(JwtTokenVerifier(verificationKeyResolver))
+
+    constructor(verificationKey: Key, allowedAlgorithms: Set<JwsAlgorithm>) : this(
+        JwtTokenVerifier(Crypto2JwtVerificationKeyResolver {
+            Crypto2JwtVerificationKey(verificationKey, allowedAlgorithms)
+        })
+    )
 
     override suspend fun verify(
         token: String,
@@ -91,5 +103,10 @@ class JwtRefreshTokenVerifier(
             is JsonPrimitive -> element.contentOrNull?.let(::setOf).orEmpty()
             else -> emptySet()
         }
+    }
+
+    companion object {
+        fun crypto2(resolver: Crypto2JwtVerificationKeyResolver): JwtRefreshTokenVerifier =
+            JwtRefreshTokenVerifier(JwtTokenVerifier(resolver))
     }
 }

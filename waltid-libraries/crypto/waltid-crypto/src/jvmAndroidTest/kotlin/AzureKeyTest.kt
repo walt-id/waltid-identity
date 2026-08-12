@@ -13,13 +13,20 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 
+/**
+ * Enable this test by exporting `WALTID_TEST_AZURE_CLIENT_ID`, `WALTID_TEST_AZURE_CLIENT_SECRET`,
+ * `WALTID_TEST_AZURE_TENANT_ID` and `WALTID_TEST_AZURE_KEY_VAULT_URL`.
+ *
+ * Credentials are never read from source, so they cannot be committed by accident, and the dedicated
+ * variable names keep the test inert on machines with ambient `AZURE_*` credentials.
+ */
 class AzureKeyTest {
 
     private object Config {
-        val clientId = ""
-        val clientSecret = ""
-        val tenantId = ""
-        val keyVaultUrl = ""
+        val clientId: String = System.getenv("WALTID_TEST_AZURE_CLIENT_ID").orEmpty()
+        val clientSecret: String = System.getenv("WALTID_TEST_AZURE_CLIENT_SECRET").orEmpty()
+        val tenantId: String = System.getenv("WALTID_TEST_AZURE_TENANT_ID").orEmpty()
+        val keyVaultUrl: String = System.getenv("WALTID_TEST_AZURE_KEY_VAULT_URL").orEmpty()
 
         val payloadJWS = JsonObject(
             mapOf(

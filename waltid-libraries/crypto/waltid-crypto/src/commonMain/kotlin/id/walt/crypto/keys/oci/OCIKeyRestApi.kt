@@ -8,6 +8,7 @@ import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -22,7 +23,6 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import io.ktor.util.*
 import io.ktor.util.date.*
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
@@ -135,7 +135,7 @@ class OCIKeyRestApi(
     @JsExport.Ignore
     override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         return retry {
-            val encodedMessage: String = SHA256().digest(plaintext).encodeBase64()
+            val encodedMessage = keyType.digestForSignature(plaintext).encodeToBase64()
 
             val requestBody = JsonObject(
                 mapOf(
@@ -201,9 +201,10 @@ class OCIKeyRestApi(
         val requestBody = JsonObject(
             mapOf(
                 "keyId" to JsonPrimitive(id),
-                "message" to JsonPrimitive(detachedPlaintext.encodeBase64()),
-                "signature" to JsonPrimitive(signed.encodeBase64()),
-                "signingAlgorithm" to JsonPrimitive(ociSigningAlgorithm)
+                "message" to JsonPrimitive(keyType.digestForSignature(detachedPlaintext).encodeToBase64()),
+                "signature" to JsonPrimitive(signed.encodeToBase64()),
+                "signingAlgorithm" to JsonPrimitive(ociSigningAlgorithm),
+                "messageType" to JsonPrimitive("DIGEST"),
             )
         ).toString()
 
@@ -522,5 +523,4 @@ private suspend fun <T> retry(retriesLeft: Int = 3, currentTry: Int = 1, block: 
                 else -> retry(retriesLeft - 1, currentTry + 1, block)
             }
         })
-
 
