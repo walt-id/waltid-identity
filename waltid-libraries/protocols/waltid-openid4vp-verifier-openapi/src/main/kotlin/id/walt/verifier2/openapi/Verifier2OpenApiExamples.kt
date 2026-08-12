@@ -498,17 +498,13 @@ object Verifier2OpenApiExamples {
      * shape for. The transaction data binds to the payment card alone: `credential_ids` names only it,
      * so the age credential is presented without device-signing the transaction data hash.
      *
-     * **Not presentable through Android Credential Manager**; use
-     * [openid4vpDcApiScaPaymentCardScaPayment] there. Its embedded matcher cannot handle this
-     * transaction data prompt and a second credential at the same time, whichever way the request is
-     * shaped: it compares a candidate only against the *first* entry of
-     * `transaction_data[0].credential_ids`, and skips transaction data entirely unless
-     * `transaction_data` holds exactly one entry. So this request yields zero candidates, while
-     * splitting into one transaction data entry per credential surfaces both credentials and renders
-     * no transaction data. Two credentials without transaction data are fine. The matcher's
-     * transaction data handling never learns a candidate's format, so no credential format escapes it.
-     * Browsers on other platforms, and the wallet's own review screen, are unaffected: they build the
-     * prompt from the request.
+     * Presentable everywhere, including Android Credential Manager - but only by a wallet whose
+     * OpenID4VP matcher handles it. The matcher embedded in the released AndroidX credentials registry
+     * yields zero candidates for this shape, because its transaction data path emits nothing for a
+     * credential the transaction data does not name. The walt.id demo wallet therefore registers
+     * Google's newer OpenID4VP matcher instead; see `OPENID4VP-MATCHER.md` in
+     * `waltid-openid4vc-wallet-mobile`. Browsers on other platforms, and the wallet's own review
+     * screen, were never affected: they build the prompt from the request.
      */
     val openid4vpDcApiScaPaymentCardAndAgeVerificationScaPayment = DcApiAnnexDFlowSetup(
         core = GeneralFlowConfig(

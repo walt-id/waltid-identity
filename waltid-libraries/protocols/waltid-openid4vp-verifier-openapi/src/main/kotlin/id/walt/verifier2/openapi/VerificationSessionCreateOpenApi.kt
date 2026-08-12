@@ -120,10 +120,7 @@ object VerificationSessionCreateOpenApi {
                 example("[openid4vp-dc_api][sca] urn:eudi:sca:payment:1") {
                     value = Verifier2OpenApiExamples.openid4vpDcApiScaPaymentCardScaPayment
                 }
-                // The combined one is labelled: transaction data plus a second credential yields zero
-                // candidates in Android's Credential Manager, so a user reaching for it needs to know
-                // before the picker comes up empty. See its KDoc for the matcher detail.
-                example("[openid4vp-dc_api][sca + age] urn:eudi:sca:payment:1 (not on Android)") {
+                example("[openid4vp-dc_api][sca + age] urn:eudi:sca:payment:1") {
                     value = Verifier2OpenApiExamples.openid4vpDcApiScaPaymentCardAndAgeVerificationScaPayment
                 }
 
