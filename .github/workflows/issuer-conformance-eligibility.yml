@@ -74,10 +74,13 @@ jobs:
           "waltid-services/waltid-service-commons/*",
           "waltid-libraries/protocols/waltid-openid4vci*/*",
           "waltid-libraries/crypto/waltid-crypto*/*",
+          "waltid-libraries/crypto/waltid-cose/*",
           "waltid-libraries/crypto/waltid-jose/*",
           "waltid-libraries/crypto/waltid-x509/*",
+          "waltid-libraries/credentials/waltid-credential-key-resolver/*",
           "waltid-libraries/credentials/waltid-mdoc-credentials*/*",
+          "waltid-libraries/credentials/waltid-w3c-credentials/*",
           "waltid-libraries/sdjwt/waltid-sdjwt/*",
           "waltid-libraries/waltid-did/*",
-          "waltid-libraries/web/waltid-ktor-notifications/*"
+          "waltid-libraries/web/waltid-ktor-notifications*/*"
         ]
