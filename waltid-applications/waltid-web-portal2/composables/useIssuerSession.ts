@@ -1,5 +1,4 @@
 import {
-  DC_API_ISSUANCE_DOCS_URL,
   enrichCredentialOfferForDcApi,
   formatDcApiIssuanceUnsupportedMessage,
   getDcApiIssuanceSupport,
@@ -7,17 +6,12 @@ import {
   parseCredentialOfferFromUrl,
 } from "~/utils/dcApiIssuance";
 
-export type DcApiHandoffStatus = "pending" | "success" | "failed";
-
 export interface IssuerSessionResult {
   offerId: string;
   sessionId: string;
   credentialOffer: string;
   txCodeValue?: string;
   flowType: "qr" | "dc_api";
-  dcApiHandoffStatus?: DcApiHandoffStatus;
-  dcApiError?: string;
-  dcApiDocsUrl?: string;
 }
 
 type CredentialOfferCreateResponse = {
@@ -91,17 +85,10 @@ export function useIssuerSession(issuerBase: string) {
         credentialOffer,
         txCodeValue,
         flowType: "dc_api",
-        dcApiHandoffStatus: "pending",
-        dcApiDocsUrl: DC_API_ISSUANCE_DOCS_URL,
       };
 
+      // Issuer OpenID4VCI events only — no synthetic DC_API_* log lines.
       sse.open(`${issuerBase}/issuer2/sessions/${sessionId}/events`);
-      sse.addEvent({ event: "DC_API_ISSUANCE_STARTED", status: "STARTED" });
-      sse.addEvent({
-        event: "DC_API_OFFER_CREATED",
-        offerId,
-        sessionId,
-      });
 
       const offer = parseCredentialOfferFromUrl(credentialOffer);
       const [credentialIssuerMetadata, authorizationServerMetadata] =
@@ -119,54 +106,14 @@ export function useIssuerSession(issuerBase: string) {
         credentialIssuerMetadata,
         authorizationServerMetadata,
       );
-      sse.addEvent({
-        event: "DC_API_REQUEST_BUILT",
-        protocol: "openid4vci-v1",
-        request: enrichedOffer,
-      });
 
-      try {
-        const handoffResult = await invokeDigitalCredentialsCreate(
-          enrichedOffer,
-          mediationRequired,
-        );
-        result.value = {
-          ...result.value,
-          dcApiHandoffStatus: "success",
-          dcApiError: undefined,
-        };
-        sse.addEvent({
-          event: "DC_API_HANDOFF_SUCCESS",
-          response: handoffResult ?? null,
-        });
-      } catch (handoffError) {
-        const message =
-          handoffError instanceof Error
-            ? handoffError.message
-            : "Digital Credentials API handoff failed.";
-        error.value = message;
-        result.value = {
-          ...result.value,
-          dcApiHandoffStatus: "failed",
-          dcApiError: message,
-          dcApiDocsUrl: DC_API_ISSUANCE_DOCS_URL,
-        };
-        sse.addEvent({
-          event: "DC_API_HANDOFF_FAILED",
-          status: "FAILED",
-          message,
-        });
-      }
+      // Engage wallet / Chrome proximity QR, then ignore handoff outcome.
+      void invokeDigitalCredentialsCreate(
+        enrichedOffer,
+        mediationRequired,
+      ).catch(() => undefined);
     } catch (e) {
       error.value = e instanceof Error ? e.message : "Unknown error";
-      if (result.value?.flowType === "dc_api") {
-        result.value = {
-          ...result.value,
-          dcApiHandoffStatus: "failed",
-          dcApiError: error.value,
-          dcApiDocsUrl: DC_API_ISSUANCE_DOCS_URL,
-        };
-      }
     } finally {
       loading.value = false;
     }

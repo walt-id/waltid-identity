@@ -379,8 +379,8 @@ async function submit() {
       <p class="mt-1 text-xs text-blue-800">
         Creates a by-value OpenID4VCI offer, embeds issuer/AS metadata, and calls
         <code>navigator.credentials.create</code> with protocol
-        <code>openid4vci-v1</code>. If the browser handoff fails, the portal
-        shows an error and falls back to the offer QR.
+        <code>openid4vci-v1</code> to engage a wallet. Browser handoff outcome is
+        ignored; the result log follows issuer OpenID4VCI SSE events only.
       </p>
       <label
         v-if="useDcApi"
