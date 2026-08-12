@@ -35,7 +35,7 @@ public class PreviewSessionException(
  * Entries are wallet-bound, expire after [timeToLive], and are evicted in insertion order. A
  * bounded tombstone set preserves useful failure reasons without retaining resolved protocol data.
  */
-internal class PreviewSessionStore<T>(
+public class PreviewSessionStore<T>(
     private val sessionName: String,
     private val capacity: Int = DEFAULT_CAPACITY,
     private val timeToLive: Duration = DEFAULT_TIME_TO_LIVE,

@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationError
+import id.walt.walletdemo.compose.logic.toSharingRequest
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
@@ -40,7 +41,7 @@ internal fun PresentationErrorSection(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
-            VerifierReviewSections(error)
+            SharingRequestSections(error.toSharingRequest())
             Text(error.message, style = MaterialTheme.typography.bodyMedium)
             Text(
                 "OpenID4VP error: ${error.errorCode}",

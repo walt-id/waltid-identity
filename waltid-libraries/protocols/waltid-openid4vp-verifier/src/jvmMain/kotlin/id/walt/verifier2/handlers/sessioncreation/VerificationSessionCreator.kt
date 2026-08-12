@@ -23,6 +23,7 @@ import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequestInfo
+import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.mdoc.objects.deviceretrieval.UseCase
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
@@ -34,8 +35,6 @@ import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionDataStructure
 import id.walt.verifier2.data.*
-import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthentication
-import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthenticationAll
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
@@ -188,7 +187,7 @@ object VerificationSessionCreator {
         val isSiop = responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN
         require(!isSiop || isCrossDevice) { "SIOPv2 combined responses require an OpenID4VP cross-device flow" }
         val origins =
-            if (setup is DcApiAnnexDFlowSetup) setup.expectedOrigins else if (setup is DcApiAnnexCFlowSetup) listOf(setup.origin) else null
+            if (setup is DcApiAnnexDFlowSetup) setup.expectedOrigins else if (setup is DcApiAnnexCFlowSetup) setup.expectedOrigins else null
 
         var ephemeralKey: JWKKey? = null
         var crypto2EphemeralKey: SoftwareKey? = null
@@ -465,6 +464,12 @@ object VerificationSessionCreator {
             requestSigningKey.signJws(Json.encodeToString(payloadWithAud).encodeToByteArray(), headers)
         } else null
 
+        if (isSignedRequest) {
+            requireNotNull(signedAuthorizationRequest) {
+                "Signed authorization request could not be created although signedRequest=true"
+            }
+        }
+
         val effectiveVpPolicies = (setup.core.policies.vp_policies ?: defaultVpPolicies())
             .withMandatoryTransactionDataPolicies(transactionDataFormats)
         val effectivePolicies = Verification2Session.DefinedVerificationPolicies(
@@ -477,6 +482,10 @@ object VerificationSessionCreator {
 
         val customData = when {
             isAnnexC -> {
+                val annexCSetup = setup
+                val annexCRequestedElements = requireNotNull(annexCSetup.coreFlow.requestedElements) {
+                    "core_flow.requestedElements is required for ISO 18013-7 DC API"
+                }
 
                 val encryptionInfoObj = DCAPIEncryptionInfo(
                     nonce = nonce.toByteArray(),
@@ -498,11 +507,11 @@ object VerificationSessionCreator {
                     // Build the DC API Session Transcript
                     val sessionTranscript = AnnexCTranscriptBuilder.buildSessionTranscript(
                         encryptionInfoB64 = encryptionInfoB64,
-                        origin = setup.origin
+                        origin = annexCSetup.origin
                     )
 
                     // Prepare the base request without signatures
-                    val initialDeviceRequest = DeviceRequest(setup.requestedElements)
+                    val initialDeviceRequest = DeviceRequest(annexCRequestedElements)
 
                     // Create the DeviceRequestInfo (Use Cases)
                     // By grouping all indices into a single documentSet, we make ALL requested documents mandatory.
@@ -525,18 +534,13 @@ object VerificationSessionCreator {
 
                     // Generate readerAuth for EACH document requested (Per-Document Signature)
                     val signedDocRequests = initialDeviceRequest.docRequests.map { docReq ->
-                        val itemsRequestBytes = docReq.itemsRequest.serialized
-
-                        val readerAuthPayload = ReaderAuthentication(
-                            context = ReaderAuthentication.CONTEXT,
-                            sessionTranscript = sessionTranscript,
-                            itemsRequestBytes = itemsRequestBytes
-                        )
-
                         val readerAuthSignature = CoseSign1.createAndSignDetached(
                             protectedHeaders = protectedHeaders,
                             unprotectedHeaders = unprotectedHeaders,
-                            detachedPayload = coseCompliantCbor.encodeToByteArray(readerAuthPayload),
+                            detachedPayload = ReaderAuthenticationPayloads.forDocument(
+                                sessionTranscript,
+                                docReq.itemsRequest,
+                            ),
                             signer = coseSigner
                         )
 
@@ -545,19 +549,14 @@ object VerificationSessionCreator {
                     }
 
                     // Generate readerAuthAll for the entire set (Global Signature)
-                    val itemsRequestBytesAll = initialDeviceRequest.docRequests.map { it.itemsRequest.serialized }
-
-                    val readerAuthAllPayload = ReaderAuthenticationAll(
-                        context = ReaderAuthenticationAll.CONTEXT,
-                        sessionTranscript = sessionTranscript,
-                        itemsRequestBytesAll = itemsRequestBytesAll,
-                        docRequestsInfoBytes = deviceRequestInfo.serialized
-                    )
-
                     val readerAuthAllSignature = CoseSign1.createAndSignDetached(
                         protectedHeaders = protectedHeaders,
                         unprotectedHeaders = unprotectedHeaders,
-                        detachedPayload = coseCompliantCbor.encodeToByteArray(readerAuthAllPayload),
+                        detachedPayload = ReaderAuthenticationPayloads.forAllDocuments(
+                            sessionTranscript = sessionTranscript,
+                            itemsRequests = initialDeviceRequest.docRequests.map { it.itemsRequest },
+                            deviceRequestInfo = deviceRequestInfo,
+                        ),
                         signer = coseSigner
                     )
 
@@ -569,7 +568,7 @@ object VerificationSessionCreator {
                         readerAuthAll = listOf(readerAuthAllSignature)
                     )
                 } else {
-                    DeviceRequest(setup.requestedElements).copy(version = DeviceRequest.VERSION)
+                    DeviceRequest(annexCRequestedElements).copy(version = DeviceRequest.VERSION)
                 }
 
                 AnnexCRequestResponse(
