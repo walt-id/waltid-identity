@@ -369,10 +369,17 @@ object DemoTestBackend {
         require(credentialQueries.isNotEmpty()) { "DC API sessions require at least one DCQL credential query" }
 
         val payload = buildJsonObject {
-            // "dc_api_openid4vp" is the @SerialName of DcApiAnnexDFlowSetup, and unlike cross_device
-            // this flow takes no url_config.
-            put("flow_type", "dc_api_openid4vp")
-            putJsonObject("core_flow") {
+            // Deliberately the *old* wire names. `20e20a539` renamed this flow's discriminator to
+            // "dc_api_openid4vp" and its core config to "core_flow", but verifier2.demo.walt.id -
+            // which these tests run against - is still serving a pre-rename build and answers the new
+            // names with HTTP 400 "Serializer for subclass 'dc_api_openid4vp' is not found". The two
+            // names move together: "dc_api" + "core_flow" is also a 400.
+            //
+            // Switch both to "dc_api_openid4vp" / "core_flow" once the demo verifier is redeployed
+            // from main; until then the new names would fail the whole DC API suite on the deployment
+            // rather than on anything this test exercises.
+            put("flow_type", "dc_api")
+            putJsonObject("core") {
                 putJsonObject("dcql_query") {
                     putJsonArray("credentials") {
                         credentialQueries.forEach { add(it) }
