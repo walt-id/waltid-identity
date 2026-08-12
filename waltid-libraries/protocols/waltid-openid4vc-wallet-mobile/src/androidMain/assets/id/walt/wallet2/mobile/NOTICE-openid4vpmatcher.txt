@@ -1,8 +1,9 @@
 openid4vpmatcher.wasm - third-party notices
 ===========================================
 
-openid4vpmatcher.wasm in this directory is redistributed unmodified from Google's Android
-identity-samples project. It is a WebAssembly binary compiled from Rust and statically linked against
+openid4vpmatcher.wasm in this directory is our build, compiled from unmodified sources from Google's
+Android identity-samples project. Google publishes no binary for those sources, so this is not a
+Google-published artifact; it is a WebAssembly binary compiled from Rust and statically linked against
 the Rust standard library and several crates, so many components are compiled into the single object.
 The licenses and attributions below apply to those components.
 
@@ -13,7 +14,9 @@ Provenance
   Branch               wasm
   Commit               5d966fc4913cac93f3b3b11e11bdd44d3e0b5c9e
   Upstream path        CredentialProvider/wasm/matcher-rs
-  Built artifact       target/wasm32-unknown-unknown/release/presentation.wasm
+  Source modifications none
+  Built artifact       target/wasm32-unknown-unknown/release/presentation.wasm (built here, not
+                       published upstream)
   Size                 117546 bytes
   SHA-256              5f1738caf65854d8999701dd54a7caafbd8c2fccc355be340e553fe16f5cfd79
   Matcher sources      CredentialProvider/wasm/matcher-rs/src/ (Rust 2024, nightly -Z build-std)

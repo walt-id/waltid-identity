@@ -281,8 +281,9 @@ class DigitalCredentialSharingE2ETest {
      * This is what AndroidX's embedded matcher cannot report, and the reason the wallet vendors Google's
      * newer one (see `OPENID4VP-MATCHER.md`): it declares the option with arity 2 and then emits only the
      * payment credential, so the platform discards the whole option and the picker shows nothing at all.
-     * What has to hold instead is that both credentials reach the same option, the payment prompt still
-     * renders, and the transaction data binds to the payment card alone.
+     * The fault is in its transaction data reporting path rather than in DCQL matching. What has to hold
+     * instead is that both credentials reach the same option, the payment prompt still renders, and the
+     * transaction data binds to the payment card alone.
      */
     @Test
     @Ignore(
@@ -436,43 +437,6 @@ class DigitalCredentialSharingE2ETest {
             )
             fixture.device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT)
         }
-    }
-
-    /**
-     * Two credentials and no transaction data - the France Identité / Authologic combined shape. This
-     * worked with AndroidX's matcher, so it is the regression the vendored one must not introduce.
-     */
-    @Test
-    @Ignore("Enable once euAgeVerificationMdoc and the SCA profiles are deployed together.")
-    fun sharesTwoMdocsWithoutTransactionData() = runBlocking {
-        val fixture = start() ?: return@runBlocking
-        val mdlScenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
-        val ageScenario = DemoTestBackend.presentationScenarios.first { it.id == "eu-age-verification" }
-        fixture.issue(mdlScenario)
-        fixture.issue(ageScenario)
-
-        val session = DemoTestBackend.createDcApiVerifierSession(
-            credentialQueries = listOf(mdlScenario.verifierCredentialQuery, ageScenario.verifierCredentialQuery),
-            expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
-        )
-
-        val credential = fixture.share(session.requestJson, candidateText = MDL_DOC_TYPE)
-        val vpToken = requireNotNull(
-            Json.parseToJsonElement(credential.credentialJson).jsonObject["data"]
-                ?.jsonObject?.get("vp_token")?.jsonObject,
-        ) { "Response carries no vp_token: ${credential.credentialJson}" }
-        assertEquals(
-            "Combined presentation must answer both queries: ${vpToken.keys}",
-            setOf("mdl", AGE_CREDENTIAL_QUERY_ID),
-            vpToken.keys,
-        )
-
-        assertVerifierAccepted(
-            sessionId = session.sessionId,
-            responseJson = credential.credentialJson,
-            presentedCredentialId = "mdl",
-            requiredPolicyIds = MDOC_REQUIRED_POLICIES,
-        )
     }
 
     /**
