@@ -18,6 +18,11 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private lateinit var controller: WalletDemoController
+    private val onCredentialStoreChanged: () -> Unit = {
+        if (::controller.isInitialized) {
+            controller.refreshCredentialsFromStore()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,6 +39,7 @@ class MainActivity : ComponentActivity() {
             ),
             pinStore = createAndroidDemoPinStore(applicationContext, config.walletId),
         )
+        WalletDemoCredentialStoreNotifier.addListener(onCredentialStoreChanged)
         handleIntent(intent)
 
         setContent {
@@ -52,6 +58,11 @@ class MainActivity : ComponentActivity() {
         if (!::controller.isInitialized) return
         // CreateActivity stores into the shared DB; reload so Credentials tab does not stay stale.
         controller.refreshCredentialsFromStore()
+    }
+
+    override fun onDestroy() {
+        WalletDemoCredentialStoreNotifier.removeListener(onCredentialStoreChanged)
+        super.onDestroy()
     }
 
     private fun handleIntent(intent: Intent?) {
@@ -83,7 +94,7 @@ class MainActivity : ComponentActivity() {
                     callbackUri = callbackUri,
                 )
                 DigitalCredentialCreateAuthHandoff.clear(this@MainActivity)
-                controller.refreshCredentialsFromStore()
+                WalletDemoCredentialStoreNotifier.notifyChanged()
                 Log.i(TAG, "Completed orphan CREATE authorization for session=$sessionId")
             }.onFailure { error ->
                 Log.e(TAG, "Orphan CREATE authorization failed", error)

@@ -163,7 +163,12 @@ class DigitalCredentialCreateActivity : ComponentActivity() {
         when (outcome) {
             is WalletIssuanceOutcome.Stored,
             is WalletIssuanceOutcome.Deferred,
-            -> sendSuccessAck()
+            -> {
+                // MainActivity may already be resumed from the openid:// callback; nudge it after
+                // the shared DB write so the Credentials tab is not stale until the next relaunch.
+                WalletDemoCredentialStoreNotifier.notifyChanged()
+                sendSuccessAck()
+            }
             is WalletIssuanceOutcome.Cancelled -> {
                 AndroidDigitalCredentialCreateProvider.setCancellation(resultIntent)
                 finishProviderResult()
