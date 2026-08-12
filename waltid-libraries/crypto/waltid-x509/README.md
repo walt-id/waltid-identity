@@ -44,10 +44,11 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
 ## Targets
 
 - **JVM / Android**: Full chain validation, [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) build/parse/validate, JVM extensions.
-- **iOS**: Explicit-trust chain validation plus ISO/IEC 18013-5 build/parse/validate support.
-- **JS**: Chain validation stub; ISO tooling not implemented yet.
+- **iOS**: Explicit-trust chain validation plus ISO/IEC 18013-5 build/parse/validate support. Limited set of supported key types.
+- **JS**: Explicit-trust chain validation plus ISO/IEC 18013-5 build/parse/validate support. Limited set of supported key types.
 
-> JS X.509 support is intentionally limited today. On iOS, system trust anchors and revocation checks are still not supported.
+> Certificate revocation checks are not yet supported. 
+> On iOS and JS system trust anchors are not supported.
 
 ---
 
@@ -91,33 +92,107 @@ expect fun validateCertificateChain(
 class X509ValidationException(message: String, cause: Throwable? = null) : Exception(message, cause)
 ```
 
-### Quick start (JVM/Android)
+### Quick start
+
+#### Create self-signed root certificate
 
 ```kotlin
-import id.walt.x509.CertificateDer
-import id.walt.x509.validateCertificateChain
-import okio.ByteString.Companion.toByteString
-import java.util.Base64
+import id.walt.certificate.x509.X509Certificate
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.*
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.algorithms.*
+import id.walt.crypto2.keys.*
+import id.walt.crypto2.providers.*
+// imports are shortended in this example
 
-fun validateFromX5cExample(
-    x5cBase64: List<String>,             // JWT header "x5c": Base64 DER certs
-    trustAnchorsDer: List<ByteArray>?,   // null = use self-signed root from chain (pinning/private PKI)
-    enableRevocation: Boolean = false
-) {
-    val chain = x5cBase64.map { CertificateDer(Base64.getDecoder().decode(it).toByteString()) }
-    val leaf = chain.first()
-    val anchors = trustAnchorsDer?.map { CertificateDer(it.toByteString()) }
+private val cryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
+private val keyGen = GenerateSoftwareKeyRequest(
+  id = KeyId("ca"),
+  spec = KeySpec.Ec(EcCurve.P256),
+  usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
+)
+private val certSigningAlg = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
+val caKey = cryptoRuntime.generateSoftwareKey(keyGen)
 
-    validateCertificateChain(
-        leaf = leaf,
-        chain = chain,
-        trustAnchors = anchors,
-        enableTrustedChainRoot = anchors.isNullOrEmpty(),
-        enableSystemTrustAnchors = false,
-        enableRevocation = enableRevocation
-    )
+//create self-signed root certificate
+//required extensions like 'basic constraints' and 'subject key identifier' are added automatically
+val caCert = X509CertificateUtil.createSelfSignedCertificate(key, certSigningAlg) {
+  subjectDn = "cn=My Root, o=Walt.id, c=AT"
+  //add key usage constraint
+  extensionKeyUsage {
+    addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature, KeyUsageExtension.KeyUsage.keyCertSign)
+  }
+  //add subject alternative names
+  extensionSan {
+    addEmail("office@walt.id")
+    addUri("https://walt.id")
+  }
 }
 ```
+
+#### Create a certificate signed by the root
+
+```kotlin
+import id.walt.certificate.x509.X509Certificate
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.*
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.algorithms.*
+import id.walt.crypto2.keys.*
+import id.walt.crypto2.providers.*
+// imports are shortended in this example
+
+val leafKey = cryptoRuntime.generateSoftwareKey(keyGen)
+val cert = X509CertificateUtil.createCertificate(issuerKey, issuerCert, certSigningAlg) {
+  subjectDn = "cn=My Leaf Certificate, o=Walt.id, c=AT"
+  subjectPublicKey(subjectKey)
+}
+```
+
+#### Restore Subject Public Key Info (SPKI) from a certificate
+```kotlin
+val publicKey = cert.restoreSubjectPublicKey(cryptoRuntime)
+```
+
+#### Validate a certificate chain
+```kotlin
+import id.walt.certificate.x509.X509Certificate
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.*
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.algorithms.*
+import id.walt.crypto2.keys.*
+import id.walt.crypto2.providers.*
+// imports are shortended in this example
+
+//trust our own root certificate
+val trustStore = InMemoryTrustStore(listOf(trustRoot))
+//validate the certificate chain (order in the chain does not matter)
+//root can be included in the chain,
+val validationResult = X509CertificateUtil.validateCertificateChain(chain, trustStore)
+println("Validation result: ${validationResult.valid}")
+validationResult.log.forEach { println("${it.severity} ${it.subjectDn}/${it.validatorId}: '${it.message}'") }
+```
+The result contains information about which validations are performed on which certificates and the outcome of each validation:
+```
+Validation result - isValid: true
+Validation result - log:
+WARN CN=My Root,O=Walt.id,C=AT/validityPeriod: 'Certificate will expire soon'
+INFO CN=My Root,O=Walt.id,C=AT/validityPeriod: 'DONE'
+INFO CN=My Root,O=Walt.id,C=AT/basicConstraints: 'DONE'
+INFO CN=My Root,O=Walt.id,C=AT/certificateSignature: 'DONE'
+WARN CN=My Leaf Certificate,O=Walt.id,C=AT/validityPeriod: 'Certificate will expire soon'
+INFO CN=My Leaf Certificate,O=Walt.id,C=AT/validityPeriod: 'DONE'
+INFO CN=My Leaf Certificate,O=Walt.id,C=AT/basicConstraints: 'DONE'
+INFO CN=My Leaf Certificate,O=Walt.id,C=AT/certificateSignature: '(BouncyCastle) Certificate Signature valid: ecPublicKey / ecdsa-with-SHA256'
+INFO CN=My Leaf Certificate,O=Walt.id,C=AT/certificateSignature: 'DONE'
+```
+
+
 
 ### Loading trust anchors from a JVM KeyStore (JVM helper)
 
