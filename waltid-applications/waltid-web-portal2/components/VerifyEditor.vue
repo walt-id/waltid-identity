@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import type { useSwaggerExamples } from "~/composables/useSwaggerExamples";
 import type { useVerifierSession } from "~/composables/useVerifierSession";
+import {
+  defaultTransactionFieldValue,
+  isNestedTransactionDataField,
+  parseTransactionFieldValue,
+} from "~/utils/transactionDataFields";
 
 const props = defineProps<{
   swagger: ReturnType<typeof useSwaggerExamples>;
@@ -333,18 +338,30 @@ function applyTransactionDataOverrides(
     });
 
   const openid = getOpenIdObject(payload);
+  let fieldEntries: [string, unknown][];
+  try {
+    fieldEntries = selectedProfile.fields.map((field) => [
+      field,
+      parseTransactionFieldValue(
+        field,
+        transactionDataFieldValues.value[field] ?? "",
+      ),
+    ]);
+  } catch (e) {
+    optionsError.value =
+      e instanceof Error
+        ? e.message
+        : "Invalid nested transaction data field value.";
+    return false;
+  }
+
   openid.transactionData = [
     {
       type: selectedProfile.type,
       credential_ids: credentialIds,
       transaction_data_hashes_alg: ["sha-256"],
       require_cryptographic_holder_binding: true,
-      ...Object.fromEntries(
-        selectedProfile.fields.map((field) => [
-          field,
-          transactionDataFieldValues.value[field] ?? "",
-        ]),
-      ),
+      ...Object.fromEntries(fieldEntries),
     },
   ];
 
@@ -461,7 +478,8 @@ watch(selectedTransactionProfile, (profile) => {
   transactionDataFieldValues.value = Object.fromEntries(
     profile.fields.map((field) => [
       field,
-      transactionDataFieldValues.value[field] ?? "",
+      transactionDataFieldValues.value[field] ||
+        defaultTransactionFieldValue(field, profile.type),
     ]),
   );
 });
@@ -598,15 +616,34 @@ async function submit() {
                 v-for="field in selectedTransactionProfile.fields"
                 :key="field"
                 class="grid gap-1"
+                :class="
+                  isNestedTransactionDataField(field) ? 'sm:col-span-2' : ''
+                "
               >
                 <span class="form-label !mb-0">
                   {{ formatTransactionFieldLabel(field) }}
                 </span>
+                <textarea
+                  v-if="isNestedTransactionDataField(field)"
+                  v-model="transactionDataFieldValues[field]"
+                  class="form-textarea min-h-[180px] font-mono text-xs"
+                  :name="`transaction-${field}`"
+                  spellcheck="false"
+                />
                 <input
+                  v-else
                   v-model="transactionDataFieldValues[field]"
                   class="form-input"
                   :name="`transaction-${field}`"
                 />
+                <p
+                  v-if="isNestedTransactionDataField(field)"
+                  class="text-xs text-[--color-text-muted]"
+                >
+                  Nested JSON object (for example SCA
+                  <code>payload.payee.name</code> /
+                  <code>payload.amount</code>). Amount should be a JSON number.
+                </p>
               </label>
             </div>
           </template>
