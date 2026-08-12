@@ -12,6 +12,8 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.addJsonArray
+import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
@@ -84,6 +86,19 @@ object DemoTestBackend {
             ),
         ),
         CredentialScenario(
+            id = "eu-age-verification",
+            displayName = "EU Age Verification",
+            profileId = "euAgeVerificationMdoc",
+            credentialConfigurationId = "eu.europa.ec.av.1",
+            format = "mso_mdoc",
+            verifierCredentialQuery = mdocQuery(
+                id = "proof_of_age",
+                doctype = "eu.europa.ec.av.1",
+                namespace = "eu.europa.ec.av.1",
+                claims = listOf("age_over_18"),
+            ),
+        ),
+        CredentialScenario(
             id = "iso-mdl",
             displayName = "ISO mDL",
             profileId = "isoMdl",
@@ -99,6 +114,21 @@ object DemoTestBackend {
     )
 
     val presentationScenarios = scenarios
+
+    /**
+     * A DCQL credential query no wallet in these tests can satisfy, for asserting what is *not* offered.
+     *
+     * The doctype is deliberately one the demo issuer does not issue: the wallet database survives
+     * between tests, so "a credential that simply was not issued yet" is not a reliable negative.
+     */
+    val unsatisfiableMdocQuery: JsonObject = mdocQuery(
+        id = "unheld",
+        doctype = UNHELD_DOC_TYPE,
+        namespace = UNHELD_DOC_TYPE,
+        claims = listOf("some_element"),
+    )
+
+    const val UNHELD_DOC_TYPE = "org.example.never_issued.1"
 
     val optionalBirthDatePresentationScenario = scenarios.first { it.id == "eudi-pid-sdjwt" }.copy(
         id = "eudi-pid-sdjwt-optional-birth-date",
@@ -345,12 +375,16 @@ object DemoTestBackend {
      *
      * [transactionData] is passed through verbatim, so a test can assert on the exact fields the wallet
      * displayed and hashed; see [paymentAuthorizationTransactionData].
+     *
+     * [credentialSetOptions] adds one required `credential_sets` entry whose options are the given query
+     * id groups, which is what makes a holder pick between alternatives instead of presenting everything.
      */
     suspend fun createDcApiVerifierSession(
         credentialQueries: List<JsonObject>,
         expectedOrigins: List<String>,
         encryptedResponse: Boolean = false,
         transactionData: List<JsonObject> = emptyList(),
+        credentialSetOptions: List<List<String>> = emptyList(),
     ): DcApiVerifierSession {
         require(expectedOrigins.isNotEmpty()) { "DC API sessions require at least one expected origin" }
         require(credentialQueries.isNotEmpty()) { "DC API sessions require at least one DCQL credential query" }
@@ -363,6 +397,17 @@ object DemoTestBackend {
                 putJsonObject("dcql_query") {
                     putJsonArray("credentials") {
                         credentialQueries.forEach { add(it) }
+                    }
+                    if (credentialSetOptions.isNotEmpty()) {
+                        putJsonArray("credential_sets") {
+                            addJsonObject {
+                                putJsonArray("options") {
+                                    credentialSetOptions.forEach { option ->
+                                        addJsonArray { option.forEach { add(JsonPrimitive(it)) } }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 if (encryptedResponse) put("encrypted_response", JsonPrimitive(true))
