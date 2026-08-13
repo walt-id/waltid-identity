@@ -134,6 +134,13 @@ object OnboardingService {
         val iacaKey = KeyManager.resolveSerializedKey(request.iacaSigner.iacaKey)
         val iacaCert = X509CertificateUtil.parseCertificatePem(request.iacaSigner.iacaPem)
 
+        val iacaRootValidationResult = iaCaRootCertUtil.validateCertificateChain(listOf(iacaCert), iacaCert)
+        require(iacaRootValidationResult.valid) {
+            "Provided IACA root certificate is not profile compliant: ${
+                iacaRootValidationResult.log.filter { it.severity == ValidationResult.Severity.ERROR }.map { it.message }
+            }"
+        }
+
         require((request.certificateData.finalNotBefore - iacaCert.data.validity.notBefore) > (-1).seconds) {
             "Document signer certificate validity (${request.certificateData.finalNotBefore}) starts before IACA root certificate validity (${iacaCert.data.validity.notBefore}) - ${request.certificateData.finalNotBefore - iacaCert.data.validity.notBefore}"
         }
@@ -182,7 +189,7 @@ object OnboardingService {
             certificateData = DocumentSignerCertificateData(
                 country = request.certificateData.country,
                 commonName = request.certificateData.commonName,
-                notBefore = documentSingerCert.data.validity.notAfter,
+                notBefore = documentSingerCert.data.validity.notBefore,
                 notAfter = documentSingerCert.data.validity.notAfter,
                 crlDistributionPointUri = request.certificateData.crlDistributionPointUri,
                 stateOrProvinceName = request.certificateData.stateOrProvinceName,

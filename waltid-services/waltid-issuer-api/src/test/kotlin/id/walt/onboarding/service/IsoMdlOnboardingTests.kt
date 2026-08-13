@@ -139,6 +139,37 @@ class IsoMdlOnboardingTests {
     }
 
     @Test
+    fun `onboard Document Signer rejects a non-IACA-profile-compliant root certificate`() = runTest {
+        // A self-signed cert built without the IACA profile helper: e.g. it won't have the
+        // mandatory issuer-alt-name extension, a critical basicConstraints with pathLenConstraint=0,
+        // or a critical keyUsage restricted to keyCertSign+cRLSign. A caller controlling the private
+        // key behind such a certificate must not be able to get a Document Signer issued "under" it.
+        val notARealRootKey = KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1))
+        val now = Clock.System.now()
+        val notARealRootCert = X509CertificateUtil.createSelfSignedCertificate(notARealRootKey) {
+            subjectDn = "CN=Not A Real IACA Root"
+            // wide enough to comfortably cover validDSReqData's default validity window, so the
+            // only thing that can reject this request is the (missing) IACA profile compliance
+            validity = X509Certificate.Validity(
+                notBefore = now.minus(1.days),
+                notAfter = now.plus(500.days),
+            )
+        }
+
+        val request = DocumentSignerOnboardingRequest(
+            iacaSigner = IACASignerData(
+                iacaKey = KeySerialization.serializeKeyToJson(notARealRootKey).jsonObject,
+                iacaPem = notARealRootCert.encodedPem,
+            ),
+            certificateData = validDSReqData,
+        )
+
+        assertFails {
+            OnboardingService.onboardDocumentSigner(request)
+        }
+    }
+
+    @Test
     fun `onboard IACA does not work with unsupported key types`() = runTest {
         listOf(
             IACAOnboardingRequest(
