@@ -3,8 +3,13 @@
 `src/androidMain/assets/id/walt/wallet2/mobile/identitycredentialmatcher.wasm` is the Credential
 Manager matcher this wallet registers for its ISO 18013-7 Annex C (`org-iso-mdoc`) registry. AndroidX
 ships no Annex C registry or matcher, so `AndroidDigitalCredentialRegistry` registers a raw
-`DigitalCredentialRegistry` and supplies the binary itself. OpenID4VP is unaffected: it uses
-`OpenId4VpRegistry` with the matcher AndroidX embeds.
+`DigitalCredentialRegistry` and supplies the binary itself.
+
+Annex C and OpenID4VP use separate Credential Manager registries and separate vendored matchers. This
+binary is not limited to Annex C - it also implements OpenID4VP and DCQL - but it implements no
+`transaction_data`, so the OpenID4VP registry uses the Rust matcher described in
+`OPENID4VP-MATCHER.md` instead. Conversely, that Rust matcher implements no `org-iso-mdoc`, so it
+cannot replace this one.
 
 ## Why it is vendored
 

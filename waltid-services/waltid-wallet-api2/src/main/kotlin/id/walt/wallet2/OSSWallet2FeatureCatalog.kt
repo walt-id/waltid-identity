@@ -1,5 +1,6 @@
 package id.walt.wallet2
 
+import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature
 import id.walt.commons.featureflag.ServiceFeatureCatalog
@@ -21,6 +22,17 @@ object OSSWallet2FeatureCatalog : ServiceFeatureCatalog {
     val persistenceFeature =
         OptionalFeature("wallet2-persistence", "SQL persistence for wallets, credentials, keys and DIDs", Wallet2PersistenceConfig::class, default = false)
 
+    val transactionDataProfilesFeature = OptionalFeature(
+        name = "transaction-data-profiles",
+        description = "Transaction data type profiles for OpenID4VP",
+        config = TransactionDataProfilesConfig::class,
+        default = true,
+    )
+
     override val baseFeatures = listOf(walletService)
-    override val optionalFeatures: List<OptionalFeature> = listOf(authFeature, persistenceFeature)
+    override val optionalFeatures: List<OptionalFeature> = listOf(
+        authFeature,
+        persistenceFeature,
+        transactionDataProfilesFeature,
+    )
 }

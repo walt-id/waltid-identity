@@ -48,6 +48,7 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
+        authorizedTransactionDataTypes: List<String>?,
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
