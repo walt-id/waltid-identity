@@ -137,7 +137,7 @@ object Issuer2RequestExamples {
                     put("family_name", "Doe")
                     put("birth_date", "2003-12-21")
                     put("issue_date", "2025-12-13")
-                    put("issuing_authority_unicode", "Walt.id Issuer")
+                    put("issuing_authority_unicode", "walt.id Issuer")
                     put("expiry_date", "2026-12-13")
                 }
                 putJsonObject("org.iso.23220.photoid.1") {

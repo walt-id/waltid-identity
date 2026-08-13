@@ -38,7 +38,7 @@ jobs:
         include: ${{ fromJSON(needs.api-docker-matrix.outputs.json) }}
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
       - name: Configure gradle

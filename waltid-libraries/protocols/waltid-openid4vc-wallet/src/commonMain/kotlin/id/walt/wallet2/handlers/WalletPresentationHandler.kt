@@ -380,6 +380,23 @@ object WalletPresentationHandler {
         wallet: Wallet,
         request: PresentCredentialRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
+    ): WalletPresentResult = presentCredential(
+        wallet, request, onEvent, TransactionDataTypeRegistry(), beforeCredentialsUsed = {},
+    )
+
+    suspend fun presentCredential(
+        wallet: Wallet,
+        request: PresentCredentialRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
+        beforeCredentialsUsed: suspend (Int) -> Unit,
+    ): WalletPresentResult = presentCredential(
+        wallet, request, onEvent, TransactionDataTypeRegistry(), beforeCredentialsUsed,
+    )
+
+    suspend fun presentCredential(
+        wallet: Wallet,
+        request: PresentCredentialRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ): WalletPresentResult = presentCredentialWithTrust(
         wallet,
@@ -389,12 +406,28 @@ object WalletPresentationHandler {
         ClientIdTrustConfiguration(),
     )
 
+    suspend fun presentCredential(
+        wallet: Wallet,
+        request: PresentCredentialRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        beforeCredentialsUsed: suspend (Int) -> Unit,
+    ): WalletPresentResult = presentCredentialWithTrust(
+        wallet,
+        request,
+        onEvent,
+        transactionDataTypeRegistry,
+        ClientIdTrustConfiguration(),
+        beforeCredentialsUsed,
+    )
+
     suspend fun presentCredentialWithTrust(
         wallet: Wallet,
         request: PresentCredentialRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        beforeCredentialsUsed: suspend (Int) -> Unit = {},
     ): WalletPresentResult {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
@@ -419,6 +452,7 @@ object WalletPresentationHandler {
             runPolicies = request.runPolicies,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
+            beforeCredentialsUsed = beforeCredentialsUsed,
         )
 
         return result.emitPresentationOutcome(onEvent)
@@ -431,6 +465,23 @@ object WalletPresentationHandler {
         wallet: Wallet,
         request: PresentCredentialIsolatedRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
+    ): WalletPresentResult = presentCredentialIsolated(
+        wallet, request, onEvent, TransactionDataTypeRegistry(), beforeCredentialsUsed = {},
+    )
+
+    suspend fun presentCredentialIsolated(
+        wallet: Wallet,
+        request: PresentCredentialIsolatedRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
+        beforeCredentialsUsed: suspend (Int) -> Unit,
+    ): WalletPresentResult = presentCredentialIsolated(
+        wallet, request, onEvent, TransactionDataTypeRegistry(), beforeCredentialsUsed,
+    )
+
+    suspend fun presentCredentialIsolated(
+        wallet: Wallet,
+        request: PresentCredentialIsolatedRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ): WalletPresentResult = presentCredentialIsolatedWithTrust(
         wallet,
@@ -440,12 +491,28 @@ object WalletPresentationHandler {
         ClientIdTrustConfiguration(),
     )
 
+    suspend fun presentCredentialIsolated(
+        wallet: Wallet,
+        request: PresentCredentialIsolatedRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        beforeCredentialsUsed: suspend (Int) -> Unit,
+    ): WalletPresentResult = presentCredentialIsolatedWithTrust(
+        wallet,
+        request,
+        onEvent,
+        transactionDataTypeRegistry,
+        ClientIdTrustConfiguration(),
+        beforeCredentialsUsed,
+    )
+
     suspend fun presentCredentialIsolatedWithTrust(
         wallet: Wallet,
         request: PresentCredentialIsolatedRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        beforeCredentialsUsed: suspend (Int) -> Unit = {},
     ): WalletPresentResult {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
@@ -469,6 +536,7 @@ object WalletPresentationHandler {
             runPolicies = null,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
+            beforeCredentialsUsed = beforeCredentialsUsed,
         )
 
         return result.emitPresentationOutcome(onEvent)
@@ -921,6 +989,7 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        beforeCredentialsUsed: suspend (Int) -> Unit = {},
     ): Result<WalletPresentResult> = keyMaterial.crypto2Key?.let { crypto2Key ->
         WalletPresentFunctionality2.walletPresentHandling(
             holderKey = crypto2Key,
@@ -932,6 +1001,7 @@ object WalletPresentationHandler {
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             resolvedAuthorizationRequest = resolvedAuthorizationRequest,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
+            beforeCredentialsUsed = beforeCredentialsUsed,
         )
     } ?: WalletPresentFunctionality2.walletPresentHandling(
         holderKey = requireNotNull(keyMaterial.legacyKey) {
@@ -946,6 +1016,7 @@ object WalletPresentationHandler {
         resolvedAuthorizationRequest = resolvedAuthorizationRequest,
         holderCrypto2Key = null,
         clientIdTrustConfiguration = clientIdTrustConfiguration,
+        beforeCredentialsUsed = beforeCredentialsUsed,
     )
 
     suspend fun submitDcApiPresentation(

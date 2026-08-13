@@ -105,6 +105,35 @@ jobs:
       deployment: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'dev' || 'prod' }}
       oss: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-identity-main' || 'identity-main' }}
       enterprise: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-enterprise-main' || 'enterprise-main' }}
+  deploy-license:
+    runs-on: ubuntu-latest
+    needs: [ version, api-docker ]
+    if: ${{ !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
+    steps:
+      - name: Determine ref for enterprise repo
+        id: enterprise_ref
+        env:
+          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          if git ls-remote --exit-code --heads "https://$GH_TOKEN@github.com/walt-id/waltid-identity-enterprise.git" "refs/heads/$BRANCH" >/dev/null 2>&1; then
+            echo "ref=$BRANCH" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Dispatch license deployment in enterprise repo
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_ACCESS_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'walt-id',
+              repo: 'waltid-identity-enterprise',
+              workflow_id: 'deploy-k8s-license.yml',
+              ref: '${{ steps.enterprise_ref.outputs.ref }}',
+              inputs: { version: '${{ needs.version.outputs.release_version }}' }
+            })
   branch:
     uses: ./.github/workflows/branch.yml
     secrets: inherit
