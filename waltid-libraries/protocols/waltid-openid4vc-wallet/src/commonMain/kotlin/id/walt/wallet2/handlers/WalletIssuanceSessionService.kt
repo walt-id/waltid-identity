@@ -896,7 +896,14 @@ class WalletIssuanceSessionService(
             CredentialOfferResolver(httpClient).resolveCredentialOffer(parsed.credentialOffer, parsed.credentialOfferUri)
         }
         val resolver = IssuerMetadataResolver(httpClient)
-        val issuerMetadata = resolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
+        // Digital Credentials API issuance data may carry metadata by value. It remains
+        // untrusted input: the issuer and selected authorization-server identifiers are checked
+        // below before the supplied metadata is used.
+        val embeddedIssuerMetadata = request.offerJson
+            ?.get("credential_issuer_metadata")
+            ?.let { json.decodeFromJsonElement<CredentialIssuerMetadata>(it) }
+        val issuerMetadata = embeddedIssuerMetadata
+            ?: resolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
         require(issuerMetadata.credentialIssuer == offer.credentialIssuer) {
             "Credential issuer metadata identifier does not match the offer"
         }
@@ -906,7 +913,11 @@ class WalletIssuanceSessionService(
             else -> null
         }
         val selectedAuthorizationServer = selectAuthorizationServer(issuerMetadata, grantAuthorizationServer)
-        val authorizationServerMetadata = resolver.resolveAuthorizationServerMetadata(selectedAuthorizationServer)
+        val embeddedAuthorizationServerMetadata = request.offerJson
+            ?.get("authorization_server_metadata")
+            ?.let { json.decodeFromJsonElement<AuthorizationServerMetadata>(it) }
+        val authorizationServerMetadata = embeddedAuthorizationServerMetadata
+            ?: resolver.resolveAuthorizationServerMetadata(selectedAuthorizationServer)
         require(authorizationServerMetadata.issuer == selectedAuthorizationServer) {
             "Authorization server metadata issuer does not match the selected server"
         }

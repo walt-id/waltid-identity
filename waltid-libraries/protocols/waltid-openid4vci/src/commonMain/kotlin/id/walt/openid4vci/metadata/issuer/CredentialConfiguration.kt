@@ -185,7 +185,19 @@ internal object CredentialConfigurationSerializer : KSerializer<CredentialConfig
             doctype = jsonObject.string("doctype"),
             vct = jsonObject.string("vct"),
             credentialSigningAlgValuesSupported = jsonObject["credential_signing_alg_values_supported"]?.let {
-                lenientJson.decodeFromJsonElement(SigningAlgIdSetSerializer, it)
+                val decoded = lenientJson.decodeFromJsonElement(SigningAlgIdSetSerializer, it)
+                if (format == CredentialFormat.MSO_MDOC) {
+                    // COSE algorithm names are JSON strings too, but mdoc metadata interprets
+                    // them as COSE names rather than JOSE identifiers.
+                    decoded.mapTo(linkedSetOf()) { algorithm ->
+                        when (algorithm) {
+                            is SigningAlgId.Jose -> SigningAlgId.CoseName(algorithm.value)
+                            else -> algorithm
+                        }
+                    }
+                } else {
+                    decoded
+                }
             },
             cryptographicBindingMethodsSupported = jsonObject["cryptographic_binding_methods_supported"]?.let {
                 val serializer = SetSerializer(CryptographicBindingMethod.serializer())

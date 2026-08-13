@@ -1,0 +1,111 @@
+{
+  "requests": [
+      {
+        "protocol": "openid4vci1.0",
+        "data": {
+          "authorization_server_metadata": {
+            "authorization_endpoint": "https://digital-credentials.dev/openid4vci/auth",
+            "challenge_endpoint": "https://digital-credentials.dev/openid4vci/client_attestation_challenge",
+            "grant_types_supported": [
+              "authorization_code",
+              "refresh_token",
+              "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+            ],
+            "issuer": "https://digital-credentials.dev",
+            "response_types_supported": ["code", "token"],
+            "token_endpoint": "https://digital-credentials.dev/openid4vci/token"
+          },
+          "credential_configuration_ids": ["com.emvco.payment_card"],
+          "credential_issuer": "https://digital-credentials.dev",
+          "credential_issuer_metadata": {
+            "credential_configurations_supported": {
+              "com.emvco.dpc_sdjwt": {
+                "credential_signing_alg_values_supported": ["ES256"],
+                "cryptographic_binding_methods_supported": ["jwk"],
+                "format": "dc+sd-jwt",
+                "proof_types_supported": {
+                  "android_keystore_attestation": {"proof_signing_alg_values_supported": ["ES256"]},
+                  "jwt": {"proof_signing_alg_values_supported": ["ES256"]}
+                },
+                "vct": "dpc.cred.card"
+              },
+              "com.emvco.dpc_v1_draft_sdjwt": {
+                "credential_signing_alg_values_supported": ["ES256"],
+                "cryptographic_binding_methods_supported": ["jwk"],
+                "format": "dc+sd-jwt",
+                "proof_types_supported": {
+                  "android_keystore_attestation": {"proof_signing_alg_values_supported": ["ES256"]},
+                  "jwt": {"proof_signing_alg_values_supported": ["ES256"]}
+                },
+                "vct": "com.emvco.dpc.card"
+              },
+              "com.emvco.dpc_v3_2_sdjwt": {
+                "credential_signing_alg_values_supported": ["ES256"],
+                "cryptographic_binding_methods_supported": ["jwk"],
+                "format": "dc+sd-jwt",
+                "proof_types_supported": {
+                  "android_keystore_attestation": {"proof_signing_alg_values_supported": ["ES256"]},
+                  "jwt": {"proof_signing_alg_values_supported": ["ES256"]}
+                },
+                "vct": "com.emvco.dpc"
+              },
+              "com.emvco.payment_card": {
+                "claims": [
+                  {"display": [{"locale": "en-US", "name": "Holder Name"}], "path": ["com.emvco.payment_card.1", "holder_name"]},
+                  {"display": [{"locale": "en-US", "name": "Card Number"}], "path": ["com.emvco.payment_card.1", "card_number"]},
+                  {"display": [{"locale": "en-US", "name": "Month of Expiry"}], "path": ["com.emvco.payment_card.1", "expiry_month"]},
+                  {"display": [{"locale": "en-US", "name": "Year of Expiry"}], "path": ["com.emvco.payment_card.1", "expiry_year"]},
+                  {"display": [{"locale": "en-US", "name": "Card Network"}], "path": ["com.emvco.payment_card.1", "card_network"]},
+                  {"display": [{"locale": "en-US", "name": "Card issuer"}], "path": ["com.emvco.payment_card.1", "card_issuer"]},
+                  {"display": [{"locale": "en-US", "name": "Payment Account Reference"}], "path": ["com.emvco.payment_card.1", "par"]},
+                  {"display": [{"locale": "en-US", "name": "Age over 21"}], "path": ["com.example.1", "age_over_21"]},
+                  {"display": [{"locale": "en-US", "name": "Email Address"}], "path": ["com.example.1", "email"]}
+                ],
+                "credential_signing_alg_values_supported": ["ES256"],
+                "cryptographic_binding_methods_supported": ["cose_key"],
+                "display": [{"locale": "en-US", "name": "Payment Card"}],
+                "doctype": "com.emvco.payment_card",
+                "format": "mso_mdoc",
+                "proof_types_supported": {
+                  "android_keystore_attestation": {"proof_signing_alg_values_supported": ["ES256"]},
+                  "jwt": {"proof_signing_alg_values_supported": ["ES256"]}
+                }
+              },
+              "org.iso.18013.5.1.mDL": {
+                "claims": [
+                  {"display": [{"locale": "en-US", "name": "Family Name"}], "path": ["org.iso.18013.5.1", "family_name"]},
+                  {"display": [{"locale": "en-US", "name": "Given Name"}], "path": ["org.iso.18013.5.1", "given_name"]},
+                  {"display": [{"locale": "en-US", "name": "Driving Privs"}], "path": ["org.iso.18013.5.1", "driving_privileges"]},
+                  {"display": [{"locale": "en-US", "name": "Issue Date"}], "path": ["org.iso.18013.5.1", "issue_date"]},
+                  {"display": [{"locale": "en-US", "name": "Expiry Date"}], "path": ["org.iso.18013.5.1", "expiry_date"]},
+                  {"display": [{"locale": "en-US", "name": "Birth Date"}], "path": ["org.iso.18013.5.1", "birth_date"]},
+                  {"display": [{"locale": "en-US", "name": "Document Number"}], "path": ["org.iso.18013.5.1", "document_number"]},
+                  {"display": [{"locale": "en-US", "name": "Issuing Authority"}], "path": ["org.iso.18013.5.1", "issuing_authority"]},
+                  {"display": [{"locale": "en-US", "name": "Issuing Jurisdiction"}], "path": ["org.iso.18013.5.1", "issuing_jurisdiction"]},
+                  {"display": [{"locale": "en-US", "name": "Portrait"}], "path": ["org.iso.18013.5.1", "portrait"]},
+                  {"display": [{"locale": "en-US", "name": "Age Over 21"}], "path": ["com.example.1", "age_over_21"]}
+                ],
+                "credential_signing_alg_values_supported": ["ES256"],
+                "cryptographic_binding_methods_supported": ["jwk"],
+                "display": [{"description": "Mobile Driving License", "locale": "en-US", "name": "Driver's License"}],
+                "doctype": "org.iso.18013.5.1.mDL",
+                "format": "mso_mdoc",
+                "proof_types_supported": {
+                  "android_keystore_attestation": {"proof_signing_alg_values_supported": ["ES256"]},
+                  "jwt": {"proof_signing_alg_values_supported": ["ES256"]}
+                }
+              }
+            },
+            "credential_endpoint": "https://digital-credentials.dev/openid4vci/credential_endpoint",
+            "credential_issuer": "https://digital-credentials.dev",
+            "nonce_endpoint": "https://digital-credentials.dev/openid4vci/nonce_endpoint"
+          },
+          "grants": {
+            "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+              "pre-authorized_code": "REDACTED_TEST_PRE_AUTHORIZED_CODE"
+            }
+          }
+        }
+      }
+  ]
+}

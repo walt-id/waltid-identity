@@ -49,14 +49,50 @@ class AndroidDigitalCredentialCreateProviderTest {
     }
 
     @Test
-    fun rejectsHistoricalOpenId4VciProtocolAliases() {
-        for (protocol in listOf("openid4vci1.0", "openid4vci")) {
-            assertFailsWith<IllegalArgumentException> {
-                AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
-                    requestJson = """{"requests":[{"protocol":"$protocol","data":{"credential_issuer":"https://i.example","credential_configuration_ids":["c"]}}]}""",
-                    verifiedOrigin = "android:apk-key-hash:abc",
-                )
-            }
+    fun resolvesHistoricalOpenId4VciProtocolAlias() {
+        val request = AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
+            requestJson = """{"requests":[{"protocol":"openid4vci1.0","data":{"credential_issuer":"https://i.example","credential_configuration_ids":["c"]}}]}""",
+            verifiedOrigin = "android:apk-key-hash:abc",
+        )
+
+        assertEquals("openid4vci1.0", request.protocol)
+        assertEquals("https://i.example", Json.parseToJsonElement(request.offerJson).jsonObject["credential_issuer"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun resolvesCapturedDmvCreateRequestWithoutLiveDependency() {
+        val requestJson = requireNotNull(javaClass.getResource("/fixtures/dmv-openid4vci-create-request.json"))
+            .readText()
+        val request = AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
+            requestJson = requestJson,
+            verifiedOrigin = "https://digital-credentials.dev",
+        )
+
+        assertEquals("openid4vci1.0", request.protocol)
+        val offer = Json.parseToJsonElement(request.offerJson).jsonObject
+        assertEquals("https://digital-credentials.dev", offer["credential_issuer"]?.jsonPrimitive?.content)
+        assertEquals(
+            "com.emvco.payment_card",
+            offer["credential_configuration_ids"]?.jsonArray?.single()?.jsonPrimitive?.content,
+        )
+        assertEquals(
+            "REDACTED_TEST_PRE_AUTHORIZED_CODE",
+            offer["grants"]?.jsonObject
+                ?.get("urn:ietf:params:oauth:grant-type:pre-authorized_code")
+                ?.jsonObject
+                ?.get("pre-authorized_code")
+                ?.jsonPrimitive
+                ?.content,
+        )
+    }
+
+    @Test
+    fun rejectsUnsupportedOpenId4VciProtocolAlias() {
+        assertFailsWith<IllegalArgumentException> {
+            AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
+                requestJson = """{"requests":[{"protocol":"openid4vci","data":{"credential_issuer":"https://i.example","credential_configuration_ids":["c"]}}]}""",
+                verifiedOrigin = "android:apk-key-hash:abc",
+            )
         }
     }
 
