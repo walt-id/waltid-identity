@@ -5,15 +5,9 @@ package id.waltid.openid4vp.wallet
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.crypto.keys.Key
-import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto.utils.ShaUtils.calculateSha256Base64Url
-import id.walt.crypto2.jose.CompactJws
-import id.walt.crypto2.jose.CompactJwe
-import id.walt.crypto2.jose.JweContentEncryption
-import id.walt.crypto2.jose.Jwk
-import id.walt.crypto2.jose.selectJwsAlgorithm
+import id.walt.crypto2.jose.*
 import id.walt.crypto2.keys.EncodedKey
-import id.walt.sdjwt.SDJwt
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.CredentialFormat
@@ -21,18 +15,20 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.sdjwt.SDJwt
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
-import id.walt.verifier.openid.transactiondata.*
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
+import id.walt.verifier.openid.transactiondata.decodeList
+import id.walt.verifier.openid.transactiondata.resolveHashAlgorithm
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
-import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.buildIdToken
-import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.buildVpToken
-import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.resolveAuthorizationRequest
-import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.sendAuthorizationResponse
-import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.walletPresentHandling
-import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.walletRejectHandling
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.isLegacyPresentationDefinitionRequest
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.legacyFallbackResult
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.resolveAndValidateAuthorizationRequest
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.validateAuthorizationRequest
 import id.waltid.openid4vp.wallet.presentation.*
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
@@ -50,6 +46,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 
 object WalletPresentFunctionality2 {
@@ -296,8 +293,8 @@ object WalletPresentFunctionality2 {
 
     private fun isOAuthErrorCharacter(character: Char): Boolean =
         character.code in 0x20..0x21 ||
-            character.code in 0x23..0x5B ||
-            character.code in 0x5D..0x7E
+                character.code in 0x23..0x5B ||
+                character.code in 0x5D..0x7E
 
     private suspend fun postFormResponse(
         responseUri: String,
@@ -725,12 +722,12 @@ object WalletPresentFunctionality2 {
      */
     private fun Url.isLegacyPresentationDefinitionRequest(): Boolean =
         !parameters.contains("request") &&
-            !parameters.contains("request_uri") &&
-            (
-                protocol.name == "mdoc-openid4vp" ||
-                    parameters.contains("presentation_definition") ||
-                    parameters.contains("presentation_definition_uri")
-                )
+                !parameters.contains("request_uri") &&
+                (
+                        protocol.name == "mdoc-openid4vp" ||
+                                parameters.contains("presentation_definition") ||
+                                parameters.contains("presentation_definition_uri")
+                        )
 
     @Deprecated("Use the Crypto2Key overload")
     suspend fun walletPresentHandling(
@@ -871,6 +868,15 @@ object WalletPresentFunctionality2 {
             },
         )
         if (validation is PresentationRequestValidationResult.Invalid) {
+            // OpenID4VP 1.0 8.x: a Wallet SHOULD NOT return protocol errors before obtaining End-User
+            // consent, and may cancel the flow instead. transaction_data is rejected purely from the
+            // request, long before the user sees anything, so reporting invalid_transaction_data to the
+            // Verifier would leak that a request was received without any interaction having happened.
+            // Cancelling matches how the other pre-consent request checks behave (they throw), and 5.1
+            // is still satisfied because no Credential is presented.
+            if (validation.error.code == OID4VPErrorCode.INVALID_TRANSACTION_DATA) {
+                throw IllegalArgumentException(validation.error.message)
+            }
             return walletRejectHandling(authorizationRequest, validation.error.code)
         }
         val validatedTransactionData = (validation as PresentationRequestValidationResult.Valid).transactionData
