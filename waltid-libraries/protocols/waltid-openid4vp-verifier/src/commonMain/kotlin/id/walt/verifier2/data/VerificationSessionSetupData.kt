@@ -3,6 +3,7 @@
 package id.walt.verifier2.data
 
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialFormat
@@ -88,6 +89,22 @@ sealed interface VerificationSessionSetup {
     val core: GeneralFlowConfig
 }
 
+/**
+ * Persist the effective signing key on the session setup so `request_uri_method=post`
+ * can re-sign with `wallet_nonce` (OID4VP 1.0 §5.6). Keys resolved via KMS
+ * `keyReference` are otherwise only passed as a create-time argument and lost.
+ */
+fun VerificationSessionSetup.withCoreKeyIfMissing(key: Key): VerificationSessionSetup {
+    if (core.key != null) return this
+    val newCore = core.copy(key = DirectSerializedKey(key))
+    return when (this) {
+        is CrossDeviceFlowSetup -> copy(core = newCore)
+        is SameDeviceFlowSetup -> copy(core = newCore)
+        is DcApiAnnexDFlowSetup -> copy(core = newCore)
+        is DcApiAnnexCFlowSetup -> copy(coreFlow = coreFlow.copy(key = DirectSerializedKey(key)))
+    }
+}
+
 internal fun VerificationSessionSetup.publicView(): VerificationSessionSetup = when (this) {
     is CrossDeviceFlowSetup -> copy(core = core.publicView())
     is SameDeviceFlowSetup -> copy(core = core.publicView())
@@ -110,6 +127,7 @@ internal fun KtorSessionNotifications.publicView(): KtorSessionNotifications = c
         bearerToken = null,
     )
 )
+
 
 /** Flows that use URLs*/
 sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
