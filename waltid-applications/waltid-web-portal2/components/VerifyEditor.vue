@@ -1,10 +1,18 @@
 <script setup lang="ts">
 import type { useSwaggerExamples } from "~/composables/useSwaggerExamples";
-import type { useVerifierSession } from "~/composables/useVerifierSession";
+import {
+  isDcApiFlowType,
+  type useVerifierSession,
+} from "~/composables/useVerifierSession";
+import {
+  getDcApiPresentationSupport,
+  type DcApiPresentationSupport,
+} from "~/utils/dcApiPresentation";
 import {
   defaultTransactionFieldValue,
   isNestedTransactionDataField,
   parseTransactionFieldValue,
+  stringifyTransactionFieldValue,
 } from "~/utils/transactionDataFields";
 
 const props = defineProps<{
@@ -96,6 +104,9 @@ const x5cValues = ref(parseX5cPreset(verifierX5cPreset));
 const signedRequest = ref(false);
 const encryptedResponse = ref(false);
 const dcApiMediationRequired = ref(false);
+const dcApiSupport = ref<DcApiPresentationSupport>(
+  getDcApiPresentationSupport(),
+);
 const optionsError = ref<string | null>(null);
 const clientIdType = ref<ClientIdType>("x509_hash");
 const clientIdInput = ref("");
@@ -108,6 +119,8 @@ const transactionDataEnabled = ref(false);
 const transactionDataTouched = ref(false);
 const selectedTransactionProfileType = ref("");
 const transactionDataFieldValues = ref<Record<string, string>>({});
+const selectedTransactionCredentialIds = ref<string[]>([]);
+const isHydrating = ref(false);
 
 const clientIdOptions = [
   {
@@ -146,12 +159,27 @@ const selectedClientIdOption = computed(() =>
   clientIdOptions.find((option) => option.value === clientIdType.value)!,
 );
 const clientIdNeedsInput = computed(() => clientIdType.value !== "x509_hash");
-const selectedSwaggerExample = computed(
-  () => props.swagger.examples.value[selectedIndex.value] ?? null,
-);
-const isDcApiExample = computed(() =>
-  selectedSwaggerExample.value?.title.toLowerCase().includes("dc_api"),
-);
+const parsedPayload = computed<Record<string, unknown> | null>(() => {
+  try {
+    const parsed = JSON.parse(json.value || "{}");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+});
+const isDcApiPayload = computed(() => isDcApiFlowType(parsedPayload.value));
+const dcqlCredentialIds = computed(() => {
+  const payload = parsedPayload.value;
+  if (!payload) return [];
+  const coreFlow = payload.core_flow;
+  if (!coreFlow || typeof coreFlow !== "object" || Array.isArray(coreFlow)) {
+    return [];
+  }
+  return getDcqlCredentialIds(coreFlow as Record<string, unknown>);
+});
 
 const canSubmit = computed(() => {
   if (!json.value.trim()) return false;
@@ -178,7 +206,8 @@ const transactionDataUnavailable = computed(
     transactionDataEnabled.value &&
     (transactionDataProfiles.loading.value ||
       !!transactionDataProfiles.error.value ||
-      !selectedTransactionProfile.value),
+      !selectedTransactionProfile.value ||
+      selectedTransactionCredentialIds.value.length === 0),
 );
 const submitDisabled = computed(
   () =>
@@ -186,7 +215,8 @@ const submitDisabled = computed(
     !!optionsError.value ||
     missingRequiredClientId.value ||
     transactionDataUnavailable.value ||
-    props.session.loading.value,
+    props.session.loading.value ||
+    (isDcApiPayload.value && !dcApiSupport.value.supported),
 );
 
 function readPayload(): Record<string, unknown> {
@@ -299,6 +329,97 @@ function formatTransactionFieldLabel(field: string) {
 
 function handleTransactionDataToggle() {
   transactionDataTouched.value = true;
+  if (
+    transactionDataEnabled.value &&
+    selectedTransactionCredentialIds.value.length === 0 &&
+    dcqlCredentialIds.value.length === 1
+  ) {
+    selectedTransactionCredentialIds.value = [...dcqlCredentialIds.value];
+  }
+}
+
+function defaultTransactionCredentialIds(
+  availableIds: string[],
+  existingIds?: string[],
+): string[] {
+  if (existingIds && existingIds.length > 0) {
+    const selected = existingIds.filter((id) => availableIds.includes(id));
+    if (selected.length > 0) return selected;
+  }
+  return availableIds.length === 1 ? [availableIds[0]!] : [];
+}
+
+function hydrateTransactionDataFromPayload(payload: Record<string, unknown>) {
+  const availableIds = getDcqlCredentialIds(getCoreFlowObject(payload));
+  const openid = payload.openid;
+  const transactionData =
+    openid && typeof openid === "object" && !Array.isArray(openid)
+      ? (openid as Record<string, unknown>).transactionData
+      : undefined;
+
+  if (!Array.isArray(transactionData) || transactionData.length === 0) {
+    transactionDataEnabled.value = false;
+    selectedTransactionCredentialIds.value = defaultTransactionCredentialIds(
+      availableIds,
+    );
+    return;
+  }
+
+  const item = transactionData[0];
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    transactionDataEnabled.value = false;
+    selectedTransactionCredentialIds.value = defaultTransactionCredentialIds(
+      availableIds,
+    );
+    return;
+  }
+
+  const record = item as Record<string, unknown>;
+  transactionDataEnabled.value = true;
+
+  if (typeof record.type === "string" && record.type.trim()) {
+    selectedTransactionProfileType.value = record.type;
+  }
+
+  const existingIds = Array.isArray(record.credential_ids)
+    ? record.credential_ids.filter(
+        (id): id is string => typeof id === "string" && id.trim().length > 0,
+      )
+    : [];
+  selectedTransactionCredentialIds.value = defaultTransactionCredentialIds(
+    availableIds,
+    existingIds,
+  );
+
+  const profile =
+    transactionDataProfiles.profiles.value.find(
+      (candidate) => candidate.type === selectedTransactionProfileType.value,
+    ) ?? null;
+  if (!profile) return;
+
+  transactionDataFieldValues.value = Object.fromEntries(
+    profile.fields.map((field) => [
+      field,
+      stringifyTransactionFieldValue(field, record[field]),
+    ]),
+  );
+}
+
+function hydrateControlsFromPayload() {
+  isHydrating.value = true;
+  try {
+    const payload = readPayload();
+    const coreFlow = getCoreFlowObject(payload);
+    signedRequest.value = coreFlow.signed_request === true;
+    encryptedResponse.value = coreFlow.encrypted_response === true;
+    hydrateTransactionDataFromPayload(payload);
+  } catch {
+    // Invalid JSON — leave controls unchanged until the payload parses.
+  } finally {
+    nextTick(() => {
+      isHydrating.value = false;
+    });
+  }
 }
 
 function applyTransactionDataOverrides(
@@ -324,10 +445,15 @@ function applyTransactionDataOverrides(
     return false;
   }
 
-  const credentialIds = getDcqlCredentialIds(coreFlow);
+  const availableIds = getDcqlCredentialIds(coreFlow);
+  const credentialIds = selectedTransactionCredentialIds.value.filter((id) =>
+    availableIds.includes(id),
+  );
   if (credentialIds.length === 0) {
     optionsError.value =
-      "Transaction data requires at least one DCQL credential with an id.";
+      availableIds.length === 0
+        ? "Transaction data requires at least one DCQL credential with an id."
+        : "Select at least one DCQL credential to bind transaction data to.";
     return false;
   }
 
@@ -435,8 +561,10 @@ watch(
     transactionDataEnabled,
     selectedTransactionProfileType,
     transactionDataFieldValues,
+    selectedTransactionCredentialIds,
   ],
   () => {
+    if (isHydrating.value) return;
     void applySecurityOverridesToJson();
   },
   { deep: true },
@@ -444,7 +572,7 @@ watch(
 
 watch(selectedIndex, () =>
   nextTick(() => {
-    void applySecurityOverridesToJson();
+    hydrateControlsFromPayload();
   }),
 );
 
@@ -455,21 +583,24 @@ watch(json, () => {
   }
 
   nextTick(() => {
-    void applySecurityOverridesToJson();
+    hydrateControlsFromPayload();
   });
 });
 
 watch(
   transactionDataProfiles.profiles,
   (profiles) => {
+    isHydrating.value = true;
     if (!selectedTransactionProfileType.value && profiles[0]) {
       selectedTransactionProfileType.value = profiles[0].type;
     }
+    nextTick(() => hydrateControlsFromPayload());
   },
   { immediate: true },
 );
 
 watch(selectedTransactionProfile, (profile) => {
+  if (isHydrating.value) return;
   if (!profile) {
     transactionDataFieldValues.value = {};
     return;
@@ -485,14 +616,20 @@ watch(selectedTransactionProfile, (profile) => {
 });
 
 onMounted(() => {
+  dcApiSupport.value = getDcApiPresentationSupport();
   void transactionDataProfiles.load();
+  nextTick(() => hydrateControlsFromPayload());
+});
+
+watch(isDcApiPayload, (enabled) => {
+  if (enabled) dcApiSupport.value = getDcApiPresentationSupport();
 });
 
 async function submit() {
   const payload = await applySecurityOverridesToJson();
   if (!payload) return;
 
-  if (isDcApiExample.value) {
+  if (isDcApiFlowType(payload)) {
     await props.session.createDcApiSession(
       payload,
       dcApiMediationRequired.value,
@@ -530,8 +667,8 @@ async function submit() {
           <div>
             <span class="text-base font-semibold">Transaction data</span>
             <span class="block text-sm text-[--color-text-muted] mt-1">
-              Add OpenID4VP transaction data to the request and bind it to the
-              DCQL credential ids in the payload.
+              Add OpenID4VP transaction data to the request and bind it to
+              selected DCQL credential ids.
             </span>
           </div>
           <div
@@ -603,10 +740,40 @@ async function submit() {
                 </option>
               </select>
               <p class="mt-1 text-xs text-[--color-text-muted]">
-                The generated <code>credential_ids</code> are taken from
-                <code>core_flow.dcql_query.credentials[].id</code>.
+                Bind transaction data to specific
+                <code>core_flow.dcql_query.credentials[].id</code> values. For a
+                combined SCA + age request, select only the payment credential.
               </p>
             </div>
+
+            <fieldset
+              v-if="dcqlCredentialIds.length > 0"
+              class="grid gap-2 rounded-lg border border-[--color-border] bg-white p-3"
+            >
+              <legend class="form-label !mb-1">Target credentials</legend>
+              <label
+                v-for="credentialId in dcqlCredentialIds"
+                :key="credentialId"
+                class="inline-flex items-center gap-2 text-sm"
+              >
+                <input
+                  v-model="selectedTransactionCredentialIds"
+                  type="checkbox"
+                  :value="credentialId"
+                />
+                <code>{{ credentialId }}</code>
+              </label>
+              <p
+                v-if="selectedTransactionCredentialIds.length === 0"
+                class="text-xs text-amber-800"
+              >
+                Select at least one credential. Combined demos must not bind
+                transaction data to every query.
+              </p>
+            </fieldset>
+            <p v-else class="text-xs text-amber-800">
+              No DCQL credential ids found in the payload.
+            </p>
 
             <div
               v-if="selectedTransactionProfile"
@@ -685,17 +852,32 @@ async function submit() {
 
       <div class="grid gap-4 px-4 pb-4">
         <div
-          v-if="isDcApiExample"
+          v-if="isDcApiPayload"
           class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900"
         >
           <p class="font-medium">Digital Credentials API flow</p>
           <p class="mt-1">
-             May be required for iOS compatibility with 18013-7 flows
+            Transport follows <code>flow_type</code>
+            <code>dc_api_openid4vp</code> or <code>dc_api_18013_7</code>. The
+            session origin is set to this page's origin before create.
+          </p>
+          <p class="mt-1">
+            May be required for iOS compatibility with 18013-7 flows
           </p>
           <label class="mt-3 inline-flex items-center gap-2 font-medium">
             <input v-model="dcApiMediationRequired" type="checkbox" />
             mediation: required
           </label>
+          <div
+            v-if="!dcApiSupport.supported"
+            class="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
+          >
+            <p class="font-medium">
+              Digital Credentials API presentation is not available in this
+              browser.
+            </p>
+            <p class="mt-1">{{ dcApiSupport.reason }}</p>
+          </div>
         </div>
 
         <div class="grid gap-3">

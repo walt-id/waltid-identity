@@ -25,6 +25,7 @@ export function useIssuerSession(issuerBase: string) {
   const result = ref<IssuerSessionResult | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
+  const browserHandoffNotice = ref<string | null>(null);
 
   const sse = useSSE();
 
@@ -32,6 +33,7 @@ export function useIssuerSession(issuerBase: string) {
     loading.value = true;
     error.value = null;
     result.value = null;
+    browserHandoffNotice.value = null;
     sse.close();
 
     try {
@@ -62,6 +64,7 @@ export function useIssuerSession(issuerBase: string) {
     loading.value = true;
     error.value = null;
     result.value = null;
+    browserHandoffNotice.value = null;
     sse.reset();
 
     try {
@@ -107,11 +110,26 @@ export function useIssuerSession(issuerBase: string) {
         authorizationServerMetadata,
       );
 
-      // Engage wallet / Chrome proximity QR, then ignore handoff outcome.
-      void invokeDigitalCredentialsCreate(
-        enrichedOffer,
-        mediationRequired,
-      ).catch(() => undefined);
+      // Issuer SSE is the authoritative issuance result. Surface browser
+      // create() cancellation/failure as non-fatal feedback.
+      void invokeDigitalCredentialsCreate(enrichedOffer, mediationRequired).then(
+        () => {
+          sse.addEvent({
+            event: "DC_API_BROWSER_HANDOFF",
+            status: "COMPLETED",
+          });
+        },
+        (e) => {
+          const message = e instanceof Error ? e.message : String(e);
+          browserHandoffNotice.value = message;
+          sse.addEvent({
+            event: "DC_API_BROWSER_HANDOFF",
+            status: "FAILED",
+            message,
+            note: "Issuer SSE remains the authoritative issuance result.",
+          });
+        },
+      );
     } catch (e) {
       error.value = e instanceof Error ? e.message : "Unknown error";
     } finally {
@@ -141,6 +159,7 @@ export function useIssuerSession(issuerBase: string) {
     result.value = null;
     error.value = null;
     loading.value = false;
+    browserHandoffNotice.value = null;
     sse.reset();
   }
 
@@ -148,6 +167,7 @@ export function useIssuerSession(issuerBase: string) {
     result,
     loading,
     error,
+    browserHandoffNotice,
     createOffer,
     createDcApiOffer,
     clear,

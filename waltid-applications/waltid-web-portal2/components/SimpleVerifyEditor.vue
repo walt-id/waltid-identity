@@ -4,6 +4,10 @@ import {
   SIMPLE_PID_VERIFICATION_REQUEST_OPTIONS,
   getSimplePidVerificationRequestOption,
 } from "~/data/simplePidVerificationRequests";
+import {
+  getDcApiPresentationSupport,
+  type DcApiPresentationSupport,
+} from "~/utils/dcApiPresentation";
 
 const props = defineProps<{
   session: ReturnType<typeof useVerifierSession>;
@@ -14,6 +18,9 @@ const selectedPidRequestId = ref(
   SIMPLE_PID_VERIFICATION_REQUEST_OPTIONS[0]!.id,
 );
 const selectedClaimIds = ref<string[]>([]);
+const dcApiSupport = ref<DcApiPresentationSupport>(
+  getDcApiPresentationSupport(),
+);
 
 const selectedOption = computed(() =>
   getSimpleCredentialOption(selectedOptionId.value),
@@ -30,6 +37,9 @@ watch(
   selectedOption,
   (option) => {
     selectedClaimIds.value = option.verifier.claims.map((claim) => claim.id);
+    if (option.verifierFlowType === "dc_api") {
+      dcApiSupport.value = getDcApiPresentationSupport();
+    }
   },
   { immediate: true },
 );
@@ -41,7 +51,9 @@ const selectedClaims = computed(() =>
 );
 
 const canSubmit = computed(
-  () => isPidOption.value || selectedClaims.value.length > 0,
+  () =>
+    (isPidOption.value || selectedClaims.value.length > 0) &&
+    (!isDcApiOption.value || dcApiSupport.value.supported),
 );
 const allClaimsSelected = computed(
   () =>
@@ -129,7 +141,6 @@ async function submitOpenId4VpDcApi() {
   await props.session.createDcApiSession(
     {
       flow_type: "dc_api_openid4vp",
-      expectedOrigins: [window.location.origin],
       haip: false,
       core_flow: {
         dcql_query: {
@@ -145,7 +156,6 @@ async function submitIso180137DcApi() {
   await props.session.createDcApiSession(
     {
       flow_type: "dc_api_18013_7",
-      expectedOrigins: [window.location.origin],
       core_flow: {
         requestedElements: buildAnnexCRequestedElements(),
       },
@@ -316,11 +326,22 @@ async function submitIso180137DcApi() {
       >
         <p class="font-medium">Digital Credentials API</p>
         <p class="mt-1 text-xs text-blue-800/90">
-          Requires a browser that supports
-          <code>navigator.credentials.get</code> and an HTTPS origin. The wallet
+          Requires a browser that supports the Digital Credentials API
+          (<code>window.DigitalCredential</code>) on an HTTPS origin. The wallet
           picker opens on this device — no QR code is shown. Use ISO 18013-7 for
-          iOS / native wallet compatibility.
+          iOS / native wallet compatibility. Session
+          <code>expectedOrigins</code> is set to this page's origin.
         </p>
+        <div
+          v-if="!dcApiSupport.supported"
+          class="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
+        >
+          <p class="font-medium">
+            Digital Credentials API presentation is not available in this
+            browser.
+          </p>
+          <p class="mt-1">{{ dcApiSupport.reason }}</p>
+        </div>
       </section>
     </template>
 

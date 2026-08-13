@@ -1,3 +1,8 @@
+import {
+  formatDcApiPresentationUnsupportedMessage,
+  getDcApiPresentationSupport,
+} from "~/utils/dcApiPresentation";
+
 export interface VerifierSessionResult {
   sessionId: string;
   authorizationRequestUrl?: string;
@@ -7,6 +12,8 @@ export interface VerifierSessionResult {
 
 const DC_API_POLL_INTERVAL_MS = 5_000;
 const DC_API_MAX_POLL_ATTEMPTS = 12;
+
+const DC_API_FLOW_TYPES = new Set(["dc_api_openid4vp", "dc_api_18013_7"]);
 
 type CreateResponse = {
   sessionId?: string;
@@ -22,6 +29,14 @@ type DigitalCredentialsNavigator = Navigator & {
     get?: (options: unknown) => Promise<unknown>;
   };
 };
+
+export function isDcApiFlowType(payload: unknown): boolean {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return false;
+  }
+  const flowType = (payload as Record<string, unknown>).flow_type;
+  return typeof flowType === "string" && DC_API_FLOW_TYPES.has(flowType);
+}
 
 export function useVerifierSession(verifierBase: string) {
   const result = ref<VerifierSessionResult | null>(null);
@@ -88,7 +103,7 @@ export function useVerifierSession(verifierBase: string) {
             "content-type": "application/json",
             accept: "application/json",
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(withPortalExpectedOrigins(payload)),
         },
       );
 
@@ -168,21 +183,45 @@ export function useVerifierSession(verifierBase: string) {
     );
   }
 
-  return { result, loading, error, createSession, createDcApiSession, sse };
+  function clear() {
+    result.value = null;
+    error.value = null;
+    loading.value = false;
+    sse.reset();
+  }
+
+  return {
+    result,
+    loading,
+    error,
+    createSession,
+    createDcApiSession,
+    clear,
+    sse,
+  };
+}
+
+function withPortalExpectedOrigins(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return payload;
+  }
+
+  return {
+    ...(payload as Record<string, unknown>),
+    expectedOrigins: [window.location.origin],
+  };
 }
 
 async function invokeDigitalCredentialsApi(
   requestPayload: unknown,
   mediationRequired: boolean,
 ): Promise<unknown> {
-  const nav = navigator as DigitalCredentialsNavigator;
-
-  if (typeof nav.credentials?.get !== "function") {
-    throw new Error(
-      "Digital Credentials API is unavailable in this browser (navigator.credentials.get missing).",
-    );
+  const support = getDcApiPresentationSupport();
+  if (!support.supported) {
+    throw new Error(formatDcApiPresentationUnsupportedMessage(support));
   }
 
+  const nav = navigator as DigitalCredentialsNavigator;
   const digitalPayload =
     requestPayload != null &&
     typeof requestPayload === "object" &&
@@ -196,7 +235,7 @@ async function invokeDigitalCredentialsApi(
 
   if (mediationRequired) dcRequestPayload.mediation = "required";
 
-  const response = await nav.credentials.get(dcRequestPayload);
+  const response = await nav.credentials!.get!(dcRequestPayload);
   if (response == null)
     throw new Error("Digital Credentials API returned empty response");
   return response;

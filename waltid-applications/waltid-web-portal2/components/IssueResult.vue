@@ -35,7 +35,20 @@ const walletUrl = config.public.walletUrl as string;
         <p class="mt-2 text-xs text-blue-800">
           On desktop, Chrome may show a proximity QR for a nearby Android
           wallet. After the wallet engages, watch the result log for OpenID4VCI
-          issuance events from the issuer (not browser handoff status).
+          issuance events from the issuer. Browser create() cancellation or
+          failure is shown below and does not replace issuer SSE status.
+        </p>
+      </div>
+
+      <div
+        v-if="session.browserHandoffNotice.value"
+        class="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-900"
+      >
+        <p class="font-semibold">Browser Digital Credentials handoff</p>
+        <p class="mt-1">{{ session.browserHandoffNotice.value }}</p>
+        <p class="mt-1 text-xs">
+          This is non-fatal. The issuer session is still running; use the result
+          log for the authoritative issuance outcome.
         </p>
       </div>
 

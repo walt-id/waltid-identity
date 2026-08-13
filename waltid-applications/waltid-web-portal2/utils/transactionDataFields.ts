@@ -25,6 +25,30 @@ export function defaultTransactionFieldValue(
   return "";
 }
 
+export function stringifyTransactionFieldValue(
+  field: string,
+  value: unknown,
+): string {
+  if (value == null) {
+    return isNestedTransactionDataField(field)
+      ? defaultTransactionFieldValue(field)
+      : "";
+  }
+
+  if (isNestedTransactionDataField(field)) {
+    if (typeof value === "string") {
+      try {
+        return JSON.stringify(JSON.parse(value), null, 2);
+      } catch {
+        return value;
+      }
+    }
+    return JSON.stringify(value, null, 2);
+  }
+
+  return String(value);
+}
+
 /**
  * Converts a UI string into the value to embed in OpenID4VP transaction_data.
  * Nested fields (e.g. `payload`) must be JSON objects, not quoted strings.
