@@ -132,16 +132,19 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
         return services.certificateSigner.signCertificate(issuerKey, builder)
     }
 
+    /**
+     * @param trustOverride if given, used *instead of* this util's configured trust store for this
+     *   call - not merged with it. See [X509CertificateChainValidator.validate].
+     */
     suspend fun validatePemCertificateChain(
         certificateChainPem: String,
-        additionalTrust: X509CertificateTrustStore? = null
+        trustOverride: X509CertificateTrustStore? = null
     ): ValidationResult {
         val certificates =
             PemUtil.spitPemChain(certificateChainPem)
                 .map { services.certificateParser.parseCertificatePem(it) }
                 .toList()
-        services.certificateChainValidator.trustStore.findCertificateBySubjectDn("First Atmept")
-        return validateCertificateChain(certificates, additionalTrust)
+        return validateCertificateChain(certificates, trustOverride)
     }
 
     suspend fun validateCsrSignature(csr: Pkcs10CertificateSigningRequest): Boolean =
@@ -153,11 +156,15 @@ sealed class X509CertificateUtil(val services: X509CertificateServices) {
     ): ValidationResult =
         validateCertificateChain(certificateChain, InMemoryTrustStore(listOf(trustedRootCert)))
 
+    /**
+     * @param trustOverride if given, used *instead of* this util's configured trust store for this
+     *   call - not merged with it. See [X509CertificateChainValidator.validate].
+     */
     suspend fun validateCertificateChain(
         certificateChain: Collection<X509Certificate>,
-        additionalTrust: X509CertificateTrustStore? = null
+        trustOverride: X509CertificateTrustStore? = null
     ): ValidationResult =
-        services.certificateChainValidator.validate(services.cryptoRuntime, certificateChain, additionalTrust)
+        services.certificateChainValidator.validate(services.cryptoRuntime, certificateChain, trustOverride)
 
     companion object Default : X509CertificateUtil(platformDefaultServices())
 
