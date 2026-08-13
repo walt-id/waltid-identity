@@ -2,6 +2,7 @@ package id.walt.issuer2.openid4vci
 
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.testsupport.Issuer2CredentialScenario
 import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
 import id.walt.issuer2.testsupport.Issuer2TxCodeMode
@@ -30,7 +31,8 @@ import kotlin.test.assertNull
 /**
  * Transaction data presentation is gated on the MSO's `KeyAuthorizations`, so an mdoc issued
  * without it can never sign transaction data. These tests pin that grant at the issuer2 boundary:
- * a profile that authorizes a type gets exactly the hash elements, and one that does not gets nothing.
+ * a profile that authorizes a type gets exactly the hash elements, one that does not gets nothing,
+ * and an offer-scoped runtime override can grant a type the profile itself does not authorize.
  */
 class Issuer2TransactionDataAuthorizationTest {
 
@@ -71,14 +73,37 @@ class Issuer2TransactionDataAuthorizationTest {
         )
     }
 
+    @Test
+    fun runtimeOverrideAuthorizesTransactionDataOnProfileWithoutGrant() = testApplication {
+        installIssuer2WithConfigFiles()
+
+        val keyAuthorizations = assertNotNull(
+            apiClient().issueAndReadKeyAuthorizations(
+                scenario = euAgeVerificationScenario,
+                runtimeOverrides = CredentialOfferRuntimeOverrides(
+                    authorizedTransactionDataTypes = listOf(SCA_PAYMENT_TYPE),
+                ),
+            ),
+            "Expected keyAuthorizations from an offer-scoped authorizedTransactionDataTypes override",
+        )
+
+        assertNull(keyAuthorizations.namespaces, "Expected no blanket nameSpaces grant")
+        assertEquals(
+            mapOf(SCA_PAYMENT_TYPE to TRANSACTION_DATA_HASH_ELEMENTS),
+            keyAuthorizations.dataElements,
+        )
+    }
+
     private suspend fun HttpClient.issueAndReadKeyAuthorizations(
         scenario: Issuer2CredentialScenario = scaPaymentCardScenario,
+        runtimeOverrides: CredentialOfferRuntimeOverrides? = null,
     ): KeyAuthorization? {
         val walletFlow = Issuer2WalletFlowDriver(this)
         val createdOffer = createWalletFlowCredentialOffer(
             scenario = scenario,
             authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
             txCodeMode = Issuer2TxCodeMode.NONE,
+            runtimeOverrides = runtimeOverrides,
         )
 
         val resolvedOffer = walletFlow.resolve(createdOffer)
@@ -102,11 +127,14 @@ class Issuer2TransactionDataAuthorizationTest {
 
     private companion object {
         const val SCA_PROFILE_ID = "scaPaymentCardMdoc"
+        const val EU_AGE_VERIFICATION_PROFILE_ID = "euAgeVerificationMdoc"
         const val SCA_PAYMENT_TYPE = "urn:eudi:sca:payment:1"
 
         val TRANSACTION_DATA_HASH_ELEMENTS = listOf("transaction_data_hash", "transaction_data_hash_alg")
 
         val scaPaymentCardScenario =
             Issuer2CredentialScenarios.configured.single { it.profileId == SCA_PROFILE_ID }
+        val euAgeVerificationScenario =
+            Issuer2CredentialScenarios.configured.single { it.profileId == EU_AGE_VERIFICATION_PROFILE_ID }
     }
 }
