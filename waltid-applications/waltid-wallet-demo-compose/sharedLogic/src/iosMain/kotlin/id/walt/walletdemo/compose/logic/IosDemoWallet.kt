@@ -46,7 +46,8 @@ fun createIosDemoWallet(
                         reason = "Authorize wallet signing",
                         cancelText = "Cancel",
                     ),
-                )
+                ),
+                DemoClientIdTrust.configuration,
             ),
             warning = transactionDataProfiles.warning,
         )

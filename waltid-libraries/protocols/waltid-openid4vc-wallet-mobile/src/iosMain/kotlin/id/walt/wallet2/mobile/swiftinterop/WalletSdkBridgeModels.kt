@@ -209,6 +209,8 @@ internal fun KeyUseAuthorizationReuseTimeoutValidation.toBridgeModel():
  * Verifier Request Object trust configuration exposed to the Swift wallet bridge.
  *
  * @property x509TrustAnchorsPem PEM-encoded trust anchors pinned by the hosting application.
+ *   Required for OpenID4VP `x509_san_dns` and `x509_hash` clients; an empty list fails those
+ *   prefixes closed. Append additional PEMs to trust more verifiers.
  * @property preRegisteredClientMetadataJson Explicit pre-registered client metadata, keyed by client ID.
  */
 public data class WalletBridgeClientIdTrustConfiguration(
