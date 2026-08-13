@@ -3,6 +3,7 @@
 package id.walt.verifier2.data
 
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialFormat
@@ -88,6 +89,22 @@ sealed interface VerificationSessionSetup {
     val core: GeneralFlowConfig
 }
 
+/**
+ * Persist the effective signing key on the session setup so `request_uri_method=post`
+ * can re-sign with `wallet_nonce` (OID4VP 1.0 §5.6). Keys resolved via KMS
+ * `keyReference` are otherwise only passed as a create-time argument and lost.
+ */
+fun VerificationSessionSetup.withCoreKeyIfMissing(key: Key): VerificationSessionSetup {
+    if (core.key != null) return this
+    val newCore = core.copy(key = DirectSerializedKey(key))
+    return when (this) {
+        is CrossDeviceFlowSetup -> copy(core = newCore)
+        is SameDeviceFlowSetup -> copy(core = newCore)
+        is DcApiAnnexDFlowSetup -> copy(core = newCore)
+        is DcApiAnnexCFlowSetup -> copy(coreFlow = coreFlow.copy(key = DirectSerializedKey(key)))
+    }
+}
+
 internal fun VerificationSessionSetup.publicView(): VerificationSessionSetup = when (this) {
     is CrossDeviceFlowSetup -> copy(core = core.publicView())
     is SameDeviceFlowSetup -> copy(core = core.publicView())
@@ -110,6 +127,7 @@ internal fun KtorSessionNotifications.publicView(): KtorSessionNotifications = c
         bearerToken = null,
     )
 )
+
 
 /** Flows that use URLs*/
 sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
@@ -280,7 +298,7 @@ data class DcApiAnnexDFlowSetup(
 
                 key = DirectSerializedKey(KeyManager.resolveSerializedKeyBlocking("""{"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}"""))
             ),
-            expectedOrigins = listOf("https://digital-credentials.walt.id"),
+            expectedOrigins = listOf("https://portal2.demo.walt.id"),
             haip = false
         )
         val EXAMPLE_UNSIGNED_ENCRYPTED_MDL = EX_UNSIGNED_UNENCRYPTED_MDL.copy(
@@ -325,7 +343,7 @@ data class DcApiAnnexDFlowSetup(
                     )
                 )
             ),
-            expectedOrigins = listOf("https://digital-credentials.walt.id"),
+            expectedOrigins = listOf("https://portal2.demo.walt.id"),
             haip = false
         )
         val EXAMPLE_SIGNED_ENCRYPTED_MDL = EXAMPLE_SIGNED_MDL.copy(
@@ -484,7 +502,7 @@ data class DcApiAnnexCFlowSetup(
                     )
                 )
             ),
-            expectedOrigins = listOf("https://digital-credentials.walt.id")
+            expectedOrigins = listOf("https://portal2.demo.walt.id")
         )
 
         val EXTENDED_PHOTOID_EXAMPLE = DcApiAnnexCFlowSetup(
@@ -534,7 +552,7 @@ data class DcApiAnnexCFlowSetup(
                     )
                 )
             ),
-            expectedOrigins = listOf("https://digital-credentials.walt.id"),
+            expectedOrigins = listOf("https://portal2.demo.walt.id"),
         )
 
         val EXTENDED_PID_EXAMPLE = DcApiAnnexCFlowSetup(
@@ -561,7 +579,7 @@ data class DcApiAnnexCFlowSetup(
                     )
                 )
             ),
-            expectedOrigins = listOf("https://digital-credentials.walt.id"),
+            expectedOrigins = listOf("https://portal2.demo.walt.id"),
         )
 
         val MULTI_CREDENTIAL_EXAMPLE = DcApiAnnexCFlowSetup(
@@ -569,7 +587,7 @@ data class DcApiAnnexCFlowSetup(
                 requestedElements = EXTENDED_MDL_EXAMPLE.coreFlow.requestedElements!! +
                     EXTENDED_PHOTOID_EXAMPLE.coreFlow.requestedElements!!
             ),
-            expectedOrigins = listOf("https://digital-credentials.walt.id"),
+            expectedOrigins = listOf("https://portal2.demo.walt.id"),
         )
 
         val SIGNED_MDL_EXAMPLE = EXTENDED_MDL_EXAMPLE.copy(

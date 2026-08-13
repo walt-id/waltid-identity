@@ -12,8 +12,8 @@ import kotlin.test.assertTrue
 /**
  * Pins the vendored matchers, read through the same asset API the registry uses, because their absence
  * or replacement is otherwise only observable when a verifier opens the platform picker on a device. A
- * refresh is a deliberate compatibility change rather than a file swap: see `ANNEX-C-MATCHER.md` and
- * `OPENID4VP-MATCHER.md`.
+ * refresh is a deliberate compatibility change rather than a file swap: see `ANNEX-C-MATCHER.md`,
+ * `OPENID4VP-MATCHER.md`, and `OPENID4VCI-MATCHER.md`.
  *
  * The asset paths are spelled out here rather than shared with the registry, so that this asserts the
  * packaging contract instead of restating whatever path production happens to declare.
@@ -46,6 +46,18 @@ class AndroidVendoredMatcherTest {
     }
 
     @Test
+    fun openId4VciMatcherAssetIsThePinnedProvisionBinary() {
+        val matcher = assets.open("id/walt/wallet2/mobile/provision_hardcoded.wasm")
+            .use { it.readBytes() }
+
+        assertEquals(
+            "d6b4846072839bb43b98dfa5da5ae9ec83f2c30ce875c1ebd19c5ad2b5344ac1",
+            MessageDigest.getInstance("SHA-256").digest(matcher).joinToString("") { "%02x".format(it) },
+            "vendored OpenID4VCI matcher content changed; see OPENID4VCI-MATCHER.md before repinning",
+        )
+    }
+
+    @Test
     fun openId4VpMatcherAssetIsThePinnedVendoredBuild() {
         val matcher = assets.open("id/walt/wallet2/mobile/openid4vpmatcher.wasm")
             .use { it.readBytes() }
@@ -55,6 +67,19 @@ class AndroidVendoredMatcherTest {
             MessageDigest.getInstance("SHA-256").digest(matcher).joinToString("") { "%02x".format(it) },
             "vendored matcher content changed; see OPENID4VP-MATCHER.md before repinning",
         )
+    }
+
+    @Test
+    fun openId4VciMatcherNoticeShipsBesideTheMatcher() {
+        val notice = assets.open("id/walt/wallet2/mobile/NOTICE-provision_hardcoded.txt")
+            .use { it.readBytes() }.decodeToString()
+
+        assertTrue(notice.contains("digitalcredentialsdev/CMWallet"), "notice lost its provenance")
+        assertTrue(notice.contains("provision_hardcoded.wasm"), "notice lost the asset name")
+        assertTrue(notice.contains("6b350ff8cfc9ed49b301603c25eb56fcd2a904b1"), "notice lost the pinned commit")
+        assertTrue(notice.contains("matcher/issuance/provision.c"), "notice lost the C provision source path")
+        assertTrue(notice.contains("Do not attribute this binary to the Rust matcher"), "notice lost the Rust-mismatch clarification")
+        assertTrue(notice.contains("release"), "notice lost the redistribution release-gate note")
     }
 
     @Test

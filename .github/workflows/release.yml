@@ -45,6 +45,57 @@ jobs:
       deploy: true
       version: ${{ needs.version.outputs.release_version }}
       tags: '["stable", "latest"]'
+  enterprise-image-digests:
+    name: Resolve enterprise image digests
+    runs-on: ubuntu-latest
+    needs: [ version, api-docker, docker ]
+    outputs:
+      api-index-digest: ${{ steps.digest.outputs.api }}
+      ui-index-digest: ${{ steps.digest.outputs.ui }}
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Resolve published image index digests
+        id: digest
+        env:
+          VERSION: ${{ needs.version.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          API_DIGEST="$(docker buildx imagetools inspect "waltid/waltid-enterprise-api:${VERSION}" --format '{{json .Manifest}}' | jq -r '.digest')"
+          UI_DIGEST="$(docker buildx imagetools inspect "waltid/waltid-enterprise-ui:${VERSION}" --format '{{json .Manifest}}' | jq -r '.digest')"
+          echo "api=${API_DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "ui=${UI_DIGEST}" >> "$GITHUB_OUTPUT"
+  enterprise-supply-chain:
+    name: Enterprise supply chain
+    runs-on: ubuntu-latest
+    needs: [ version, enterprise-image-digests ]
+    steps:
+      - name: Determine ref to dispatch on
+        id: ref
+        env:
+          REF: ${{ github.ref_name }}
+          TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+        run: |
+          if git ls-remote --exit-code --heads "https://${TOKEN}@github.com/walt-id/waltid-identity-enterprise.git" "$REF"; then
+            echo "Branch '$REF' found in waltid-identity-enterprise, using it."
+            echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "Branch '$REF' not found in waltid-identity-enterprise, using main."
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Dispatch enterprise-supply-chain.yml and wait
+        uses: benc-uk/workflow-dispatch@v1.3.2
+        with:
+          workflow: enterprise-supply-chain.yml
+          repo: walt-id/waltid-identity-enterprise
+          ref: ${{ steps.ref.outputs.ref }}
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          wait-for-completion: true
+          sync-status: true
+          inputs: '{"api-index-digest": "${{ needs.enterprise-image-digests.outputs.api-index-digest }}", "ui-index-digest": "${{ needs.enterprise-image-digests.outputs.ui-index-digest }}", "version": "${{ needs.version.outputs.release_version }}"}'
   deploy:
     uses: ./.github/workflows/deployment.yml
     secrets: inherit
