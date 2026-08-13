@@ -10,6 +10,7 @@ import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
 import id.walt.openid4vp.clientidprefix.ClientIdPrefixParser
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
+import id.walt.openid4vp.clientidprefix.prefixes.RedirectUri
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
@@ -18,6 +19,7 @@ import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.webdatafetching.WebDataFetcher
 import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
 import io.github.oshai.kotlinlogging.KotlinLogging
+import id.waltid.openid4vp.wallet.walletResponseMode
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -192,12 +194,13 @@ object AuthorizationRequestResolver {
         fetchRequestUri: suspend (requestUri: String, requestUriMethod: RequestUriHttpMethod?) -> RequestUriFetchResponse,
         trustConfiguration: ClientIdTrustConfiguration,
     ): ResolvedAuthorizationRequest {
-        val requestUri = requestUrl.parameters["request_uri"]
+        val parameters = authorizationRequestParameters(requestUrl)
+        val requestUri = parameters["request_uri"]
         if (requestUri != null) {
             return resolveFromRequestUri(
                 requestUri = requestUri,
-                requestUriMethod = requestUrl.parameters["request_uri_method"],
-                outerClientId = requestUrl.parameters["client_id"],
+                requestUriMethod = parameters["request_uri_method"],
+                outerClientId = parameters["client_id"],
                 enforceFinalRequestObject = enforceFinalRequestObject,
                 unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                 fetchRequestUri = fetchRequestUri,
@@ -205,32 +208,62 @@ object AuthorizationRequestResolver {
             )
         }
 
-        val requestObject = requestUrl.parameters["request"]
+        val requestObject = parameters["request"]
         if (requestObject != null) return resolveFromRequestObject(
             requestObject = requestObject,
-            outerClientId = requestUrl.parameters["client_id"],
+            outerClientId = parameters["client_id"],
             enforceFinalRequestObject = enforceFinalRequestObject,
             unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
             trustConfiguration = trustConfiguration,
         )
 
-        return ResolvedAuthorizationRequest.Plain(parseParameters(requestUrl.parameters))
+        return ResolvedAuthorizationRequest.Plain(parseParameters(parameters))
     }
+
+    /**
+     * Query parameters of an Authorization Request, decoding `+` as a literal plus sign.
+     *
+     * [Url.parameters] applies `application/x-www-form-urlencoded` rules, where `+` denotes a space.
+     * That reading is defensible - OAuth 2.0 Section 3.1 does say the endpoint query is built that way,
+     * which would oblige a Verifier to send `%2B` - but RFC 3986 Section 3.4 equally allows a bare `+`
+     * in a query component, where it means itself, and that is what implementations send.
+     *
+     * The conflict is not academic: several OpenID4VP Credential Format Identifiers contain a `+`
+     * (`dc+sd-jwt`, `jwt_vc_json`+..., `vc+sd-jwt`). Form-decoding a verifier's
+     * `client_metadata={"vp_formats_supported":{"dc+sd-jwt":...}}` yields the format `dc sd-jwt`, which
+     * matches nothing and fails the request outright. The conformance suite sends the bare `+`, so
+     * form-decoding here made every SD-JWT VC presentation over `request_method=url_query` impossible
+     * while ISO mdoc - whose `mso_mdoc` identifier has no `+` - was unaffected.
+     *
+     * Reading `+` literally is therefore the interoperable choice, and it loses nothing: a Verifier
+     * that means a space has `%20` available, and no OpenID4VP parameter carries a meaningful space.
+     */
+    internal fun authorizationRequestParameters(requestUrl: Url): Parameters =
+        Parameters.build {
+            parseQueryString(requestUrl.encodedQuery, decode = false).forEach { name, values ->
+                val decodedName = name.decodeURLQueryComponent(plusIsSpace = false)
+                values.forEach { value ->
+                    append(decodedName, value.decodeURLQueryComponent(plusIsSpace = false))
+                }
+            }
+        }
 
     fun parseParameters(parameters: Parameters): AuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest from direct request parameters" }
         return json.decodeFromJsonElement(
             AuthorizationRequest.serializer(),
-            buildJsonObject {
-                parameters.entries()
-                    .mapNotNull { (key, values) -> values.lastOrNull()?.let { key to it } }
-                    .forEach { (key, value) ->
-                        put(
-                            key,
-                            AuthorizationRequestParameterCodec.parse(json, value)
-                        )
-                    }
-            },
+            applyRedirectUriPrefixBinding(
+                buildJsonObject {
+                    parameters.entries()
+                        .mapNotNull { (key, values) -> values.lastOrNull()?.let { key to it } }
+                        .forEach { (key, value) ->
+                            put(
+                                key,
+                                AuthorizationRequestParameterCodec.parse(json, value)
+                            )
+                        }
+                }
+            ),
         )
     }
 
@@ -283,10 +316,10 @@ object AuthorizationRequestResolver {
         require(requestObject.isJwt()) { "AuthorizationRequest object must be a JWT" }
 
         val authReqJws = requestObject.decodeJws()
+        val jwtAlg = authReqJws.header["alg"]?.jsonPrimitive?.contentOrNull
+        val isUnsigned = jwtAlg.equals("none", ignoreCase = true)
         if (enforceFinalRequestObject) {
-            require(authReqJws.header["typ"]?.jsonPrimitive?.contentOrNull == REQUEST_OBJECT_TYPE) {
-                "Authorization Request Object typ must be '$REQUEST_OBJECT_TYPE'"
-            }
+            requireRequestObjectType(authReqJws.header["typ"]?.jsonPrimitive?.contentOrNull, isUnsigned)
             requireMatchingClientId(
                 outerClientId = outerClientId,
                 innerClientId = authReqJws.payload["client_id"]?.jsonPrimitive?.contentOrNull,
@@ -298,11 +331,11 @@ object AuthorizationRequestResolver {
                 "AuthorizationRequest object wallet_nonce mismatch for request_uri_method=post"
             }
         }
-        val jwtAlg = authReqJws.header["alg"]?.jsonPrimitive?.contentOrNull
-        if (jwtAlg.equals("none", ignoreCase = true)) {
-            if (unsignedRequestObjectPolicy != UnsignedRequestObjectPolicy.ALLOW_UNSIGNED) {
-                throw UnsignedAuthorizationRequestNotAllowedException()
-            }
+        if (isUnsigned) {
+            requireUnsignedRequestObjectAllowed(
+                clientId = authReqJws.payload["client_id"]?.jsonPrimitive?.contentOrNull,
+                policy = unsignedRequestObjectPolicy,
+            )
         } else {
             log.trace { "Authenticating signed AuthorizationRequest object" }
             authenticateSignedRequestObject(requestObject, authReqJws.payload, trustConfiguration)
@@ -311,7 +344,7 @@ object AuthorizationRequestResolver {
         return ResolvedAuthorizationRequest.WithRequestObject(
             authorizationRequest = json.decodeFromJsonElement(
                 deserializer = AuthorizationRequest.serializer(),
-                element = authReqJws.payload,
+                element = applyRedirectUriPrefixBinding(authReqJws.payload),
             ),
             requestObject = requestObject,
         )
@@ -365,12 +398,103 @@ object AuthorizationRequestResolver {
         else -> throw IllegalArgumentException("invalid_request_uri_method: $value is neither 'get' nor 'post'")
     }
 
+    /**
+     * Decide whether an unsigned (`alg: none`) Request Object may be processed.
+     *
+     * [UnsignedRequestObjectPolicy.ALLOW_UNSIGNED] accepts any of them. Under
+     * [UnsignedRequestObjectPolicy.REQUIRE_SIGNED] one is still accepted when the Client Identifier
+     * Prefix has no key to sign with in the first place, which is the case OpenID4VP 1.0 §5.9.3
+     * describes for `redirect_uri`: that prefix is authenticated by the Verifier receiving the
+     * response at the very URI that names it, not by a signature, and the same section forbids
+     * combining it with a signed request at all. Rejecting those made every
+     * `request_method=request_uri_unsigned` flow impossible, since `redirect_uri` is the only prefix
+     * the suite pairs with it.
+     *
+     * Every other prefix authenticates the Verifier *through* the request object's signature and its
+     * `x5c` chain, DID, attestation or federation trust chain. Accepting `alg: none` there would let
+     * anyone at all claim, say, `x509_san_dns:bank.example.com` simply by omitting the signature, so
+     * those stay refused regardless of how the request arrived.
+     */
+    private fun requireUnsignedRequestObjectAllowed(clientId: String?, policy: UnsignedRequestObjectPolicy) {
+        if (policy == UnsignedRequestObjectPolicy.ALLOW_UNSIGNED) return
+        val prefixCannotSign = clientId
+            ?.let { ClientIdPrefixParser.parse(it).getOrNull() }
+            ?.let { it is RedirectUri }
+            ?: false
+        if (!prefixCannotSign) throw UnsignedAuthorizationRequestNotAllowedException()
+    }
+
+    /**
+     * Enforce the identity the `redirect_uri` Client Identifier Prefix asserts, and fill in the
+     * destination when the Verifier left it out.
+     *
+     * OpenID4VP 1.0 Section 5.9.3: "This prefix value indicates that the original Client Identifier
+     * part (without the prefix `redirect_uri:`) **is** the Verifier's Redirect URI (or Response URI
+     * when Response Mode `direct_post` is used). The Verifier MAY omit the `redirect_uri`
+     * Authorization Request parameter (or `response_uri` when Response Mode `direct_post` is used)."
+     *
+     * Two consequences, and this prefix has no signature to lean on for either:
+     * - Omitted: the destination is derived from the Client Identifier. Requiring it to be present
+     *   instead rejected every Verifier that exercises the carve-out.
+     * - Present but different: the request is claiming an identifier it does not own, and would have
+     *   the wallet post a Presentation somewhere the Client Identifier does not authorise. Refused.
+     *   Without this the wallet posted the VP Token to whatever `response_uri` it was handed, which is
+     *   exactly the leak Section 14.3.1 requires the wallet to prevent.
+     */
+    private fun applyRedirectUriPrefixBinding(payload: JsonObject): JsonObject {
+        val clientId = payload["client_id"]?.jsonPrimitive?.contentOrNull ?: return payload
+        if (ClientIdPrefixParser.parse(clientId).getOrNull() !is RedirectUri) return payload
+        val boundDestination = clientId.removePrefix("${ClientIdPrefix.REDIRECT_URI.value}:")
+
+        // Response Mode direct_post (and direct_post.jwt, which builds on it) answers to response_uri;
+        // every other mode answers to redirect_uri. Applied before deserialization because
+        // AuthorizationRequest itself rejects a direct_post request whose response_uri is absent, so a
+        // derived value has to be in place by then.
+        val responseMode = payload["response_mode"]?.let { mode ->
+            runCatching { json.decodeFromJsonElement(OpenID4VPResponseMode.serializer(), mode) }.getOrNull()
+        }
+        val destinationParameter =
+            if (responseMode in OpenID4VPResponseMode.DIRECT_POST_RESPONSES) "response_uri" else "redirect_uri"
+        val declared = payload[destinationParameter]?.jsonPrimitive?.contentOrNull
+        require(declared == null || declared == boundDestination) {
+            "Authorization Request $destinationParameter '$declared' does not match the " +
+                    "redirect_uri client_id '$boundDestination'"
+        }
+        if (declared != null) return payload
+        return JsonObject(payload + (destinationParameter to JsonPrimitive(boundDestination)))
+    }
+
     private fun requireMatchingClientId(outerClientId: String?, innerClientId: String?) {
         require(!outerClientId.isNullOrBlank()) {
             "client_id is required alongside request or request_uri"
         }
         require(innerClientId == outerClientId) {
             "Authorization Request client_id mismatch between outer request and Request Object"
+        }
+    }
+
+    /**
+     * Check the Request Object's `typ` header.
+     *
+     * OpenID4VP 1.0 Section 5: "Verifiers MUST include the typ Header Parameter in Request Objects
+     * with the value oauth-authz-req+jwt [...] Wallets MUST NOT process Request Objects where the typ
+     * Header Parameter is not present or does not have the value oauth-authz-req+jwt."
+     *
+     * Enforced as written for signed Request Objects. For an unsigned one ([isUnsigned], `alg: none`)
+     * an *absent* `typ` is tolerated, because the conformance suite emits exactly `{"alg":"none"}` for
+     * `request_method=request_uri_unsigned` - see `AbstractSignClaimsWithNullAlgorithm` - and the suite
+     * is treated as the arbiter of interoperability where it disagrees with the prose. A `typ` that is
+     * present but wrong is still rejected in both cases.
+     *
+     * Confining the carve-out to unsigned objects keeps the requirement where it does real work. The
+     * `typ` header guards against cross-JWT confusion, i.e. replaying a JWT that some other party
+     * legitimately signed in a different context. An `alg: none` object carries no signature to
+     * borrow - anyone can mint one with any `typ` - so demanding the header there buys nothing.
+     */
+    private fun requireRequestObjectType(typ: String?, isUnsigned: Boolean) {
+        if (typ == null && isUnsigned) return
+        require(typ == REQUEST_OBJECT_TYPE) {
+            "Authorization Request Object typ must be '$REQUEST_OBJECT_TYPE'"
         }
     }
 
