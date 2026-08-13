@@ -62,6 +62,14 @@ class ConfiguredIssuanceSessionRepository(
 
     override suspend fun get(sessionId: String): IssuanceSession? = sessions[sessionId]?.let { attachCrypto2Key(it, backfill = true) }
 
+    // Claiming hands the crypto2 key material to the caller and drops the sidecar with the session,
+    // the way remove() does. Backfilling would write a sidecar for a session that no longer exists,
+    // and callers that restore a claimed session save it again, which rewrites the sidecar.
+    override suspend fun take(sessionId: String): IssuanceSession? =
+        sessions.getAndRemove(sessionId)?.let { session ->
+            attachCrypto2Key(session, backfill = false).also { crypto2Keys.remove(sessionId) }
+        }
+
     override suspend fun list(): List<IssuanceSession> {
         val result = mutableListOf<IssuanceSession>()
         for (session in sessions.getAll()) result += attachCrypto2Key(session, backfill = true)

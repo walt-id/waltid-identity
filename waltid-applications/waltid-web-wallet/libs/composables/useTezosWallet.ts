@@ -3,7 +3,7 @@
 /*
 const useTezosWallet = () => {
     const account = ref('')
-    const wallet = new BeaconWallet({ name: "Walt.id" });
+    const wallet = new BeaconWallet({ name: "walt.id" });
 
     async function connect() {
         const permissions = await wallet.client.requestPermissions();
