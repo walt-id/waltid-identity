@@ -2,20 +2,13 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.DirectSerializedKey
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.selectJwsAlgorithm
-import id.walt.crypto2.keys.EncodedKey
-import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toStoredSoftwareKey
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.crypto2.serialization.BinaryData
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
@@ -26,18 +19,17 @@ import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
-import id.walt.wallet2.data.StoredCredential
-import id.walt.wallet2.data.Wallet
-import id.walt.wallet2.data.WalletKeyStoreEntry
-import id.walt.wallet2.data.WalletSessionEvent
-import id.walt.wallet2.data.resolveKeyMaterial
+import id.walt.wallet2.data.*
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
 import id.waltid.openid4vci.wallet.authorization.AuthorizationResponseParser
-import id.waltid.openid4vci.wallet.dpop.DPoPProofBuilder
+import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
+import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
+import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
+import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
 import id.waltid.openid4vci.wallet.nonce.NonceRequestBuilder
@@ -53,42 +45,18 @@ import id.waltid.openid4vci.wallet.token.DPoPProofFactory
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import id.waltid.openid4vci.wallet.token.TokenRequestException
 import io.github.oshai.kotlinlogging.KotlinLogging
-import id.walt.crypto2.keys.Key as Crypto2Key
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.header
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.Parameters
-import io.ktor.http.URLBuilder
-import io.ktor.http.Url
-import io.ktor.http.formUrlEncode
-import io.ktor.http.isSuccess
-import io.ktor.http.contentType
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -281,6 +249,7 @@ class WalletIssuanceSessionService(
             "authorizationCallbackTtl must be positive"
         }
     }
+
     private val httpClient = httpClient ?: WebDataFetcher(WebDataFetcherId.WALLET2_ISSUANCE_HANDLER).httpClient
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
     private val mutex = Mutex()
@@ -315,7 +284,7 @@ class WalletIssuanceSessionService(
             authorization = null,
             state = SessionState.AWAITING_ACCEPTANCE,
             expiresAtEpochMilliseconds = nowEpochMilliseconds() +
-                sessionPolicy.reviewTtl.inWholeMilliseconds,
+                    sessionPolicy.reviewTtl.inWholeMilliseconds,
         )
         val evicted = mutex.withLock {
             val removed = if (sessions.size >= MAX_ACTIVE_SESSIONS) sessions.remove(sessions.keys.first()) else null
@@ -379,7 +348,7 @@ class WalletIssuanceSessionService(
                 active.authorization = authorization
                 active.state = SessionState.AWAITING_CALLBACK
                 active.expiresAtEpochMilliseconds = nowEpochMilliseconds() +
-                    sessionPolicy.authorizationCallbackTtl.inWholeMilliseconds
+                        sessionPolicy.authorizationCallbackTtl.inWholeMilliseconds
             }
             persistActive(active)
             return authorization.public
@@ -463,10 +432,10 @@ class WalletIssuanceSessionService(
         }
         val removed = try {
             val removedFromMemory = mutex.withLock {
-            if (active?.state == SessionState.PROCESSING) return@withLock false
-            val activeRemoved = sessions.remove(sessionId) != null
-            val deferredRemoved = deferred.entries.removeAll { it.value.sessionId == sessionId }
-            activeRemoved || deferredRemoved
+                if (active?.state == SessionState.PROCESSING) return@withLock false
+                val activeRemoved = sessions.remove(sessionId) != null
+                val deferredRemoved = deferred.entries.removeAll { it.value.sessionId == sessionId }
+                activeRemoved || deferredRemoved
             }
             if (active?.state == SessionState.PROCESSING) return invalidSession(sessionId)
             val persisted = sessionStore?.list().orEmpty().filter { it.sessionId == sessionId }
@@ -585,8 +554,8 @@ class WalletIssuanceSessionService(
         } catch (error: TokenRequestException) {
             log.warn {
                 "Issuance token request failed: status=${error.statusCode}, " +
-                    "oauthError=${error.oauthError}, grant=${active.public.offer.grant}, " +
-                    "clientId=${active.request.clientId}, dpopAdvertised=${active.dpopAlgorithms() != null}"
+                        "oauthError=${error.oauthError}, grant=${active.public.offer.grant}, " +
+                        "clientId=${active.request.clientId}, dpopAdvertised=${active.dpopAlgorithms() != null}"
             }
             if (
                 retryTokenRejection &&
@@ -742,9 +711,9 @@ class WalletIssuanceSessionService(
                 else -> {
                     log.warn {
                         "Issuance credential request failed: status=${protected.response.status.value}, " +
-                            "oauthError=${protected.oauthError}, " +
-                            "credentialConfigurationId=${offered.credentialConfigurationId}, " +
-                            "tokenType=${token.token_type}, dpopSent=${dpopAlgorithms != null}"
+                                "oauthError=${protected.oauthError}, " +
+                                "credentialConfigurationId=${offered.credentialConfigurationId}, " +
+                                "tokenType=${token.token_type}, dpopSent=${dpopAlgorithms != null}"
                     }
                     throw IssuanceStageException(WalletIssuanceErrorCode.ISSUER_RESPONSE)
                 }
@@ -762,7 +731,7 @@ class WalletIssuanceSessionService(
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
         val attestation = attestationHeaders(metadata, active.request.clientId, active.keyMaterial)
         val anonymous = metadata.preAuthorizedGrantAnonymousAccessSupported == true &&
-            active.request.tokenRequestHeaders.isEmpty() && attestation == null
+                active.request.tokenRequestHeaders.isEmpty() && attestation == null
         return TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthorizedCode,
@@ -792,21 +761,28 @@ class WalletIssuanceSessionService(
         )
     }
 
+    /**
+     * Advertised DPoP algorithms, without checking that the wallet key can sign them.
+     *
+     * Deliberately unlike [usableDpopAlgorithms], which the server-side [WalletIssuanceHandler] uses
+     * to fall back to a Bearer token. A session wallet's key is fixed instance material, so an issuer
+     * demanding algorithms it cannot produce is a misconfiguration worth surfacing rather than
+     * silently downgrading the security posture the wallet was built for. `dpopFactory` therefore
+     * raises `WalletIssuanceErrorCode.CRYPTO` before any token request is attempted - asserted by
+     * `unsupportedDpopKeyInPreAuthorizedGrantFailsAsCryptoBeforeTokenRequest`.
+     */
     private fun ActiveSession.dpopAlgorithms(): Set<String>? =
-        resolved.authorizationServerMetadata.dpopSigningAlgValuesSupported
-            ?.takeIf { it.isNotEmpty() }
+        resolved.authorizationServerMetadata.dpopSigningAlgorithms()
 
     private fun ActiveSession.dpopFactory(): DPoPProofFactory? =
         dpopAlgorithms()?.let { algorithms ->
             { endpoint: String, nonce: String? ->
                 try {
-                    val crypto2Key = keyMaterial.requireCrypto2SigningKey()
-                    DPoPProofBuilder().buildProof(
-                        key = crypto2Key,
-                        httpMethod = "POST",
-                        targetUri = endpoint,
+                    buildDpopProof(
+                        keyMaterial = keyMaterial,
+                        algorithms = algorithms,
+                        endpoint = endpoint,
                         nonce = nonce,
-                        supportedAlgorithms = algorithms,
                     )
                 } catch (error: CancellationException) {
                     throw error
@@ -862,7 +838,7 @@ class WalletIssuanceSessionService(
                 response.status == HttpStatusCode.Created -> Unit
 
                 response.status == HttpStatusCode.TooManyRequests ||
-                    response.status.value >= 500 -> {
+                        response.status.value >= 500 -> {
                     throw RetryablePushedAuthorizationRequestException(
                         statusCode = response.status.value,
                     )
@@ -891,7 +867,7 @@ class WalletIssuanceSessionService(
                     ),
                     pushedAuthorizationRequestUsed = true,
                     requestUriExpiresAtEpochMilliseconds = nowEpochMilliseconds() +
-                        par.expiresIn * 1000L,
+                            par.expiresIn * 1000L,
                 ),
                 pkce = pkce,
             )
@@ -1047,6 +1023,7 @@ class WalletIssuanceSessionService(
             supportsHolderDid -> ProofKeyBinding.KeyId(requireNotNull(didKeyId))
             methods.any { it is CryptographicBindingMethod.Jwk || it is CryptographicBindingMethod.CoseKey } ->
                 ProofKeyBinding.Jwk
+
             else -> error("Issuer requires a DID that is bound to the selected holder key")
         }
         val crypto2Key = active.keyMaterial.requireCrypto2SigningKey()
@@ -1123,17 +1100,15 @@ class WalletIssuanceSessionService(
         body: String,
     ): ProtectedResponse {
         var nonce = dpopNonce
-        repeat(2) { attempt ->
+        repeat(DPOP_NONCE_ATTEMPTS) { attempt ->
             val proof = try {
                 dpop?.let { algorithms ->
-                    val crypto2Key = keyMaterial.requireCrypto2SigningKey()
-                    DPoPProofBuilder().buildProof(
-                        key = crypto2Key,
-                        httpMethod = "POST",
-                        targetUri = endpoint,
+                    buildDpopProof(
+                        keyMaterial = keyMaterial,
+                        algorithms = algorithms,
+                        endpoint = endpoint,
                         accessToken = accessToken,
                         nonce = nonce,
-                        supportedAlgorithms = algorithms,
                     )
                 }
             } catch (error: CancellationException) {
@@ -1153,7 +1128,7 @@ class WalletIssuanceSessionService(
             } catch (error: Exception) {
                 throw IssuanceStageException(WalletIssuanceErrorCode.NETWORK, error)
             }
-            val oauthError = response.oauthError()
+            val oauthError = response.oauthErrorCode()
             val suppliedNonce = response.headers[DPOP_NONCE_HEADER]
             if (
                 attempt == 0 &&
@@ -1167,20 +1142,6 @@ class WalletIssuanceSessionService(
             return ProtectedResponse(response, suppliedNonce ?: nonce, oauthError)
         }
         error("DPoP nonce retry exhausted")
-    }
-
-    private suspend fun HttpResponse.oauthError(): String? {
-        if (status.isSuccess()) return null
-        if (headers[HttpHeaders.WWWAuthenticate]?.contains(USE_DPOP_NONCE, ignoreCase = true) == true) {
-            return USE_DPOP_NONCE
-        }
-        return try {
-            Json.parseToJsonElement(bodyAsText()).jsonObject["error"]?.jsonPrimitive?.contentOrNull
-        } catch (error: CancellationException) {
-            throw error
-        } catch (_: Exception) {
-            null
-        }
     }
 
     private suspend fun attestationHeaders(
@@ -1199,21 +1160,6 @@ class WalletIssuanceSessionService(
             emitEvent(WalletSessionEvent.issuance_attestation_obtained)
         }
     }
-
-    private fun dpopAlgorithmsForToken(
-        tokenType: String,
-        advertisedAlgorithms: Set<String>?,
-    ): Set<String>? = when {
-        tokenType.equals("DPoP", ignoreCase = true) -> requireNotNull(advertisedAlgorithms) {
-            "Authorization server returned a DPoP token without advertising DPoP support"
-        }
-
-        tokenType.equals("Bearer", ignoreCase = true) -> null
-        else -> error("Authorization server returned an unsupported token type")
-    }
-
-    private fun authorizationScheme(tokenType: String): String =
-        if (tokenType.equals("DPoP", ignoreCase = true)) "DPoP" else "Bearer"
 
     private suspend fun Wallet.parseAndStore(issued: IssuedCredential, label: String?): StoredCredential {
         val raw = issued.credential.let { value ->
@@ -1300,9 +1246,11 @@ class WalletIssuanceSessionService(
             SessionState.AWAITING_ACCEPTANCE -> require(persisted.authorization == null) {
                 "Stored review session already contains authorization state"
             }
+
             SessionState.AWAITING_CALLBACK -> require(persisted.authorization != null) {
                 "Stored callback session is missing authorization state"
             }
+
             SessionState.PROCESSING -> Unit
         }
         val authorization = persisted.authorization?.let { public ->
@@ -1353,7 +1301,7 @@ class WalletIssuanceSessionService(
         }
         require(
             resolved.offeredCredentials.map { it.credentialConfigurationId } ==
-                public.offer.credentials.map { it.configurationId }
+                    public.offer.credentials.map { it.configurationId }
         ) { "Stored offered credential binding is invalid" }
         val resolvedGrant = when (resolved.offer.getGrantType()) {
             is GrantType.AuthorizationCode -> WalletIssuanceGrant.AUTHORIZATION_CODE
@@ -1417,8 +1365,8 @@ class WalletIssuanceSessionService(
         val now = nowEpochMilliseconds()
         val expired = records.filter {
             it.kind == WalletIssuanceSessionRecordKind.ACTIVE_SESSION &&
-                runCatching { json.decodeFromString<PersistedActiveSession>(it.payload).expiresAtEpochMilliseconds <= now }
-                    .getOrDefault(false)
+                    runCatching { json.decodeFromString<PersistedActiveSession>(it.payload).expiresAtEpochMilliseconds <= now }
+                        .getOrDefault(false)
         }
         expired.forEach { record ->
             store.remove(record.id)
@@ -1539,11 +1487,11 @@ class WalletIssuanceSessionService(
                 active.state = state
                 if (state == SessionState.AWAITING_ACCEPTANCE) active.authorization = null
                 active.expiresAtEpochMilliseconds = nowEpochMilliseconds() +
-                    when (state) {
-                        SessionState.AWAITING_ACCEPTANCE -> sessionPolicy.reviewTtl.inWholeMilliseconds
-                        SessionState.AWAITING_CALLBACK -> sessionPolicy.authorizationCallbackTtl.inWholeMilliseconds
-                        SessionState.PROCESSING -> PROCESSING_EXPIRY
-                    }
+                        when (state) {
+                            SessionState.AWAITING_ACCEPTANCE -> sessionPolicy.reviewTtl.inWholeMilliseconds
+                            SessionState.AWAITING_CALLBACK -> sessionPolicy.authorizationCallbackTtl.inWholeMilliseconds
+                            SessionState.PROCESSING -> PROCESSING_EXPIRY
+                        }
                 restored = true
             }
         }
@@ -1561,7 +1509,7 @@ class WalletIssuanceSessionService(
                 active.authorization = null
                 active.state = SessionState.AWAITING_ACCEPTANCE
                 active.expiresAtEpochMilliseconds = nowEpochMilliseconds() +
-                    sessionPolicy.reviewTtl.inWholeMilliseconds
+                        sessionPolicy.reviewTtl.inWholeMilliseconds
                 true
             }
         }
@@ -1638,7 +1586,7 @@ class WalletIssuanceSessionService(
 
     private data class AuthorizationState(
         val public: WalletIssuanceAuthorization,
-        val pkce: id.waltid.openid4vci.wallet.oauth.PKCEManager.PKCEData,
+        val pkce: PKCEManager.PKCEData,
     )
 
     private data class ActiveSession(
@@ -1675,6 +1623,7 @@ class WalletIssuanceSessionService(
         val public: WalletDeferredCredential,
         val record: DeferredRecord,
     )
+
     private data class ProtectedResponse(
         val response: HttpResponse,
         val dpopNonce: String?,
@@ -1727,20 +1676,6 @@ class WalletIssuanceSessionService(
             ?: wallet.resolveKeyMaterial(keyId, setOf(KeyUsage.SIGN))
             ?: error("No holder key is available for credential issuance")
 
-    private suspend fun WalletKeyStoreEntry.requireCrypto2SigningKey(): Crypto2Key =
-        crypto2Key
-            ?: legacyKey?.let { migrateLocalJwk(it) }?.let { crypto2Runtime.restore(it) }
-            ?: error("Key '$keyId' has no usable crypto2 signing representation")
-
-    private suspend fun migrateLocalJwk(key: Key) =
-        (key as? JWKKey)?.takeUnless { it.keyType == KeyType.secp256k1 }?.let {
-            val jwk = it.exportJWKObject()
-            EncodedKey.Jwk(
-                BinaryData(Json.encodeToString(jwk).encodeToByteArray()),
-                privateMaterial = Jwk.containsPrivateMaterial(jwk),
-            ).toStoredSoftwareKey(KeyId(it.getKeyId()), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
-        }
-
     private suspend fun WalletKeyStoreEntry.exportPublicJwkObject(): JsonObject {
         crypto2Key?.let { key ->
             val exported = requireNotNull(key.capabilities.publicKeyExporter) {
@@ -1774,9 +1709,6 @@ class WalletIssuanceSessionService(
     private companion object {
         const val MAX_ACTIVE_SESSIONS = 32
         const val PROCESSING_EXPIRY = Long.MAX_VALUE
-        const val DPOP_HEADER = "DPoP"
-        const val DPOP_NONCE_HEADER = "DPoP-Nonce"
-        const val USE_DPOP_NONCE = "use_dpop_nonce"
         const val ACTIVE_RECORD_PREFIX = "active:"
         const val DEFERRED_RECORD_PREFIX = "deferred:"
 
