@@ -64,7 +64,8 @@ suspend fun createAndroidDemoMobileWallet(
                     reason = "Authorize wallet signing",
                     cancelText = "Cancel",
                 ),
-            )
+            ),
+            DemoClientIdTrust.configuration,
         ),
         transactionDataProfilesWarning = transactionDataProfiles.warning,
     )
