@@ -55,14 +55,15 @@ class VciWalletConformanceAdapter(
     private var server: EmbeddedServer<*, *>? = null
     private var httpClient: HttpClient? = null
 
-    /** Pending authorization code flows awaiting callback */
-    private val pendingAuthFlows = mutableMapOf<String, PendingAuthFlow>()
-    
-    /** Stored credential offers awaiting user action */
-    private val pendingOffers = mutableMapOf<String, String>()
-    
-    /** Generate unique offer ID */
-    private fun generateOfferId(): String = java.util.UUID.randomUUID().toString().take(8)
+    /**
+     * Authorization codes captured at [getRedirectUri], keyed by the `state` that produced them.
+     *
+     * The authorization leg is driven by simply GETting the authorization URL with a redirect-following
+     * client: the authorization server's redirect lands back on this adapter's own callback, which
+     * records the code here. That is the real redirect path a browser would take, and it avoids
+     * needing a second HTTP client configured without redirect following.
+     */
+    private val authorizationCodesByState = mutableMapOf<String, String>()
 
     /** Get the credential offer endpoint URL for conformance suite configuration */
     fun getCredentialOfferEndpoint(): String = "http://127.0.0.1:$adapterPort/credential-offer"
@@ -97,9 +98,6 @@ class VciWalletConformanceAdapter(
                 }
 
                 post("/credential-offer") { handleCredentialOfferApi(call) }
-                get("/credential-offer") { handleCredentialOfferDirectPage(call) }
-                get("/offer/:offerId") { handleOfferPage(call) }
-                post("/start-issuance") { handleStartIssuance(call) }
                 get("/callback") { handleAuthCallback(call) }
             }
         }.start(wait = false)
@@ -113,8 +111,7 @@ class VciWalletConformanceAdapter(
         server?.stop(1000, 2000)
         server = null
         httpClient = null
-        pendingAuthFlows.clear()
-        pendingOffers.clear()
+        authorizationCodesByState.clear()
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -137,197 +134,6 @@ class VciWalletConformanceAdapter(
         } catch (e: Exception) {
             println("[VCI Adapter] Could not fetch format: ${e.message}")
             null
-        }
-    }
-
-    /**
-     * GET /credential-offer - Direct link with query parameter (from conformance suite browser view)
-     */
-    private suspend fun handleCredentialOfferDirectPage(call: ApplicationCall) {
-        try {
-            val offerParam = call.request.queryParameters["credential_offer"]
-            if (offerParam == null) {
-                call.respondText("Missing credential_offer parameter", status = HttpStatusCode.BadRequest)
-                return
-            }
-
-            // Parse the offer to extract issuer info
-            val offerJson = try {
-                Json.parseToJsonElement(offerParam).jsonObject
-            } catch (e: Exception) {
-                call.respondText("Invalid JSON in credential_offer: ${e.message}", status = HttpStatusCode.BadRequest)
-                return
-            }
-
-            val credentialIssuer = offerJson["credential_issuer"]?.jsonPrimitive?.content ?: "Unknown Issuer"
-            val configurationIds = offerJson["credential_configuration_ids"]?.jsonArray?.map { 
-                it.jsonPrimitive.content 
-            } ?: emptyList()
-
-            // Fetch actual formats from issuer metadata
-            val credentialsWithFormats = configurationIds.map { configId ->
-                val format = getCredentialFormat(credentialIssuer, configId)
-                if (format != null) {
-                    "$configId (format: $format)"
-                } else {
-                    configId
-                }
-            }.joinToString(", ")
-
-            val credentials = if (credentialsWithFormats.isNotEmpty()) credentialsWithFormats else "Unknown"
-
-            val hasAuthCode = offerJson["grants"]?.jsonObject?.containsKey("authorization_code") == true
-            val hasPreAuth = offerJson["grants"]?.jsonObject?.containsKey("urn:ietf:params:oauth:grant-type:pre-authorized_code") == true
-
-            val grantType = when {
-                hasAuthCode -> "Authorization Code (OAuth)"
-                hasPreAuth -> "Pre-Authorized Code"
-                else -> "Unknown"
-            }
-
-            // Return HTML page with start button
-            call.respondText(credentialOfferPageHtml(credentialIssuer, credentials, grantType, offerParam), ContentType.Text.Html)
-
-        } catch (e: Exception) {
-            println("[VCI Adapter] Error rendering offer page: ${e.message}")
-            e.printStackTrace()
-            call.respondText("Error: ${e.message}", status = HttpStatusCode.InternalServerError)
-        }
-    }
-
-    /**
-     * GET /offer/:offerId - Show user-friendly page with one-click start button
-     */
-    private suspend fun handleOfferPage(call: ApplicationCall) {
-        try {
-            val offerId = call.parameters["offerId"] ?: run {
-                call.respondText("Missing offer ID", status = HttpStatusCode.BadRequest)
-                return
-            }
-            
-            val offer = pendingOffers[offerId] ?: run {
-                call.respondText("Offer not found or already processed", status = HttpStatusCode.NotFound)
-                return
-            }
-
-            // Parse the offer to extract issuer info
-            val offerJson = try {
-                Json.parseToJsonElement(offer).jsonObject
-            } catch (e: Exception) {
-                call.respondText("Invalid JSON in credential offer: ${e.message}", status = HttpStatusCode.BadRequest)
-                return
-            }
-
-            val credentialIssuer = offerJson["credential_issuer"]?.jsonPrimitive?.content ?: "Unknown Issuer"
-            val configurationIds = offerJson["credential_configuration_ids"]?.jsonArray?.map { 
-                it.jsonPrimitive.content 
-            } ?: emptyList()
-
-            // Fetch actual formats from issuer metadata
-            val credentialsWithFormats = configurationIds.map { configId ->
-                val format = getCredentialFormat(credentialIssuer, configId)
-                if (format != null) {
-                    "$configId (format: $format)"
-                } else {
-                    configId
-                }
-            }.joinToString(", ")
-
-            val credentials = if (credentialsWithFormats.isNotEmpty()) credentialsWithFormats else "Unknown"
-
-            val hasAuthCode = offerJson["grants"]?.jsonObject?.containsKey("authorization_code") == true
-            val hasPreAuth = offerJson["grants"]?.jsonObject?.containsKey("urn:ietf:params:oauth:grant-type:pre-authorized_code") == true
-
-            val grantType = when {
-                hasAuthCode -> "Authorization Code (OAuth)"
-                hasPreAuth -> "Pre-Authorized Code"
-                else -> "Unknown"
-            }
-
-            // Return HTML page with start button
-            call.respondText(credentialOfferPageHtml(credentialIssuer, credentials, grantType, offer), ContentType.Text.Html)
-
-        } catch (e: Exception) {
-            println("[VCI Adapter] Error rendering offer page: ${e.message}")
-            e.printStackTrace()
-            call.respondText("Error: ${e.message}", status = HttpStatusCode.InternalServerError)
-        }
-    }
-
-    /**
-     * POST /start-issuance - Process the credential offer and start issuance
-     */
-    private suspend fun handleStartIssuance(call: ApplicationCall) {
-        val client = httpClient ?: run {
-            call.respond(HttpStatusCode.InternalServerError, "HTTP client not initialized")
-            return
-        }
-
-        try {
-            val formParams = call.receiveParameters()
-            val offer = formParams["offer"] ?: run {
-                call.respondText("Missing offer parameter", status = HttpStatusCode.BadRequest)
-                return
-            }
-
-            println("[VCI Adapter] Starting issuance from user click")
-            
-            // Remove from pending offers (one-time use)
-            pendingOffers.values.remove(offer)
-
-            // Parse and process the offer
-            val offerJson = Json.parseToJsonElement(offer).jsonObject
-            val grants = offerJson["grants"]?.jsonObject
-            val hasPreAuthCode = grants?.containsKey("urn:ietf:params:oauth:grant-type:pre-authorized_code") == true
-            val hasAuthCode = grants?.containsKey("authorization_code") == true
-
-            when {
-                hasPreAuthCode -> {
-                    val result = claimCredentialPreAuth(client, offer)
-                    call.respondText(
-                        issuanceResultHtml(result.success, result.message),
-                        ContentType.Text.Html
-                    )
-                }
-                hasAuthCode -> {
-                    val result = initiateAuthCodeFlow(client, offer)
-                    if (result.authorizationUrl != null) {
-                        result.state?.let { state ->
-                            pendingAuthFlows[state] = PendingAuthFlow(
-                                state = state,
-                                codeVerifier = result.codeVerifier,
-                                tokenEndpoint = result.tokenEndpoint ?: error("Missing tokenEndpoint"),
-                                asIssuerUrl = result.asIssuerUrl,
-                                credentialEndpoint = result.credentialEndpoint,
-                                credentialIssuerUrl = result.credentialIssuerUrl,
-                                credentialConfigurationId = result.credentialConfigurationId,
-                                nonceEndpoint = result.nonceEndpoint
-                            )
-                        }
-                        // Redirect to authorization URL
-                        call.respondRedirect(result.authorizationUrl)
-                    } else {
-                        call.respondText(
-                            issuanceResultHtml(false, "Auth flow failed: ${result.error}"),
-                            ContentType.Text.Html
-                        )
-                    }
-                }
-                else -> {
-                    call.respondText(
-                        issuanceResultHtml(false, "No supported grant type in offer"),
-                        ContentType.Text.Html
-                    )
-                }
-            }
-
-        } catch (e: Exception) {
-            println("[VCI Adapter] Error starting issuance: ${e.message}")
-            e.printStackTrace()
-            call.respondText(
-                issuanceResultHtml(false, "Error: ${e.message}"),
-                ContentType.Text.Html
-            )
         }
     }
 
@@ -362,7 +168,7 @@ class VciWalletConformanceAdapter(
 
             // Determine grant type and route accordingly
             val grants = offerJson["grants"]?.jsonObject
-            val hasPreAuthCode = grants?.containsKey("urn:ietf:params:oauth:grant-type:pre-authorized_code") == true
+            val hasPreAuthCode = grants?.containsKey(PRE_AUTHORIZED_CODE_GRANT) == true
             val hasAuthCode = grants?.containsKey("authorization_code") == true
 
             println("[VCI Adapter] Grants - preAuth: $hasPreAuthCode, authCode: $hasAuthCode")
@@ -372,21 +178,12 @@ class VciWalletConformanceAdapter(
                     val result = claimCredentialPreAuth(client, offer)
                     call.respond(HttpStatusCode.OK, "Pre-auth claim: ${result.message}")
                 }
+
                 hasAuthCode -> {
-                    // Store offer and return URL for user to visit
-                    val offerId = generateOfferId()
-                    pendingOffers[offerId] = offer
-                    val offerUrl = "http://127.0.0.1:$adapterPort/offer/$offerId"
-                    
-                    println("[VCI Adapter] Stored offer with ID: $offerId")
-                    println("[VCI Adapter] ✨ Open this URL in your browser: $offerUrl")
-                    
-                    call.respond(HttpStatusCode.OK, buildJsonObject {
-                        put("status", "ready")
-                        put("message", "Open the offer URL in your browser to continue")
-                        put("offer_url", offerUrl)
-                    }.toString())
+                    val result = claimCredentialAuthCode(client, offer)
+                    call.respond(HttpStatusCode.OK, "Auth-code claim: ${result.message}")
                 }
+
                 else -> {
                     call.respond(HttpStatusCode.BadRequest, "No supported grant type in offer")
                 }
@@ -399,71 +196,177 @@ class VciWalletConformanceAdapter(
         }
     }
 
+    /**
+     * Redirect target of the authorization request.
+     *
+     * Only records the code against its `state`; the exchange itself is Wallet2's job via
+     * `POST /credentials/receive/authorized`. Nothing renders a page here because no human is
+     * involved - the caller that GET the authorization URL is the one following this redirect.
+     */
     private suspend fun handleAuthCallback(call: ApplicationCall) {
-        val client = httpClient ?: run {
-            call.respond(HttpStatusCode.InternalServerError, "HTTP client not initialized")
-            return
-        }
+        val code = call.request.queryParameters["code"]
+        val state = call.request.queryParameters["state"]
+        val error = call.request.queryParameters["error"]
 
-        try {
-            val code = call.request.queryParameters["code"]
-            val state = call.request.queryParameters["state"]
-            val error = call.request.queryParameters["error"]
+        println("[VCI Adapter] Auth callback - code: ${code?.take(12)}…, state: $state, error: $error")
 
-            println("[VCI Adapter] Auth callback - code: ${code?.take(20)}..., state: $state, error: $error")
-
-            if (error != null) {
-                val errorDesc = call.request.queryParameters["error_description"]
-                call.respond(HttpStatusCode.BadRequest, "Authorization error: $error - $errorDesc")
-                return
+        when {
+            error != null -> {
+                val description = call.request.queryParameters["error_description"]
+                call.respondText("Authorization error: $error - $description", status = HttpStatusCode.BadRequest)
             }
 
-            if (code == null || state == null) {
-                call.respond(HttpStatusCode.BadRequest, "Missing code or state")
-                return
-            }
+            code == null || state == null ->
+                call.respondText("Missing code or state", status = HttpStatusCode.BadRequest)
 
-            val pendingFlow = pendingAuthFlows.remove(state)
-            if (pendingFlow == null) {
-                // Still show success page even if state not found
-                call.respondText(authCompleteHtml("Code received, but no pending flow found"), ContentType.Text.Html)
-                return
+            else -> {
+                authorizationCodesByState[state] = code
+                call.respondText("Authorization code received")
             }
-
-            // Exchange code for token
-            val tokenResult = exchangeCodeForToken(client, code, pendingFlow)
-            
-            if (tokenResult.success && tokenResult.accessToken != null && pendingFlow.credentialEndpoint != null) {
-                // Now fetch the credential
-                val credResult = fetchCredential(
-                    client = client,
-                    accessToken = tokenResult.accessToken,
-                    cNonce = tokenResult.cNonce,
-                    credentialEndpoint = pendingFlow.credentialEndpoint,
-                    credentialConfigurationId = pendingFlow.credentialConfigurationId ?: "org.iso.18013.5.1.mDL",
-                    credentialIssuerUrl = pendingFlow.credentialIssuerUrl,
-                    nonceEndpoint = pendingFlow.nonceEndpoint
-                )
-                call.respondText(
-                    authCompleteHtml(if (credResult.success) "Credential received: ${credResult.message}" else "Credential fetch failed: ${credResult.message}"),
-                    ContentType.Text.Html
-                )
-            } else {
-                call.respondText(
-                    authCompleteHtml(if (tokenResult.success) "Token obtained but missing data for credential fetch" else "Token exchange failed: ${tokenResult.message}"),
-                    ContentType.Text.Html
-                )
-            }
-
-        } catch (e: Exception) {
-            println("[VCI Adapter] ERROR: ${e.message}")
-            call.respond(HttpStatusCode.InternalServerError, "Error: ${e.message}")
         }
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
     // Wallet API Calls
     // ─────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Completes the authorization-code grant by delegating every protocol step to Wallet2.
+     *
+     * The adapter drives only the browser leg the suite expects a user to perform: it asks the wallet
+     * for an authorization URL, GETs it so the authorization server's redirect lands on
+     * [handleAuthCallback], then hands the captured code back. Discovery, PKCE, the token exchange,
+     * proof of possession and credential storage all happen inside the wallet - mirroring how the
+     * pre-authorized grant delegates to `POST /credentials/receive`.
+     *
+     * This replaces per-field orchestration in the adapter that had drifted out of sync with the
+     * wallet's DTOs (it read `tokenEndpoint`/`cNonce` fields that no longer exist and omitted
+     * required ones), and which therefore never completed a single flow.
+     */
+    private suspend fun claimCredentialAuthCode(client: HttpClient, offer: String): ClaimResult {
+        val offerSource = buildOfferSource(offer)
+
+        // 1. Endpoints the wallet needs back on the final call; authorization-url does not return them.
+        val resolveResponse = client.post("$walletApiUrl/wallet/$walletId/credentials/receive/resolve-offer") {
+            contentType(ContentType.Application.Json)
+            setBody(offerSource.toString())
+        }
+        if (!resolveResponse.status.isSuccess()) {
+            return ClaimResult(false, "resolve-offer ${resolveResponse.status}: ${resolveResponse.bodyAsText()}")
+        }
+        val resolved = Json.parseToJsonElement(resolveResponse.bodyAsText()).jsonObject
+        val credentialIssuer = resolved["credentialIssuer"]?.jsonPrimitive?.content
+            ?: return ClaimResult(false, "resolve-offer returned no credentialIssuer")
+        val credentialEndpoint = resolved["credentialEndpoint"]?.jsonPrimitive?.content
+            ?: return ClaimResult(false, "resolve-offer returned no credentialEndpoint")
+        val nonceEndpoint = resolved["nonceEndpoint"]?.jsonPrimitive?.contentOrNull
+
+        // 2. Authorization URL, PKCE verifier and state.
+        val authUrlResponse = client.post("$walletApiUrl/wallet/$walletId/credentials/receive/authorization-url") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                buildJsonObject {
+                    offerSource.entries.forEach { (key, value) -> put(key, value) }
+                    put("clientId", CLIENT_ID)
+                    put("redirectUri", getRedirectUri())
+                    put("usePkce", true)
+                }.toString()
+            )
+        }
+        if (!authUrlResponse.status.isSuccess()) {
+            return ClaimResult(false, "authorization-url ${authUrlResponse.status}: ${authUrlResponse.bodyAsText()}")
+        }
+        val authorization = Json.parseToJsonElement(authUrlResponse.bodyAsText()).jsonObject
+        val authorizationUrl = authorization["authorizationUrl"]?.jsonPrimitive?.content
+            ?: return ClaimResult(false, "authorization-url returned no authorizationUrl")
+        val state = authorization["state"]?.jsonPrimitive?.content
+            ?: return ClaimResult(false, "authorization-url returned no state")
+        val codeVerifier = authorization["codeVerifier"]?.jsonPrimitive?.contentOrNull
+        val credentialConfigurationId = authorization["credentialConfigurationId"]?.jsonPrimitive?.content
+            ?: return ClaimResult(false, "authorization-url returned no credentialConfigurationId")
+
+        // 3. The browser leg, followed by hand. Ktor's HttpRedirect refuses to follow an HTTPS ->
+        // HTTP downgrade, and the authorization server is HTTPS while this adapter's redirect URI is
+        // plain HTTP on loopback, so an automatic follow silently stops at the 303.
+        println("[VCI Adapter] Following authorization request")
+        val code = followAuthorization(client, authorizationUrl).getOrElse { return ClaimResult(false, it.message ?: "authorization failed") }
+
+        // 4. Everything after the redirect is the wallet's job.
+        val url = "$walletApiUrl/wallet/$walletId/credentials/receive/authorized"
+        println("[VCI Adapter] POST $url")
+        val response = client.post(url) {
+            contentType(ContentType.Application.Json)
+            setBody(
+                buildJsonObject {
+                    put("code", code)
+                    codeVerifier?.let { put("codeVerifier", it) }
+                    put("credentialIssuer", credentialIssuer)
+                    put("credentialEndpoint", credentialEndpoint)
+                    put("credentialConfigurationId", credentialConfigurationId)
+                    nonceEndpoint?.let { put("nonceEndpoint", it) }
+                    put("clientId", CLIENT_ID)
+                    put("redirectUri", getRedirectUri())
+                    testDid?.let { put("did", it) }
+                    testKeyId?.let { put("keyId", it) }
+                }.toString()
+            )
+        }
+        val body = response.bodyAsText()
+        return if (response.status.isSuccess()) {
+            ClaimResult(true, body)
+        } else {
+            ClaimResult(false, "Status ${response.status}: $body")
+        }
+    }
+
+    /**
+     * Walks the authorization server's redirect chain until it lands on [getRedirectUri], returning
+     * the authorization code from that final query.
+     *
+     * Done by hand rather than by letting the HTTP client follow: the authorization server is HTTPS
+     * and this adapter's redirect URI is plain HTTP on loopback, and Ktor's `HttpRedirect` refuses
+     * HTTPS -> HTTP downgrades, so an automatic follow stops at the redirect without reporting why.
+     *
+     * A chain longer than [MAX_AUTHORIZATION_REDIRECTS] means the server wants interaction this
+     * adapter cannot supply, which is reported rather than looped on.
+     */
+    private suspend fun followAuthorization(client: HttpClient, authorizationUrl: String): Result<String> {
+        var current = authorizationUrl
+
+        repeat(MAX_AUTHORIZATION_REDIRECTS) {
+            val response = client.get(current)
+            val location = response.headers[HttpHeaders.Location]
+                ?: return Result.failure(
+                    IllegalStateException(
+                        "authorization endpoint answered ${response.status} without a Location: " +
+                                response.bodyAsText().take(300),
+                    )
+                )
+
+            val target = URLBuilder(current).apply { takeFrom(location) }.build()
+            if ("${target.protocol.name}://${target.host}:${target.port}${target.encodedPath}" == getRedirectUri()) {
+                target.parameters["error"]?.let { error ->
+                    return Result.failure(
+                        IllegalStateException(
+                            "authorization failed: $error ${target.parameters["error_description"].orEmpty()}",
+                        )
+                    )
+                }
+                return target.parameters["code"]
+                    ?.let { Result.success(it) }
+                    ?: Result.failure(IllegalStateException("redirect to $location carried no code"))
+            }
+
+            println("[VCI Adapter] Authorization redirect -> $location")
+            current = target.toString()
+        }
+
+        return Result.failure(
+            IllegalStateException(
+                "authorization did not reach ${getRedirectUri()} within $MAX_AUTHORIZATION_REDIRECTS redirects",
+            )
+        )
+    }
 
     private suspend fun claimCredentialPreAuth(client: HttpClient, offer: String): ClaimResult {
         return try {
@@ -487,162 +390,6 @@ class VciWalletConformanceAdapter(
         }
     }
 
-    private suspend fun initiateAuthCodeFlow(client: HttpClient, offer: String): AuthFlowResult {
-        return try {
-            val url = "$walletApiUrl/wallet/$walletId/credentials/receive/authorization-url"
-            println("[VCI Adapter] POST $url")
-
-            val requestBody = buildOfferRequest(offer, includeAuthParams = true)
-            val response = client.post(url) {
-                contentType(ContentType.Application.Json)
-                setBody(requestBody.toString())
-            }
-
-            val body = response.bodyAsText()
-            println("[VCI Adapter] Response: ${response.status} - $body")
-
-            if (response.status.isSuccess()) {
-                val result = Json.parseToJsonElement(body).jsonObject
-                AuthFlowResult(
-                    authorizationUrl = result["authorizationUrl"]?.jsonPrimitive?.content,
-                    state = result["state"]?.jsonPrimitive?.content,
-                    codeVerifier = result["codeVerifier"]?.jsonPrimitive?.content,
-                    tokenEndpoint = result["tokenEndpoint"]?.jsonPrimitive?.content,
-                    asIssuerUrl = result["asIssuerUrl"]?.jsonPrimitive?.content,
-                    credentialEndpoint = result["credentialEndpoint"]?.jsonPrimitive?.content,
-                    credentialIssuerUrl = result["credentialIssuerUrl"]?.jsonPrimitive?.content,
-                    credentialConfigurationId = result["credentialConfigurationId"]?.jsonPrimitive?.content,
-                    nonceEndpoint = result["nonceEndpoint"]?.jsonPrimitive?.content
-                )
-            } else {
-                AuthFlowResult(error = "Status ${response.status}: $body")
-            }
-        } catch (e: Exception) {
-            AuthFlowResult(error = "Exception: ${e.message}")
-        }
-    }
-
-    private suspend fun exchangeCodeForToken(client: HttpClient, code: String, flow: PendingAuthFlow): TokenResult {
-        return try {
-            val url = "$walletApiUrl/wallet/$walletId/credentials/receive/exchange-code"
-            println("[VCI Adapter] POST $url")
-
-            val requestBody = buildJsonObject {
-                put("tokenEndpoint", flow.tokenEndpoint)
-                put("code", code)
-                flow.codeVerifier?.let { put("codeVerifier", it) }
-                put("clientId", "wallet-conformance-test")
-                put("redirectUri", getRedirectUri())
-                // Include AS issuer URL for client_assertion aud claim
-                flow.asIssuerUrl?.let { put("asIssuerUrl", it) }
-            }
-
-            val response = client.post(url) {
-                contentType(ContentType.Application.Json)
-                setBody(requestBody.toString())
-            }
-
-            val body = response.bodyAsText()
-            println("[VCI Adapter] Token exchange response: $body")
-            if (response.status.isSuccess()) {
-                val result = Json.parseToJsonElement(body).jsonObject
-                println("[VCI Adapter] Parsed token result keys: ${result.keys}")
-                println("[VCI Adapter] cNonce value: ${result["cNonce"]}")
-                TokenResult(
-                    success = true,
-                    message = "Token obtained",
-                    accessToken = result["accessToken"]?.jsonPrimitive?.content,
-                    cNonce = result["cNonce"]?.jsonPrimitive?.content
-                )
-            } else {
-                TokenResult(success = false, message = "Status ${response.status}: $body")
-            }
-        } catch (e: Exception) {
-            TokenResult(success = false, message = "Exception: ${e.message}")
-        }
-    }
-
-    private suspend fun fetchCredential(
-        client: HttpClient,
-        accessToken: String,
-        cNonce: String?,
-        credentialEndpoint: String,
-        credentialConfigurationId: String,
-        credentialIssuerUrl: String?,
-        nonceEndpoint: String?
-    ): ClaimResult {
-        return try {
-            val url = "$walletApiUrl/wallet/$walletId/credentials/receive/fetch-credential"
-            println("[VCI Adapter] POST $url")
-            println("[VCI Adapter] cNonce: $cNonce, nonceEndpoint: $nonceEndpoint, credentialIssuerUrl: $credentialIssuerUrl")
-
-            // Let the wallet API handle nonce fetching and proof signing
-            // It will: 1) fetch from nonceEndpoint if provided, 2) fall back to cNonce, 3) sign proof with wallet's key
-            val requestBody = buildJsonObject {
-                put("credentialEndpoint", credentialEndpoint)
-                put("accessToken", accessToken)
-                put("credentialConfigurationId", credentialConfigurationId)
-                // Pass nonce info for the API to handle
-                cNonce?.let { put("cNonce", it) }
-                nonceEndpoint?.let { put("nonceEndpoint", it) }
-                credentialIssuerUrl?.let { put("credentialIssuerUrl", it) }
-            }
-
-            val response = client.post(url) {
-                contentType(ContentType.Application.Json)
-                setBody(requestBody.toString())
-            }
-
-            val body = response.bodyAsText()
-            println("[VCI Adapter] Fetch response: ${response.status} - ${body.take(200)}")
-            
-            if (response.status.isSuccess()) {
-                ClaimResult(true, "Credential received")
-            } else {
-                ClaimResult(false, "Status ${response.status}: $body")
-            }
-        } catch (e: Exception) {
-            ClaimResult(false, "Exception: ${e.message}")
-        }
-    }
-
-    private suspend fun signKeyProof(client: HttpClient, nonce: String, issuerUrl: String): String? {
-        return try {
-            val url = "$walletApiUrl/wallet/$walletId/credentials/receive/sign-proof"
-            println("[VCI Adapter] POST $url")
-            println("[VCI Adapter] Sign proof request - nonce: $nonce, issuerUrl: $issuerUrl")
-
-            val requestBody = buildJsonObject {
-                put("issuerUrl", issuerUrl)
-                put("nonce", nonce)
-            }
-
-            val response = client.post(url) {
-                contentType(ContentType.Application.Json)
-                setBody(requestBody.toString())
-            }
-
-            val body = response.bodyAsText()
-            println("[VCI Adapter] Sign proof response: ${response.status} - $body")
-            
-            if (response.status.isSuccess()) {
-                val result = Json.parseToJsonElement(body).jsonObject
-                val proofJwt = result["proofJwt"]?.jsonPrimitive?.content
-                println("[VCI Adapter] Extracted proofJwt: ${proofJwt?.take(50)}...")
-                proofJwt
-            } else {
-                println("[VCI Adapter] Sign proof failed: ${response.status} - $body")
-                null
-            }
-        } catch (e: Exception) {
-            println("[VCI Adapter] Sign proof exception: ${e.message}")
-            e.printStackTrace()
-            null
-        }
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Wallet Setup
     // ─────────────────────────────────────────────────────────────────────────────
 
     /**
@@ -696,15 +443,23 @@ class VciWalletConformanceAdapter(
 
         println("[VCI Adapter] Created wallet: $newWalletId")
 
-        // Generate additional key and DID
-        client.post("$walletApiUrl/wallet/$newWalletId/keys/generate") {
+        // Generate the signing key and a DID. "backend" is the sealed-class discriminator of
+        // TypedKeyGenerationRequest - without it the wallet answers 400 and, since these responses
+        // were previously unchecked, the wallet silently ended up with no key at all.
+        val keyResponse = client.post("$walletApiUrl/wallet/$newWalletId/keys/generate") {
             contentType(ContentType.Application.Json)
-            setBody("""{"keyType": "secp256r1"}""")
+            setBody("""{"backend": "jwk", "keyType": "secp256r1"}""")
+        }
+        check(keyResponse.status.isSuccess()) {
+            "Failed to generate wallet key: ${keyResponse.status} ${keyResponse.bodyAsText()}"
         }
 
-        client.post("$walletApiUrl/wallet/$newWalletId/dids/create") {
+        val didResponse = client.post("$walletApiUrl/wallet/$newWalletId/dids/create") {
             contentType(ContentType.Application.Json)
             setBody("""{"method": "key"}""")
+        }
+        check(didResponse.status.isSuccess()) {
+            "Failed to create wallet DID: ${didResponse.status} ${didResponse.bodyAsText()}"
         }
 
         return newWalletId
@@ -726,6 +481,17 @@ class VciWalletConformanceAdapter(
         } else null
     }
 
+    /**
+     * Just the offer source, as `resolve-offer` and `authorization-url` accept it.
+     *
+     * Both reject unknown fields, so the key/DID/tx-code extras that [buildOfferRequest] adds for
+     * `credentials/receive` must not be sent here.
+     */
+    private fun buildOfferSource(offer: String): JsonObject = buildJsonObject {
+        val offerJsonObject = parseOfferJson(offer)
+        if (offerJsonObject != null) put("offerJson", offerJsonObject) else put("offerUrl", offer)
+    }
+
     private fun buildOfferRequest(offer: String, includeAuthParams: Boolean = false): JsonObject {
         val offerJsonObject = parseOfferJson(offer)
         return buildJsonObject {
@@ -741,115 +507,40 @@ class VciWalletConformanceAdapter(
             }
             testDid?.let { put("did", it) }
             testKeyId?.let { put("keyId", it) }
+            offerJsonObject?.let(::extractTransactionCode)?.let { put("txCode", it) }
         }
     }
 
-    private fun credentialOfferPageHtml(issuer: String, credentials: String, grantType: String, offerJson: String): String = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Credential Offer</title>
-            <style>
-                body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
-                h1 { color: #333; }
-                .info { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; }
-                .info-row { margin: 10px 0; }
-                .label { font-weight: bold; color: #666; }
-                button { 
-                    background: #007bff; 
-                    color: white; 
-                    border: none; 
-                    padding: 15px 30px; 
-                    font-size: 16px; 
-                    border-radius: 5px; 
-                    cursor: pointer;
-                    width: 100%;
-                }
-                button:hover { background: #0056b3; }
-            </style>
-        </head>
-        <body>
-            <h1>🎫 Credential Offer Received</h1>
-            <div class="info">
-                <div class="info-row"><span class="label">Issuer:</span> $issuer</div>
-                <div class="info-row"><span class="label">Credentials:</span> $credentials</div>
-                <div class="info-row"><span class="label">Grant Type:</span> $grantType</div>
-            </div>
-            <form method="POST" action="/start-issuance">
-                <input type="hidden" name="offer" value="${offerJson.replace("\"", "&quot;")}" />
-                <button type="submit">🚀 Start Issuance</button>
-            </form>
-        </body>
-        </html>
-    """.trimIndent()
+    /**
+     * Transaction code (PIN) for the pre-authorized code grant.
+     *
+     * OpenID4VCI carries only the code's *shape* in `tx_code`, never its value - a real user reads
+     * the value from the issuer out of band. The conformance suite embeds it in the human-readable
+     * description ("Input the one-time code: <123456> for testing purposes") precisely so that an
+     * automated wallet can recover it, so parsing the description is the intended automation and
+     * survives the suite replacing its currently hardcoded value.
+     */
+    private fun extractTransactionCode(offer: JsonObject): String? =
+        offer["grants"]?.jsonObject
+            ?.get(PRE_AUTHORIZED_CODE_GRANT)?.jsonObject
+            ?.get("tx_code")?.jsonObject
+            ?.get("description")?.jsonPrimitive?.contentOrNull
+            ?.let { TX_CODE_IN_DESCRIPTION.find(it)?.groupValues?.get(1) }
 
-    private fun issuanceResultHtml(success: Boolean, message: String): String = """
-        <!DOCTYPE html>
-        <html>
-        <head><title>Issuance Result</title>
-            <style>
-                body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center; }
-                .success { color: #28a745; }
-                .error { color: #dc3545; }
-            </style>
-        </head>
-        <body>
-            <h1 class="${if (success) "success" else "error"}">${if (success) "✅ Success" else "❌ Error"}</h1>
-            <p>$message</p>
-        </body>
-        </html>
-    """.trimIndent()
-
-    private fun authCompleteHtml(message: String): String = """
-        <!DOCTYPE html>
-        <html>
-        <head><title>Authorization Complete</title>
-            <style>
-                body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center; }
-            </style>
-        </head>
-        <body>
-            <h1>✅ Authorization Complete</h1>
-            <p>$message</p>
-            <p>You can close this window.</p>
-        </body>
-        </html>
-    """.trimIndent()
-
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Data Classes
-    // ─────────────────────────────────────────────────────────────────────────────
-
-    private data class PendingAuthFlow(
-        val state: String,
-        val codeVerifier: String?,
-        val tokenEndpoint: String,
-        val asIssuerUrl: String?,
-        val credentialEndpoint: String?,
-        val credentialIssuerUrl: String?,
-        val credentialConfigurationId: String?,
-        val nonceEndpoint: String?
-    )
-
+    /** Outcome of delegating a grant to the wallet; [message] carries the wallet's own response body. */
     private data class ClaimResult(val success: Boolean, val message: String)
 
-    private data class AuthFlowResult(
-        val authorizationUrl: String? = null,
-        val state: String? = null,
-        val codeVerifier: String? = null,
-        val tokenEndpoint: String? = null,
-        val asIssuerUrl: String? = null,
-        val credentialEndpoint: String? = null,
-        val credentialIssuerUrl: String? = null,
-        val credentialConfigurationId: String? = null,
-        val nonceEndpoint: String? = null,
-        val error: String? = null
-    )
+    private companion object {
+        /** Client identifier the VCI wallet plans register with the conformance suite. */
+        const val CLIENT_ID = "wallet-conformance-test"
 
-    private data class TokenResult(
-        val success: Boolean,
-        val message: String,
-        val accessToken: String? = null,
-        val cNonce: String? = null
-    )
+        /** Redirects tolerated on the authorization leg before concluding interaction is required. */
+        const val MAX_AUTHORIZATION_REDIRECTS = 5
+
+        /** OpenID4VCI 1.0 pre-authorized code grant key in a credential offer's `grants` object. */
+        const val PRE_AUTHORIZED_CODE_GRANT = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+
+        /** Matches the `<code>` the conformance suite embeds in its `tx_code` description. */
+        val TX_CODE_IN_DESCRIPTION = Regex("<([^>]+)>")
+    }
 }
