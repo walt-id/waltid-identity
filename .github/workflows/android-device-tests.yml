@@ -52,6 +52,24 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      - name: Restore warmed DC API AVD
+        if: matrix.phase == 'dc-api-compose'
+        id: dc-api-avd-cache
+        uses: actions/cache/restore@v4
+        with:
+          # Keep the reusable baseline separate from the Gradle/test workspace. The key excludes
+          # commit and unrelated workflow changes; the schema, substrate, and preparation scripts
+          # make changes to the prepared-device contract explicit cache invalidation points.
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: dc-api-avd-v1-${{ runner.os }}-api37-x86_64-pixel7-playstore_ps16k-emulator-runner-2.38.0-${{ hashFiles('waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
+
+      - name: Report DC API AVD cache state
+        if: matrix.phase == 'dc-api-compose'
+        run: |
+          echo "DC API AVD cache hit: ${{ steps.dc-api-avd-cache.outputs.cache-hit || 'false' }}"
+
       - name: Configure Android device test phase
         id: android-device-phase
         run: ./waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh "${{ matrix.phase }}"
@@ -87,6 +105,31 @@ jobs:
         if: matrix.phase == 'enterprise-mobile'
         run: ./waltid-identity/.github/scripts/mobile-ci/prepare-enterprise-android-mobile-tests.sh
 
+      - name: Prepare warmed DC API AVD baseline
+        if: matrix.phase == 'dc-api-compose' && steps.dc-api-avd-cache.outputs.cache-hit != 'true'
+        id: dc-api-avd-preparation
+        uses: reactivecircus/android-emulator-runner@v2.38.0
+        with:
+          api-level: ${{ steps.android-device-phase.outputs.emulator_api_level }}
+          arch: x86_64
+          avd-name: ${{ steps.android-device-phase.outputs.emulator_avd_name }}
+          force-avd-creation: false
+          profile: ${{ steps.android-device-phase.outputs.emulator_profile }}
+          target: ${{ steps.android-device-phase.outputs.emulator_target }}
+          emulator-boot-timeout: 600
+          emulator-options: ${{ steps.android-device-phase.outputs.emulator_options }}
+          disable-animations: true
+          script: ./waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh
+
+      - name: Save warmed DC API AVD baseline
+        if: matrix.phase == 'dc-api-compose' && steps.dc-api-avd-cache.outputs.cache-hit != 'true' && steps.dc-api-avd-preparation.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: dc-api-avd-v1-${{ runner.os }}-api37-x86_64-pixel7-playstore_ps16k-emulator-runner-2.38.0-${{ hashFiles('waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
+
       - name: Run Android device tests
         if: matrix.phase != 'dc-api-compose'
         uses: reactivecircus/android-emulator-runner@v2
@@ -105,10 +148,12 @@ jobs:
         with:
           api-level: ${{ steps.android-device-phase.outputs.emulator_api_level }}
           arch: x86_64
+          avd-name: ${{ steps.android-device-phase.outputs.emulator_avd_name }}
+          force-avd-creation: false
           profile: ${{ steps.android-device-phase.outputs.emulator_profile }}
           target: ${{ steps.android-device-phase.outputs.emulator_target }}
           emulator-boot-timeout: 600
-          emulator-options: ${{ steps.android-device-phase.outputs.emulator_options }}
+          emulator-options: ${{ steps.android-device-phase.outputs.emulator_test_options }}
           disable-animations: true
           script: ${{ steps.android-device-phase.outputs.script }}
 
