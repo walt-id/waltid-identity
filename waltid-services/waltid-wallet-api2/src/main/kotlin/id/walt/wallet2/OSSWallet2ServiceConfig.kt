@@ -21,6 +21,16 @@ import kotlinx.serialization.json.JsonObject
  *             jwk = "{{public_jwk}}"
  *         }
  *     }
+ *     # Required for OpenID4VP x509_san_dns / x509_hash clients. Empty fails those prefixes closed.
+ *     # Append more PEM strings to trust additional verifiers. Demo material from verifier-service.conf:
+ *     # clientIdTrust {
+ *     #     x509TrustAnchors = [
+ *     #         """-----BEGIN CERTIFICATE-----
+ *     #         MIIBVzCB/aADAgECAggNKZAvUrtimzAKBggqhkjOPQQDAjAfMR0wGwYDVQQDDBR2
+ *     #         ...
+ *     #         -----END CERTIFICATE-----"""
+ *     #     ]
+ *     # }
  * }
  * ```
  */
@@ -40,6 +50,14 @@ data class OSSWallet2ServiceConfig(
     val transactionDataTypes: Set<String> = emptySet(),
 ) : WaltConfig()
 
+/**
+ * Verifier client-ID trust used for OpenID4VP Request Object authentication.
+ *
+ * @property x509TrustAnchors PEM-encoded trust anchors. Required for `x509_san_dns` and `x509_hash`
+ *   clients; an empty list fails those prefixes closed. Append additional PEMs to trust more verifiers.
+ * @property trustedVerifierAttestationIssuers DIDs allowed to issue verifier attestation JWTs.
+ * @property preRegisteredClients Metadata for `pre-registered` client IDs such as Verifier2's default `verifier2`.
+ */
 @Serializable
 data class ClientIdTrustConfig(
     val x509TrustAnchors: List<String> = emptyList(),

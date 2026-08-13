@@ -1,7 +1,9 @@
 package id.waltid.openid4vp.wallet
 
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.ktor.http.URLBuilder
 import io.ktor.http.URLProtocol
@@ -12,16 +14,19 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * OpenID4VP 1.0 Appendix A exchange protocol values accepted by this wallet.
  *
- * Only the unsigned protocol is implemented, so this enum has one entry. Any other protocol value —
- * including the `openid4vp-v1-signed` and `openid4vp-v1-multisigned` values defined by Appendix A —
- * fails closed with [UnsupportedDcApiProtocolException].
+ * Unsigned and signed compact Request Objects are implemented. The `openid4vp-v1-multisigned`
+ * value defined by Appendix A fails closed with [UnsupportedDcApiProtocolException].
  */
 public enum class DcApiRequestProtocol(public val value: String) {
     OPENID4VP_V1_UNSIGNED("openid4vp-v1-unsigned"),
+    OPENID4VP_V1_SIGNED("openid4vp-v1-signed"),
     ;
 
     public companion object {
@@ -70,20 +75,30 @@ public object DcApiWallet {
     private val ANDROID_APP_ORIGIN_HASH = Regex("[A-Za-z0-9_-]+")
 
     /**
-     * Resolves a DC API request using only the origin authenticated by the platform adapter.
+     * Resolves a DC API request using the origin authenticated by the platform adapter.
      *
-     * Request-supplied `client_id` and `expected_origins` are ignored: the platform-asserted origin
-     * is the sole requester identity for the unsigned protocol.
+     * For [DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED], request-supplied `client_id` and
+     * `expected_origins` are ignored: the platform-asserted origin is the sole requester identity.
+     *
+     * For [DcApiRequestProtocol.OPENID4VP_V1_SIGNED], `data.request` is a compact Request Object.
+     * The signature is authenticated with [trustConfiguration], and the platform origin must appear
+     * in the Request Object's `expected_origins`.
      */
-    public fun resolveRequest(
+    public suspend fun resolveRequest(
         protocol: String,
         data: JsonObject,
         origin: String,
+        trustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
     ): ResolvedDcApiRequest {
         val validatedOrigin = canonicalizePlatformOrigin(origin)
         val requestProtocol = DcApiRequestProtocol.fromValue(protocol)
         val authorizationRequest = when (requestProtocol) {
             DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED -> resolveUnsignedRequest(data)
+            DcApiRequestProtocol.OPENID4VP_V1_SIGNED -> resolveSignedRequest(
+                data = data,
+                origin = validatedOrigin,
+                trustConfiguration = trustConfiguration,
+            )
         }
 
         validateAuthorizationRequest(authorizationRequest)
@@ -195,9 +210,10 @@ public object DcApiWallet {
     }
 
     /**
-     * Validates the Appendix A request members. The requester identity is not validated here: for
-     * the unsigned protocol it is the platform-asserted origin alone, which [resolveRequest]
-     * canonicalises, and no request claim is trusted against it.
+     * Validates the Appendix A request members shared by unsigned and signed protocols.
+     *
+     * Unsigned requester identity is the platform-asserted origin alone. Signed requester identity
+     * is the authenticated Request Object `client_id`, bound to that origin via `expected_origins`.
      */
     internal fun validateAuthorizationRequest(request: AuthorizationRequest) {
         require(request.responseType?.responseType?.contains("vp_token") == true) {
@@ -219,6 +235,43 @@ public object DcApiWallet {
         )
         return json.decodeFromJsonElement(AuthorizationRequest.serializer(), effectiveData)
             .also { it.dcqlQuery?.precheck() }
+    }
+
+    private suspend fun resolveSignedRequest(
+        data: JsonObject,
+        origin: String,
+        trustConfiguration: ClientIdTrustConfiguration,
+    ): AuthorizationRequest {
+        require(data["request_uri"] == null || data["request_uri"] == JsonNull) {
+            "openid4vp-v1-signed must not fetch a Request Object from request_uri"
+        }
+        val requestObject = data["request"]?.jsonPrimitive?.contentOrNull
+        require(!requestObject.isNullOrBlank()) {
+            "openid4vp-v1-signed must contain a Request Object"
+        }
+        val authorizationRequest = AuthorizationRequestResolver.resolveInlineRequestObject(
+            requestObject = requestObject,
+            trustConfiguration = trustConfiguration,
+        ).authorizationRequest
+        requireExpectedOrigin(authorizationRequest, origin)
+        return authorizationRequest
+    }
+
+    /**
+     * OpenID4VP 1.0 Appendix A.3.2: the wallet must verify that the platform-asserted origin is
+     * listed in the signed Request Object's `expected_origins`.
+     */
+    private fun requireExpectedOrigin(request: AuthorizationRequest, origin: String) {
+        val expectedOrigins = request.expectedOrigins.orEmpty()
+        require(expectedOrigins.isNotEmpty()) {
+            "openid4vp-v1-signed requires expected_origins"
+        }
+        val canonicalExpected = expectedOrigins.mapNotNull { candidate ->
+            runCatching { canonicalizePlatformOrigin(candidate) }.getOrNull()
+        }
+        require(origin in canonicalExpected) {
+            "Platform origin is not listed in expected_origins"
+        }
     }
 
     /**

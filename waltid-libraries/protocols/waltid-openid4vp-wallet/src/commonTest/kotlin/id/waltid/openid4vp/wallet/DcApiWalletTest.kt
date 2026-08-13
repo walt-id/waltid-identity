@@ -1,6 +1,8 @@
 package id.waltid.openid4vp.wallet
 
 import id.walt.cose.coseCompliantCbor
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJwe
@@ -11,16 +13,21 @@ import id.walt.crypto2.migration.v1.V1KeyMigration
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.objects.handover.OpenID4VPDCAPIHandoverInfo
 import id.walt.mdoc.objects.sha256
+import id.walt.openid4vp.clientidprefix.ClientIdError
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -37,7 +44,7 @@ class DcApiWalletTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
-    fun `unsigned request ignores client id and expected origins`() {
+    fun `unsigned request ignores client id and expected origins`() = runTest {
         val request = DcApiWallet.resolveRequest(
             protocol = "openid4vp-v1-unsigned",
             data = unsignedRequestData(
@@ -56,8 +63,20 @@ class DcApiWalletTest {
     }
 
     @Test
-    fun `only the unsigned protocol is accepted`() {
-        listOf("openid4vp-v1-signed", "openid4vp-v1-multisigned", "org-iso-mdoc", "").forEach { protocol ->
+    fun `unsigned and compact signed protocols are accepted`() = runTest {
+        DcApiWallet.resolveRequest(
+            protocol = "openid4vp-v1-unsigned",
+            data = unsignedRequestData(),
+            origin = "https://verifier.example",
+        )
+        val (data, trust) = signedRequest(JWKKey.generate(KeyType.Ed25519))
+        DcApiWallet.resolveRequest(
+            protocol = "openid4vp-v1-signed",
+            data = data,
+            origin = "https://verifier.example",
+            trustConfiguration = trust,
+        )
+        listOf("openid4vp-v1-multisigned", "org-iso-mdoc", "").forEach { protocol ->
             assertFailsWith<UnsupportedDcApiProtocolException>("protocol '$protocol' must be rejected") {
                 DcApiWallet.resolveRequest(
                     protocol = protocol,
@@ -66,6 +85,86 @@ class DcApiWalletTest {
                 )
             }
         }
+    }
+
+    @Test
+    fun `signed request authenticates client id and binds the platform origin`() = runTest {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val (data, trust) = signedRequest(key)
+        val request = DcApiWallet.resolveRequest(
+            protocol = "openid4vp-v1-signed",
+            data = data,
+            origin = "https://verifier.example",
+            trustConfiguration = trust,
+        )
+
+        assertEquals(DcApiRequestProtocol.OPENID4VP_V1_SIGNED, request.protocol)
+        assertEquals("verifier2", request.authorizationRequest.clientId)
+        assertEquals(listOf("https://verifier.example"), request.authorizationRequest.expectedOrigins)
+        assertEquals("origin:https://verifier.example", request.holderBindingAudience)
+    }
+
+    @Test
+    fun `signed request rejects an origin missing from expected origins`() = runTest {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val (data, trust) = signedRequest(key, origin = "https://verifier.example")
+        assertFailsWith<IllegalArgumentException> {
+            DcApiWallet.resolveRequest(
+                protocol = "openid4vp-v1-signed",
+                data = data,
+                origin = "https://attacker.example",
+                trustConfiguration = trust,
+            )
+        }
+    }
+
+    @Test
+    fun `signed request rejects an invalid signature`() = runTest {
+        val trustedKey = JWKKey.generate(KeyType.Ed25519)
+        val attackerKey = JWKKey.generate(KeyType.Ed25519)
+        val (data, _) = signedRequest(attackerKey)
+        val trust = ClientIdTrustConfiguration(
+            preRegisteredClients = mapOf(
+                "verifier2" to ClientMetadata(
+                    jwks = ClientMetadata.Jwks(listOf(trustedKey.getPublicKey().exportJWKObject())),
+                )
+            ),
+        )
+        val error = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
+            DcApiWallet.resolveRequest(
+                protocol = "openid4vp-v1-signed",
+                data = data,
+                origin = "https://verifier.example",
+                trustConfiguration = trust,
+            )
+        }
+        assertEquals(ClientIdError.InvalidSignature, error.clientIdError)
+    }
+
+    @Test
+    fun `signed request with encrypted response wraps members in a jwe`() = runTest {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val (data, trust) = signedRequest(
+            key = key,
+            responseMode = "dc_api.jwt",
+            clientMetadata = encryptionClientMetadata(),
+        )
+        val request = DcApiWallet.resolveRequest(
+            protocol = "openid4vp-v1-signed",
+            data = data,
+            origin = "https://verifier.example",
+            trustConfiguration = trust,
+        )
+        val response = DcApiWallet.buildResponse(
+            request = request,
+            vpToken = """{"pid":["presentation"]}""",
+        )
+
+        assertEquals("openid4vp-v1-signed", response.protocol)
+        assertEquals(setOf("response"), response.data.keys)
+        val jwe = assertNotNull(response.data["response"]?.jsonPrimitive?.content)
+        assertEquals(5, jwe.split('.').size, "response is not a compact JWE")
+        assertFalse(jwe.contains("presentation"), "the vp_token leaked into the JWE in cleartext")
     }
 
     @Test
@@ -405,6 +504,38 @@ class DcApiWalletTest {
         assertEquals(
             "206b7a9625010915900a6fd3a3ef28b0ece0ec15c4207ad74f731f6ed03f73e5",
             transcript.oid4VPHandover?.infoHash?.toHexString(),
+        )
+    }
+
+    private suspend fun signedRequest(
+        key: JWKKey,
+        origin: String = "https://verifier.example",
+        clientId: String = "verifier2",
+        responseMode: String = "dc_api",
+        clientMetadata: ClientMetadata? = null,
+    ): Pair<JsonObject, ClientIdTrustConfiguration> {
+        val payload = buildJsonObject {
+            put("client_id", clientId)
+            put("response_type", "vp_token")
+            put("response_mode", responseMode)
+            put("nonce", "nonce-123")
+            put("aud", AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE)
+            put("expected_origins", buildJsonArray { add(JsonPrimitive(origin)) })
+            put("dcql_query", unsignedRequestData()["dcql_query"]!!)
+            clientMetadata?.let {
+                put("client_metadata", json.encodeToJsonElement(ClientMetadata.serializer(), it))
+            }
+        }
+        val requestObject = key.signJws(
+            payload.toString().encodeToByteArray(),
+            mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
+        )
+        return buildJsonObject { put("request", JsonPrimitive(requestObject)) } to ClientIdTrustConfiguration(
+            preRegisteredClients = mapOf(
+                clientId to ClientMetadata(
+                    jwks = ClientMetadata.Jwks(listOf(key.getPublicKey().exportJWKObject())),
+                )
+            ),
         )
     }
 
