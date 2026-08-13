@@ -1,12 +1,9 @@
 package id.walt.openid4vp.conformance.testplans
 
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
-import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.MdlX509SanDnsRequestUriSignedDirectPost
-import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.MdlX509HashRequestUriSignedDirectPostHaip
-import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.SdJwtVcX509SanDnsRequestUriSignedDirectPost
-import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.SdJwtVcX509HashRequestUriSignedDirectPostHaip
-import id.walt.openid4vp.conformance.testplans.plans.TestPlan
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
+import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.Oid4vpVerifierVariantPlan
+import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.VerifierVariantMatrix
 import id.walt.openid4vp.conformance.testplans.runner.TestPlanRunner
 import io.ktor.client.*
 import io.ktor.client.plugins.*
@@ -15,15 +12,14 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
-import kotlin.reflect.jvm.jvmName
 import kotlin.test.assertNotNull
 
 /**
  * OpenID4VP Verifier Conformance Test Runner
- * 
+ *
  * Runs the conformance suite against an already-running verifier-api2 service.
  * The verifier must be exposed via ngrok for the conformance suite to reach it.
- * 
+ *
  * Prerequisites:
  * 1. Start verifier-api2: ./gradlew :waltid-services:waltid-verifier-api2:run
  * 2. Start ngrok: ngrok http 7003
@@ -38,7 +34,7 @@ class VerifierConformanceTestRunner(
     private val http: HttpClient by lazy {
         // Parse the ngrok URL to extract host and protocol
         val parsedUrl = Url(verifierNgrokUrl)
-        
+
         HttpClient {
             defaultRequest {
                 url {
@@ -58,18 +54,12 @@ class VerifierConformanceTestRunner(
         }
     }
 
-    private val testPlans: List<TestPlan> by lazy {
+    private val testPlans: List<Oid4vpVerifierVariantPlan> by lazy {
         // Use ngrok URL as the verifier prefix - endpoint is /verification-session
         val verifier2UrlPrefix = "$verifierNgrokUrl/verification-session"
-        listOf(
-            // Baseline test plans - Plain VP (non-HAIP, unencrypted direct_post)
-            MdlX509SanDnsRequestUriSignedDirectPost(verifier2UrlPrefix, conformanceHost, conformancePort),
-            
-            // HAIP test plans - encrypted responses (direct_post.jwt)
-            SdJwtVcX509SanDnsRequestUriSignedDirectPost(verifier2UrlPrefix, conformanceHost, conformancePort),
-            MdlX509HashRequestUriSignedDirectPostHaip(verifier2UrlPrefix, conformanceHost, conformancePort),
-            SdJwtVcX509HashRequestUriSignedDirectPostHaip(verifier2UrlPrefix, conformanceHost, conformancePort)
-        )
+        VerifierVariantMatrix.all().map {
+            Oid4vpVerifierVariantPlan(it, verifier2UrlPrefix, conformanceHost, conformancePort)
+        }
     }
 
     suspend fun run(): List<TestPlanResult> {
@@ -84,13 +74,13 @@ class VerifierConformanceTestRunner(
 
         // 3. Run all test plans
         return testPlans.flatMap { plan ->
-            val planName = plan::class.simpleName ?: plan::class.jvmName
+            val planName = plan.name
             println("\n" + "=".repeat(60))
             println("Running verifier plan: $planName")
             println("=".repeat(60))
-            
+
             try {
-                listOf(TestPlanRunner(plan.config, http, conformanceHost, conformancePort, planName).test())
+                TestPlanRunner(plan.config, http, conformanceHost, conformancePort, planName).test()
             } catch (e: Exception) {
                 println("❌ Test plan $planName failed with exception: ${e.message}")
                 listOf(
@@ -118,8 +108,8 @@ class VerifierConformanceTestRunner(
         } catch (e: Exception) {
             throw IllegalStateException(
                 "Cannot reach verifier at $verifierNgrokUrl. " +
-                "Ensure verifier-api2 is running and ngrok is forwarding to port 7003.\n" +
-                "Error: ${e.message}"
+                        "Ensure verifier-api2 is running and ngrok is forwarding to port 7003.\n" +
+                        "Error: ${e.message}"
             )
         }
     }
