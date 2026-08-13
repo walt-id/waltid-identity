@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.WalletDemoCompose" parent="android:style/Theme.Material.Light.NoActionBar" />
+
+    <!-- CREATE_CREDENTIAL fulfillment: transparent host so ModalBottomSheet feels in-tray. -->
+    <style name="Theme.WalletDemoCompose.Translucent" parent="android:style/Theme.Translucent.NoTitleBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>

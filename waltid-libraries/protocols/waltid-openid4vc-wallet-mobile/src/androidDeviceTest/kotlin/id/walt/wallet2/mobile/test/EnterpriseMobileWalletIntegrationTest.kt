@@ -10,6 +10,7 @@ import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.WalletAttestationConfig
@@ -158,7 +159,7 @@ class EnterpriseMobileWalletIntegrationTest {
         when (
             val outcome = continuePreAuthorizedIssuance(
                 sessionId = startIssuance(
-                    MobileWalletIssuanceRequest(offerUrl = offerUrl)
+                    MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(offerUrl))
                 ).id,
                 transactionCode = transactionCode,
             )
