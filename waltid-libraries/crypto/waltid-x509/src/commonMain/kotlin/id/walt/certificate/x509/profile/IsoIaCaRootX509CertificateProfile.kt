@@ -233,18 +233,60 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
      * encoding is not listed above syntax shall be either
      * PrintableString or UTF8String.
      */
+    private val countryNameRegex = Regex("^[A-Z]{2}$")
+
     fun validateSubjectDn(
         context: ValidationContext,
         x509Certificate: X509Certificate
     ) {
         val dn = DistinguishedName.ofString(x509Certificate.data.subjectDn)
-        val dnByType = dn.rdnList
-            .flatMap { it }
-            .map { it.type.names.associateWith { it } }
+        val grouped = dn.rdnList.flatMap { it }
+            .groupBy { it.type.name.lowercase() }
 
-        //{ it.flatMap { it.type.names.associateWith { it } } }
-        // .groupingBy { it.type }
-        //if (dn)
+        val countryName = grouped.get("c")
+        if (countryName == null) {
+            context.addLogEntry(
+                ValidationResult.Severity.ERROR,
+                "subjectDn",
+                "Missing countryName in DN"
+            )
+        } else {
+            if (countryName.size != 1) {
+                context.addLogEntry(
+                    ValidationResult.Severity.ERROR,
+                    "subjectDn",
+                    "Multiple countryName in DN"
+                )
+            }
+            countryName.forEach {
+                if (!countryNameRegex.matches(it.value)) {
+                    context.addLogEntry(
+                        ValidationResult.Severity.ERROR,
+                        "subjectDn",
+                        "Invalid countryName in DN: '${it}'"
+                    )
+                }
+            }
+        }
+
+        val cn = grouped.get("cn")
+        if (cn == null) {
+            context.addLogEntry(
+                ValidationResult.Severity.ERROR,
+                "subjectDn",
+                "Missing commonName in DN"
+            )
+        } else {
+            cn.forEach {
+                if (it.value.isBlank()) {
+                    context.addLogEntry(
+                        ValidationResult.Severity.ERROR,
+                        "subjectDn",
+                        "commonName must not be blank"
+                    )
+                }
+            }
+        }
     }
 
     /**

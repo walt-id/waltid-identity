@@ -76,6 +76,48 @@ class IsoIaCaRootX509CertificateProfileTest {
 
 
     @Test
+    fun shouldFindMissingCommonNameInIaCaRootCertificateSubjectDn() = runTest {
+        withCertificateTestKey(KeyType.secp256r1) { key ->
+            val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
+                profileIaCaRootCertificate(
+                    issuerDn = "C=AT",
+                    issuerEmailAddress = "office@walt.id",
+                    issuerUri = "https://walt.id"
+                )
+            }
+            val validationResult = validator.validate(cert)
+            assertTrue(validationResult.hasErrors)
+            assertTrue(validationResult.log.any {
+                it.severity == ValidationResult.Severity.ERROR
+                        && it.validatorId == "iso-iaca-root.subjectDn"
+                        && it.message.contains("commonName")
+            })
+            assertFalse(validationResult.valid)
+        }
+    }
+
+    @Test
+    fun shouldFindMissingCountryNameInIaCaRootCertificateSubjectDn() = runTest {
+        withCertificateTestKey(KeyType.secp256r1) { key ->
+            val cert = X509CertificateUtil.createSelfSignedCertificate(key) {
+                profileIaCaRootCertificate(
+                    issuerDn = "CN=Walt ID",
+                    issuerEmailAddress = "office@walt.id",
+                    issuerUri = "https://walt.id"
+                )
+            }
+            val validationResult = validator.validate(cert)
+            assertTrue(validationResult.hasErrors)
+            assertTrue(validationResult.log.any {
+                it.severity == ValidationResult.Severity.ERROR
+                        && it.validatorId == "iso-iaca-root.subjectDn"
+                        && it.message.contains("countryName")
+            })
+            assertFalse(validationResult.valid)
+        }
+    }
+
+    @Test
     fun `build should succeed when IACA signing key is of valid keyType`() = runTest {
         IsoSharedTestHarnessValidResources
             .iacaSigningKeyMap()
