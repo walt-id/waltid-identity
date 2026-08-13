@@ -6,9 +6,14 @@ import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.VciWalletTestPlan
 import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 /**
  * Executes VCI wallet conformance test plans through the local wallet adapter.
@@ -59,15 +64,8 @@ class VciWalletTestPlanRunner(
         println()
 
         val results = mutableListOf<TestPlanResult>()
-        val modulesToRun = if (testPlan.isHaip) {
-            modules
-        } else {
-            // Non-HAIP profiles still keep the reduced execution path until the
-            // multi-module wallet flow is hardened for the reference profiles too.
-            modules.take(1)
-        }
 
-        modulesToRun.forEachIndexed { index, module ->
+        modules.forEachIndexed { index, module ->
             println("[${index + 1}/${modules.size}] Running: ${module.testModule}")
             val result = runModule(testPlanId, module)
             results.add(result)
@@ -89,6 +87,7 @@ class VciWalletTestPlanRunner(
             results = namedResults,
             conformanceHost = conformanceHost,
             conformancePort = conformancePort,
+            producer = testPlan.producerId,
         )
         printSummary(namedResults)
         ConformanceReportWriter.failIfNeededFromTestPlanResults(
@@ -132,7 +131,8 @@ class VciWalletTestPlanRunner(
         println("   Test ID: $testId")
         println("   View: https://$conformanceHost:$conformancePort/log-detail.html?log=$testId")
         println("   Credential Offer Endpoint: $walletAdapterUrl/credential-offer")
-        println("   Note: Open the credential offer URL in your browser to start issuance")
+
+        deliverCredentialOfferToWallet(testId)
         println()
 
         // Poll for result (5 minute timeout for auth code flow)
@@ -157,7 +157,7 @@ class VciWalletTestPlanRunner(
             }
 
             if (testInfo.status == "WAITING" && attempts % 20 == 0) {
-                println("   Status: WAITING (open the adapter offer URL to continue)")
+                println("   Status: WAITING")
             }
         }
 
@@ -216,5 +216,52 @@ class VciWalletTestPlanRunner(
         }
 
         println("═".repeat(80))
+    }
+
+    /**
+     * Hand the suite's credential offer to the wallet.
+     *
+     * The suite publishes the offer as an `openid-credential-offer://` deep link for a human to open;
+     * nothing happens until someone does, which is why an automated run otherwise just times out.
+     * Forwarding the offer parameter to the adapter is what a user tapping that link would achieve.
+     */
+    private suspend fun deliverCredentialOfferToWallet(testId: String) {
+        // Poll for the offer URL rather than for a status: the authorization-code grant parks the test
+        // in WAITING, but the pre-authorized code grant does not, so waiting on WAITING would time out
+        // for a perfectly healthy pre-auth run.
+        var offerUrl: String? = null
+        repeat(OFFER_POLL_ATTEMPTS) {
+            offerUrl = conformance.getTestRun(testId).getBrowserUrls().firstOrNull()
+            if (offerUrl != null) return@repeat
+            delay(500)
+        }
+        val resolvedOfferUrl = offerUrl
+            ?: error("Conformance suite published no credential offer URL to hand to the wallet")
+
+        // Parsed by hand rather than with Url(): the deep link uses a custom scheme.
+        val parameters = parseQueryString(resolvedOfferUrl.substringAfter('?', ""))
+        val (parameterName, parameterValue) = OFFER_PARAMETER_NAMES
+            .firstNotNullOfOrNull { name -> parameters[name]?.let { name to it } }
+            ?: error("Credential offer URL carries none of $OFFER_PARAMETER_NAMES: $resolvedOfferUrl")
+
+        // POSTed with the wallet's own client: POST /credential-offer is the adapter's programmatic
+        // entry point (GET renders a page for a human), and the conformance client pins its host and
+        // protocol to the suite via defaultRequest, so it cannot address the adapter at all.
+        println("   Delivering $parameterName to the wallet adapter")
+        val response = walletHttpClient.post("$walletAdapterUrl/credential-offer") {
+            parameter(parameterName, parameterValue)
+        }
+        val body = response.bodyAsText()
+        // Printed untruncated on purpose: the adapter relays the wallet's own error body verbatim,
+        // and that body is the only place a wallet-side failure reason ever appears.
+        println("   Adapter accepted the offer: ${response.status} $body")
+    }
+
+    private companion object {
+        /** Offer delivery is either by value or by reference, per OpenID4VCI 1.0. */
+        val OFFER_PARAMETER_NAMES = listOf("credential_offer", "credential_offer_uri")
+
+        /** ~15s of polling for the suite to publish its credential offer URL. */
+        const val OFFER_POLL_ATTEMPTS = 30
     }
 }
