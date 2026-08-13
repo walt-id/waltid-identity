@@ -566,7 +566,9 @@ public class MobileWallet internal constructor(
      * The caller-provided origin must already have been asserted by the platform adapter. For an
      * unsigned request, the returned [MobileWalletDigitalCredentialPreview.verifiedOrigin] is the
      * authenticated requester identity and [MobileWalletDigitalCredentialRequestInfo.clientId]
-     * remains null because the untrusted request-supplied `client_id` is ignored.
+     * remains null because the untrusted request-supplied `client_id` is ignored. For a signed
+     * request, [MobileWalletDigitalCredentialRequestInfo.clientId] is the authenticated Request
+     * Object client identifier after signature verification against [clientIdTrustConfiguration].
      */
     public suspend fun previewDigitalCredentialPresentation(
         request: MobileWalletDigitalCredentialRequest,
@@ -593,6 +595,7 @@ public class MobileWallet internal constructor(
                 eligibleCredentialIds = selectedCredentialIds.ifEmpty { null },
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
             onEvent = ::emitSessionEvent,
         )
         val authorizationRequest = result.resolvedRequest.authorizationRequest

@@ -245,6 +245,10 @@ public protocol IssuerMetadataTrustResolver: Sendable {
 /// Trust configuration used to authenticate verifier Request Objects.
 public struct WalletClientIDTrustConfiguration: Sendable, Equatable {
     /// PEM-encoded X.509 trust anchors pinned by the hosting application.
+    ///
+    /// Required for OpenID4VP `x509_san_dns` and `x509_hash` clients; an empty list fails those
+    /// prefixes closed. Append additional PEMs to trust more verifiers. `decentralized_identifier`
+    /// clients still authenticate through DID resolution.
     public var x509TrustAnchorsPEM: [String]
 
     /// Explicit pre-registered client metadata JSON, keyed by client ID.
@@ -253,7 +257,10 @@ public struct WalletClientIDTrustConfiguration: Sendable, Equatable {
     /// Creates client-ID trust configuration.
     ///
     /// - Parameters:
-    ///   - x509TrustAnchorsPEM: PEM-encoded X.509 trust anchors pinned by the hosting application.
+    ///   - x509TrustAnchorsPEM: PEM-encoded X.509 trust anchors pinned
+    ///     by the hosting application. Pass your organisation's CAs. walt.id Verifier2
+    ///     `verifier-service.conf` publishes a demo `x5c` for `x509_san_dns:verifier.example.com`
+    ///     that apps can copy as a starting PEM.
     ///   - preRegisteredClientMetadataJSON: Client metadata JSON for explicit pre-registered verifiers.
     public init(
         x509TrustAnchorsPEM: [String] = [],

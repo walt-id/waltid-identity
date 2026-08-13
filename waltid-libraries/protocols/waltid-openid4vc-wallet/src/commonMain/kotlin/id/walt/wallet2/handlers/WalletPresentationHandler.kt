@@ -811,12 +811,14 @@ object WalletPresentationHandler {
         request: PreviewDcApiPresentationRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
     ): PreviewDcApiPresentationResult {
         onEvent(WalletSessionEvent.presentation_request_parsed)
         val resolvedRequest = DcApiWallet.resolveRequest(
             protocol = request.protocol,
             data = request.data,
             origin = request.origin,
+            trustConfiguration = clientIdTrustConfiguration,
         )
         val authorizationRequest = resolvedRequest.authorizationRequest
         val query = requireNotNull(authorizationRequest.dcqlQuery)

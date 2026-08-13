@@ -100,6 +100,30 @@ class MobileDigitalCredentialSharingReviewTest {
         assertTrue(review.request.transactionData.isEmpty())
     }
 
+    /**
+     * A signed Digital Credentials request has an authenticated `client_id`, shown as a technical
+     * detail. The platform origin remains the requester heading because it is still what the OS
+     * asserted; inventing a display name from the client identifier would mix two identities.
+     */
+    @Test
+    fun signedRequestShowsTheAuthenticatedClientId() {
+        val review = digitalCredentialPreview(
+            protocol = "openid4vp-v1-signed",
+            clientId = "verifier2",
+            responseMode = "dc_api.jwt",
+        ).toSharingReview()
+
+        val requester = requireNotNull(review.request.requester) { "review has no requester" }
+        assertEquals("https://verifier.example", requester.fallbackName)
+        assertEquals("openid4vp-v1-signed", review.request.technicalDetails.textValue("Protocol"))
+        assertEquals("verifier2", review.request.technicalDetails.textValue("Client ID"))
+        assertEquals("dc_api.jwt", review.request.technicalDetails.textValue("Response mode"))
+        assertTrue(
+            review.request.responseProtection is WalletDemoSharingResponseProtection.Encrypted,
+            "signed dc_api.jwt must still report encryption",
+        )
+    }
+
     /** Verifier metadata heads the requester when the request published any, over the bare origin. */
     @Test
     fun verifierMetadataOutranksTheOriginAsRequesterIdentity() {
@@ -232,12 +256,14 @@ class MobileDigitalCredentialSharingReviewTest {
         transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
         verifierMetadata: MobileWalletVerifierMetadata? = null,
         responseMode: String? = "dc_api",
+        protocol: String = "openid4vp-v1-unsigned",
+        clientId: String? = null,
     ): MobileWalletDigitalCredentialPreview = MobileWalletDigitalCredentialPreview(
         requestId = "request-1",
-        protocol = "openid4vp-v1-unsigned",
+        protocol = protocol,
         verifiedOrigin = "https://verifier.example",
         request = MobileWalletDigitalCredentialRequestInfo(
-            clientId = null,
+            clientId = clientId,
             verifierMetadata = verifierMetadata,
             nonce = "nonce-123",
             responseMode = responseMode,

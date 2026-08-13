@@ -87,7 +87,7 @@ class DcApiMdocVerifier2IntegrationTest {
         vc_policies = VCPolicyList(listOf(CredentialSignaturePolicy()))
     )
 
-    /** Unsigned request, unencrypted response - the only DC API shape this wallet supports. */
+    /** Unsigned request, unencrypted response. Signed+encrypted coverage is in DcApiWalletTest. */
     private val verificationSessionSetup: VerificationSessionSetup = DcApiAnnexDFlowSetup(
         core = GeneralFlowConfig(
             dcqlQuery = mdocsDcqlQuery,

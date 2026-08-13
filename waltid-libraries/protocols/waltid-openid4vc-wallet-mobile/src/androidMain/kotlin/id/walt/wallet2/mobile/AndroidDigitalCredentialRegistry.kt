@@ -105,9 +105,12 @@ public class AndroidDigitalCredentialRegistry(
                             MobileWalletDigitalCredentialFormat.SD_JWT_VC,
                         ),
                         requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.SIGNED),
-                        responseProtection = listOf(MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED),
-                        supported = false,
-                        unsupportedReason = SIGNED_UNSUPPORTED_REASON,
+                        responseProtection = listOf(
+                            MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
+                            MobileWalletDigitalCredentialResponseProtection.JWE,
+                        ),
+                        supported = runtimeAvailable,
+                        unsupportedReason = unavailableReason,
                     ),
                     MobileWalletDigitalCredentialCapability(
                         protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_MULTISIGNED,
@@ -154,12 +157,15 @@ public class AndroidDigitalCredentialRegistry(
         }
         val entries = records.map { it.toAndroidEntry() }
         return runCatching {
-            // Registering only the unsigned protocol makes Credential Manager ignore signed and
-            // multisigned requests rather than route them here to be rejected.
+            // Advertise unsigned and signed. Multisigned stays off the list so Credential Manager
+            // ignores JWS JSON Serialization request objects rather than routing them here to fail.
             val openId4Vp = OpenId4VpRegistry(
                 credentialEntries = entries,
                 id = registryId,
-                supportedProtocols = listOf(OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_UNSIGNED),
+                supportedProtocols = listOf(
+                    OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_SIGNED,
+                    OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_UNSIGNED,
+                ),
             )
             // Same registry bytes, different matcher. See OPENID4VP-MATCHER.md for why AndroidX's
             // embedded matcher cannot serve a transaction data request alongside a second credential.
@@ -444,11 +450,9 @@ public class AndroidDigitalCredentialRegistry(
         private const val MAX_MATCHER_VALUE_LENGTH = 128
         /** Credential Manager selector icons are small; keep registry PNG payloads modest. */
         private const val REGISTRY_ICON_MAX_EDGE_PX = 128
-        private const val SIGNED_UNSUPPORTED_REASON =
-            "The wallet accepts only the unsigned OpenID4VP Digital Credentials protocol"
         private const val MULTISIGNED_UNSUPPORTED_REASON =
-            "The wallet accepts only the unsigned OpenID4VP Digital Credentials protocol, " +
-                "and does not support JWS JSON Serialization request objects"
+            "The wallet accepts unsigned and signed compact OpenID4VP Digital Credentials " +
+                "request objects, and does not support JWS JSON Serialization request objects"
     }
 }
 
