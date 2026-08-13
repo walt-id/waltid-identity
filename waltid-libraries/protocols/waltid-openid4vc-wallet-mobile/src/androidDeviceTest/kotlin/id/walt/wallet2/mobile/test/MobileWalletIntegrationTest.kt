@@ -18,6 +18,7 @@ import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
@@ -110,7 +111,7 @@ class MobileWalletIntegrationTest {
         val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
         val session = client.startIssuance(
             MobileWalletIssuanceRequest(
-                offerUrl = offer.offerUrl,
+                offer = MobileWalletCredentialOffer.Uri(offer.offerUrl),
             )
         )
         assertTrue(session.offer.issuer.identifier.isNotBlank(), "Resolved issuer metadata should include its identifier")
@@ -427,7 +428,7 @@ class MobileWalletIntegrationTest {
         continuePreAuthorizedIssuance(
             sessionId = startIssuance(
                 MobileWalletIssuanceRequest(
-                    offerUrl = offerUrl,
+                    offer = MobileWalletCredentialOffer.Uri(offerUrl),
                 )
             ).id,
             transactionCode = transactionCode,

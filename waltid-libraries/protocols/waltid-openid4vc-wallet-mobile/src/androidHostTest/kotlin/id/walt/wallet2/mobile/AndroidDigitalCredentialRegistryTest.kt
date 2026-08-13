@@ -5,6 +5,9 @@ import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtEntry
 import id.walt.cose.coseCompliantCbor
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -20,7 +23,7 @@ class AndroidDigitalCredentialRegistryTest {
     private val registry = AndroidDigitalCredentialRegistry(RuntimeEnvironment.getApplication())
 
     @Test
-    fun capabilityMatrixReportsOnlyUnsignedOpenId4VpAsSupportable() {
+    fun capabilityMatrixReportsUnsignedOpenId4VpAndOpenId4VciAsSupportableWhenRegistered() {
         val capabilities = registry.capabilities
 
         assertTrue(capabilities.platformAvailable)
@@ -31,6 +34,11 @@ class AndroidDigitalCredentialRegistryTest {
         // Unsupported here only because registration has not run; the combination itself is implemented.
         assertFalse(unsigned.supported)
         assertTrue(unsigned.unsupportedReason?.contains("registration") == true)
+        val openId4Vci = capabilities.capabilities.single {
+            it.protocol == MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1
+        }
+        assertFalse(openId4Vci.supported)
+        assertTrue(openId4Vci.unsupportedReason?.contains("creation registration") == true)
         // Both DC API response modes: dc_api and dc_api.jwt.
         assertEquals(
             listOf(
@@ -108,6 +116,27 @@ class AndroidDigitalCredentialRegistryTest {
         assertEquals("Vienna", entry.claims.single().value)
         assertTrue(entry.claims.single().isSelectivelyDisclosable)
         assertEquals("opaque-id", entry.id)
+    }
+
+    @Test
+    fun openId4VciCreationOptionsDatabaseCarriesDisplayAndIconOffsets() {
+        val icon = byteArrayOf(1, 2, 3, 4)
+        val bytes = registry.encodeOpenId4VciCreationOptions(
+            title = "walt.id Wallet",
+            subtitle = "Save a credential to this wallet",
+            iconPng = icon,
+        )
+        val jsonOffset = java.nio.ByteBuffer.wrap(bytes, 0, 4)
+            .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            .int
+        assertEquals(4 + icon.size, jsonOffset)
+        assertEquals(icon.toList(), bytes.slice(4 until jsonOffset))
+        val json = Json.parseToJsonElement(bytes.copyOfRange(jsonOffset, bytes.size).decodeToString()).jsonObject
+        val display = json["display"]!!.jsonObject
+        assertEquals("walt.id Wallet", display["title"]?.jsonPrimitive?.content)
+        assertEquals("Save a credential to this wallet", display["subtitle"]?.jsonPrimitive?.content)
+        assertEquals(4, display["icon"]!!.jsonObject["start"]?.jsonPrimitive?.content?.toInt())
+        assertEquals(icon.size, display["icon"]!!.jsonObject["length"]?.jsonPrimitive?.content?.toInt())
     }
 
     @OptIn(ExperimentalSerializationApi::class)
