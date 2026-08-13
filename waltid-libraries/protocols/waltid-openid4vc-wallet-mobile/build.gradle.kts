@@ -129,17 +129,17 @@ tasks.withType<Test>().configureEach {
 // also built with `enableAndroidBuild=false` for iOS.
 if (enableAndroidBuild) extensions.configure<KotlinMultiplatformAndroidComponentsExtension>("androidComponents") {
     // Asset and resource processing is off by default for Android KMP libraries, and required for
-    // `androidMain/assets` to be packaged into the AAR at all. See ANNEX-C-MATCHER.md.
+    // `androidMain/assets` to be packaged into the AAR at all. See the matcher provenance docs.
     finalizeDsl { android ->
         android.androidResources.enable = true
     }
 
     // The host tests read the matcher through the asset API, which still passes when the published AAR
-    // carries no assets at all, so assert on the artifact itself. See ANNEX-C-MATCHER.md.
+    // carries no assets at all, so assert on the artifact itself.
     onVariants { variant ->
         val aar = variant.artifacts.get(SingleArtifact.AAR)
-        val verifyAnnexCMatcherPackaging = tasks.register("verifyAnnexCMatcherPackaging") {
-            description = "Fails if the AAR does not carry the vendored Annex C matcher and its notice."
+        val verifyMatcherPackaging = tasks.register("verifyMatcherPackaging") {
+            description = "Fails if the AAR does not carry the vendored matcher assets and notices."
             inputs.file(aar).withPropertyName("aar")
             doLast {
                 val entries = ZipFile(aar.get().asFile).use { zip ->
@@ -148,12 +148,12 @@ if (enableAndroidBuild) extensions.configure<KotlinMultiplatformAndroidComponent
                 val missing = setOf(
                     "assets/id/walt/wallet2/mobile/identitycredentialmatcher.wasm",
                     "assets/id/walt/wallet2/mobile/NOTICE-identitycredentialmatcher.txt",
-                    "assets/id/walt/wallet2/mobile/provision_hardcoded.wasm",
-                    "assets/id/walt/wallet2/mobile/NOTICE-provision_hardcoded.txt",
+                    "assets/id/walt/wallet2/mobile/issuance.wasm",
+                    "assets/id/walt/wallet2/mobile/NOTICE-issuance.txt",
                 ) - entries
                 require(missing.isEmpty()) { "AAR is missing vendored matcher assets: $missing" }
             }
         }
-        tasks.named("check") { dependsOn(verifyAnnexCMatcherPackaging) }
+        tasks.named("check") { dependsOn(verifyMatcherPackaging) }
     }
 }

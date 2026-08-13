@@ -36,6 +36,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -209,9 +210,11 @@ public class AndroidDigitalCredentialRegistry(
             registryManager.registerCreationOptions(
                 object : RegisterCreationOptionsRequest(
                     creationOptions = encodeOpenId4VciCreationOptions(
-                        title = applicationDisplayName(),
+                        entryId = OPENID4VCI_CREATION_REGISTRY_ID,
+                        applicationName = applicationDisplayName(),
                         subtitle = "Save a credential to this wallet",
-                        iconPng = iconPng,
+                        explainer = "Save a credential to this wallet.",
+                        icon = iconPng,
                     ),
                     matcher = matcher,
                     type = DigitalCredential.TYPE_DIGITAL_CREDENTIAL,
@@ -237,31 +240,51 @@ public class AndroidDigitalCredentialRegistry(
             .ifBlank { applicationContext.packageName }
 
     /**
-     * Binary creation-options database understood by the vendored OpenID4VCI provision matcher.
+     * Binary creation-options database understood by Google's OpenID4VCI issuance matcher.
      *
-     * Layout matches the CMWallet / Android Credential Manager sample: little-endian JSON offset,
-     * then icon bytes, then a JSON display object whose icon offsets point into that blob.
+     * Layout matches AndroidX's OpenId4VciRegistry: little-endian JSON offset, then optional icon
+     * bytes, then JSON metadata whose package-info icon offsets point into that blob.
      */
     internal fun encodeOpenId4VciCreationOptions(
-        title: String,
+        entryId: String,
+        applicationName: String,
         subtitle: String?,
-        iconPng: ByteArray,
+        explainer: String?,
+        icon: ByteArray,
     ): ByteArray {
-        val jsonOffset = 4 + iconPng.size
+        val jsonOffset = 4 + icon.size
         val json = buildJsonObject {
-            putJsonObject("display") {
-                put("title", title)
-                if (subtitle != null) put("subtitle", subtitle)
-                putJsonObject("icon") {
-                    put("start", 4)
-                    put("length", iconPng.size)
+            put("entry_id", entryId)
+            putJsonArray("entries") {
+                add(buildJsonObject {
+                    if (subtitle != null) put("subtitle", subtitle)
+                    if (explainer != null) {
+                        putJsonObject("explainer") {
+                            put("default", explainer)
+                        }
+                    }
+                })
+            }
+            putJsonObject("filter") {
+                putJsonObject("Pass") {}
+            }
+            putJsonArray("preferred_protocols") {
+                add(JsonPrimitive(MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1))
+            }
+            putJsonObject("package_info") {
+                put("name", applicationName)
+                if (icon.isNotEmpty()) {
+                    putJsonArray("icon") {
+                        add(JsonPrimitive(4))
+                        add(JsonPrimitive(4 + icon.size))
+                    }
                 }
             }
         }.toString().encodeToByteArray()
         return ByteArrayOutputStream(jsonOffset + json.size).use { out ->
             val offsetBytes = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(jsonOffset).array()
             out.write(offsetBytes)
-            out.write(iconPng)
+            out.write(icon)
             out.write(json)
             out.toByteArray()
         }
@@ -411,7 +434,7 @@ public class AndroidDigitalCredentialRegistry(
         // copy in the application asset merge. See ANNEX-C-MATCHER.md.
         private const val ANNEX_C_MATCHER_ASSET = "id/walt/wallet2/mobile/identitycredentialmatcher.wasm"
         // Vendored OpenID4VCI creation matcher. See OPENID4VCI-MATCHER.md.
-        private const val OPENID4VCI_MATCHER_ASSET = "id/walt/wallet2/mobile/provision_hardcoded.wasm"
+        private const val OPENID4VCI_MATCHER_ASSET = "id/walt/wallet2/mobile/issuance.wasm"
         private const val OPENID4VCI_CREATION_REGISTRY_ID = "openid4vci"
 
         // Vendored, not a dependency. See OPENID4VP-MATCHER.md.
