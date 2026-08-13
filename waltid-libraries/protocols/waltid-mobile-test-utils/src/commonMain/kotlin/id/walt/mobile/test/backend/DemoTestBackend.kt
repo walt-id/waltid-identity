@@ -31,9 +31,18 @@ object DemoTestBackend {
 
     private const val ISSUER_BASE_URL = "https://issuer2.demo.walt.id"
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
+
     const val TRANSACTION_DATA_PROFILES_URL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
     private const val EUDI_PID_SD_JWT_VCT = "$ISSUER_BASE_URL/openid4vci/urn:eudi:pid:1"
     private const val PAYMENT_AUTHORIZATION_TYPE = "org.waltid.transaction-data.payment-authorization"
+
+    /** EUDI TS-12 SCA payment, the type whose payload the Credential Manager matcher reads as a nested object. */
+    const val SCA_PAYMENT_TYPE = "urn:eudi:sca:payment:1"
+    const val SCA_PAYMENT_PAYEE_NAME = "Super Store"
+    const val SCA_PAYMENT_CURRENCY = "EUR"
+    const val SCA_PAYMENT_AMOUNT = 11.56
+    const val SCA_PAYMENT_TRANSACTION_ID = "8D8AC610-566D-4EF0-9C22-186B2A5ED793"
+    // The fields the currently deployed profile declares, not the ones #2062 configures.
     private val requiredPaymentAuthorizationFields = setOf("amount", "currency", "payee")
 
     val scenarios = listOf(
@@ -59,6 +68,32 @@ object DemoTestBackend {
                 doctype = "eu.europa.ec.eudi.pid.1",
                 namespace = "eu.europa.ec.eudi.pid.1",
                 claims = listOf("given_name", "family_name"),
+            ),
+        ),
+        CredentialScenario(
+            id = "sca-payment-card",
+            displayName = "SCA Payment Card",
+            profileId = "scaPaymentCardMdoc",
+            credentialConfigurationId = "sca_payment_card_mso_mdoc",
+            format = "mso_mdoc",
+            verifierCredentialQuery = mdocQuery(
+                id = "sca_payment_card",
+                doctype = "eu.europa.ec.eudi.sca.payment_card.1",
+                namespace = "eu.europa.ec.eudi.sca.payment_card.1",
+                claims = listOf("card_scheme", "card_last4", "card_holder_name"),
+            ),
+        ),
+        CredentialScenario(
+            id = "eu-age-verification",
+            displayName = "EU Age Verification",
+            profileId = "euAgeVerificationMdoc",
+            credentialConfigurationId = "eu.europa.ec.av.1",
+            format = "mso_mdoc",
+            verifierCredentialQuery = mdocQuery(
+                id = "proof_of_age",
+                doctype = "eu.europa.ec.av.1",
+                namespace = "eu.europa.ec.av.1",
+                claims = listOf("age_over_18"),
             ),
         ),
         CredentialScenario(
@@ -113,6 +148,12 @@ object DemoTestBackend {
 
     data class VerifierSession(val sessionId: String, val authorizationRequestUri: String)
 
+    /**
+     * A Digital Credentials API session. Unlike the cross-device flow there is no authorization
+     * request URL: [requestJson] is the object the browser or OS hands to the wallet verbatim.
+     */
+    data class DcApiVerifierSession(val sessionId: String, val requestJson: String)
+
     suspend fun createOffer(
         scenario: CredentialScenario,
         withGeneratedTransactionCode: Boolean = false,
@@ -165,16 +206,65 @@ object DemoTestBackend {
 
     suspend fun createTransactionDataVerifierSession(
         scenario: CredentialScenario = transactionDataPresentationScenario,
-    ): VerifierSession {
-        val paymentAuthorizationFields = transactionDataProfileFields(PAYMENT_AUTHORIZATION_TYPE)
-        check(paymentAuthorizationFields.containsAll(requiredPaymentAuthorizationFields)) {
+    ): VerifierSession = createVerifierSession(
+        credentialQuery = scenario.verifierCredentialQuery,
+        transactionData = listOf(paymentAuthorizationTransactionData("pid")),
+    )
+
+    /**
+     * One `payment-authorization` transaction data item bound to [credentialId], with the fields the
+     * deployed profile declares.
+     *
+     * The profile is fetched rather than assumed, so a deployment that stops declaring `amount`,
+     * `currency` or `payee` fails here instead of producing an item whose fields a test cannot find on
+     * screen for a reason it would misattribute to the wallet. `payee` is required only for as long as
+     * the deployed profile is the pre-#2062 one.
+     */
+    suspend fun paymentAuthorizationTransactionData(credentialId: String): JsonObject {
+        val fields = transactionDataProfileFields(PAYMENT_AUTHORIZATION_TYPE)
+        check(fields.containsAll(requiredPaymentAuthorizationFields)) {
             "Public demo transaction data profile '$PAYMENT_AUTHORIZATION_TYPE' is missing required fields: " +
-                (requiredPaymentAuthorizationFields - paymentAuthorizationFields).joinToString()
+                (requiredPaymentAuthorizationFields - fields).joinToString()
         }
-        return createVerifierSession(
-            credentialQuery = scenario.verifierCredentialQuery,
-            transactionData = listOf(paymentAuthorizationTransactionData("pid", paymentAuthorizationFields)),
-        )
+        return paymentAuthorizationTransactionData(credentialId, fields)
+    }
+
+    /**
+     * One `urn:eudi:sca:payment:1` item bound to [credentialId], shaped as the type requires: a nested
+     * `payload`, not the flat fields the walt.id payment-authorization type uses.
+     *
+     * The values are those of the SCA demo request in `Verifier2OpenApiExamples`, so a test can assert
+     * the same strings on the Credential Manager prompt and on the wallet's own review. `amount` is a
+     * JSON number because the Credential Manager matcher reads it as one for this type and skips the
+     * entry if it is a string.
+     *
+     * The profile is fetched rather than assumed so that a deployment which still declares the old
+     * `payment_details` type fails here, instead of producing an item the matcher silently drops.
+     */
+    suspend fun scaPaymentTransactionData(credentialId: String): JsonObject {
+        val fields = transactionDataProfileFields(SCA_PAYMENT_TYPE)
+        check(fields.contains("payload")) {
+            "Demo transaction data profile '$SCA_PAYMENT_TYPE' does not declare 'payload': $fields"
+        }
+        return buildJsonObject {
+            put("type", JsonPrimitive(SCA_PAYMENT_TYPE))
+            putJsonArray("credential_ids") {
+                add(JsonPrimitive(credentialId))
+            }
+            put("require_cryptographic_holder_binding", JsonPrimitive(true))
+            putJsonArray("transaction_data_hashes_alg") {
+                add(JsonPrimitive("sha-256"))
+            }
+            putJsonObject("payload") {
+                put("transaction_id", JsonPrimitive(SCA_PAYMENT_TRANSACTION_ID))
+                putJsonObject("payee") {
+                    put("name", JsonPrimitive(SCA_PAYMENT_PAYEE_NAME))
+                    put("id", JsonPrimitive("merchant-001"))
+                }
+                put("currency", JsonPrimitive(SCA_PAYMENT_CURRENCY))
+                put("amount", JsonPrimitive(SCA_PAYMENT_AMOUNT))
+            }
+        }
     }
 
     suspend fun transactionDataProfileFields(type: String): Set<String> {
@@ -242,6 +332,120 @@ object DemoTestBackend {
         return VerifierSession(sessionId, authorizationRequestUri)
     }
 
+    /**
+     * Creates an Annex D (Digital Credentials API) session and fetches its request object.
+     *
+     * The verifier hashes the first [expectedOrigins] entry into the mdoc session transcript, and the
+     * wallet hashes the origin the OS asserted for the calling app; a disagreement fails
+     * `mso_mdoc/device-auth` with a signature error that never mentions the origin. Callers must pass the
+     * origin the platform will actually report - for a native caller
+     * `android:apk-key-hash:<base64url-sha256-of-signing-cert>`.
+     */
+    suspend fun createDcApiVerifierSession(
+        scenario: CredentialScenario,
+        expectedOrigins: List<String>,
+    ): DcApiVerifierSession = createDcApiVerifierSession(
+        credentialQueries = listOf(scenario.verifierCredentialQuery),
+        expectedOrigins = expectedOrigins,
+    )
+
+    /**
+     * As above, for the cases a single [CredentialScenario] cannot express.
+     *
+     * [encryptedResponse] switches the session to `response_mode=dc_api.jwt`, which also makes the
+     * verifier derive the mdoc session transcript from its own encryption key's JWK thumbprint - so it
+     * changes what a correct wallet response looks like, not just how it is wrapped.
+     *
+     * [transactionData] is passed through verbatim, so a test can assert on the exact fields the wallet
+     * displayed and hashed; see [paymentAuthorizationTransactionData].
+     */
+    suspend fun createDcApiVerifierSession(
+        credentialQueries: List<JsonObject>,
+        expectedOrigins: List<String>,
+        encryptedResponse: Boolean = false,
+        transactionData: List<JsonObject> = emptyList(),
+    ): DcApiVerifierSession {
+        require(expectedOrigins.isNotEmpty()) { "DC API sessions require at least one expected origin" }
+        require(credentialQueries.isNotEmpty()) { "DC API sessions require at least one DCQL credential query" }
+
+        val payload = buildJsonObject {
+            // Deliberately the *old* wire names. `20e20a539` renamed this flow's discriminator to
+            // "dc_api_openid4vp" and its core config to "core_flow", but verifier2.demo.walt.id -
+            // which these tests run against - is still serving a pre-rename build and answers the new
+            // names with HTTP 400 "Serializer for subclass 'dc_api_openid4vp' is not found". The two
+            // names move together: "dc_api" + "core_flow" is also a 400.
+            //
+            // Switch both to "dc_api_openid4vp" / "core_flow" once the demo verifier is redeployed
+            // from main; until then the new names would fail the whole DC API suite on the deployment
+            // rather than on anything this test exercises.
+            put("flow_type", "dc_api")
+            putJsonObject("core") {
+                putJsonObject("dcql_query") {
+                    putJsonArray("credentials") {
+                        credentialQueries.forEach { add(it) }
+                    }
+                }
+                if (encryptedResponse) put("encrypted_response", JsonPrimitive(true))
+            }
+            if (transactionData.isNotEmpty()) {
+                putJsonObject("openid") {
+                    putJsonArray("transactionData") {
+                        transactionData.forEach { add(it) }
+                    }
+                }
+            }
+            // No vp_policies override: the verifier applies its full default mdoc policy set, so a policy
+            // regression is visible here instead of silently skipped.
+            putJsonArray("expectedOrigins") {
+                expectedOrigins.forEach { add(JsonPrimitive(it)) }
+            }
+        }
+
+        val response = requestJson(
+            url = "$VERIFIER_BASE_URL/verification-session/create",
+            body = payload,
+        )
+        val sessionId = response["sessionId"]?.jsonPrimitive?.contentOrNull
+            ?: error("Missing sessionId in public demo verifier2 DC API response: $response")
+
+        return DcApiVerifierSession(
+            sessionId = sessionId,
+            requestJson = dcApiRequestJson(sessionId),
+        )
+    }
+
+    /**
+     * The `digital` member of the verifier's request object: the argument a browser passes to
+     * `navigator.credentials.get({ digital: ... })`, and what Credential Manager expects as its request
+     * JSON.
+     */
+    private suspend fun dcApiRequestJson(sessionId: String): String {
+        val response = client.get("$VERIFIER_BASE_URL/verification-session/$sessionId/request") {
+            accept(ContentType.Application.Json)
+        }
+        val body = response.bodyAsText()
+        if (!response.status.isSuccess()) {
+            error("HTTP ${response.status.value} from verifier2 DC API request for $sessionId: $body")
+        }
+        val digital = json.parseToJsonElement(body).jsonObject["digital"]
+            ?: error("Missing 'digital' member in public demo verifier2 DC API request object: $body")
+        return digital.toString()
+    }
+
+    /** Posts a wallet's `{protocol, data}` DC API response to the verifier for real verification. */
+    suspend fun submitDcApiResponse(sessionId: String, responseJson: String): String {
+        val response = client.post("$VERIFIER_BASE_URL/verification-session/$sessionId/response") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            setBody(responseJson)
+        }
+        val body = response.bodyAsText()
+        if (!response.status.isSuccess()) {
+            error("HTTP ${response.status.value} from verifier2 DC API response for $sessionId: $body")
+        }
+        return body
+    }
+
     private fun paymentAuthorizationTransactionData(
         credentialId: String,
         fields: Set<String>,
@@ -254,8 +458,15 @@ object DemoTestBackend {
         putJsonArray("transaction_data_hashes_alg") {
             add(JsonPrimitive("sha-256"))
         }
+        // Credential Manager consumes merchant_name/amount, so merchant_name is sent whether or not the
+        // deployed profile declares it yet.
+        put("merchant_name", JsonPrimitive("ACME Corp"))
         putProfileField(fields, "amount", "42.00")
         putProfileField(fields, "currency", "EUR")
+        // TODO: Remove `payee` once the transaction-data profile from #2062 is deployed to
+        //  wallet.demo.walt.id and verifier2.demo.walt.id. The repository config already declares
+        //  merchant_name/amount/currency; the deployed one still declares payee, and the fields are
+        //  resolved from it at run time.
         putProfileField(fields, "payee", "ACME Corp")
     }
 
@@ -265,7 +476,7 @@ object DemoTestBackend {
         }
         val body = response.bodyAsText()
         if (!response.status.isSuccess()) {
-            error("HTTP ${response.status.value} from public demo verifier2 session info for $sessionId: $body")
+            error("HTTP ${response.status.value} from verifier2 session info for $sessionId: $body")
         }
         return json.parseToJsonElement(body).jsonObject
     }

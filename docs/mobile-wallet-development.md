@@ -44,6 +44,71 @@ enableIosBuild=true
 
 Enable only the platform builds your machine can support. Android requires an Android SDK; native iOS requires macOS and Xcode. The Web/Wasm flag only enables the mock Compose preview module.
 
+## iOS physical-device and Digital Credentials setup
+
+Physical-device Digital Credentials development must use the walt.id Apple Developer team:
+
+```text
+Team ID: 9BB78CFW7Y
+```
+
+Do not sign the demo applications or their identity document provider extensions with a Personal Team.
+
+The Apple Developer account is preconfigured with these application identities:
+
+```text
+Native
+  App:       id.walt.wallet.native
+  Provider:  id.walt.wallet.native.identitydocumentprovider
+  App Group: group.id.walt.wallet.native
+
+Compose
+  App:       id.walt.wallet.compose
+  Provider:  id.walt.wallet.compose.identitydocumentprovider
+  App Group: group.id.walt.wallet.compose
+```
+
+Both host/provider pairs require the Digital Credentials API Mobile Document Provider capability and
+share their respective App Group. The demos advertise:
+
+```text
+org.iso.18013.5.1.mDL
+eu.europa.ec.eudi.pid.1
+```
+
+Keychain sharing is configured by the Xcode projects rather than as a separate Developer Portal
+identifier:
+
+```text
+Native:  id.walt.wallet.native.shared
+Compose: id.walt.wallet.compose.shared
+```
+
+The host and its provider must resolve the same `$(AppIdentifierPrefix)`-prefixed shared Keychain
+group. Only the Info.plist processor expands `$(AppIdentifierPrefix)`; as an `INFOPLIST_KEY_` build
+setting it resolves to the bare suffix and matches no entitlement.
+
+Running on a physical device needs:
+
+- access to the walt.id Apple Developer team;
+- a valid Apple Development certificate for that team;
+- a device registered with that team;
+- Xcode automatic signing resolving `DEVELOPMENT_TEAM = 9BB78CFW7Y`.
+
+If signing reports that the provisioning profile does not contain the Mobile Document Provider or App
+Group entitlement, do not switch to a Personal Team and do not remove the entitlement. Verify the App
+ID and capability assignment in the walt.id Apple Developer account, then refresh automatic
+provisioning.
+
+A simulator running iOS 26 or later is a usable end-to-end target: it registers the provider
+extension with the system and mediates real requests from Safari. Only `org-iso-mdoc` is available
+there, because `DigitalCredential.userAgentAllowsProtocol()` rejects every `openid4vp` variant, so
+the OpenID4VP variants of this flow can only be exercised on Android.
+
+What a simulator does not establish is physical-device provisioning or cross-process Keychain access:
+its entitlements are the simulated ones the build applied rather than a provisioning profile, and the
+shared Keychain group resolves against a simulated `AppIdentifierPrefix`.
+
 ## Common checks
 
 Android:
@@ -84,6 +149,40 @@ https://verifier2.demo.walt.id/
 Run public-backend tests serially on iOS. The tests depend on public network
 services, so a transient simulator networking failure should be retried before
 treating it as a product regression.
+
+Identity document provider configuration is checked on the built products rather than on the source
+`.entitlements` and `Info.plist` files, because the interesting values contain `$(AppIdentifierPrefix)`
+or come from `INFOPLIST_KEY_` build settings and can silently resolve to nothing. Run the same script
+CI runs, from the repository root:
+
+```bash
+.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh \
+  --project-dir waltid-applications/waltid-wallet-demo-ios/iosApp \
+  --destination "platform=iOS Simulator,name=iPhone 17" \
+  --derived-data /tmp/xcode-derived \
+  --app-group group.id.walt.wallet.native \
+  --keychain-group-suffix id.walt.wallet.native.shared \
+  --app-bundle-id id.walt.wallet.native \
+  --appex-bundle-id id.walt.wallet.native.identitydocumentprovider \
+  --development-team 9BB78CFW7Y \
+  --build-setting OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
+
+.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh \
+  --project-dir waltid-applications/waltid-wallet-demo-compose/iosApp \
+  --destination "platform=iOS Simulator,name=iPhone 17" \
+  --derived-data /tmp/xcode-derived-compose \
+  --app-group group.id.walt.wallet.compose \
+  --keychain-group-suffix id.walt.wallet.compose.shared \
+  --app-bundle-id id.walt.wallet.compose \
+  --appex-bundle-id id.walt.wallet.compose.identitydocumentprovider \
+  --development-team 9BB78CFW7Y
+```
+
+Each run builds the demo scheme with its provider extension and asserts that the built host and
+provider agree on bundle identifier nesting, App Group, default Keychain group, advertised doctypes,
+extension embedding, and the provider's extension point. It also asserts that both targets resolve the
+Walt team with automatic signing, in both Debug and Release. Doctypes default to mDL and EU PID and can
+be overridden with repeated `--doctype` arguments.
 
 ## Enterprise mobile platform tests
 
@@ -182,3 +281,6 @@ or non-PR comparisons, pass an explicit base with `--base-ref origin/<base-branc
 - **IntelliJ Android import fails:** use Android Studio for Android modules, or keep `enableAndroidBuild=false` for shared Kotlin/JVM work.
 - **Enterprise mobile fixture cannot be reached from Android:** make sure an emulator or device is booted and `adb reverse` is available.
 - **Enterprise mobile fixture cannot be reached from iOS:** pass a valid `-Penterprise.ios.destination` value for an installed simulator.
+- **iOS device signs with a Personal Team:** select the Walt team `9BB78CFW7Y` and let automatic signing resolve it; do not alter the required entitlements to make signing succeed.
+- **Provisioning profile is missing Mobile Document Provider or the App Group:** verify the corresponding App ID and its capabilities in the walt.id Apple Developer account, then refresh automatic signing.
+- **Provider installs but cannot reach the wallet or its keys:** verify the built App Group and `keychain-access-groups` of both host and provider with `verify-ios-identity-document-provider.sh`; simulator success does not establish physical-device Keychain sharing.

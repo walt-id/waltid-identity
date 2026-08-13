@@ -29,6 +29,7 @@ import platform.Security.errSecItemNotFound
 import platform.Security.errSecSuccess
 import platform.Security.kSecAttrAccessible
 import platform.Security.kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+import platform.Security.kSecAttrAccessGroup
 import platform.Security.kSecAttrAccount
 import platform.Security.kSecAttrService
 import platform.Security.kSecClass
@@ -44,7 +45,9 @@ import platform.posix.memcpy
  * iOS SDK-managed database key provider backed by Keychain generic-password items.
  */
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
-public class IosDatabaseEncryptionKeyProvider : DatabaseEncryptionKeyProvider {
+public class IosDatabaseEncryptionKeyProvider(
+    private val accessGroup: String? = null,
+) : DatabaseEncryptionKeyProvider {
 
     /**
      * Returns the existing Keychain database key or creates and stores a new one.
@@ -140,6 +143,7 @@ public class IosDatabaseEncryptionKeyProvider : DatabaseEncryptionKeyProvider {
         query.addRetained(kSecAttrService, KEYCHAIN_SERVICE)
         query.addRetained(kSecAttrAccount, keyId)
         query.add(kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
+        accessGroup?.let { query.addRetained(kSecAttrAccessGroup, it) }
         if (returnData) {
             query.add(kSecReturnData, kCFBooleanTrue)
             query.add(kSecMatchLimit, kSecMatchLimitOne)

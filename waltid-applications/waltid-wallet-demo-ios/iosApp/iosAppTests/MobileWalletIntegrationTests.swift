@@ -153,6 +153,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertEqual(second.keyID, first.keyID, "Encrypted wallet key reference should survive wallet facade recreation")
     }
 
+    // Reopening a wallet from the shared App Group and Keychain group is covered by
+    // SharedWalletConfigurationTests, which asserts the same reopen plus the access-group placement
+    // and the provider extension's own entry point.
+
     func testDeleteLocalDataRemovesManagedEncryptedWalletState() async throws {
         let wallet1 = try await makeWallet()
         let first = try await wallet1.bootstrap()
@@ -239,7 +243,9 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertEqual(reopenedBootstrap.did, bootstrap.did, "Default DID store should survive wallet facade recreation")
         XCTAssertEqual(reopenedBootstrap.keyID, bootstrap.keyID, "Platform signing-key reference should survive wallet facade recreation")
         XCTAssertTrue(reopenedCredentials.isEmpty)
-        XCTAssertEqual(listCredentialsCalls, 2)
+        // Each bootstrap refreshes the native document registry, in addition to the two
+        // explicit credentials() reads above.
+        XCTAssertEqual(listCredentialsCalls, 4)
 
         try await wallet.deleteLocalData()
     }

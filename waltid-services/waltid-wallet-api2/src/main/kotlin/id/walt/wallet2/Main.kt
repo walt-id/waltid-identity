@@ -99,6 +99,7 @@ fun Application.wallet2Api(authConfig: OSSWallet2AuthConfig? = null) {
                 walletResolver = OSSWallet2Service.resolver,
             )
         }
+        registerTransactionDataProfilesRoute()
         OSSWallet2Service.run { registerRoutes() }
     }
 }

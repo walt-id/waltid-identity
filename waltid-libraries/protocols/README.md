@@ -74,7 +74,7 @@ OpenID4VP 1.0 verifier implementation. Provides integration-ready components for
 
 ### Wallet Libraries
 
-Learn more about mobile development with walt.id in our [Mobile Development Guide](../../docs/mobile-development.md) and check out our example applications for [Compose](../../waltid-applications/waltid-compose-wallet-demo) and [iOS](../../waltid-applications/waltid-wallet-demo-ios) Wallets.
+Learn more about mobile development with walt.id in our [Mobile Development Guide](../../docs/mobile-wallet-development.md) and check out our example applications for [Compose](../../waltid-applications/waltid-wallet-demo-compose) and [iOS](../../waltid-applications/waltid-wallet-demo-ios) Wallets.
 
 #### Core Wallet Libraries
 
