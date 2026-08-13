@@ -50,6 +50,16 @@ import kotlin.uuid.Uuid
 import id.walt.crypto2.keys.Key as Crypto2Key
 
 @OptIn(ExperimentalSerializationApi::class)
+/**
+ * The OpenID4VP `redirect_uri` Client Identifier Prefix.
+ *
+ * Deliberately restated rather than shared with `ClientIdPrefix.REDIRECT_URI`: that enum lives in
+ * `waltid-openid4vp-clientidprefix`, a wallet-side client-authentication module the verifier neither
+ * depends on nor should. Adding a module dependency to share one string literal would be a worse
+ * trade than repeating it here.
+ */
+private const val REDIRECT_URI_CLIENT_ID_PREFIX = "redirect_uri"
+
 object VerificationSessionCreator {
 
     private val log = KotlinLogging.logger { }
@@ -332,6 +342,27 @@ object VerificationSessionCreator {
 
         // TODO: Build AuthorizationRequest based on preset
 
+        // OID4VP 1.0 §5.9.3-3.1.1 requires a `redirect_uri` client identifier to be the Response URI
+        // itself, which only exists once the session id has been generated. Callers therefore pass the
+        // bare prefix and it is completed here - a bare prefix carries no URI and is not a usable
+        // client identifier on its own, so this is unambiguous.
+        //
+        // Hoisted out of the AuthorizationRequest below because the bootstrap request must advertise
+        // the same client_id.
+        val responseUri = when {
+            isDcApi || isAnnexC -> null
+            isCrossDevice -> "$urlPrefix/$sessionId/response" // For Cross-Device flow (direct_post, direct_post.jwt)
+            else -> throw IllegalStateException("No flow is selected")
+        }
+        val resolvedClientId = if (clientId == REDIRECT_URI_CLIENT_ID_PREFIX) {
+            "$REDIRECT_URI_CLIENT_ID_PREFIX:" + requireNotNull(responseUri) {
+                "A redirect_uri client identifier is the Response URI, so it is only available for " +
+                    "cross-device flows"
+            }
+        } else {
+            clientId
+        }
+
         val bootstrapAuthorizationRequest = if (isDcApi) null
         else AuthorizationRequest(
             // TODO: url building (handle host alias)
@@ -341,7 +372,7 @@ object VerificationSessionCreator {
             // request_uri_method=post so wallets can send wallet_nonce to prevent replay.
             requestUriMethod = if (isSignedRequest) RequestUriHttpMethod.POST else null,
 
-            clientId = clientId,
+            clientId = resolvedClientId,
 
             nonce = null, // not required in the initial request yet
             responseType = null
@@ -364,7 +395,7 @@ object VerificationSessionCreator {
             .mapNotNull { credentialId -> credentialQueriesById?.get(credentialId)?.format }
             .toSet()
 
-        val effectiveClientId = if ((isDcApi && !isSignedRequest) || isAnnexC) null else clientId
+        val effectiveClientId = if ((isDcApi && !isSignedRequest) || isAnnexC) null else resolvedClientId
 
         val authorizationRequest = AuthorizationRequest(
             responseType = if (!isAnnexC) responseType else null,
@@ -374,12 +405,7 @@ object VerificationSessionCreator {
             clientId = effectiveClientId,
             issuer = effectiveClientId.takeIf { isSignedRequest },
             redirectUri = null, // For Same-Device flow (fragment/query/after code exchange etc)
-            // TODO: url building (handle host alias)
-            responseUri = when {
-                isDcApi || isAnnexC -> null
-                isCrossDevice -> "$urlPrefix/$sessionId/response" // For Cross-Device flow (direct_post, direct_post.jwt)
-                else -> throw IllegalStateException("No flow is selected")
-            },
+            responseUri = responseUri,
             scope = openIdConfig?.scope,//OPTIONAL. OAuth 2.0 Scope value. Can be used for pre-defined DCQL queries or OpenID Connect scopes (e.g., "openid").
             state = state, // Opaque value used by the Verifier to maintain state between the request and callback.
             nonce = nonce, // String value used to mitigate replay attacks. Also used to establish holder binding.
