@@ -8,13 +8,22 @@ package id.walt.wallet2.mobile
  * including Digital Credentials API `CREATE_CREDENTIAL` handoffs.
  */
 public sealed interface MobileWalletCredentialOffer {
+    /**
+     * Deep-link or QR credential offer URI (`openid-credential-offer://…`).
+     *
+     * @property value Non-blank credential offer URI.
+     */
     public data class Uri(public val value: String) : MobileWalletCredentialOffer {
         init {
             require(value.trim().isNotEmpty()) { "Credential offer URI must not be blank" }
         }
     }
 
-    /** Inline Credential Offer JSON object as a string (cross-language friendly). */
+    /**
+     * Inline Credential Offer JSON object as a string (cross-language friendly).
+     *
+     * @property value Non-blank Credential Offer JSON object.
+     */
     public data class InlineJson(public val value: String) : MobileWalletCredentialOffer {
         init {
             require(value.trim().isNotEmpty()) { "Inline credential offer JSON must not be blank" }

@@ -32,6 +32,13 @@ public data class AndroidDigitalCredentialCreateProviderInput(
  * Android CREATE_CREDENTIAL OpenID4VCI request after Credential Manager extraction.
  *
  * Kept on the Android adapter boundary rather than the common mobile SDK surface.
+ *
+ * @property protocol Digital Credentials protocol identifier; this adapter only accepts
+ * `openid4vci-v1`.
+ * @property offerJson Credential Offer JSON object extracted from the selected protocol
+ * alternative's `data` field.
+ * @property verifiedOrigin Canonical caller origin derived from Credential Manager caller
+ * authentication.
  */
 public data class AndroidDigitalCredentialCreateRequest(
     public val protocol: String,
@@ -41,12 +48,23 @@ public data class AndroidDigitalCredentialCreateRequest(
 
 /**
  * Android CREATE_CREDENTIAL acknowledgement returned to Credential Manager after OpenID4VCI completes.
+ *
+ * @property protocol Digital Credentials protocol identifier echoed in the create response.
+ * @property dataJson JSON object serialized as the response `data` field. OpenID4VCI create
+ * acknowledgements currently send an empty object.
  */
 public data class AndroidDigitalCredentialCreateResponse(
     public val protocol: String = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
     public val dataJson: String = "{}",
 ) {
+    /** Factory for the empty OpenID4VCI create acknowledgement. */
     public companion object {
+        /**
+         * Returns the empty acknowledgement Credential Manager expects after a successful
+         * OpenID4VCI create.
+         *
+         * @param protocol Digital Credentials protocol identifier echoed in the create response.
+         */
         public fun acknowledgment(
             protocol: String = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
         ): AndroidDigitalCredentialCreateResponse =
