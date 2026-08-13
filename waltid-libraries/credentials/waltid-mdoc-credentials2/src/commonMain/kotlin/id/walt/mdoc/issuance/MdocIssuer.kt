@@ -11,6 +11,7 @@ import id.walt.mdoc.objects.digest.ValueDigestList
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.mso.DeviceKeyInfo
+import id.walt.mdoc.objects.mso.KeyAuthorization
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.objects.mso.Status
 import id.walt.mdoc.objects.mso.ValidityInfo
@@ -62,7 +63,9 @@ object MdocIssuer {
          * Optional `x5t` (RFC 9360 label 34) certificate hash to place in the protected header.
          * Required alongside [protectedHeaderX5u] for QEAA/PuB-EAA; digest SHALL be SHA-256.
          */
-        protectedHeaderX5t: CoseCertHash? = null
+        protectedHeaderX5t: CoseCertHash? = null,
+        /** Optional restriction on what the holder's device key may sign, embedded in the MSO. */
+        keyAuthorizations: KeyAuthorization? = null,
     ): IssuerSigned {
         return signMsoForIssuerSignedObjects(
             namespaceIssuerSignedItems = namespaceIssuerSignedItems,
@@ -75,6 +78,7 @@ object MdocIssuer {
             digestAlgorithm = digestAlgorithm,
             protectedHeaderX5u = protectedHeaderX5u,
             protectedHeaderX5t = protectedHeaderX5t,
+            keyAuthorizations = keyAuthorizations,
             coseSigner = issuerKey.toCoseSigner(),
             coseAlgorithm = requireNotNull(issuerKey.keyType.toCoseAlgorithm()) {
                 "Issuer key type has no COSE signing algorithm: ${issuerKey.keyType}"
@@ -95,6 +99,7 @@ object MdocIssuer {
         digestAlgorithm: String = "SHA-256",
         protectedHeaderX5u: String? = null,
         protectedHeaderX5t: CoseCertHash? = null,
+        keyAuthorizations: KeyAuthorization? = null,
     ): IssuerSigned = signMsoForIssuerSignedObjects(
         namespaceIssuerSignedItems = namespaceIssuerSignedItems,
         issuerCertificate = issuerCertificate,
@@ -106,6 +111,7 @@ object MdocIssuer {
         digestAlgorithm = digestAlgorithm,
         protectedHeaderX5u = protectedHeaderX5u,
         protectedHeaderX5t = protectedHeaderX5t,
+        keyAuthorizations = keyAuthorizations,
         coseSigner = issuerKey.toCoseSigner(signatureAlgorithm),
         coseAlgorithm = signatureAlgorithm,
     )
@@ -121,6 +127,7 @@ object MdocIssuer {
         digestAlgorithm: String,
         protectedHeaderX5u: String?,
         protectedHeaderX5t: CoseCertHash?,
+        keyAuthorizations: KeyAuthorization?,
         coseSigner: CoseSigner,
         coseAlgorithm: Int,
     ): IssuerSigned {
@@ -139,7 +146,7 @@ object MdocIssuer {
             digestAlgorithm = digestAlgorithm,
             docType = docType,
             valueDigests = valueDigests,
-            deviceKeyInfo = DeviceKeyInfo(deviceKey = holderKey),
+            deviceKeyInfo = DeviceKeyInfo(deviceKey = holderKey, keyAuthorizations = keyAuthorizations),
             validityInfo = ValidityInfo(
                 signed = signedTimestamp,
                 validFrom = effectiveValidFrom,
@@ -219,6 +226,9 @@ object MdocIssuer {
         /** Optional x5t (RFC 9360) cert hash for the protected header (ETSI QEAA/PuB-EAA). */
         protectedHeaderX5t: CoseCertHash? = null,
 
+        /** Optional restriction on what the holder's device key may sign, embedded in the MSO. */
+        keyAuthorizations: KeyAuthorization? = null,
+
         /** Custom value serialization (null returns are explicitly NOT mapped) */
         valueMappingFunction: (
             docType: String,
@@ -240,7 +250,8 @@ object MdocIssuer {
             status = status,
             digestAlgorithm = digestAlgorithm,
             protectedHeaderX5u = protectedHeaderX5u,
-            protectedHeaderX5t = protectedHeaderX5t
+            protectedHeaderX5t = protectedHeaderX5t,
+            keyAuthorizations = keyAuthorizations
         )
     }
 
@@ -257,6 +268,7 @@ object MdocIssuer {
         digestAlgorithm: String = "SHA-256",
         protectedHeaderX5u: String? = null,
         protectedHeaderX5t: CoseCertHash? = null,
+        keyAuthorizations: KeyAuthorization? = null,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -276,6 +288,7 @@ object MdocIssuer {
         digestAlgorithm = digestAlgorithm,
         protectedHeaderX5u = protectedHeaderX5u,
         protectedHeaderX5t = protectedHeaderX5t,
+        keyAuthorizations = keyAuthorizations,
     )
 
     @Deprecated("Use the crypto2 Key overload with an explicit signature algorithm")

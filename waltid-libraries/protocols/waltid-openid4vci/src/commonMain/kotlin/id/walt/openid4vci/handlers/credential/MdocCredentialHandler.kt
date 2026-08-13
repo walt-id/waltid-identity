@@ -49,6 +49,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
+        authorizedTransactionDataTypes: List<String>?,
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
@@ -79,6 +80,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
                         status = credentialStatus,
                         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
                         verifiedProof = verifiedProof,
+                        authorizedTransactionDataTypes = authorizedTransactionDataTypes,
                     )
                 },
                 credentialData = credentialData,
@@ -106,6 +108,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
+        authorizedTransactionDataTypes: List<String>?,
         credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
@@ -132,6 +135,7 @@ class MdocCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpoi
                     status = credentialStatus,
                     mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
                     verifiedProof = verifiedProof,
+                    authorizedTransactionDataTypes = authorizedTransactionDataTypes,
                 )
             },
         )

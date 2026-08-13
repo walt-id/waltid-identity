@@ -471,6 +471,7 @@ class OpenId4VciProtocolService(
                     selectiveDisclosure = session.selectiveDisclosure,
                     x5Chain = x5Chain,
                     mDocNameSpacesDataMappingConfig = session.mDocNameSpacesDataMappingConfig,
+                    authorizedTransactionDataTypes = session.authorizedTransactionDataTypes,
                     credentialStatus = mDocStatus,
                     proofValidationContext = proofValidationContext,
                 )
@@ -485,6 +486,7 @@ class OpenId4VciProtocolService(
                     selectiveDisclosure = session.selectiveDisclosure,
                     x5Chain = x5Chain,
                     mDocNameSpacesDataMappingConfig = session.mDocNameSpacesDataMappingConfig,
+                    authorizedTransactionDataTypes = session.authorizedTransactionDataTypes,
                     credentialStatus = mDocStatus,
                     proofValidationContext = proofValidationContext,
                 )
@@ -606,6 +608,7 @@ class OpenId4VciProtocolService(
             selectiveDisclosure = selectiveDisclosure,
             idTokenClaimsMapping = idTokenClaimsMapping,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+            authorizedTransactionDataTypes = authorizedTransactionDataTypes,
             x5Chain = x5Chain,
             issuerDid = issuerDid,
             authorizationRequest = authorizationRequest,

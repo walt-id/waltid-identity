@@ -3,10 +3,11 @@ package id.walt.wallet2
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
-import id.walt.wallet2.OSSWallet2Service.namedKeyStores
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
@@ -184,6 +185,7 @@ object OSSWallet2Service {
     fun Route.registerRoutes() {
         val attestationAssembler = createAttestationAssembler()
         val clientIdTrustConfiguration = configuredClientIdTrustConfiguration()
+        val transactionDataTypeRegistry = configuredTransactionDataTypeRegistry()
         val authEnabled = runCatching {
             FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)
         }.getOrElse { false }
@@ -197,6 +199,7 @@ object OSSWallet2Service {
                     getAccountId = getAccountId,
                     attestationAssembler = attestationAssembler,
                     clientIdTrustConfiguration = clientIdTrustConfiguration,
+                    transactionDataTypeRegistry = transactionDataTypeRegistry,
                 )
             }
         } else {
@@ -205,6 +208,7 @@ object OSSWallet2Service {
                 getAccountId = null,
                 attestationAssembler = attestationAssembler,
                 clientIdTrustConfiguration = clientIdTrustConfiguration,
+                transactionDataTypeRegistry = transactionDataTypeRegistry,
             )
         }
     }
@@ -219,6 +223,14 @@ object OSSWallet2Service {
 
     internal fun configuredClientIdTrustConfiguration(): ClientIdTrustConfiguration =
         ConfigManager.getConfig<OSSWallet2ServiceConfig>().clientIdTrust.toDomain()
+
+    internal fun configuredTransactionDataTypeRegistry(): TransactionDataTypeRegistry {
+        val enabled = runCatching {
+            FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.transactionDataProfilesFeature)
+        }.getOrElse { false }
+        if (!enabled) return TransactionDataTypeRegistry(emptySet())
+        return ConfigManager.getConfig<TransactionDataProfilesConfig>().toTypeRegistry()
+    }
 
     private fun createAttestationAssembler(): ClientAttestationAssembler? {
         val config = ConfigManager.getConfig<OSSWallet2ServiceConfig>().attestationConfig ?: return null

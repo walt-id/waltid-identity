@@ -269,10 +269,21 @@ object CredentialDisplayNormalizer {
                 ) {
                     listOf(rows.single().copy(item = rows.single().item.copy(label = item.label)))
                 } else {
-                    rows
+                    rows.map { row -> row.qualifiedWithParentLabel(parentPath = path, parentLabel = item.label) }
                 }
             }
             else -> item.flattenDisplayObjectForClaimRows()
+        }
+
+    /**
+     * Nested leaves such as `payee.name` say nothing on their own, so transaction data rows inherit
+     * the label of the object they came from.
+     */
+    private fun ClaimRow.qualifiedWithParentLabel(parentPath: ClaimPath, parentLabel: String): ClaimRow =
+        if (CredentialDisplayVocabulary.qualifiesNestedClaimLabels(parentPath)) {
+            copy(item = item.copy(label = CredentialDisplayVocabulary.qualifiedClaimLabel(parentLabel, item.label)))
+        } else {
+            this
         }
 
     private fun ClaimItem.flattenDisplayObjectForClaimRows(): List<ClaimRow> =
