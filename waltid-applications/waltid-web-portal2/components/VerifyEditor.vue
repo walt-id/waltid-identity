@@ -117,10 +117,16 @@ const transactionDataProfiles = useTransactionDataProfiles(
 );
 const transactionDataEnabled = ref(false);
 const transactionDataTouched = ref(false);
-const selectedTransactionProfileType = ref("");
-const transactionDataFieldValues = ref<Record<string, string>>({});
-const selectedTransactionCredentialIds = ref<string[]>([]);
+const transactionDataEntries = ref<TransactionDataEntry[]>([]);
 const isHydrating = ref(false);
+let nextTransactionDataEntryId = 1;
+
+type TransactionDataEntry = {
+  id: number;
+  profileType: string;
+  credentialIds: string[];
+  fieldValues: Record<string, string>;
+};
 
 const clientIdOptions = [
   {
@@ -193,21 +199,16 @@ const canSubmit = computed(() => {
 const missingRequiredClientId = computed(
   () => clientIdNeedsInput.value && !clientIdInput.value.trim(),
 );
-const selectedTransactionProfile = computed(
-  () =>
-    transactionDataProfiles.profiles.value.find(
-      (profile) => profile.type === selectedTransactionProfileType.value,
-    ) ??
-    transactionDataProfiles.profiles.value[0] ??
-    null,
-);
 const transactionDataUnavailable = computed(
   () =>
     transactionDataEnabled.value &&
     (transactionDataProfiles.loading.value ||
       !!transactionDataProfiles.error.value ||
-      !selectedTransactionProfile.value ||
-      selectedTransactionCredentialIds.value.length === 0),
+      transactionDataEntries.value.length === 0 ||
+      transactionDataEntries.value.some(
+        (entry) =>
+          !profileForEntry(entry) || entry.credentialIds.length === 0,
+      )),
 );
 const submitDisabled = computed(
   () =>
@@ -329,13 +330,81 @@ function formatTransactionFieldLabel(field: string) {
 
 function handleTransactionDataToggle() {
   transactionDataTouched.value = true;
-  if (
-    transactionDataEnabled.value &&
-    selectedTransactionCredentialIds.value.length === 0 &&
-    dcqlCredentialIds.value.length === 1
-  ) {
-    selectedTransactionCredentialIds.value = [...dcqlCredentialIds.value];
+  if (!transactionDataEnabled.value) return;
+  if (transactionDataEntries.value.length === 0) {
+    transactionDataEntries.value = [createTransactionDataEntry()];
   }
+}
+
+function profileForEntry(entry: TransactionDataEntry) {
+  return (
+    transactionDataProfiles.profiles.value.find(
+      (profile) => profile.type === entry.profileType,
+    ) ?? null
+  );
+}
+
+function createTransactionDataEntry(
+  existing?: Partial<Omit<TransactionDataEntry, "id">>,
+): TransactionDataEntry {
+  const profileType =
+    existing?.profileType ||
+    transactionDataProfiles.profiles.value[0]?.type ||
+    "";
+  const profile =
+    transactionDataProfiles.profiles.value.find(
+      (candidate) => candidate.type === profileType,
+    ) ?? null;
+  const fieldValues: Record<string, string> = {};
+  if (profile) {
+    for (const field of profile.fields) {
+      fieldValues[field] =
+        existing?.fieldValues?.[field] ||
+        defaultTransactionFieldValue(field, profile.type);
+    }
+  }
+
+  return {
+    id: nextTransactionDataEntryId++,
+    profileType,
+    credentialIds: defaultTransactionCredentialIds(
+      dcqlCredentialIds.value,
+      existing?.credentialIds,
+    ),
+    fieldValues,
+  };
+}
+
+function addTransactionDataEntry() {
+  transactionDataTouched.value = true;
+  if (!transactionDataEnabled.value) {
+    transactionDataEnabled.value = true;
+  }
+  transactionDataEntries.value.push(createTransactionDataEntry());
+}
+
+function removeTransactionDataEntry(index: number) {
+  transactionDataTouched.value = true;
+  transactionDataEntries.value.splice(index, 1);
+  if (transactionDataEntries.value.length === 0) {
+    transactionDataEnabled.value = false;
+  }
+}
+
+function syncEntryFields(entry: TransactionDataEntry) {
+  const profile = profileForEntry(entry);
+  if (!profile) {
+    entry.fieldValues = {};
+    return;
+  }
+
+  entry.fieldValues = Object.fromEntries(
+    profile.fields.map((field) => [
+      field,
+      entry.fieldValues[field] ||
+        defaultTransactionFieldValue(field, profile.type),
+    ]),
+  );
 }
 
 function defaultTransactionCredentialIds(
@@ -359,50 +428,44 @@ function hydrateTransactionDataFromPayload(payload: Record<string, unknown>) {
 
   if (!Array.isArray(transactionData) || transactionData.length === 0) {
     transactionDataEnabled.value = false;
-    selectedTransactionCredentialIds.value = defaultTransactionCredentialIds(
-      availableIds,
-    );
+    transactionDataEntries.value = [createTransactionDataEntry()];
     return;
   }
 
-  const item = transactionData[0];
-  if (!item || typeof item !== "object" || Array.isArray(item)) {
-    transactionDataEnabled.value = false;
-    selectedTransactionCredentialIds.value = defaultTransactionCredentialIds(
-      availableIds,
-    );
-    return;
-  }
+  const entries = transactionData.filter(isRecord).map((record) => {
+    const profileType =
+      typeof record.type === "string" && record.type.trim()
+        ? record.type
+        : "";
+    const existingIds = Array.isArray(record.credential_ids)
+      ? record.credential_ids.filter(
+          (id): id is string => typeof id === "string" && id.trim().length > 0,
+        )
+      : [];
+    const profile =
+      transactionDataProfiles.profiles.value.find(
+        (candidate) => candidate.type === profileType,
+      ) ?? null;
+    const fieldValues = profile
+      ? Object.fromEntries(
+          profile.fields.map((field) => [
+            field,
+            stringifyTransactionFieldValue(field, record[field]),
+          ]),
+        )
+      : {};
 
-  const record = item as Record<string, unknown>;
-  transactionDataEnabled.value = true;
+    return {
+      id: nextTransactionDataEntryId++,
+      profileType,
+      credentialIds: defaultTransactionCredentialIds(availableIds, existingIds),
+      fieldValues,
+    };
+  });
 
-  if (typeof record.type === "string" && record.type.trim()) {
-    selectedTransactionProfileType.value = record.type;
-  }
-
-  const existingIds = Array.isArray(record.credential_ids)
-    ? record.credential_ids.filter(
-        (id): id is string => typeof id === "string" && id.trim().length > 0,
-      )
-    : [];
-  selectedTransactionCredentialIds.value = defaultTransactionCredentialIds(
-    availableIds,
-    existingIds,
-  );
-
-  const profile =
-    transactionDataProfiles.profiles.value.find(
-      (candidate) => candidate.type === selectedTransactionProfileType.value,
-    ) ?? null;
-  if (!profile) return;
-
-  transactionDataFieldValues.value = Object.fromEntries(
-    profile.fields.map((field) => [
-      field,
-      stringifyTransactionFieldValue(field, record[field]),
-    ]),
-  );
+  transactionDataEnabled.value = entries.length > 0;
+  transactionDataEntries.value =
+    entries.length > 0 ? entries : [createTransactionDataEntry()];
 }
 
 function hydrateControlsFromPayload() {
@@ -439,58 +502,65 @@ function applyTransactionDataOverrides(
     return true;
   }
 
-  const selectedProfile = selectedTransactionProfile.value;
-  if (!selectedProfile) {
-    optionsError.value = "Select a transaction data profile.";
+  if (transactionDataEntries.value.length === 0) {
+    optionsError.value = "Add at least one transaction data payload.";
     return false;
   }
 
   const availableIds = getDcqlCredentialIds(coreFlow);
-  const credentialIds = selectedTransactionCredentialIds.value.filter((id) =>
-    availableIds.includes(id),
-  );
-  if (credentialIds.length === 0) {
-    optionsError.value =
-      availableIds.length === 0
-        ? "Transaction data requires at least one DCQL credential with an id."
-        : "Select at least one DCQL credential to bind transaction data to.";
-    return false;
-  }
+  const items: Record<string, unknown>[] = [];
+  const boundCredentialIds = new Set<string>();
 
-  getDcqlCredentialObjects(coreFlow)
-    .filter((credential) => credentialIds.includes(String(credential.id)))
-    .forEach((credential) => {
-      credential.require_cryptographic_holder_binding = true;
-    });
+  for (const [index, entry] of transactionDataEntries.value.entries()) {
+    const selectedProfile = profileForEntry(entry);
+    if (!selectedProfile) {
+      optionsError.value = `Select a transaction data profile for payload ${index + 1}.`;
+      return false;
+    }
 
-  const openid = getOpenIdObject(payload);
-  let fieldEntries: [string, unknown][];
-  try {
-    fieldEntries = selectedProfile.fields.map((field) => [
-      field,
-      parseTransactionFieldValue(
+    const credentialIds = entry.credentialIds.filter((id) =>
+      availableIds.includes(id),
+    );
+    if (credentialIds.length === 0) {
+      optionsError.value =
+        availableIds.length === 0
+          ? "Transaction data requires at least one DCQL credential with an id."
+          : `Select at least one DCQL credential for transaction data payload ${index + 1}.`;
+      return false;
+    }
+
+    credentialIds.forEach((id) => boundCredentialIds.add(id));
+
+    let fieldEntries: [string, unknown][];
+    try {
+      fieldEntries = selectedProfile.fields.map((field) => [
         field,
-        transactionDataFieldValues.value[field] ?? "",
-      ),
-    ]);
-  } catch (e) {
-    optionsError.value =
-      e instanceof Error
-        ? e.message
-        : "Invalid nested transaction data field value.";
-    return false;
-  }
+        parseTransactionFieldValue(field, entry.fieldValues[field] ?? ""),
+      ]);
+    } catch (e) {
+      optionsError.value =
+        e instanceof Error
+          ? `Payload ${index + 1}: ${e.message}`
+          : `Invalid nested transaction data field value in payload ${index + 1}.`;
+      return false;
+    }
 
-  openid.transactionData = [
-    {
+    items.push({
       type: selectedProfile.type,
       credential_ids: credentialIds,
       transaction_data_hashes_alg: ["sha-256"],
       require_cryptographic_holder_binding: true,
       ...Object.fromEntries(fieldEntries),
-    },
-  ];
+    });
+  }
 
+  getDcqlCredentialObjects(coreFlow)
+    .filter((credential) => boundCredentialIds.has(String(credential.id)))
+    .forEach((credential) => {
+      credential.require_cryptographic_holder_binding = true;
+    });
+
+  getOpenIdObject(payload).transactionData = items;
   return true;
 }
 
@@ -559,9 +629,7 @@ watch(
     clientIdType,
     clientIdInput,
     transactionDataEnabled,
-    selectedTransactionProfileType,
-    transactionDataFieldValues,
-    selectedTransactionCredentialIds,
+    transactionDataEntries,
   ],
   () => {
     if (isHydrating.value) return;
@@ -589,31 +657,12 @@ watch(json, () => {
 
 watch(
   transactionDataProfiles.profiles,
-  (profiles) => {
+  () => {
     isHydrating.value = true;
-    if (!selectedTransactionProfileType.value && profiles[0]) {
-      selectedTransactionProfileType.value = profiles[0].type;
-    }
     nextTick(() => hydrateControlsFromPayload());
   },
   { immediate: true },
 );
-
-watch(selectedTransactionProfile, (profile) => {
-  if (isHydrating.value) return;
-  if (!profile) {
-    transactionDataFieldValues.value = {};
-    return;
-  }
-
-  transactionDataFieldValues.value = Object.fromEntries(
-    profile.fields.map((field) => [
-      field,
-      transactionDataFieldValues.value[field] ||
-        defaultTransactionFieldValue(field, profile.type),
-    ]),
-  );
-});
 
 onMounted(() => {
   dcApiSupport.value = getDcApiPresentationSupport();
@@ -725,94 +774,123 @@ async function submit() {
           </p>
 
           <template v-else>
-            <div>
-              <label class="form-label">Profile</label>
-              <select
-                v-model="selectedTransactionProfileType"
-                class="form-select"
-              >
-                <option
-                  v-for="profile in transactionDataProfiles.profiles.value"
-                  :key="profile.type"
-                  :value="profile.type"
-                >
-                  {{ profile.displayName }}
-                </option>
-              </select>
-              <p class="mt-1 text-xs text-[--color-text-muted]">
-                Bind transaction data to specific
-                <code>core_flow.dcql_query.credentials[].id</code> values. For a
-                combined SCA + age request, select only the payment credential.
-              </p>
-            </div>
-
-            <fieldset
-              v-if="dcqlCredentialIds.length > 0"
-              class="grid gap-2 rounded-lg border border-[--color-border] bg-white p-3"
-            >
-              <legend class="form-label !mb-1">Target credentials</legend>
-              <label
-                v-for="credentialId in dcqlCredentialIds"
-                :key="credentialId"
-                class="inline-flex items-center gap-2 text-sm"
-              >
-                <input
-                  v-model="selectedTransactionCredentialIds"
-                  type="checkbox"
-                  :value="credentialId"
-                />
-                <code>{{ credentialId }}</code>
-              </label>
-              <p
-                v-if="selectedTransactionCredentialIds.length === 0"
-                class="text-xs text-amber-800"
-              >
-                Select at least one credential. Combined demos must not bind
-                transaction data to every query.
-              </p>
-            </fieldset>
-            <p v-else class="text-xs text-amber-800">
-              No DCQL credential ids found in the payload.
-            </p>
-
             <div
-              v-if="selectedTransactionProfile"
-              class="grid sm:grid-cols-2 gap-3"
+              v-for="(entry, index) in transactionDataEntries"
+              :key="entry.id"
+              class="grid gap-4 rounded-lg border border-[--color-border] bg-white p-3"
             >
-              <label
-                v-for="field in selectedTransactionProfile.fields"
-                :key="field"
-                class="grid gap-1"
-                :class="
-                  isNestedTransactionDataField(field) ? 'sm:col-span-2' : ''
-                "
-              >
-                <span class="form-label !mb-0">
-                  {{ formatTransactionFieldLabel(field) }}
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-sm font-semibold">
+                  Transaction data payload {{ index + 1 }}
                 </span>
-                <textarea
-                  v-if="isNestedTransactionDataField(field)"
-                  v-model="transactionDataFieldValues[field]"
-                  class="form-textarea min-h-[180px] font-mono text-xs"
-                  :name="`transaction-${field}`"
-                  spellcheck="false"
-                />
-                <input
-                  v-else
-                  v-model="transactionDataFieldValues[field]"
-                  class="form-input"
-                  :name="`transaction-${field}`"
-                />
-                <p
-                  v-if="isNestedTransactionDataField(field)"
-                  class="text-xs text-[--color-text-muted]"
+                <button
+                  v-if="transactionDataEntries.length > 1"
+                  type="button"
+                  class="btn btn-secondary !px-2 !py-1 !text-xs"
+                  @click="removeTransactionDataEntry(index)"
                 >
-                  Nested JSON object (for example SCA
-                  <code>payload.payee.name</code> /
-                  <code>payload.amount</code>). Amount should be a JSON number.
+                  Remove
+                </button>
+              </div>
+
+              <div>
+                <label class="form-label">Profile</label>
+                <select
+                  v-model="entry.profileType"
+                  class="form-select"
+                  @change="syncEntryFields(entry)"
+                >
+                  <option
+                    v-for="profile in transactionDataProfiles.profiles.value"
+                    :key="profile.type"
+                    :value="profile.type"
+                  >
+                    {{ profile.displayName }}
+                  </option>
+                </select>
+                <p class="mt-1 text-xs text-[--color-text-muted]">
+                  Bind this payload to specific
+                  <code>core_flow.dcql_query.credentials[].id</code> values.
                 </p>
-              </label>
+              </div>
+
+              <fieldset
+                v-if="dcqlCredentialIds.length > 0"
+                class="grid gap-2 rounded-lg border border-[--color-border] bg-slate-50 p-3"
+              >
+                <legend class="form-label !mb-1">Target credentials</legend>
+                <label
+                  v-for="credentialId in dcqlCredentialIds"
+                  :key="credentialId"
+                  class="inline-flex items-center gap-2 text-sm"
+                >
+                  <input
+                    v-model="entry.credentialIds"
+                    type="checkbox"
+                    :value="credentialId"
+                  />
+                  <code>{{ credentialId }}</code>
+                </label>
+                <p
+                  v-if="entry.credentialIds.length === 0"
+                  class="text-xs text-amber-800"
+                >
+                  Select at least one credential for this payload.
+                </p>
+              </fieldset>
+              <p v-else class="text-xs text-amber-800">
+                No DCQL credential ids found in the payload.
+              </p>
+
+              <div
+                v-if="profileForEntry(entry)"
+                class="grid sm:grid-cols-2 gap-3"
+              >
+                <label
+                  v-for="field in profileForEntry(entry)!.fields"
+                  :key="field"
+                  class="grid gap-1"
+                  :class="
+                    isNestedTransactionDataField(field) ? 'sm:col-span-2' : ''
+                  "
+                >
+                  <span class="form-label !mb-0">
+                    {{ formatTransactionFieldLabel(field) }}
+                  </span>
+                  <textarea
+                    v-if="isNestedTransactionDataField(field)"
+                    v-model="entry.fieldValues[field]"
+                    class="form-textarea min-h-[180px] font-mono text-xs"
+                    :name="`transaction-${entry.id}-${field}`"
+                    spellcheck="false"
+                  />
+                  <input
+                    v-else
+                    v-model="entry.fieldValues[field]"
+                    class="form-input"
+                    :name="`transaction-${entry.id}-${field}`"
+                  />
+                  <p
+                    v-if="isNestedTransactionDataField(field)"
+                    class="text-xs text-[--color-text-muted]"
+                  >
+                    Nested JSON object (for example SCA
+                    <code>payload.payee.name</code> /
+                    <code>payload.amount</code>). Amount should be a JSON
+                    number.
+                  </p>
+                </label>
+              </div>
             </div>
+
+            <button
+              type="button"
+              class="btn btn-secondary justify-self-start !px-3 !py-1.5"
+              aria-label="Add transaction data payload"
+              @click="addTransactionDataEntry"
+            >
+              +
+            </button>
           </template>
         </div>
       </div>
@@ -856,11 +934,6 @@ async function submit() {
           class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900"
         >
           <p class="font-medium">Digital Credentials API flow</p>
-          <p class="mt-1">
-            Transport follows <code>flow_type</code>
-            <code>dc_api_openid4vp</code> or <code>dc_api_18013_7</code>. The
-            session origin is set to this page's origin before create.
-          </p>
           <p class="mt-1">
             May be required for iOS compatibility with 18013-7 flows
           </p>
