@@ -2,10 +2,12 @@ package id.walt.verifier2.handlers.authrequest
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.PublicKeyIds
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
@@ -156,6 +158,7 @@ object Verifier2RequestUriPostHandler {
         payload: JsonObject,
         headers: JsonObject,
     ): String {
+        requireMatchingKeyId(headers, signingKey)
         val crypto2Key = resolveCrypto2Key(signingKey, setOf(KeyUsage.SIGN))
         return if (crypto2Key != null) {
             val algorithm = JwsAlgorithm.parse(
@@ -175,6 +178,7 @@ object Verifier2RequestUriPostHandler {
     @Deprecated("Use the Crypto2Key overload")
     internal suspend fun verifyExistingRequestObject(jwt: String, signingKey: Key) {
         val decoded = CompactJws.decodeUnverified(jwt)
+        requireMatchingKeyId(decoded.protectedHeader, signingKey)
         val algorithm = JwsAlgorithm.parse(
             requireNotNull(decoded.protectedHeader["alg"]?.jsonPrimitive?.contentOrNull) {
                 "Existing signed request JWT is missing alg"
@@ -193,6 +197,7 @@ object Verifier2RequestUriPostHandler {
         payload: JsonObject,
         headers: JsonObject,
     ): String {
+        requireMatchingKeyId(headers, signingKey)
         val algorithm = JwsAlgorithm.parse(
             requireNotNull(headers["alg"]?.jsonPrimitive?.contentOrNull) {
                 "Existing signed request JWT is missing alg"
@@ -208,6 +213,7 @@ object Verifier2RequestUriPostHandler {
 
     internal suspend fun verifyExistingRequestObject(jwt: String, signingKey: Crypto2Key) {
         val decoded = CompactJws.decodeUnverified(jwt)
+        requireMatchingKeyId(decoded.protectedHeader, signingKey)
         val algorithm = decoded.algorithm
         val publicJwk = requireNotNull(signingKey.capabilities.publicKeyExporter) {
             "Request signing key does not export public material"
@@ -222,6 +228,43 @@ object Verifier2RequestUriPostHandler {
             )
         )
         CompactJws.verify(jwt, verificationKey, algorithm)
+    }
+
+    /**
+     * Bind re-sign / verify to the JAR kid when it is a raw key id.
+     * DID URL kids (`did:key:…#…`) are not KMS locators — they are checked against
+     * [Verifier2RequestObjectKid] in [respondRequestUriPost].
+     */
+    private suspend fun requireMatchingKeyId(headers: JsonObject, signingKey: Key) {
+        val publicId = PublicKeyIds.run { signingKey.publicKeyId() }
+        requireMatchingPublicKeyId(headers, publicId, signingKey.getKeyId())
+    }
+
+    private suspend fun requireMatchingKeyId(headers: JsonObject, signingKey: Crypto2Key) {
+        val keyId = signingKey.id.value
+        val publicId = if (PublicKeyIds.isHttpKeyId(keyId)) {
+            val publicJwk = signingKey.capabilities.publicKeyExporter
+                ?.exportPublicKey() as? EncodedKey.Jwk
+            if (publicJwk != null) Jwk.sha256Thumbprint(publicJwk) else keyId
+        } else {
+            keyId
+        }
+        requireMatchingPublicKeyId(headers, publicId, keyId)
+    }
+
+    private fun requireMatchingPublicKeyId(headers: JsonObject, publicId: String, rawKeyId: String) {
+        val protectedKeyId = requireNotNull(headers["kid"]?.jsonPrimitive?.contentOrNull) {
+            "Existing signed request JWT is missing kid"
+        }
+        if (protectedKeyId.startsWith("did:")) return
+        require(
+            protectedKeyId == publicId ||
+                protectedKeyId == rawKeyId ||
+                protectedKeyId.endsWith("#$publicId") ||
+                protectedKeyId.endsWith("#$rawKeyId")
+        ) {
+            "Resolved signing key does not match the existing signed request kid"
+        }
     }
 
     private suspend fun resolveCrypto2Key(signingKey: Key, usages: Set<KeyUsage>) =

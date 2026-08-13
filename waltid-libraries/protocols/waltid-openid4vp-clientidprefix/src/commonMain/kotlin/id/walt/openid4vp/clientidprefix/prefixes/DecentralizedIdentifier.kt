@@ -64,21 +64,27 @@ data class DecentralizedIdentifier(val did: String, override val rawValue: Strin
 
     /**
      * Key selection for OpenID4VP decentralized_identifier:
-     * 1. JAR kid is a DID URL for this DID (verification method id) — match fragment to key id/thumbprint
-     * 2. Otherwise match RFC 7638 thumbprint / public key id
-     * 3. Last resort: single-key DID with a DID-URL kid for this DID (e.g. did:key:<mb>#<mb>)
+     * 1. JAR kid is a DID URL for this DID — match fragment to public key id / thumbprint
+     * 2. did:key method id `did:key:<multibase>#<multibase>` may not equal the KMS key id
+     *    (e.g. Azure vault URL); accept the single key only for that method fragment
+     * 3. Otherwise match RFC 7638 thumbprint / public key id
+     * 4. Unknown fragments (e.g. `did:…#missing`) must not authenticate
      */
     private suspend fun selectLegacyVerificationKey(did: String, kid: String, keys: Set<Key>): Key {
         if (kid == did || kid.startsWith("$did#")) {
-            val fragment = kid.substringAfter('#', missingDelimiterValue = "")
+            val fragment = kid.removePrefix("$did#").takeIf { kid != did }.orEmpty()
             if (fragment.isNotEmpty()) {
                 keys.find { key ->
                     val publicId = PublicKeyIds.run { key.publicKeyId() }
                     val thumbprint = key.getThumbprint()
                     fragment == publicId || fragment == thumbprint || fragment == key.getKeyId()
                 }?.let { return it }
+                if (isDidKeyMethodFragment(did, fragment)) {
+                    keys.singleOrNull()?.let { return it }
+                }
+            } else {
+                keys.singleOrNull()?.let { return it }
             }
-            keys.singleOrNull()?.let { return it }
         }
 
         keys.find { key ->
@@ -94,14 +100,18 @@ data class DecentralizedIdentifier(val did: String, override val rawValue: Strin
 
     private fun selectCrypto2VerificationKey(did: String, kid: String, keys: Set<Crypto2Key>): Crypto2Key {
         if (kid == did || kid.startsWith("$did#")) {
-            val fragment = kid.substringAfter('#', missingDelimiterValue = "")
+            val fragment = kid.removePrefix("$did#").takeIf { kid != did }.orEmpty()
             if (fragment.isNotEmpty()) {
                 keys.find { key ->
                     val keyId = key.id.value
                     !PublicKeyIds.isHttpKeyId(keyId) && (fragment == keyId)
                 }?.let { return it }
+                if (isDidKeyMethodFragment(did, fragment)) {
+                    keys.singleOrNull()?.let { return it }
+                }
+            } else {
+                keys.singleOrNull()?.let { return it }
             }
-            keys.singleOrNull()?.let { return it }
         }
 
         keys.find { key ->
@@ -113,4 +123,7 @@ data class DecentralizedIdentifier(val did: String, override val rawValue: Strin
 
         throw IllegalArgumentException("Key ID '$kid' from JWS not found in DID document.")
     }
+
+    private fun isDidKeyMethodFragment(did: String, fragment: String): Boolean =
+        did.startsWith("did:key:") && fragment == did.removePrefix("did:key:")
 }
