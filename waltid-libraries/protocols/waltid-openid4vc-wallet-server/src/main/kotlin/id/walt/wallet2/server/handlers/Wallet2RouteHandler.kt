@@ -181,13 +181,11 @@ object Wallet2RouteHandler {
          */
         getAccountId: (suspend RoutingCall.() -> String?)? = null,
         attestationAssembler: ClientAttestationAssembler? = null,
-        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
     ) = registerWallet2Routes(
         resolver,
         getAccountId,
         attestationAssembler,
         ClientIdTrustConfiguration(),
-        transactionDataTypeRegistry,
     )
 
     fun Route.registerWallet2Routes(
@@ -195,7 +193,20 @@ object Wallet2RouteHandler {
         getAccountId: (suspend RoutingCall.() -> String?)?,
         attestationAssembler: ClientAttestationAssembler?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
-        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+    ) = registerWallet2Routes(
+        resolver,
+        getAccountId,
+        attestationAssembler,
+        clientIdTrustConfiguration,
+        TransactionDataTypeRegistry(emptySet()),
+    )
+
+    fun Route.registerWallet2Routes(
+        resolver: WalletResolver,
+        getAccountId: (suspend RoutingCall.() -> String?)?,
+        attestationAssembler: ClientAttestationAssembler?,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ) {
         route("/wallet", { tags = listOf(WALLET_MANAGEMENT_TAG) }) {
             registerWalletManagementRoutes(
@@ -222,7 +233,7 @@ object Wallet2RouteHandler {
         getAccountId: (suspend RoutingCall.() -> String?)?,
         attestationAssembler: ClientAttestationAssembler?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
-        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ) {
 
         post("", Wallet2OpenApiDocs.createWallet()) {

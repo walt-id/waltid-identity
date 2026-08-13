@@ -35,6 +35,7 @@ import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionDataStructure
 import id.walt.verifier2.data.*
+import id.walt.verifier2.handlers.authrequest.Verifier2RequestObjectKid
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
@@ -83,16 +84,9 @@ object VerificationSessionCreator {
     ): List<Policy> =
         if (!shouldInclude || any { it.id == policy.id || it.id in equivalentPolicyIds }) this else this + policy
 
-    private suspend fun getKid(clientId: String?, key: VerifierSigningKey): String {
-        val keyId = when (key) {
-            is VerifierSigningKey.Legacy -> key.key.getKeyId()
-            is VerifierSigningKey.Crypto2 -> key.key.id.value
-        }
-        val prefix = "decentralized_identifier:"
-        return clientId
-            ?.takeIf { it.startsWith(prefix) && it.substringAfter(prefix).isNotBlank() }
-            ?.let { "${it.substringAfter(prefix)}#$keyId" }
-            ?: keyId
+    private suspend fun getKid(clientId: String?, key: VerifierSigningKey): String = when (key) {
+        is VerifierSigningKey.Legacy -> Verifier2RequestObjectKid.forClient(clientId, key.key)
+        is VerifierSigningKey.Crypto2 -> Verifier2RequestObjectKid.forClient(clientId, key.key)
     }
 
     @Deprecated("Use the crypto2 Key overload with explicit JWS and COSE algorithms for signed sessions")
@@ -583,10 +577,13 @@ object VerificationSessionCreator {
             else -> null
         }
 
+        val setupForSession =
+            if (isSignedRequest && key != null) setup.withCoreKeyIfMissing(key) else setup
+
         @Suppress("SENSELESS_COMPARISON") // TODO
         val newSession = Verification2Session(
             id = sessionId,
-            setup = setup,
+            setup = setupForSession,
             data = customData?.let { Json.encodeToJsonElement(it) },
 
             creationDate = now,
