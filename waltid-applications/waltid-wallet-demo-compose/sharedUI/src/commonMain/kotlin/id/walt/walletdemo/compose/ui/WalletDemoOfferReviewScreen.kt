@@ -100,19 +100,25 @@ fun WalletDemoOfferCreateSheet(
                 },
                 sheetState = sheetState,
             ) {
-                when (state) {
-                    WalletDemoOfferCreateUiState.Loading -> OfferCreateLoadingContent()
-                    is WalletDemoOfferCreateUiState.Review -> OfferCreateReviewContent(
-                        preview = state.preview,
-                        title = state.title,
-                        enabled = !state.submitting,
-                        onAccept = onAccept,
-                        onDecline = onDecline,
-                    )
-                    is WalletDemoOfferCreateUiState.WaitingForAuthorization -> OfferCreateWaitingForAuthorizationContent(
-                        completing = state.completing,
-                        onCancel = onCancelAuthorization,
-                    )
+                // ModalBottomSheet hosts its content in its own window, which the enclosing Box's
+                // semantics do not reach, so the export has to be repeated here or none of the
+                // sheet's test tags become resource IDs for platform UI automation.
+                Box(modifier = Modifier.exportTestTagsForPlatformAutomation()) {
+                    when (state) {
+                        WalletDemoOfferCreateUiState.Loading -> OfferCreateLoadingContent()
+                        is WalletDemoOfferCreateUiState.Review -> OfferCreateReviewContent(
+                            preview = state.preview,
+                            title = state.title,
+                            enabled = !state.submitting,
+                            onAccept = onAccept,
+                            onDecline = onDecline,
+                        )
+                        is WalletDemoOfferCreateUiState.WaitingForAuthorization ->
+                            OfferCreateWaitingForAuthorizationContent(
+                                completing = state.completing,
+                                onCancel = onCancelAuthorization,
+                            )
+                    }
                 }
             }
         }
