@@ -5,7 +5,7 @@ import kotlin.io.encoding.Base64
 
 object PemUtil {
 
-    val CERTIFICATE_CHAIN_PEM_REGEX = "-----\\s*BEGIN\\s+([^-]+)-----([^-]+)-----\\s*END\\s+([^-]+)-----".toRegex()
+    val CERTIFICATE_CHAIN_PEM_REGEX = "\\s*-----\\s*BEGIN\\s+([^-]+)-----([^-]+)-----\\s*END\\s+([^-]+)-----\\s*".toRegex()
 
     fun spitPemChain(pemChainString: String): Collection<String> =
         CERTIFICATE_CHAIN_PEM_REGEX.findAll(pemChainString)

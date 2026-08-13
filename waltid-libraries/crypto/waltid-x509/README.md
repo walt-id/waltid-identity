@@ -34,8 +34,8 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
   - IACA and Document Signer X.509 certificate generation and parsing.
   - Configurable validators with profile-compliant defaults.
 - **CSR Support**: Support for creating and fulfilling Certificate Signing Requests (CSRs) using the PKCS#10 standard.
-- **Crypto2 signing**: Generic, ISO IACA, and Document Signer certificates plus PKCS#10 CSRs use native crypto2 keys through `buildDer`.
-- **Crypto2 parsing**: Parsed certificate and CSR public keys are available as typed `EncodedKey.Jwk` values.
+- **Crypto2 signing**: Generic, ISO IACA, and Document Signer certificates plus PKCS#10 CSRs use native crypto2 keys.
+- **Crypto2 parsing**: Parsed certificate and CSR public keys are available as typed `id.walt.crypto2.keys.Key` values.
 - **Certificate extensions**: Support of most common X509 certificate extensions `KeyUsage`, `Basic Constraints`and `Subject Alternative Names` and more.
 - **Extensible certificate chain validation**: Basic validation is platform independently implemented, easy to add additional checks.
 
@@ -43,9 +43,9 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
 
 ## Targets
 
-- **JVM / Android**: Full chain validation, [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) build/parse/validate, JVM extensions.
-- **iOS**: Explicit-trust chain validation plus ISO/IEC 18013-5 build/parse/validate support. Limited set of supported key types.
-- **JS**: Explicit-trust chain validation plus ISO/IEC 18013-5 build/parse/validate support. Limited set of supported key types.
+- **JVM / Android**: Based on [Bouncy Caslte library](https://www.bouncycastle.org/) - Full chain validation, [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) build/parse/validate, JVM extensions.
+- **iOS**: Based on [Signum library](https://github.com/a-sit-plus/signum) - Explicit-trust chain validation plus ISO/IEC 18013-5 build/parse/validate support. Limited set of supported key types.
+- **JS**: Based on [Signum library](https://github.com/a-sit-plus/signum) - Explicit-trust chain validation plus ISO/IEC 18013-5 build/parse/validate support. Limited set of supported key types.
 
 > Certificate revocation checks are not yet supported. 
 > On iOS and JS system trust anchors are not supported.
@@ -68,33 +68,12 @@ include(":waltid-libraries:crypto:waltid-x509") // if used as a composite build/
 
 ---
 
-## PKIX Certificate Chain Validation
+## Quick start
 
 > Namespaces may differ slightly in your repo; adjust imports to your package.
 
-```kotlin
-// Common API (expect)
-import okio.ByteString
 
-data class CertificateDer(val bytes: ByteString)
-
-/** Validate a leaf X.509 cert against a provided chain and trust anchors. */
-@Throws(X509ValidationException::class)
-expect fun validateCertificateChain(
-    leaf: CertificateDer,
-    chain: List<CertificateDer>,
-    trustAnchors: List<CertificateDer>? = null,
-    enableTrustedChainRoot: Boolean = false,
-    enableSystemTrustAnchors: Boolean = false,
-    enableRevocation: Boolean = false
-)
-
-class X509ValidationException(message: String, cause: Throwable? = null) : Exception(message, cause)
-```
-
-### Quick start
-
-#### Create self-signed root certificate
+### Create self-signed root certificate
 
 ```kotlin
 import id.walt.certificate.x509.X509Certificate
@@ -132,7 +111,7 @@ val caCert = X509CertificateUtil.createSelfSignedCertificate(key, certSigningAlg
 }
 ```
 
-#### Create a certificate signed by the root
+### Create a certificate signed by the root
 
 ```kotlin
 import id.walt.certificate.x509.X509Certificate
@@ -152,12 +131,12 @@ val cert = X509CertificateUtil.createCertificate(issuerKey, issuerCert, certSign
 }
 ```
 
-#### Restore Subject Public Key Info (SPKI) from a certificate
+### Restore Subject Public Key Info (SPKI) from a certificate
 ```kotlin
 val publicKey = cert.restoreSubjectPublicKey(cryptoRuntime)
 ```
 
-#### Validate a certificate chain
+### Validate a certificate chain
 ```kotlin
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
@@ -192,9 +171,10 @@ INFO CN=My Leaf Certificate,O=Walt.id,C=AT/certificateSignature: '(BouncyCastle)
 INFO CN=My Leaf Certificate,O=Walt.id,C=AT/certificateSignature: 'DONE'
 ```
 
+## Configure X509CertificateUtil
 
 
-### Loading trust anchors from a JVM KeyStore (JVM helper)
+## Loading trust anchors from a JVM KeyStore (JVM helper)
 
 ```kotlin
 import id.walt.x509.CertificateDer
