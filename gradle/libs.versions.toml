@@ -1,6 +1,6 @@
 [versions]
 # Build/compilation versions
-kotlin = "2.4.0"
+kotlin = "2.4.10"
 suspend-transform = "2.4.0-0.14.0"
 jspecify = "1.0.0"
 
