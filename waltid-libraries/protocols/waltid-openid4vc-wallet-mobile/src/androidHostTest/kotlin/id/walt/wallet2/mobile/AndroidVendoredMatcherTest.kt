@@ -10,10 +10,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Pins the vendored Annex C matcher, read through the same asset API the registry uses, because its
- * absence or replacement is otherwise only observable when a verifier opens the platform picker on a
- * device. A refresh is a deliberate compatibility change rather than a file swap: see
- * `ANNEX-C-MATCHER.md`.
+ * Pins the vendored matchers, read through the same asset API the registry uses, because their absence
+ * or replacement is otherwise only observable when a verifier opens the platform picker on a device. A
+ * refresh is a deliberate compatibility change rather than a file swap: see `ANNEX-C-MATCHER.md`,
+ * `OPENID4VP-MATCHER.md`, and `OPENID4VCI-MATCHER.md`.
  *
  * The asset paths are spelled out here rather than shared with the registry, so that this asserts the
  * packaging contract instead of restating whatever path production happens to declare.
@@ -58,6 +58,18 @@ class AndroidVendoredMatcherTest {
     }
 
     @Test
+    fun openId4VpMatcherAssetIsThePinnedVendoredBuild() {
+        val matcher = assets.open("id/walt/wallet2/mobile/openid4vpmatcher.wasm")
+            .use { it.readBytes() }
+
+        assertEquals(
+            "5f1738caf65854d8999701dd54a7caafbd8c2fccc355be340e553fe16f5cfd79",
+            MessageDigest.getInstance("SHA-256").digest(matcher).joinToString("") { "%02x".format(it) },
+            "vendored matcher content changed; see OPENID4VP-MATCHER.md before repinning",
+        )
+    }
+
+    @Test
     fun openId4VciMatcherNoticeShipsBesideTheMatcher() {
         val notice = assets.open("id/walt/wallet2/mobile/NOTICE-provision_hardcoded.txt")
             .use { it.readBytes() }.decodeToString()
@@ -68,5 +80,19 @@ class AndroidVendoredMatcherTest {
         assertTrue(notice.contains("matcher/issuance/provision.c"), "notice lost the C provision source path")
         assertTrue(notice.contains("Do not attribute this binary to the Rust matcher"), "notice lost the Rust-mismatch clarification")
         assertTrue(notice.contains("release"), "notice lost the redistribution release-gate note")
+    }
+
+    @Test
+    fun thirdPartyNoticeShipsBesideTheOpenId4VpMatcher() {
+        val notice = assets.open("id/walt/wallet2/mobile/NOTICE-openid4vpmatcher.txt")
+            .use { it.readBytes() }.decodeToString()
+
+        assertTrue(
+            notice.contains("5d966fc4913cac93f3b3b11e11bdd44d3e0b5c9e"),
+            "notice lost its provenance",
+        )
+        assertTrue(notice.contains("Apache License"), "notice lost the Apache-2.0 text")
+        assertTrue(notice.contains("LLVM Exception"), "notice lost the compiler-builtins exception")
+        assertTrue(notice.contains("MIT License"), "notice lost the memchr attribution")
     }
 }

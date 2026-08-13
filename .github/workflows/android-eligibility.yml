@@ -53,6 +53,7 @@ jobs:
       pr-head-repo: ${{ inputs.pr-head-repo }}
       pr-labels: ${{ inputs.pr-labels }}
       pr-draft: ${{ inputs.pr-draft }}
+      additional-labels: '["ci:mobile"]'
       platform-name: Android
       platform-label: ci:android
       path-patterns: |

@@ -31,6 +31,11 @@ on:
         required: false
         type: boolean
         default: false
+      additional-labels:
+        description: "JSON array of additional labels that force this CI group"
+        required: false
+        type: string
+        default: "[]"
       platform-name:
         description: "Human-readable platform name for log messages"
         required: true
@@ -66,6 +71,7 @@ jobs:
         id: decide
         env:
           EVENT_NAME: ${{ inputs.event-name }}
+          ADDITIONAL_LABELS: ${{ inputs.additional-labels }}
           GH_TOKEN: ${{ github.token }}
           PATH_PATTERNS: ${{ inputs.path-patterns }}
           PLATFORM_LABEL: ${{ inputs.platform-label }}
@@ -82,6 +88,8 @@ jobs:
           set_decision() {
             echo "should-run=$1" >> "$GITHUB_OUTPUT"
             echo "reason=$2" >> "$GITHUB_OUTPUT"
+            echo "${PLATFORM_NAME} eligibility: $1"
+            echo "Reason: $2"
           }
 
           is_relevant_path() {
@@ -121,20 +129,30 @@ jobs:
               fi
 
               label_match="$(
-                jq -er --arg platform_label "$PLATFORM_LABEL" '
-                  if index($platform_label) != null then "platform"
-                  elif index("ci:mobile") != null then "mobile"
-                  else "none"
-                  end
-                ' <<< "$PR_LABELS"
+                jq -er \
+                  --arg platform_label "$PLATFORM_LABEL" \
+                  --argjson additional_labels "$ADDITIONAL_LABELS" '
+                    . as $pr_labels |
+                    if ($pr_labels | index($platform_label)) != null then "platform"
+                    elif any($additional_labels[]; . as $additional_label | ($pr_labels | index($additional_label)) != null) then "additional"
+                    else "none"
+                    end
+                  ' <<< "$PR_LABELS"
               )"
+              additional_label_names="$(jq -r 'join(", ")' <<< "$ADDITIONAL_LABELS")"
+              if [[ -n "$additional_label_names" ]]; then
+                label_requirement="$PLATFORM_LABEL or $additional_label_names"
+              else
+                label_requirement="$PLATFORM_LABEL"
+              fi
+
               case "$label_match" in
                 platform) set_decision true "$PLATFORM_LABEL label"; exit 0 ;;
-                mobile) set_decision true "ci:mobile label"; exit 0 ;;
+                additional) set_decision true "$additional_label_names label"; exit 0 ;;
               esac
 
               if [[ "$PR_DRAFT" == "true" ]]; then
-                set_decision false "draft PR without $PLATFORM_LABEL or ci:mobile label"
+                set_decision false "draft PR without $label_requirement label"
                 exit 0
               fi
 
@@ -152,7 +170,7 @@ jobs:
                 fi
               done
 
-              set_decision false "no ${PLATFORM_NAME}-relevant path changes, $PLATFORM_LABEL label, or ci:mobile label"
+              set_decision false "no ${PLATFORM_NAME}-relevant path changes, $label_requirement label"
               exit 0
               ;;
           esac
