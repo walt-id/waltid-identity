@@ -1,14 +1,22 @@
 package id.walt.openid4vp.conformance
 
+import id.walt.commons.config.ConfigManager
+import id.walt.commons.testing.E2ETest
+import id.walt.did.dids.DidService
 import id.walt.openid4vp.conformance.adapter.VciWalletConformanceAdapter
 import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
-import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.VciWalletTestPlan
-import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.VciWalletMdocDpop
-import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.VciWalletSdJwtHaip
-import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.VciWalletSdJwtDpop
+import id.walt.openid4vp.conformance.testplans.keys.TestKeyMaterial
+import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.*
 import id.walt.openid4vp.conformance.testplans.runner.VciWalletTestPlanRunner
+import id.walt.wallet2.OSSWallet2FeatureCatalog
+import id.walt.wallet2.OSSWallet2ServiceConfig
+import id.walt.wallet2.server.handlers.CreateWalletRequest
+import id.walt.wallet2.server.handlers.ImportKeyRequest
+import id.walt.wallet2.server.handlers.WalletCreatedResponse
+import id.walt.wallet2.wallet2Module
 import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
@@ -16,8 +24,11 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * VCI Wallet Conformance Tests
@@ -65,38 +76,24 @@ import kotlin.test.Test
 class VciWalletConformanceTests {
 
     companion object {
-        private val walletApiUrl = ConformanceConfig.WALLET_API_URL
+        private const val WALLET_HOST = "127.0.0.1"
+        private const val WALLET_PORT = 7016
+
+        /** Wallet2 runs in-process, so its URL is derived rather than configured. */
+        private val walletApiUrl = "http://$WALLET_HOST:$WALLET_PORT"
         private val adapterPort = 7007
         private val conformanceHost = ConformanceConfig.CONFORMANCE_HOST
         private val conformancePort = ConformanceConfig.CONFORMANCE_PORT
 
-        // Get host IP for Docker container access (host.docker.internal doesn't work on Linux)
-        private val adapterHostIp = getHostIp()
-
-        private fun getHostIp(): String {
-            return try {
-                val process = ProcessBuilder("sh", "-c", "ip route get 1.1.1.1 | awk '{print \$7; exit}'")
-                    .redirectErrorStream(true)
-                    .start()
-                val ip = process.inputStream.bufferedReader().readText().trim()
-                process.waitFor()
-                if (ip.isNotEmpty() && ip.matches(Regex("\\d+\\.\\d+\\.\\d+\\.\\d+"))) {
-                    println("[VCI Test] Host IP: $ip")
-                    ip
-                } else {
-                    println("[VCI Test] Could not determine host IP, using 127.0.0.1")
-                    "127.0.0.1"
-                }
-            } catch (_: Exception) {
-                "127.0.0.1"
-            }
-        }
+        /** Host the conformance suite must call the adapter on; see [ConformanceConfig.ADAPTER_CALLBACK_HOST]. */
+        private val adapterHostIp = ConformanceConfig.ADAPTER_CALLBACK_HOST
 
         private val conformanceAvailable = runBlocking {
             runCatching {
                 ConformanceInterface(conformanceHost, conformancePort).getServerVersion()
             }.onFailure {
-                println("""
+                println(
+                    """
                     |
                     | Conformance suite not available.
                     | To run these tests:
@@ -104,7 +101,8 @@ class VciWalletConformanceTests {
                     |   2. docker compose -f docker-compose-walt.yml up -d
                     |   3. Wait ~30s for startup
                     |
-                """.trimMargin())
+                """.trimMargin()
+                )
             }
         }
 
@@ -144,9 +142,9 @@ class VciWalletConformanceTests {
         }
     }
 
-    private suspend fun runPlan(plan: VciWalletTestPlan) {
+    private suspend fun runPlan(plan: VciWalletTestPlan, walletId: String) {
         val httpClient = createHttpClient()
-        val adapter = startAdapterIfNeeded(httpClient)
+        val adapter = startAdapterIfNeeded(httpClient, walletId)
         val adapterBaseUrl = "http://127.0.0.1:$adapterPort"
 
         try {
@@ -165,7 +163,10 @@ class VciWalletConformanceTests {
         }
     }
 
-    private suspend fun startAdapterIfNeeded(httpClient: HttpClient): VciWalletConformanceAdapter? {
+    private suspend fun startAdapterIfNeeded(
+        httpClient: HttpClient,
+        walletId: String,
+    ): VciWalletConformanceAdapter? {
         val adapterAlreadyRunning = try {
             val response = httpClient.get("http://127.0.0.1:$adapterPort/health")
             response.status.isSuccess()
@@ -181,7 +182,8 @@ class VciWalletConformanceTests {
         println("[VCI Test] Starting adapter on port $adapterPort")
         return VciWalletConformanceAdapter(
             walletApiUrl = walletApiUrl,
-            adapterPort = adapterPort
+            adapterPort = adapterPort,
+            walletId = walletId,
         ).also { it.start(httpClient) }
     }
 
@@ -190,17 +192,39 @@ class VciWalletConformanceTests {
      *
      * Tests wallet's complete credential issuance flow:
      * 1. Receive credential offer from issuer
-     * 2. Discover issuer metadata  
+     * 2. Discover issuer metadata
      * 3. Initiate authorization code flow
      * 4. Exchange auth code for tokens with DPoP
      * 5. Request credential with proof
      * 6. Validate and store issued SD-JWT VC
-     * 
+     *
      * Uses credential configuration ID: eu.europa.ec.eudi.pid.1 (SD-JWT VC format)
+     */
+    /**
+     * SD-JWT VC + DPoP + pre-authorized code.
+     *
+     * The grant Wallet2 can complete in a single call, so the adapter delegates rather than
+     * orchestrating the exchange itself. See [VciWalletSdJwtPreAuth].
      */
     @Test
     @EnabledIf("isConformanceAvailable")
-    fun vciWalletSdJwtVcDpopAuthorizationCode() = runBlocking {
+    fun vciWalletSdJwtVcPreAuthorizedCode() = withInProcessWallet { walletId ->
+        runPlan(
+            VciWalletSdJwtPreAuth(
+                walletApiUrl = walletApiUrl,
+                credentialOfferEndpoint = "http://127.0.0.1:$adapterPort/credential-offer",
+                redirectUri = "http://127.0.0.1:$adapterPort/callback",
+                conformanceHost = conformanceHost,
+                conformancePort = conformancePort,
+                adapterHost = adapterHostIp,
+            ),
+            walletId,
+        )
+    }
+
+    @Test
+    @EnabledIf("isConformanceAvailable")
+    fun vciWalletSdJwtVcDpopAuthorizationCode() = withInProcessWallet { walletId ->
         runPlan(
             VciWalletSdJwtDpop(
                 walletApiUrl = walletApiUrl,
@@ -209,9 +233,9 @@ class VciWalletConformanceTests {
                 conformanceHost = conformanceHost,
                 conformancePort = conformancePort,
                 adapterHost = adapterHostIp
-            )
+            ),
+            walletId,
         )
-        Unit  // JUnit 5 requires void return
     }
 
     /**
@@ -229,7 +253,7 @@ class VciWalletConformanceTests {
      */
     @Test
     @EnabledIf("isConformanceAvailable")
-    fun vciWalletIsoMdocDpopAuthorizationCode() = runBlocking {
+    fun vciWalletIsoMdocDpopAuthorizationCode() = withInProcessWallet { walletId ->
         runPlan(
             VciWalletMdocDpop(
                 walletApiUrl = walletApiUrl,
@@ -238,9 +262,9 @@ class VciWalletConformanceTests {
                 conformanceHost = conformanceHost,
                 conformancePort = conformancePort,
                 adapterHost = adapterHostIp
-            )
+            ),
+            walletId,
         )
-        Unit  // JUnit 5 requires void return
     }
 
     /**
@@ -252,7 +276,7 @@ class VciWalletConformanceTests {
      */
     @Test
     @EnabledIf("isConformanceAvailable")
-    fun vciWalletSdJwtVcAuthorizationCodeHaipFullTarget() = runBlocking {
+    fun vciWalletSdJwtVcAuthorizationCodeHaipFullTarget() = withInProcessWallet { walletId ->
         runPlan(
             VciWalletSdJwtHaip(
                 walletApiUrl = walletApiUrl,
@@ -261,8 +285,62 @@ class VciWalletConformanceTests {
                 conformanceHost = conformanceHost,
                 conformancePort = conformancePort,
                 adapterHost = adapterHostIp
-            )
+            ),
+            walletId,
         )
-        Unit  // JUnit 5 requires void return
+    }
+
+    /**
+     * Run [block] against a freshly created wallet in an in-process Wallet2.
+     *
+     * Mirrors how Verifier2 is hosted for the verifier suite: no separately launched service and no
+     * fixed external port to coordinate. Unlike the presentation suite no *credential* is provisioned -
+     * OpenID4VCI is about receiving one.
+     *
+     * A signing key is still required: the credential request carries a JWT proof of possession, so
+     * with no key `receiveCredential` fails before it ever contacts the issuer. The wallet imports
+     * [TestKeyMaterial.SUITE_WALLET_CLIENT_KEY] rather than generating one, because the same key also
+     * signs the `private_key_jwt` client assertion and must therefore match the `client.jwks` the
+     * plan registers with the suite.
+     *
+     * No DID is created - `buildJwtProof` binds the proof to the raw JWK when the wallet has no DID,
+     * which is the natural binding for SD-JWT VC (`cnf.jwk`).
+     */
+    private fun withInProcessWallet(block: suspend (walletId: String) -> Unit) {
+        E2ETest(WALLET_HOST, WALLET_PORT, failEarly = true).testBlock(
+            timeout = 30.minutes,
+            features = listOf(OSSWallet2FeatureCatalog),
+            preload = {
+                ConfigManager.preloadConfig(
+                    "wallet-service",
+                    OSSWallet2ServiceConfig(publicBaseUrl = Url(walletApiUrl)),
+                )
+            },
+            init = { DidService.minimalInit() },
+            module = { wallet2Module(withPlugins = false) },
+        ) {
+            val walletId = testAndReturn("Create wallet") {
+                testHttpClient().post("/wallet") {
+                    contentType(ContentType.Application.Json)
+                    setBody(CreateWalletRequest())
+                }.also { assertEquals(HttpStatusCode.Created, it.status) }
+                    .body<WalletCreatedResponse>().walletId
+            }
+
+            test("Import the pre-registered client key the wallet authenticates with") {
+                testHttpClient().post("/wallet/$walletId/keys/import") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        ImportKeyRequest(
+                            key = Json.parseToJsonElement(
+                                TestKeyMaterial.SUITE_WALLET_CLIENT_SERIALIZED_KEY
+                            ).jsonObject
+                        )
+                    )
+                }.also { assertEquals(HttpStatusCode.Created, it.status) }
+            }
+
+            block(walletId)
+        }
     }
 }
