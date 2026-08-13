@@ -441,47 +441,69 @@ class DigitalCredentialSharingE2ETest {
     }
 
     /**
-     * The wallet registers only `openid4vp-v1-unsigned`, and the vendored matcher honours that: a signed
-     * or multisigned request must not surface this wallet at all, because it cannot fulfill one.
+     * The wallet registers unsigned and signed compact OpenID4VP, but not multisigned. A multisigned
+     * request must not surface this wallet, because it cannot fulfill JWS JSON Serialization.
      *
-     * Each unsupported request carries the *same* OpenID4VP payload that
+     * The unsupported request carries the *same* OpenID4VP payload that
      * [sharesMdocThroughClearOpenId4VpDcApi] matches successfully, re-wrapped into the structurally valid
-     * signed and multisigned shapes the matcher's own parsers accept (see [signedDcApiRequest] and
-     * [multisignedDcApiRequest]). That is what makes this decisive rather than incidental: relabelling
-     * the protocol alone would also pass simply because the payload no longer parses. Here, if protocol
-     * filtering stopped working - the registry advertising a signed protocol, or the matcher ignoring
-     * `supported_protocols` - the matcher would decode these payloads, run the same mDL DCQL query, and
-     * surface the issued mDL, failing this test.
+     * multisigned shape the matcher's own parser accepts (see [multisignedDcApiRequest]). That is what
+     * makes this decisive rather than incidental: relabelling the protocol alone would also pass simply
+     * because the payload no longer parses.
      *
      * Asserted through the real caller rather than the picker, because "no provider" is what the caller
      * observes.
      */
     @Test
-    fun doesNotSurfaceForSignedOrMultisignedRequests() = runBlocking {
+    fun doesNotSurfaceForMultisignedRequests() = runBlocking {
         val fixture = fixture()
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
         val session = DemoTestBackend.createDcApiVerifierSession(
             scenario = scenario,
             expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
         )
-        // The payload a matchable unsigned request carries, transplanted verbatim below.
         val openId4VpPayload = requireNotNull(
             Json.parseToJsonElement(session.requestJson).jsonObject["requests"]
                 ?.jsonArray?.firstOrNull()?.jsonObject?.get("data")?.jsonObject,
         ) { "Unsigned DC API request carries no object 'data': ${session.requestJson}" }
 
-        listOf(
-            "openid4vp-v1-signed" to signedDcApiRequest(openId4VpPayload),
-            "openid4vp-v1-multisigned" to multisignedDcApiRequest(openId4VpPayload),
-        ).forEach { (protocol, request) ->
-            val requestHandle = fixture.startCredentialRequest(request)
-            fixture.awaitUnsupportedRequestEmptyState(requestHandle, protocol, MDL_DOC_TYPE)
-            val outcome = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) { requestHandle.await() }
+        val requestHandle = fixture.startCredentialRequest(multisignedDcApiRequest(openId4VpPayload))
+        fixture.awaitUnsupportedRequestEmptyState(requestHandle, "openid4vp-v1-multisigned", MDL_DOC_TYPE)
+        val outcome = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) { requestHandle.await() }
+        assertNotNull(
+            "openid4vp-v1-multisigned produced a credential: ${outcome.getOrNull()}",
+            outcome.exceptionOrNull(),
+        )
+        fixture.device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT)
+    }
+
+    /**
+     * Signed compact Request Objects are advertised to Credential Manager. The matcher does not verify
+     * the JAR, so a structurally valid signed wrapper of a matchable unsigned payload must surface the
+     * issued mDL. Cryptographic verification of that JAR is covered by the wallet SDK tests rather than
+     * this OS-mediated picker assertion.
+     */
+    @Test
+    fun surfacesForSignedRequests() = runBlocking {
+        val fixture = fixture()
+        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
+        val session = DemoTestBackend.createDcApiVerifierSession(
+            scenario = scenario,
+            expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
+        )
+        val openId4VpPayload = requireNotNull(
+            Json.parseToJsonElement(session.requestJson).jsonObject["requests"]
+                ?.jsonArray?.firstOrNull()?.jsonObject?.get("data")?.jsonObject,
+        ) { "Unsigned DC API request carries no object 'data': ${session.requestJson}" }
+
+        val requestHandle = fixture.startCredentialRequest(signedDcApiRequest(openId4VpPayload))
+        try {
             assertNotNull(
-                "$protocol produced a credential: ${outcome.getOrNull()}",
-                outcome.exceptionOrNull(),
+                "Credential Manager did not surface a signed-request candidate.\n" +
+                    pickerDiagnostic(requestHandle, MDL_DOC_TYPE, candidateSelected = false),
+                fixture.device.wait(Until.findObject(By.textContains(MDL_DOC_TYPE)), UI_ELEMENT_TIMEOUT),
             )
-            fixture.device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT)
+        } finally {
+            requestHandle.abandon()
         }
     }
 

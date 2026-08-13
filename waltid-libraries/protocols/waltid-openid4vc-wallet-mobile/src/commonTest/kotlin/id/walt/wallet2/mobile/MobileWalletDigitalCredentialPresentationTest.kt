@@ -10,6 +10,8 @@ import id.walt.cose.toCoseKey
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.MdocsExamples
 import id.walt.credentials.examples.SdJwtExamples
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
@@ -26,6 +28,8 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.Document
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.wallet2.data.HolderKeyBindingErrorCode
 import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.StoredCredential
@@ -34,15 +38,21 @@ import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.withImportedHolderKeyBinding
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
+import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -169,6 +179,53 @@ class MobileWalletDigitalCredentialPresentationTest {
             selectedCredentialOptions = preview.credentialOptions.selections(),
         )
 
+        val data = Json.parseToJsonElement(response.dataJson).jsonObject
+        assertEquals(setOf("response"), data.keys)
+        val jwe = assertNotNull(data["response"]?.jsonPrimitive?.content)
+        assertEquals(5, jwe.split('.').size, "response is not a compact JWE: $jwe")
+        assertFalse(jwe.contains("vp_token"), "the response members leaked outside the JWE ciphertext")
+    }
+
+    /**
+     * Signed DC API request plus `dc_api.jwt`: the JAR authenticates `client_id`, and the platform
+     * still only relays ciphertext. The two protections are independent, so covering them together
+     * is what the unsigned+encrypted and signed+cleartext cases cannot.
+     */
+    @Test
+    fun aSignedEncryptedRequestAuthenticatesTheClientAndReturnsOnlyAJwe() = runTest {
+        val verifierKey = JWKKey.generate(KeyType.Ed25519)
+        val trust = ClientIdTrustConfiguration(
+            preRegisteredClients = mapOf(
+                "verifier2" to ClientMetadata(
+                    jwks = ClientMetadata.Jwks(listOf(verifierKey.getPublicKey().exportJWKObject())),
+                )
+            ),
+        )
+        val fixture = walletFixture(sdJwtCredential(), clientIdTrustConfiguration = trust)
+        val preview = fixture.wallet.previewDigitalCredentialPresentation(
+            dcApiRequest(
+                protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
+                data = signedRequestObject(
+                    key = verifierKey,
+                    unsignedPayload = Json.parseToJsonElement(
+                        sdJwtQuery(responseMode = "dc_api.jwt", clientMetadata = ENCRYPTION_CLIENT_METADATA),
+                    ).jsonObject,
+                ),
+                selectedRegistryEntryIds = listOf(fixture.registryEntryId("pid-1")),
+            )
+        )
+
+        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED, preview.protocol)
+        assertEquals("verifier2", preview.request.clientId)
+        assertEquals("dc_api.jwt", preview.request.responseMode)
+        assertEquals(MobileWalletReaderTrust.NotApplicable, preview.readerTrust)
+
+        val response = fixture.wallet.submitDigitalCredentialPresentation(
+            requestId = preview.requestId,
+            selectedCredentialOptions = preview.credentialOptions.selections(),
+        )
+
+        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED, response.protocol)
         val data = Json.parseToJsonElement(response.dataJson).jsonObject
         assertEquals(setOf("response"), data.keys)
         val jwe = assertNotNull(data["response"]?.jsonPrimitive?.content)
@@ -471,6 +528,7 @@ class MobileWalletDigitalCredentialPresentationTest {
     private suspend fun walletFixture(
         vararg credentials: StoredCredential,
         transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+        clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
     ): Fixture {
         // The DC API is a crypto2-only surface, so the wallet holds nothing but a managed key.
         return walletFixtureWithKeys(
@@ -507,6 +565,7 @@ class MobileWalletDigitalCredentialPresentationTest {
             credentialStore = credentialStore,
             generateAndPersistKey = { _, _ -> error("Digital Credentials presentation must not bootstrap a key") },
             transactionDataProfiles = transactionDataProfiles,
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
             credentialRegistry = registry,
         )
         return Fixture(wallet, registry, credentialStore)
@@ -524,12 +583,32 @@ class MobileWalletDigitalCredentialPresentationTest {
     private fun dcApiRequest(
         data: String,
         selectedRegistryEntryIds: List<String> = emptyList(),
+        protocol: String = MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
     ) = MobileWalletDigitalCredentialRequest(
-        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+        protocol = protocol,
         dataJson = data,
         verifiedOrigin = "https://verifier.example",
         selectedRegistryEntryIds = selectedRegistryEntryIds,
     )
+
+    private suspend fun signedRequestObject(
+        key: JWKKey,
+        unsignedPayload: JsonObject,
+    ): String {
+        val payload = buildJsonObject {
+            unsignedPayload.forEach { (name, value) ->
+                if (name != "client_id") put(name, value)
+            }
+            put("client_id", "verifier2")
+            put("aud", AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE)
+            put("expected_origins", buildJsonArray { add(JsonPrimitive("https://verifier.example")) })
+        }
+        val requestObject = key.signJws(
+            payload.toString().encodeToByteArray(),
+            mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
+        )
+        return buildJsonObject { put("request", JsonPrimitive(requestObject)) }.toString()
+    }
 
     private fun sdJwtQuery(
         responseMode: String = "dc_api",
