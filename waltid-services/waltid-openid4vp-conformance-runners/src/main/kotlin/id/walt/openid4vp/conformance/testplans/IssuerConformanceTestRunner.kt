@@ -3,16 +3,10 @@ package id.walt.openid4vp.conformance.testplans
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.http.IssuerInterface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
-import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariant
-import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantMatrix
-import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantReportWriter
-import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantRunResult
-import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantRunStatus
-import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantSelection
-import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.Oid4vciIssuerVariantPlan
+import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.*
 import id.walt.openid4vp.conformance.testplans.runner.IssuerTestPlanRunner
+import id.walt.openid4vp.conformance.utils.JsonUtils.lenientJson
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -55,7 +49,8 @@ class IssuerConformanceTestRunner(
         return try {
             val metadataHttp = HttpClient {
                 install(ContentNegotiation) {
-                    json()
+                    // Tolerate response fields added by newer conformance-suite releases
+                    json(lenientJson)
                 }
             }
             try {
@@ -119,7 +114,10 @@ class IssuerConformanceTestRunner(
                 println("Running issuer matrix variant ${index + 1}/${selectedVariants.size}: ${variant.id}")
                 val credentialConfigurationId = credentialConfigurationIdFor(variant, resolvedIds)
                 if (credentialConfigurationId == null) {
-                    results += blockedResult(variant, "No issuer metadata credential configuration id found for ${variant.credentialFormat}.")
+                    results += blockedResult(
+                        variant,
+                        "No issuer metadata credential configuration id found for ${variant.credentialFormat}."
+                    )
                     return@forEachIndexed
                 }
 
@@ -157,7 +155,7 @@ class IssuerConformanceTestRunner(
             val failingResults = results.filter { it.status != IssuerVariantRunStatus.PASSED }
             require(failingResults.isEmpty()) {
                 "OpenID4VCI issuer matrix strict mode failed for ${failingResults.size} variants. " +
-                    "See ${variantSelection.reportDir}/summary.md"
+                        "See ${variantSelection.reportDir}/summary.md"
             }
         }
 
@@ -181,7 +179,7 @@ class IssuerConformanceTestRunner(
 
         require(response.status.value in 200..299) {
             "Issuer metadata endpoint returned ${response.status} for $metadataUrl. " +
-                "Body: ${responseBody.take(1_000)}"
+                    "Body: ${responseBody.take(1_000)}"
         }
 
         val metadata = runCatching {
@@ -190,8 +188,8 @@ class IssuerConformanceTestRunner(
         }.getOrElse {
             error(
                 "Issuer metadata endpoint returned ${response.status} for $metadataUrl, but the body was not a JSON object. " +
-                    "Content-Type: ${response.headers[HttpHeaders.ContentType] ?: "<none>"}. " +
-                    "Body: ${responseBody.take(1_000)}"
+                        "Content-Type: ${response.headers[HttpHeaders.ContentType] ?: "<none>"}. " +
+                        "Body: ${responseBody.take(1_000)}"
             )
         }
         println("✅ Issuer metadata endpoint responding: $metadataUrl")
