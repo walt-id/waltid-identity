@@ -436,6 +436,7 @@ All configuration files live in `config/` and are loaded automatically at startu
 | File                       | Purpose                                                       |
 |----------------------------|---------------------------------------------------------------|
 | `_features.conf`           | Feature flags: `auth`, `wallet2-persistence`, `dev-mode`      |
+| `dev-mode.conf`            | Development-mode settings, including DID Web HTTP resolver support |
 | `wallet-service.conf`      | `publicBaseUrl` - the external URL of this service (required) |
 | `wallet2-persistence.conf` | JDBC URL + driver for SQLite or Postgres                      |
 | `web.conf`                 | `webHost` + `webPort` (default `0.0.0.0:7005`)                |
