@@ -194,6 +194,42 @@ object DemoClientIdTrust {
         -----END CERTIFICATE-----
     """.trimIndent()
 
+    /** Certificates for Authologic demos */
+
+    val AUTHOLOGIC_VERIFIER_PEM = """
+        -----BEGIN CERTIFICATE-----
+        MIIClzCCAj6gAwIBAgIUN8ilrsD3z/GdAtRss8ZauIptoSUwCgYIKoZIzj0EAwIw
+        gYQxCzAJBgNVBAYTAlBMMRQwEgYDVQQIDAtNYXpvd2llY2tpZTEPMA0GA1UEBwwG
+        V2Fyc2F3MRMwEQYDVQQKDApBdXRob2xvZ2ljMREwDwYDVQQLDAhWZXJpZmllcjEm
+        MCQGA1UEAwwddmVyaWZpZXIuZGV2ZWwuYXV0aG9sb2dpYy5jb20wHhcNMjYwMjIz
+        MTIyODE4WhcNMjcwMjIzMTIyODE4WjCBhDELMAkGA1UEBhMCUEwxFDASBgNVBAgM
+        C01hem93aWVja2llMQ8wDQYDVQQHDAZXYXJzYXcxEzARBgNVBAoMCkF1dGhvbG9n
+        aWMxETAPBgNVBAsMCFZlcmlmaWVyMSYwJAYDVQQDDB12ZXJpZmllci5kZXZlbC5h
+        dXRob2xvZ2ljLmNvbTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABDndzENVECsj
+        NOcY7xZjLVw9q9WgNzOv0B7Ba9hxcin+FEa9FNCuIVOMWtYZhdeh/NVn9s9mbjbx
+        /Ak4XZfuO82jgYswgYgwDgYDVR0PAQH/BAQDAgeAMAwGA1UdEwEB/wQCMAAwHQYD
+        VR0OBBYEFB7KBw+B5xgRhuUUK7ktHEkGc7lJMB8GA1UdIwQYMBaAFB7KBw+B5xgR
+        huUUK7ktHEkGc7lJMCgGA1UdEQQhMB+CHXZlcmlmaWVyLmRldmVsLmF1dGhvbG9n
+        aWMuY29tMAoGCCqGSM49BAMCA0cAMEQCIEx7YjQP1QKik0bG90iLuP3+VG+/44EY
+        H3jrNwtSsd52AiAORJyqaFYvO5L8Wg01DFXYICumvhMZmrluzuOggqQVXg==
+        -----END CERTIFICATE-----
+    """.trimIndent()
+
+    val AUTHOLOGIC_READER_PEM = """
+        -----BEGIN CERTIFICATE-----
+        MIIB3DCCAYOgAwIBAgIUcMNDYnHDDVHpOP3Hr7ICtlcYLuwwCgYIKoZIzj0EAwIw
+        RDEgMB4GA1UEAwwXQXV0aG9sb2dpYyBWZXJpZmllciBEZXYxEzARBgNVBAoMCkF1
+        dGhvbG9naWMxCzAJBgNVBAYTAlBMMB4XDTI1MTAyODA4MDUxMVoXDTI2MTAyODA4
+        MDUxMVowRDEgMB4GA1UEAwwXQXV0aG9sb2dpYyBWZXJpZmllciBEZXYxEzARBgNV
+        BAoMCkF1dGhvbG9naWMxCzAJBgNVBAYTAlBMMFkwEwYHKoZIzj0CAQYIKoZIzj0D
+        AQcDQgAEkbbJTcjOozGhwx/6GtH1hh5BWbRd/CZL95Cy0LUj9gQmHEA9DzBzqhmz
+        UzD9DCVjTeaJ7smnyMIEkotFQSANb6NTMFEwHQYDVR0OBBYEFAtXR3HJegYDnF7e
+        dbc3tiwfzytmMB8GA1UdIwQYMBaAFAtXR3HJegYDnF7edbc3tiwfzytmMA8GA1Ud
+        EwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDRwAwRAIhAJ0ak5Vluoj6irVz5CjuAcUe
+        ivkGqOZBNz0HMNc86pgvAh9VgANGh61oaZL5S9FfCr6PtcBABmmIo3ejZwDdLCms
+        -----END CERTIFICATE-----
+    """.trimIndent()
+
     /**
      * PEM trust anchors passed into [id.walt.wallet2.mobile.MobileWalletFactory.create].
      *
@@ -216,6 +252,8 @@ object DemoClientIdTrust {
         PID_NL_CA_PEM,
         PID_PT_CA_PEM,
         PID_UT_CA_PEM,
+        AUTHOLOGIC_VERIFIER_PEM,
+        AUTHOLOGIC_READER_PEM,
     )
 
     val configuration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(
