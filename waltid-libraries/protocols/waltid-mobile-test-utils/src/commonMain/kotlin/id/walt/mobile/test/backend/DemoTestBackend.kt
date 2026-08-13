@@ -144,7 +144,11 @@ object DemoTestBackend {
         val verifierCredentialQuery: JsonObject,
     )
 
-    data class GeneratedOffer(val offerUrl: String, val txCode: String?)
+    /**
+     * @property offerId The issuer-side session id, so callers can poll `/issuer2/sessions/{id}`
+     *   to confirm the issuer actually completed issuance rather than trusting a wallet-side ack.
+     */
+    data class GeneratedOffer(val offerUrl: String, val txCode: String?, val offerId: String)
 
     data class VerifierSession(val sessionId: String, val authorizationRequestUri: String)
 
@@ -154,13 +158,23 @@ object DemoTestBackend {
      */
     data class DcApiVerifierSession(val sessionId: String, val requestJson: String)
 
+    /**
+     * Creates a pre-authorized credential offer on the public demo issuer2.
+     *
+     * [inlineOffer] requests `valueMode=BY_VALUE`, so the returned URL carries a `credential_offer`
+     * query parameter instead of a `credential_offer_uri`. The issuer defaults to `BY_REFERENCE`,
+     * which is what the QR and deep link flows consume; DC API issuance needs the offer object itself
+     * because it is passed to `navigator.credentials.create` / Credential Manager verbatim.
+     */
     suspend fun createOffer(
         scenario: CredentialScenario,
         withGeneratedTransactionCode: Boolean = false,
+        inlineOffer: Boolean = false,
     ): GeneratedOffer {
         val payload = buildJsonObject {
             put("profileId", scenario.profileId)
             put("authMethod", "PRE_AUTHORIZED")
+            if (inlineOffer) put("valueMode", "BY_VALUE")
             if (withGeneratedTransactionCode) {
                 putJsonObject("txCode") {
                     put("input_mode", "numeric")
@@ -181,8 +195,55 @@ object DemoTestBackend {
         check(!withGeneratedTransactionCode || txCode != null) {
             "Public demo issuer2 did not return the requested transaction code: $response"
         }
+        val offerId = response["offerId"]?.jsonPrimitive?.contentOrNull
+            ?: error("Missing offerId in public demo issuer2 response: $response")
 
-        return GeneratedOffer(offerUrl = offerUrl, txCode = txCode)
+        return GeneratedOffer(
+            offerUrl = offerUrl,
+            txCode = txCode,
+            offerId = offerId,
+        )
+    }
+
+    /**
+     * Lifecycle status of an offer session, e.g. `ACTIVE` or `SUCCESSFUL`.
+     *
+     * Deliberately narrow: this endpoint also returns the issuer signing key and the full credential
+     * payload, so nothing but the status is lifted out of the response and it is never logged whole.
+     */
+    suspend fun issuerSessionStatus(offerId: String): String? {
+        val response = client.get("$ISSUER_BASE_URL/issuer2/sessions/$offerId")
+        check(response.status.isSuccess()) {
+            "Public demo issuer2 session lookup failed: ${response.status}"
+        }
+        return json.parseToJsonElement(response.bodyAsText())
+            .jsonObject["status"]?.jsonPrimitive?.contentOrNull
+    }
+
+    /**
+     * Waits until issuer2 closes the offer session, i.e. the credential was actually issued.
+     *
+     * The DC API create flow gives the caller no trustworthy completion signal of its own: the
+     * provider acknowledgment is built from constants, so asserting on it proves nothing about
+     * issuance. This is the authoritative signal that the protocol ran to completion.
+     */
+    suspend fun waitForIssuerIssuanceSuccess(offerId: String, timeoutMs: Long = 60_000) {
+        val mark = TimeSource.Monotonic.markNow()
+        while (true) {
+            val status = runCatching { issuerSessionStatus(offerId) }.getOrNull()
+            when (status?.uppercase()) {
+                "SUCCESSFUL" -> return
+                "UNSUCCESSFUL", "REJECTED_BY_USER", "EXPIRED" ->
+                    error("public demo issuer2 reported $status for offer session $offerId")
+            }
+            if (mark.elapsedNow() > timeoutMs.milliseconds) {
+                error(
+                    "public demo issuer2 did not complete issuance within ${timeoutMs}ms for offer " +
+                        "session $offerId (last status ${status ?: "<unavailable>"})"
+                )
+            }
+            delay(2_000.milliseconds)
+        }
     }
 
     suspend fun createVerifierSession(scenario: CredentialScenario): VerifierSession {
