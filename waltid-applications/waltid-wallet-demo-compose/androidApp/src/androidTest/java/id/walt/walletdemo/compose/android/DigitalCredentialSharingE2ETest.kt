@@ -34,8 +34,11 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertClaimValueVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextContainingVisibleAfterScrolling
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextContainingVisibleInForegroundWindow
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.foregroundWindowSnapshot
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.sendDeepLink
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
@@ -57,8 +60,10 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.security.MessageDigest
@@ -182,6 +187,197 @@ class DigitalCredentialSharingE2ETest {
     }
 
     /**
+     * The EUDI TS-12 SCA payment demo: an mdoc plus one `urn:eudi:sca:payment:1` transaction data entry
+     * whose payload nests (`payee.name`) where the walt.id payment-authorization type is flat, presented
+     * together with a second credential the transaction data is *not* bound to - the entry names only the
+     * payment card, and the age credential comes from an independent DCQL query.
+     *
+     * Four things this shape exercises, each of which fails silently rather than loudly if broken:
+     *
+     * 1. The matcher dispatches on the transaction data type. For `urn:eudi:sca:payment:1` it
+     *    reads `payload.payee.name` and `payload.currency`/`payload.amount`; pairing that payload with a
+     *    different type sends it down a flat-field branch, which finds nothing and produces a prompt with
+     *    no payment details. Asserted on Credential Manager's own prompt, not just the wallet's.
+     * 2. The wallet's review has to say what is being authorized, so nested leaves are qualified with the
+     *    object they came from - "Payee name", not a bare "Name".
+     * 3. Signing the transaction data requires its type to be authorized in the mdoc MSO's
+     *    KeyAuthorizations. Without that the wallet cannot sign, and
+     *    `mso_mdoc/transaction-data-hash-check` is what proves it did.
+     * 4. Combining the two is what AndroidX's embedded matcher cannot report, and the reason the wallet
+     *    vendors Google's newer one (see `OPENID4VP-MATCHER.md`): it declares the option with arity 2 and
+     *    then emits only the payment credential, so the platform discards the whole option and the picker
+     *    shows nothing at all. The fault is in its transaction data reporting path rather than in DCQL
+     *    matching. What has to hold instead is that both credentials reach the same option, the payment
+     *    prompt still renders, and the transaction data binds to the payment card alone.
+     */
+    @Test
+    @Ignore(
+        "Enable once the urn:eudi:sca:payment:1 transaction data profile, the scaPaymentCardMdoc " +
+            "issuance profile from this branch and euAgeVerificationMdoc are deployed together to " +
+            "verifier2.demo.walt.id and issuer2.demo.walt.id.",
+    )
+    fun sharesMdocWithScaPaymentTransactionDataAndSecondCredential() = runBlocking {
+        val fixture = start() ?: return@runBlocking
+        val scaScenario = DemoTestBackend.presentationScenarios.first { it.id == "sca-payment-card" }
+        val ageScenario = DemoTestBackend.presentationScenarios.first { it.id == "eu-age-verification" }
+        fixture.issue(scaScenario)
+        fixture.issue(ageScenario)
+
+        val transactionData = DemoTestBackend.scaPaymentTransactionData(credentialId = SCA_CREDENTIAL_QUERY_ID)
+        val session = DemoTestBackend.createDcApiVerifierSession(
+            credentialQueries = listOf(scaScenario.verifierCredentialQuery, ageScenario.verifierCredentialQuery),
+            expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
+            transactionData = listOf(transactionData),
+        )
+
+        val credential = fixture.share(
+            requestJson = session.requestJson,
+            candidateText = SCA_DOC_TYPE,
+            onCredentialManagerPrompt = { device ->
+                // The payment prompt survives the second credential: these come from the matcher's
+                // payment entry, which is the half AndroidX's matcher drops the whole option over.
+                listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, SCA_AMOUNT_TEXT).forEach { expected ->
+                    assertTextContainingVisibleInForegroundWindow(
+                        device = device,
+                        substring = expected,
+                        message = "Credential Manager prompt did not show '$expected'",
+                    )
+                }
+                // And the age credential is in the same option rather than a separate one, which is
+                // what makes this a combined presentation instead of two consecutive requests.
+                assertTextContainingVisibleInForegroundWindow(
+                    device = device,
+                    substring = AGE_DOC_TYPE,
+                    message = "Credential Manager prompt did not surface the second credential",
+                )
+            },
+            beforeShare = { device ->
+                // Labels as well as values: an unqualified "Name" row is the regression this guards.
+                assertClaimValueVisibleAfterScrolling(
+                    device = device,
+                    path = "transactionData[0].details.payload.payee.name",
+                    label = "Payee name",
+                    expectedValues = listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME),
+                    message = "SCA payee name missing from the wallet review",
+                )
+                assertClaimValueVisibleAfterScrolling(
+                    device = device,
+                    path = "transactionData[0].details.payload.amount",
+                    label = "Amount",
+                    expectedValues = listOf(SCA_AMOUNT_TEXT),
+                    message = "SCA payment amount missing from the wallet review",
+                )
+                assertClaimValueVisibleAfterScrolling(
+                    device = device,
+                    path = "transactionData[0].details.payload.currency",
+                    label = "Currency",
+                    expectedValues = listOf(DemoTestBackend.SCA_PAYMENT_CURRENCY),
+                    message = "SCA payment currency missing from the wallet review",
+                )
+                // The review received both credentials, not just the one the prompt was built from.
+                // The requested disclosure is asserted rather than the credential card, because a card
+                // would also appear for a credential the platform offered without any claims selected.
+                assertTextContainingVisibleAfterScrolling(
+                    device = device,
+                    substring = AGE_DISCLOSURE_LABEL,
+                    message = "Review did not receive the second credential",
+                )
+            },
+        )
+
+        val responseJson = Json.parseToJsonElement(credential.credentialJson).jsonObject
+        assertEquals("openid4vp-v1-unsigned", responseJson["protocol"]?.jsonPrimitive?.content)
+        val vpToken = requireNotNull(responseJson["data"]?.jsonObject?.get("vp_token")?.jsonObject) {
+            "Response carries no vp_token: $responseJson"
+        }
+        assertEquals(
+            "Combined presentation must answer both queries: ${vpToken.keys}",
+            setOf(SCA_CREDENTIAL_QUERY_ID, AGE_CREDENTIAL_QUERY_ID),
+            vpToken.keys,
+        )
+
+        assertVerifierAccepted(
+            sessionId = session.sessionId,
+            responseJson = credential.credentialJson,
+            presentedCredentialId = SCA_CREDENTIAL_QUERY_ID,
+            requiredPolicyIds = MDOC_REQUIRED_POLICIES + "mso_mdoc/transaction-data-hash-check",
+        )
+        // Named separately: the verifier reports per credential, and this is what proves the age
+        // credential was verified rather than merely carried along.
+        assertNotNull(
+            "Verifier did not report the second credential",
+            DemoTestBackend.verifierSessionInfo(session.sessionId)["presented_credentials"]
+                ?.jsonObject?.get(AGE_CREDENTIAL_QUERY_ID),
+        )
+    }
+
+    /**
+     * The wallet registers only `openid4vp-v1-unsigned`, and the vendored matcher honours that: a signed
+     * or multisigned request must not surface this wallet at all, because it cannot fulfill one.
+     *
+     * Each unsupported request carries the *same* OpenID4VP payload that
+     * [sharesMdocThroughClearOpenId4VpDcApi] matches successfully, re-wrapped into the structurally valid
+     * signed and multisigned shapes the matcher's own parsers accept (see [signedDcApiRequest] and
+     * [multisignedDcApiRequest]). That is what makes this decisive rather than incidental: relabelling
+     * the protocol alone would also pass simply because the payload no longer parses. Here, if protocol
+     * filtering stopped working - the registry advertising a signed protocol, or the matcher ignoring
+     * `supported_protocols` - the matcher would decode these payloads, run the same mDL DCQL query, and
+     * surface the issued mDL, failing this test.
+     *
+     * Asserted through the real caller rather than the picker, because "no provider" is what the caller
+     * observes.
+     */
+    @Test
+    fun doesNotSurfaceForSignedOrMultisignedRequests() = runBlocking {
+        val fixture = start() ?: return@runBlocking
+        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
+        fixture.issue(scenario)
+        val session = DemoTestBackend.createDcApiVerifierSession(
+            scenario = scenario,
+            expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
+        )
+        // The payload a matchable unsigned request carries, transplanted verbatim below.
+        val openId4VpPayload = requireNotNull(
+            Json.parseToJsonElement(session.requestJson).jsonObject["requests"]
+                ?.jsonArray?.firstOrNull()?.jsonObject?.get("data")?.jsonObject,
+        ) { "Unsigned DC API request carries no object 'data': ${session.requestJson}" }
+
+        listOf(
+            "openid4vp-v1-signed" to signedDcApiRequest(openId4VpPayload),
+            "openid4vp-v1-multisigned" to multisignedDcApiRequest(openId4VpPayload),
+        ).forEach { (protocol, request) ->
+            DigitalCredentialTestVerifier.reset(request)
+            fixture.context.startActivity(
+                Intent(fixture.context, DigitalCredentialTestVerifierActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+
+            // A candidate appearing at all is the failure: it would let a user authorize a presentation
+            // the wallet then cannot produce.
+            assertNull(
+                "Credential Manager surfaced a candidate for $protocol",
+                fixture.device.wait(Until.findObject(By.textContains(MDL_DOC_TYPE)), UI_ELEMENT_TIMEOUT),
+            )
+            // With no provider left to ask, Credential Manager puts up its own empty state and waits to
+            // be dismissed, so the caller is only told after that. Dismissing it is the user action that
+            // ends the request, not a workaround for a missing result.
+            assertTrue(
+                "Credential Manager did not report an empty result for $protocol: " +
+                    foregroundWindowSnapshot(fixture.device),
+                fixture.device.wait(Until.hasObject(By.text(CREDENTIAL_SELECTOR_CLOSE_LABEL)), UI_ELEMENT_TIMEOUT),
+            )
+            fixture.device.findObject(By.text(CREDENTIAL_SELECTOR_CLOSE_LABEL)).click()
+
+            val outcome = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) { DigitalCredentialTestVerifier.await() }
+            assertNotNull(
+                "$protocol produced a credential: ${outcome.getOrNull()}",
+                outcome.exceptionOrNull(),
+            )
+            fixture.device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT)
+        }
+    }
+
+    /**
      * `response_mode=dc_api.jwt`, with mdoc rather than SD-JWT: the verifier must both decrypt the JWE
      * *and* rebuild the mdoc session transcript from the thumbprint of the encryption key it published,
      * so a wallet that thumbprinted anything else produces a readable JWE whose device signature does
@@ -235,9 +431,8 @@ class DigitalCredentialSharingE2ETest {
      *    reach the picker, so an Annex C entry ahead of a *matchable* OpenID4VP one is matched and
      *    dropped.
      *
-     * Neither is reachable from wallet code: the AndroidX OpenID4VP matcher is embedded in
-     * `androidx.credentials.registry` and `OpenId4VpRegistry` accepts no replacement. Mixed
-     * OpenID4VP/Annex C envelopes are covered by host tests, which need no platform picker.
+     * Neither is reachable from wallet code, so the envelope is what has to be asserted. Mixed
+     * OpenID4VP/Annex C envelopes are otherwise covered by host tests, which need no platform picker.
      */
     @Test
     fun selectsNonZeroAnnexCAlternativeFromMultiProtocolRequest() = runBlocking {
@@ -442,15 +637,18 @@ class DigitalCredentialSharingE2ETest {
      *   more than one alternative this is what identifies which one is being chosen.
      * @param clickCandidate Whether to select that candidate explicitly. Needed only when the picker
      *   offers a choice; with a single candidate the OS pre-selects it.
+     * @param onCredentialManagerPrompt Assertions to run on Credential Manager's own prompt, while it is
+     *   still up. This is the only place the matcher's output is observable.
      * @param beforeShare Assertions to run on the wallet's own consent surface, before it is accepted.
      */
     private suspend fun Fixture.share(
         requestJson: String,
         candidateText: String,
         clickCandidate: Boolean = false,
+        onCredentialManagerPrompt: (UiDevice) -> Unit = {},
         beforeShare: (UiDevice) -> Unit = {},
     ): DigitalCredential {
-        openProviderReview(requestJson, candidateText, clickCandidate)
+        openProviderReview(requestJson, candidateText, clickCandidate, onCredentialManagerPrompt)
 
         beforeShare(device)
 
@@ -471,6 +669,7 @@ class DigitalCredentialSharingE2ETest {
         requestJson: String,
         candidateText: String,
         clickCandidate: Boolean = false,
+        onCredentialManagerPrompt: (UiDevice) -> Unit = {},
     ) {
         DigitalCredentialTestVerifier.reset(requestJson)
         // The previous test's picker can still be up and showing candidate text, so wait it out:
@@ -482,7 +681,16 @@ class DigitalCredentialSharingE2ETest {
         )
 
         val candidate = device.wait(Until.findObject(By.textContains(candidateText)), UI_ELEMENT_TIMEOUT)
-        assertNotNull("Credential Manager did not surface a '$candidateText' candidate", candidate)
+        assertNotNull(
+            "Credential Manager did not surface a '$candidateText' candidate. " +
+                foregroundWindowSnapshot(device),
+            candidate,
+        )
+
+        // Before any click: what the picker shows now is the matcher's output, and selecting a candidate
+        // can replace this window.
+        onCredentialManagerPrompt(device)
+
         // Re-resolved rather than reused: the picker may have recomposed since the wait above, and a
         // stale node throws instead of failing an assertion.
         if (clickCandidate) {
@@ -499,7 +707,7 @@ class DigitalCredentialSharingE2ETest {
         continueButton?.click()
 
         assertNotNull(
-            "Wallet provider review did not open",
+            "Wallet provider review did not open. ${foregroundWindowSnapshot(device)}",
             waitForResource(device, WALLET_SHARING_REVIEW_TAG, UI_ELEMENT_TIMEOUT),
         )
     }
@@ -576,6 +784,59 @@ class DigitalCredentialSharingE2ETest {
             },
         )
     }
+
+    /**
+     * A `openid4vp-v1-signed` DC API request carrying [payload] as the payload of a dummy compact JWS.
+     *
+     * The matcher does not verify the signature while matching: it splits `data.request` on `.` and
+     * base64url-decodes segment 1, so an unsigned `alg: none` header and a placeholder signature are
+     * enough for it to reach the very same DCQL query. Deliberately not real signing infrastructure -
+     * the point is that the payload is *matchable*, not that it is authentic.
+     */
+    private fun signedDcApiRequest(payload: JsonObject): String {
+        val jws = listOf(
+            base64Url(buildJsonObject { put("alg", JsonPrimitive("none")) }.toString().encodeToByteArray()),
+            base64Url(payload.toString().encodeToByteArray()),
+            base64Url("dummy-signature".encodeToByteArray()),
+        ).joinToString(".")
+        return dcApiRequest("openid4vp-v1-signed", buildJsonObject { put("request", JsonPrimitive(jws)) })
+    }
+
+    /**
+     * A `openid4vp-v1-multisigned` DC API request carrying [payload] under `request.payload`.
+     *
+     * `data` is a JSON *string* holding `{"request":{"payload":"<base64url>"}}`, which is the shape the
+     * pinned matcher's `extract_multisigned_payload` accepts and the one its own unit tests use. No
+     * multisignature verification is involved in matching.
+     */
+    private fun multisignedDcApiRequest(payload: JsonObject): String {
+        val multisigned = buildJsonObject {
+            put(
+                "request",
+                buildJsonObject { put("payload", JsonPrimitive(base64Url(payload.toString().encodeToByteArray()))) },
+            )
+        }
+        return dcApiRequest("openid4vp-v1-multisigned", JsonPrimitive(multisigned.toString()))
+    }
+
+    /** The `digital` request object Credential Manager routes, with a single `requests[]` entry. */
+    private fun dcApiRequest(protocol: String, data: JsonElement): String = buildJsonObject {
+        put(
+            "requests",
+            buildJsonArray {
+                add(
+                    buildJsonObject {
+                        put("protocol", JsonPrimitive(protocol))
+                        put("data", data)
+                    },
+                )
+            },
+        )
+    }.toString()
+
+    /** Unpadded base64url, the only alphabet the matcher's decoder accepts. */
+    private fun base64Url(bytes: ByteArray): String =
+        Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
 
     /** The claims of an SD-JWT VC presentation's key binding JWT, which is its final `~` segment. */
     private fun keyBindingJwtClaims(presentation: String): JsonObject {
@@ -676,12 +937,25 @@ class DigitalCredentialSharingE2ETest {
 
     private companion object {
         private const val MDL_DOC_TYPE = "org.iso.18013.5.1.mDL"
+        private const val SCA_DOC_TYPE = "eu.europa.ec.eudi.sca.payment_card.1"
+        private const val SCA_CREDENTIAL_QUERY_ID = "sca_payment_card"
+        private const val AGE_DOC_TYPE = "eu.europa.ec.av.1"
+        private const val AGE_CREDENTIAL_QUERY_ID = "proof_of_age"
+
+        /** How the review labels `age_over_18`, which it humanizes rather than showing verbatim. */
+        private const val AGE_DISCLOSURE_LABEL = "Age over 18"
+
+        /** How the amount reads once rendered, on the prompt and on the review alike. */
+        private const val SCA_AMOUNT_TEXT = "11.56"
         private const val MDL_NAMESPACE = "org.iso.18013.5.1"
         private val REQUESTED_MDL_ELEMENTS = listOf("family_name", "given_name")
         private const val PAYMENT_AUTHORIZATION_DISPLAY_NAME = "Payment Authorization"
 
         /** Owns `CredentialSelectorActivity`, i.e. the picker window these tests drive. */
         private const val CREDENTIAL_SELECTOR_PACKAGE = "com.google.android.gms"
+
+        /** Dismisses Credential Manager's own "Your info wasn't found" state, which has no candidates. */
+        private const val CREDENTIAL_SELECTOR_CLOSE_LABEL = "Close"
         private const val CANDIDATE_CLICK_ATTEMPTS = 3
 
         /**

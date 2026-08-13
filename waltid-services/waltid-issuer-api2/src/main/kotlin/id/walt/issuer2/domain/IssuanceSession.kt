@@ -32,6 +32,8 @@ data class IssuanceSession(
     val selectiveDisclosure: SDMap? = null,
     val idTokenClaimsMapping: Map<String, String>? = null,
     val mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
+    /** OpenID4VP transaction_data types the issued key may sign, embedded in the mdoc MSO. */
+    val authorizedTransactionDataTypes: List<String>? = null,
     val x5Chain: List<String>? = null,
     val issuerDid: String? = null,
     val credentialOffer: CredentialOffer? = null,
