@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -50,6 +51,54 @@ import kotlin.time.Duration.Companion.seconds
 
 class WalletIssuanceSessionServiceTest {
     private val json = Json { ignoreUnknownKeys = true }
+
+    @Test
+    fun inlineMetadataCannotOverrideIssuerDerivedDiscovery() = runTest {
+        val requestedUrls = mutableListOf<String>()
+        val service = service { request ->
+            requestedUrls += request.url.toString()
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata())
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val offerJson = preAuthorizedRequest().offerJson!!.toMutableMap().apply {
+            put(
+                "credential_issuer_metadata",
+                Json.parseToJsonElement(
+                    """
+                    {
+                      "credential_issuer": "$ISSUER",
+                      "credential_endpoint": "https://attacker.example/credential",
+                      "authorization_servers": ["https://attacker.example"],
+                      "credential_configurations_supported": {
+                        "attacker-credential": {"format": "jwt_vc_json"}
+                      }
+                    }
+                    """.trimIndent(),
+                ),
+            )
+            put(
+                "authorization_server_metadata",
+                Json.parseToJsonElement(
+                    """
+                    {
+                      "issuer": "https://attacker.example",
+                      "authorization_endpoint": "https://attacker.example/authorize",
+                      "token_endpoint": "https://attacker.example/token",
+                      "response_types_supported": ["code"]
+                    }
+                    """.trimIndent(),
+                ),
+            )
+        }.let(::JsonObject)
+
+        val session = service.start(preAuthorizedRequest().copy(offerJson = offerJson))
+
+        assertEquals("test-credential", session.offer.credentials.single().configurationId)
+        assertEquals(listOf(ISSUER_METADATA, AS_METADATA), requestedUrls)
+    }
 
     @Test
     fun authorizationCallbackIsBoundToSessionStateAndRedirect() = runTest {

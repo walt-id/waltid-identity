@@ -120,6 +120,7 @@ data class CredentialConfiguration(
 
 internal object CredentialConfigurationSerializer : KSerializer<CredentialConfiguration> {
     private val lenientJson = Json { ignoreUnknownKeys = true }
+    private val legacyMdocCoseAlgorithmNames = setOf("ES256")
 
     override val descriptor: SerialDescriptor =
         CredentialConfiguration.generatedSerializer().descriptor
@@ -187,11 +188,17 @@ internal object CredentialConfigurationSerializer : KSerializer<CredentialConfig
             credentialSigningAlgValuesSupported = jsonObject["credential_signing_alg_values_supported"]?.let {
                 val decoded = lenientJson.decodeFromJsonElement(SigningAlgIdSetSerializer, it)
                 if (format == CredentialFormat.MSO_MDOC) {
-                    // COSE algorithm names are JSON strings too, but mdoc metadata interprets
-                    // them as COSE names rather than JOSE identifiers.
+                    // One deployed issuer emits the legacy string "ES256" for mdoc metadata.
+                    // Keep that compatibility narrowly allow-listed; unknown strings remain
+                    // invalid rather than becoming arbitrary COSE names.
                     decoded.mapTo(linkedSetOf()) { algorithm ->
                         when (algorithm) {
-                            is SigningAlgId.Jose -> SigningAlgId.CoseName(algorithm.value)
+                            is SigningAlgId.Jose -> {
+                                require(algorithm.value in legacyMdocCoseAlgorithmNames) {
+                                    "Unsupported legacy mdoc signing algorithm: ${algorithm.value}"
+                                }
+                                SigningAlgId.CoseName(algorithm.value)
+                            }
                             else -> algorithm
                         }
                     }
