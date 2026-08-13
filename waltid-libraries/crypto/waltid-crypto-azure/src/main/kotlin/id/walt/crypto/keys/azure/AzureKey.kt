@@ -38,15 +38,13 @@ class AzureKey(
 
     override fun toString(): String = "[Azure ${keyType.name} key @KeyVault - $id]"
 
-    override suspend fun getKeyId(): String = getPublicKey().getKeyId()
+    override suspend fun getKeyId(): String = getPublicKey().getThumbprint()
 
-    override suspend fun getThumbprint(): String {
-        TODO("Not yet implemented")
-    }
+    override suspend fun getThumbprint(): String = getPublicKey().getThumbprint()
 
-    override suspend fun exportJWK(): String = throw NotImplementedError("JWK export is not available for remote keys.")
+    override suspend fun exportJWK(): String = getPublicKey().exportJWK()
 
-    override suspend fun exportJWKObject(): JsonObject = Json.parseToJsonElement(_publicKey!!.toString()).jsonObject
+    override suspend fun exportJWKObject(): JsonObject = PublicKeyIds.run { publicJwkForPublish() }
 
     override suspend fun exportPEM(): String = throw NotImplementedError("PEM export is not available for remote keys.")
 
@@ -217,15 +215,23 @@ class AzureKey(
             val azureKeyType =
                 publicKeyJson["kty"]?.jsonPrimitive?.content ?: error("Missing key type in public key response")
             val crvFromResponse = publicKeyJson["crv"]?.jsonPrimitive?.content
-            val publicKeyJsonModified = publicKeyJson.toMutableMap()
-            publicKeyJsonModified.remove("key_ops")
-            val publicKey = JWKKey.importJWK(publicKeyJsonModified.toMap().toJsonElement().toString())
+            val publicKeyJsonModified = publicKeyJson.toMutableMap().apply {
+                remove("key_ops")
+                remove("kid")
+            }
+            val materialOnly = JWKKey.importJWK(publicKeyJsonModified.toMap().toJsonElement().toString())
                 .getOrElse { exception ->
                     throw IllegalArgumentException(
                         "Invalid JWK in public key: $publicKeyJson",
                         exception
                     )
                 }
+            val thumbprint = materialOnly.getThumbprint()
+            val publicKey = JWKKey.importJWK(
+                JsonObject(materialOnly.exportJWKObject() + ("kid" to JsonPrimitive(thumbprint))).toString()
+            ).getOrElse { exception ->
+                throw IllegalArgumentException("Failed to assign public thumbprint kid: $publicKeyJson", exception)
+            }
 
             val keyType = azureKeyToKeyTypeMapping(crvFromResponse ?: "", azureKeyType)
 
@@ -294,8 +300,8 @@ class AzureKey(
 
                 val jwk = keyVaultKey.key
                 val jwkJson = jwk.toString() // Azure SDK's JsonWebKey has a toString that outputs JWK JSON
-
-                JWKKey.importJWK(jwkJson).getOrThrow()
+                val imported = JWKKey.importJWK(jwkJson).getOrThrow()
+                parseAzurePublicKey(imported.exportJWKObject()).publicKey
             } catch (e: ResourceNotFoundException) {
                 throw KeyNotFoundException(keyName, "Key not found in Azure Key Vault", e)
             } catch (e: com.azure.core.exception.HttpResponseException) {

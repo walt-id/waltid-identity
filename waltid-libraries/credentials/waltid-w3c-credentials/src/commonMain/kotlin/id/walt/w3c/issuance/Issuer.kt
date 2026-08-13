@@ -1,6 +1,7 @@
 package id.walt.w3c.issuance
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.PublicKeyIds.publicKeyId
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
@@ -316,7 +317,7 @@ object Issuer {
     @JsPromise
     @JsExport.Ignore
     suspend fun getKidHeader(issuerKey: Key, issuerDid: String? = null): String {
-        return qualifyDidKeyId(issuerKey.getKeyId(), issuerDid)
+        return qualifyDidKeyId(issuerKey.publicKeyId(), issuerDid)
     }
 
     @JsExport.Ignore
