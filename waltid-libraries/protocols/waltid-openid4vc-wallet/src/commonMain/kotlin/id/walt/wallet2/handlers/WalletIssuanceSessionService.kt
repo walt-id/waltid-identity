@@ -10,6 +10,7 @@ import id.walt.crypto2.jose.selectJwsAlgorithm
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
@@ -749,7 +750,7 @@ class WalletIssuanceSessionService(
             onResponseHeaders = { headers ->
                 rememberAttestationChallenge(
                     active,
-                    headers[ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE],
+                    headers[CLIENT_ATTESTATION_CHALLENGE],
                 )
             },
         )
@@ -778,7 +779,7 @@ class WalletIssuanceSessionService(
             onResponseHeaders = { headers ->
                 rememberAttestationChallenge(
                     active,
-                    headers[ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE],
+                    headers[CLIENT_ATTESTATION_CHALLENGE],
                 )
             },
         )
@@ -860,7 +861,7 @@ class WalletIssuanceSessionService(
                 onResponseHeaders = { headers ->
                     rememberAttestationChallenge(
                         active,
-                        headers[ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE],
+                        headers[CLIENT_ATTESTATION_CHALLENGE],
                     )
                 },
             )

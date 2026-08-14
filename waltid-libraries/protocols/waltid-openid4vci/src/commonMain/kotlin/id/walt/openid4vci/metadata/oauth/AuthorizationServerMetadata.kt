@@ -197,6 +197,13 @@ data class AuthorizationServerMetadata(
             require(!requiresSigningAlgs || !tokenEndpointAuthSigningAlgValuesSupported.isNullOrEmpty()) {
                 "Authorization server token_endpoint_auth_signing_alg_values_supported is required when using JWT auth methods"
             }
+            val requiresAttestationAlgorithms = methods.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH)
+            require(!requiresAttestationAlgorithms || !clientAttestationSigningAlgValuesSupported.isNullOrEmpty()) {
+                "Authorization server client_attestation_signing_alg_values_supported is required when using attest_jwt_client_auth"
+            }
+            require(!requiresAttestationAlgorithms || !clientAttestationPopSigningAlgValuesSupported.isNullOrEmpty()) {
+                "Authorization server client_attestation_pop_signing_alg_values_supported is required when using attest_jwt_client_auth"
+            }
         }
 
         customParameters?.let { params ->

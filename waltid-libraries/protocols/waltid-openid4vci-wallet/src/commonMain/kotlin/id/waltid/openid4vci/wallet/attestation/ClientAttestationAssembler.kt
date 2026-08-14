@@ -12,7 +12,6 @@ data class ClientAttestationHeaders(
     companion object {
         const val HEADER_ATTESTATION = "OAuth-Client-Attestation"
         const val HEADER_ATTESTATION_POP = "OAuth-Client-Attestation-PoP"
-        const val HEADER_ATTESTATION_CHALLENGE = "OAuth-Client-Attestation-Challenge"
     }
 }
 

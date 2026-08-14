@@ -2,6 +2,7 @@ package id.walt.wallet2.handlers
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.Key
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.credentials.examples.MdocsExamples
@@ -131,7 +132,7 @@ class WalletIssuanceSessionServiceTest {
                         status = HttpStatusCode.Created,
                         headers = headersOf(
                             HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()),
-                            ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE to listOf("challenge-2"),
+                            CLIENT_ATTESTATION_CHALLENGE to listOf("challenge-2"),
                             ),
                         )
                     }
@@ -145,7 +146,7 @@ class WalletIssuanceSessionServiceTest {
                         status = HttpStatusCode.OK,
                         headers = headersOf(
                             HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()),
-                            ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE to listOf("challenge-3"),
+                            CLIENT_ATTESTATION_CHALLENGE to listOf("challenge-3"),
                             ),
                         )
                     }
@@ -197,7 +198,7 @@ class WalletIssuanceSessionServiceTest {
                                 status = HttpStatusCode.BadRequest,
                                 headers = headersOf(
                                     HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()),
-                                    ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE to listOf("challenge-2"),
+                                    CLIENT_ATTESTATION_CHALLENGE to listOf("challenge-2"),
                                 ),
                             )
                         } else {

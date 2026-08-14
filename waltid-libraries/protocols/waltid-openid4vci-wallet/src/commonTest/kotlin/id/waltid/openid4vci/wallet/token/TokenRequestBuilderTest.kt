@@ -1,5 +1,6 @@
 package id.waltid.openid4vci.wallet.token
 
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import io.ktor.client.*
@@ -491,6 +492,56 @@ class TokenRequestBuilderTest {
     }
 
     @Test
+    fun testSameOriginRedirectRegeneratesAttestationPopAfterChallenge() = runTest {
+        var callCount = 0
+        var challenge: String? = null
+        val popValues = mutableListOf<String?>()
+        val client = createMockClient { request ->
+            callCount += 1
+            popValues += request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP]
+            when (callCount) {
+                1 -> respond(
+                    content = "",
+                    status = HttpStatusCode.TemporaryRedirect,
+                    headers = headersOf(
+                        HttpHeaders.Location to listOf("https://auth.example.com/other-token"),
+                        CLIENT_ATTESTATION_CHALLENGE to listOf("challenge-2"),
+                    ),
+                )
+
+                2 -> {
+                    assertEquals("https://auth.example.com/other-token", request.url.toString())
+                    respond(
+                        content = """{"access_token":"redirected-token","token_type":"Bearer"}""",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                    )
+                }
+
+                else -> error("Token redirect should only be followed once")
+            }
+        }
+
+        val response = TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
+            tokenEndpoint = tokenEndpoint,
+            code = "auth-code",
+            attestationHeadersFactory = {
+                ClientAttestationHeaders(
+                    attestationJwt = "attestation.jwt",
+                    popJwt = "pop-${challenge ?: "initial"}",
+                )
+            },
+            dpopProofFactory = null,
+            onResponseHeaders = { headers ->
+                challenge = headers[CLIENT_ATTESTATION_CHALLENGE]
+            },
+        )
+
+        assertEquals("redirected-token", response.access_token)
+        assertEquals(listOf<String?>("pop-initial", "pop-challenge-2"), popValues)
+    }
+
+    @Test
     fun testTransportFailureOnSameOriginRedirectIsTyped() = runTest {
         var callCount = 0
         val client = createMockClient { _ ->
@@ -620,7 +671,7 @@ class TokenRequestBuilderTest {
                     status = HttpStatusCode.BadRequest,
                     headers = headersOf(
                         HttpHeaders.ContentType to listOf("application/json"),
-                        ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE to listOf("challenge-2"),
+                        CLIENT_ATTESTATION_CHALLENGE to listOf("challenge-2"),
                     ),
                 )
             } else {
@@ -643,7 +694,7 @@ class TokenRequestBuilderTest {
             },
             dpopProofFactory = null,
             onResponseHeaders = { headers ->
-                challenge = headers[ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE]
+                challenge = headers[CLIENT_ATTESTATION_CHALLENGE]
             },
         )
 
@@ -667,7 +718,7 @@ class TokenRequestBuilderTest {
                     headers = headersOf(
                         HttpHeaders.WWWAuthenticate to listOf("DPoP error=\"use_dpop_nonce\""),
                         "DPoP-Nonce" to listOf("server-nonce"),
-                        ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE to listOf("challenge-2"),
+                        CLIENT_ATTESTATION_CHALLENGE to listOf("challenge-2"),
                     ),
                 )
             } else {
@@ -693,7 +744,7 @@ class TokenRequestBuilderTest {
                 "proof-${proofInputs.size}"
             },
             onResponseHeaders = { headers ->
-                challenge = headers[ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE]
+                challenge = headers[CLIENT_ATTESTATION_CHALLENGE]
             },
         )
 

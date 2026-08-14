@@ -1,6 +1,7 @@
 package id.waltid.openid4vci.wallet.token
 
 import id.walt.openid4vci.GrantType
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.clientauth.CLIENT_ASSERTION_TYPE_JWT_BEARER
@@ -359,12 +360,12 @@ class TokenRequestBuilder(
                     append("client_assertion", assertion)
                 }
             } ?: parameters
-            val requestAttestationHeaders = attestationHeadersFactory?.invoke() ?: attestationHeaders
             val response = sendTokenRequestFollowingRedirects(
                 tokenEndpoint = tokenEndpoint,
                 parameters = attemptParameters,
                 additionalHeaders = additionalHeaders,
-                attestationHeaders = requestAttestationHeaders,
+                attestationHeaders = attestationHeaders,
+                attestationHeadersFactory = attestationHeadersFactory,
                 dpopProofFactory = dpopProofFactory,
                 dpopNonce = dpopNonce,
                 onResponseHeaders = onResponseHeaders,
@@ -386,7 +387,7 @@ class TokenRequestBuilder(
                     attempt == 0 &&
                     attestationHeadersFactory != null &&
                     oauthError == USE_ATTESTATION_CHALLENGE &&
-                    !response.headers[ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE].isNullOrBlank()
+                    !response.headers[CLIENT_ATTESTATION_CHALLENGE].isNullOrBlank()
                 ) {
                     return@repeat
                 }
@@ -430,17 +431,19 @@ class TokenRequestBuilder(
         parameters: Parameters,
         additionalHeaders: Map<String, String>,
         attestationHeaders: ClientAttestationHeaders?,
+        attestationHeadersFactory: ClientAttestationHeadersFactory?,
         dpopProofFactory: DPoPProofFactory?,
         dpopNonce: String?,
         onResponseHeaders: TokenResponseHeadersHandler,
     ): HttpResponse {
         suspend fun send(endpoint: String): HttpResponse {
+            val requestAttestationHeaders = attestationHeadersFactory?.invoke() ?: attestationHeaders
             val dpopProof = dpopProofFactory?.invoke(endpoint, dpopNonce)
             return try {
                 httpClient.post(endpoint) {
                     contentType(ContentType.Application.FormUrlEncoded)
                     setBody(parameters.formUrlEncode())
-                    appendTokenRequestHeaders(additionalHeaders, attestationHeaders, dpopProof)
+                    appendTokenRequestHeaders(additionalHeaders, requestAttestationHeaders, dpopProof)
                 }
             } catch (e: CancellationException) {
                 throw e
