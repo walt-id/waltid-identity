@@ -25,6 +25,8 @@ import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
+import id.waltid.openid4vci.wallet.authorization.PushedAuthorizationRequestExecutor
+import id.waltid.openid4vci.wallet.authorization.RetryablePushedAuthorizationRequestException
 import id.waltid.openid4vci.wallet.authorization.AuthorizationResponseParser
 import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
@@ -65,10 +67,6 @@ import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
 private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
-
-private class RetryablePushedAuthorizationRequestException(
-    val statusCode: Int,
-) : Exception("Pushed authorization request failed with HTTP $statusCode")
 
 /** Grant selected for a resolved issuance session. */
 @Serializable
@@ -824,33 +822,12 @@ class WalletIssuanceSessionService(
                 dpopJkt = dpopJkt,
             )
             val attestation = attestationHeaders(metadata, request.clientId, keyMaterial)
-            val response = httpClient.post(parEndpoint) {
-                contentType(ContentType.Application.FormUrlEncoded)
-                setBody(Parameters.build {
-                    pushed.parameters.forEach { (name, value) -> append(name, value) }
-                }.formUrlEncode())
-                attestation?.let { headers ->
-                    header(ClientAttestationHeaders.HEADER_ATTESTATION, headers.attestationJwt)
-                    header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, headers.popJwt)
-                }
-            }
-            when {
-                response.status == HttpStatusCode.Created -> Unit
-
-                response.status == HttpStatusCode.TooManyRequests ||
-                        response.status.value >= 500 -> {
-                    throw RetryablePushedAuthorizationRequestException(
-                        statusCode = response.status.value,
-                    )
-                }
-
-                else -> {
-                    throw IllegalArgumentException(
-                        "Pushed authorization request failed with HTTP ${response.status.value}"
-                    )
-                }
-            }
-            val par = json.decodeFromString<PushedAuthorizationResponse>(response.bodyAsText())
+            val par = PushedAuthorizationRequestExecutor.execute(
+                httpClient = httpClient,
+                parEndpoint = parEndpoint,
+                parameters = pushed.parameters,
+                attestationHeaders = attestation,
+            )
             val browserUrl = URLBuilder(endpoint).apply {
                 parameters.append("client_id", request.clientId)
                 parameters.append("request_uri", par.requestUri)
@@ -1687,16 +1664,6 @@ class WalletIssuanceSessionService(
         return legacy.getPublicKey().exportJWKObject()
     }
 
-    private suspend fun WalletKeyStoreEntry.jwkThumbprint(): String {
-        crypto2Key?.let { key ->
-            val exported = requireNotNull(key.capabilities.publicKeyExporter) {
-                "Key '$keyId' does not export public material"
-            }.exportPublicKey().toPublicJwk(key.spec)
-            return Jwk.sha256Thumbprint(exported)
-        }
-        val legacy = requireNotNull(legacyKey) { "Key '$keyId' has no usable public representation" }
-        return legacy.getPublicKey().getThumbprint()
-    }
 
     private class IssuanceStageException(
         val code: WalletIssuanceErrorCode,
