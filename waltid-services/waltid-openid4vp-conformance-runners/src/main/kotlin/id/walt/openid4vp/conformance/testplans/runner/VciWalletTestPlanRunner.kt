@@ -135,23 +135,28 @@ class VciWalletTestPlanRunner(
         deliverCredentialOfferToWallet(testId)
         println()
 
-        // Poll for result (5 minute timeout for auth code flow)
-        val maxAttempts = 600  // 600 * 500ms = 5 minutes
+        val maxAttempts = MODULE_POLL_ATTEMPTS
         var attempts = 0
 
         while (attempts < maxAttempts) {
-            delay(500)
+            delay(POLL_INTERVAL_MILLISECONDS)
             attempts++
 
             val testInfo = conformance.getTestRunInfo(testId)
 
             if (testInfo.status in setOf("FINISHED", "INTERRUPTED")) {
+                val result = testInfo.result ?: "UNKNOWN"
+                // The suite reports SKIPPED for a module it decided not to exercise - typically an
+                // optional feature this wallet does not advertise. That is not a wallet failure, and
+                // counting it as one made a clean run read as "6 passed, 6 failed".
+                val skipped = result == "SKIPPED"
                 return TestPlanResult(
                     conformanceTestId = testId,
-                    conformanceResult = testInfo.result ?: "UNKNOWN",
-                    walletStatus = testInfo.result ?: "UNKNOWN",
-                    errorMessage = if (testInfo.result != "PASSED") {
-                        "Test finished: ${testInfo.result}"
+                    conformanceResult = result,
+                    walletStatus = result,
+                    skipReason = "Suite skipped this module".takeIf { skipped },
+                    errorMessage = if (result != "PASSED" && !skipped) {
+                        "Test finished: $result"
                     } else null
                 )
             }
@@ -161,11 +166,17 @@ class VciWalletTestPlanRunner(
             }
         }
 
+        // Every module of a plan shares the plan alias and the suite allows one holder at a time, so a
+        // module left running is killed by the next one with "Stopping test due to alias conflict" -
+        // overwriting the real reason it stalled. Cancel deliberately so this module keeps its own
+        // diagnosis and the next one starts from a clean alias.
+        conformance.cancelTest(testId)
+
         return TestPlanResult(
             conformanceTestId = testId,
             conformanceResult = "TIMEOUT",
             walletStatus = "TIMEOUT",
-            errorMessage = "Module did not complete within 5 minutes"
+            errorMessage = "Module did not complete within ${MODULE_POLL_ATTEMPTS * POLL_INTERVAL_MILLISECONDS / 1000} seconds"
         )
     }
 
@@ -233,7 +244,7 @@ class VciWalletTestPlanRunner(
         repeat(OFFER_POLL_ATTEMPTS) {
             offerUrl = conformance.getTestRun(testId).getBrowserUrls().firstOrNull()
             if (offerUrl != null) return@repeat
-            delay(500)
+            delay(POLL_INTERVAL_MILLISECONDS)
         }
         val resolvedOfferUrl = offerUrl
             ?: error("Conformance suite published no credential offer URL to hand to the wallet")
@@ -263,5 +274,22 @@ class VciWalletTestPlanRunner(
 
         /** ~15s of polling for the suite to publish its credential offer URL. */
         const val OFFER_POLL_ATTEMPTS = 30
+
+        const val POLL_INTERVAL_MILLISECONDS = 500L
+
+        /**
+         * Safety net for a module that never reaches a verdict, at [POLL_INTERVAL_MILLISECONDS] each.
+         *
+         * A healthy module finishes in seconds - the whole four-module authorization-code plan runs in
+         * about 13 s. This budget only matters when a module stalls, and the previous 5 minutes made a
+         * fully stalling plan cost 20 minutes and the 22-module HAIP plan over an hour.
+         *
+         * Not lowered further than 90 s because the suite deliberately waits before deciding some
+         * modules: `maxWaitForNotificationSeconds` is 20 s by default, and the plan configuration
+         * grants the suite `waitTimeoutSeconds` to wait for the wallet. Cutting below those would
+         * report a timeout for a module that was about to reach a legitimate verdict.
+         */
+        const val MODULE_POLL_ATTEMPTS = 180
     }
+
 }
