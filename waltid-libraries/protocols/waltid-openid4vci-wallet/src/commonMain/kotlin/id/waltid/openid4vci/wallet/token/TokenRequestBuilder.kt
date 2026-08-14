@@ -113,6 +113,15 @@ class TokenRequestBuilder(
         additionalHeaders: Map<String, String> = emptyMap(),
         attestationHeaders: ClientAttestationHeaders? = null,
         dpopProofFactory: DPoPProofFactory?,
+        /**
+         * `private_key_jwt` client authentication (RFC 7523) for the token endpoint.
+         *
+         * The authorization-code exchange needs this exactly as much as the pre-authorized-code
+         * exchange already does: omitting it left the request unauthenticated, which an authorization
+         * server advertising `private_key_jwt` rejects with "Could not find client assertion in
+         * request parameters".
+         */
+        clientAssertionFactory: ClientAssertionFactory? = null,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(code.isNotBlank()) { "Authorization code cannot be blank" }
@@ -140,6 +149,7 @@ class TokenRequestBuilder(
             additionalHeaders,
             attestationHeaders,
             dpopProofFactory,
+            clientAssertionFactory,
         )
     }
 
