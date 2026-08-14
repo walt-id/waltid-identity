@@ -61,6 +61,8 @@ kotlin {
             implementation(identityLibs.slf4j.simple)
             implementation(identityLibs.ktor.server.test.host)
             implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
+            implementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
+            implementation(project(":waltid-services:waltid-service-commons-test"))
         }
     }
 }
