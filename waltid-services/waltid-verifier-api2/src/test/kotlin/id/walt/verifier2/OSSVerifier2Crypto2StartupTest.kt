@@ -169,6 +169,18 @@ class OSSVerifier2Crypto2StartupTest {
         )
     }
 
+    @Test
+    fun `blank per-session clientId falls back to configured service clientId`() = runTest {
+        loadConfig()
+        OSSVerifier2Manager.initialize()
+
+        val session = OSSVerifier2Manager.createVerificationSession(
+            CrossDeviceFlowSetup(core = GeneralFlowConfig(clientId = "   "))
+        )
+
+        assertEquals("verifier2", session.authorizationRequest.clientId)
+    }
+
     private fun loadConfig(
         storedKey: String? = null,
         legacyKey: String? = null,
