@@ -12,9 +12,7 @@ import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletTransactionDataItem
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
-import id.walt.wallet2.handlers.WalletIssuanceGrant
-import id.walt.wallet2.handlers.WalletIssuanceOutcome
-import id.walt.wallet2.handlers.WalletIssuanceTransactionCode
+import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.WalletAttestationConfig
 
@@ -51,47 +49,11 @@ internal class MobileDemoWallet(
         did: String?,
     ): WalletDemoIssuanceSession = mobileWallet.startIssuance(
         MobileWalletIssuanceRequest(
-            offerUrl = offerUrl,
+            offer = MobileWalletCredentialOffer.Uri(offerUrl),
             redirectUri = redirectUri,
             did = did,
         )
-    ).let { session ->
-        WalletDemoIssuanceSession(
-            id = session.id,
-            grant = when (session.offer.grant) {
-                WalletIssuanceGrant.PRE_AUTHORIZED_CODE -> WalletDemoIssuanceGrant.PreAuthorizedCode
-                WalletIssuanceGrant.AUTHORIZATION_CODE -> WalletDemoIssuanceGrant.AuthorizationCode
-            },
-            preview = WalletDemoOfferPreview(
-                issuer = WalletDemoIssuerMetadata(
-                    credentialIssuer = session.offer.issuer.identifier,
-                    display = WalletDemoMetadataDisplay(
-                        name = session.offer.issuer.name,
-                        logoUri = session.offer.issuer.logoUri,
-                        logoAltText = session.offer.issuer.logoAltText,
-                        description = null,
-                    ),
-                ),
-                offeredCredentials = session.offer.credentials.map { credential ->
-                    WalletDemoOfferedCredentialMetadata(
-                        configurationId = credential.configurationId,
-                        format = credential.format,
-                        vct = null,
-                        doctype = null,
-                        display = WalletDemoMetadataDisplay(
-                            name = credential.name,
-                            logoUri = credential.logoUri,
-                            logoAltText = null,
-                            description = credential.descriptionText,
-                        ),
-                        claims = emptyList(),
-                    )
-                },
-                transactionCode = session.offer.transactionCode?.toDemoRequirement(),
-                requiresIssuerAuthentication = session.offer.grant == WalletIssuanceGrant.AUTHORIZATION_CODE,
-            ),
-        )
-    }
+    ).toDemoIssuanceSession()
 
     override suspend fun beginAuthorizationIssuance(sessionId: String): WalletDemoIssuanceAuthorization =
         mobileWallet.beginAuthorizationIssuance(sessionId).let {
@@ -102,19 +64,19 @@ internal class MobileDemoWallet(
         sessionId: String,
         transactionCode: String?,
     ): WalletDemoIssuanceOutcome =
-        mobileWallet.continuePreAuthorizedIssuance(sessionId, transactionCode).toDemoOutcome()
+        mobileWallet.continuePreAuthorizedIssuance(sessionId, transactionCode).toDemoIssuanceOutcome()
 
     override suspend fun continueAuthorizationIssuance(
         sessionId: String,
         callbackUri: String,
     ): WalletDemoIssuanceOutcome =
-        mobileWallet.continueAuthorizationIssuance(sessionId, callbackUri).toDemoOutcome()
+        mobileWallet.continueAuthorizationIssuance(sessionId, callbackUri).toDemoIssuanceOutcome()
 
     override suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome =
-        mobileWallet.cancelIssuance(sessionId).toDemoOutcome()
+        mobileWallet.cancelIssuance(sessionId).toDemoIssuanceOutcome()
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome =
-        mobileWallet.resumeDeferredIssuance(deferredCredentialId).toDemoOutcome()
+        mobileWallet.resumeDeferredIssuance(deferredCredentialId).toDemoIssuanceOutcome()
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
         mobileWallet.present(requestUrl = requestUrl, did = did).toDemoOperationResult(
@@ -209,23 +171,6 @@ private fun MobileWalletPresentationResult.toDemoOperationResult(
         is MobileWalletPresentationResult.Transmitted.Failed -> WalletDemoOperationResult.Failure(failureMessage)
     }
 
-private fun WalletIssuanceOutcome.toDemoOutcome(): WalletDemoIssuanceOutcome =
-    when (this) {
-        is WalletIssuanceOutcome.Stored -> WalletDemoIssuanceOutcome.Stored(credentialIds)
-        is WalletIssuanceOutcome.Deferred -> WalletDemoIssuanceOutcome.Deferred(
-            storedCredentialIds = storedCredentialIds,
-            credentials = credentials.map { credential ->
-                WalletDemoDeferredCredential(
-                    id = credential.id,
-                    credentialConfigurationId = credential.credentialConfigurationId,
-                    intervalSeconds = credential.intervalSeconds,
-                )
-            },
-        )
-        is WalletIssuanceOutcome.Cancelled -> WalletDemoIssuanceOutcome.Cancelled
-        is WalletIssuanceOutcome.Failed -> WalletDemoIssuanceOutcome.Failed(error.message)
-    }
-
 internal fun DemoWalletConfig.toWalletAttestationConfig(): WalletAttestationConfig? =
     attestationBaseUrl.takeIf { it.isNotBlank() }?.let {
         WalletAttestationConfig(
@@ -305,17 +250,6 @@ internal fun MobileWalletMetadataDisplay.toDemoMetadataDisplay(): WalletDemoMeta
         logoUri = logoUri,
         logoAltText = logoAltText,
         description = description,
-    )
-
-private fun WalletIssuanceTransactionCode.toDemoRequirement(): WalletDemoTransactionCodeRequirement =
-    WalletDemoTransactionCodeRequirement(
-        inputMode = when (inputMode ?: "numeric") {
-            "numeric" -> WalletDemoTransactionCodeInputMode.Numeric
-            "text" -> WalletDemoTransactionCodeInputMode.Text
-            else -> throw IllegalArgumentException("Unsupported transaction code input mode: $inputMode")
-        },
-        length = length,
-        description = descriptionText,
     )
 
 internal fun MobileWalletVerifierMetadata.toDemoMetadata(): WalletDemoVerifierMetadata =

@@ -193,9 +193,29 @@ object Wallet2RouteHandler {
         getAccountId: (suspend RoutingCall.() -> String?)?,
         attestationAssembler: ClientAttestationAssembler?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
+    ) = registerWallet2Routes(
+        resolver,
+        getAccountId,
+        attestationAssembler,
+        clientIdTrustConfiguration,
+        TransactionDataTypeRegistry(emptySet()),
+    )
+
+    fun Route.registerWallet2Routes(
+        resolver: WalletResolver,
+        getAccountId: (suspend RoutingCall.() -> String?)?,
+        attestationAssembler: ClientAttestationAssembler?,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ) {
         route("/wallet", { tags = listOf(WALLET_MANAGEMENT_TAG) }) {
-            registerWalletManagementRoutes(resolver, getAccountId, attestationAssembler, clientIdTrustConfiguration)
+            registerWalletManagementRoutes(
+                resolver = resolver,
+                getAccountId = getAccountId,
+                attestationAssembler = attestationAssembler,
+                clientIdTrustConfiguration = clientIdTrustConfiguration,
+                transactionDataTypeRegistry = transactionDataTypeRegistry,
+            )
         }
         if (getAccountId == null) {
             route("/stores", { tags = listOf("Named Store Management") }) {
@@ -213,6 +233,7 @@ object Wallet2RouteHandler {
         getAccountId: (suspend RoutingCall.() -> String?)?,
         attestationAssembler: ClientAttestationAssembler?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ) {
 
         post("", Wallet2OpenApiDocs.createWallet()) {
@@ -791,7 +812,8 @@ object Wallet2RouteHandler {
                             WalletPresentationHandler.presentCredentialWithTrust(
                                 wallet = wallet,
                                 request = req,
-                                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                                onEvent = {},
+                                transactionDataTypeRegistry = transactionDataTypeRegistry,
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )
                         )
@@ -808,7 +830,8 @@ object Wallet2RouteHandler {
                             WalletPresentationHandler.presentCredentialIsolatedWithTrust(
                                 wallet = wallet,
                                 request = req,
-                                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                                onEvent = {},
+                                transactionDataTypeRegistry = transactionDataTypeRegistry,
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )
                         )
@@ -865,6 +888,7 @@ object Wallet2RouteHandler {
                             WalletPresentationHandler.buildVpToken(
                                 wallet = wallet,
                                 request = req,
+                                transactionDataTypeRegistry = transactionDataTypeRegistry,
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )
                         )
@@ -886,6 +910,7 @@ object Wallet2RouteHandler {
                             WalletPresentationHandler.sendAuthorizationResponse(
                                 wallet = wallet,
                                 request = req,
+                                transactionDataTypeRegistry = transactionDataTypeRegistry,
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )
                         )
@@ -912,7 +937,7 @@ object Wallet2RouteHandler {
                         val result = WalletPresentationHandler.previewPresentationStateless(
                             wallet = wallet,
                             request = req,
-                            transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                            transactionDataTypeRegistry = transactionDataTypeRegistry,
                             clientIdTrustConfiguration = clientIdTrustConfiguration,
                         )
                         call.respond(result.toPreviewResponse())

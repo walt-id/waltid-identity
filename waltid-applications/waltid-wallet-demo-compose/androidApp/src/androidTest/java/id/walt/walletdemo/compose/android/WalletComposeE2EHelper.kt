@@ -6,10 +6,12 @@ import android.net.Uri
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
+import androidx.test.uiautomator.Until
 import org.junit.Assert.fail
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import java.io.ByteArrayOutputStream
 
 internal object WalletComposeE2EHelper {
     const val PIN = "1234"
@@ -182,6 +184,20 @@ internal object WalletComposeE2EHelper {
     ) {
         if (findTextContainingAfterScrolling(device, substring) != null) return
         fail("$message. Expected a node containing '$substring'.\n${visibleUiSnapshot(device)}")
+    }
+
+    /**
+     * Asserts [substring] appears in the front-most window, whichever package owns it. Credential
+     * Manager draws its prompt from Google Play services, so the wallet-scoped lookups above cannot
+     * see it - and would report an empty screen rather than a missing value.
+     */
+    fun assertTextContainingVisibleInForegroundWindow(
+        device: UiDevice,
+        substring: String,
+        message: String,
+    ) {
+        if (device.wait(Until.findObject(By.textContains(substring)), UI_ELEMENT_TIMEOUT) != null) return
+        fail("$message. Expected a node containing '$substring'.\n${foregroundWindowSnapshot(device)}")
     }
 
     fun assertClaimValueVisibleAfterScrolling(
@@ -377,6 +393,29 @@ internal object WalletComposeE2EHelper {
             node = node.parent
         }
         return null
+    }
+
+    /**
+     * Every text and content description in the front-most window. Dumped rather than walked, because
+     * the node tree of a window owned by another package is not reachable through a package matcher.
+     */
+    fun foregroundWindowSnapshot(device: UiDevice): String {
+        val hierarchy = ByteArrayOutputStream().use { out ->
+            runCatching { device.dumpWindowHierarchy(out) }
+            out.toString("UTF-8")
+        }
+        val texts = Regex("""(?:text|content-desc)="([^"]*)"""").findAll(hierarchy)
+            .map { it.groupValues[1] }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(120)
+            .joinToString("\n")
+
+        return """
+            package=${device.currentPackageName}
+            foregroundWindowTexts:
+            ${texts.ifBlank { "<none>" }}
+        """.trimIndent()
     }
 
     private fun visibleUiSnapshot(device: UiDevice): String {

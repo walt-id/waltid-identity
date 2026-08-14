@@ -10,6 +10,8 @@ public object MobileWalletDigitalCredentialProtocols {
     public const val OPENID4VP_MULTISIGNED: String = "openid4vp-v1-multisigned"
     /** ISO 18013-7 Annex C mobile-document protocol identifier. */
     public const val ISO_MDOC_ANNEX_C: String = "org-iso-mdoc"
+    /** OpenID4VCI Digital Credentials issuance protocol identifier. */
+    public const val OPENID4VCI_V1: String = "openid4vci-v1"
 }
 
 /**
@@ -152,6 +154,18 @@ public interface MobileWalletCredentialRegistry {
         registryId: String,
         records: List<MobileWalletCredentialRegistryRecord>,
     ): MobileWalletCredentialRegistrationResult
+
+    /**
+     * Registers OpenID4VCI creation options (what the wallet can receive via CREATE_CREDENTIAL).
+     *
+     * Distinct from [replace], which projects currently stored credentials for presentation.
+     * Default is a no-op for platforms without an issuance-provider integration.
+     */
+    public suspend fun registerCreationOptions(): MobileWalletCredentialRegistrationResult =
+        MobileWalletCredentialRegistrationResult(
+            available = capabilities.registrationAvailable,
+            registeredEntryCount = 0,
+        )
 }
 
 /** Registry used when the current platform or application has no registration integration. */

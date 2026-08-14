@@ -315,13 +315,18 @@ object WalletPresentFunctionality2 {
         parameters: Parameters,
     ): WalletPresentResult {
         val response = webPostToken.sendForm(responseUri, parameters)
-        val responseBody = response.bodyAsText()
-        val responseBodyJson = Json.parseToJsonElement(responseBody).jsonObject
+        return directPostResult(response.status.isSuccess(), response.bodyAsText())
+    }
+
+    internal fun directPostResult(success: Boolean, responseBody: String): WalletPresentResult {
+        val responseBodyJson = responseBody.takeIf(String::isNotBlank)
+            ?.let { body -> runCatching { Json.parseToJsonElement(body) }.getOrElse { JsonPrimitive(body) } }
+            ?: JsonObject(emptyMap())
 
         return WalletPresentResult(
-            transmissionSuccess = response.status.isSuccess(),
+            transmissionSuccess = success,
             verifierResponse = responseBodyJson,
-            redirectTo = responseBodyJson["redirect_uri"]?.jsonPrimitive?.content,
+            redirectTo = (responseBodyJson as? JsonObject)?.get("redirect_uri")?.jsonPrimitive?.content,
         )
     }
 
@@ -807,6 +812,7 @@ object WalletPresentFunctionality2 {
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
+        beforeCredentialsUsed: suspend (Int) -> Unit = {},
     ): Result<WalletPresentResult> = walletPresentHandling(
         holderKey = holderKey,
         holderDid = holderDid,
@@ -820,6 +826,7 @@ object WalletPresentFunctionality2 {
         resolvedAuthorizationRequest = resolvedAuthorizationRequest,
         holderCrypto2Key = null,
         clientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        beforeCredentialsUsed = beforeCredentialsUsed,
     )
 
     @Deprecated("Use the Crypto2Key overload")
@@ -837,6 +844,7 @@ object WalletPresentFunctionality2 {
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
         holderCrypto2Key: Crypto2Key?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        beforeCredentialsUsed: suspend (Int) -> Unit = {},
     ): Result<WalletPresentResult> = walletPresentHandlingWithKey(
         holderKey,
         holderDid,
@@ -850,6 +858,7 @@ object WalletPresentFunctionality2 {
         resolvedAuthorizationRequest,
         holderCrypto2Key,
         clientIdTrustConfiguration,
+        beforeCredentialsUsed,
     )
 
     suspend fun walletPresentHandling(
@@ -865,6 +874,7 @@ object WalletPresentFunctionality2 {
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        beforeCredentialsUsed: suspend (Int) -> Unit = {},
     ): Result<WalletPresentResult> = walletPresentHandlingWithKey(
         null,
         holderDid,
@@ -878,6 +888,7 @@ object WalletPresentFunctionality2 {
         resolvedAuthorizationRequest,
         holderKey,
         clientIdTrustConfiguration,
+        beforeCredentialsUsed,
     )
 
     private suspend fun walletPresentHandlingWithKey(
@@ -900,6 +911,8 @@ object WalletPresentFunctionality2 {
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest?,
         holderCrypto2Key: Crypto2Key?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        /** Invoked with the credential count before the credentials are used, for usage metering. */
+        beforeCredentialsUsed: suspend (Int) -> Unit,
     ): Result<WalletPresentResult> {
         log.trace { "- Start of Wallet Present Handling -" }
         log.trace { "Wallet presentation will use key $holderKey, and did $holderDid" }
@@ -980,6 +993,9 @@ object WalletPresentFunctionality2 {
             }
         }
 
+        val credentialCount = distinctCredentialCount(credentials)
+        if (credentialCount > 0) beforeCredentialsUsed(credentialCount)
+
         // Step 3: Build VP token (and optional ID token for SIOPv2).
         val vpToken = holderCrypto2Key?.let {
             buildVpToken(authorizationRequest, credentials, it, holderDid, transactionDataTypeRegistry)
@@ -999,6 +1015,10 @@ object WalletPresentFunctionality2 {
         // Step 4: Send response.
         return sendAuthorizationResponse(authorizationRequest, vpToken, idToken)
     }
+
+    internal fun distinctCredentialCount(
+        credentials: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+    ): Int = credentials.values.flatten().distinctBy { it.credential.id }.size
 
     /**
      * Creates a Key Binding JWT for SD-JWT presentations.

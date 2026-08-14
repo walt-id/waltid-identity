@@ -351,32 +351,21 @@ class IssuanceNotificationRouteTest {
                 IssuanceSessionEvent.ACCESS_TOKEN_ISSUED,
                 IssuanceSessionEvent.CREDENTIAL_REQUEST_RECEIVED,
                 IssuanceSessionEvent.CREDENTIAL_PROOF_VALIDATION_FAILED,
-                IssuanceSessionEvent.CREDENTIAL_REQUEST_FAILED,
-                IssuanceSessionEvent.ISSUANCE_STATUS,
             )
             expectedEvents.forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
             val receivedUpdates = notificationServer.getReceivedUpdates()
                 .filter { it.target == createdOffer.offerId }
             assertEquals(expectedEvents.map { it.value }, receivedUpdates.map { it.event })
-            assertEquals(
-                "UNSUCCESSFUL",
-                receivedUpdates.last().session["status"]?.jsonPrimitive?.contentOrNull,
-            )
-            val failureUpdate = assertNotNull(
+            // invalid_proof is retryable: the grant stays usable, so the session is not concluded.
+            assertNull(
                 receivedUpdates.singleOrNull { it.event == IssuanceSessionEvent.CREDENTIAL_REQUEST_FAILED.value },
-            )
-            // Reports the rejected stage, not the concluded session: the terminal state is carried by
-            // the issuance_status that follows, so every *_failed event has the same shape.
-            assertNull(failureUpdate.session["status"]?.jsonPrimitive?.contentOrNull)
-            assertEquals(
-                "invalid_proof",
-                assertNotNull(failureUpdate.session["failure"]?.jsonObject)["errorCode"]?.jsonPrimitive?.contentOrNull,
             )
             val proofFailureUpdate = assertNotNull(
                 receivedUpdates.singleOrNull {
                     it.event == IssuanceSessionEvent.CREDENTIAL_PROOF_VALIDATION_FAILED.value
                 },
             )
+            assertNull(proofFailureUpdate.session["status"]?.jsonPrimitive?.contentOrNull)
             assertEquals(
                 "invalid_proof",
                 assertNotNull(proofFailureUpdate.session["failure"]?.jsonObject)["errorCode"]

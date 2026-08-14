@@ -53,6 +53,7 @@ import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.handlers.WalletIssuanceGrant
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecordKind
@@ -849,7 +850,9 @@ class MobileWalletTest {
             issuanceHttpClient = mockIssuer(),
         )
 
-        val session = wallet.startIssuance(MobileWalletIssuanceRequest(offerUrl = preAuthorizedOfferUrl()))
+        val session = wallet.startIssuance(
+            MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(preAuthorizedOfferUrl()))
+        )
         val outcome = assertIs<WalletIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(session.id))
 
         // The credential is in the wallet and reported as issued, both of which the registry cannot revoke.
@@ -862,6 +865,45 @@ class MobileWalletTest {
         val reported = assertNotNull(wallet.digitalCredentialRegistration.value)
         assertFalse(reported.available)
         assertEquals("Credential Manager rejected the registry", reported.reason)
+    }
+
+    @Test
+    fun startIssuanceAcceptsInlineOfferJsonUsedByDigitalCredentialsCreate() = runTest {
+        val holderKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("offer-json-holder-key"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "offer-json-wallet",
+            keyStore = InMemoryKeyStore().also { it.addCrypto2Key(holderKey) },
+            didStore = InMemoryDidStore().also {
+                it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
+            },
+            credentialStore = InMemoryCredentialStore(),
+            generateAndPersistKey = { error("Issuance must not generate keys") },
+            issuanceHttpClient = mockIssuer(),
+        )
+
+        val session = wallet.startIssuance(
+            MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.InlineJson(preAuthorizedOfferJson()))
+        )
+        assertEquals(WalletIssuanceGrant.PRE_AUTHORIZED_CODE, session.offer.grant)
+
+        val outcome = assertIs<WalletIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(session.id))
+        assertEquals(1, outcome.credentialIds.size)
+    }
+
+    @Test
+    fun issuanceRequestRejectsBlankOffer() {
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletCredentialOffer.Uri("")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletCredentialOffer.InlineJson("   ")
+        }
     }
 
     /**
@@ -1683,20 +1725,20 @@ class MobileWalletTest {
 
     /** A pre-authorized offer carried inline, so resolving it needs no offer fetch of its own. */
     private fun preAuthorizedOfferUrl(): String = URLBuilder(CROSS_DEVICE_CREDENTIAL_OFFER_URL).apply {
-        parameters.append(
-            "credential_offer",
-            buildJsonObject {
-                put("credential_issuer", MOCK_ISSUER)
-                put("credential_configuration_ids", buildJsonArray { add(JsonPrimitive(MOCK_CONFIGURATION_ID)) })
-                put("grants", buildJsonObject {
-                    put(
-                        "urn:ietf:params:oauth:grant-type:pre-authorized_code",
-                        buildJsonObject { put("pre-authorized_code", "pre-code") },
-                    )
-                })
-            }.toString(),
-        )
+        parameters.append("credential_offer", preAuthorizedOfferJson())
     }.buildString()
+
+    /** Credential Offer JSON object as delivered by Digital Credentials API create requests. */
+    private fun preAuthorizedOfferJson(): String = buildJsonObject {
+        put("credential_issuer", MOCK_ISSUER)
+        put("credential_configuration_ids", buildJsonArray { add(JsonPrimitive(MOCK_CONFIGURATION_ID)) })
+        put("grants", buildJsonObject {
+            put(
+                "urn:ietf:params:oauth:grant-type:pre-authorized_code",
+                buildJsonObject { put("pre-authorized_code", "pre-code") },
+            )
+        })
+    }.toString()
 
     /**
      * The smallest OpenID4VCI issuer that answers one pre-authorized request with one credential.

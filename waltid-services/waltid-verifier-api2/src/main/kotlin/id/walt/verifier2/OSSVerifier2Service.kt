@@ -30,10 +30,11 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.server.util.*
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
-import java.util.concurrent.ConcurrentHashMap
 
 
 private val log = logger("Verifier2Service")
@@ -43,33 +44,40 @@ private const val ENVELOPE_QUERY_PARAM = "envelope"
 
 object Verifier2Service {
 
-    val sessions = ConcurrentHashMap<String, Verification2Session>()
+    /**
+     * Safe default for OSS startup and tests. Deployments inject a repository into [registerRoute]
+     * rather than replacing global process state at runtime.
+     */
+    val defaultSessionRepository: VerificationSessionRepository = InMemoryVerificationSessionRepository()
 
     /**
      * Update data for this session and send session update notifications
      */
-    val updateSessionCallback: suspend (
+    private fun updateSessionCallback(repository: VerificationSessionRepository): suspend (
         session: Verification2Session,
         event: SessionEvent,
         block: Verification2Session.() -> Unit
     ) -> Unit = { session, event, block ->
         log.trace { "Updating session due to '$event': ${session.id}" }
         val notificationConfig = session.notifications
-        val newSession = session.apply {
-            block.invoke(this)
-        }
-        sessions[newSession.id] = newSession
+        val updated = repository.update(session.id, block).session
 
-        val publicSession = session.publicView()
-        Verifier2SessionUpdate(publicSession.id, event, publicSession)
-            .toKtorSessionUpdate()
-            .notifySessionUpdate(publicSession.id, notificationConfig)
+        try {
+            // publicView() keeps the ephemeral decryption keys and internal policy detail out of
+            // the notification payload.
+            val publicSession = updated.publicView()
+            Verifier2SessionUpdate(publicSession.id, event, publicSession)
+                .toKtorSessionUpdate()
+                .notifySessionUpdate(publicSession.id, notificationConfig)
+        } catch (exception: Exception) {
+            log.warn(exception) { "Could not deliver verification session notification for ${updated.id}" }
+        }
     }
 
     /**
      * Mark this session as failed
      */
-    val failSessionCallback: suspend (
+    private val failSessionCallback: suspend (
         session: Verification2Session,
         event: SessionEvent,
         updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit
@@ -79,14 +87,15 @@ object Verifier2Service {
         }
     }
 
-    fun Route.registerRoute() {
+    fun Route.registerRoute(repository: VerificationSessionRepository = defaultSessionRepository) {
+        val updateSessionCallback = updateSessionCallback(repository)
         route(VERIFICATION_SESSION) {
             route("", {
                 tags("Verification Session Management")
             }) {
                 post<VerificationSessionSetup>("create", VerificationSessionCreateOpenApi.createDocs) { sessionSetup ->
                     val newSession = OSSVerifier2Manager.createVerificationSession(sessionSetup)
-                    sessions[newSession.id] = newSession
+                    repository.create(newSession)
                     val creationResponse = newSession.toSessionCreationResponse()
                     call.respond(creationResponse)
                 }
@@ -99,8 +108,8 @@ object Verifier2Service {
                         response { HttpStatusCode.OK to { body<Verification2Session>() } }
                     }) {
                         val verifierSession =
-                            sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
-                                ?: throw IllegalArgumentException("Unknown session id")
+                            repository.get(call.parameters.getOrFail(VERIFICATION_SESSION))?.session
+                                ?: throw VerificationSessionNotFoundException(call.parameters.getOrFail(VERIFICATION_SESSION))
                         call.respond(verifierSession.publicView())
                     }
 
@@ -113,8 +122,8 @@ object Verifier2Service {
                             httpJson.encodeToString(serializer, it)
                         }) {
                             val verifierSession =
-                                sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
-                                    ?: throw IllegalArgumentException("Unknown session id")
+                                repository.get(call.parameters.getOrFail(VERIFICATION_SESSION))?.session
+                                    ?: throw VerificationSessionNotFoundException(call.parameters.getOrFail(VERIFICATION_SESSION))
 
                             // Get the flow for this specific target.
                             val sseFlow = SseNotifier.getSseFlow(verifierSession.id)
@@ -137,8 +146,8 @@ object Verifier2Service {
                         response { HttpStatusCode.OK to { body<AuthorizationRequest>() } }
                     }) {
                     val verificationSession =
-                        sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
-                            ?: throw IllegalArgumentException("Unknown session id")
+                        repository.get(call.parameters.getOrFail(VERIFICATION_SESSION))?.session
+                            ?: throw VerificationSessionNotFoundException(call.parameters.getOrFail(VERIFICATION_SESSION))
 
                     call.respondAuthorizationRequest(
                         verificationSession = verificationSession,
@@ -154,8 +163,8 @@ object Verifier2Service {
                         response { HttpStatusCode.OK to { body<String> { description = "Signed request object JWT (application/oauth-authz-req+jwt)" } } }
                     }) {
                     val verificationSession =
-                        sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
-                            ?: throw IllegalArgumentException("Unknown session id")
+                        repository.get(call.parameters.getOrFail(VERIFICATION_SESSION))?.session
+                            ?: throw VerificationSessionNotFoundException(call.parameters.getOrFail(VERIFICATION_SESSION))
 
                     call.respondRequestUriPost(
                         verificationSession = verificationSession,
@@ -179,13 +188,24 @@ object Verifier2Service {
                         }) { body ->
                         val sessionId = call.parameters.getOrFail(VERIFICATION_SESSION)
                         log.trace { "Received verification session response to session: $sessionId" }
-                        val verificationSession = sessions[sessionId]
-
-                        call.respondHandleDirectPostResponse(
-                            verificationSession = verificationSession,
-                            updateSessionCallback = updateSessionCallback,
-                            failSessionCallback = failSessionCallback
-                        )
+                        val claim = repository.claimForProcessingWithOriginal(sessionId)
+                        try {
+                            call.respondHandleDirectPostResponse(
+                                verificationSession = claim.claimed.session,
+                                updateSessionCallback = updateSessionCallback,
+                                failSessionCallback = failSessionCallback,
+                                beforeRespond = { rejected ->
+                                    if (rejected) repository.restoreProcessingClaim(claim)
+                                },
+                            )
+                        } catch (exception: Exception) {
+                            try {
+                                withContext(NonCancellable) { repository.restoreProcessingClaim(claim) }
+                            } catch (rollbackException: Exception) {
+                                exception.addSuppressed(rollbackException)
+                            }
+                            throw exception
+                        }
                     }
                 }
             }

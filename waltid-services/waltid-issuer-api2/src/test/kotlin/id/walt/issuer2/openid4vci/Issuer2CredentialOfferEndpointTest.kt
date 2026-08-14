@@ -283,6 +283,31 @@ class Issuer2CredentialOfferEndpointTest {
     }
 
     @Test
+    fun shouldApplyAuthorizedTransactionDataTypesRuntimeOverrideToOfferSession() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val profile = client.getProfile(EU_AGE_VERIFICATION_PROFILE_ID)
+        assertNull(
+            profile.authorizedTransactionDataTypes,
+            "euAgeVerificationMdoc must not authorize transaction data at the profile, so the offer override is the grant",
+        )
+
+        val response = client.createCredentialOffer(
+            CredentialOfferCreateRequest(
+                profileId = profile.profileId,
+                authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+                runtimeOverrides = CredentialOfferRuntimeOverrides(
+                    authorizedTransactionDataTypes = listOf(SCA_PAYMENT_TRANSACTION_DATA_TYPE),
+                ),
+            )
+        )
+
+        val session = client.getSession(response.offerId)
+        assertEquals(listOf(SCA_PAYMENT_TRANSACTION_DATA_TYPE), session.authorizedTransactionDataTypes)
+        assertNull(client.getProfile(profile.profileId).authorizedTransactionDataTypes)
+    }
+
+    @Test
     fun shouldMergeCredentialDataRuntimeOverridesWithConfiguredProfileData() = testApplication {
         installIssuer2WithConfigFiles()
         val client = apiClient()
@@ -896,6 +921,8 @@ class Issuer2CredentialOfferEndpointTest {
         const val ISO_PHOTO_ID_CONFIGURATION_ID = "org.iso.23220.photoid.1"
         const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
         const val TAX_ID_SD_JWT_PROFILE_ID = "taxIdCredentialSdJwt"
+        const val EU_AGE_VERIFICATION_PROFILE_ID = "euAgeVerificationMdoc"
+        const val SCA_PAYMENT_TRANSACTION_DATA_TYPE = "urn:eudi:sca:payment:1"
         const val TX_CODE_VALUE = "123456"
         const val TWO_MINUTES_SECONDS = 120L
 

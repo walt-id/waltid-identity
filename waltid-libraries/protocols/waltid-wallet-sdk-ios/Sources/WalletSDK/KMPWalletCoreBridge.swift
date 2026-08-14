@@ -60,7 +60,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
         let result = try await bridge.startIssuance(
             request: MobileWalletIssuanceRequest(
-                offerUrl: request.offer.absoluteString,
+                offer: MobileWalletCredentialOfferUri(value: request.offer.absoluteString),
                 clientId: request.clientID,
                 redirectUri: request.redirectURI.absoluteString,
                 keyId: request.keyID,

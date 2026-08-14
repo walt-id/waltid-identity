@@ -101,6 +101,25 @@ class WalletDemoController(
         _state.update { it.copy(selectedTab = tab) }
     }
 
+    /**
+     * Reloads credentials from the store into the ready session.
+     *
+     * Needed after a CREATE_CREDENTIAL provider activity (or another process-local wallet handle)
+     * writes credentials while this controller's in-memory list is still stale.
+     */
+    fun refreshCredentialsFromStore() {
+        scope.launch(dispatcher) {
+            if (_state.value.session !is WalletSessionState.Ready) return@launch
+            runCatching { wallet.listCredentials() }
+                .onSuccess { credentials ->
+                    _state.update { state ->
+                        val currentReady = state.session as? WalletSessionState.Ready ?: return@update state
+                        state.copy(session = currentReady.copy(credentials = credentials))
+                    }
+                }
+        }
+    }
+
     fun completePresentationContinuation() {
         _state.update { state ->
             val pending = state.pendingPresentationContinuation ?: return@update state

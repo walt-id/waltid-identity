@@ -148,6 +148,8 @@ if (enableAndroidBuild) extensions.configure<KotlinMultiplatformAndroidComponent
                 val missing = setOf(
                     "assets/id/walt/wallet2/mobile/identitycredentialmatcher.wasm",
                     "assets/id/walt/wallet2/mobile/NOTICE-identitycredentialmatcher.txt",
+                    "assets/id/walt/wallet2/mobile/provision_hardcoded.wasm",
+                    "assets/id/walt/wallet2/mobile/NOTICE-provision_hardcoded.txt",
                 ) - entries
                 require(missing.isEmpty()) { "AAR is missing vendored matcher assets: $missing" }
             }

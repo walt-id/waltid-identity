@@ -7,6 +7,8 @@ const props = defineProps<{
   error: string | null
   optionsLabel: string
   warning?: string | null
+  /** Optional transform applied when loading a swagger example into the editor. */
+  mapExamplePayload?: (payload: unknown) => unknown
 }>()
 
 defineEmits<{ reload: [] }>()
@@ -18,7 +20,11 @@ function onSelectChange(e: Event) {
   const idx = Number((e.target as HTMLSelectElement).value)
   selectedIndex.value = idx
   const ex = props.examples[idx]
-  if (ex) json.value = JSON.stringify(ex.payload, null, 2)
+  if (!ex) return
+  const payload = props.mapExamplePayload
+    ? props.mapExamplePayload(ex.payload)
+    : ex.payload
+  json.value = JSON.stringify(payload, null, 2)
 }
 </script>
 

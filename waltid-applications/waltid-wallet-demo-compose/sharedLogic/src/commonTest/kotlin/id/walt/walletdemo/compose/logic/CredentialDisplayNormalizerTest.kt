@@ -963,6 +963,83 @@ class CredentialDisplayNormalizerTest {
         assertEquals("ACME Corp", labelsToValues["Payee"])
     }
 
+    @Test
+    fun transactionDataGroupsQualifyNestedScaPayloadLabelsWithTheirParent() {
+        val groups = CredentialDisplayNormalizer.transactionDataGroups(
+            listOf(
+                WalletDemoTransactionDataItem(
+                    type = "urn:eudi:sca:payment:1",
+                    displayName = "SCA Payment",
+                    credentialQueryIds = listOf("sca_payment_card"),
+                    supportedFields = listOf("payload"),
+                    detailsJson = """
+                        {
+                          "payload": {
+                            "transaction_id": "8D8AC610-566D-4EF0-9C22-186B2A5ED793",
+                            "payee": {
+                              "name": "Super Store",
+                              "id": "merchant-001"
+                            },
+                            "currency": "EUR",
+                            "amount": 11.56
+                          }
+                        }
+                    """.trimIndent(),
+                    rawJson = """
+                        {
+                          "type": "urn:eudi:sca:payment:1",
+                          "credential_ids": ["sca_payment_card"],
+                          "payload": {
+                            "transaction_id": "8D8AC610-566D-4EF0-9C22-186B2A5ED793",
+                            "payee": {
+                              "name": "Super Store",
+                              "id": "merchant-001"
+                            },
+                            "currency": "EUR",
+                            "amount": 11.56
+                          }
+                        }
+                    """.trimIndent(),
+                )
+            )
+        )
+
+        val payment = groups.single()
+        assertEquals("SCA Payment", payment.title)
+        assertTrue(payment.items.none { it.value is DisplayValue.ObjectValue })
+
+        val labelsByPath = payment.items.associate { it.path.id to it.label }
+        // The `payload` wrapper carries no meaning of its own, so its direct leaves stay unprefixed...
+        assertEquals("Amount", labelsByPath["transactionData[0].details.payload.amount"])
+        assertEquals("Currency", labelsByPath["transactionData[0].details.payload.currency"])
+        assertEquals("Transaction id", labelsByPath["transactionData[0].details.payload.transaction_id"])
+        // ...while a bare "Name" row would not say whose name it is.
+        assertEquals("Payee name", labelsByPath["transactionData[0].details.payload.payee.name"])
+        assertEquals("Payee id", labelsByPath["transactionData[0].details.payload.payee.id"])
+
+        val valuesByPath = payment.items.associate { it.path.id to it.value }
+        assertEquals(DisplayValue.NumberValue("11.56"), valuesByPath["transactionData[0].details.payload.amount"])
+        assertEquals(DisplayValue.Text("EUR"), valuesByPath["transactionData[0].details.payload.currency"])
+        assertEquals(DisplayValue.Text("Super Store"), valuesByPath["transactionData[0].details.payload.payee.name"])
+    }
+
+    @Test
+    fun credentialClaimsKeepUnqualifiedNestedLabels() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "dc+sd-jwt",
+                issuer = null,
+                label = "PID",
+                credentialDataJson = """{"place_of_birth":{"locality":"Vienna","country":"AT"}}""",
+            )
+        )
+
+        val claims = details.groups.flatMap { it.items }
+        assertEquals("Locality", claims.first { it.path.id == "place_of_birth.locality" }.label)
+        assertEquals("Country", claims.first { it.path.id == "place_of_birth.country" }.label)
+    }
+
     private fun onePixelPngByteArrayJson(): String =
         Base64.Default.decode(onePixelPngBase64).joinToString(prefix = "[", postfix = "]") { byte ->
             (byte.toInt() and 0xFF).toString()

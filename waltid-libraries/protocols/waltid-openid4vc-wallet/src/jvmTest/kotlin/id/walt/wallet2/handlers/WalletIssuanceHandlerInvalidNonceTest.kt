@@ -1,6 +1,11 @@
 package id.walt.wallet2.handlers
 
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.WalletCredentialStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -10,6 +15,8 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -144,15 +151,98 @@ class WalletIssuanceHandlerInvalidNonceTest {
         assertEquals(1, credentialRequests)
     }
 
-    private fun fetchRequest() = FetchCredentialRequest(
+    /**
+     * Server adapters account stored credentials, so the storing variant must report the batch size
+     * before the first credential is persisted and report every credential it stored.
+     */
+    @Test
+    fun storingFetchReportsBatchSizeBeforePersistingEachCredential() = runTest {
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler {
+                    respondJson("""{"credentials":[{"credential":"$SD_JWT_CREDENTIAL"},{"credential":"$SD_JWT_CREDENTIAL"}]}""")
+                }
+            }
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true })
+            }
+        }
+        val events = mutableListOf<String>()
+        val store = RecordingCredentialStore(events)
+        val wallet = Wallet(
+            id = "isolated-fetch-accounting",
+            staticKey = JWKKey.generate(KeyType.Ed25519),
+            credentialStores = listOf(store),
+        )
+
+        val result = WalletIssuanceHandler.fetchCredential(
+            wallet = wallet,
+            request = fetchRequest(storeInWallet = true),
+            httpClient = client,
+            beforeCredentialsStored = { events += "reserve:$it" },
+            onCredentialStored = { events += "stored" },
+        )
+
+        assertEquals(2, result.rawCredentials.size)
+        assertEquals(listOf("reserve:2", "persist", "stored", "persist", "stored"), events)
+    }
+
+    @Test
+    fun statelessFetchStoresNothingAndReportsNoUsage() = runTest {
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { respondJson("""{"credentials":[{"credential":"$SD_JWT_CREDENTIAL"}]}""") }
+            }
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true })
+            }
+        }
+        val events = mutableListOf<String>()
+        val wallet = Wallet(
+            id = "isolated-fetch-stateless",
+            staticKey = JWKKey.generate(KeyType.Ed25519),
+            credentialStores = listOf(RecordingCredentialStore(events)),
+        )
+
+        val result = WalletIssuanceHandler.fetchCredential(
+            wallet = wallet,
+            request = fetchRequest(storeInWallet = false),
+            httpClient = client,
+            beforeCredentialsStored = { events += "reserve:$it" },
+            onCredentialStored = { events += "stored" },
+        )
+
+        assertEquals(1, result.rawCredentials.size)
+        assertEquals(emptyList(), events)
+    }
+
+    private fun fetchRequest(storeInWallet: Boolean = false) = FetchCredentialRequest(
         credentialEndpoint = Url(CREDENTIAL_ENDPOINT),
         accessToken = "access-token",
         credentialConfigurationId = "pid",
+        storeInWallet = storeInWallet,
     )
+
+    private class RecordingCredentialStore(private val events: MutableList<String>) : WalletCredentialStore {
+        private val credentials = mutableListOf<StoredCredential>()
+
+        override suspend fun addCredential(entry: StoredCredential) {
+            events += "persist"
+            credentials += entry
+        }
+
+        override suspend fun getCredential(id: String): StoredCredential? = credentials.firstOrNull { it.id == id }
+
+        override suspend fun listCredentials(): Flow<StoredCredential> = credentials.toList().asFlow()
+
+        override suspend fun removeCredential(id: String): Boolean = credentials.removeAll { it.id == id }
+    }
 
     private companion object {
         const val NONCE_ENDPOINT = "https://issuer.example/nonce"
         const val CREDENTIAL_ENDPOINT = "https://issuer.example/credential"
+        const val SD_JWT_CREDENTIAL =
+            "eyJhbGciOiJFZERTQSIsInR5cCI6ImRjK3NkLWp3dCJ9.eyJ2Y3QiOiJodHRwczovL2lzc3Vlci5leGFtcGxlL3BpZCIsInN1YiI6ImhvbGRlciJ9.c2lnbmF0dXJl~"
     }
 }
 

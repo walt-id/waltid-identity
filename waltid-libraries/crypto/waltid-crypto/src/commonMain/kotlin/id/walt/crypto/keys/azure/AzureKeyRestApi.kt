@@ -42,11 +42,19 @@ private const val AZURE_KEY_VAULT_PROVIDER = "Azure Key Vault"
 @Serializable
 @SerialName("azure-rest-api")
 class AzureKeyRestApi(
+    /**
+     * Azure Key Vault key URL used for REST operations
+     * (`https://{vault}.vault.azure.net/keys/{name}/{version}`).
+     * This is an ops locator, not a public kid — use [getKeyId] for publishing.
+     */
     val id: String,
     var auth: AzureAuth? = null,
     private var _keyType: KeyType? = null,
     var _publicKey: DirectSerializedKey? = null,
 ) : Key() {
+
+    /** Vault URL for Azure Key Vault HTTP operations. */
+    val keyIdUrl: String get() = id
 
     @Transient
     private lateinit var accessToken: String
@@ -54,13 +62,17 @@ class AzureKeyRestApi(
     @Transient
     private lateinit var accessTokenExpiration: Instant
 
+    @Transient
+    private var cachedPublicKeyId: String? = null
+
     private fun updateKeyType() {
         _keyType = _publicKey?.key?.keyType
     }
 
     @JsExport.Ignore
     suspend fun fetchAndUpdatePublicKey() {
-        _publicKey = DirectSerializedKey(getPublicKeyFromAzureKms(getKeyId()))
+        _publicKey = DirectSerializedKey(getPublicKeyFromAzureKms(keyIdUrl))
+        cachedPublicKeyId = null
     }
 
     @JsExport.Ignore
@@ -105,37 +117,42 @@ class AzureKeyRestApi(
     override val hasPrivateKey: Boolean
         get() = true
 
-    override fun toString(): String = "[Azure ${keyType.name} key @ ${auth?.keyVaultUrl} - $id]"
+    override fun toString(): String = "[Azure ${keyType.name} key @ ${auth?.keyVaultUrl} - $keyIdUrl]"
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun getKeyId(): String = id
+    override suspend fun getKeyId(): String {
+        cachedPublicKeyId?.let { return it }
+        val publicKeyId = getPublicKey().getThumbprint()
+        cachedPublicKeyId = publicKeyId
+        return publicKeyId
+    }
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun getThumbprint(): String = throw UnsupportedOperationException("No private key available")
+    override suspend fun getThumbprint(): String = getPublicKey().getThumbprint()
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun exportJWK(): String = throw UnsupportedOperationException("No private key available")
+    override suspend fun exportJWK(): String = getPublicKey().exportJWK()
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun exportJWKObject(): JsonObject = throw UnsupportedOperationException("No private key available")
+    override suspend fun exportJWKObject(): JsonObject = PublicKeyIds.run { publicJwkForPublish() }
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun exportPEM(): String = throw UnsupportedOperationException("No private key available")
+    override suspend fun exportPEM(): String = throw UnsupportedOperationException("PEM export is not available for remote Azure keys")
 
     @JvmBlocking
     @JvmAsync
@@ -158,7 +175,7 @@ class AzureKeyRestApi(
             put("alg", JsonPrimitive(signingAlgorithm))
             put("value", JsonPrimitive(base64UrlEncoded))
         }
-        val signatureResponse = client.post("$id/sign?api-version=7.4") {
+        val signatureResponse = client.post("$keyIdUrl/sign?api-version=7.4") {
             contentType(ContentType.Application.Json)
             bearerAuth(accessToken)
             setBody(body)
@@ -244,7 +261,7 @@ class AzureKeyRestApi(
     @JsExport.Ignore
     override suspend fun deleteKey(): Boolean {
         ensureAccessTokenValid()
-        val response = client.delete("$id?api-version=7.4") {
+        val response = client.delete("$keyIdUrl?api-version=7.4") {
             contentType(ContentType.Application.Json)
             bearerAuth(accessToken)
         }
@@ -303,10 +320,19 @@ class AzureKeyRestApi(
             val kid = publicKeyJson["kid"]?.jsonPrimitive?.content ?: error("No key id in key response")
             val azureKeyType = publicKeyJson["kty"]?.jsonPrimitive?.content ?: error("Missing key type in public key response")
             val crvFromResponse = publicKeyJson["crv"]?.jsonPrimitive?.content
-            val publicKeyJsonModified = publicKeyJson.toMutableMap()
-            publicKeyJsonModified.remove("key_ops")
-            val publicKey = JWKKey.importJWK(publicKeyJsonModified.toMap().toJsonElement().toString())
+            // Vault URL kids are ops locators — strip before import so getKeyId()/exports use thumbprint.
+            val publicKeyJsonModified = publicKeyJson.toMutableMap().apply {
+                remove("key_ops")
+                remove("kid")
+            }
+            val materialOnly = JWKKey.importJWK(publicKeyJsonModified.toMap().toJsonElement().toString())
                 .getOrElse { exception -> throw IllegalArgumentException("Invalid JWK in public key: $publicKeyJson", exception) }
+            val thumbprint = materialOnly.getThumbprint()
+            val publicKey = JWKKey.importJWK(
+                JsonObject(materialOnly.exportJWKObject() + ("kid" to JsonPrimitive(thumbprint))).toString()
+            ).getOrElse { exception ->
+                throw IllegalArgumentException("Failed to assign public thumbprint kid: $publicKeyJson", exception)
+            }
 
             val keyType = if (azureKeyType == "RSA") {
                 publicKey.keyType
@@ -442,10 +468,8 @@ class AzureKeyRestApi(
 
                 val parsedAzurePublicKey = parseAzurePublicKey(response.jsonObject["key"]?.jsonObject!!)
 
-                val keyId = parsedAzurePublicKey.kid
-
                 val createdKey = AzureKeyRestApi(
-                    id = keyId,
+                    id = parsedAzurePublicKey.kid, // vault URL for ops
                     auth = metadata.auth,
                     // Prefer requested type: Azure kty/crv cannot distinguish RSA key sizes.
                     _keyType = type,
