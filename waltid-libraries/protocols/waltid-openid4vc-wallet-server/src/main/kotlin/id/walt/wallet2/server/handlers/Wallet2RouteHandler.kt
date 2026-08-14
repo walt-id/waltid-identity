@@ -698,8 +698,11 @@ object Wallet2RouteHandler {
                         request { pathParameter<String>("walletId"); body<GenerateAuthorizationUrlRequest>() }
                         response { HttpStatusCode.OK to { body<GenerateAuthorizationUrlResult>() } }
                     }) {
+                        // Wallet-aware overload: PAR is a client-authenticated endpoint, so the
+                        // authorization request can only be pushed when a signing key is available.
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<GenerateAuthorizationUrlRequest>()
-                        call.respond(WalletIssuanceHandler.generateAuthorizationUrl(req))
+                        call.respond(WalletIssuanceHandler.generateAuthorizationUrl(wallet, req))
                     }
 
                     post("/exchange-code", {
