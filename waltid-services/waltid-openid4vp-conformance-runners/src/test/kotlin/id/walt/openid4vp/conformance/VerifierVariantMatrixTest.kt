@@ -20,40 +20,42 @@ class VerifierVariantMatrixTest {
         val all = VerifierVariantMatrix.all()
 
         // 2 formats x 3 prefixes x 2 request methods x 2 response modes = 24, less 4 excluded
-        // redirect_uri + signed, 8 excluded x509 + url_query, 2 excluded mdoc + url_query and 1
-        // excluded encrypted + url_query, plus 2 HAIP points.
-        assertEquals(11, all.size)
+        // redirect_uri + signed and 8 excluded x509 + url_query, plus 2 HAIP points.
+        // The mdoc/encrypted + url_query exclusions were dropped when conformance-suite 5.2.3 moved
+        // those conditions onto the effective authorization request; see VerifierVariantMatrix.
+        assertEquals(14, all.size)
         assertEquals(all.size, all.distinctBy { it.id }.size, "variant ids must be unique")
     }
 
     @Test
-    fun `redirect_uri is driven for the one combination the suite can exercise`() {
+    fun `redirect_uri is driven for every url_query combination`() {
         val redirectUri = VerifierVariantMatrix.all().filter { it.clientIdPrefix == "redirect_uri" }
 
-        // redirect_uri implies url_query (signed requests are excluded), and the suite cannot drive
-        // url_query with mdoc or with an encrypted response - both of its conditions there read the
-        // request object that url_query never produces. So sd-jwt + direct_post is the whole set.
-        assertEquals(1, redirectUri.size)
-        assertEquals("sd_jwt_vc", redirectUri.single().credentialFormat)
-        assertEquals("url_query", redirectUri.single().requestMethod)
-        assertEquals("direct_post", redirectUri.single().responseMode)
+        // redirect_uri implies url_query, since a signed request has no key to authenticate with.
+        // Both formats and both response modes are drivable as of conformance-suite 5.2.3.
+        assertEquals(4, redirectUri.size)
+        assertTrue(redirectUri.all { it.requestMethod == "url_query" })
+        assertEquals(setOf("sd_jwt_vc", "iso_mdl"), redirectUri.map { it.credentialFormat }.toSet())
+        assertEquals(setOf("direct_post", "direct_post.jwt"), redirectUri.map { it.responseMode }.toSet())
     }
 
     @Test
-    fun `url_query cannot be combined with anything needing a request object`() {
-        // Both suite conditions involved read from `authorization_request_object`, which a url_query
-        // request has none of. Suite limitations, not Verifier2 gaps.
-        assertFalse(
+    fun `url_query is drivable with mdoc and with an encrypted response since suite 5_2_3`() {
+        // Until conformance-suite 5.2.3 both conditions read `authorization_request_object`, which a
+        // url_query request never produces, so these combinations errored out before Verifier2 was
+        // exercised. They now read the effective authorization request. This guard fails if a suite
+        // downgrade reintroduces the old behaviour.
+        assertTrue(
             VerifierVariantMatrix.isApplicable(
                 VerifierVariant("iso_mdl", "redirect_uri", "url_query", "direct_post", "plain_vp"),
             ),
-            "mdoc SessionTranscript needs the request object",
+            "mdoc SessionTranscript now reads the effective authorization request",
         )
-        assertFalse(
+        assertTrue(
             VerifierVariantMatrix.isApplicable(
                 VerifierVariant("sd_jwt_vc", "redirect_uri", "url_query", "direct_post.jwt", "plain_vp"),
             ),
-            "response encryption reads client_metadata.jwks from the request object",
+            "response encryption now reads client_metadata.jwks from the effective request",
         )
     }
 
