@@ -83,7 +83,11 @@ class VciWalletSdJwtHaip(
     override val variant = mapOf(
         "credential_format" to "sd_jwt_vc",
         "vci_authorization_code_flow_variant" to "issuer_initiated",
+        // The HAIP plan fixes authorization_request_type itself and rejects it being restated
+        // ("Variant 'authorization_request_type' has been set by user, but test plan already sets
+        // this variant"), so unlike the non-HAIP plans it must not appear here.
         "vci_credential_offer_variant" to "by_value"
+
     )
 
     override val configuration: JsonObject = buildJsonObject {
@@ -174,7 +178,7 @@ class VciWalletSdJwtHaip(
             put("credential_configuration_id", "eu.europa.ec.eudi.pid.1")
         }
 
-        put("waitTimeoutSeconds", 120)
+        put("waitTimeoutSeconds", 30)
         put("publish", "no")
     }
 }
