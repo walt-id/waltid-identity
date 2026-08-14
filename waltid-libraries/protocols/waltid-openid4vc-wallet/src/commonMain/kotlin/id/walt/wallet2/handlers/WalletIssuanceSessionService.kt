@@ -3,6 +3,7 @@ package id.walt.wallet2.handlers
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.selectJwsAlgorithm
@@ -730,23 +731,28 @@ class WalletIssuanceSessionService(
     ): TokenRequestBuilder.TokenResponse {
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
-        val attestation = attestationHeaders(active)
+        val attestationConfigured = active.clientAttestationConfigured()
         val anonymous = metadata.preAuthorizedGrantAnonymousAccessSupported == true &&
-            active.request.tokenRequestHeaders.isEmpty() && attestation == null
-        var responseChallenge: String? = null
+            active.request.tokenRequestHeaders.isEmpty() && !attestationConfigured
         val token = TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthorizedCode,
             txCode = transactionCode,
             additionalHeaders = active.request.tokenRequestHeaders,
-            attestationHeaders = attestation,
+            attestationHeadersFactory = if (attestationConfigured) {
+                { requireNotNull(attestationHeaders(active)) }
+            } else {
+                null
+            },
             anonymous = anonymous,
             dpopProofFactory = active.dpopFactory(),
             onResponseHeaders = { headers ->
-                responseChallenge = headers[ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE]
+                rememberAttestationChallenge(
+                    active,
+                    headers[ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE],
+                )
             },
         )
-        rememberAttestationChallenge(active, responseChallenge)
         return token
     }
 
@@ -757,22 +763,32 @@ class WalletIssuanceSessionService(
     ): TokenRequestBuilder.TokenResponse {
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
-        val attestation = attestationHeaders(active)
-        var responseChallenge: String? = null
+        val attestationConfigured = active.clientAttestationConfigured()
         val token = TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangeAuthorizationCode(
             tokenEndpoint = tokenEndpoint,
             code = code,
             codeVerifier = codeVerifier,
             additionalHeaders = active.request.tokenRequestHeaders,
-            attestationHeaders = attestation,
+            attestationHeadersFactory = if (attestationConfigured) {
+                { requireNotNull(attestationHeaders(active)) }
+            } else {
+                null
+            },
             dpopProofFactory = active.dpopFactory(),
             onResponseHeaders = { headers ->
-                responseChallenge = headers[ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE]
+                rememberAttestationChallenge(
+                    active,
+                    headers[ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE],
+                )
             },
         )
-        rememberAttestationChallenge(active, responseChallenge)
         return token
     }
+
+    private fun ActiveSession.clientAttestationConfigured(): Boolean =
+        attestationAssembler != null &&
+            resolved.authorizationServerMetadata.tokenEndpointAuthMethodsSupported
+                ?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) == true
 
     /**
      * Advertised DPoP algorithms, without checking that the wallet key can sign them.
@@ -1151,14 +1167,9 @@ class WalletIssuanceSessionService(
         ) {
             return null
         }
-        val supportedAlgorithm = ClientAttestationSigningAlgorithms.ES256
-        metadata.clientAttestationSigningAlgValuesSupported?.let { advertised ->
-            require(supportedAlgorithm in advertised) {
-                "Authorization server does not advertise a supported client attestation signing algorithm"
-            }
-        }
+        val advertisedAttestationAlgorithms = metadata.clientAttestationSigningAlgValuesSupported
         metadata.clientAttestationPopSigningAlgValuesSupported?.let { advertised ->
-            require(supportedAlgorithm in advertised) {
+            require(ClientAttestationSigningAlgorithms.ES256 in advertised) {
                 "Authorization server does not advertise a supported client attestation PoP signing algorithm"
             }
         }
@@ -1189,8 +1200,25 @@ class WalletIssuanceSessionService(
             active.request.clientId,
             metadata.issuer,
             challenge,
-        ).also {
+        ).also { headers ->
+            advertisedAttestationAlgorithms?.let { advertised ->
+                validateClientAttestationAlgorithm(headers.attestationJwt, advertised)
+            }
             emitEvent(WalletSessionEvent.issuance_attestation_obtained)
+        }
+    }
+
+    private fun validateClientAttestationAlgorithm(jwt: String, advertised: Set<String>) {
+        val algorithm = try {
+            CompactJws.decodeUnverified(jwt).algorithm.identifier
+        } catch (_: Exception) {
+            null
+        }
+        require(!algorithm.isNullOrBlank()) {
+            "Wallet Attestation JWT must contain a protected JOSE alg header"
+        }
+        require(algorithm in advertised) {
+            "Authorization server does not advertise the Wallet Attestation JWT algorithm $algorithm"
         }
     }
 

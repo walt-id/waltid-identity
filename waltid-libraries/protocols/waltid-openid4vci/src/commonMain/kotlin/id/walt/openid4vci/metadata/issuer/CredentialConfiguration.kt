@@ -100,8 +100,8 @@ data class CredentialConfiguration(
                     }
 
                 CredentialFormat.MSO_MDOC ->
-                    require(algorithms.all { it is SigningAlgId.CoseValue || it is SigningAlgId.CoseName }) {
-                        "credential_signing_alg_values_supported must contain COSE identifiers for ${format.value}"
+                    require(algorithms.all { it is SigningAlgId.CoseValue }) {
+                        "credential_signing_alg_values_supported must contain numeric COSE identifiers for ${format.value}"
                     }
 
                 else ->
@@ -185,8 +185,7 @@ internal object CredentialConfigurationSerializer : KSerializer<CredentialConfig
             doctype = jsonObject.string("doctype"),
             vct = jsonObject.string("vct"),
             credentialSigningAlgValuesSupported = jsonObject["credential_signing_alg_values_supported"]?.let {
-                val decoded = lenientJson.decodeFromJsonElement(SigningAlgIdSetSerializer, it)
-                decoded
+                lenientJson.decodeFromJsonElement(SigningAlgIdSetSerializer, it)
             },
             cryptographicBindingMethodsSupported = jsonObject["cryptographic_binding_methods_supported"]?.let {
                 val serializer = SetSerializer(CryptographicBindingMethod.serializer())

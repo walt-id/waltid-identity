@@ -41,7 +41,10 @@ typealias DPoPProofFactory = suspend (targetEndpoint: String, nonce: String?) ->
 typealias ClientAssertionFactory = suspend () -> String
 
 /** Observes response headers without exposing token response bodies to the caller. */
-typealias TokenResponseHeadersHandler = (Headers) -> Unit
+typealias TokenResponseHeadersHandler = suspend (Headers) -> Unit
+
+/** Builds fresh client-attestation headers for each token request attempt. */
+typealias ClientAttestationHeadersFactory = suspend () -> ClientAttestationHeaders
 
 /** Sanitized token endpoint failure that never retains the response body. */
 class TokenRequestException(
@@ -126,6 +129,7 @@ class TokenRequestBuilder(
          */
         clientAssertionFactory: ClientAssertionFactory? = null,
         onResponseHeaders: TokenResponseHeadersHandler = {},
+        attestationHeadersFactory: ClientAttestationHeadersFactory? = null,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(code.isNotBlank()) { "Authorization code cannot be blank" }
@@ -134,7 +138,7 @@ class TokenRequestBuilder(
         log.trace { "Token endpoint: $tokenEndpoint" }
         log.trace { "Code verifier present: ${codeVerifier != null}" }
         log.trace { "Additional headers: ${additionalHeaders.keys}" }
-        log.trace { "Client attestation: ${attestationHeaders != null}" }
+        log.trace { "Client attestation: ${attestationHeaders != null || attestationHeadersFactory != null}" }
 
         val parameters = Parameters.build {
             append("grant_type", GrantType.AuthorizationCode.value)
@@ -155,6 +159,7 @@ class TokenRequestBuilder(
             dpopProofFactory,
             clientAssertionFactory,
             onResponseHeaders,
+            attestationHeadersFactory,
         )
     }
 
@@ -202,10 +207,11 @@ class TokenRequestBuilder(
         dpopProofFactory: DPoPProofFactory?,
         clientAssertionFactory: ClientAssertionFactory? = null,
         onResponseHeaders: TokenResponseHeadersHandler = {},
+        attestationHeadersFactory: ClientAttestationHeadersFactory? = null,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(preAuthorizedCode.isNotBlank()) { "Pre-authorized code cannot be blank" }
-        require(!anonymous || (additionalHeaders.isEmpty() && attestationHeaders == null && clientAssertionFactory == null)) {
+        require(!anonymous || (additionalHeaders.isEmpty() && attestationHeaders == null && attestationHeadersFactory == null && clientAssertionFactory == null)) {
             "Anonymous pre-authorized code token requests cannot include client authentication headers"
         }
 
@@ -214,7 +220,7 @@ class TokenRequestBuilder(
         log.trace { "Transaction code (PIN) present: ${txCode != null}" }
         log.trace { "Additional parameters: ${additionalParameters.keys}" }
         log.trace { "Additional headers: ${additionalHeaders.keys}" }
-        log.trace { "Client attestation: ${attestationHeaders != null}" }
+        log.trace { "Client attestation: ${attestationHeaders != null || attestationHeadersFactory != null}" }
         log.trace { "Client assertion: ${clientAssertionFactory != null}" }
         log.trace { "Anonymous pre-authorized request: $anonymous" }
 
@@ -241,6 +247,7 @@ class TokenRequestBuilder(
             dpopProofFactory,
             clientAssertionFactory,
             onResponseHeaders,
+            attestationHeadersFactory,
         )
     }
 
@@ -283,10 +290,11 @@ class TokenRequestBuilder(
         anonymous: Boolean = false,
         dpopProofFactory: DPoPProofFactory?,
         onResponseHeaders: TokenResponseHeadersHandler = {},
+        attestationHeadersFactory: ClientAttestationHeadersFactory? = null,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(refreshToken.isNotBlank()) { "Refresh token cannot be blank" }
-        require(!anonymous || (additionalHeaders.isEmpty() && attestationHeaders == null)) {
+        require(!anonymous || (additionalHeaders.isEmpty() && attestationHeaders == null && attestationHeadersFactory == null)) {
             "Anonymous refresh token requests cannot include client authentication headers"
         }
 
@@ -294,7 +302,7 @@ class TokenRequestBuilder(
         log.trace { "Token endpoint: $tokenEndpoint" }
         log.trace { "Additional parameters: ${additionalParameters.keys}" }
         log.trace { "Additional headers: ${additionalHeaders.keys}" }
-        log.trace { "Client attestation: ${attestationHeaders != null}" }
+        log.trace { "Client attestation: ${attestationHeaders != null || attestationHeadersFactory != null}" }
         log.trace { "Anonymous refresh request: $anonymous" }
 
         val parameters = Parameters.build {
@@ -313,6 +321,7 @@ class TokenRequestBuilder(
             attestationHeaders,
             dpopProofFactory,
             onResponseHeaders = onResponseHeaders,
+            attestationHeadersFactory = attestationHeadersFactory,
         )
     }
 
@@ -327,9 +336,13 @@ class TokenRequestBuilder(
         dpopProofFactory: DPoPProofFactory? = null,
         clientAssertionFactory: ClientAssertionFactory? = null,
         onResponseHeaders: TokenResponseHeadersHandler = {},
+        attestationHeadersFactory: ClientAttestationHeadersFactory? = null,
     ): TokenResponse {
         require(dpopProofFactory == null || additionalHeaders.keys.none { it.equals(DPOP_HEADER, ignoreCase = true) }) {
             "DPoP must be configured with either dpopProofFactory or an additional header, not both"
+        }
+        require(attestationHeaders == null || attestationHeadersFactory == null) {
+            "Client attestation must be configured with either attestationHeaders or attestationHeadersFactory, not both"
         }
         log.debug { "Sending token request to authorization server" }
         log.trace { "Request parameters count: ${parameters.names().size}" }
@@ -346,12 +359,12 @@ class TokenRequestBuilder(
                     append("client_assertion", assertion)
                 }
             } ?: parameters
-
+            val requestAttestationHeaders = attestationHeadersFactory?.invoke() ?: attestationHeaders
             val response = sendTokenRequestFollowingRedirects(
                 tokenEndpoint = tokenEndpoint,
                 parameters = attemptParameters,
                 additionalHeaders = additionalHeaders,
-                attestationHeaders = attestationHeaders,
+                attestationHeaders = requestAttestationHeaders,
                 dpopProofFactory = dpopProofFactory,
                 dpopNonce = dpopNonce,
                 onResponseHeaders = onResponseHeaders,
@@ -369,6 +382,14 @@ class TokenRequestBuilder(
                     dpopNonce = suppliedNonce
                     return@repeat
                 }
+                if (
+                    attempt == 0 &&
+                    attestationHeadersFactory != null &&
+                    oauthError == USE_ATTESTATION_CHALLENGE &&
+                    !response.headers[ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE].isNullOrBlank()
+                ) {
+                    return@repeat
+                }
                 throw TokenRequestException(response.status.value, oauthError)
             }
 
@@ -381,7 +402,7 @@ class TokenRequestBuilder(
                 }
             }
         }
-        error("DPoP nonce retry exhausted")
+        error("Token request retry exhausted")
     }
 
     private suspend fun HttpResponse.decodeTokenResponse(): TokenResponse {
@@ -442,6 +463,7 @@ class TokenRequestBuilder(
             onResponseHeaders(initialResponse.headers)
             throw TokenRequestException(initialResponse.status.value, oauthError = "unsafe_redirect")
         }
+        onResponseHeaders(initialResponse.headers)
         return send(location).also { onResponseHeaders(it.headers) }
     }
 
@@ -480,6 +502,7 @@ class TokenRequestBuilder(
     }
 
     private companion object {
+        const val USE_ATTESTATION_CHALLENGE = "use_attestation_challenge"
         val REDIRECT_STATUS_CODES = setOf(307, 308)
     }
 }

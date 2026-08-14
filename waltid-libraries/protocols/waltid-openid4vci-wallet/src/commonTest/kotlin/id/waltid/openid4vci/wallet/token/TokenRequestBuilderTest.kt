@@ -605,4 +605,103 @@ class TokenRequestBuilderTest {
             proofInputs,
         )
     }
+
+    @Test
+    fun testAttestationChallengeErrorRegeneratesPop() = runTest {
+        var callCount = 0
+        var challenge: String? = null
+        val popValues = mutableListOf<String?>()
+        val client = createMockClient { request ->
+            callCount += 1
+            popValues += request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP]
+            if (callCount == 1) {
+                respond(
+                    content = """{"error":"use_attestation_challenge"}""",
+                    status = HttpStatusCode.BadRequest,
+                    headers = headersOf(
+                        HttpHeaders.ContentType to listOf("application/json"),
+                        ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE to listOf("challenge-2"),
+                    ),
+                )
+            } else {
+                respond(
+                    content = """{"access_token":"attested-token","token_type":"Bearer"}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            }
+        }
+
+        val response = TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
+            tokenEndpoint = tokenEndpoint,
+            code = "auth-code",
+            attestationHeadersFactory = {
+                ClientAttestationHeaders(
+                    attestationJwt = "attestation.jwt",
+                    popJwt = "pop-${challenge ?: "initial"}",
+                )
+            },
+            dpopProofFactory = null,
+            onResponseHeaders = { headers ->
+                challenge = headers[ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE]
+            },
+        )
+
+        assertEquals("attested-token", response.access_token)
+        assertEquals(listOf<String?>("pop-initial", "pop-challenge-2"), popValues)
+    }
+
+    @Test
+    fun testDpopNonceRetryRegeneratesAttestationPopAfterChallenge() = runTest {
+        var callCount = 0
+        var challenge: String? = null
+        val proofInputs = mutableListOf<Pair<String, String?>>()
+        val popValues = mutableListOf<String?>()
+        val client = createMockClient { request ->
+            callCount += 1
+            popValues += request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP]
+            if (callCount == 1) {
+                respond(
+                    content = "{}",
+                    status = HttpStatusCode.Unauthorized,
+                    headers = headersOf(
+                        HttpHeaders.WWWAuthenticate to listOf("DPoP error=\"use_dpop_nonce\""),
+                        "DPoP-Nonce" to listOf("server-nonce"),
+                        ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE to listOf("challenge-2"),
+                    ),
+                )
+            } else {
+                respond(
+                    content = """{"access_token":"attested-dpop-token","token_type":"DPoP"}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            }
+        }
+
+        val response = TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
+            tokenEndpoint = tokenEndpoint,
+            code = "auth-code",
+            attestationHeadersFactory = {
+                ClientAttestationHeaders(
+                    attestationJwt = "attestation.jwt",
+                    popJwt = "pop-${challenge ?: "initial"}",
+                )
+            },
+            dpopProofFactory = { endpoint, nonce ->
+                proofInputs += endpoint to nonce
+                "proof-${proofInputs.size}"
+            },
+            onResponseHeaders = { headers ->
+                challenge = headers[ClientAttestationHeaders.HEADER_ATTESTATION_CHALLENGE]
+            },
+        )
+
+        assertEquals("attested-dpop-token", response.access_token)
+        assertEquals(listOf<String?>("pop-initial", "pop-challenge-2"), popValues)
+        assertEquals(
+            listOf(tokenEndpoint to null, tokenEndpoint to "server-nonce"),
+            proofInputs,
+        )
+    }
 }

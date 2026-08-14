@@ -34,7 +34,7 @@ public data class AndroidDigitalCredentialCreateProviderInput(
  * Kept on the Android adapter boundary rather than the common mobile SDK surface.
  *
  * @property protocol Digital Credentials protocol identifier; this adapter only accepts
- * the canonical `openid4vci-v1` identifier.
+ * `openid4vci-v1`.
  * @property offerJson Credential Offer JSON object extracted from the selected protocol
  * alternative's `data` field.
  * @property verifiedOrigin Canonical caller origin derived from Credential Manager caller
@@ -118,12 +118,11 @@ public object AndroidDigitalCredentialCreateProvider {
     }
 
     /**
-     * Resolves the first supported OpenID4VCI protocol alternative from a standard create-request
-     * envelope. The selected protocol is preserved for the Credential Manager acknowledgement.
+     * Resolves the first `openid4vci-v1` protocol alternative from a standard create-request envelope.
      *
      * Only the Digital Credentials `requests` array shape is accepted. Unsupported alternatives are
      * skipped so an issuer that also offers an unknown protocol still reaches this wallet when
-     * the canonical OpenID4VCI identifier is present.
+     * `openid4vci-v1` is present.
      */
     internal fun resolveCreateRequest(
         requestJson: String,
@@ -136,12 +135,12 @@ public object AndroidDigitalCredentialCreateProvider {
         val selected = requests.map { it.jsonObject }.firstOrNull { protocolRequest ->
             protocolRequest["protocol"]?.jsonPrimitive?.content == OPENID4VCI_PROTOCOL
         } ?: throw IllegalArgumentException(
-            "No supported OpenID4VCI Digital Credentials create protocol was offered",
+            "No openid4vci-v1 Digital Credentials create protocol was offered",
         )
         val data = selected["data"] as? JsonObject
             ?: throw IllegalArgumentException("Digital credential create request data must be an object")
         return AndroidDigitalCredentialCreateRequest(
-            protocol = selected["protocol"]!!.jsonPrimitive.content,
+            protocol = OPENID4VCI_PROTOCOL,
             offerJson = Json.encodeToString(JsonObject.serializer(), data),
             verifiedOrigin = verifiedOrigin,
         )
