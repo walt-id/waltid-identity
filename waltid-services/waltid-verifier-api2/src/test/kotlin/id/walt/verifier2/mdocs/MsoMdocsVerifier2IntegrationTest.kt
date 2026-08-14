@@ -42,6 +42,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -209,16 +210,21 @@ class MsoMdocsVerifier2IntegrationTest {
     }
 
     @Test
-    fun test() {
+    fun test() = runVerifierWalletFlow(port = 17011, clientId = "verifier2")
+
+    @Test
+    fun `omitted clientId generates redirect_uri and wallet presents`() =
+        runVerifierWalletFlow(port = 17012, clientId = null)
+
+    private fun runVerifierWalletFlow(port: Int, clientId: String?) {
         val host = "127.0.0.1"
-        val port = 17011
 
         E2ETest(host, port, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(
-                        clientId = "verifier2",
+                        clientId = clientId,
                         clientMetadata = ClientMetadata(
                             clientName = "Verifier2",
                             logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
@@ -265,6 +271,15 @@ class MsoMdocsVerifier2IntegrationTest {
             test("Check Verification Session") {
                 assertTrue {
                     info1.creationDate.wasWithinLastSeconds()
+                }
+            }
+
+            if (clientId == null) {
+                val responseUri = "http://$host:$port/verification-session/$sessionId/response"
+                test("Omitted clientId is generated as redirect_uri bound to response_uri") {
+                    assertEquals(responseUri, info1.authorizationRequest.responseUri)
+                    assertEquals("redirect_uri:$responseUri", info1.authorizationRequest.clientId)
+                    assertEquals("redirect_uri:$responseUri", info1.bootstrapAuthorizationRequest?.clientId)
                 }
             }
 

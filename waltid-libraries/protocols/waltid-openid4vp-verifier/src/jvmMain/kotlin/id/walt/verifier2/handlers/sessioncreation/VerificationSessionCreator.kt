@@ -190,10 +190,24 @@ object VerificationSessionCreator {
         if (isDcApi) {
             require(urlPrefix == null) { "URL prefix is not used for DC API" }
             require(!urlHost.startsWith("openid4vp://authorize")) { "URL Host has to be set to the DC API origin" }
-            if (isSignedRequest && !isAnnexC) {
-                require(!clientId.isNullOrBlank()) { "Signed DC API requests require non-empty client_id" }
-            }
         }
+
+        require(isCrossDevice || isDcApi || isAnnexC) { "No flow is selected" }
+        val responseUri = when {
+            isDcApi || isAnnexC -> null
+            isCrossDevice -> {
+                requireNotNull(urlPrefix) { "urlPrefix is required for cross-device flows" }
+                "$urlPrefix/$sessionId/response"
+            }
+            else -> throw IllegalStateException("No flow is selected")
+        }
+        val effectiveClientId = resolveEffectiveClientId(
+            clientId = clientId,
+            isSignedRequest = isSignedRequest,
+            isDcApi = isDcApi,
+            isAnnexC = isAnnexC,
+            responseUri = responseUri,
+        )
 
         // Preserve OpenID4VP 1.0 algorithms while also advertising fully specified identifiers.
         val supportedJwsAlgorithms = JsonArray(
@@ -308,7 +322,6 @@ object VerificationSessionCreator {
 
 
         // TODO: Annex C is actually a kind of DC API...
-        require(isCrossDevice || isDcApi || isAnnexC) { "No flow is selected" } // list all flows here
         val nonce = Uuid.random().toString()
         val state = if (!isDcApi) Uuid.random().toString() else null
 
@@ -334,7 +347,7 @@ object VerificationSessionCreator {
             // request_uri_method=post so wallets can send wallet_nonce to prevent replay.
             requestUriMethod = if (isSignedRequest) RequestUriHttpMethod.POST else null,
 
-            clientId = clientId,
+            clientId = effectiveClientId,
 
             nonce = null, // not required in the initial request yet
             responseType = null
@@ -357,8 +370,6 @@ object VerificationSessionCreator {
             .mapNotNull { credentialId -> credentialQueriesById?.get(credentialId)?.format }
             .toSet()
 
-        val effectiveClientId = if ((isDcApi && !isSignedRequest) || isAnnexC) null else clientId
-
         val authorizationRequest = AuthorizationRequest(
             responseType = if (!isAnnexC) responseType else null,
 
@@ -368,11 +379,7 @@ object VerificationSessionCreator {
             issuer = effectiveClientId.takeIf { isSignedRequest },
             redirectUri = null, // For Same-Device flow (fragment/query/after code exchange etc)
             // TODO: url building (handle host alias)
-            responseUri = when {
-                isDcApi || isAnnexC -> null
-                isCrossDevice -> "$urlPrefix/$sessionId/response" // For Cross-Device flow (direct_post, direct_post.jwt)
-                else -> throw IllegalStateException("No flow is selected")
-            },
+            responseUri = responseUri,
             scope = openIdConfig?.scope,//OPTIONAL. OAuth 2.0 Scope value. Can be used for pre-defined DCQL queries or OpenID Connect scopes (e.g., "openid").
             state = state, // Opaque value used by the Verifier to maintain state between the request and callback.
             nonce = nonce, // String value used to mitigate replay attacks. Also used to establish holder binding.
@@ -440,7 +447,7 @@ object VerificationSessionCreator {
 
             val headers = hashMapOf<String, JsonElement>(
                 "typ" to JsonPrimitive("oauth-authz-req+jwt"),
-                "kid" to JsonPrimitive(getKid(clientId, requestSigningKey))
+                "kid" to JsonPrimitive(getKid(effectiveClientId, requestSigningKey))
             )
             if (x5c != null) headers["x5c"] = JsonArray(x5c.map { JsonPrimitive(it) })
 
@@ -641,6 +648,34 @@ object VerificationSessionCreator {
 
             is VerifierSigningKey.Crypto2 -> coseAlgorithm
         }
+
+    /**
+     * OpenID4VP 1.0 §5.9.3: unsigned requests without another client_id prefix use
+     * `redirect_uri:<response destination>`. That prefix cannot be signed.
+     */
+    private fun resolveEffectiveClientId(
+        clientId: String?,
+        isSignedRequest: Boolean,
+        isDcApi: Boolean,
+        isAnnexC: Boolean,
+        responseUri: String?,
+    ): String? {
+        if ((isDcApi && !isSignedRequest) || isAnnexC) return null
+        val provided = clientId?.takeIf { it.isNotBlank() }
+        if (provided != null) {
+            require(!isSignedRequest || !provided.startsWith("redirect_uri:")) {
+                "Signed requests cannot use the redirect_uri client_id prefix"
+            }
+            return provided
+        }
+        require(!isSignedRequest) {
+            "Signed requests require a client_id; omitting client_id only auto-generates the unsigned redirect_uri scheme"
+        }
+        val destination = requireNotNull(responseUri) {
+            "Cannot auto-generate redirect_uri client_id without a response_uri"
+        }
+        return "redirect_uri:$destination"
+    }
 
     private sealed interface VerifierSigningKey {
         data class Legacy(val key: Key) : VerifierSigningKey
