@@ -115,7 +115,7 @@ class VciWalletSdJwtPreAuth(
                 "credential_offer_endpoint": "http://$adapterHost:7007/credential-offer",
                 "credential_configuration_id": "eu.europa.ec.eudi.pid.1"
             },
-            "waitTimeoutSeconds": 120,
+            "waitTimeoutSeconds": 30,
             "publish": "no"
         }
         """.trimIndent()
