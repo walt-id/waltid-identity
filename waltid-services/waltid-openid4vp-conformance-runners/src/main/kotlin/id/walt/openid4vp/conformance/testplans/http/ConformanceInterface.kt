@@ -245,6 +245,23 @@ class ConformanceInterface(
 
 
     /**
+     * Cancel the test referenced by [testId] (`DELETE /api/runner/{id}`).
+     *
+     * Every module of a plan shares the plan's `alias`, and the suite only lets one test hold an
+     * alias at a time: creating the next module's test kills any predecessor still running, replacing
+     * its real outcome with "Stopping test due to alias conflict". Cancelling deliberately once a
+     * module is done keeps each module's recorded result its own.
+     *
+     * Best effort - a test that already finished is simply not running any more (404).
+     */
+    suspend fun cancelTest(testId: String) {
+        val response = conformanceHttp.delete("/api/runner/$testId")
+        if (!response.status.isSuccess() && response.status != HttpStatusCode.NotFound) {
+            println("Could not cancel test $testId: HTTP ${response.status.value}")
+        }
+    }
+
+    /**
      * Wait ([delay]) until the test referenced by [testId] reached the defined status
      * - [shouldBeWaiting] = true: wait until test is in "waiting" state
      * - [shouldBeWaiting] = false: wait until test is no longer in "waiting" state
