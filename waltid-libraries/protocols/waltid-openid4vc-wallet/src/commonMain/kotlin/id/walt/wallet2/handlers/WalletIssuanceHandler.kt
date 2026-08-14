@@ -24,6 +24,8 @@ import id.walt.wallet2.handlers.WalletIssuanceHandler.pollDeferredFlow
 import id.walt.wallet2.handlers.WalletIssuanceHandler.resolveOffer
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
+import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
+import id.waltid.openid4vci.wallet.authorization.PushedAuthorizationRequestExecutor
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.clientauth.ClientAssertionBuilder
@@ -1219,6 +1221,72 @@ object WalletIssuanceHandler {
      * Builds a [ClientConfiguration] from the common clientId/redirectUri pair.
      * Extracted to eliminate four identical constructions across issuance functions.
      */
+    /**
+     * Perform a pushed authorization request (RFC 9126) and return the browser URL for it.
+     *
+     * The resulting authorization request carries **only** `client_id` and `request_uri`. Anything
+     * else is a finding: RFC 9126 Section 4 and FAPI 2.0 Security Profile Section 5.3.3.2 both
+     * require it, on the grounds that duplicated parameters can leak into browser history and logs.
+     *
+     * [keyMaterial] is what makes this possible at all - the endpoint is client authenticated. When it
+     * is absent the request is still pushed, but unauthenticated, which an authorization server
+     * demanding `private_key_jwt` will reject; callers that have a wallet should use the
+     * [generateAuthorizationUrl] overload that takes one.
+     */
+    private suspend fun pushAuthorizationRequest(
+        request: GenerateAuthorizationUrlRequest,
+        offer: CredentialOffer,
+        issuerMetadata: CredentialIssuerMetadata,
+        asMetadata: AuthorizationServerMetadata,
+        authorizationEndpoint: String,
+        authBuilder: AuthorizationRequestBuilder,
+        credentialConfigurationId: String,
+        parEndpoint: String,
+        keyMaterial: WalletKeyStoreEntry?,
+    ): GenerateAuthorizationUrlResult {
+        // Binds the eventual access token to this wallet's key at authorization time (RFC 9449
+        // Section 10). Only offered when the key can actually sign an advertised algorithm.
+        val dpopJkt = keyMaterial
+            ?.takeIf { usableDpopAlgorithms(asMetadata, it) != null }
+            ?.jwkThumbprint()
+
+        val pushed = authBuilder.buildPushedAuthorizationRequestStateForCredentialConfigurations(
+            credentialConfigurationIds = listOf(credentialConfigurationId),
+            issuerState = offer.grants?.authorizationCode?.issuerState,
+            usePKCE = request.usePkce,
+            metadata = asMetadata,
+            redirectUri = request.redirectUri.toString(),
+            dpopJkt = dpopJkt,
+        )
+
+        val response = PushedAuthorizationRequestExecutor.execute(
+            httpClient = httpClient,
+            parEndpoint = parEndpoint,
+            parameters = pushed.parameters,
+            clientAssertionFactory = keyMaterial?.let { material ->
+                clientAssertionFactory(
+                    asMetadata = asMetadata,
+                    clientId = request.clientId,
+                    keyMaterial = material,
+                )
+            },
+        )
+
+        return GenerateAuthorizationUrlResult(
+            authorizationUrl = Url(
+                URLBuilder(authorizationEndpoint).apply {
+                    parameters.append("client_id", request.clientId)
+                    parameters.append("request_uri", response.requestUri)
+                }.buildString()
+            ),
+            state = pushed.state,
+            codeVerifier = pushed.pkceData?.codeVerifier,
+            credentialConfigurationId = credentialConfigurationId,
+            credentialIssuerBaseUrl = offer.credentialIssuer,
+            nonceEndpoint = issuerMetadata.nonceEndpoint?.let { Url(it) },
+        )
+    }
+
     private fun clientConfig(clientId: String, redirectUri: Url) =
         ClientConfiguration(clientId = clientId, redirectUris = listOf(redirectUri.toString()))
 
@@ -1452,7 +1520,30 @@ object WalletIssuanceHandler {
      * The caller (mobile app / browser) must then redirect to [GenerateAuthorizationUrlResult.authorizationUrl]
      * and capture the `code` from the redirect callback before calling [exchangeCode].
      */
-    suspend fun generateAuthorizationUrl(request: GenerateAuthorizationUrlRequest): GenerateAuthorizationUrlResult {
+    /**
+     * Step 1 of the auth-code grant, with the wallet available so the request can be client
+     * authenticated.
+     *
+     * Prefer this over the [wallet]-less overload: only this one can perform a pushed authorization
+     * request (RFC 9126), because PAR needs a key to authenticate the client and to bind the DPoP
+     * proof (`dpop_jkt`). An authorization server that advertises
+     * `require_pushed_authorization_requests` rejects a plain authorization request outright.
+     */
+    suspend fun generateAuthorizationUrl(
+        wallet: Wallet,
+        request: GenerateAuthorizationUrlRequest,
+    ): GenerateAuthorizationUrlResult = generateAuthorizationUrl(
+        request = request,
+        keyMaterial = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)),
+    )
+
+    suspend fun generateAuthorizationUrl(request: GenerateAuthorizationUrlRequest): GenerateAuthorizationUrlResult =
+        generateAuthorizationUrl(request = request, keyMaterial = null)
+
+    private suspend fun generateAuthorizationUrl(
+        request: GenerateAuthorizationUrlRequest,
+        keyMaterial: WalletKeyStoreEntry?,
+    ): GenerateAuthorizationUrlResult {
         val offer = resolveOffer(request, httpClient)
         val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer)
         val asMetadata =
@@ -1462,8 +1553,26 @@ object WalletIssuanceHandler {
             ?: error("Authorization server has no authorization_endpoint")
 
         val clientConfig = clientConfig(request.clientId, request.redirectUri)
-        val authBuilder = id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder(clientConfig)
+        val authBuilder = AuthorizationRequestBuilder(clientConfig)
         val credentialConfigurationId = offer.credentialConfigurationIds.first()
+
+        val parEndpoint = asMetadata.pushedAuthorizationRequestEndpoint
+        require(asMetadata.requirePushedAuthorizationRequests != true || parEndpoint != null) {
+            "Authorization server requires PAR but advertises no pushed_authorization_request_endpoint"
+        }
+        if (parEndpoint != null) {
+            return pushAuthorizationRequest(
+                request = request,
+                offer = offer,
+                issuerMetadata = issuerMetadata,
+                asMetadata = asMetadata,
+                authorizationEndpoint = authorizationEndpoint,
+                authBuilder = authBuilder,
+                credentialConfigurationId = credentialConfigurationId,
+                parEndpoint = parEndpoint,
+                keyMaterial = keyMaterial,
+            )
+        }
 
         val authRequest = authBuilder.buildAuthorizationRequest(
             authorizationEndpoint = authorizationEndpoint,
