@@ -40,6 +40,9 @@ typealias DPoPProofFactory = suspend (targetEndpoint: String, nonce: String?) ->
  */
 typealias ClientAssertionFactory = suspend () -> String
 
+/** Observes response headers without exposing token response bodies to the caller. */
+typealias TokenResponseHeadersHandler = (Headers) -> Unit
+
 /** Sanitized token endpoint failure that never retains the response body. */
 class TokenRequestException(
     val statusCode: Int,
@@ -122,6 +125,7 @@ class TokenRequestBuilder(
          * request parameters".
          */
         clientAssertionFactory: ClientAssertionFactory? = null,
+        onResponseHeaders: TokenResponseHeadersHandler = {},
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(code.isNotBlank()) { "Authorization code cannot be blank" }
@@ -150,6 +154,7 @@ class TokenRequestBuilder(
             attestationHeaders,
             dpopProofFactory,
             clientAssertionFactory,
+            onResponseHeaders,
         )
     }
 
@@ -196,6 +201,7 @@ class TokenRequestBuilder(
         anonymous: Boolean = false,
         dpopProofFactory: DPoPProofFactory?,
         clientAssertionFactory: ClientAssertionFactory? = null,
+        onResponseHeaders: TokenResponseHeadersHandler = {},
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(preAuthorizedCode.isNotBlank()) { "Pre-authorized code cannot be blank" }
@@ -234,6 +240,7 @@ class TokenRequestBuilder(
             attestationHeaders,
             dpopProofFactory,
             clientAssertionFactory,
+            onResponseHeaders,
         )
     }
 
@@ -275,6 +282,7 @@ class TokenRequestBuilder(
         attestationHeaders: ClientAttestationHeaders? = null,
         anonymous: Boolean = false,
         dpopProofFactory: DPoPProofFactory?,
+        onResponseHeaders: TokenResponseHeadersHandler = {},
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(refreshToken.isNotBlank()) { "Refresh token cannot be blank" }
@@ -304,6 +312,7 @@ class TokenRequestBuilder(
             additionalHeaders,
             attestationHeaders,
             dpopProofFactory,
+            onResponseHeaders = onResponseHeaders,
         )
     }
 
@@ -317,6 +326,7 @@ class TokenRequestBuilder(
         attestationHeaders: ClientAttestationHeaders? = null,
         dpopProofFactory: DPoPProofFactory? = null,
         clientAssertionFactory: ClientAssertionFactory? = null,
+        onResponseHeaders: TokenResponseHeadersHandler = {},
     ): TokenResponse {
         require(dpopProofFactory == null || additionalHeaders.keys.none { it.equals(DPOP_HEADER, ignoreCase = true) }) {
             "DPoP must be configured with either dpopProofFactory or an additional header, not both"
@@ -344,6 +354,7 @@ class TokenRequestBuilder(
                 attestationHeaders = attestationHeaders,
                 dpopProofFactory = dpopProofFactory,
                 dpopNonce = dpopNonce,
+                onResponseHeaders = onResponseHeaders,
             )
 
             if (!response.status.isSuccess()) {
@@ -400,6 +411,7 @@ class TokenRequestBuilder(
         attestationHeaders: ClientAttestationHeaders?,
         dpopProofFactory: DPoPProofFactory?,
         dpopNonce: String?,
+        onResponseHeaders: TokenResponseHeadersHandler,
     ): HttpResponse {
         suspend fun send(endpoint: String): HttpResponse {
             val dpopProof = dpopProofFactory?.invoke(endpoint, dpopNonce)
@@ -417,13 +429,20 @@ class TokenRequestBuilder(
         }
 
         val initialResponse = send(tokenEndpoint)
-        if (initialResponse.status.value !in REDIRECT_STATUS_CODES) return initialResponse
+        if (initialResponse.status.value !in REDIRECT_STATUS_CODES) {
+            onResponseHeaders(initialResponse.headers)
+            return initialResponse
+        }
 
-        val location = initialResponse.headers[HttpHeaders.Location] ?: return initialResponse
+        val location = initialResponse.headers[HttpHeaders.Location] ?: run {
+            onResponseHeaders(initialResponse.headers)
+            return initialResponse
+        }
         if (!isSameOrigin(tokenEndpoint, location)) {
+            onResponseHeaders(initialResponse.headers)
             throw TokenRequestException(initialResponse.status.value, oauthError = "unsafe_redirect")
         }
-        return send(location)
+        return send(location).also { onResponseHeaders(it.headers) }
     }
 
     private suspend fun HttpResponse.oauthError(): String? {

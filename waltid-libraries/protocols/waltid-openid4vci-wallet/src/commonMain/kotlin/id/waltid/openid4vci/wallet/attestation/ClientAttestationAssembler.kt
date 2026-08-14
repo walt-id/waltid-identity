@@ -12,6 +12,7 @@ data class ClientAttestationHeaders(
     companion object {
         const val HEADER_ATTESTATION = "OAuth-Client-Attestation"
         const val HEADER_ATTESTATION_POP = "OAuth-Client-Attestation-PoP"
+        const val HEADER_ATTESTATION_CHALLENGE = "OAuth-Client-Attestation-Challenge"
     }
 }
 
@@ -24,9 +25,10 @@ class ClientAttestationAssembler(
         instanceKey: LegacyKey,
         clientId: String,
         audience: String,
+        challenge: String? = null,
     ): ClientAttestationHeaders {
         val attestationJwt = attestationProvider.getAttestationJwt(instanceKey.getPublicKey(), clientId)
-        val popJwt = popBuilder.buildPopJwt(instanceKey, clientId, audience)
+        val popJwt = popBuilder.buildPopJwt(instanceKey, clientId, audience, challenge)
         return ClientAttestationHeaders(attestationJwt, popJwt)
     }
 
@@ -34,13 +36,14 @@ class ClientAttestationAssembler(
         instanceKey: Key,
         clientId: String,
         audience: String,
+        challenge: String? = null,
     ): ClientAttestationHeaders {
         val exported = requireNotNull(instanceKey.capabilities.publicKeyExporter) {
             "Wallet attestation instance key does not export its public key"
         }.exportPublicKey()
         val publicJwk = exported.toPublicJwk(instanceKey.spec).publicOnly()
         val attestationJwt = attestationProvider.getAttestationJwt(publicJwk, clientId)
-        val popJwt = popBuilder.buildPopJwt(instanceKey, clientId, audience)
+        val popJwt = popBuilder.buildPopJwt(instanceKey, clientId, audience, challenge)
         return ClientAttestationHeaders(attestationJwt, popJwt)
     }
 }

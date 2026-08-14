@@ -19,6 +19,7 @@ class WalletAttestationPopBuilder {
         instanceKey: LegacyKey,
         clientId: String,
         audience: String,
+        challenge: String? = null,
     ): String {
         check(instanceKey.keyType == KeyType.secp256r1) {
             "Wallet attestation PoP requires a P-256 (secp256r1) key, got ${instanceKey.keyType}"
@@ -35,6 +36,10 @@ class WalletAttestationPopBuilder {
             put("iat", now)
             put("exp", now + 300)
             put("jti", Uuid.random().toString())
+            challenge?.let {
+                require(it.isNotBlank()) { "Wallet attestation PoP challenge must not be blank" }
+                put("challenge", it)
+            }
         }
         return instanceKey.signJws(payload.toString().encodeToByteArray(), header)
     }
@@ -43,6 +48,7 @@ class WalletAttestationPopBuilder {
         instanceKey: Key,
         clientId: String,
         audience: String,
+        challenge: String? = null,
     ): String {
         check(instanceKey.spec == KeySpec.Ec(EcCurve.P256)) {
             "Wallet attestation PoP requires a P-256 key, got ${instanceKey.spec}"
@@ -61,6 +67,10 @@ class WalletAttestationPopBuilder {
             put("iat", now)
             put("exp", now + 300)
             put("jti", Uuid.random().toString())
+            challenge?.let {
+                require(it.isNotBlank()) { "Wallet attestation PoP challenge must not be blank" }
+                put("challenge", it)
+            }
         }
 
         return CompactJws.sign(

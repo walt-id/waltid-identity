@@ -411,7 +411,7 @@ class CredentialIssuerMetadataSerializationTest {
     }
 
     @Test
-    fun `decodes mdoc signing algorithms with narrow legacy name compatibility`() {
+    fun `decodes mdoc signing algorithms as numeric cose identifiers`() {
         val numeric = json.decodeFromString<CredentialConfiguration>(
             """
             {
@@ -425,18 +425,16 @@ class CredentialIssuerMetadataSerializationTest {
             numeric.credentialSigningAlgValuesSupported,
         )
 
-        val legacyName = json.decodeFromString<CredentialConfiguration>(
-            """
-            {
-              "format": "mso_mdoc",
-              "credential_signing_alg_values_supported": ["ES256"]
-            }
-            """.trimIndent(),
-        )
-        assertEquals(
-            setOf(SigningAlgId.CoseName("ES256")),
-            legacyName.credentialSigningAlgValuesSupported,
-        )
+        assertFailsWith<IllegalArgumentException> {
+            json.decodeFromString<CredentialConfiguration>(
+                """
+                {
+                  "format": "mso_mdoc",
+                  "credential_signing_alg_values_supported": ["ES256"]
+                }
+                """.trimIndent(),
+            )
+        }
 
         assertFailsWith<IllegalArgumentException> {
             json.decodeFromString<CredentialConfiguration>(

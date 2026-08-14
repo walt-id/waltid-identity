@@ -48,6 +48,8 @@ data class AuthorizationServerMetadata(
     val jwksUri: String? = null,
     @SerialName("registration_endpoint")
     val registrationEndpoint: String? = null,
+    @SerialName("challenge_endpoint")
+    val challengeEndpoint: String? = null,
     @SerialName("scopes_supported")
     val scopesSupported: Set<String>? = null,
     @SerialName("response_types_supported")
@@ -179,6 +181,7 @@ data class AuthorizationServerMetadata(
 
         // RFC 8414 §2: Validate jwks_uri if present
         jwksUri?.let { validateUrl("jwks_uri", it) }
+        challengeEndpoint?.let { validateUrl("challenge_endpoint", it) }
         statusListAggregationEndpoint?.let { validateUrl("status_list_aggregation_endpoint", it) }
 
         // RFC 8414 §2: "none" is not a valid JWS alg for token endpoint JWT auth.
@@ -229,6 +232,7 @@ data class AuthorizationServerMetadata(
             codeChallengeMethodsSupported: List<String>? = null,
             requirePushedAuthorizationRequests: Boolean? = false,
             pushedAuthorizationRequestEndpointPath: String? = "/par",
+            challengeEndpointPath: String? = null,
             statusListAggregationEndpointPath: String? = null,
             preAuthorizedGrantAnonymousAccessSupported: Boolean? = true,
             authorizationResponseIssParameterSupported: Boolean? = true,
@@ -251,6 +255,7 @@ data class AuthorizationServerMetadata(
                 codeChallengeMethodsSupported = codeChallengeMethodsSupported,
                 requirePushedAuthorizationRequests = requirePushedAuthorizationRequests,
                 pushedAuthorizationRequestEndpoint = parEndpoint,
+                challengeEndpoint = challengeEndpointPath?.let { normalized + it },
                 statusListAggregationEndpoint = statusListAggregationEndpointPath?.let { normalized + it },
                 preAuthorizedGrantAnonymousAccessSupported = preAuthorizedGrantAnonymousAccessSupported,
                 authorizationResponseIssParameterSupported = authorizationResponseIssParameterSupported,
@@ -326,6 +331,7 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
                 )
             }
             value.registrationEndpoint?.let { put("registration_endpoint", JsonPrimitive(it)) }
+            value.challengeEndpoint?.let { put("challenge_endpoint", JsonPrimitive(it)) }
             value.requirePushedAuthorizationRequests?.let {
                 put(
                     "require_pushed_authorization_requests",
@@ -383,6 +389,7 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
             tokenEndpoint = element.string("token_endpoint"),
             jwksUri = element.string("jwks_uri"),
             registrationEndpoint = element.string("registration_endpoint"),
+            challengeEndpoint = element.string("challenge_endpoint"),
             scopesSupported = element.stringSet("scopes_supported"),
             responseTypesSupported = responseTypes,
             responseModesSupported = element.stringSet("response_modes_supported"),
