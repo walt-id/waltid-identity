@@ -48,8 +48,6 @@ data class AuthorizationServerMetadata(
     val jwksUri: String? = null,
     @SerialName("registration_endpoint")
     val registrationEndpoint: String? = null,
-    @SerialName("challenge_endpoint")
-    val challengeEndpoint: String? = null,
     @SerialName("scopes_supported")
     val scopesSupported: Set<String>? = null,
     @SerialName("response_types_supported")
@@ -102,6 +100,8 @@ data class AuthorizationServerMetadata(
     val preAuthorizedGrantAnonymousAccessSupported: Boolean? = null,
     @SerialName("status_list_aggregation_endpoint")
     val statusListAggregationEndpoint: String? = null,
+    @SerialName("challenge_endpoint")
+    val challengeEndpoint: String? = null,
     val customParameters: Map<String, JsonElement>? = null,
 ) {
     init {
@@ -239,10 +239,10 @@ data class AuthorizationServerMetadata(
             codeChallengeMethodsSupported: List<String>? = null,
             requirePushedAuthorizationRequests: Boolean? = false,
             pushedAuthorizationRequestEndpointPath: String? = "/par",
-            challengeEndpointPath: String? = null,
             statusListAggregationEndpointPath: String? = null,
             preAuthorizedGrantAnonymousAccessSupported: Boolean? = true,
             authorizationResponseIssParameterSupported: Boolean? = true,
+            challengeEndpointPath: String? = null,
         ): AuthorizationServerMetadata {
             val normalized = baseUrl.trimEnd('/')
             val parEndpoint = pushedAuthorizationRequestEndpointPath?.let { normalized + it }

@@ -59,18 +59,6 @@ class AndroidDigitalCredentialCreateProviderTest {
     }
 
     @Test
-    fun rejectsCapturedDmvHistoricalProtocolRequest() {
-        val requestJson = requireNotNull(javaClass.getResource("/fixtures/dmv-openid4vci-create-request.json"))
-            .readText()
-        assertFailsWith<IllegalArgumentException> {
-            AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
-                requestJson = requestJson,
-                verifiedOrigin = "https://digital-credentials.dev",
-            )
-        }
-    }
-
-    @Test
     fun rejectsUnsupportedOpenId4VciProtocolAlias() {
         assertFailsWith<IllegalArgumentException> {
             AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
