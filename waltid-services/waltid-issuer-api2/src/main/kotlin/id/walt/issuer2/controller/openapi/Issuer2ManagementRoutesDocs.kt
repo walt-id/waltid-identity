@@ -18,8 +18,8 @@ object Issuer2ManagementRoutesDocs {
             Profiles are deployment templates used by credential-offer creation. Use the
             returned profileId in POST /issuer2/credential-offers. Runtime overrides may
             provide credential data, mappings, selective disclosure, mDoc namespace data
-            mappings, ID token claim mappings, x5 chains, and webhook URLs for a single
-            issuance session.
+            mappings, authorized transaction data types, ID token claim mappings, x5 chains,
+            and webhook URLs for a single issuance session.
         """.trimIndent()
         response {
             HttpStatusCode.OK to {
@@ -69,7 +69,8 @@ object Issuer2ManagementRoutesDocs {
             Supports pre-authorized and authorization-code issuance flows. The offer can be returned
             by reference or by value. Runtime overrides can be applied for one offer only. Supported
             override fields are: issuerDid, credentialData, mapping, selectiveDisclosure,
-            idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, x5Chain, and notifications.
+            idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, authorizedTransactionDataTypes,
+            x5Chain, and notifications.
             credentialData is applied as a partial object patch over the configured profile data:
             nested objects are merged, while primitive, array, and null values replace the configured value.
             Authorization-code offers include issuer_state by default. Set issuerStateMode to OMIT only
@@ -118,6 +119,9 @@ object Issuer2ManagementRoutesDocs {
                 }
                 example("[pre-authorized][by-reference][override mDoc photo ID credentialData]") {
                     value = Issuer2RequestExamples.PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE
+                }
+                example("[pre-authorized][by-reference][override authorizedTransactionDataTypes]") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_AUTHORIZED_TRANSACTION_DATA_TYPES_OVERRIDE
                 }
                 example("[authorized][by-reference][override mDoc mDL credentialData]") {
                     value = Issuer2RequestExamples.AUTHORIZED_MDOC_MDL_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE

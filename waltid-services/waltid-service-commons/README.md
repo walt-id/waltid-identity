@@ -1,5 +1,5 @@
 <div align="center">
- <h1>Walt.id Service Commons</h1>
+ <h1>walt.id Service Commons</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
     <p>Common configurations and codes shared between walt.id services</p>
 <a href="https://walt.id/community">

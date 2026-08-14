@@ -92,13 +92,15 @@ class CredentialOfferService(
             authenticationMethod = request.authMethod,
             credentialConfigurationId = profile.credentialConfigurationId,
             issuerKey = issuerKey,
+            expectedCredentialProofKeyJwk = overrides?.expectedCredentialProofKeyJwk,
             credentialData = credentialData,
             mapping = overrides?.mapping ?: profile.mapping,
             selectiveDisclosure = overrides?.selectiveDisclosure ?: profile.selectiveDisclosure,
             idTokenClaimsMapping = idTokenClaimsMapping,
             mDocNameSpacesDataMappingConfig =
                 overrides?.mDocNameSpacesDataMappingConfig ?: profile.mDocNameSpacesDataMappingConfig,
-            authorizedTransactionDataTypes = profile.authorizedTransactionDataTypes,
+            authorizedTransactionDataTypes = overrides?.authorizedTransactionDataTypes
+                ?: profile.authorizedTransactionDataTypes,
             x5Chain = overrides?.x5Chain ?: profile.x5Chain,
             issuerDid = issuerDid,
             credentialOffer = credentialOffer,
@@ -135,6 +137,10 @@ class CredentialOfferService(
         )
         return credentialOffer
     }
+
+    suspend fun getIssuanceSession(sessionId: String): IssuanceSession? = sessionService.getSessionOrNull(sessionId)
+
+    suspend fun removeIssuanceSession(sessionId: String) = sessionService.removeSession(sessionId)
 
     private fun issuerBaseUrl(): String = config.openId4VciBaseUrl()
 

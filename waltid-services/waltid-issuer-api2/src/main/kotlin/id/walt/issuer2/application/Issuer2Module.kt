@@ -17,12 +17,16 @@ import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.openid4vci.MetadataService
+import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
+import id.walt.issuer2.service.openid4vci.CredentialProofKeyCommitment
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 
-class Issuer2Module(
+class Issuer2Module @JvmOverloads constructor(
     serviceConfig: Issuer2ServiceConfig,
     metadataConfig: Issuer2MetadataConfig,
     profilesConfig: Issuer2ProfilesConfig,
+    credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null,
+    credentialProofKeyCommitment: CredentialProofKeyCommitment? = null,
 ) {
     private val issuanceSessionRepository = ConfiguredIssuanceSessionRepository()
     private val authorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
@@ -58,7 +62,7 @@ class Issuer2Module(
         crypto2TokenSigningKey = openId4VciModule.crypto2TokenSigningKey,
     )
 
-    private val credentialOfferService = CredentialOfferService(
+    val credentialOfferService = CredentialOfferService(
         profileService = credentialProfileService,
         sessionService = issuanceSessionService,
         preAuthorizedCodeIssuer = openId4VciModule.preAuthorizedCodeIssuer,
@@ -72,6 +76,8 @@ class Issuer2Module(
         profileService = credentialProfileService,
         metadataService = metadataService,
         notificationService = notificationService,
+        credentialProofKeyAcceptance = credentialProofKeyAcceptance,
+        credentialProofKeyCommitment = credentialProofKeyCommitment,
         credentialNonceService = openId4VciModule.credentialNonceService,
     )
 
@@ -88,11 +94,13 @@ class Issuer2Module(
     )
 
     companion object {
-        fun load(): Issuer2Module =
+        @JvmOverloads
+        fun load(credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null): Issuer2Module =
             Issuer2Module(
                 serviceConfig = ConfigManager.getConfig(),
                 metadataConfig = ConfigManager.getConfig(),
                 profilesConfig = ConfigManager.getConfig(),
+                credentialProofKeyAcceptance = credentialProofKeyAcceptance,
             )
     }
 }

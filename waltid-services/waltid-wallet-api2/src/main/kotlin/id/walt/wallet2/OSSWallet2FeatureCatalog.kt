@@ -1,5 +1,6 @@
 package id.walt.wallet2
 
+import id.walt.commons.config.list.DevModeConfig
 import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature
@@ -13,6 +14,8 @@ object OSSWallet2FeatureCatalog : ServiceFeatureCatalog {
 
     val authFeature =
         OptionalFeature("auth", "User authentication via waltid-ktor-authnz", OSSWallet2AuthConfig::class, default = false)
+
+    val devModeFeature = OptionalFeature("dev-mode", "Development mode", DevModeConfig::class, default = false)
 
     /**
      * When enabled, wallet data is persisted to a SQL database (SQLite by default, Postgres optional).
@@ -31,6 +34,7 @@ object OSSWallet2FeatureCatalog : ServiceFeatureCatalog {
 
     override val baseFeatures = listOf(walletService)
     override val optionalFeatures: List<OptionalFeature> = listOf(
+        devModeFeature,
         authFeature,
         persistenceFeature,
         transactionDataProfilesFeature,
