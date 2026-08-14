@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class OSSVerifier2ServiceConfig(
-    val clientId: String,
+    val clientId: String? = null,
     val clientMetadata: ClientMetadata? = null,
     val urlPrefix: String,
     val urlHost: String,
@@ -19,7 +19,7 @@ data class OSSVerifier2ServiceConfig(
 ) : WaltConfig() {
     /** Preserves the JVM constructor descriptor from before the StoredKey field was added. */
     constructor(
-        clientId: String,
+        clientId: String?,
         clientMetadata: ClientMetadata?,
         urlPrefix: String,
         urlHost: String,

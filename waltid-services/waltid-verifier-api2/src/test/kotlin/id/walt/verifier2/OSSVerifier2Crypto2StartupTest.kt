@@ -154,12 +154,31 @@ class OSSVerifier2Crypto2StartupTest {
         assertEquals(null, config.requestSigningStoredKey)
     }
 
-    private fun loadConfig(storedKey: String? = null, legacyKey: String? = null): Pair<Path, String> {
+    @Test
+    fun `omitted config clientId starts and generates redirect_uri client_id`() = runTest {
+        loadConfig(includeClientId = false)
+        OSSVerifier2Manager.initialize()
+
+        val session = OSSVerifier2Manager.createVerificationSession(
+            CrossDeviceFlowSetup(core = GeneralFlowConfig())
+        )
+
+        assertEquals(
+            "redirect_uri:http://localhost:7003/verification-session/${session.id}/response",
+            session.authorizationRequest.clientId,
+        )
+    }
+
+    private fun loadConfig(
+        storedKey: String? = null,
+        legacyKey: String? = null,
+        includeClientId: Boolean = true,
+    ): Pair<Path, String> {
         val configFile = Files.createTempFile("verifier-service", ".conf")
         tempFiles.add(configFile)
         val tripleQuotes = "\"\"\""
         val content = buildString {
-            appendLine("clientId = \"verifier2\"")
+            if (includeClientId) appendLine("clientId = \"verifier2\"")
             appendLine("urlPrefix = \"http://localhost:7003/verification-session\"")
             appendLine("urlHost = \"openid4vp://authorize\"")
             storedKey?.let { appendLine("requestSigningStoredKey = $tripleQuotes$it$tripleQuotes") }
