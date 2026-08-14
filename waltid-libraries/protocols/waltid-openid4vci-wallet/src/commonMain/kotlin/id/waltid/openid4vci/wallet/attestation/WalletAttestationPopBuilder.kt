@@ -19,7 +19,14 @@ class WalletAttestationPopBuilder {
         instanceKey: LegacyKey,
         clientId: String,
         audience: String,
-        challenge: String? = null,
+    ): String = buildPopJwt(instanceKey, clientId, audience, null)
+
+    @Deprecated("Use the Crypto2Key overload")
+    suspend fun buildPopJwt(
+        instanceKey: LegacyKey,
+        clientId: String,
+        audience: String,
+        challenge: String?,
     ): String {
         check(instanceKey.keyType == KeyType.secp256r1) {
             "Wallet attestation PoP requires a P-256 (secp256r1) key, got ${instanceKey.keyType}"
@@ -48,7 +55,13 @@ class WalletAttestationPopBuilder {
         instanceKey: Key,
         clientId: String,
         audience: String,
-        challenge: String? = null,
+    ): String = buildPopJwt(instanceKey, clientId, audience, null)
+
+    suspend fun buildPopJwt(
+        instanceKey: Key,
+        clientId: String,
+        audience: String,
+        challenge: String?,
     ): String {
         check(instanceKey.spec == KeySpec.Ec(EcCurve.P256)) {
             "Wallet attestation PoP requires a P-256 key, got ${instanceKey.spec}"

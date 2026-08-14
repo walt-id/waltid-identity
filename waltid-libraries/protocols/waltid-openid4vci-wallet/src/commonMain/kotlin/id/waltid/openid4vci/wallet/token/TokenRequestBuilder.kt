@@ -44,7 +44,7 @@ typealias ClientAssertionFactory = suspend () -> String
 /** Observes response headers without exposing token response bodies to the caller. */
 typealias TokenResponseHeadersHandler = suspend (Headers) -> Unit
 
-/** Builds fresh client-attestation headers for each token request attempt. */
+/** Builds fresh client-attestation headers for each token HTTP request. */
 typealias ClientAttestationHeadersFactory = suspend () -> ClientAttestationHeaders
 
 /** Sanitized token endpoint failure that never retains the response body. */
@@ -129,8 +129,29 @@ class TokenRequestBuilder(
          * request parameters".
          */
         clientAssertionFactory: ClientAssertionFactory? = null,
-        onResponseHeaders: TokenResponseHeadersHandler = {},
-        attestationHeadersFactory: ClientAttestationHeadersFactory? = null,
+    ): TokenResponse = exchangeAuthorizationCode(
+        tokenEndpoint = tokenEndpoint,
+        code = code,
+        codeVerifier = codeVerifier,
+        additionalHeaders = additionalHeaders,
+        attestationHeaders = attestationHeaders,
+        dpopProofFactory = dpopProofFactory,
+        clientAssertionFactory = clientAssertionFactory,
+        onResponseHeaders = {},
+        attestationHeadersFactory = null,
+    )
+
+    /** Exchanges an authorization code while creating fresh DPoP proofs when requested. */
+    suspend fun exchangeAuthorizationCode(
+        tokenEndpoint: String,
+        code: String,
+        codeVerifier: String? = null,
+        additionalHeaders: Map<String, String> = emptyMap(),
+        attestationHeaders: ClientAttestationHeaders? = null,
+        dpopProofFactory: DPoPProofFactory?,
+        clientAssertionFactory: ClientAssertionFactory? = null,
+        onResponseHeaders: TokenResponseHeadersHandler,
+        attestationHeadersFactory: ClientAttestationHeadersFactory?,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(code.isNotBlank()) { "Authorization code cannot be blank" }
@@ -207,8 +228,33 @@ class TokenRequestBuilder(
         anonymous: Boolean = false,
         dpopProofFactory: DPoPProofFactory?,
         clientAssertionFactory: ClientAssertionFactory? = null,
-        onResponseHeaders: TokenResponseHeadersHandler = {},
-        attestationHeadersFactory: ClientAttestationHeadersFactory? = null,
+    ): TokenResponse = exchangePreAuthorizedCode(
+        tokenEndpoint = tokenEndpoint,
+        preAuthorizedCode = preAuthorizedCode,
+        txCode = txCode,
+        additionalParameters = additionalParameters,
+        additionalHeaders = additionalHeaders,
+        attestationHeaders = attestationHeaders,
+        anonymous = anonymous,
+        dpopProofFactory = dpopProofFactory,
+        clientAssertionFactory = clientAssertionFactory,
+        onResponseHeaders = {},
+        attestationHeadersFactory = null,
+    )
+
+    /** Exchanges a pre-authorized code while creating fresh DPoP proofs when requested. */
+    suspend fun exchangePreAuthorizedCode(
+        tokenEndpoint: String,
+        preAuthorizedCode: String,
+        txCode: String? = null,
+        additionalParameters: Map<String, String> = emptyMap(),
+        additionalHeaders: Map<String, String> = emptyMap(),
+        attestationHeaders: ClientAttestationHeaders? = null,
+        anonymous: Boolean = false,
+        dpopProofFactory: DPoPProofFactory?,
+        clientAssertionFactory: ClientAssertionFactory? = null,
+        onResponseHeaders: TokenResponseHeadersHandler,
+        attestationHeadersFactory: ClientAttestationHeadersFactory?,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(preAuthorizedCode.isNotBlank()) { "Pre-authorized code cannot be blank" }
@@ -290,8 +336,29 @@ class TokenRequestBuilder(
         attestationHeaders: ClientAttestationHeaders? = null,
         anonymous: Boolean = false,
         dpopProofFactory: DPoPProofFactory?,
-        onResponseHeaders: TokenResponseHeadersHandler = {},
-        attestationHeadersFactory: ClientAttestationHeadersFactory? = null,
+    ): TokenResponse = refreshAccessToken(
+        tokenEndpoint = tokenEndpoint,
+        refreshToken = refreshToken,
+        additionalParameters = additionalParameters,
+        additionalHeaders = additionalHeaders,
+        attestationHeaders = attestationHeaders,
+        anonymous = anonymous,
+        dpopProofFactory = dpopProofFactory,
+        onResponseHeaders = {},
+        attestationHeadersFactory = null,
+    )
+
+    /** Refreshes an access token while creating fresh DPoP proofs when requested. */
+    suspend fun refreshAccessToken(
+        tokenEndpoint: String,
+        refreshToken: String,
+        additionalParameters: Map<String, String> = emptyMap(),
+        additionalHeaders: Map<String, String> = emptyMap(),
+        attestationHeaders: ClientAttestationHeaders? = null,
+        anonymous: Boolean = false,
+        dpopProofFactory: DPoPProofFactory?,
+        onResponseHeaders: TokenResponseHeadersHandler,
+        attestationHeadersFactory: ClientAttestationHeadersFactory?,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(refreshToken.isNotBlank()) { "Refresh token cannot be blank" }

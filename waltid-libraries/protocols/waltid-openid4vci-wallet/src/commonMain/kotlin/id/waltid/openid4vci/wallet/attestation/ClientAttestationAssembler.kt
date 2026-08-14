@@ -24,7 +24,14 @@ class ClientAttestationAssembler(
         instanceKey: LegacyKey,
         clientId: String,
         audience: String,
-        challenge: String? = null,
+    ): ClientAttestationHeaders = buildAttestationHeaders(instanceKey, clientId, audience, null)
+
+    @Deprecated("Use the Crypto2Key overload")
+    suspend fun buildAttestationHeaders(
+        instanceKey: LegacyKey,
+        clientId: String,
+        audience: String,
+        challenge: String?,
     ): ClientAttestationHeaders {
         val attestationJwt = attestationProvider.getAttestationJwt(instanceKey.getPublicKey(), clientId)
         val popJwt = popBuilder.buildPopJwt(instanceKey, clientId, audience, challenge)
@@ -35,7 +42,13 @@ class ClientAttestationAssembler(
         instanceKey: Key,
         clientId: String,
         audience: String,
-        challenge: String? = null,
+    ): ClientAttestationHeaders = buildAttestationHeaders(instanceKey, clientId, audience, null)
+
+    suspend fun buildAttestationHeaders(
+        instanceKey: Key,
+        clientId: String,
+        audience: String,
+        challenge: String?,
     ): ClientAttestationHeaders {
         val exported = requireNotNull(instanceKey.capabilities.publicKeyExporter) {
             "Wallet attestation instance key does not export its public key"
