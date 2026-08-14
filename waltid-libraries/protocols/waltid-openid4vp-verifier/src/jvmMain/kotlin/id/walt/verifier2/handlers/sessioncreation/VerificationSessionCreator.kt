@@ -662,7 +662,12 @@ object VerificationSessionCreator {
     ): String? {
         if ((isDcApi && !isSignedRequest) || isAnnexC) return null
         val provided = clientId?.takeIf { it.isNotBlank() }
-        if (provided != null) return provided
+        if (provided != null) {
+            require(!isSignedRequest || !provided.startsWith("redirect_uri:")) {
+                "Signed requests cannot use the redirect_uri client_id prefix"
+            }
+            return provided
+        }
         require(!isSignedRequest) {
             "Signed requests require a client_id; omitting client_id only auto-generates the unsigned redirect_uri scheme"
         }

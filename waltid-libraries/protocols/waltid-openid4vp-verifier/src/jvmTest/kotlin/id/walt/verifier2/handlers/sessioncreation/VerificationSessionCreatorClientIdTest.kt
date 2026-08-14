@@ -104,6 +104,33 @@ class VerificationSessionCreatorClientIdTest {
     }
 
     @Test
+    fun `signed request with explicit redirect_uri clientId is rejected`() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val error = assertFailsWith<IllegalArgumentException> {
+            VerificationSessionCreator.createVerificationSession(
+                setup = CrossDeviceFlowSetup(
+                    core = GeneralFlowConfig(
+                        signedRequest = true,
+                        dcqlQuery = DcqlQuery(
+                            credentials = listOf(
+                                CredentialQuery("pid", CredentialFormat.DC_SD_JWT, meta = NoMeta)
+                            )
+                        )
+                    )
+                ),
+                clientId = "redirect_uri:https://verifier.example/response",
+                urlPrefix = "https://verifier.example.com/verification-session",
+                urlHost = "openid4vp://authorize",
+                key = key,
+            )
+        }
+        assertEquals(
+            "Signed requests cannot use the redirect_uri client_id prefix",
+            error.message,
+        )
+    }
+
+    @Test
     fun `unsigned DC API still omits clientId`() = runTest {
         val setup = DcApiAnnexDFlowSetup.EX_UNSIGNED_UNENCRYPTED_MDL.copy(
             core = DcApiAnnexDFlowSetup.EX_UNSIGNED_UNENCRYPTED_MDL.core.copy(clientId = null),
