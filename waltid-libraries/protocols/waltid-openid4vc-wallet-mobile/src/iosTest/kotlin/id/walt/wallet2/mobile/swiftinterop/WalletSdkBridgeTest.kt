@@ -407,6 +407,7 @@ class WalletSdkBridgeTest {
             ),
             capturedConfig?.transactionDataProfiles,
         )
+        assertEquals(false, capturedConfig?.allowUnsignedRequests)
 
         val credentials = result.value.credentials()
         assertIs<WalletBridgeResult.Success<List<MobileWalletCredential>>>(credentials)
@@ -601,6 +602,7 @@ class WalletSdkBridgeTest {
         assertEquals(MobileWalletPersistence(), config.persistence)
         assertEquals(emptyList(), config.preferredLocales)
         assertEquals(emptyList(), config.transactionDataProfiles)
+        assertEquals(false, config.allowUnsignedRequests)
     }
 
     @Test

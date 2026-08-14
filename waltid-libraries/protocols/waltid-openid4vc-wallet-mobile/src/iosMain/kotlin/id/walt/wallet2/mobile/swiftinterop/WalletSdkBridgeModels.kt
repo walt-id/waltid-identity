@@ -56,6 +56,8 @@ import kotlin.time.Instant
  * @property issuerMetadataTrustResolver Optional Swift-owned verifier for signed Credential Issuer Metadata.
  * @property preferredLocales Ordered BCP 47 locale preferences used to select display metadata.
  * @property transactionDataProfiles Transaction data profiles this wallet accepts.
+ * @property allowUnsignedRequests Whether this wallet accepts unsigned OpenID4VP requests.
+ * Signed compact Request Objects are always accepted. Defaults to false so consuming apps opt in.
  * @property clientIdTrustConfiguration Trust anchors used to authenticate verifier Request Objects.
  * @property appGroupIdentifier Shared container used by the app and document-provider extension.
  * @property keychainAccessGroup Shared Keychain access group used for database and signing keys.
@@ -71,6 +73,7 @@ public data class WalletBridgeConfiguration(
     public val issuerMetadataTrustResolver: WalletBridgeIssuerMetadataTrustResolver? = null,
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    public val allowUnsignedRequests: Boolean = false,
     public val clientIdTrustConfiguration: WalletBridgeClientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(),
     public val appGroupIdentifier: String? = null,
     public val keychainAccessGroup: String? = null,
@@ -255,6 +258,7 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
         persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
         preferredLocales = preferredLocales,
         transactionDataProfiles = transactionDataProfiles,
+        allowUnsignedRequests = allowUnsignedRequests,
         defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy.toCorePolicy(),
         keyUseAuthorizationPrompt = keyUseAuthorizationPrompt,
         signingIdentity = signingIdentity,
