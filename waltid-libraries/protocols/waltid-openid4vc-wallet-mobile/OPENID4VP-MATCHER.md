@@ -85,11 +85,12 @@ Multipaz-private convention is involved. Three things have to hold. No full beha
 against AndroidX's matcher was performed, so this is not a closed list:
 
 - **Protocol scoping.** The matcher iterates `registry.supported_protocols` and skips any request
-  whose protocol is not listed, so registering only `openid4vp-v1-unsigned` keeps the wallet out of
-  signed and multisigned requests. This is load-bearing: the matcher recognises all three
-  `openid4vp-v1-*` protocols, and would serve signed requests the wallet cannot fulfill if the
-  registry ever advertised them. `DigitalCredentialSharingE2ETest.doesNotSurfaceForSignedOrMultisignedRequests`
-  asserts it against the real platform.
+  whose protocol is not listed. The SDK always registers `openid4vp-v1-signed`, and also
+  `openid4vp-v1-unsigned` when `MobileWalletConfig.allowUnsignedRequests` is true. Multisigned stays
+  off the list either way: the matcher recognises all three `openid4vp-v1-*` protocols, and would
+  serve unsigned or multisigned requests the wallet cannot fulfill if the registry advertised them.
+  `DigitalCredentialSharingE2ETest.doesNotSurfaceForMultisignedRequests` asserts the multisigned
+  exclusion against the real platform.
 - **Host imports.** The matcher imports its host functions from module `credman`, whereas AndroidX's C
   matcher imports the set-based ones from `credman_v2` and `credman_v5`. Google Play services resolves
   both, but a future GMS that stops aliasing `credman` for those would break this binary and not

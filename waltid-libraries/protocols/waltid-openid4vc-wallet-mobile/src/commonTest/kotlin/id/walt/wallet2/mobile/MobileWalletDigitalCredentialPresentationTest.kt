@@ -188,6 +188,21 @@ class MobileWalletDigitalCredentialPresentationTest {
         assertFalse(jwe.contains("vp_token"), "the response members leaked outside the JWE ciphertext")
     }
 
+    @Test
+    fun anUnsignedRequestIsRejectedWhenTheApplicationHasNotPermittedIt() = runTest {
+        val fixture = walletFixture(sdJwtCredential(), allowUnsignedRequests = false)
+        val error = assertFailsWith<IllegalArgumentException> {
+            fixture.wallet.previewDigitalCredentialPresentation(
+                dcApiRequest(
+                    data = sdJwtQuery(),
+                    selectedRegistryEntryIds = listOf(fixture.registryEntryId("pid-1")),
+                )
+            )
+        }
+
+        assertTrue(error.message.orEmpty().contains("not permitted"))
+    }
+
     /**
      * `dc_api.jwt` without usable verifier encryption keys must fail rather than degrade to a
      * cleartext response, which the verifier would still accept as an answer to its encrypted request.
@@ -480,6 +495,7 @@ class MobileWalletDigitalCredentialPresentationTest {
         vararg credentials: StoredCredential,
         transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        allowUnsignedRequests: Boolean = true,
     ): Fixture {
         // The DC API is a crypto2-only surface, so the wallet holds nothing but a managed key.
         val holderKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
@@ -502,6 +518,7 @@ class MobileWalletDigitalCredentialPresentationTest {
             credentialStore = credentialStore,
             generateAndPersistKey = { _, _ -> error("Digital Credentials presentation must not bootstrap a key") },
             transactionDataProfiles = transactionDataProfiles,
+            allowUnsignedRequests = allowUnsignedRequests,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
             credentialRegistry = registry,
         )
