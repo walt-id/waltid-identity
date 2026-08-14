@@ -442,6 +442,8 @@ object WalletPresentationHandler {
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
         beforeCredentialsUsed: suspend (Int) -> Unit = {},
         expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
     ): WalletPresentResult {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
@@ -474,6 +476,7 @@ object WalletPresentationHandler {
             clientIdTrustConfiguration = clientIdTrustConfiguration,
             beforeCredentialsUsed = beforeCredentialsUsed,
             expectedRequestObjectAudience = expectedRequestObjectAudience,
+            unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
         )
 
         return result.emitPresentationOutcome(onEvent)
@@ -590,6 +593,8 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
         expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
     ): PreviewPresentationResult {
         // Selected once up front so advertised wallet metadata, request validation and the retained
         // preview all refer to the same key, but only *required* where a key is genuinely needed: a
@@ -608,6 +613,7 @@ object WalletPresentationHandler {
                     requestUrl,
                     clientIdTrustConfiguration,
                     expectedRequestObjectAudience,
+                    unsignedRequestObjectPolicy,
                 )
             },
         )
@@ -1103,6 +1109,8 @@ object WalletPresentationHandler {
         beforeCredentialsUsed: suspend (Int) -> Unit = {},
         isolatedCredentialsById: Map<String, StoredCredential> = emptyMap(),
         expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
     ): Result<WalletPresentResult> = memoizedSelection(selectCredentialsForQuery).let { selectOnce ->
         keyMaterial.crypto2Key?.let { crypto2Key ->
         WalletPresentFunctionality2.walletPresentHandling(
@@ -1118,6 +1126,7 @@ object WalletPresentationHandler {
             beforeCredentialsUsed = beforeCredentialsUsed,
             mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(isolatedCredentialsById),
             expectedRequestObjectAudience = expectedRequestObjectAudience,
+            unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
         )
     } ?: WalletPresentFunctionality2.walletPresentHandling(
         holderKey = requireNotNull(keyMaterial.legacyKey) {
@@ -1135,6 +1144,7 @@ object WalletPresentationHandler {
         beforeCredentialsUsed = beforeCredentialsUsed,
         mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(isolatedCredentialsById),
         expectedRequestObjectAudience = expectedRequestObjectAudience,
+        unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
     )
     }
 
@@ -1803,11 +1813,13 @@ object WalletPresentationHandler {
         requestUrl: Url,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
         expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
     ): ResolvedAuthorizationRequest {
         val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
         return AuthorizationRequestResolver.resolve(
             requestUrl = requestUrl,
-            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
             trustConfiguration = clientIdTrustConfiguration,
             expectedRequestObjectAudience = expectedRequestObjectAudience,
             fetchRequestUri = { requestUri, requestUriMethod ->

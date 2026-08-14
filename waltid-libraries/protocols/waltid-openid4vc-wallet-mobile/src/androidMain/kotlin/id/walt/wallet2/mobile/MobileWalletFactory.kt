@@ -40,7 +40,12 @@ public actual class MobileWalletFactory(
         val applicationContext = context.applicationContext
         val driverFactory = DriverFactory(applicationContext)
         val platformConfig = if (config.credentialRegistry === UnavailableMobileWalletCredentialRegistry) {
-            config.copy(credentialRegistry = AndroidDigitalCredentialRegistry(applicationContext))
+            config.copy(
+                credentialRegistry = AndroidDigitalCredentialRegistry(
+                    applicationContext,
+                    allowUnsignedRequests = config.allowUnsignedRequests,
+                ),
+            )
         } else config
         return createEncryptedSqlDelightMobileWallet(
             config = platformConfig,
