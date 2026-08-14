@@ -134,21 +134,14 @@ object VerifierVariantMatrix {
         // be signed, so it cannot be delivered unsigned in the URL query.
         variant.clientIdPrefix in setOf("x509_san_dns", "x509_hash") && variant.requestMethod == "url_query" -> false
 
-        // Two suite conditions read their inputs from `authorization_request_object`, which only the
-        // request-object-extracting conditions ever populate (FetchRequestUriAndExtractRequestObject,
-        // PostToRequestUriAndExtractRequestObject, AbstractExtractRequestObject). A `url_query`
-        // request has no request object at all - AbstractVP1FinalVerifierTest says so itself: "there
-        // is no signed request object in the url_query method" - so these modules error out before
-        // Verifier2 is exercised:
-        //
-        //  - iso_mdl: CreateVP1FinalVerifierIsoMdocRedirectSessionTranscript* builds the mdoc
-        //    SessionTranscript from the request object.
-        //  - direct_post.jwt: VP1FinalEncryptVPResponse reads the response-encryption key from
-        //    `claims.client_metadata.jwks` of the request object. Verifier2 does put that key in
-        //    `client_metadata` and serialises it into the URL; the suite simply never looks there.
-        //
-        // Both are suite limitations, not Verifier2 gaps, and neither is fixable from this side.
-        variant.requestMethod == "url_query" && (variant.isMdoc || variant.encryptedResponse) -> false
+        // Previously `url_query` was excluded for iso_mdl and for direct_post.jwt: the suite's
+        // SessionTranscript and response-encryption conditions read their inputs from
+        // `authorization_request_object`, which a url_query request never produces. Fixed upstream in
+        // conformance-suite 5.2.3 - CreateVP1FinalVerifierIsoMdocRedirectSessionTranscript{Encrypted,
+        // Unencrypted} and VP1FinalEncryptVPResponse now read
+        // `CreateEffectiveAuthorizationRequestParameters.ENV_KEY`, each carrying the comment "with
+        // url_query there is no request object, so authorization_request_object is absent". Both
+        // combinations are therefore drivable again and are no longer excluded here.
 
         else -> true
     }
