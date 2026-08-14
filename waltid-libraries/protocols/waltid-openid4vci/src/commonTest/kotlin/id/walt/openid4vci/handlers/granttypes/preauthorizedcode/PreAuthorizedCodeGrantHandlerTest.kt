@@ -176,6 +176,7 @@ class PreAuthorizedCodeGrantHandlerTest {
         val context = assertNotNull(failure.context)
         assertEquals("pin-subject", context.sessionSubject)
         assertEquals(TokenFailureStage.TX_CODE_VALIDATION, context.stage)
+        assertEquals(failure.context, failure.copy().context)
         assertNotNull(repository.get(code))
 
         val secondAttempt = createAccessRequestWithGrant(code = code, txCode = "4321")

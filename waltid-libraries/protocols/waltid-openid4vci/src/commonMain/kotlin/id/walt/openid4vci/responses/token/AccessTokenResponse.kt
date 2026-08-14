@@ -82,15 +82,10 @@ sealed class AccessTokenResponseResult {
         val request: AccessTokenRequest,
         val response: AccessTokenResponse,
     ) : AccessTokenResponseResult()
-    data class Failure(val error: OAuthError) : AccessTokenResponseResult() {
-        // Outside the primary constructor: this type is published, so a new parameter would change
-        // the generated constructor and `copy` signatures for compiled consumers. Consequently
-        // `copy()` does not carry it over, and it takes no part in equals/hashCode.
-        var context: TokenFailureContext? = null
-            internal set
-
-        internal fun withContext(context: TokenFailureContext): Failure = apply { this.context = context }
-    }
+    data class Failure(
+        val error: OAuthError,
+        val context: TokenFailureContext? = null,
+    ) : AccessTokenResponseResult()
 
     fun isSuccess(): Boolean = this is Success
 }
@@ -99,13 +94,12 @@ internal fun tokenFailure(
     error: OAuthError,
     sessionSubject: String?,
     stage: TokenFailureStage = TokenFailureStage.UNSPECIFIED,
-): AccessTokenResponseResult.Failure {
-    val failure = AccessTokenResponseResult.Failure(error)
-    return sessionSubject
+): AccessTokenResponseResult.Failure = AccessTokenResponseResult.Failure(
+    error = error,
+    context = sessionSubject
         ?.takeIf { it.isNotBlank() }
-        ?.let { failure.withContext(TokenFailureContext(sessionSubject = it, stage = stage)) }
-        ?: failure
-}
+        ?.let { TokenFailureContext(sessionSubject = it, stage = stage) },
+)
 
 data class TokenFailureContext(
     /** The grant's session subject, verbatim. Issuers that key sessions by subject can correlate on it. */
