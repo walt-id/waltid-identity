@@ -9,6 +9,7 @@ import id.walt.crypto2.jose.selectJwsAlgorithm
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.keys.toStoredSoftwareKey
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
@@ -193,3 +194,21 @@ internal suspend fun migrateLocalJwk(key: Key) =
             privateMaterial = Jwk.containsPrivateMaterial(jwk),
         ).toStoredSoftwareKey(KeyId(it.getKeyId()), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
     }
+
+/**
+ * JWK SHA-256 thumbprint (RFC 7638) of this key's public material.
+ *
+ * Used for the `dpop_jkt` authorization request parameter (RFC 9449 Section 10), which binds the
+ * eventual access token to this key at authorization time. Lives here rather than in a single caller
+ * so the server-side and session-service authorization flows compute it identically.
+ */
+internal suspend fun WalletKeyStoreEntry.jwkThumbprint(): String {
+    crypto2Key?.let { key ->
+        val exported = requireNotNull(key.capabilities.publicKeyExporter) {
+            "Key '$keyId' does not export public material"
+        }.exportPublicKey().toPublicJwk(key.spec)
+        return Jwk.sha256Thumbprint(exported)
+    }
+    val legacy = requireNotNull(legacyKey) { "Key '$keyId' has no usable public representation" }
+    return legacy.getPublicKey().getThumbprint()
+}
