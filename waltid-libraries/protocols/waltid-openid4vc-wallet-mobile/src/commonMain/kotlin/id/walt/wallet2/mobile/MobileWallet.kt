@@ -60,6 +60,7 @@ import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import id.waltid.openid4vp.wallet.DcApiCredentialResponse
 import id.waltid.openid4vp.wallet.DcApiWallet
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.ktor.client.HttpClient
 import io.ktor.http.Url
 import kotlinx.coroutines.CancellationException
@@ -217,6 +218,7 @@ public class MobileWallet internal constructor(
     attestationConfig: WalletAttestationConfig? = null,
     private val preferredLocales: List<String> = emptyList(),
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    private val allowUnsignedRequests: Boolean = false,
     private val clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
     private val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     private val credentialRegistry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
@@ -227,6 +229,13 @@ public class MobileWallet internal constructor(
     /** Issuance transport override. Only tests set this; production uses the configured engine. */
     issuanceHttpClient: HttpClient? = null,
 ) {
+    private val unsignedRequestObjectPolicy
+        get() = if (allowUnsignedRequests) {
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED
+        } else {
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED
+        }
+
     private val eventStream = MobileWalletEventStream()
     /**
      * Buffered stream of recent issuance and presentation events emitted by this wallet.
@@ -599,12 +608,19 @@ public class MobileWallet internal constructor(
      * remains null because the untrusted request-supplied `client_id` is ignored. For a signed
      * request, [MobileWalletDigitalCredentialRequestInfo.clientId] is the authenticated Request
      * Object client identifier after signature verification against [clientIdTrustConfiguration].
+     * Unsigned requests are rejected unless [MobileWalletConfig.allowUnsignedRequests] is true.
      */
     public suspend fun previewDigitalCredentialPresentation(
         request: MobileWalletDigitalCredentialRequest,
     ): MobileWalletDigitalCredentialPreview {
         require(request.protocol != MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C) {
             "ISO 18013-7 Annex C requests use the dedicated Annex C facade"
+        }
+        require(
+            request.protocol != MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED ||
+                allowUnsignedRequests,
+        ) {
+            "Unsigned OpenID4VP Digital Credentials requests are not permitted by this wallet"
         }
         val currentRecords = registryRecords()
         val credentialIdsByRegistryId = currentRecords.associate { it.registryEntryId to it.credentialId }
@@ -743,6 +759,7 @@ public class MobileWallet internal constructor(
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             clientIdTrustConfiguration = clientIdTrustConfiguration,
+            unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
             onEvent = ::emitSessionEvent,
         )
 
@@ -762,6 +779,7 @@ public class MobileWallet internal constructor(
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             clientIdTrustConfiguration = clientIdTrustConfiguration,
+            unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
             onEvent = ::emitSessionEvent,
         )
 

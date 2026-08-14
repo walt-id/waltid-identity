@@ -42,6 +42,11 @@ import kotlin.uuid.Uuid
  * @property transactionDataProfiles Transaction data profiles this mobile wallet accepts in OpenID4VP requests.
  * @property credentialIssuerMetadataTrustResolver Optional trust boundary for signed Credential Issuer Metadata.
  * When absent, signed metadata is neither requested nor accepted.
+ * @property allowUnsignedRequests Whether this wallet accepts unsigned OpenID4VP requests.
+ * Signed compact Request Objects are always accepted. When false, unsigned Digital Credentials
+ * `openid4vp-v1-unsigned` requests are not advertised to the platform and are rejected if they
+ * still arrive, and unsigned JAR request objects (`alg=none`) are rejected. Multisigned remains
+ * unsupported. Defaults to false so consuming apps opt in.
  * @property credentialRegistry Platform metadata registry. Platform factories install their native default when omitted.
  * @property readerTrustEvaluator Application trust policy for verified ISO 18013-7 reader chains.
  * @property crossProcessAccess Optional shared-container/keychain configuration for provider extensions.
@@ -57,6 +62,7 @@ public data class MobileWalletConfig(
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     public val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
+    public val allowUnsignedRequests: Boolean = false,
     public val credentialRegistry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
     public val readerTrustEvaluator: MobileWalletReaderTrustEvaluator = UnconfiguredMobileWalletReaderTrustEvaluator,
     public val crossProcessAccess: MobileWalletCrossProcessAccess? = null,
@@ -242,6 +248,7 @@ internal fun createSqlDelightMobileWallet(
         attestationConfig = config.attestationConfig,
         preferredLocales = config.preferredLocales,
         transactionDataProfiles = config.transactionDataProfiles,
+        allowUnsignedRequests = config.allowUnsignedRequests,
         clientIdTrustConfiguration = clientIdTrustConfiguration,
         credentialIssuerMetadataTrustResolver = config.credentialIssuerMetadataTrustResolver,
         onEvent = config.onEvent,

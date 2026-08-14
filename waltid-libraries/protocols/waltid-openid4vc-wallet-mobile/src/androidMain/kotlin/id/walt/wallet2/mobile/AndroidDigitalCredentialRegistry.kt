@@ -55,9 +55,13 @@ import kotlinx.coroutines.withTimeoutOrNull
  * wallet keeps no copy to replay at startup. Verified on API 37 with Google Play services 26.29.32.
  *
  * @property capabilities Current Android platform and registry availability.
+ * @param allowUnsignedRequests When true, unsigned compact OpenID4VP Digital Credentials requests
+ * are advertised alongside signed. When false, only signed is registered so Credential Manager
+ * does not route unsigned requests here.
  */
 public class AndroidDigitalCredentialRegistry(
     context: Context,
+    private val allowUnsignedRequests: Boolean = false,
 ) : MobileWalletCredentialRegistry {
     private val applicationContext: Context = context.applicationContext
     private val registryManager: RegistryManager = RegistryManager.create(applicationContext)
@@ -100,8 +104,11 @@ public class AndroidDigitalCredentialRegistry(
                             MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
                             MobileWalletDigitalCredentialResponseProtection.JWE,
                         ),
-                        supported = runtimeAvailable,
-                        unsupportedReason = unavailableReason,
+                        supported = runtimeAvailable && allowUnsignedRequests,
+                        unsupportedReason = when {
+                            !allowUnsignedRequests -> UNSIGNED_NOT_PERMITTED_REASON
+                            else -> unavailableReason
+                        },
                     ),
                     MobileWalletDigitalCredentialCapability(
                         protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
@@ -189,15 +196,13 @@ public class AndroidDigitalCredentialRegistry(
     ): MobileWalletCredentialRegistrationResult {
         val entries = records.map { it.toAndroidEntry() }
         return runCatching {
-            // Advertise unsigned and signed. Multisigned stays off the list so Credential Manager
-            // ignores JWS JSON Serialization request objects rather than routing them here to fail.
+            // Signed is always advertised. Unsigned is opt-in so Credential Manager does not route
+            // unauthenticated request objects the hosting application has not permitted. Multisigned
+            // stays off the list so JWS JSON Serialization is ignored rather than routed here to fail.
             val openId4Vp = OpenId4VpRegistry(
                 credentialEntries = entries,
                 id = registryId,
-                supportedProtocols = listOf(
-                    OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_SIGNED,
-                    OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_UNSIGNED,
-                ),
+                supportedProtocols = advertisedOpenId4VpProtocols(),
             )
             // Same registry bytes, different matcher. See OPENID4VP-MATCHER.md for why AndroidX's
             // embedded matcher cannot serve a transaction data request alongside a second credential.
@@ -515,6 +520,13 @@ public class AndroidDigitalCredentialRegistry(
         else -> value.toString()
     }
 
+    internal fun advertisedOpenId4VpProtocols(): List<String> = buildList {
+        add(OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_SIGNED)
+        if (allowUnsignedRequests) {
+            add(OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_UNSIGNED)
+        }
+    }
+
     private companion object {
         // Vendored, not a dependency; package-qualified so it cannot collide with another library's
         // copy in the application asset merge. See ANNEX-C-MATCHER.md.
@@ -529,9 +541,10 @@ public class AndroidDigitalCredentialRegistry(
         /** Credential Manager selector icons are small; keep registry PNG payloads modest. */
         private const val REGISTRY_ICON_MAX_EDGE_PX = 128
         private const val REGISTRY_ICON_MAX_PIXELS = 2_048L * 2_048L
+        private const val UNSIGNED_NOT_PERMITTED_REASON =
+            "The application has not permitted unsigned OpenID4VP Digital Credentials requests"
         private const val MULTISIGNED_UNSUPPORTED_REASON =
-            "The wallet accepts unsigned and signed compact OpenID4VP Digital Credentials " +
-                "request objects, and does not support JWS JSON Serialization request objects"
+            "The wallet does not support JWS JSON Serialization request objects"
     }
 }
 

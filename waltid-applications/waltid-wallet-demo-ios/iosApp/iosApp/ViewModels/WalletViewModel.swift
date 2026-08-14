@@ -599,6 +599,7 @@ class WalletViewModel: ObservableObject {
                 hostHeader: attestationHostHeader
             ),
             transactionDataProfiles: transactionDataProfiles.profiles,
+            allowUnsignedRequests: true,
             crossProcessAccess: Self.crossProcessAccessConfiguration(),
             defaultKeyUseAuthorizationPolicy: selectedProtection.authorizationPolicy,
             keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt(

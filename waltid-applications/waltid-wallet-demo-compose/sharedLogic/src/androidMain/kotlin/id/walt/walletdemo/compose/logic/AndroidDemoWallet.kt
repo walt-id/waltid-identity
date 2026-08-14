@@ -55,6 +55,7 @@ suspend fun createAndroidDemoMobileWallet(
                 walletId = config.walletId,
                 attestationConfig = config.toWalletAttestationConfig(),
                 transactionDataProfiles = transactionDataProfiles.profiles,
+                allowUnsignedRequests = true,
                 preferredLocales = LocaleList.getDefault().let { locales ->
                     List(locales.size()) { index -> locales[index].toLanguageTag() }
                 },
