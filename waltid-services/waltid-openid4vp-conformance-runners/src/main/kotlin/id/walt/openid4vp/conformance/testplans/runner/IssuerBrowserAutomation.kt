@@ -7,13 +7,7 @@ import com.microsoft.playwright.Locator
 import com.microsoft.playwright.Page
 import com.microsoft.playwright.Playwright
 import id.walt.openid4vp.conformance.testplans.httpdata.TestRunResult
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import java.net.URI
-import java.net.URLDecoder
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
@@ -58,81 +52,20 @@ data class IssuerBrowserAutomationConfig(
     }
 }
 
-data class IssuerBrowserInteraction(
-    val url: String,
-    val method: String,
-)
-
-fun TestRunResult.browserInteractionsForAutomation(): List<IssuerBrowserInteraction> {
-    val pending = pendingBrowserInteractions()
-    return pending.ifEmpty {
-        browser.visitedUrlsWithMethod.mapNotNull { element ->
-            element?.browserUrlWithMethod()
-        } + browser.visited.mapNotNull { element ->
-            element?.browserUrl()
-        }
-    }
-}
-
-fun TestRunResult.pendingBrowserInteractions(): List<IssuerBrowserInteraction> {
-    val withMethod = browser.urlsWithMethod.mapNotNull { element ->
-        element?.browserUrlWithMethod()
-    }
-
-    if (withMethod.isNotEmpty()) {
-        return withMethod
-    }
-
-    return browser.urls.mapNotNull { element ->
-        element?.browserUrl()
-    }
-}
-
-private fun JsonElement.browserUrlWithMethod(): IssuerBrowserInteraction? {
-    val obj = this as? JsonObject ?: return browserUrl()
-    val url = obj.stringValue("url")
-        ?: obj.stringValue("originalUrl")
-        ?: obj.stringValue("fullUrl")
-        ?: return null
-    val method = obj.stringValue("method") ?: "GET"
-    return IssuerBrowserInteraction(url = url, method = method.uppercase())
-}
-
-private fun JsonElement.browserUrl(): IssuerBrowserInteraction? =
-    runCatching {
-        jsonPrimitive.contentOrNull?.takeIf { it.isNotBlank() }?.let {
-            IssuerBrowserInteraction(url = it, method = "GET")
-        }
-    }.getOrNull()
-
-private fun JsonObject.stringValue(name: String): String? =
-    get(name)?.let { element ->
-        runCatching { element.jsonPrimitive.contentOrNull }.getOrNull()
-    }?.takeIf { it.isNotBlank() }
-
-fun TestRunResult.browserInteractionSummary(): String =
-    "urlsWithMethod=${browser.urlsWithMethod.map { it.shortJson() }}, " +
-        "urls=${browser.urls.map { it.shortJson() }}, " +
-        "visitedUrlsWithMethod=${browser.visitedUrlsWithMethod.map { it.shortJson() }}, " +
-        "visited=${browser.visited.map { it.shortJson() }}"
-
-private fun JsonElement?.shortJson(): String =
-    this?.toString()?.let { if (it.length > 500) it.take(500) + "..." else it } ?: "null"
-
-class IssuerConformanceBrowserAutomation(
+internal class IssuerConformanceBrowserAutomation(
     private val config: IssuerBrowserAutomationConfig,
     private val conformanceHost: String,
     private val conformancePort: Int,
 ) {
-    fun complete(interaction: IssuerBrowserInteraction) {
-        val browser = KeycloakConformanceBrowser.open()
+    fun complete(interaction: BrowserInteraction) {
+        val browser = ConformanceBrowser.open()
         try {
             val page = browser.page
             page.setDefaultTimeout(Duration.ofSeconds(30).toMillis().toDouble())
             page.setDefaultNavigationTimeout(Duration.ofSeconds(30).toMillis().toDouble())
 
             println("Opening conformance browser interaction via ${interaction.method}: ${interaction.url}")
-            openInteraction(page, interaction)
+            openBrowserInteraction(page, interaction)
 
             val timeoutAt = System.currentTimeMillis() + Duration.ofSeconds(config.timeoutSeconds).toMillis()
             var loginSubmitted = false
@@ -209,40 +142,6 @@ class IssuerConformanceBrowserAutomation(
         }
     }
 
-    private fun openInteraction(page: Page, interaction: IssuerBrowserInteraction) {
-        when (interaction.method.uppercase()) {
-            "POST" -> page.setContent(buildPostRedirectForm(interaction.url))
-            else -> page.navigate(interaction.url)
-        }
-    }
-
-    private fun buildPostRedirectForm(url: String): String {
-        val uri = URI.create(url)
-        val action = buildString {
-            append(uri.scheme)
-            append("://")
-            append(uri.rawAuthority)
-            append(uri.rawPath.orEmpty())
-        }
-        val inputs = parseFormParams(uri.rawQuery)
-            .joinToString("\n") { (name, value) ->
-                """<input type="hidden" name="${name.htmlEscape()}" value="${value.htmlEscape()}">"""
-            }
-
-        return """
-            <!doctype html>
-            <html>
-              <body>
-                <form method="post" action="${action.htmlEscape()}">
-                  $inputs
-                  <button type="submit">Continue</button>
-                </form>
-                <script>document.forms[0].submit();</script>
-              </body>
-            </html>
-        """.trimIndent()
-    }
-
     private fun String.isConformanceSuiteUrl(): Boolean {
         val uri = runCatching { URI.create(this) }.getOrNull() ?: return false
         return uri.host == conformanceHost && effectivePort(uri) == conformancePort
@@ -257,7 +156,7 @@ class IssuerConformanceBrowserAutomation(
         }
 
         val uri = runCatching { URI.create(this) }.getOrNull() ?: return null
-        val params = parseFormParams(uri.rawQuery)
+        val params = parseBrowserFormParameters(uri.rawQuery)
         val error = params.firstOrNull { it.first == "error" }?.second ?: return null
         val description = params.firstOrNull { it.first == "error_description" }?.second
         return if (description.isNullOrBlank()) error else "$error: $description"
@@ -276,7 +175,14 @@ class IssuerConformanceBrowserAutomation(
     }
 }
 
-private class KeycloakConformanceBrowser private constructor(
+/**
+ * Playwright wrapper shared by the issuer and wallet conformance automations.
+ *
+ * Nothing here is Keycloak-specific - it was named for the first authorization server it drove.
+ * Kept `internal` so the wallet automation reuses this single wrapper rather than standing up a
+ * second one.
+ */
+internal class ConformanceBrowser private constructor(
     private val playwright: Playwright,
     private val browser: Browser,
     private val context: BrowserContext,
@@ -317,7 +223,7 @@ private class KeycloakConformanceBrowser private constructor(
         private const val ENV_PLAYWRIGHT_BROWSER_BIN = "PLAYWRIGHT_BROWSER_BIN"
         private const val ENV_PLAYWRIGHT_HEADLESS = "PLAYWRIGHT_HEADLESS"
 
-        fun open(): KeycloakConformanceBrowser {
+        fun open(): ConformanceBrowser {
             val browserName = PlaywrightBrowserName.fromEnv()
             val playwright = Playwright.create()
             return try {
@@ -335,7 +241,7 @@ private class KeycloakConformanceBrowser private constructor(
                         .setViewportSize(1280, 800)
                         .setExtraHTTPHeaders(mapOf("ngrok-skip-browser-warning" to "true"))
                 )
-                KeycloakConformanceBrowser(
+                ConformanceBrowser(
                     playwright = playwright,
                     browser = browser,
                     context = context,
@@ -421,7 +327,7 @@ private enum class PlaywrightBrowserName {
 
     companion object {
         fun fromEnv(): PlaywrightBrowserName = when (
-            (KeycloakConformanceBrowser.configuredBrowserName() ?: "chromium").lowercase()
+            (ConformanceBrowser.configuredBrowserName() ?: "chromium").lowercase()
         ) {
             "chromium", "chrome" -> CHROMIUM
             "firefox" -> FIREFOX
@@ -431,33 +337,3 @@ private enum class PlaywrightBrowserName {
     }
 }
 
-private fun parseFormParams(rawQuery: String?): List<Pair<String, String>> =
-    rawQuery
-        ?.takeIf { it.isNotBlank() }
-        ?.split("&")
-        ?.filter { it.isNotBlank() }
-        ?.map { part ->
-            val separator = part.indexOf('=')
-            if (separator == -1) {
-                decodeFormValue(part) to ""
-            } else {
-                decodeFormValue(part.substring(0, separator)) to decodeFormValue(part.substring(separator + 1))
-            }
-        }
-        ?: emptyList()
-
-private fun decodeFormValue(value: String): String =
-    URLDecoder.decode(value, StandardCharsets.UTF_8)
-
-private fun String.htmlEscape(): String = buildString {
-    this@htmlEscape.forEach { char ->
-        when (char) {
-            '&' -> append("&amp;")
-            '<' -> append("&lt;")
-            '>' -> append("&gt;")
-            '"' -> append("&quot;")
-            '\'' -> append("&#39;")
-            else -> append(char)
-        }
-    }
-}
