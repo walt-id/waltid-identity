@@ -135,11 +135,13 @@ class MobileWalletIntegrationTest {
         receiveCredentialFromDemoIssuer2("iso-mdl")
     }
 
+    @Ignore("Public EUDI verifier currently requires a registration certificate (HTTP 400 MissingRegistrationCertificate from verifier-backend.eudiw.dev)")
     @Test
     fun receiveAndPresentEudiEhicSdJwtAgainstEudi() = runBlocking {
         receiveAndPresentEudiCredential(EUDI_EHIC_SD_JWT_CREDENTIAL_ID)
     }
 
+    @Ignore("Public EUDI verifier currently requires a registration certificate (HTTP 400 MissingRegistrationCertificate from verifier-backend.eudiw.dev)")
     @Test
     fun previewAndSubmitEudiEhicSdJwtAgainstEudi() = runBlocking {
         previewAndSubmitEudiCredential(EUDI_EHIC_SD_JWT_CREDENTIAL_ID)

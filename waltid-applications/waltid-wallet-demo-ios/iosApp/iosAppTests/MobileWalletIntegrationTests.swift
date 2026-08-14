@@ -311,10 +311,18 @@ final class MobileWalletIntegrationTests: XCTestCase {
     }
 
     func testReceiveAndPresentEudiEhicSdJwtAgainstEudi() async throws {
+        try XCTSkipIf(
+            true,
+            "Public EUDI verifier currently requires a registration certificate (HTTP 400 MissingRegistrationCertificate from verifier-backend.eudiw.dev)"
+        )
         try await receiveAndPresentEudiCredential(credentialID: Self.eudiEhicSdJwtCredentialID)
     }
 
     func testPreviewAndSubmitEudiEhicSdJwtAgainstEudi() async throws {
+        try XCTSkipIf(
+            true,
+            "Public EUDI verifier currently requires a registration certificate (HTTP 400 MissingRegistrationCertificate from verifier-backend.eudiw.dev)"
+        )
         try await previewAndSubmitEudiCredential(credentialID: Self.eudiEhicSdJwtCredentialID)
     }
 
