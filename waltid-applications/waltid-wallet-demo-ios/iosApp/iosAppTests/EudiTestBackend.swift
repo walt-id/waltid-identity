@@ -61,12 +61,14 @@ actor EudiTestBackend {
     }
 
     func createVerifierTransaction(credentialId: String = "eu.europa.ec.eudi.pid_vc_sd_jwt") async throws -> VerifierTransaction {
+        let intendedUseID = try await resolveVerifierIntendedUseID()
         let payload: [String: Any] = [
             "dcql_query": TestHelpers.buildDcqlQuery(credentialID: credentialId),
             "nonce": UUID().uuidString,
             "request_uri_method": "post",
             "profile": "openid4vp",
-            "authorization_request_uri": "openid4vp://"
+            "authorization_request_uri": "openid4vp://",
+            "intended_use_id": intendedUseID,
         ]
 
         let response = try await client.jsonRequest(
@@ -82,6 +84,32 @@ actor EudiTestBackend {
         }
 
         return VerifierTransaction(transactionId: transactionId, authorizationRequestUri: authRequestUri)
+    }
+
+    private func resolveVerifierIntendedUseID() async throws -> String {
+        let response = try await client.jsonRequest(
+            url: URL(string: "https://verifier-backend.eudiw.dev/ui/intended-uses")!
+        )
+
+        guard let intendedUses = response["intended_uses"] as? [[String: Any]] else {
+            throw NSError(
+                domain: "EudiTestBackend",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Verifier response did not contain an intended_uses array"]
+            )
+        }
+
+        if let intendedUseID = intendedUses
+            .compactMap({ $0["intended_use_id"] as? String })
+            .first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+            return intendedUseID
+        }
+
+        throw NSError(
+            domain: "EudiTestBackend",
+            code: 3,
+            userInfo: [NSLocalizedDescriptionKey: "Verifier exposes no configured intended use"]
+        )
     }
 
 }
