@@ -30,6 +30,12 @@ public struct WalletConfiguration: Sendable {
     /// Transaction data profiles this wallet accepts in OpenID4VP requests.
     public var transactionDataProfiles: [WalletTransactionDataProfile]
 
+    /// Whether this wallet accepts unsigned OpenID4VP requests.
+    ///
+    /// Signed compact Request Objects are always accepted. When `false`, unsigned requests are
+    /// rejected. Multisigned remains unsupported. Defaults to `false` so consuming apps opt in.
+    public var allowUnsignedRequests: Bool
+
     /// Ordered BCP 47 locale preferences used to select protocol display metadata.
     public var preferredLocales: [String]
     /// Shared app/extension storage and Keychain configuration for IdentityDocumentServices.
@@ -52,6 +58,8 @@ public struct WalletConfiguration: Sendable {
     ///   - persistence: Local persistence configuration for wallet-owned state.
     ///   - transactionDataProfiles: OpenID4VP transaction data profiles this
     ///     wallet accepts before previewing or submitting a presentation.
+    ///   - allowUnsignedRequests: Whether unsigned OpenID4VP requests are accepted.
+    ///     Signed compact Request Objects remain accepted either way. Defaults to `false`.
     ///   - preferredLocales: Ordered BCP 47 locale preferences used for issuer,
     ///     credential, and verifier display metadata.
     ///   - crossProcessAccess: Optional shared app/extension storage and Keychain configuration
@@ -67,6 +75,7 @@ public struct WalletConfiguration: Sendable {
         issuerMetadataTrustResolver: (any IssuerMetadataTrustResolver)? = nil,
         persistence: WalletPersistence = WalletPersistence(),
         transactionDataProfiles: [WalletTransactionDataProfile] = [],
+        allowUnsignedRequests: Bool = false,
         preferredLocales: [String] = Locale.preferredLanguages,
         crossProcessAccess: WalletCrossProcessAccess? = nil,
         defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .biometricCurrentSet,
@@ -81,6 +90,7 @@ public struct WalletConfiguration: Sendable {
         self.issuerMetadataTrustResolver = issuerMetadataTrustResolver
         self.persistence = persistence
         self.transactionDataProfiles = transactionDataProfiles
+        self.allowUnsignedRequests = allowUnsignedRequests
         self.preferredLocales = preferredLocales
         self.crossProcessAccess = crossProcessAccess
     }

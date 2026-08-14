@@ -1197,6 +1197,7 @@ private extension WalletConfiguration {
             },
             preferredLocales: preferredLocales,
             transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
+            allowUnsignedRequests: allowUnsignedRequests,
             clientIdTrustConfiguration: clientIDTrustConfiguration.toKMPClientIDTrustConfiguration(),
             appGroupIdentifier: crossProcessAccess?.appGroupIdentifier,
             keychainAccessGroup: crossProcessAccess?.keychainAccessGroup,
