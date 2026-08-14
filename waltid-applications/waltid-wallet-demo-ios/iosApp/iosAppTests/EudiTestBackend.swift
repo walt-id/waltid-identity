@@ -33,6 +33,7 @@ actor EudiTestBackend {
 
     private let client = WalletE2EClient()
     private let offerFlow: EudiOfferFlow
+    private static let verifierBackendURL = URL(string: "https://verifier-backend.eudiw.dev")!
 
     private init() {
         self.offerFlow = EudiOfferFlow(client: client)
@@ -72,7 +73,7 @@ actor EudiTestBackend {
         ]
 
         let response = try await client.jsonRequest(
-            url: URL(string: "https://verifier-backend.eudiw.dev/ui/presentations/v2")!,
+            url: Self.verifierBackendURL.appendingPathComponent("ui/presentations/v2"),
             method: "POST",
             headers: ["Content-Type": "application/json"],
             body: Data(try jsonString(payload).utf8)
@@ -88,7 +89,7 @@ actor EudiTestBackend {
 
     private func resolveVerifierIntendedUseID() async throws -> String {
         let response = try await client.jsonRequest(
-            url: URL(string: "https://verifier-backend.eudiw.dev/ui/intended-uses")!
+            url: Self.verifierBackendURL.appendingPathComponent("ui/intended-uses")
         )
 
         guard let intendedUses = response["intended_uses"] as? [[String: Any]] else {
