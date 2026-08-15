@@ -70,7 +70,7 @@ class MobileWalletIntegrationTest {
         private const val EUDI_EHIC_SD_JWT_CREDENTIAL_ID = "eu.europa.ec.eudi.ehic_sd_jwt_vc"
 
         private val DEMO_TRANSACTION_DATA_PROFILES = demoTransactionDataProfiles(
-            paymentAuthorizationFields = listOf("amount", "currency", "payee"),
+            paymentAuthorizationFields = listOf("merchant_name", "amount", "currency"),
         )
 
         private fun demoTransactionDataProfiles(
@@ -205,7 +205,7 @@ class MobileWalletIntegrationTest {
         assertTrue(
             transactionData.detailsJson.contains("\"amount\":\"42.00\"") &&
                 transactionData.detailsJson.contains("\"currency\":\"EUR\"") &&
-                transactionData.detailsJson.contains("\"payee\":\"ACME Corp\""),
+                transactionData.detailsJson.contains("\"merchant_name\":\"ACME Corp\""),
             "Preview should expose readable payment details: ${transactionData.detailsJson}",
         )
         val result = client.submitPresentation(

@@ -63,7 +63,6 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.security.MessageDigest
@@ -211,11 +210,6 @@ class DigitalCredentialSharingE2ETest {
      *    prompt still renders, and the transaction data binds to the payment card alone.
      */
     @Test
-    @Ignore(
-        "Enable once the urn:eudi:sca:payment:1 transaction data profile, the scaPaymentCardMdoc " +
-            "issuance profile from this branch and euAgeVerificationMdoc are deployed together to " +
-            "verifier2.demo.walt.id and issuer2.demo.walt.id.",
-    )
     fun sharesMdocWithScaPaymentTransactionDataAndSecondCredential() = runBlocking {
         val fixture = start() ?: return@runBlocking
         val scaScenario = DemoTestBackend.presentationScenarios.first { it.id == "sca-payment-card" }
