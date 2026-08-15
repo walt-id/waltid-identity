@@ -80,10 +80,14 @@ avd_config_value() {
   [[ -n "$config_file" ]] || return 1
 
   awk -F= -v expected_key="$key" '
-    $1 == expected_key {
+    {
+      actual_key = $1
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", actual_key)
+    }
+    actual_key == expected_key {
       value = $0
       sub(/^[^=]*=/, "", value)
-      sub(/\r$/, "", value)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
       print value
       found = 1
     }
@@ -135,15 +139,21 @@ android_platform_tools_version() {
 
 log_android_dc_api_host_identity() {
   local emulator_package_xml platform_tools_package_xml system_image_package_xml
+  local config_file
   emulator_package_xml="${ANDROID_HOME}/emulator/package.xml"
   platform_tools_package_xml="${ANDROID_HOME}/platform-tools/package.xml"
   system_image_package_xml="$(avd_system_image_dir 2>/dev/null || true)/package.xml"
+  config_file="$(avd_config_file || true)"
 
   echo "DC API host identity: androidHome=${ANDROID_HOME:-<unset>}"
   echo "DC API host identity: emulatorBinary=$(android_emulator_binary_version) emulatorPackageRevision=$(package_revision "$emulator_package_xml" || true)"
   echo "DC API host identity: adbBinary=$(android_platform_tools_version) platformToolsPackageRevision=$(package_revision "$platform_tools_package_xml" || true)"
   echo "DC API host identity: systemImagePackage=${DC_API_SYSTEM_IMAGE_PACKAGE} systemImageRevision=$(package_revision "$system_image_package_xml" || true)"
-  echo "DC API host identity: avdDir=$DC_API_AVD_DIR configFile=$(avd_config_file || printf '<missing>') configImageSysdir=$(avd_config_value image.sysdir.1 || true) ram=$(avd_config_value hw.ramSize || true) cpuCores=$(avd_config_value hw.cpu.ncore || true)"
+  echo "DC API host identity: avdDir=$DC_API_AVD_DIR configFile=${config_file:-<missing>} configBytes=$(wc -c < "${config_file:-/dev/null}" 2>/dev/null || printf 0) configImageSysdir=$(avd_config_value image.sysdir.1 || true) ram=$(avd_config_value hw.ramSize || true) cpuCores=$(avd_config_value hw.cpu.ncore || true)"
+  if [[ -n "$config_file" ]]; then
+    echo "DC API host identity: config key lines"
+    sed -n -E '/^[[:space:]]*(image\.sysdir\.1|hw\.ramSize|hw\.cpu\.ncore|hw\.gpu\.mode)[[:space:]]*=/p' "$config_file" || true
+  fi
 }
 
 adb_cmd() {
