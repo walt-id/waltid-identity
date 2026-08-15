@@ -3,6 +3,17 @@ set -euo pipefail
 
 ADB_BIN="${ADB_BIN:-adb}"
 ANDROID_SERIAL="${ANDROID_SERIAL:-}"
+ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+DC_API_BASELINE_SCHEMA="${DC_API_BASELINE_SCHEMA:-2}"
+DC_API_EMULATOR_PACKAGE_REVISION="${DC_API_EMULATOR_PACKAGE_REVISION:-37.1.11}"
+DC_API_PLATFORM_TOOLS_REVISION="${DC_API_PLATFORM_TOOLS_REVISION:-37.0.1}"
+DC_API_SYSTEM_IMAGE_PACKAGE="${DC_API_SYSTEM_IMAGE_PACKAGE:-system-images;android-37.0;google_apis_playstore_ps16k;x86_64}"
+DC_API_SYSTEM_IMAGE_REVISION="${DC_API_SYSTEM_IMAGE_REVISION:-6}"
+DC_API_AVD_NAME="${DC_API_AVD_NAME:-dc-api-api37-pixel7-playstore}"
+DC_API_AVD_ROOT="${ANDROID_AVD_HOME:-${HOME}/.android/avd}"
+DC_API_AVD_DIR="$DC_API_AVD_ROOT/${DC_API_AVD_NAME}.avd"
+DC_API_BASELINE_MANIFEST="$DC_API_AVD_DIR/waltid-dc-api-baseline.manifest"
+DC_API_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 MIN_GMS_VERSION="${MIN_GMS_VERSION:-26.29.32}"
 GMS_READY_TIMEOUT_SECONDS="${GMS_READY_TIMEOUT_SECONDS:-300}"
 GMS_STABILITY_SECONDS="${GMS_STABILITY_SECONDS:-15}"
@@ -10,6 +21,105 @@ GMS_POLL_SECONDS="${GMS_POLL_SECONDS:-2}"
 GMS_VALIDATION_TIMEOUT_SECONDS="${GMS_VALIDATION_TIMEOUT_SECONDS:-60}"
 LAUNCHER_READY_TIMEOUT_SECONDS="${LAUNCHER_READY_TIMEOUT_SECONDS:-30}"
 LAUNCHER_STABILITY_SECONDS="${LAUNCHER_STABILITY_SECONDS:-6}"
+
+package_revision() {
+  local package_xml="$1"
+  [[ -f "$package_xml" ]] || return 1
+  awk '
+    function tag_value(text, tag, pattern, match_text) {
+      pattern = "<" tag ">[0-9]+</" tag ">"
+      if (match(text, pattern)) {
+        match_text = substr(text, RSTART, RLENGTH)
+        gsub(/<[^>]+>/, "", match_text)
+        return match_text
+      }
+      return ""
+    }
+    {
+      text = $0
+      if (index(text, "<revision>") > 0) {
+        in_revision = 1
+        text = substr(text, index(text, "<revision>") + length("<revision>"))
+      }
+      if (!in_revision) next
+      major = major == "" ? tag_value(text, "major") : major
+      minor = minor == "" ? tag_value(text, "minor") : minor
+      micro = micro == "" ? tag_value(text, "micro") : micro
+      if (index(text, "</revision>") > 0) {
+        if (major == "") exit 1
+        printf "%s", major
+        if (minor != "") printf ".%s", minor
+        if (micro != "") printf ".%s", micro
+        printf "\n"
+        exit
+      }
+    }
+  ' "$package_xml"
+}
+
+script_sha256() {
+  local script="$1"
+  sha256sum "$script" | awk '{print $1}'
+}
+
+avd_config_value() {
+  local key="$1"
+  [[ -f "$DC_API_AVD_DIR/config.ini" ]] || return 1
+  sed -n -E "s/^${key}=(.*)$/\1/p" "$DC_API_AVD_DIR/config.ini" | tail -n 1
+}
+
+avd_system_image_dir() {
+  local image_sysdir
+  image_sysdir="$(avd_config_value image.sysdir.1 || true)"
+  image_sysdir="${image_sysdir%/}"
+  [[ -n "$image_sysdir" ]] || return 1
+  printf '%s/%s\n' "${ANDROID_HOME}/system-images" "${image_sysdir#system-images/}"
+}
+
+expected_avd_system_image_sysdir() {
+  local package_path="${DC_API_SYSTEM_IMAGE_PACKAGE#system-images;}"
+  package_path="${package_path//;/\/}"
+  printf 'system-images/%s/\n' "$package_path"
+}
+
+android_device_property() {
+  adb_shell getprop "$1"
+}
+
+android_device_page_size() {
+  adb_shell getconf PAGESIZE 2>/dev/null || true
+}
+
+gms_apk_path() {
+  adb_shell pm path com.google.android.gms 2>/dev/null |
+    sed -n 's/^package:\(.*\)$/\1/p' |
+    head -n 1
+}
+
+android_emulator_binary_version() {
+  local version
+  version="$(${ANDROID_HOME}/emulator/emulator -version 2>&1 | sed -n -E 's/^Android emulator version ([^[:space:]]+).*/\1/p' | head -n 1 || true)"
+  printf '%s\n' "${version:-<unavailable>}"
+}
+
+android_platform_tools_version() {
+  local version
+  version="$(${ANDROID_HOME}/platform-tools/adb version 2>&1 | sed -n -E 's/^Android Debug Bridge version ([^[:space:]]+).*/\1/p' | head -n 1 || true)"
+  printf '%s\n' "${version:-<unavailable>}"
+}
+
+log_android_dc_api_host_identity() {
+  local emulator_package_xml platform_tools_package_xml system_image_package_xml
+  emulator_package_xml="${ANDROID_HOME}/emulator/package.xml"
+  platform_tools_package_xml="${ANDROID_HOME}/platform-tools/package.xml"
+  system_image_package_xml="$(avd_system_image_dir 2>/dev/null || true)/package.xml"
+
+  echo "DC API host identity: androidHome=${ANDROID_HOME:-<unset>}"
+  echo "DC API host identity: emulatorBinary=$(android_emulator_binary_version) emulatorPackageRevision=$(package_revision "$emulator_package_xml" || true)"
+  echo "DC API host identity: adbBinary=$(android_platform_tools_version) platformToolsPackageRevision=$(package_revision "$platform_tools_package_xml" || true)"
+  echo "DC API host identity: systemImagePackage=${DC_API_SYSTEM_IMAGE_PACKAGE} systemImageRevision=$(package_revision "$system_image_package_xml" || true)"
+  echo "DC API host identity: avdDir=$DC_API_AVD_DIR configImageSysdir=$(avd_config_value image.sysdir.1 || true) ram=$(avd_config_value hw.ramSize || true) cpuCores=$(avd_config_value hw.cpu.ncore || true)"
+}
 
 adb_cmd() {
   if [[ -n "$ANDROID_SERIAL" ]]; then
@@ -70,6 +180,104 @@ gms_version_identity() {
   printf '%s|%s\n' "$version" "$code"
 }
 
+android_dc_api_manifest_value() {
+  local key="$1"
+  [[ -f "$DC_API_BASELINE_MANIFEST" ]] || return 1
+  sed -n -E "s/^${key}=(.*)$/\1/p" "$DC_API_BASELINE_MANIFEST" | tail -n 1
+}
+
+android_dc_api_manifest_current_values() {
+  local image_dir image_package_xml
+  image_dir="$(avd_system_image_dir || true)"
+  image_package_xml="${image_dir:+$image_dir/package.xml}"
+
+  printf 'schema=%s\n' "$DC_API_BASELINE_SCHEMA"
+  printf 'avd_name=%s\n' "$DC_API_AVD_NAME"
+  printf 'emulator_binary_version=%s\n' "$(android_emulator_binary_version)"
+  printf 'emulator_package_revision=%s\n' "$(package_revision "${ANDROID_HOME}/emulator/package.xml" || true)"
+  printf 'platform_tools_version=%s\n' "$(android_platform_tools_version)"
+  printf 'platform_tools_package_revision=%s\n' "$(package_revision "${ANDROID_HOME}/platform-tools/package.xml" || true)"
+  printf 'system_image_package=%s\n' "$DC_API_SYSTEM_IMAGE_PACKAGE"
+  printf 'system_image_revision=%s\n' "$(package_revision "$image_package_xml" || true)"
+  printf 'avd_image_sysdir=%s\n' "$(avd_config_value image.sysdir.1 || true)"
+  printf 'avd_ram=%s\n' "$(avd_config_value hw.ramSize || true)"
+  printf 'avd_cpu_cores=%s\n' "$(avd_config_value hw.cpu.ncore || true)"
+  printf 'avd_gpu_mode=%s\n' "$(avd_config_value hw.gpu.mode || true)"
+  printf 'device_api=%s\n' "$(android_device_property ro.build.version.sdk)"
+  printf 'device_release=%s\n' "$(android_device_property ro.build.version.release)"
+  printf 'device_build_id=%s\n' "$(android_device_property ro.build.id)"
+  printf 'device_incremental=%s\n' "$(android_device_property ro.build.version.incremental)"
+  printf 'device_fingerprint=%s\n' "$(android_device_property ro.build.fingerprint)"
+  printf 'device_page_size=%s\n' "$(android_device_page_size)"
+  printf 'gms_version=%s\n' "$(gms_version_name)"
+  printf 'gms_version_code=%s\n' "$(gms_version_code)"
+  printf 'gms_apk_path=%s\n' "$(gms_apk_path)"
+  printf 'script_configure_sha256=%s\n' "$(script_sha256 "$DC_API_SCRIPT_DIR/configure-android-device-phase.sh")"
+  printf 'script_device_sha256=%s\n' "$(script_sha256 "$DC_API_SCRIPT_DIR/prepare-android-dc-api-device.sh")"
+  printf 'script_avd_sha256=%s\n' "$(script_sha256 "$DC_API_SCRIPT_DIR/prepare-android-dc-api-avd.sh")"
+}
+
+write_android_dc_api_baseline_manifest() {
+  [[ -d "$DC_API_AVD_DIR" ]] || {
+    echo "::error::Cannot write DC API baseline: AVD directory is missing: $DC_API_AVD_DIR" >&2
+    return 1
+  }
+
+  log_android_dc_api_host_identity
+  local temporary_manifest="$DC_API_BASELINE_MANIFEST.tmp.$$"
+  android_dc_api_manifest_current_values > "$temporary_manifest"
+  mv "$temporary_manifest" "$DC_API_BASELINE_MANIFEST"
+  echo "DC API baseline manifest: wrote $DC_API_BASELINE_MANIFEST"
+  cat "$DC_API_BASELINE_MANIFEST"
+}
+
+assert_android_dc_api_baseline_manifest() {
+  if [[ ! -f "$DC_API_BASELINE_MANIFEST" ]]; then
+    echo "::error::DC API AVD baseline manifest is missing: $DC_API_BASELINE_MANIFEST" >&2
+    log_android_dc_api_host_identity
+    log_android_dc_api_device_identity
+    return 1
+  fi
+
+  local expected actual key mismatch=0 current_values
+  current_values="$(android_dc_api_manifest_current_values)"
+  while IFS='=' read -r key expected; do
+    [[ -n "$key" ]] || continue
+    actual="$(sed -n -E "s/^${key}=(.*)$/\1/p" <<< "$current_values" | tail -n 1)"
+    if [[ "$expected" != "$actual" ]]; then
+      echo "::error::DC API AVD baseline mismatch: ${key} expected='${expected}' actual='${actual}'" >&2
+      mismatch=1
+    fi
+  done < "$DC_API_BASELINE_MANIFEST"
+
+  local declared_emulator declared_platform declared_image declared_image_sysdir
+  declared_emulator="$(sed -n -E 's/^emulator_package_revision=(.*)$/\1/p' <<< "$current_values")"
+  declared_platform="$(sed -n -E 's/^platform_tools_package_revision=(.*)$/\1/p' <<< "$current_values")"
+  declared_image="$(sed -n -E 's/^system_image_revision=(.*)$/\1/p' <<< "$current_values")"
+  declared_image_sysdir="$(sed -n -E 's/^avd_image_sysdir=(.*)$/\1/p' <<< "$current_values")"
+  if [[ "$declared_emulator" != "$DC_API_EMULATOR_PACKAGE_REVISION" ||
+    "$declared_platform" != "$DC_API_PLATFORM_TOOLS_REVISION" ||
+    "$declared_image" != "$DC_API_SYSTEM_IMAGE_REVISION"
+  ]]; then
+    echo "::error::DC API AVD baseline uses an unexpected SDK substrate: emulator=$declared_emulator platform-tools=$declared_platform system-image=$declared_image" >&2
+    echo "Expected: emulator=$DC_API_EMULATOR_PACKAGE_REVISION platform-tools=$DC_API_PLATFORM_TOOLS_REVISION system-image=$DC_API_SYSTEM_IMAGE_REVISION" >&2
+    mismatch=1
+  fi
+  if [[ "$declared_image_sysdir" != "$(expected_avd_system_image_sysdir)" ]]; then
+    echo "::error::DC API AVD baseline uses an unexpected system image path: actual=$declared_image_sysdir expected=$(expected_avd_system_image_sysdir)" >&2
+    mismatch=1
+  fi
+
+  if (( mismatch != 0 )); then
+    echo "DC API baseline manifest:" >&2
+    cat "$DC_API_BASELINE_MANIFEST" >&2
+    log_android_dc_api_host_identity
+    log_android_dc_api_device_identity
+    return 1
+  fi
+  echo "DC API baseline manifest: exact substrate/device/GMS identity match"
+}
+
 current_foreground_package() {
   adb_shell dumpsys activity activities 2>/dev/null |
     sed -n -E 's/.*(mResumedActivity|topResumedActivity|ResumedActivity)[=:].* u0 ([^/[:space:]]+)\/.*/\2/p' |
@@ -85,33 +293,27 @@ home_activity() {
 }
 
 log_android_dc_api_device_identity() {
-  local sdk release build fingerprint avd emulator_version emulator_package_xml home foreground gms_state
+  local sdk release build incremental fingerprint page_size avd emulator_version home foreground gms_state
+  log_android_dc_api_host_identity
   sdk="$(adb_shell getprop ro.build.version.sdk || true)"
   release="$(adb_shell getprop ro.build.version.release || true)"
   build="$(adb_shell getprop ro.build.id || true)"
+  incremental="$(adb_shell getprop ro.build.version.incremental || true)"
   fingerprint="$(adb_shell getprop ro.build.fingerprint || true)"
+  page_size="$(android_device_page_size)"
   avd="$(adb_cmd emu avd name 2>/dev/null | tr -d '\r' | head -n 1 || true)"
-  emulator_version="<unavailable>"
-  emulator_package_xml="${ANDROID_HOME:-}/emulator/package.xml"
-  if [[ -f "$emulator_package_xml" ]]; then
-    emulator_version="$(sed -n -E 's:.*<revision><major>([^<]+)</major><minor>([^<]+)</minor><micro>([^<]+)</micro></revision>.*:\1.\2.\3:p' "$emulator_package_xml" | head -n 1)"
-    if [[ -n "$emulator_version" ]]; then
-      emulator_version="package-revision=$emulator_version"
-    else
-      emulator_version="<unavailable>"
-    fi
-  fi
+  emulator_version="$(android_emulator_binary_version)"
   home="$(home_activity || true)"
   foreground="$(current_foreground_package || true)"
   gms_state="$(adb_shell cmd activity get-uid-state com.google.android.gms 2>/dev/null || true)"
 
   echo "DC API device identity: serial=${ANDROID_SERIAL:-<default>} avd=${avd:-<unknown>}"
   echo "DC API device identity: adbState=$(adb_cmd get-state 2>/dev/null || true) bootCompleted=$(adb_shell getprop sys.boot_completed || true)"
-  echo "DC API device identity: api=$sdk release=$release build=$build"
+  echo "DC API device identity: api=$sdk release=$release build=$build incremental=$incremental pageSize=$page_size"
   echo "DC API device identity: fingerprint=$fingerprint"
-  echo "DC API device identity: emulator=$emulator_version"
+  echo "DC API device identity: emulator=$emulator_version emulatorPackageRevision=$(package_revision "${ANDROID_HOME}/emulator/package.xml" || true) platformTools=$(android_platform_tools_version) systemImageRevision=$(package_revision "$(avd_system_image_dir 2>/dev/null || true)/package.xml" || true)"
   echo "DC API device identity: home=$home foreground=$foreground"
-  echo "DC API device identity: GMS version=$(gms_version_name || true) versionCode=$(gms_version_code || true) pid=$(gms_pid || true) uidState=$gms_state"
+  echo "DC API device identity: GMS version=$(gms_version_name || true) versionCode=$(gms_version_code || true) apk=$(gms_apk_path || true) pid=$(gms_pid || true) uidState=$gms_state"
 }
 
 assert_android_dc_api_launcher_health() {
@@ -352,6 +554,7 @@ validate_android_dc_api_device() {
     fi
     echo "DC API device validation: GMS identity=$identity stableFor=${stable_for_seconds}s"
     if (( stable_for_seconds >= GMS_STABILITY_SECONDS )); then
+      assert_android_dc_api_baseline_manifest
       record_gms_baseline "$identity" "$code"
       log_android_dc_api_device_identity
       assert_android_dc_api_launcher_health

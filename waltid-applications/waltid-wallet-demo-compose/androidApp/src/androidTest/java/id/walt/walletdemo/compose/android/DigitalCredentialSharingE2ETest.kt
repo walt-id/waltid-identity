@@ -102,6 +102,40 @@ class DigitalCredentialSharingE2ETest {
         runBlocking { assertSharedCredentialStateUnchanged() }
     }
 
+    /**
+     * A small platform gate before the protocol assertions: registration has to be visible to the
+     * platform and a real Digital Credentials request has to open Google's selector. The remaining
+     * tests then exercise the same selector through issuance, matching, review, and submission.
+     */
+    @Test
+    fun credentialManagerPlatformSmoke() = runBlocking {
+        val fixture = fixture()
+        val registration = wallet.refreshDigitalCredentialRegistration()
+        assertTrue(
+            "Credential Manager registration was unavailable in the platform smoke: ${registration.reason}",
+            registration.available,
+        )
+        assertTrue(
+            "Credential Manager registered no credentials in the platform smoke",
+            registration.registeredEntryCount > 0,
+        )
+
+        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
+        val session = DemoTestBackend.createDcApiVerifierSession(
+            scenario = scenario,
+            expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
+        )
+        val request = fixture.startCredentialRequest(session.requestJson)
+        try {
+            assertNotNull(
+                "Credential Manager selector did not open for a real DC API request",
+                fixture.device.wait(Until.findObject(By.pkg(CREDENTIAL_SELECTOR_PACKAGE)), UI_ELEMENT_TIMEOUT),
+            )
+        } finally {
+            request.abandon()
+        }
+    }
+
     @After
     fun cleanupTest() {
         val fixture = fixture()

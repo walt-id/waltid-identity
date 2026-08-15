@@ -30,8 +30,11 @@ case "$phase" in
     # Dedicated Play Store lane for the class-level GMS-gated sharing E2Es.
     dc_api_test_classes="id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest"
     script="ANDROID_TEST_CLASS=$dc_api_test_classes ./waltid-identity/.github/scripts/mobile-ci/run-android-dc-api-compose-tests.sh"
-    emulator_options="-no-window -gpu auto -noaudio -no-boot-anim -camera-back none -memory 4096 -feature GLDirectMem,HasSharedSlotsHostMemoryAllocator"
-    emulator_test_options="$emulator_options -no-snapshot-save"
+    # The cached artifact is the configured userdata disk, not a Quick Boot state. Always cold-boot
+    # it so the first process/ADB/GMS state is recreated for every job and never restored from a
+    # potentially poisoned host snapshot.
+    emulator_options="-no-snapshot -no-snapshot-save -no-window -gpu auto -noaudio -no-boot-anim -camera-back none -memory 4096 -feature GLDirectMem,HasSharedSlotsHostMemoryAllocator"
+    emulator_test_options="$emulator_options"
     emulator_avd_name="dc-api-api37-pixel7-playstore"
     report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**/*.xml"
     artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**'
