@@ -8,64 +8,177 @@ import androidx.credentials.ExperimentalDigitalCredentialApi
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
 import androidx.credentials.GetDigitalCredentialOption
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+
+internal const val EXTRA_REQUEST_ID = "id.walt.walletdemo.compose.android.extra.REQUEST_ID"
+internal const val EXTRA_REQUEST_JSON = "id.walt.walletdemo.compose.android.extra.REQUEST_JSON"
 
 /** Debug-only native verifier used by the Digital Credentials instrumentation E2E. */
 @OptIn(ExperimentalDigitalCredentialApi::class)
 class DigitalCredentialTestVerifierActivity : ComponentActivity() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var requestId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        scope.launch {
-            val result = runCatching {
-                CredentialManager.create(this@DigitalCredentialTestVerifierActivity).getCredential(
-                    context = this@DigitalCredentialTestVerifierActivity,
-                    request = GetCredentialRequest(
-                        credentialOptions = listOf(GetDigitalCredentialOption(DigitalCredentialTestVerifier.requestJson)),
+        val requestId = intent.getStringExtra(EXTRA_REQUEST_ID)
+        val requestJson = intent.getStringExtra(EXTRA_REQUEST_JSON)
+        if (requestId == null || requestJson == null) {
+            Log.e("DigitalCredentialE2E", "Verifier Activity was launched without a request handle")
+            finish()
+            return
+        }
+        this.requestId = requestId
+
+        val request = DigitalCredentialTestVerifier.attach(requestId, this)
+        if (request == null) {
+            Log.e("DigitalCredentialE2E", "Verifier Activity was launched for an unknown request: $requestId")
+            finish()
+            return
+        }
+
+        val operation = lifecycleScope.launch {
+            val result = try {
+                Result.success(
+                    CredentialManager.create(this@DigitalCredentialTestVerifierActivity).getCredential(
+                        context = this@DigitalCredentialTestVerifierActivity,
+                        request = GetCredentialRequest(
+                            credentialOptions = listOf(GetDigitalCredentialOption(requestJson)),
+                        ),
                     ),
                 )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                Result.failure(e)
             }
             result.exceptionOrNull()?.let { Log.e("DigitalCredentialE2E", "Credential Manager request failed", it) }
-            DigitalCredentialTestVerifier.complete(result)
+            DigitalCredentialTestVerifier.complete(requestId, result)
             finish()
         }
+        request.attachOperation(operation)
+    }
+
+    override fun onDestroy() {
+        requestId?.let(DigitalCredentialTestVerifier::onActivityDestroyed)
+        super.onDestroy()
     }
 }
 
-/**
- * Test-side handoff for [DigitalCredentialTestVerifierActivity].
- *
- * The request is injected rather than hardcoded: the nonce must be the one a real verifier issued,
- * otherwise nothing about the response can be verified.
- */
+/** Test-side handoff for [DigitalCredentialTestVerifierActivity]. */
+internal class DigitalCredentialRequestHandle internal constructor(
+    val id: String,
+    private val deferred: CompletableDeferred<Result<GetCredentialResponse>>,
+) {
+    private val destroyed = CompletableDeferred<Unit>()
+
+    @Volatile
+    private var completedResult: Result<GetCredentialResponse>? = null
+
+    @Volatile
+    private var callerActivity: DigitalCredentialTestVerifierActivity? = null
+
+    @Volatile
+    private var operation: Job? = null
+
+    @Volatile
+    private var abandonRequested = false
+
+    val isComplete: Boolean
+        get() = deferred.isCompleted
+
+    internal fun complete(value: Result<GetCredentialResponse>) {
+        completedResult = value
+        deferred.complete(value)
+    }
+
+    internal fun completedResult(): Result<GetCredentialResponse>? = completedResult
+
+    @Synchronized
+    internal fun abandonRequest(): Boolean {
+        abandonRequested = true
+        operation?.cancel()
+        callerActivity?.let { activity ->
+            activity.runOnUiThread { activity.finish() }
+        }
+        deferred.cancel()
+        if (callerActivity == null) {
+            destroyed.complete(Unit)
+            return true
+        }
+        return false
+    }
+
+    @Synchronized
+    internal fun attachCaller(activity: DigitalCredentialTestVerifierActivity): Boolean {
+        if (abandonRequested) {
+            destroyed.complete(Unit)
+            return false
+        }
+        callerActivity = activity
+        return true
+    }
+
+    @Synchronized
+    internal fun attachOperation(operation: Job) {
+        this.operation = operation
+        if (abandonRequested) operation.cancel()
+    }
+
+    @Synchronized
+    internal fun markDestroyed() {
+        callerActivity = null
+        operation = null
+        destroyed.complete(Unit)
+    }
+
+    suspend fun await(): Result<GetCredentialResponse> = deferred.await()
+
+    suspend fun awaitSettled() {
+        destroyed.await()
+    }
+
+    fun abandon() {
+        DigitalCredentialTestVerifier.abandon(id)
+    }
+}
+
 internal object DigitalCredentialTestVerifier {
-    private var result = CompletableDeferred<Result<GetCredentialResponse>>()
+    private val requests = ConcurrentHashMap<String, DigitalCredentialRequestHandle>()
 
-    lateinit var requestJson: String
-        private set
-
-    fun reset(requestJson: String) {
-        result = CompletableDeferred()
-        this.requestJson = requestJson
+    fun prepare(): DigitalCredentialRequestHandle {
+        val id = UUID.randomUUID().toString()
+        val handle = DigitalCredentialRequestHandle(id, CompletableDeferred())
+        check(requests.putIfAbsent(id, handle) == null) { "Duplicate Digital Credentials request id $id" }
+        return handle
     }
 
-    fun complete(value: Result<GetCredentialResponse>) {
-        result.complete(value)
+    fun attach(requestId: String, activity: DigitalCredentialTestVerifierActivity): DigitalCredentialRequestHandle? =
+        requests.computeIfPresent(requestId) { _, request ->
+            request.takeIf { it.attachCaller(activity) }
+        }
+
+    fun complete(requestId: String, value: Result<GetCredentialResponse>) {
+        requests[requestId]?.complete(value)
     }
 
-    suspend fun await(): Result<GetCredentialResponse> = result.await()
+    fun abandon(requestId: String) {
+        requests.computeIfPresent(requestId) { _, request ->
+            request.takeIf { !it.abandonRequest() }
+        }
+    }
 
-    /**
-     * Whether Credential Manager has already resolved the request, either way.
-     *
-     * The absence of a result is itself an outcome to assert: a provider that leaves the request
-     * unanswered lets the platform offer it elsewhere, which is indistinguishable from a cancellation
-     * unless it can be checked without waiting for one.
-     */
-    fun isComplete(): Boolean = result.isCompleted
+    fun onActivityDestroyed(requestId: String) {
+        requests.computeIfPresent(requestId) { _, request ->
+            request.markDestroyed()
+            null
+        }
+    }
+
+    fun activeRequestCount(): Int = requests.size
 }
