@@ -922,21 +922,21 @@ class CredentialDisplayNormalizerTest {
                     type = "org.waltid.transaction-data.payment-authorization",
                     displayName = "Payment Authorization",
                     credentialQueryIds = listOf("pid", "payment"),
-                    supportedFields = listOf("amount", "currency", "payee"),
+                    supportedFields = listOf("merchant_name", "amount", "currency"),
                     detailsJson = """
                         {
+                          "merchant_name": "ACME Corp",
                           "amount": "42.00",
-                          "currency": "EUR",
-                          "payee": "ACME Corp"
+                          "currency": "EUR"
                         }
                     """.trimIndent(),
                     rawJson = """
                         {
                           "type": "org.waltid.transaction-data.payment-authorization",
                           "credential_ids": ["pid", "payment"],
+                          "merchant_name": "ACME Corp",
                           "amount": "42.00",
-                          "currency": "EUR",
-                          "payee": "ACME Corp"
+                          "currency": "EUR"
                         }
                     """.trimIndent(),
                 )
@@ -953,14 +953,14 @@ class CredentialDisplayNormalizerTest {
 
         assertEquals("Payment Authorization", payment.title)
         assertEquals(
-            listOf("Amount", "Currency", "Payee"),
+            listOf("Merchant name", "Amount", "Currency"),
             payment.items.take(3).map { it.label },
         )
         assertEquals("org.waltid.transaction-data.payment-authorization", labelsToValues["Type"])
         assertEquals("pid, payment", labelsToValues["Credential queries"])
+        assertEquals("ACME Corp", labelsToValues["Merchant name"])
         assertEquals("42.00", labelsToValues["Amount"])
         assertEquals("EUR", labelsToValues["Currency"])
-        assertEquals("ACME Corp", labelsToValues["Payee"])
     }
 
     @Test
