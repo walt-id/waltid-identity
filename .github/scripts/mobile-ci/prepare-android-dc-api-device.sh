@@ -62,10 +62,35 @@ script_sha256() {
   sha256sum "$script" | awk '{print $1}'
 }
 
+avd_config_file() {
+  if [[ -f "$DC_API_AVD_DIR/config.ini" ]]; then
+    printf '%s\n' "$DC_API_AVD_DIR/config.ini"
+    return 0
+  fi
+
+  [[ -d "$DC_API_AVD_ROOT" ]] || return 1
+  find "$DC_API_AVD_ROOT" -maxdepth 2 -type f \
+    -path "*/${DC_API_AVD_NAME}.avd/config.ini" -print -quit
+}
+
 avd_config_value() {
   local key="$1"
-  [[ -f "$DC_API_AVD_DIR/config.ini" ]] || return 1
-  sed -n -E "s/^${key}=(.*)$/\1/p" "$DC_API_AVD_DIR/config.ini" | tail -n 1
+  local config_file
+  config_file="$(avd_config_file || true)"
+  [[ -n "$config_file" ]] || return 1
+
+  awk -F= -v expected_key="$key" '
+    $1 == expected_key {
+      value = $0
+      sub(/^[^=]*=/, "", value)
+      sub(/\r$/, "", value)
+      print value
+      found = 1
+    }
+    END {
+      if (!found) exit 1
+    }
+  ' "$config_file" | tail -n 1
 }
 
 avd_system_image_dir() {
@@ -118,7 +143,7 @@ log_android_dc_api_host_identity() {
   echo "DC API host identity: emulatorBinary=$(android_emulator_binary_version) emulatorPackageRevision=$(package_revision "$emulator_package_xml" || true)"
   echo "DC API host identity: adbBinary=$(android_platform_tools_version) platformToolsPackageRevision=$(package_revision "$platform_tools_package_xml" || true)"
   echo "DC API host identity: systemImagePackage=${DC_API_SYSTEM_IMAGE_PACKAGE} systemImageRevision=$(package_revision "$system_image_package_xml" || true)"
-  echo "DC API host identity: avdDir=$DC_API_AVD_DIR configImageSysdir=$(avd_config_value image.sysdir.1 || true) ram=$(avd_config_value hw.ramSize || true) cpuCores=$(avd_config_value hw.cpu.ncore || true)"
+  echo "DC API host identity: avdDir=$DC_API_AVD_DIR configFile=$(avd_config_file || printf '<missing>') configImageSysdir=$(avd_config_value image.sysdir.1 || true) ram=$(avd_config_value hw.ramSize || true) cpuCores=$(avd_config_value hw.cpu.ncore || true)"
 }
 
 adb_cmd() {
