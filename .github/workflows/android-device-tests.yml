@@ -57,12 +57,15 @@ jobs:
         id: dc-api-avd-cache
         uses: actions/cache/restore@v4
         with:
-          # Cache only the configured AVD disk. The key is deliberately explicit about the complete
-          # emulator substrate; the manifest written during preparation verifies the same values on
-          # every consumer job. No adb host state or Quick Boot snapshot is reusable across jobs.
+          # Cache the configured AVD disk plus the host ADB key pair that authorizes it. The restored
+          # userdata contains that key in its adbd authorization list; omitting the matching host key
+          # makes a cross-runner cache boot as `unauthorized`. This excludes the ADB daemon/device
+          # runtime state (`adb*.log`, sockets, server state) and no Quick Boot snapshot is reused.
           path: |
             ~/.android/avd/*
-          key: dc-api-avd-v2-${{ runner.os }}-api37-x86_64-pixel7-playstore_ps16k-emulator-37.1.11-platform-tools-37.0.1-system-image-6.5.11-${{ hashFiles('waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
+            ~/.android/adbkey
+            ~/.android/adbkey.pub
+          key: dc-api-avd-v3-adb-auth-${{ runner.os }}-api37-x86_64-pixel7-playstore_ps16k-emulator-37.1.11-platform-tools-37.0.1-system-image-6.5.11-${{ hashFiles('waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
 
       - name: Report DC API AVD cache state
         if: matrix.phase == 'dc-api-compose'
@@ -126,7 +129,9 @@ jobs:
         with:
           path: |
             ~/.android/avd/*
-          key: dc-api-avd-v2-${{ runner.os }}-api37-x86_64-pixel7-playstore_ps16k-emulator-37.1.11-platform-tools-37.0.1-system-image-6.5.11-${{ hashFiles('waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
+            ~/.android/adbkey
+            ~/.android/adbkey.pub
+          key: dc-api-avd-v3-adb-auth-${{ runner.os }}-api37-x86_64-pixel7-playstore_ps16k-emulator-37.1.11-platform-tools-37.0.1-system-image-6.5.11-${{ hashFiles('waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
 
       - name: Run Android device tests
         if: matrix.phase != 'dc-api-compose'
