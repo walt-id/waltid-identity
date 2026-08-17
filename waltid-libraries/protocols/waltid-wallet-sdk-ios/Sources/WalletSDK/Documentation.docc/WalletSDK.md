@@ -17,7 +17,13 @@ let wallet = try await Wallet(
 )
 
 let bootstrap = try await wallet.bootstrap(didMethod: "key")
-let credentialIDs = try await wallet.receive(offer: credentialOfferURL)
+let session = try await wallet.startIssuance(
+    IssuanceRequest(
+        offer: credentialOfferURL,
+        redirectURI: URL(string: "openid://")!
+    )
+)
+let outcome = try await wallet.continuePreAuthorizedIssuance(sessionID: session.id)
 let credentials = try await wallet.credentials()
 let presentation = try await wallet.present(
     request: authorizationRequestURL,

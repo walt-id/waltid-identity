@@ -249,7 +249,7 @@ The wrapper also enables strict result checking, the static transaction code,
 browser automation, Jane's test credentials, and Playwright installation.
 
 On success, inspect the suite at `https://localhost.emobix.co.uk:8443` and the
-matrix reports under `build/reports/openid4vci-issuer-matrix`.
+matrix reports under `build/reports/openid-conformance/vci-issuer`.
 
 ### Change the Selection
 
@@ -436,7 +436,8 @@ also run the dedicated FAPI module group.
 
 ## Results and Selection Controls
 
-The runner writes artifacts to `build/reports/openid4vci-issuer-matrix`:
+The runner writes artifacts to `build/reports/openid-conformance/vci-issuer`
+(override with `OPENID4VCI_CONFORMANCE_REPORT_DIR`):
 
 ```text
 matrix.json
@@ -444,6 +445,10 @@ results.json
 summary.md
 ```
 
+CI publishes these summaries into the GitHub Actions job summary. Soft-fail is
+controlled by `CONFORMANCE_ALLOW_FAILURE` (see the module
+[README](../README.md#ci-summaries-and-soft-fail)); locally you can still use
+`OPENID4VCI_CONFORMANCE_STRICT=false` for exploration.
 Result states have these meanings:
 
 - `generated`: variant was generated but not executed, usually discovery-only mode

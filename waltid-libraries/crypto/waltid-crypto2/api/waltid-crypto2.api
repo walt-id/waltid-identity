@@ -576,6 +576,8 @@ public final class id/walt/crypto2/hpke/Hpke {
 	public static synthetic fun openBase$default (Lid/walt/crypto2/hpke/Hpke;Lid/walt/crypto2/keys/Key;Lid/walt/crypto2/keys/HpkeCiphertext;[B[BLdev/whyoleg/cryptography/CryptographyProvider;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun sealBase (Lid/walt/crypto2/keys/EncodedKey$Jwk;[B[B[BLdev/whyoleg/cryptography/CryptographyProvider;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun sealBase$default (Lid/walt/crypto2/hpke/Hpke;Lid/walt/crypto2/keys/EncodedKey$Jwk;[B[B[BLdev/whyoleg/cryptography/CryptographyProvider;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun validateRecipientPublicKey (Lid/walt/crypto2/keys/EncodedKey$Jwk;Ldev/whyoleg/cryptography/CryptographyProvider;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun validateRecipientPublicKey$default (Lid/walt/crypto2/hpke/Hpke;Lid/walt/crypto2/keys/EncodedKey$Jwk;Ldev/whyoleg/cryptography/CryptographyProvider;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class id/walt/crypto2/keys/AeadCiphertext {
@@ -2165,7 +2167,7 @@ public final class id/walt/crypto2/providers/cryptography/CryptographySoftwareKe
 public final class id/walt/crypto2/providers/cryptography/CryptographySoftwareKeyProvider$Companion {
 }
 
-public final class id/walt/crypto2/providers/cryptography/DefaultSoftwareKeyProviders_jvmKt {
+public final class id/walt/crypto2/providers/cryptography/DefaultSoftwareKeyProvidersKt {
 	public static final fun defaultSoftwareKeyProviders ()Ljava/util/List;
 }
 

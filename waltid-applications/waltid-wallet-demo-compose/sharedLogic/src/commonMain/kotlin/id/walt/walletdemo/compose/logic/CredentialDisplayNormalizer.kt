@@ -23,15 +23,17 @@ object CredentialDisplayNormalizer {
     private val valueDecoder = CredentialDisplayValueDecoder(json) { element, path -> element.toDisplayValue(path) }
 
     fun toDetails(summary: CredentialSummary): CredentialDetails {
+        val issuerDisplay = StoredCredentialMetadataParser.issuerDisplay(summary.metadataJson)
         val rawJson = summary.credentialDataJson?.trim().orEmpty()
         if (rawJson.isBlank()) {
-            return CredentialDetails(summary = summary, groups = emptyList())
+            return CredentialDetails(summary = summary, groups = emptyList(), issuerDisplay = issuerDisplay)
         }
 
         val parsed = runCatching { json.parseToJsonElement(rawJson).jsonObject }.getOrNull()
             ?: return CredentialDetails(
                 summary = summary,
                 groups = emptyList(),
+                issuerDisplay = issuerDisplay,
             )
         val displayData = if (summary.format == MdocFormat) parsed.withoutNullObjectMembers() else parsed
 
@@ -60,6 +62,7 @@ object CredentialDisplayNormalizer {
         return CredentialDetails(
             summary = summary,
             groups = groupedItems,
+            issuerDisplay = issuerDisplay,
         )
     }
 
@@ -266,10 +269,21 @@ object CredentialDisplayNormalizer {
                 ) {
                     listOf(rows.single().copy(item = rows.single().item.copy(label = item.label)))
                 } else {
-                    rows
+                    rows.map { row -> row.qualifiedWithParentLabel(parentPath = path, parentLabel = item.label) }
                 }
             }
             else -> item.flattenDisplayObjectForClaimRows()
+        }
+
+    /**
+     * Nested leaves such as `payee.name` say nothing on their own, so transaction data rows inherit
+     * the label of the object they came from.
+     */
+    private fun ClaimRow.qualifiedWithParentLabel(parentPath: ClaimPath, parentLabel: String): ClaimRow =
+        if (CredentialDisplayVocabulary.qualifiesNestedClaimLabels(parentPath)) {
+            copy(item = item.copy(label = CredentialDisplayVocabulary.qualifiedClaimLabel(parentLabel, item.label)))
+        } else {
+            this
         }
 
     private fun ClaimItem.flattenDisplayObjectForClaimRows(): List<ClaimRow> =

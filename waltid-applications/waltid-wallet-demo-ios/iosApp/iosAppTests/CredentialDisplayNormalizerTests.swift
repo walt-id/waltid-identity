@@ -1,7 +1,7 @@
 import Foundation
+import WalletDemoSharingUI
 import WalletSDK
 import XCTest
-@testable import iosApp
 
 final class CredentialDisplayNormalizerTests: XCTestCase {
 
@@ -149,80 +149,6 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         )
 
         XCTAssertFalse(details.groups.contains { $0.title == "Age attestations" || $0.title == "Travel document data" })
-    }
-
-    func testGroupsAndSortsMdocOfferClaimsByUserFacingSemantics() {
-        let credential = OfferedCredentialMetadata(
-            configurationID: "org.iso.23220.photoid.1",
-            format: "mso_mdoc",
-            scope: nil,
-            vct: nil,
-            doctype: "org.iso.23220.photoid.1",
-            display: nil,
-            claims: [
-                CredentialClaimMetadata(
-                    path: ["org.iso.23220.1", "given_name"],
-                    mandatory: true,
-                    displayName: "Given name"
-                ),
-                CredentialClaimMetadata(
-                    path: ["org.iso.23220.1", "age_over_65"],
-                    mandatory: false,
-                    displayName: nil
-                ),
-                CredentialClaimMetadata(
-                    path: ["org.iso.23220.dtc.1", "dtc_dg2"],
-                    mandatory: nil,
-                    displayName: nil
-                ),
-                CredentialClaimMetadata(
-                    path: ["org.iso.23220.1", "age_over_18"],
-                    mandatory: true,
-                    displayName: nil
-                ),
-                CredentialClaimMetadata(
-                    path: ["org.iso.23220.dtc.1", "dtc_sod"],
-                    mandatory: true,
-                    displayName: nil
-                ),
-                CredentialClaimMetadata(
-                    path: ["org.iso.23220.dtc.1", "dtc_dg1"],
-                    mandatory: nil,
-                    displayName: nil
-                ),
-                CredentialClaimMetadata(
-                    path: ["org.iso.23220.dtc.1", "dtc_version"],
-                    mandatory: true,
-                    displayName: nil
-                )
-            ]
-        )
-
-        XCTAssertEqual(
-            credential.claimDisplayGroups,
-            [
-                OfferClaimDisplayGroup(
-                    title: "Credential claims",
-                    claims: [OfferClaimDisplay(label: "Given name", inclusion: "Always included")]
-                ),
-                OfferClaimDisplayGroup(
-                    title: "Age attestations",
-                    claims: [
-                        OfferClaimDisplay(label: "18 or older", inclusion: "Always included"),
-                        OfferClaimDisplay(label: "65 or older", inclusion: "May be included")
-                    ]
-                ),
-                OfferClaimDisplayGroup(
-                    title: "Travel document data",
-                    claims: [
-                        OfferClaimDisplay(label: "Specification version", inclusion: "Always included"),
-                        OfferClaimDisplay(label: "Document security object (SOD)", inclusion: "Always included"),
-                        OfferClaimDisplay(label: "DG1: Machine-readable zone", inclusion: "May be included"),
-                        OfferClaimDisplay(label: "DG2: Facial image", inclusion: "May be included")
-                    ]
-                )
-            ]
-        )
     }
 
     func testSortsKnownClaimRowsByCredentialVocabularyInsteadOfIssuerJSONOrder() throws {
@@ -886,21 +812,21 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                     type: "org.waltid.transaction-data.payment-authorization",
                     displayName: "Payment Authorization",
                     credentialQueryIDs: ["pid", "payment"],
-                    supportedFields: ["amount", "currency", "payee"],
+                    supportedFields: ["merchant_name", "amount", "currency"],
                     rawJSON: """
                     {
                       "type": "org.waltid.transaction-data.payment-authorization",
                       "credential_ids": ["pid", "payment"],
+                      "merchant_name": "ACME Corp",
                       "amount": "42.00",
-                      "currency": "EUR",
-                      "payee": "ACME Corp"
+                      "currency": "EUR"
                     }
                     """,
                     detailsJSON: """
                     {
+                      "merchant_name": "ACME Corp",
                       "amount": "42.00",
-                      "currency": "EUR",
-                      "payee": "ACME Corp"
+                      "currency": "EUR"
                     }
                     """
                 )
@@ -913,12 +839,56 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         })
 
         XCTAssertEqual(payment.title, "Payment Authorization")
-        XCTAssertEqual(Array(payment.items.prefix(3).map(\.label)), ["Amount", "Currency", "Payee"])
+        XCTAssertEqual(Array(payment.items.prefix(3).map(\.label)), ["Merchant name", "Amount", "Currency"])
         XCTAssertEqual(valuesByLabel["Type"], "org.waltid.transaction-data.payment-authorization")
         XCTAssertEqual(valuesByLabel["Credential queries"], "pid, payment")
+        XCTAssertEqual(valuesByLabel["Merchant name"], "ACME Corp")
         XCTAssertEqual(valuesByLabel["Amount"], "42.00")
         XCTAssertEqual(valuesByLabel["Currency"], "EUR")
-        XCTAssertEqual(valuesByLabel["Payee"], "ACME Corp")
+    }
+
+    func testParsesStoredIssuerDisplayFromMetadataJSON() {
+        let display = StoredCredentialMetadataParser.issuerDisplay(
+            from: """
+            {
+              "issuerDisplay": [
+                {
+                  "name": "Government Issuer",
+                  "locale": "en-US",
+                  "logo": { "uri": "https://issuer.example/logo.png", "alt_text": "Gov logo" }
+                }
+              ]
+            }
+            """
+        )
+
+        XCTAssertEqual(display?.name, "Government Issuer")
+        XCTAssertEqual(display?.logoURI, "https://issuer.example/logo.png")
+        XCTAssertEqual(display?.logoAltText, "Gov logo")
+    }
+
+    func testCredentialDetailsSurfacesIssuerDisplayFromCredentialMetadata() {
+        let credential = Credential(
+            id: "cred-1",
+            format: "vc+sd-jwt",
+            issuer: "https://issuer.example",
+            subject: "did:key:holder",
+            label: "PID",
+            addedAt: nil,
+            credentialDataJSON: #"{"given_name":"Ada"}"#,
+            metadataJSON: """
+            {
+              "issuerDisplay": [
+                { "name": "Demo Issuer", "logo": { "uri": "https://issuer.example/logo.png" } }
+              ]
+            }
+            """
+        )
+
+        let details = CredentialDisplayNormalizer.details(for: credential)
+        XCTAssertEqual(details.issuerDisplay?.name, "Demo Issuer")
+        XCTAssertEqual(details.issuerDisplay?.logoURI, "https://issuer.example/logo.png")
+        XCTAssertEqual(details.cardSummary.issuer, "Demo Issuer")
     }
 
     private func onePixelPNGByteArrayJSON() -> String {

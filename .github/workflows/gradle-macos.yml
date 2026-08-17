@@ -10,6 +10,7 @@ on:
         required: false
         default: ''
 
+# Pinned to the gradle-ios revision validated by this workflow.
 env:
   XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
   IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=latest
@@ -20,7 +21,7 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
@@ -30,7 +31,7 @@ jobs:
 
       - name: Compile iOS targets and run Kotlin iOS simulator tests
         timeout-minutes: 40
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@6586fd276e3631e06162f72c0897bef404d3150c
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
@@ -48,7 +49,7 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
@@ -57,8 +58,10 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
 
       - name: Build WalletCore and run native iOS demo tests
-        timeout-minutes: 35
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@c95b601fc5095d5668eb8c906af992d8e00ed513
+        # Same XCFramework cost as the Compose job; this one already used 29 of its previous 35 min,
+        # so a cold cache left no margin.
+        timeout-minutes: 65
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@6586fd276e3631e06162f72c0897bef404d3150c
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
@@ -67,6 +70,7 @@ jobs:
           run-ios-simulator-tests: 'false'
           run-wallet-core-xcframework: 'true'
           run-native-demo-tests: 'true'
+          run-native-identity-document-provider-checks: 'true'
           run-compose-demo-tests: 'false'
           test-report-job-name: ${{ env.JOB_NAME_PREFIX }}wallet-core-native-ios-demo-tests
           test-report-check-name: Native iOS Demo Test Report
@@ -76,7 +80,7 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
@@ -85,17 +89,22 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
 
       - name: Run Compose iOS demo tests
-        timeout-minutes: 40
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@c95b601fc5095d5668eb8c906af992d8e00ed513
+        # Assembling WalletCore costs ~27 min on a cold Konan cache and the demo's own tests ~11 min,
+        # so the previous 40 min was below the job's actual work now that it needs the XCFramework.
+        timeout-minutes: 65
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@6586fd276e3631e06162f72c0897bef404d3150c
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
           simulator-destination: ${{ env.IOS_SIMULATOR_DESTINATION }}
           run-compile-smoke: 'false'
           run-ios-simulator-tests: 'false'
-          run-wallet-core-xcframework: 'false'
+          # The Compose demo embeds a document-provider extension that links WalletSDK, so this job
+          # needs the local WalletCore binary target the same way the native demo job does.
+          run-wallet-core-xcframework: 'true'
           run-native-demo-tests: 'false'
           run-compose-demo-tests: 'true'
+          run-compose-identity-document-provider-checks: 'true'
           test-report-job-name: ${{ env.JOB_NAME_PREFIX }}compose-ios-demo-tests
           test-report-check-name: Compose iOS Demo Test Report
           test-report-require-tests: 'false'
@@ -105,7 +114,7 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}

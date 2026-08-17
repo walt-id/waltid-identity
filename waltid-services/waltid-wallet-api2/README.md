@@ -285,7 +285,7 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive \
 #### Step-by-step (isolated steps)
 
 ```bash
-# Step 1: Resolve the offer - returns issuer, token endpoint, offered credentials, grant type
+# Step 1: Resolve the offer - returns grant/endpoints plus issuer display and offered-credential metadata
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/resolve-offer \
   -H "Content-Type: application/json" \
   -d "{\"offerUrl\":\"$OFFER_URL\"}"
@@ -436,6 +436,7 @@ All configuration files live in `config/` and are loaded automatically at startu
 | File                       | Purpose                                                       |
 |----------------------------|---------------------------------------------------------------|
 | `_features.conf`           | Feature flags: `auth`, `wallet2-persistence`, `dev-mode`      |
+| `dev-mode.conf`            | Development-mode settings, including DID Web HTTP resolver support |
 | `wallet-service.conf`      | `publicBaseUrl` - the external URL of this service (required) |
 | `wallet2-persistence.conf` | JDBC URL + driver for SQLite or Postgres                      |
 | `web.conf`                 | `webHost` + `webPort` (default `0.0.0.0:7005`)                |

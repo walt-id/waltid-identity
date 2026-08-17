@@ -6,6 +6,9 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.openid4vci.offers.AuthenticationMethod
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -71,6 +74,27 @@ class ConfiguredIssuanceSessionRepositoryTest {
 
             repository.remove(session.sessionId)
 
+            assertNull(repository.get(session.sessionId))
+        } finally {
+            repository.remove(session.sessionId)
+        }
+    }
+
+    @Test
+    fun concurrentTakeReturnsSessionOnce() = runTest {
+        val repository = ConfiguredIssuanceSessionRepository()
+        val session = testSession()
+
+        try {
+            // Compared against the saved session: save() attaches the crypto2 sidecar, and take()
+            // hands that same key material to whichever caller wins the claim.
+            val saved = repository.save(session)
+
+            val claims = List(8) {
+                async(Dispatchers.Default) { repository.take(session.sessionId) }
+            }.awaitAll()
+
+            assertEquals(listOf(saved), claims.filterNotNull())
             assertNull(repository.get(session.sessionId))
         } finally {
             repository.remove(session.sessionId)

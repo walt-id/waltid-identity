@@ -1,4 +1,7 @@
 import Foundation
+#if os(iOS)
+import IdentityDocumentServices
+#endif
 
 /// Actor-isolated entry point for the walt.id wallet SDK on iOS.
 ///
@@ -58,54 +61,75 @@ public actor Wallet {
         )
     }
 
-    /// Resolves a credential offer before issuance.
+    /// Starts a typed pre-authorized or authorization-code issuance session.
     ///
-    /// - Parameter offer: OpenID4VCI credential offer URL received by the app.
-    /// - Returns: The issuer, offered credential identifiers, and transaction-code requirement.
-    /// - Throws: ``WalletError`` when the offer is invalid or issuer communication fails.
-    public func resolveOffer(offer: URL) async throws -> OfferResolution {
-        try await bridge.resolveOffer(offer: offer)
+    /// - Parameter request: Offer, callback, client, and holder-binding configuration.
+    /// - Returns: A validated session with a typed offer preview.
+    /// - Throws: ``WalletError`` when offer resolution, metadata validation, or key selection fails.
+    public func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
+        try await bridge.startIssuance(request: request)
     }
 
-    /// Receives credentials from an OpenID4VCI credential offer URL.
+    /// Starts the authorization-code browser request for an accepted issuance session.
+    ///
+    /// Offer resolution and local review do not create authorization-server state. Call this
+    /// method only after the user accepts an authorization-code offer, then open the returned URL
+    /// in the browser and deliver the callback to ``continueAuthorizationIssuance(sessionID:callbackURI:)``.
+    ///
+    /// - Parameter sessionID: Opaque identifier returned by ``startIssuance(_:)``.
+    /// - Returns: Browser authorization data, including the callback binding and PKCE state.
+    /// - Throws: ``WalletError`` when authorization initiation cannot be completed.
+    public func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization {
+        try await bridge.beginAuthorizationIssuance(sessionID: sessionID)
+    }
+
+    /// Continues a reviewed pre-authorized issuance session.
     ///
     /// - Parameters:
-    ///   - offer: OpenID4VCI credential offer URL received by the app.
-    ///   - txCode: Optional transaction code requested by the issuer.
-    ///   - clientID: Client identifier to use for issuer interactions.
-    /// - Returns: Local credential identifiers stored by the wallet.
-    /// - Throws: ``WalletError`` when the offer is invalid, issuer
-    ///   communication fails, issuance fails, or local persistence fails.
-    public func receive(
-        offer: URL,
-        txCode: String? = nil,
-        clientID: String = "wallet-client"
-    ) async throws -> [String] {
-        try await bridge.receive(offer: offer, txCode: txCode, clientID: clientID)
+    ///   - sessionID: Opaque identifier returned by ``startIssuance(_:)``.
+    ///   - transactionCode: Separately delivered transaction code when required by the offer.
+    /// - Returns: A typed stored, deferred, cancelled, or failed outcome.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
+    public func continuePreAuthorizedIssuance(
+        sessionID: String,
+        transactionCode: String? = nil
+    ) async throws -> IssuanceOutcome {
+        try await bridge.continuePreAuthorizedIssuance(
+            sessionID: sessionID,
+            transactionCode: transactionCode
+        )
     }
 
-    /// Receives credentials using exactly one reviewed offer preview.
+    /// Strictly validates and consumes a browser authorization callback.
     ///
     /// - Parameters:
-    ///   - previewHandle: Handle returned by ``resolveOffer(offer:)``.
-    ///   - txCode: Optional transaction code requested by the issuer.
-    ///   - clientID: Client identifier to use for issuer interactions.
-    /// - Returns: Local credential identifiers stored by the wallet.
-    /// - Throws: ``WalletError`` when the handle is invalid or issuance fails.
-    public func receive(
-        previewHandle: IssuancePreviewHandle,
-        txCode: String? = nil,
-        clientID: String = "wallet-client"
-    ) async throws -> [String] {
-        try await bridge.receive(previewHandle: previewHandle, txCode: txCode, clientID: clientID)
+    ///   - sessionID: Opaque identifier returned by ``startIssuance(_:)``.
+    ///   - callbackURI: Complete callback URI received from the browser session.
+    /// - Returns: A typed stored, deferred, cancelled, or failed outcome.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
+    public func continueAuthorizationIssuance(
+        sessionID: String,
+        callbackURI: URL
+    ) async throws -> IssuanceOutcome {
+        try await bridge.continueAuthorizationIssuance(sessionID: sessionID, callbackURI: callbackURI)
     }
 
-    /// Discards a reviewed issuance preview after local dismissal.
+    /// Cancels an active issuance session and removes its deferred continuations.
     ///
-    /// - Parameter previewHandle: Handle returned by ``resolveOffer(offer:)``.
-    /// - Throws: ``WalletError`` when the handle cannot be discarded.
-    public func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
-        try await bridge.discardIssuancePreview(previewHandle)
+    /// - Parameter sessionID: Opaque identifier of the session to cancel.
+    /// - Returns: A cancelled outcome, or a typed failure for an invalid session.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
+    public func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
+        try await bridge.cancelIssuance(sessionID: sessionID)
+    }
+
+    /// Polls a deferred credential operation without exposing its access material.
+    ///
+    /// - Parameter deferredCredentialID: Opaque identifier returned in a deferred outcome.
+    /// - Returns: A stored, still-deferred, or failed outcome.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
+    public func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
+        try await bridge.resumeDeferredIssuance(deferredCredentialID: deferredCredentialID)
     }
 
     /// Lists credentials currently known to the wallet.
@@ -213,4 +237,61 @@ public actor Wallet {
     public func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
         try await bridge.discardPresentationPreview(previewHandle)
     }
+    /// Returns the current IdentityDocumentServices capability snapshot.
+    public func digitalCredentialCapabilities() async -> DigitalCredentialCapabilities {
+        #if canImport(WalletCore) && os(iOS)
+        if #available(iOS 26.0, *),
+           let appGroupIdentifier = configuration.crossProcessAccess?.appGroupIdentifier {
+            let status = await IdentityDocumentProviderRegistrationStore().status
+            DigitalCredentialRegistrationStorage.persist(
+                status: status,
+                appGroupIdentifier: appGroupIdentifier
+            )
+        }
+        #endif
+        return bridge.digitalCredentialCapabilities()
+    }
+
+    /// Retains Apple's parsed Annex C request until the user consents to raw request access.
+    ///
+    /// - Parameters:
+    ///   - parsedRequest: Apple's pre-consent parsed document request.
+    ///   - verifiedOrigin: Platform-verified origin bound to the request.
+    ///   - selectedRegistryEntryIDs: Optional platform-selected credential metadata IDs.
+    public func previewAnnexCPresentation(
+        parsedRequest: AnnexCParsedRequest,
+        verifiedOrigin: String,
+        selectedRegistryEntryIDs: [String] = []
+    ) async throws -> AnnexCPresentationPreview {
+        try await bridge.previewAnnexCPresentation(
+            parsedRequest: parsedRequest,
+            verifiedOrigin: verifiedOrigin,
+            selectedRegistryEntryIDs: selectedRegistryEntryIDs
+        )
+    }
+
+    /// Verifies the raw request against the retained preview and returns the HPKE response JSON.
+    ///
+    /// - Parameters:
+    ///   - requestID: Handle returned by ``previewAnnexCPresentation(parsedRequest:verifiedOrigin:selectedRegistryEntryIDs:)``.
+    ///   - verifiedOrigin: Platform-verified origin bound to the preview.
+    ///   - deviceRequestBase64URL: Raw post-consent device request.
+    ///   - encryptionInfoBase64URL: Raw post-consent encryption information.
+    ///   - selectedCredentialOptions: User-approved credentials, one per requested document.
+    public func submitAnnexCPresentation(
+        requestID: String,
+        verifiedOrigin: String,
+        deviceRequestBase64URL: String,
+        encryptionInfoBase64URL: String,
+        selectedCredentialOptions: [PresentationCredentialSelection]
+    ) async throws -> DigitalCredentialResponse {
+        try await bridge.submitAnnexCPresentation(
+            requestID: requestID,
+            verifiedOrigin: verifiedOrigin,
+            deviceRequestBase64URL: deviceRequestBase64URL,
+            encryptionInfoBase64URL: encryptionInfoBase64URL,
+            selectedCredentialOptions: selectedCredentialOptions
+        )
+    }
+
 }

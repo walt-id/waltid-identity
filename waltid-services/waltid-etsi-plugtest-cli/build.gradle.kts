@@ -10,7 +10,7 @@ object Versions {
 }
 
 dependencies {
-    // Walt.id libraries
+    // walt.id libraries
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
     implementation(project(":waltid-libraries:crypto:waltid-cose"))
     implementation(project(":waltid-libraries:crypto:waltid-x509"))

@@ -135,6 +135,7 @@ object Issuer2CredentialScenarios {
         isoPhotoId,
         mdoc("eudiPidMdoc", "eu.europa.ec.eudi.pid.1"),
         mdoc("euAgeVerificationMdoc", "eu.europa.ec.av.1"),
+        mdoc("scaPaymentCardMdoc", "sca_payment_card_mso_mdoc"),
         mdoc("idAustriaMdoc", "at.gv.id-austria.2023.iso"),
         mdoc("googleIdCardMdoc", "com.google.wallet.idcard.1"),
         sdJwtVc("taxIdCredentialSdJwt", "asit.tax-id-credential"),

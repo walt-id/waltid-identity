@@ -69,6 +69,13 @@ class WalletCrypto2OnlyPresentationTest {
                 )
             )
         )
+        val authorizationRequest = AuthorizationRequest(
+            clientId = "redirect_uri:https://verifier.example/callback",
+            redirectUri = "https://verifier.example/callback",
+            nonce = "nonce",
+            responseType = OpenID4VPResponseType.VP_TOKEN,
+            dcqlQuery = query,
+        )
         val result = WalletPresentationHandler.buildVpToken(
             wallet = Wallet(
                 id = "wallet",
@@ -76,22 +83,21 @@ class WalletCrypto2OnlyPresentationTest {
                 credentialStores = listOf(credentialStore),
             ),
             request = BuildVpTokenRequest(
-                authorizationRequest = AuthorizationRequest(
-                    clientId = "verifier",
-                    nonce = "nonce",
-                    responseType = OpenID4VPResponseType.VP_TOKEN,
-                    dcqlQuery = query,
-                ),
+                requestUrl = io.ktor.http.Url("https://verifier.example/request"),
                 selectedCredentialIds = mapOf("pid" to listOf("credential")),
                 did = did,
             ),
+            resolveAuthorizationRequest = {
+                id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest.Plain(authorizationRequest)
+            },
         )
         val presentationJwt = Json.parseToJsonElement(result.vpToken).jsonObject
             .getValue("pid").jsonArray.single().jsonPrimitive.content
 
         val verified = CompactJws.verify(presentationJwt, key, JwsAlgorithm.ED25519)
         assertEquals(
-            "verifier", Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject["aud"]
+            "redirect_uri:https://verifier.example/callback",
+            Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject["aud"]
                 ?.jsonPrimitive?.content
         )
     }

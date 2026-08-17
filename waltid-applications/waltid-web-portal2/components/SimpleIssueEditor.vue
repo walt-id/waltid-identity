@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import type { useIssuerSession } from "~/composables/useIssuerSession";
+import {
+  DC_API_ISSUANCE_DOCS_URL,
+  getDcApiIssuanceSupport,
+} from "~/utils/dcApiIssuance";
 
 type AuthMethod = "AUTHORIZED" | "PRE_AUTHORIZED";
+type DeliveryMethod = "qr" | "dc_api";
 
 const props = defineProps<{
   session: ReturnType<typeof useIssuerSession>;
@@ -9,15 +14,27 @@ const props = defineProps<{
 
 const selectedOptionId = ref(SIMPLE_CREDENTIAL_OPTIONS[0]!.id);
 const authMethod = ref<AuthMethod>("PRE_AUTHORIZED");
+const deliveryMethod = ref<DeliveryMethod>("qr");
 const credentialDataJson = ref("");
 const parseError = ref<string | null>(null);
+const dcApiSupport = ref(getDcApiIssuanceSupport());
 
 const issueCredentialOptions = computed(() =>
-  SIMPLE_CREDENTIAL_OPTIONS.filter((option) => option.id !== "pid"),
+  SIMPLE_CREDENTIAL_OPTIONS.filter((option) => !option.verifyOnly),
 );
 const selectedOption = computed(() =>
   getSimpleCredentialOption(selectedOptionId.value),
 );
+
+onMounted(() => {
+  dcApiSupport.value = getDcApiIssuanceSupport();
+});
+
+watch(deliveryMethod, (method) => {
+  if (method === "dc_api") {
+    dcApiSupport.value = getDcApiIssuanceSupport();
+  }
+});
 
 watch(
   selectedOption,
@@ -33,6 +50,12 @@ watch(
 );
 
 const canSubmit = computed(() => {
+  if (
+    deliveryMethod.value === "dc_api" &&
+    !dcApiSupport.value.supported
+  ) {
+    return false;
+  }
   if (!credentialDataJson.value.trim()) return true;
   try {
     JSON.parse(credentialDataJson.value);
@@ -82,7 +105,11 @@ async function submit() {
     payload.runtimeOverrides = { credentialData };
   }
 
-  await props.session.createOffer(payload);
+  if (deliveryMethod.value === "dc_api") {
+    await props.session.createDcApiOffer(payload);
+  } else {
+    await props.session.createOffer(payload);
+  }
 }
 </script>
 
@@ -95,7 +122,7 @@ async function submit() {
         the credential.
       </p>
 
-      <div class="grid md:grid-cols-3 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <button
           v-for="option in issueCredentialOptions"
           :key="option.id"
@@ -172,6 +199,64 @@ async function submit() {
     </section>
 
     <section>
+      <label class="form-label">Delivery method</label>
+      <div
+        class="inline-flex rounded-lg border border-[--color-border-strong] bg-white p-1"
+      >
+        <button
+          type="button"
+          class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+          :class="
+            deliveryMethod === 'qr'
+              ? 'bg-slate-900 text-white'
+              : 'text-[--color-text-muted] hover:text-[--color-text]'
+          "
+          @click="deliveryMethod = 'qr'"
+        >
+          QR / deep link
+        </button>
+        <button
+          type="button"
+          class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+          :class="
+            deliveryMethod === 'dc_api'
+              ? 'bg-slate-900 text-white'
+              : 'text-[--color-text-muted] hover:text-[--color-text]'
+          "
+          @click="deliveryMethod = 'dc_api'"
+        >
+          Digital Credentials API
+        </button>
+      </div>
+      <p class="text-xs text-[--color-text-muted] mt-2">
+        QR shows an OpenID4VCI offer for wallets to scan. DC API starts wallet
+        engagement via <code>navigator.credentials.create</code>; the result log
+        follows issuer OpenID4VCI events (Chrome origin trial).
+      </p>
+      <div
+        v-if="deliveryMethod === 'dc_api' && !dcApiSupport.supported"
+        class="text-xs text-amber-800 mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2"
+      >
+        <p class="font-medium">
+          Digital Credentials API issuance is not available in this browser.
+        </p>
+        <p>{{ dcApiSupport.reason }}</p>
+        <p>
+          Switch to <strong>QR / deep link</strong>, or follow the
+          <a
+            :href="DC_API_ISSUANCE_DOCS_URL"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="underline font-medium text-amber-950"
+          >
+            Chrome Digital Credentials API issuance docs
+          </a>
+          (Chrome 143+, issuance flag, Android wallet).
+        </p>
+      </div>
+    </section>
+
+    <section>
       <label class="form-label">Credential data override</label>
       <p class="text-xs text-[--color-text-muted] mb-2">
         Edit the data below. It will be applied as
@@ -187,9 +272,9 @@ async function submit() {
       </p>
     </section>
 
-    <div class="flex items-center gap-3">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-3">
       <button
-        class="btn btn-primary"
+        class="btn btn-primary w-full sm:w-auto"
         :disabled="!canSubmit || session.loading.value"
         @click="submit"
       >

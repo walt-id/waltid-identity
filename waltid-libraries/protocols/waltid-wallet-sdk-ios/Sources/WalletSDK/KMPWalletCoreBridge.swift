@@ -57,63 +57,64 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return .init(keyID: value.keyId, did: value.did)
     }
 
-    func resolveOffer(offer: URL) async throws -> OfferResolution {
-        let result = try await bridge.resolveOffer(offerUrl: offer.absoluteString)
+    func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
+        let result = try await bridge.startIssuance(
+            request: MobileWalletIssuanceRequest(
+                offer: MobileWalletCredentialOfferUri(value: request.offer.absoluteString),
+                clientId: request.clientID,
+                redirectUri: request.redirectURI.absoluteString,
+                keyId: request.keyID,
+                did: request.did
+            )
+        )
         let value = try Self.successValue(
             result,
-            as: MobileWalletOfferResolution.self,
-            operation: "resolve credential offer"
+            as: Waltid_openid4vc_walletWalletIssuanceSession.self,
+            operation: "start issuance"
         )
-        return OfferResolution(
-            previewHandle: IssuancePreviewHandle(value: value.previewHandle.value),
-            issuer: value.issuer.toSwiftIssuerMetadata(),
-            offeredCredentials: swiftArray(
-                value.offeredCredentials,
-                of: MobileWalletOfferedCredentialMetadata.self
-            ).map { $0.toSwiftOfferedCredentialMetadata() },
-            transactionCode: value.transactionCode?.toSwiftTransactionCodeRequirement()
-        )
+        return try value.toSwiftIssuanceSession()
     }
 
-    func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String] {
-        let result = try await bridge.receive(
-            offerUrl: offer.absoluteString,
-            txCode: txCode,
-            clientId: clientID
+    func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization {
+        let result = try await bridge.beginAuthorizationIssuance(sessionId: sessionID)
+        let value = try Self.successValue(
+            result,
+            as: Waltid_openid4vc_walletWalletIssuanceAuthorization.self,
+            operation: "begin authorization issuance"
         )
-        let value = try Self.successAnyValue(result, operation: "receive credentials")
-
-        if let credentialIDs = value as? [String] {
-            return credentialIDs
-        }
-        if let credentialIDs = value as? NSArray {
-            return credentialIDs.compactMap { $0 as? String }
-        }
-
-        throw WalletError.internalFailure("Unexpected receive result type: \(type(of: value))")
+        return try value.toSwiftIssuanceAuthorization()
     }
 
-    func receive(previewHandle: IssuancePreviewHandle, txCode: String?, clientID: String) async throws -> [String] {
-        let result = try await bridge.receivePreviewed(
-            previewHandle: MobileWalletIssuancePreviewHandle(value: previewHandle.value),
-            txCode: txCode,
-            clientId: clientID
+    func continuePreAuthorizedIssuance(
+        sessionID: String,
+        transactionCode: String?
+    ) async throws -> IssuanceOutcome {
+        let result = try await bridge.continuePreAuthorizedIssuance(
+            sessionId: sessionID,
+            transactionCode: transactionCode
         )
-        let value = try Self.successAnyValue(result, operation: "receive reviewed credentials")
-        if let credentialIDs = value as? [String] {
-            return credentialIDs
-        }
-        if let credentialIDs = value as? NSArray {
-            return credentialIDs.compactMap { $0 as? String }
-        }
-        throw WalletError.internalFailure("Unexpected receive result type: \(type(of: value))")
+        return try Self.issuanceOutcome(result, operation: "continue pre-authorized issuance")
     }
 
-    func discardIssuancePreview(_ previewHandle: IssuancePreviewHandle) async throws {
-        let result = try await bridge.discardIssuancePreview(
-            previewHandle: MobileWalletIssuancePreviewHandle(value: previewHandle.value)
+    func continueAuthorizationIssuance(
+        sessionID: String,
+        callbackURI: URL
+    ) async throws -> IssuanceOutcome {
+        let result = try await bridge.continueAuthorizationIssuance(
+            sessionId: sessionID,
+            callbackUri: callbackURI.absoluteString
         )
-        _ = try Self.successAnyValue(result, operation: "discard issuance preview")
+        return try Self.issuanceOutcome(result, operation: "continue authorization issuance")
+    }
+
+    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
+        let result = try await bridge.cancelIssuance(sessionId: sessionID)
+        return try Self.issuanceOutcome(result, operation: "cancel issuance")
+    }
+
+    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
+        let result = try await bridge.resumeDeferredIssuance(deferredCredentialId: deferredCredentialID)
+        return try Self.issuanceOutcome(result, operation: "resume deferred issuance")
     }
 
     func credentials() async throws -> [Credential] {
@@ -221,6 +222,60 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         _ = try Self.successAnyValue(result, operation: "discard presentation preview")
     }
 
+    func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
+        bridge.digitalCredentialCapabilities().toSwiftCapabilities()
+    }
+
+    func previewAnnexCPresentation(
+        parsedRequest: AnnexCParsedRequest,
+        verifiedOrigin: String,
+        selectedRegistryEntryIDs: [String]
+    ) async throws -> AnnexCPresentationPreview {
+        let result = try await bridge.previewAnnexCPresentation(
+            request: MobileWalletAnnexCRequest(
+                parsedRequest: parsedRequest.toKMPParsedRequest(),
+                verifiedOrigin: verifiedOrigin,
+                selectedRegistryEntryIds: selectedRegistryEntryIDs,
+                deviceRequestBase64Url: nil,
+                encryptionInfoBase64Url: nil
+            )
+        )
+        return try Self.successValue(
+            result,
+            as: MobileWalletAnnexCPreview.self,
+            operation: "preview Annex C presentation"
+        ).toSwiftPreview()
+    }
+
+    func submitAnnexCPresentation(
+        requestID: String,
+        verifiedOrigin: String,
+        deviceRequestBase64URL: String,
+        encryptionInfoBase64URL: String,
+        selectedCredentialOptions: [PresentationCredentialSelection]
+    ) async throws -> DigitalCredentialResponse {
+        let result = try await bridge.submitAnnexCPresentation(
+            submission: MobileWalletAnnexCSubmission(
+                requestId: requestID,
+                verifiedOrigin: verifiedOrigin,
+                deviceRequestBase64Url: deviceRequestBase64URL,
+                encryptionInfoBase64Url: encryptionInfoBase64URL,
+                selectedCredentialOptions: selectedCredentialOptions.map {
+                    MobileWalletPresentationCredentialSelection(
+                        queryId: $0.queryID,
+                        credentialId: $0.credentialID
+                    )
+                }
+            )
+        )
+        let value = try Self.successValue(
+            result,
+            as: MobileWalletDigitalCredentialResponse.self,
+            operation: "submit Annex C presentation"
+        )
+        return DigitalCredentialResponse(protocolIdentifier: value.protocol, dataJSON: value.dataJson)
+    }
+
     private static func successValue<T>(
         _ result: any WalletBridgeResult,
         as type: T.Type,
@@ -234,6 +289,17 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         }
 
         return typedValue
+    }
+
+    private static func issuanceOutcome(
+        _ result: any WalletBridgeResult,
+        operation: String
+    ) throws -> IssuanceOutcome {
+        let value = try successAnyValue(result, operation: operation)
+        guard let outcome = value as? any Waltid_openid4vc_walletWalletIssuanceOutcome else {
+            throw WalletError.internalFailure("Unexpected \(operation) result type: \(type(of: value))")
+        }
+        return try outcome.toSwiftIssuanceOutcome()
     }
 
     private static func successAnyValue(
@@ -254,6 +320,137 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     }
 }
 
+private extension Waltid_openid4vc_walletWalletIssuanceSession {
+    func toSwiftIssuanceSession() throws -> IssuanceSession {
+        IssuanceSession(
+            id: id,
+            offer: try offer.toSwiftIssuanceOfferPreview()
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceOfferPreview {
+    func toSwiftIssuanceOfferPreview() throws -> IssuanceOfferPreview {
+        IssuanceOfferPreview(
+            grant: grant == .authorizationCode ? .authorizationCode : .preAuthorizedCode,
+            issuer: issuer.toSwiftIssuanceIssuerPreview(),
+            credentials: swiftArray(credentials, of: Waltid_openid4vc_walletWalletIssuanceCredentialPreview.self)
+                .map { $0.toSwiftIssuanceCredentialPreview() },
+            transactionCode: transactionCode?.toSwiftIssuanceTransactionCode()
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceIssuerPreview {
+    func toSwiftIssuanceIssuerPreview() -> IssuanceIssuerPreview {
+        IssuanceIssuerPreview(
+            identifier: identifier,
+            name: name,
+            locale: locale,
+            logoURI: logoUri.flatMap(URL.init(string:)),
+            logoAltText: logoAltText
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceCredentialPreview {
+    func toSwiftIssuanceCredentialPreview() -> IssuanceCredentialPreview {
+        IssuanceCredentialPreview(
+            configurationID: configurationId,
+            format: format,
+            name: name,
+            descriptionText: descriptionText,
+            logoURI: logoUri.flatMap(URL.init(string:))
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceTransactionCode {
+    func toSwiftIssuanceTransactionCode() -> IssuanceTransactionCode {
+        IssuanceTransactionCode(
+            inputMode: inputMode,
+            length: length.map { Int($0.int32Value) },
+            descriptionText: descriptionText
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceAuthorization {
+    func toSwiftIssuanceAuthorization() throws -> IssuanceAuthorization {
+        guard let authorizationURL = URL(string: url), let callbackURL = URL(string: redirectUri) else {
+            throw WalletError.internalFailure("Wallet core returned an invalid issuance URL.")
+        }
+        return IssuanceAuthorization(
+            url: authorizationURL,
+            state: state,
+            redirectURI: callbackURL,
+            pkce: IssuancePKCEState(
+                codeChallenge: pkce.codeChallenge,
+                codeChallengeMethod: pkce.codeChallengeMethod
+            ),
+            pushedAuthorizationRequestUsed: pushedAuthorizationRequestUsed,
+            requestURIExpiresAt: requestUriExpiresAtEpochMilliseconds.map {
+                Date(timeIntervalSince1970: TimeInterval($0.int64Value) / 1000.0)
+            }
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceOutcome {
+    func toSwiftIssuanceOutcome() throws -> IssuanceOutcome {
+        switch onEnum(of: self) {
+        case let .stored(value):
+            return .stored(
+                sessionID: value.sessionId,
+                credentialIDs: swiftArray(value.credentialIds, of: String.self)
+            )
+        case let .deferred(value):
+            return .deferred(
+                sessionID: value.sessionId,
+                storedCredentialIDs: swiftArray(value.storedCredentialIds, of: String.self),
+                credentials: swiftArray(
+                    value.credentials,
+                    of: Waltid_openid4vc_walletWalletDeferredCredential.self
+                ).map { credential in
+                    DeferredCredential(
+                        id: credential.id,
+                        credentialConfigurationID: credential.credentialConfigurationId,
+                        intervalSeconds: credential.intervalSeconds?.int64Value
+                    )
+                }
+            )
+        case let .cancelled(value):
+            return .cancelled(sessionID: value.sessionId)
+        case let .failed(value):
+            return .failed(
+                sessionID: value.sessionId,
+                error: IssuanceFailure(
+                    code: value.error.code.toSwiftIssuanceErrorCode(),
+                    message: value.error.message
+                ),
+                storedCredentialIDs: swiftArray(value.storedCredentialIds, of: String.self)
+            )
+        }
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceErrorCode {
+    func toSwiftIssuanceErrorCode() -> IssuanceErrorCode {
+        switch self {
+        case .invalidSession: return .invalidSession
+        case .invalidCallback: return .invalidCallback
+        case .invalidInput: return .invalidInput
+        case .authorizationFailed: return .authorizationFailed
+        case .issuerMetadata: return .issuerMetadata
+        case .issuerResponse: return .issuerResponse
+        case .network: return .network
+        case .crypto: return .crypto
+        case .storage: return .storage
+        case .protocol: return .protocol
+        }
+    }
+}
+
 private extension WalletConfiguration {
     func toKMPConfiguration() -> WalletBridgeConfiguration {
         WalletBridgeConfiguration(
@@ -264,7 +461,9 @@ private extension WalletConfiguration {
             attestation: attestation?.toKMPAttestationConfiguration(),
             preferredLocales: preferredLocales,
             transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
-            clientIdTrustConfiguration: clientIDTrustConfiguration.toKMPClientIDTrustConfiguration()
+            clientIdTrustConfiguration: clientIDTrustConfiguration.toKMPClientIDTrustConfiguration(),
+            appGroupIdentifier: crossProcessAccess?.appGroupIdentifier,
+            keychainAccessGroup: crossProcessAccess?.keychainAccessGroup
         )
     }
 }
@@ -394,7 +593,8 @@ private extension StoredCredential {
             serializedCredential: serializedCredential,
             format: format,
             label: label,
-            addedAt: addedAt.map { ISO8601DateFormatter().string(from: $0) }
+            addedAt: addedAt.map { ISO8601DateFormatter().string(from: $0) },
+            metadataJson: metadataJSON
         )
     }
 }
@@ -406,7 +606,8 @@ private extension WalletBridgeStoredCredential {
             serializedCredential: serializedCredential,
             format: format,
             label: label,
-            addedAt: addedAt.flatMap(parseWalletISO8601Date)
+            addedAt: addedAt.flatMap(parseWalletISO8601Date),
+            metadataJSON: metadataJson
         )
     }
 }
@@ -485,7 +686,8 @@ private extension MobileWalletCredential {
             subject: subject,
             label: label,
             addedAt: addedAt.flatMap(parseWalletISO8601Date),
-            credentialDataJSON: requiredCredentialDataJSON(credentialDataJson)
+            credentialDataJSON: requiredCredentialDataJSON(credentialDataJson),
+            metadataJSON: metadataJson
         )
     }
 }
@@ -507,6 +709,71 @@ private extension MobileWalletPresentationPreviewResult {
         default:
             throw WalletError.internalFailure("Unsupported presentation preview result: \(type(of: self))")
         }
+    }
+}
+
+private extension AnnexCParsedRequest {
+    func toKMPParsedRequest() -> MobileWalletAnnexCParsedRequest {
+        MobileWalletAnnexCParsedRequest(
+            documents: documents.map {
+                MobileWalletAnnexCDocumentRequest(
+                    docType: $0.documentType,
+                    namespaces: $0.namespaces
+                )
+            }
+        )
+    }
+}
+
+private extension MobileWalletDigitalCredentialCapabilities {
+    func toSwiftCapabilities() -> DigitalCredentialCapabilities {
+        DigitalCredentialCapabilities(
+            platform: platform,
+            platformAvailable: platformAvailable,
+            minimumOSVersion: minimumOsVersion,
+            registrationAvailable: registrationAvailable,
+            capabilities: swiftArray(capabilities, of: MobileWalletDigitalCredentialCapability.self).map {
+                DigitalCredentialCapability(
+                    protocolIdentifier: $0.protocol,
+                    // `identifier`, not String(describing:): SKIE renders these as Swift enums, so
+                    // describing them would publish compiler-derived case names as API.
+                    credentialFormats: swiftArray($0.credentialFormats, of: MobileWalletDigitalCredentialFormat.self).map(\.identifier),
+                    requestProtection: swiftArray($0.requestProtection, of: MobileWalletDigitalCredentialRequestProtection.self).map(\.identifier),
+                    responseProtection: swiftArray($0.responseProtection, of: MobileWalletDigitalCredentialResponseProtection.self).map(\.identifier),
+                    supported: $0.supported,
+                    unsupportedReason: $0.unsupportedReason
+                )
+            }
+        )
+    }
+}
+
+private extension MobileWalletAnnexCPreview {
+    func toSwiftPreview() -> AnnexCPresentationPreview {
+        AnnexCPresentationPreview(
+            requestID: requestId,
+            verifiedOrigin: verifiedOrigin,
+            parsedRequest: AnnexCParsedRequest(
+                documents: swiftArray(parsedRequest.documents, of: MobileWalletAnnexCDocumentRequest.self).map {
+                    AnnexCDocumentRequest(documentType: $0.docType, namespaces: $0.namespaces as? [String: [String]] ?? [:])
+                }
+            ),
+            credentialOptions: swiftArray(credentialOptions, of: MobileWalletPresentationCredentialOption.self).map { $0.toSwiftCredentialOption() },
+            readerTrust: readerTrust.toSwiftReaderTrust()
+        )
+    }
+}
+
+private extension MobileWalletReaderTrust {
+    func toSwiftReaderTrust() -> ReaderTrust {
+        if self is MobileWalletReaderTrustNotApplicable { return .notApplicable }
+        if self is MobileWalletReaderTrustNotAuthenticated { return .notAuthenticated }
+        if self is MobileWalletReaderTrustPendingRawRequest { return .pendingRawRequest }
+        if let value = self as? MobileWalletReaderTrustUntrusted { return .untrusted(reason: value.reason) }
+        if let value = self as? MobileWalletReaderTrustTrusted { return .trusted(certificateSubject: value.certificateSubject) }
+        // A state this SDK build does not know about cannot be reported as identifying the reader,
+        // and the reason string says so rather than implying a rejected trust policy.
+        return .untrusted(reason: "Unrecognized reader trust state")
     }
 }
 
@@ -581,50 +848,6 @@ private extension MobileWalletMetadataDisplay {
             backgroundColor: backgroundColor,
             backgroundImageURI: backgroundImageUri,
             textColor: textColor
-        )
-    }
-}
-
-private extension MobileWalletIssuerMetadata {
-    func toSwiftIssuerMetadata() -> IssuerMetadata {
-        IssuerMetadata(
-            credentialIssuer: credentialIssuer,
-            display: display?.toSwiftMetadataDisplay()
-        )
-    }
-}
-
-private extension MobileWalletCredentialClaimMetadata {
-    func toSwiftCredentialClaimMetadata() -> CredentialClaimMetadata {
-        CredentialClaimMetadata(
-            path: swiftArray(path, of: String.self),
-            mandatory: mandatory?.boolValue,
-            displayName: displayName
-        )
-    }
-}
-
-private extension MobileWalletOfferedCredentialMetadata {
-    func toSwiftOfferedCredentialMetadata() -> OfferedCredentialMetadata {
-        OfferedCredentialMetadata(
-            configurationID: configurationId,
-            format: format,
-            scope: scope,
-            vct: vct,
-            doctype: doctype,
-            display: display?.toSwiftMetadataDisplay(),
-            claims: swiftArray(claims, of: MobileWalletCredentialClaimMetadata.self)
-                .map { $0.toSwiftCredentialClaimMetadata() }
-        )
-    }
-}
-
-private extension MobileWalletTransactionCodeRequirement {
-    func toSwiftTransactionCodeRequirement() -> TransactionCodeRequirement {
-        TransactionCodeRequirement(
-            inputMode: inputMode == .numeric ? .numeric : .text,
-            length: length?.intValue,
-            description: descriptionText
         )
     }
 }

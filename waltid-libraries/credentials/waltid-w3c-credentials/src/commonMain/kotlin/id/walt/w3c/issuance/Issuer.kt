@@ -1,8 +1,11 @@
 package id.walt.w3c.issuance
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.PublicKeyIds.publicKeyId
+import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidUtils
 import id.walt.sdjwt.SDMap
@@ -316,12 +319,30 @@ object Issuer {
     @JsPromise
     @JsExport.Ignore
     suspend fun getKidHeader(issuerKey: Key, issuerDid: String? = null): String {
-        return qualifyDidKeyId(issuerKey.getKeyId(), issuerDid)
+        return qualifyDidKeyId(issuerKey.publicKeyId(), issuerDid)
     }
 
     @JsExport.Ignore
-    fun getKidHeader(issuerKey: Crypto2Key, issuerDid: String? = null): String =
-        qualifyDidKeyId(issuerKey.id.value, issuerDid)
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    suspend fun getKidHeader(issuerKey: Crypto2Key, issuerDid: String? = null): String {
+        val rawId = issuerKey.id.value
+        val keyId = when {
+            DidUtils.isDidUrl(rawId) -> rawId
+            issuerDid != null && DidUtils.isDidUrl(issuerDid) && !issuerDid.startsWith("did:key:") ->
+                publicJwkThumbprint(issuerKey)
+            else -> rawId
+        }
+        return qualifyDidKeyId(keyId, issuerDid)
+    }
+
+    private suspend fun publicJwkThumbprint(issuerKey: Crypto2Key): String {
+        val exported = requireNotNull(issuerKey.capabilities.publicKeyExporter) {
+            "Issuer signing key cannot export a public JWK for kid"
+        }.exportPublicKey()
+        return Jwk.sha256Thumbprint(exported.toPublicJwk(issuerKey.spec))
+    }
 
     private fun qualifyDidKeyId(keyId: String, issuerDid: String?): String = when {
         issuerDid.isNullOrEmpty() -> keyId

@@ -1,5 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
+import id.walt.openid4vp.conformance.report.ConformanceCiFlags
+import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.VciWalletTestPlan
@@ -76,8 +78,25 @@ class VciWalletTestPlanRunner(
             println()
         }
 
-        printSummary(results)
-        return results
+        val namedResults = results.mapIndexed { index, result ->
+            result.copy(
+                testName = result.testName.takeIf { it != "unknown" }
+                    ?: "${testPlan.description}#${index + 1}"
+            )
+        }
+        ConformanceReportWriter.writeTestPlanResults(
+            role = ConformanceReportWriter.Role.VCI_WALLET,
+            results = namedResults,
+            conformanceHost = conformanceHost,
+            conformancePort = conformancePort,
+        )
+        printSummary(namedResults)
+        ConformanceReportWriter.failIfNeededFromTestPlanResults(
+            role = ConformanceReportWriter.Role.VCI_WALLET,
+            results = namedResults,
+            allowFailure = ConformanceCiFlags.allowFailure(),
+        )
+        return namedResults
     }
 
     // ─────────────────────────────────────────────────────────────────────────────

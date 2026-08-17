@@ -40,11 +40,13 @@ object PresentationRequestValidator {
      *   Establishing them can require resolving the wallet's signing key, and a request that is already
      *   invalid for a key-independent reason must report that reason rather than a wallet-local
      *   key-resolution failure.
+     *   Pass `null` to run only key-independent request validation (nonce, response type, DCQL shape,
+     *   transaction_data) — used by non-signing continuation steps such as send-response.
      */
     fun validate(
         resolvedRequest: ResolvedAuthorizationRequest,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
-        formatCapabilities: () -> WalletPresentationFormatRegistry.RuntimeCapabilities = {
+        formatCapabilities: (() -> WalletPresentationFormatRegistry.RuntimeCapabilities)? = {
             WalletPresentationFormatRegistry.defaultCapabilities()
         },
     ): PresentationRequestValidationResult {
@@ -90,24 +92,26 @@ object PresentationRequestValidator {
             )
         }
 
-        val requestedFormats = query.credentials
-            .mapNotNull { credentialQuery -> WalletPresentationFormatRegistry.resolve(credentialQuery.format.id.first()) }
-            .toSet()
-        val capabilities = formatCapabilities()
-        val verifierFormats = request.clientMetadata?.vpFormatsSupported
-        val walletSupportsRequestedFormat = requestedFormats.any(capabilities.supportedFormats::contains)
-        val verifierSupportsRequestedFormat = verifierFormats?.let {
-            WalletPresentationFormatRegistry.supportsAny(
-                verifierFormats = it,
-                capabilities = capabilities,
-                requestedFormats = requestedFormats,
-            )
-        } ?: true
-        if (!walletSupportsRequestedFormat || !verifierSupportsRequestedFormat) {
-            return invalid(
-                WalletPresentFunctionality2.OID4VPErrorCode.VP_FORMATS_NOT_SUPPORTED,
-                "The wallet supports none of the presentation formats requested by the verifier",
-            )
+        if (formatCapabilities != null) {
+            val requestedFormats = query.credentials
+                .mapNotNull { credentialQuery -> WalletPresentationFormatRegistry.resolve(credentialQuery.format.id.first()) }
+                .toSet()
+            val capabilities = formatCapabilities()
+            val verifierFormats = request.clientMetadata?.vpFormatsSupported
+            val walletSupportsRequestedFormat = requestedFormats.any(capabilities.supportedFormats::contains)
+            val verifierSupportsRequestedFormat = verifierFormats?.let {
+                WalletPresentationFormatRegistry.supportsAny(
+                    verifierFormats = it,
+                    capabilities = capabilities,
+                    requestedFormats = requestedFormats,
+                )
+            } ?: true
+            if (!walletSupportsRequestedFormat || !verifierSupportsRequestedFormat) {
+                return invalid(
+                    WalletPresentFunctionality2.OID4VPErrorCode.VP_FORMATS_NOT_SUPPORTED,
+                    "The wallet supports none of the presentation formats requested by the verifier",
+                )
+            }
         }
 
         val transactionData = runCatching {

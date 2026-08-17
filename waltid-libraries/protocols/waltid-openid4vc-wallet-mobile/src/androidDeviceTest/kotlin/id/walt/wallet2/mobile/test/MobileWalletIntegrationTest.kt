@@ -11,9 +11,13 @@ import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.MobileWalletCredentialOffer
+import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
@@ -37,7 +41,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import org.junit.Ignore
 import org.junit.Test
 import java.util.Base64
 import java.util.UUID
@@ -66,7 +69,7 @@ class MobileWalletIntegrationTest {
         private const val EUDI_EHIC_SD_JWT_CREDENTIAL_ID = "eu.europa.ec.eudi.ehic_sd_jwt_vc"
 
         private val DEMO_TRANSACTION_DATA_PROFILES = demoTransactionDataProfiles(
-            paymentAuthorizationFields = listOf("amount", "currency", "payee"),
+            paymentAuthorizationFields = listOf("merchant_name", "amount", "currency"),
         )
 
         private fun demoTransactionDataProfiles(
@@ -103,12 +106,16 @@ class MobileWalletIntegrationTest {
         client.bootstrap()
 
         val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
-        val resolution = client.resolveOffer(offer.offerUrl)
-        assertTrue(resolution.issuer.credentialIssuer.isNotBlank(), "Resolved issuer metadata should include its identifier")
-        assertTrue(resolution.offeredCredentials.isNotEmpty(), "Offer should resolve credential metadata")
-        assertTrue(resolution.offeredCredentials.all { it.configurationId.isNotBlank() && it.format.isNotBlank() })
-        assertNotNull(resolution.transactionCode, "EUDI offer should require a transaction code")
-        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        val session = client.startIssuance(
+            MobileWalletIssuanceRequest(
+                offer = MobileWalletCredentialOffer.Uri(offer.offerUrl),
+            )
+        )
+        assertTrue(session.offer.issuer.identifier.isNotBlank(), "Resolved issuer metadata should include its identifier")
+        assertTrue(session.offer.credentials.isNotEmpty(), "Offer should resolve credential metadata")
+        assertTrue(session.offer.credentials.all { it.configurationId.isNotBlank() && it.format.isNotBlank() })
+        assertNotNull(session.offer.transactionCode, "EUDI offer should require a transaction code")
+        val credentialIds = client.continuePreAuthorizedIssuance(session.id, offer.txCode).storedCredentialIds()
         assertTrue(credentialIds.isNotEmpty(), "Should receive at least one credential")
     }
 
@@ -137,13 +144,11 @@ class MobileWalletIntegrationTest {
         previewAndSubmitEudiCredential(EUDI_EHIC_SD_JWT_CREDENTIAL_ID)
     }
 
-    @Ignore("Upstream issue: https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/172")
     @Test
     fun receiveAndPresentEudiPidSdJwtAgainstEudi() = runBlocking {
         receiveAndPresentEudiCredential(EUDI_PID_SD_JWT_CREDENTIAL_ID)
     }
 
-    @Ignore("Upstream issue: https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/172")
     @Test
     fun previewAndSubmitEudiPidSdJwtAgainstEudi() = runBlocking {
         previewAndSubmitEudiCredential(EUDI_PID_SD_JWT_CREDENTIAL_ID)
@@ -182,7 +187,7 @@ class MobileWalletIntegrationTest {
         val bootstrapResult = client.bootstrap()
 
         val offer = DemoTestBackend.createOffer(scenario)
-        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        val credentialIds = client.receiveCredential(offer.offerUrl, offer.txCode)
         assertTrue(
             credentialIds.isNotEmpty(),
             "Should receive ${scenario.displayName} from public demo issuer2",
@@ -197,7 +202,7 @@ class MobileWalletIntegrationTest {
         assertTrue(
             transactionData.detailsJson.contains("\"amount\":\"42.00\"") &&
                 transactionData.detailsJson.contains("\"currency\":\"EUR\"") &&
-                transactionData.detailsJson.contains("\"payee\":\"ACME Corp\""),
+                transactionData.detailsJson.contains("\"merchant_name\":\"ACME Corp\""),
             "Preview should expose readable payment details: ${transactionData.detailsJson}",
         )
         val result = client.submitPresentation(
@@ -266,7 +271,7 @@ class MobileWalletIntegrationTest {
         val bootstrapResult = client.bootstrap()
 
         val offer = DemoTestBackend.createOffer(scenario)
-        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        val credentialIds = client.receiveCredential(offer.offerUrl, offer.txCode)
         assertTrue(
             credentialIds.isNotEmpty(),
             "Should receive ${scenario.displayName} from public demo issuer2",
@@ -367,7 +372,10 @@ class MobileWalletIntegrationTest {
         client1.bootstrap()
 
         val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
-        client1.receive(offer.offerUrl, txCode = offer.txCode)
+        client1.receiveCredential(
+            offerUrl = offer.offerUrl,
+            transactionCode = offer.txCode,
+        )
 
         val client2 = createEudiWallet(walletConfig)
         val credentials = client2.credentials()
@@ -383,7 +391,7 @@ class MobileWalletIntegrationTest {
         val bootstrapResult = client1.bootstrap()
 
         val offer = DemoTestBackend.createOffer(scenario)
-        client1.receive(offer.offerUrl, txCode = offer.txCode)
+        client1.receiveCredential(offer.offerUrl, offer.txCode)
 
         val client2 = MobileWalletFactory(context).create(walletConfig)
         val credentials = client2.credentials()
@@ -408,6 +416,27 @@ class MobileWalletIntegrationTest {
         transactionDataProfiles = transactionDataProfiles,
     )
 
+    private suspend fun MobileWallet.receiveCredential(
+        offerUrl: String,
+        transactionCode: String?,
+    ): List<String> =
+        continuePreAuthorizedIssuance(
+            sessionId = startIssuance(
+                MobileWalletIssuanceRequest(
+                    offer = MobileWalletCredentialOffer.Uri(offerUrl),
+                )
+            ).id,
+            transactionCode = transactionCode,
+        ).storedCredentialIds()
+
+    private fun WalletIssuanceOutcome.storedCredentialIds(): List<String> =
+        when (this) {
+            is WalletIssuanceOutcome.Stored -> credentialIds
+            is WalletIssuanceOutcome.Deferred -> error("Expected stored credentials, got deferred outcome: $this")
+            is WalletIssuanceOutcome.Cancelled -> error("Expected stored credentials, got cancelled outcome")
+            is WalletIssuanceOutcome.Failed -> error("Expected stored credentials, got failed outcome: ${error.message}")
+        }
+
     @OptIn(ExperimentalSerializationApi::class)
     private val eudiVerifierTrust = ClientIdTrustConfiguration(
         x509TrustAnchors = listOf(CertificateDer.fromPEMEncodedString(EudiTestBackend.verifierTrustAnchorPem)),
@@ -422,7 +451,7 @@ class MobileWalletIntegrationTest {
         client.bootstrap()
 
         val offer = DemoTestBackend.createOffer(scenario)
-        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        val credentialIds = client.receiveCredential(offer.offerUrl, offer.txCode)
         assertTrue(
             credentialIds.isNotEmpty(),
             "Should receive at least one ${scenario.displayName} credential from public demo issuer2",
@@ -435,7 +464,10 @@ class MobileWalletIntegrationTest {
         val bootstrapResult = client.bootstrap()
 
         val offer = EudiTestBackend.generateOffer(credentialId)
-        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        val credentialIds = client.receiveCredential(
+            offerUrl = offer.offerUrl,
+            transactionCode = offer.txCode,
+        )
         assertTrue(credentialIds.isNotEmpty(), "Should receive EUDI credential $credentialId")
 
         val credentials = client.credentials()
@@ -457,7 +489,10 @@ class MobileWalletIntegrationTest {
         val bootstrapResult = client.bootstrap()
 
         val offer = EudiTestBackend.generateOffer(credentialId)
-        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        val credentialIds = client.receiveCredential(
+            offerUrl = offer.offerUrl,
+            transactionCode = offer.txCode,
+        )
         assertTrue(credentialIds.isNotEmpty(), "Should receive EUDI credential $credentialId")
 
         val offeredCredentialId = EudiTestBackend.extractCredentialIdFromOfferUrl(offer.offerUrl)
@@ -500,7 +535,7 @@ class MobileWalletIntegrationTest {
         val bootstrapResult = client.bootstrap()
 
         val offer = DemoTestBackend.createOffer(scenario)
-        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        val credentialIds = client.receiveCredential(offer.offerUrl, offer.txCode)
         assertTrue(
             credentialIds.isNotEmpty(),
             "Should receive ${scenario.displayName} from public demo issuer2",
@@ -526,7 +561,7 @@ class MobileWalletIntegrationTest {
         val bootstrapResult = client.bootstrap()
 
         val offer = DemoTestBackend.createOffer(scenario)
-        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        val credentialIds = client.receiveCredential(offer.offerUrl, offer.txCode)
         assertTrue(
             credentialIds.isNotEmpty(),
             "Should receive ${scenario.displayName} from public demo issuer2",

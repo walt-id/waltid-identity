@@ -8,11 +8,19 @@ import co.touchlab.sqliter.DatabaseFileContext
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
+import platform.Foundation.NSFileManager
 
 /**
  * iOS SQLDelight driver factory for native SQLite wallet databases.
  */
 public actual class DriverFactory {
+    private var appGroupIdentifier: String? = null
+
+    /** Uses the shared App Group container for the database and all SQLite sidecars. */
+    public fun useAppGroup(identifier: String): DriverFactory = apply {
+        require(identifier.isNotBlank()) { "App Group identifier must not be blank" }
+        appGroupIdentifier = identifier
+    }
     /**
      * Creates a SQLCipher-backed native driver for [databaseName].
      *
@@ -32,6 +40,7 @@ public actual class DriverFactory {
                 name = "$databaseName.db",
                 onConfiguration = { configuration ->
                     configuration.copy(
+                        extendedConfig = configuration.extendedConfig.copy(basePath = sharedDatabasePath(walletId)),
                         encryptionConfig = DatabaseConfiguration.Encryption(
                             key = encryptionKey.material.toSqlCipherPassphrase(),
                         )
@@ -91,6 +100,18 @@ public actual class DriverFactory {
      * Deletes the native database file and SQLite sidecar files for [databaseName].
      */
     public actual fun deleteDatabase(databaseName: String) {
-        DatabaseFileContext.deleteDatabase("$databaseName.db")
+        DatabaseFileContext.deleteDatabase("$databaseName.db", appGroupContainerPath())
     }
+
+    private fun sharedDatabasePath(walletId: String): String? = runCatching { appGroupContainerPath() }
+        .getOrElse { cause -> throw WalletPersistenceException.EncryptionConfigurationFailed(walletId, cause) }
+
+    /** Returns the App Group container path, or null when this wallet is not shared with an extension. */
+    private fun appGroupContainerPath(): String? = appGroupIdentifier?.let { identifier ->
+        NSFileManager.defaultManager
+            .containerURLForSecurityApplicationGroupIdentifier(identifier)
+            ?.path
+            ?: throw IllegalStateException("App Group container is unavailable: $identifier")
+    }
+
 }

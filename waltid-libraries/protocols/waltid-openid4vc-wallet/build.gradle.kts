@@ -75,12 +75,15 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
+            implementation(identityLibs.ktor.client.mock)
             implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
         }
 
         jvmTest.dependencies {
+            implementation(kotlin("test-junit5"))
             implementation(identityLibs.slf4j.simple)
             implementation(identityLibs.ktor.client.mock)
+            implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
         }
     }
 }

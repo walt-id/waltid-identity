@@ -9,9 +9,19 @@ struct ContentView: UIViewControllerRepresentable {
     let attestationBearerToken: String
     let attestationHostHeader: String
     let transactionDataProfilesUrl: String
+    /// App Group the Compose wallet shares with the document-provider extension.
+    let appGroupIdentifier: String
+    /// Build-expanded shared Keychain access group; empty when this build has no such entitlement.
+    let keychainAccessGroup: String
+    /// Called from Kotlin after the wallet's credential set changed, so this process can reconcile
+    /// Apple's registration store. Only the app may call `IdentityDocumentServices`.
+    let onDigitalCredentialRegistryChanged: () -> Void
 
     func makeUIViewController(context: Context) -> UIViewController {
         sharedUI.WalletDemoIosKt.walletDemoViewController(
+            appGroupIdentifier: appGroupIdentifier,
+            keychainAccessGroup: keychainAccessGroup,
+            onDigitalCredentialRegistryChanged: onDigitalCredentialRegistryChanged,
             walletId: walletId,
             attestationBaseUrl: attestationBaseUrl,
             attestationAttesterPath: attestationAttesterPath,
@@ -32,6 +42,9 @@ struct ContentView: UIViewControllerRepresentable {
         attestationAttesterPath: "",
         attestationBearerToken: "",
         attestationHostHeader: "",
-        transactionDataProfilesUrl: ""
+        transactionDataProfilesUrl: "",
+        appGroupIdentifier: "",
+        keychainAccessGroup: "",
+        onDigitalCredentialRegistryChanged: {}
     )
 }
