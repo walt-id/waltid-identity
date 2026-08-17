@@ -84,6 +84,19 @@ class SignedIssuerMetadataResolverTest {
     }
 
     @Test
+    fun futureIssuedAtDoesNotApplyWalletSpecificClockSkewPolicy() = runTest {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val jwt = key.signJws(
+            payload(issuedAt = JsonPrimitive(Clock.System.now().epochSeconds + 3_600)).toString().encodeToByteArray(),
+            signedMetadataHeaders(),
+        )
+
+        val resolved = trustedResolver(key, jwt).resolveCredentialIssuerMetadata(issuer)
+
+        assertIs<ResolvedCredentialIssuerMetadata.Signed>(resolved)
+    }
+
+    @Test
     fun quotedNumericClaimsAndMalformedOptionalIssuerAreRejected() = runTest {
         val key = JWKKey.generate(KeyType.Ed25519)
         listOf(

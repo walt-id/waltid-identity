@@ -170,9 +170,8 @@ class IssuerMetadataResolver(
         }.getOrElse { throw IllegalArgumentException("Signed Credential Issuer Metadata payload is not a JSON object", it) }
         val subject = payload.requiredString(JwtPayloadClaims.SUBJECT, "sub")
         payload.optionalString(JwtPayloadClaims.ISSUER, "iss")
-        val issuedAt = payload.requiredLong(JwtPayloadClaims.ISSUED_AT, "iat")
+        payload.requiredLong(JwtPayloadClaims.ISSUED_AT, "iat")
         val now = Clock.System.now().epochSeconds
-        require(issuedAt <= now + 60) { "Signed Credential Issuer Metadata iat is in the future" }
         payload.optionalLong(JwtPayloadClaims.EXPIRATION, "exp")?.let { expiry ->
             require(now < expiry) { "Signed Credential Issuer Metadata has expired" }
         }
