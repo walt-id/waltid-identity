@@ -41,7 +41,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import org.junit.Ignore
 import org.junit.Test
 import java.util.Base64
 import java.util.UUID
@@ -70,7 +69,7 @@ class MobileWalletIntegrationTest {
         private const val EUDI_EHIC_SD_JWT_CREDENTIAL_ID = "eu.europa.ec.eudi.ehic_sd_jwt_vc"
 
         private val DEMO_TRANSACTION_DATA_PROFILES = demoTransactionDataProfiles(
-            paymentAuthorizationFields = listOf("amount", "currency", "payee"),
+            paymentAuthorizationFields = listOf("merchant_name", "amount", "currency"),
         )
 
         private fun demoTransactionDataProfiles(
@@ -145,13 +144,11 @@ class MobileWalletIntegrationTest {
         previewAndSubmitEudiCredential(EUDI_EHIC_SD_JWT_CREDENTIAL_ID)
     }
 
-    @Ignore("Upstream issue: https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/172")
     @Test
     fun receiveAndPresentEudiPidSdJwtAgainstEudi() = runBlocking {
         receiveAndPresentEudiCredential(EUDI_PID_SD_JWT_CREDENTIAL_ID)
     }
 
-    @Ignore("Upstream issue: https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/172")
     @Test
     fun previewAndSubmitEudiPidSdJwtAgainstEudi() = runBlocking {
         previewAndSubmitEudiCredential(EUDI_PID_SD_JWT_CREDENTIAL_ID)
@@ -205,7 +202,7 @@ class MobileWalletIntegrationTest {
         assertTrue(
             transactionData.detailsJson.contains("\"amount\":\"42.00\"") &&
                 transactionData.detailsJson.contains("\"currency\":\"EUR\"") &&
-                transactionData.detailsJson.contains("\"payee\":\"ACME Corp\""),
+                transactionData.detailsJson.contains("\"merchant_name\":\"ACME Corp\""),
             "Preview should expose readable payment details: ${transactionData.detailsJson}",
         )
         val result = client.submitPresentation(

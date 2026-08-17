@@ -1,6 +1,7 @@
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
@@ -149,8 +150,10 @@ class Crypto2W3cCredentialTest {
         val fullKeyId = "$issuerDid#signing-key"
         val didKey = "did:key:z6MkhYjV5FQHjGQm1JwPz"
         val didKeyVerificationMethod = "$didKey#${didKey.removePrefix("did:key:")}"
+        val webKey = key("signing-key")
+        val webThumbprint = publicJwkThumbprint(webKey)
 
-        assertEquals("$issuerDid#signing-key", Issuer.getKidHeader(key("signing-key"), issuerDid))
+        assertEquals("$issuerDid#$webThumbprint", Issuer.getKidHeader(webKey, issuerDid))
         assertEquals(fullKeyId, Issuer.getKidHeader(key(fullKeyId), issuerDid))
         assertEquals(
             didKeyVerificationMethod,
@@ -158,6 +161,9 @@ class Crypto2W3cCredentialTest {
         )
         assertEquals(didKeyVerificationMethod, Issuer.getKidHeader(key(didKeyVerificationMethod), didKey))
     }
+
+    private suspend fun publicJwkThumbprint(key: Key) =
+        Jwk.sha256Thumbprint(key.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(key.spec))
 
     private suspend fun key(id: String = "w3c-key") = runtime.generateSoftwareKey(
         GenerateSoftwareKeyRequest(

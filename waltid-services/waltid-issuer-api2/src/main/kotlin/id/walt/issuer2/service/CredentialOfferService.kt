@@ -60,6 +60,7 @@ class CredentialOfferService(
                         session = oauthSession,
                         scopes = emptySet(),
                         audience = emptySet(),
+                        issuanceSessionId = sessionId,
                     )
                 )
                 resolvedTxCodeValue = preAuthorizedCode.txCodeValue
