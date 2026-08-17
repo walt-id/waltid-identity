@@ -1,8 +1,15 @@
+<div align="center">
+<img src="assets/walt-banner.png" alt="walt.id banner" />
 
+  <p>Multi-Platform libraries, powerful APIs and easy-to-use white label apps to build identity and wallet solutions <span>by </span><a href="https://walt.id">walt.id</a></p>
 
-Multi-Platform libraries, powerful APIs and easy-to-use white label apps to build identity and wallet solutions by [walt.id](https://walt.id)
-
-
+<a href="https://walt.id/community">
+<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
+</a>
+<a href="https://www.linkedin.com/company/walt-id/">
+<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
+</a>
+</div>
 
 ## Getting Started
 
