@@ -2,6 +2,10 @@
 import type { useSwaggerExamples } from "~/composables/useSwaggerExamples";
 import type { useIssuerSession } from "~/composables/useIssuerSession";
 import type { useProfiles } from "~/composables/useProfiles";
+import {
+  DC_API_ISSUANCE_DOCS_URL,
+  getDcApiIssuanceSupport,
+} from "~/utils/dcApiIssuance";
 
 const props = defineProps<{
   swagger: ReturnType<typeof useSwaggerExamples>;
@@ -15,6 +19,17 @@ const selectedIndex = defineModel<number>("selectedIndex", { default: 0 });
 const keyJson = ref("");
 const x5ChainValues = ref([""]);
 const optionsError = ref<string | null>(null);
+const useDcApi = ref(false);
+const dcApiMediationRequired = ref(false);
+const dcApiSupport = ref(getDcApiIssuanceSupport());
+
+onMounted(() => {
+  dcApiSupport.value = getDcApiIssuanceSupport();
+});
+
+watch(useDcApi, (enabled) => {
+  if (enabled) dcApiSupport.value = getDcApiIssuanceSupport();
+});
 
 // The profile selected in the dropdown. This overrides the (hardcoded) profileId
 // that ships in the Swagger example payload.
@@ -30,7 +45,11 @@ const canSubmit = computed(() => {
   }
 });
 const submitDisabled = computed(
-  () => !canSubmit.value || !!optionsError.value || props.session.loading.value,
+  () =>
+    !canSubmit.value ||
+    !!optionsError.value ||
+    props.session.loading.value ||
+    (useDcApi.value && !dcApiSupport.value.supported),
 );
 
 function readPayload(): Record<string, unknown> {
@@ -64,8 +83,18 @@ function applyOverride() {
   }
 }
 
+/** Keep the user's Credential Type when swapping swagger offer examples. */
+function mapExamplePayload(payload: unknown): unknown {
+  const obj = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
+  if (selectedProfile.value) {
+    obj.profileId = selectedProfile.value;
+  }
+  return obj;
+}
+
 // Initialise the dropdown once profiles + payload are available: prefer the
 // profileId already present in the example, otherwise the first profile.
+// Never re-sync from payload after the user (or init) has chosen a profile.
 watch(
   [() => props.profiles.profiles.value, json],
   () => {
@@ -75,7 +104,6 @@ watch(
     const matchesPayload =
       !!fromPayload && list.some((p) => p.profileId === fromPayload);
     selectedProfile.value = matchesPayload ? fromPayload! : list[0]!.profileId;
-    // If the example shipped a profileId we don't recognise, align the payload now.
     if (!matchesPayload) applyOverride();
     props.profiles.loadDetail(selectedProfile.value);
   },
@@ -184,7 +212,7 @@ watch(
 
 watch(selectedIndex, () =>
   nextTick(() => {
-    applyOverride();
+    // JsonEditor already stamped selectedProfile via mapExamplePayload.
     applySecurityOverridesToJson();
   }),
 );
@@ -193,7 +221,11 @@ async function submit() {
   const payload = applySecurityOverridesToJson();
   if (!payload) return;
 
-  await props.session.createOffer(payload);
+  if (useDcApi.value) {
+    await props.session.createDcApiOffer(payload, dcApiMediationRequired.value);
+  } else {
+    await props.session.createOffer(payload);
+  }
 }
 </script>
 
@@ -252,6 +284,7 @@ async function submit() {
       :loading="swagger.loading.value"
       :error="swagger.error.value"
       :warning="credentialDataOverrideWarning"
+      :map-example-payload="mapExamplePayload"
       @reload="swagger.load()"
     />
 
@@ -335,6 +368,49 @@ async function submit() {
         </p>
       </div>
     </details>
+
+    <div
+      class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900"
+    >
+      <label class="inline-flex items-center gap-2 font-medium">
+        <input v-model="useDcApi" type="checkbox" />
+        Deliver via Digital Credentials API
+      </label>
+      <p class="mt-1 text-xs text-blue-800">
+        Creates a by-value OpenID4VCI offer, embeds issuer/AS metadata, and calls
+        <code>navigator.credentials.create</code> with protocol
+        <code>openid4vci-v1</code> to engage a wallet. Browser handoff
+        cancellation or failure is shown as non-fatal feedback; the result log
+        follows issuer OpenID4VCI SSE events.
+      </p>
+      <label
+        v-if="useDcApi"
+        class="mt-3 inline-flex items-center gap-2 font-medium"
+      >
+        <input v-model="dcApiMediationRequired" type="checkbox" />
+        mediation: required
+      </label>
+      <div
+        v-if="useDcApi && !dcApiSupport.supported"
+        class="mt-2 text-xs text-amber-900 rounded-md border border-amber-200 bg-amber-50 p-3 space-y-2"
+      >
+        <p class="font-medium">
+          Digital Credentials API issuance is not available in this browser.
+        </p>
+        <p>{{ dcApiSupport.reason }}</p>
+        <p>
+          Uncheck DC API delivery to use QR / deep link, or see the
+          <a
+            :href="DC_API_ISSUANCE_DOCS_URL"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="underline font-medium"
+          >
+            Chrome Digital Credentials API issuance docs
+          </a>.
+        </p>
+      </div>
+    </div>
 
     <div class="flex items-center gap-3">
       <button

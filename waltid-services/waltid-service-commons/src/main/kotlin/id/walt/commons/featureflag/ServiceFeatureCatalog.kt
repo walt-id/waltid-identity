@@ -7,5 +7,7 @@ interface ServiceFeatureCatalog {
 
     val baseFeatures: List<BaseFeature>
     val optionalFeatures: List<OptionalFeature>
+    val deprecatedFeatures: List<String>
+        get() = emptyList()
 
 }

@@ -127,7 +127,13 @@ body {
     background: var(--color-terminal-bg);
     color: var(--color-terminal-text);
     resize: vertical;
-    min-height: 320px;
+    min-height: 220px;
+  }
+
+  @media (min-width: 768px) {
+    .form-textarea {
+      min-height: 320px;
+    }
   }
 
   .log-box {

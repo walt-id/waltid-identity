@@ -41,7 +41,13 @@ session state while the application collects a separately delivered transaction
 code when the issuer requires one:
 
 ```kotlin
-val session = wallet.startIssuance(MobileWalletIssuanceRequest(offerUrl = offerUrl))
+val session = wallet.startIssuance(
+    MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(offerUrl))
+)
+// Or, for Digital Credentials API CREATE_CREDENTIAL handoffs:
+// val session = wallet.startIssuance(
+//     MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.InlineJson(offerJson))
+// )
 val transactionCode = session.offer.transactionCode?.let { requirement ->
     collectTransactionCode(
         inputMode = requirement.inputMode ?: "numeric",
@@ -53,6 +59,13 @@ val outcome = wallet.continuePreAuthorizedIssuance(session.id, transactionCode)
 val credentialIds = (outcome as? WalletIssuanceOutcome.Stored)?.credentialIds
     ?: error("Issuance did not store credentials: $outcome")
 ```
+
+`MobileWalletCredentialOffer.Uri` is used for deep-link / QR offers.
+`MobileWalletCredentialOffer.InlineJson` is the Credential Offer object from an
+OpenID4VCI Digital Credentials create request (`openid4vci-v1`). On Android, use
+`AndroidDigitalCredentialCreateProvider` to extract that request from Credential
+Manager and `AndroidDigitalCredentialRegistry.registerCreationOptions` to
+advertise issuance capability separately from presentation registry replacement.
 
 The session contains typed issuer, credential-configuration, and transaction-code
 metadata for review UI. For an authorization-code offer, call

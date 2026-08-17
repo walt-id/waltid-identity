@@ -29,6 +29,7 @@ object W3CPresenter {
         authorizationRequest: AuthorizationRequest,
         holderKey: Key,
         holderDid: String,
+        holderBindingAudience: String? = null,
     ): JsonPrimitive = presentW3CWithKey(
         digitalCredential,
         matchResult,
@@ -36,6 +37,7 @@ object W3CPresenter {
         holderKey,
         holderDid,
         null,
+        holderBindingAudience,
     )
 
     suspend fun presentW3C(
@@ -44,6 +46,7 @@ object W3CPresenter {
         authorizationRequest: AuthorizationRequest,
         holderKey: Crypto2Key,
         holderDid: String,
+        holderBindingAudience: String? = null,
     ): JsonPrimitive = presentW3CWithKey(
         digitalCredential,
         matchResult,
@@ -51,6 +54,7 @@ object W3CPresenter {
         null,
         holderDid,
         holderKey,
+        holderBindingAudience,
     )
 
     @Deprecated("Use the Crypto2Key overload")
@@ -61,6 +65,7 @@ object W3CPresenter {
         holderKey: Key,
         holderDid: String,
         holderCrypto2Key: Crypto2Key?,
+        holderBindingAudience: String? = null,
     ): JsonPrimitive = presentW3CWithKey(
         digitalCredential,
         matchResult,
@@ -68,6 +73,7 @@ object W3CPresenter {
         holderKey,
         holderDid,
         holderCrypto2Key,
+        holderBindingAudience,
     )
 
     private suspend fun presentW3CWithKey(
@@ -77,6 +83,7 @@ object W3CPresenter {
         holderKey: Key?,
         holderDid: String,
         holderCrypto2Key: Crypto2Key?,
+        holderBindingAudience: String? = null,
     ): JsonPrimitive {
         val selectedClaimsMap = matchResult.selectedDisclosures
 
@@ -103,11 +110,13 @@ object W3CPresenter {
                 transactionData = authorizationRequest.transactionData,
                 credentialId = matchResult.originalQuery.id,
             )
+            // DC API binds the holder to the platform-asserted origin, not to client_id.
+            val audience = holderBindingAudience ?: authorizationRequest.clientId
             val kbJwtString = holderCrypto2Key?.let {
                 createKeyBindingJwt(
                     disclosed,
                     authorizationRequest.nonce!!,
-                    authorizationRequest.clientId,
+                    audience,
                     disclosuresToPresent,
                     it,
                     transactionData,
@@ -116,7 +125,7 @@ object W3CPresenter {
             } ?: createKeyBindingJwt(
                 disclosed,
                 authorizationRequest.nonce!!,
-                authorizationRequest.clientId,
+                audience,
                 disclosuresToPresent,
                 requireNotNull(holderKey),
                 transactionData,
@@ -132,7 +141,7 @@ object W3CPresenter {
             val presentationBuilder = PresentationBuilder().apply {
                 this.did = holderDid
                 this.nonce = authorizationRequest.nonce!!
-                this.audience = authorizationRequest.clientId
+                this.audience = holderBindingAudience ?: authorizationRequest.clientId
                 addCredential(
                     JsonPrimitive(
                         digitalCredential.signed ?: error("Signed W3C VC JWT missing for $digitalCredential")

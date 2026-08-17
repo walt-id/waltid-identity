@@ -266,7 +266,7 @@ class StatusListSignatureVerifierTest {
         val verificationMethodId = DidService.resolveToCrypto2Keys(did).getOrThrow().single().id.value
         val protectedHeaders = CoseHeaders(
             algorithm = -8, // EdDSA
-            contentType = id.walt.cose.CoseContentType.AsString("statuslist+cwt"),
+            type = id.walt.cose.CoseContentType.AsString("application/statuslist+cwt"),
             kid = verificationMethodId.encodeToByteArray() // ISO 18013-5 Second Edition: kid in protected headers
         )
         

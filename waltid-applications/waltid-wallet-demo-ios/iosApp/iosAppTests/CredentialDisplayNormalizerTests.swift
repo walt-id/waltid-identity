@@ -1,7 +1,7 @@
 import Foundation
+import WalletDemoSharingUI
 import WalletSDK
 import XCTest
-@testable import iosApp
 
 final class CredentialDisplayNormalizerTests: XCTestCase {
 
@@ -812,21 +812,21 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                     type: "org.waltid.transaction-data.payment-authorization",
                     displayName: "Payment Authorization",
                     credentialQueryIDs: ["pid", "payment"],
-                    supportedFields: ["amount", "currency", "payee"],
+                    supportedFields: ["merchant_name", "amount", "currency"],
                     rawJSON: """
                     {
                       "type": "org.waltid.transaction-data.payment-authorization",
                       "credential_ids": ["pid", "payment"],
+                      "merchant_name": "ACME Corp",
                       "amount": "42.00",
-                      "currency": "EUR",
-                      "payee": "ACME Corp"
+                      "currency": "EUR"
                     }
                     """,
                     detailsJSON: """
                     {
+                      "merchant_name": "ACME Corp",
                       "amount": "42.00",
-                      "currency": "EUR",
-                      "payee": "ACME Corp"
+                      "currency": "EUR"
                     }
                     """
                 )
@@ -839,12 +839,12 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         })
 
         XCTAssertEqual(payment.title, "Payment Authorization")
-        XCTAssertEqual(Array(payment.items.prefix(3).map(\.label)), ["Amount", "Currency", "Payee"])
+        XCTAssertEqual(Array(payment.items.prefix(3).map(\.label)), ["Merchant name", "Amount", "Currency"])
         XCTAssertEqual(valuesByLabel["Type"], "org.waltid.transaction-data.payment-authorization")
         XCTAssertEqual(valuesByLabel["Credential queries"], "pid, payment")
+        XCTAssertEqual(valuesByLabel["Merchant name"], "ACME Corp")
         XCTAssertEqual(valuesByLabel["Amount"], "42.00")
         XCTAssertEqual(valuesByLabel["Currency"], "EUR")
-        XCTAssertEqual(valuesByLabel["Payee"], "ACME Corp")
     }
 
     func testParsesStoredIssuerDisplayFromMetadataJSON() {

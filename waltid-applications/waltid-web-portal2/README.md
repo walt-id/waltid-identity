@@ -32,9 +32,9 @@ The portal acts as a frontend that orchestrates these services to demonstrate cr
 
 This portal enables users to:
 
-- **Issue Credentials**: Create credential offers using custom JSON payloads and send them to wallets via OpenID4VCI
+- **Issue Credentials**: Create credential offers using custom JSON payloads and send them to wallets via OpenID4VCI (QR / deep link or Digital Credentials API)
 - **Select a Profile**: Choose an issuance profile from a dropdown (loaded from `/issuer2/profiles`). The selection overrides the `profileId` in the payload, and the full profile definition (`/issuer2/profiles/{profileId}`) is available in a collapsible JSON viewer
-- **Verify Credentials**: Request credential presentations from wallets using OpenID4VP
+- **Verify Credentials**: Request credential presentations from wallets using OpenID4VP (including Digital Credentials API flows)
 - **Load Examples**: Auto-populate payloads from OpenAPI/Swagger specs served by the backend
 - **Read the Docs**: Jump to the relevant Issuer/Verifier API docs from each tab
 - **Monitor Events**: Watch real-time protocol events stream in as wallets interact with the portal
@@ -46,23 +46,38 @@ This portal enables users to:
 
 **Quickstart Guide**: Follow our [5-minute quickstart guide](https://docs.walt.id/community-stack/home/quickstart-5-min) for a walkthrough of the credential flows.
 
-> **Note on `dc_api` examples**: Verifier Swagger examples whose title contains `dc_api` are currently filtered out of the dropdown. They use the W3C Digital Credentials API flow, which the current QR-based logic does not yet support. This filter will be removed once that handling is ported.
-
 ## Key Concepts
 
 ### Credential Issuance Flow
 
 1. **Edit Payload**: Select a Swagger example or write a custom JSON credential offer payload
 2. **Create Offer**: Portal calls the Issuer API to generate a credential offer
-3. **Scan QR Code**: A QR code is displayed for the wallet to scan (enter PIN if required)
-4. **Monitor Events**: Real-time SSE events show each step (`OFFER_RECEIVED`, `CREDENTIAL_ISSUED`, etc.)
+3. **Deliver to wallet** using one of:
+   - **QR / deep link**: A QR code is displayed for the wallet to scan (enter PIN if required)
+   - **Digital Credentials API**: The portal enriches the offer with issuer/AS metadata and calls `navigator.credentials.create` with protocol `openid4vci-v1` to engage a wallet (Chrome may show a proximity QR). Browser create() handoff success/failure is ignored; the result log follows issuer OpenID4VCI SSE only. The issuer stays standard OpenID4VCI — there is no issuer-side DC API protocol mode.
+4. **Monitor Events**: Real-time SSE events show each issuer step (`requested_token`, `generated_mdoc`, `issuance_status`, etc.)
 5. **Wallet Receives**: User accepts the credential in their wallet
+
+#### Digital Credentials API issuance requirements
+
+DC API issuance is experimental (Chrome origin trial). Official setup guide:
+[Digital Credentials API for credential issuance](https://developer.chrome.com/blog/digital-credentials-api-143-issuance-ot).
+
+To try it:
+
+- Chrome 143+ on desktop and/or Android
+- Enable `chrome://flags/#web-identity-digital-credentials-creation`
+- Google Play services 24.0+ on Android, plus a compatible wallet (for example CMWallet)
+- Prefer HTTPS (or localhost) so the page is a secure context
+- Hosted demos may also need a Chrome origin-trial token for the site origin
+
+If DC API is unavailable, the portal disables that delivery option and links to the docs above — use QR / deep link instead. The issuer API is unchanged.
 
 ### Credential Verification Flow
 
 1. **Edit Payload**: Select a Swagger example or write a custom JSON verification request
 2. **Create Session**: Portal calls the Verifier API to generate an authorization request
-3. **Scan QR Code**: A QR code is displayed for the wallet to scan
+3. **Scan QR Code** or complete a **Digital Credentials API** verification session
 4. **Monitor Events**: Real-time SSE events show each step of the presentation exchange
 5. **View Results**: Verified claims are extracted and displayed after a successful presentation
 

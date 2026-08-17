@@ -40,7 +40,9 @@ object OSSVerifier2Manager {
     suspend fun createVerificationSession(setup: VerificationSessionSetup): Verification2Session {
         val inlineLegacyKey = setup.core.key?.key
         val configuredKey = if (inlineLegacyKey == null) configuredSigningKey() else null
-        val clientId = setup.core.clientId ?: config.clientId
+        val clientId =
+            setup.core.clientId?.takeIf { it.isNotBlank() }
+                ?: config.clientId?.takeIf { it.isNotBlank() }
         val clientMetadata = setup.core.clientMetadata ?: config.clientMetadata
         val urlPrefix = if (setup is UrlBearingDeviceFlowSetup) setup.urlConfig.urlPrefix ?: config.urlPrefix else null
         val urlHost = when (setup) {

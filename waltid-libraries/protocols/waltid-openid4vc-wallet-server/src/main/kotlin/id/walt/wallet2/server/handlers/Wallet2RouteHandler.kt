@@ -154,18 +154,28 @@ object Wallet2RouteHandler {
         getAccountId: (suspend RoutingCall.() -> String?)?,
         attestationAssembler: ClientAttestationAssembler?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
-        /**
-         * `transaction_data` types this wallet claims to understand.
-         *
-         * OpenID4VP 1.0 5.1 requires rejecting a request carrying any unrecognised type, so an empty
-         * registry means "supports none" - a safe default, but it has to be configurable or the
-         * feature can never be enabled.
-         */
-        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+    ) = registerWallet2Routes(
+        resolver,
+        getAccountId,
+        attestationAssembler,
+        clientIdTrustConfiguration,
+        TransactionDataTypeRegistry(emptySet()),
+    )
+
+    fun Route.registerWallet2Routes(
+        resolver: WalletResolver,
+        getAccountId: (suspend RoutingCall.() -> String?)?,
+        attestationAssembler: ClientAttestationAssembler?,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ) {
         route("/wallet", { tags = listOf(WALLET_MANAGEMENT_TAG) }) {
             registerWalletManagementRoutes(
-                resolver, getAccountId, attestationAssembler, clientIdTrustConfiguration, transactionDataTypeRegistry
+                resolver = resolver,
+                getAccountId = getAccountId,
+                attestationAssembler = attestationAssembler,
+                clientIdTrustConfiguration = clientIdTrustConfiguration,
+                transactionDataTypeRegistry = transactionDataTypeRegistry,
             )
         }
         if (getAccountId == null) {
@@ -184,7 +194,7 @@ object Wallet2RouteHandler {
         getAccountId: (suspend RoutingCall.() -> String?)?,
         attestationAssembler: ClientAttestationAssembler?,
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
-        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ) {
 
         post("", Wallet2OpenApiDocs.createWallet()) {
@@ -800,6 +810,7 @@ object Wallet2RouteHandler {
                             WalletPresentationHandler.presentCredentialWithTrust(
                                 wallet = wallet,
                                 request = req,
+                                onEvent = {},
                                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )
@@ -817,6 +828,7 @@ object Wallet2RouteHandler {
                             WalletPresentationHandler.presentCredentialIsolatedWithTrust(
                                 wallet = wallet,
                                 request = req,
+                                onEvent = {},
                                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )
@@ -874,6 +886,7 @@ object Wallet2RouteHandler {
                             WalletPresentationHandler.buildVpToken(
                                 wallet = wallet,
                                 request = req,
+                                transactionDataTypeRegistry = transactionDataTypeRegistry,
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )
                         )
@@ -895,6 +908,7 @@ object Wallet2RouteHandler {
                             WalletPresentationHandler.sendAuthorizationResponse(
                                 wallet = wallet,
                                 request = req,
+                                transactionDataTypeRegistry = transactionDataTypeRegistry,
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
                             )
                         )

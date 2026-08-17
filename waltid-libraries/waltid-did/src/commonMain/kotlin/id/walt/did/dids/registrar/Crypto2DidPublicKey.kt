@@ -1,12 +1,15 @@
 package id.walt.did.dids.registrar
 
+import id.walt.crypto.keys.PublicKeyIds
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.publicOnly
 import id.walt.crypto2.keys.toPublicJwk
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 private val privateJwkMembers = setOf("d", "p", "q", "dp", "dq", "qi", "oth", "k")
 
@@ -20,5 +23,11 @@ internal suspend fun Key.exportPublicJwkObject(): JsonObject {
     }
     val json = Json.parseToJsonElement(publicJwk.data.toByteArray().decodeToString()).jsonObject
     require(privateJwkMembers.none(json::containsKey)) { "Public-key export contains private JWK material" }
-    return json
+    val kid = json["kid"]?.jsonPrimitive?.contentOrNull
+    // Vault/HTTP kids are ops locators — never embed them in DID documents.
+    return if (kid != null && PublicKeyIds.isHttpKeyId(kid)) {
+        JsonObject(json.toMutableMap().apply { remove("kid") })
+    } else {
+        json
+    }
 }

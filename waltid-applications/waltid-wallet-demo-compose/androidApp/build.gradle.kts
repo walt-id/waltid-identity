@@ -57,16 +57,37 @@ android {
             jvmTarget.set(JvmTarget.fromTarget(javaVersion.toString()))
         }
     }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
     implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedLogic"))
     implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedUI"))
+    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
     implementation(identityLibs.androidx.activity.compose)
+    implementation(identityLibs.androidx.credentials.registry.provider)
+    debugImplementation(identityLibs.androidx.credentials.play.services.auth)
+    debugImplementation(identityLibs.androidx.lifecycle.runtime.ktx)
+    implementation(identityLibs.kotlinx.coroutines.android)
+    implementation(identityLibs.kotlinx.serialization.json)
+
+    testImplementation(kotlin("test"))
+    testImplementation(identityLibs.junit)
+    testImplementation(identityLibs.robolectric)
 
     androidTestImplementation(identityLibs.androidx.test.ext.junit)
     androidTestImplementation(identityLibs.androidx.test.runner)
     androidTestImplementation(identityLibs.androidx.test.uiautomator)
     androidTestImplementation(identityLibs.ktor.client.android)
     androidTestImplementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
+    // The Annex C E2E is its own reader, because Annex C has no back-channel: the encrypted
+    // DeviceResponse returns through the OS to whoever called getCredential. It builds the request
+    // and decrypts the response with the same shared code the deployed verifier runs.
+    androidTestImplementation(project(":waltid-libraries:protocols:waltid-18013-7-verifier"))
+    androidTestImplementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
+    androidTestImplementation(project(":waltid-libraries:crypto:waltid-crypto2"))
+    androidTestImplementation(project(":waltid-libraries:crypto:waltid-cose"))
 }

@@ -163,7 +163,7 @@ final class id.walt.wallet2.persistence.encryption/DatabaseEncryptionKey { // id
 }
 
 final class id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider : id.walt.wallet2.persistence.encryption/DatabaseEncryptionKeyProvider { // id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider|null[0]
-    constructor <init>() // id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider.<init>|<init>(){}[0]
+    constructor <init>(kotlin/String? = ...) // id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider.<init>|<init>(kotlin.String?){}[0]
 
     final suspend fun deleteKey(kotlin/String, kotlin/String) // id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider.deleteKey|deleteKey(kotlin.String;kotlin.String){}[0]
     final suspend fun getOrCreateKey(kotlin/String, kotlin/String): id.walt.wallet2.persistence.encryption/DatabaseEncryptionKey // id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider.getOrCreateKey|getOrCreateKey(kotlin.String;kotlin.String){}[0]
@@ -182,6 +182,7 @@ final class id.walt.wallet2.persistence.stores/DriverFactory { // id.walt.wallet
 
     final fun createEncryptedDriver(kotlin/String, id.walt.wallet2.persistence.encryption/DatabaseEncryptionKey, kotlin/Boolean = ..., kotlin/String = ...): app.cash.sqldelight.db/SqlDriver // id.walt.wallet2.persistence.stores/DriverFactory.createEncryptedDriver|createEncryptedDriver(kotlin.String;id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey;kotlin.Boolean;kotlin.String){}[0]
     final fun deleteDatabase(kotlin/String) // id.walt.wallet2.persistence.stores/DriverFactory.deleteDatabase|deleteDatabase(kotlin.String){}[0]
+    final fun useAppGroup(kotlin/String): id.walt.wallet2.persistence.stores/DriverFactory // id.walt.wallet2.persistence.stores/DriverFactory.useAppGroup|useAppGroup(kotlin.String){}[0]
 }
 
 final class id.walt.wallet2.persistence.stores/SqlDelightCredentialStore : id.walt.wallet2.data/WalletCredentialStore { // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore|null[0]

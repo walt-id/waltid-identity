@@ -23,6 +23,7 @@ import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequestInfo
+import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.mdoc.objects.deviceretrieval.UseCase
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
@@ -34,8 +35,7 @@ import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionDataStructure
 import id.walt.verifier2.data.*
-import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthentication
-import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthenticationAll
+import id.walt.verifier2.handlers.authrequest.Verifier2RequestObjectKid
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
@@ -94,16 +94,9 @@ object VerificationSessionCreator {
     ): List<Policy> =
         if (!shouldInclude || any { it.id == policy.id || it.id in equivalentPolicyIds }) this else this + policy
 
-    private suspend fun getKid(clientId: String?, key: VerifierSigningKey): String {
-        val keyId = when (key) {
-            is VerifierSigningKey.Legacy -> key.key.getKeyId()
-            is VerifierSigningKey.Crypto2 -> key.key.id.value
-        }
-        val prefix = "decentralized_identifier:"
-        return clientId
-            ?.takeIf { it.startsWith(prefix) && it.substringAfter(prefix).isNotBlank() }
-            ?.let { "${it.substringAfter(prefix)}#$keyId" }
-            ?: keyId
+    private suspend fun getKid(clientId: String?, key: VerifierSigningKey): String = when (key) {
+        is VerifierSigningKey.Legacy -> Verifier2RequestObjectKid.forClient(clientId, key.key)
+        is VerifierSigningKey.Crypto2 -> Verifier2RequestObjectKid.forClient(clientId, key.key)
     }
 
     @Deprecated("Use the crypto2 Key overload with explicit JWS and COSE algorithms for signed sessions")
@@ -198,7 +191,7 @@ object VerificationSessionCreator {
         val isSiop = responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN
         require(!isSiop || isCrossDevice) { "SIOPv2 combined responses require an OpenID4VP cross-device flow" }
         val origins =
-            if (setup is DcApiAnnexDFlowSetup) setup.expectedOrigins else if (setup is DcApiAnnexCFlowSetup) listOf(setup.origin) else null
+            if (setup is DcApiAnnexDFlowSetup) setup.expectedOrigins else if (setup is DcApiAnnexCFlowSetup) setup.expectedOrigins else null
 
         var ephemeralKey: JWKKey? = null
         var crypto2EphemeralKey: SoftwareKey? = null
@@ -207,10 +200,24 @@ object VerificationSessionCreator {
         if (isDcApi) {
             require(urlPrefix == null) { "URL prefix is not used for DC API" }
             require(!urlHost.startsWith("openid4vp://authorize")) { "URL Host has to be set to the DC API origin" }
-            if (isSignedRequest && !isAnnexC) {
-                require(!clientId.isNullOrBlank()) { "Signed DC API requests require non-empty client_id" }
-            }
         }
+
+        require(isCrossDevice || isDcApi || isAnnexC) { "No flow is selected" }
+        val responseUri = when {
+            isDcApi || isAnnexC -> null
+            isCrossDevice -> {
+                requireNotNull(urlPrefix) { "urlPrefix is required for cross-device flows" }
+                "$urlPrefix/$sessionId/response"
+            }
+            else -> throw IllegalStateException("No flow is selected")
+        }
+        val effectiveClientId = resolveEffectiveClientId(
+            clientId = clientId,
+            isSignedRequest = isSignedRequest,
+            isDcApi = isDcApi,
+            isAnnexC = isAnnexC,
+            responseUri = responseUri,
+        )
 
         // Preserve OpenID4VP 1.0 algorithms while also advertising fully specified identifiers.
         val supportedJwsAlgorithms = JsonArray(
@@ -325,7 +332,6 @@ object VerificationSessionCreator {
 
 
         // TODO: Annex C is actually a kind of DC API...
-        require(isCrossDevice || isDcApi || isAnnexC) { "No flow is selected" } // list all flows here
         val nonce = Uuid.random().toString()
         val state = if (!isDcApi) Uuid.random().toString() else null
 
@@ -342,27 +348,6 @@ object VerificationSessionCreator {
 
         // TODO: Build AuthorizationRequest based on preset
 
-        // OID4VP 1.0 §5.9.3-3.1.1 requires a `redirect_uri` client identifier to be the Response URI
-        // itself, which only exists once the session id has been generated. Callers therefore pass the
-        // bare prefix and it is completed here - a bare prefix carries no URI and is not a usable
-        // client identifier on its own, so this is unambiguous.
-        //
-        // Hoisted out of the AuthorizationRequest below because the bootstrap request must advertise
-        // the same client_id.
-        val responseUri = when {
-            isDcApi || isAnnexC -> null
-            isCrossDevice -> "$urlPrefix/$sessionId/response" // For Cross-Device flow (direct_post, direct_post.jwt)
-            else -> throw IllegalStateException("No flow is selected")
-        }
-        val resolvedClientId = if (clientId == REDIRECT_URI_CLIENT_ID_PREFIX) {
-            "$REDIRECT_URI_CLIENT_ID_PREFIX:" + requireNotNull(responseUri) {
-                "A redirect_uri client identifier is the Response URI, so it is only available for " +
-                    "cross-device flows"
-            }
-        } else {
-            clientId
-        }
-
         val bootstrapAuthorizationRequest = if (isDcApi) null
         else AuthorizationRequest(
             // TODO: url building (handle host alias)
@@ -372,7 +357,7 @@ object VerificationSessionCreator {
             // request_uri_method=post so wallets can send wallet_nonce to prevent replay.
             requestUriMethod = if (isSignedRequest) RequestUriHttpMethod.POST else null,
 
-            clientId = resolvedClientId,
+            clientId = effectiveClientId,
 
             nonce = null, // not required in the initial request yet
             responseType = null
@@ -395,8 +380,6 @@ object VerificationSessionCreator {
             .mapNotNull { credentialId -> credentialQueriesById?.get(credentialId)?.format }
             .toSet()
 
-        val effectiveClientId = if ((isDcApi && !isSignedRequest) || isAnnexC) null else resolvedClientId
-
         val authorizationRequest = AuthorizationRequest(
             responseType = if (!isAnnexC) responseType else null,
 
@@ -405,6 +388,7 @@ object VerificationSessionCreator {
             clientId = effectiveClientId,
             issuer = effectiveClientId.takeIf { isSignedRequest },
             redirectUri = null, // For Same-Device flow (fragment/query/after code exchange etc)
+            // TODO: url building (handle host alias)
             responseUri = responseUri,
             scope = openIdConfig?.scope,//OPTIONAL. OAuth 2.0 Scope value. Can be used for pre-defined DCQL queries or OpenID Connect scopes (e.g., "openid").
             state = state, // Opaque value used by the Verifier to maintain state between the request and callback.
@@ -473,7 +457,7 @@ object VerificationSessionCreator {
 
             val headers = hashMapOf<String, JsonElement>(
                 "typ" to JsonPrimitive("oauth-authz-req+jwt"),
-                "kid" to JsonPrimitive(getKid(clientId, requestSigningKey))
+                "kid" to JsonPrimitive(getKid(effectiveClientId, requestSigningKey))
             )
             if (x5c != null) headers["x5c"] = JsonArray(x5c.map { JsonPrimitive(it) })
 
@@ -491,6 +475,12 @@ object VerificationSessionCreator {
             requestSigningKey.signJws(Json.encodeToString(payloadWithAud).encodeToByteArray(), headers)
         } else null
 
+        if (isSignedRequest) {
+            requireNotNull(signedAuthorizationRequest) {
+                "Signed authorization request could not be created although signedRequest=true"
+            }
+        }
+
         val effectiveVpPolicies = (setup.core.policies.vp_policies ?: defaultVpPolicies())
             .withMandatoryTransactionDataPolicies(transactionDataFormats)
         val effectivePolicies = Verification2Session.DefinedVerificationPolicies(
@@ -503,6 +493,10 @@ object VerificationSessionCreator {
 
         val customData = when {
             isAnnexC -> {
+                val annexCSetup = setup
+                val annexCRequestedElements = requireNotNull(annexCSetup.coreFlow.requestedElements) {
+                    "core_flow.requestedElements is required for ISO 18013-7 DC API"
+                }
 
                 val encryptionInfoObj = DCAPIEncryptionInfo(
                     nonce = nonce.toByteArray(),
@@ -524,11 +518,11 @@ object VerificationSessionCreator {
                     // Build the DC API Session Transcript
                     val sessionTranscript = AnnexCTranscriptBuilder.buildSessionTranscript(
                         encryptionInfoB64 = encryptionInfoB64,
-                        origin = setup.origin
+                        origin = annexCSetup.origin
                     )
 
                     // Prepare the base request without signatures
-                    val initialDeviceRequest = DeviceRequest(setup.requestedElements)
+                    val initialDeviceRequest = DeviceRequest(annexCRequestedElements)
 
                     // Create the DeviceRequestInfo (Use Cases)
                     // By grouping all indices into a single documentSet, we make ALL requested documents mandatory.
@@ -551,18 +545,13 @@ object VerificationSessionCreator {
 
                     // Generate readerAuth for EACH document requested (Per-Document Signature)
                     val signedDocRequests = initialDeviceRequest.docRequests.map { docReq ->
-                        val itemsRequestBytes = docReq.itemsRequest.serialized
-
-                        val readerAuthPayload = ReaderAuthentication(
-                            context = ReaderAuthentication.CONTEXT,
-                            sessionTranscript = sessionTranscript,
-                            itemsRequestBytes = itemsRequestBytes
-                        )
-
                         val readerAuthSignature = CoseSign1.createAndSignDetached(
                             protectedHeaders = protectedHeaders,
                             unprotectedHeaders = unprotectedHeaders,
-                            detachedPayload = coseCompliantCbor.encodeToByteArray(readerAuthPayload),
+                            detachedPayload = ReaderAuthenticationPayloads.forDocument(
+                                sessionTranscript,
+                                docReq.itemsRequest,
+                            ),
                             signer = coseSigner
                         )
 
@@ -571,19 +560,14 @@ object VerificationSessionCreator {
                     }
 
                     // Generate readerAuthAll for the entire set (Global Signature)
-                    val itemsRequestBytesAll = initialDeviceRequest.docRequests.map { it.itemsRequest.serialized }
-
-                    val readerAuthAllPayload = ReaderAuthenticationAll(
-                        context = ReaderAuthenticationAll.CONTEXT,
-                        sessionTranscript = sessionTranscript,
-                        itemsRequestBytesAll = itemsRequestBytesAll,
-                        docRequestsInfoBytes = deviceRequestInfo.serialized
-                    )
-
                     val readerAuthAllSignature = CoseSign1.createAndSignDetached(
                         protectedHeaders = protectedHeaders,
                         unprotectedHeaders = unprotectedHeaders,
-                        detachedPayload = coseCompliantCbor.encodeToByteArray(readerAuthAllPayload),
+                        detachedPayload = ReaderAuthenticationPayloads.forAllDocuments(
+                            sessionTranscript = sessionTranscript,
+                            itemsRequests = initialDeviceRequest.docRequests.map { it.itemsRequest },
+                            deviceRequestInfo = deviceRequestInfo,
+                        ),
                         signer = coseSigner
                     )
 
@@ -595,7 +579,7 @@ object VerificationSessionCreator {
                         readerAuthAll = listOf(readerAuthAllSignature)
                     )
                 } else {
-                    DeviceRequest(setup.requestedElements).copy(version = DeviceRequest.VERSION)
+                    DeviceRequest(annexCRequestedElements).copy(version = DeviceRequest.VERSION)
                 }
 
                 AnnexCRequestResponse(
@@ -610,10 +594,13 @@ object VerificationSessionCreator {
             else -> null
         }
 
+        val setupForSession =
+            if (isSignedRequest && key != null) setup.withCoreKeyIfMissing(key) else setup
+
         @Suppress("SENSELESS_COMPARISON") // TODO
         val newSession = Verification2Session(
             id = sessionId,
-            setup = setup,
+            setup = setupForSession,
             data = customData?.let { Json.encodeToJsonElement(it) },
 
             creationDate = now,
@@ -671,6 +658,40 @@ object VerificationSessionCreator {
 
             is VerifierSigningKey.Crypto2 -> coseAlgorithm
         }
+
+    /**
+     * OpenID4VP 1.0 §5.9.3: unsigned requests without another client_id prefix use
+     * `redirect_uri:<response destination>`. That prefix cannot be signed.
+     */
+    private fun resolveEffectiveClientId(
+        clientId: String?,
+        isSignedRequest: Boolean,
+        isDcApi: Boolean,
+        isAnnexC: Boolean,
+        responseUri: String?,
+    ): String? {
+        if ((isDcApi && !isSignedRequest) || isAnnexC) return null
+        // The bare prefix counts as "not provided": OID4VP 1.0 Section 5.9.3-3.1.1 makes a
+        // redirect_uri client identifier the Response URI itself, which only exists once the session
+        // id has been generated, so callers that want it pass the prefix alone and it is completed
+        // here. A bare prefix carries no URI and is not a usable client identifier on its own, so
+        // this is unambiguous.
+        val provided = clientId?.takeIf { it.isNotBlank() && it != REDIRECT_URI_CLIENT_ID_PREFIX }
+        if (provided != null) {
+            require(!isSignedRequest || !provided.startsWith("$REDIRECT_URI_CLIENT_ID_PREFIX:")) {
+                "Signed requests cannot use the redirect_uri client_id prefix"
+            }
+            return provided
+        }
+        require(!isSignedRequest) {
+            "Signed requests require a client_id; omitting client_id only auto-generates the unsigned redirect_uri scheme"
+        }
+        val destination = requireNotNull(responseUri) {
+            "A redirect_uri client identifier is the Response URI, so it is only available for " +
+                "cross-device flows"
+        }
+        return "$REDIRECT_URI_CLIENT_ID_PREFIX:$destination"
+    }
 
     private sealed interface VerifierSigningKey {
         data class Legacy(val key: Key) : VerifierSigningKey
