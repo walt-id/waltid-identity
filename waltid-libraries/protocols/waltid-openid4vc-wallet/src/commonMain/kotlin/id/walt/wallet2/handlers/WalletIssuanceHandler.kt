@@ -37,6 +37,7 @@ import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
+import id.waltid.openid4vci.wallet.metadata.ResolvedCredentialIssuerMetadata
 import id.waltid.openid4vci.wallet.nonce.NonceRequestBuilder
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
@@ -241,13 +242,14 @@ data class IssuancePreview(
  * consumers can project them into platform-safe API models without parsing raw JSON or refetching.
  *
  * @property previewHandle Opaque handle required to act on this retained preview.
- * @property issuerMetadata Credential issuer metadata used by the retained issuance snapshot.
- * @property offeredCredentials Offered credential configurations resolved against [issuerMetadata].
+ * @property resolvedIssuerMetadata Canonical issuer-metadata resolution retained for this preview.
+ * @property offeredCredentials Offered credential configurations resolved against
+ * [resolvedIssuerMetadata].metadata.
  * @property transactionCode Canonical OpenID4VCI transaction-code metadata, when required.
  */
 data class WalletOfferPreviewResult(
     val previewHandle: IssuancePreviewHandle,
-    val issuerMetadata: CredentialIssuerMetadata,
+    val resolvedIssuerMetadata: ResolvedCredentialIssuerMetadata,
     val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
     val transactionCode: TxCode?,
 )
@@ -263,13 +265,14 @@ data class WalletOfferPreviewResult(
  * stateless "resolve for display" endpoints where issuance is completed by re-sending the offer.
  *
  * @property summary App-facing offer summary (identical to [resolveOffer]'s result).
- * @property issuerMetadata Resolved credential issuer metadata.
- * @property offeredCredentials Offered credential configurations resolved against [issuerMetadata].
+ * @property resolvedIssuerMetadata Canonical issuer-metadata resolution returned with this result.
+ * @property offeredCredentials Offered credential configurations resolved against
+ * [resolvedIssuerMetadata].metadata.
  * @property transactionCode Canonical OpenID4VCI transaction-code metadata, when required.
  */
 data class WalletOfferResolution(
     val summary: ResolveOfferResult,
-    val issuerMetadata: CredentialIssuerMetadata,
+    val resolvedIssuerMetadata: ResolvedCredentialIssuerMetadata,
     val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
     val transactionCode: TxCode?,
 )
@@ -279,15 +282,17 @@ data class WalletOfferResolution(
  *
  * @property summary App-facing metadata derived from the resolution.
  * @property offer Exact parsed credential offer, including its grants.
- * @property issuerMetadata Credential issuer metadata used to validate the offered configurations.
+ * @property resolvedIssuerMetadata Canonical issuer-metadata resolution used to validate the
+ * offered configurations.
  * @property authorizationServerMetadata Authorization server metadata used for the token request.
- * @property offeredCredentials Offered configurations resolved against [issuerMetadata].
+ * @property offeredCredentials Offered configurations resolved against
+ * [resolvedIssuerMetadata].metadata.
  */
 internal class ResolvedIssuanceOffer(
     val source: ResolveOfferRequest,
     val summary: ResolveOfferResult,
     val offer: CredentialOffer,
-    val issuerMetadata: CredentialIssuerMetadata,
+    val resolvedIssuerMetadata: ResolvedCredentialIssuerMetadata,
     val authorizationServerMetadata: AuthorizationServerMetadata,
     val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
 )
@@ -616,7 +621,7 @@ object WalletIssuanceHandler {
 
         // 2. Reuse issuer metadata and offered configurations from that resolution.
         val offer = effectiveResolvedOffer.offer
-        val issuerMetadata = effectiveResolvedOffer.issuerMetadata
+        val issuerMetadata = effectiveResolvedOffer.resolvedIssuerMetadata.metadata
         val offeredCredentials = effectiveResolvedOffer.offeredCredentials
         val asMetadata = effectiveResolvedOffer.authorizationServerMetadata
         log.trace { "Resolved offer: issuer=${offer.credentialIssuer}, configIds=${offer.credentialConfigurationIds}" }
@@ -809,7 +814,7 @@ object WalletIssuanceHandler {
         )
         return WalletOfferPreviewResult(
             previewHandle = previewHandle,
-            issuerMetadata = resolvedOffer.issuerMetadata,
+            resolvedIssuerMetadata = resolvedOffer.resolvedIssuerMetadata,
             offeredCredentials = resolvedOffer.offeredCredentials,
             transactionCode = resolvedOffer.offer.grants?.preAuthorizedCode?.txCode,
         )
@@ -832,7 +837,8 @@ object WalletIssuanceHandler {
     ): ResolvedIssuanceOffer {
         val offer = resolveOffer(request, httpClient)
         val metadataResolver = IssuerMetadataResolver(httpClient, metadataTrustResolver)
-        val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(offer.credentialIssuer).metadata
+        val resolvedIssuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
+        val issuerMetadata = resolvedIssuerMetadata.metadata
         val asMetadata = metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
         val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
         return ResolvedIssuanceOffer(
@@ -850,7 +856,7 @@ object WalletIssuanceHandler {
                 nonceEndpoint = issuerMetadata.nonceEndpoint?.let { Url(it) },
             ),
             offer = offer,
-            issuerMetadata = issuerMetadata,
+            resolvedIssuerMetadata = resolvedIssuerMetadata,
             authorizationServerMetadata = asMetadata,
             offeredCredentials = offeredCredentials,
         )
@@ -902,7 +908,7 @@ object WalletIssuanceHandler {
         val resolved = resolveIssuanceOffer(request, httpClient)
         return WalletOfferResolution(
             summary = resolved.summary,
-            issuerMetadata = resolved.issuerMetadata,
+            resolvedIssuerMetadata = resolved.resolvedIssuerMetadata,
             offeredCredentials = resolved.offeredCredentials,
             transactionCode = resolved.offer.grants?.preAuthorizedCode?.txCode,
         )

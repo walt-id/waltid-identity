@@ -908,7 +908,7 @@ private extension MobileWalletClientIdScheme {
             return .decentralizedIdentifier
         case .verifierAttestation:
             return .verifierAttestation
-        case .openIdFederation:
+        case .openidFederation:
             return .openIDFederation
         }
     }

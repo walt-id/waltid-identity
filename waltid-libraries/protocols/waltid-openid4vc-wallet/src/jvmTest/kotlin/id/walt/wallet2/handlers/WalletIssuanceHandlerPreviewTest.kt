@@ -2,9 +2,16 @@ package id.walt.wallet2.handlers
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
+import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
+import id.walt.openid4vci.metadata.issuer.toSignedJwt
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
+import id.waltid.openid4vci.wallet.metadata.MetadataSigner
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
+import id.waltid.openid4vci.wallet.metadata.ResolvedCredentialIssuerMetadata
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -23,6 +30,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 
 class WalletIssuanceHandlerPreviewTest {
 
@@ -180,7 +188,8 @@ class WalletIssuanceHandlerPreviewTest {
             httpClient = client,
         )
 
-        assertEquals(ISSUER, preview.issuerMetadata.credentialIssuer)
+        assertEquals(ISSUER, preview.resolvedIssuerMetadata.metadata.credentialIssuer)
+        assertIs<ResolvedCredentialIssuerMetadata.Unsigned>(preview.resolvedIssuerMetadata)
         assertEquals("pid", preview.offeredCredentials.single().credentialConfigurationId)
         assertEquals("text", preview.transactionCode?.inputMode)
 
@@ -215,6 +224,48 @@ class WalletIssuanceHandlerPreviewTest {
         assertEquals(2, offerFetches)
         assertEquals(4, metadataFetches)
         assertEquals(3, tokenRequests)
+    }
+
+    @Test
+    fun signedPreviewRetainsExactMetadataResolutionAndSigner() = runTest {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val compactJwt = signedIssuerMetadata().toSignedJwt(key)
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    when (request.url.toString()) {
+                        OFFER_URL -> respondJson(CREDENTIAL_OFFER)
+                        "$ISSUER/.well-known/openid-credential-issuer" -> respond(
+                            content = compactJwt,
+                            headers = headersOf(HttpHeaders.ContentType, "application/jwt"),
+                        )
+                        "$ISSUER/.well-known/oauth-authorization-server" -> respondJson(AUTHORIZATION_SERVER_METADATA)
+                        else -> error("Unexpected request: ${request.method.value} ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+
+        val preview = WalletIssuanceHandler.previewOffer(
+            wallet = Wallet(id = "signed-preview", staticKey = JWKKey.generate(KeyType.Ed25519)),
+            request = ResolveOfferRequest(offerUrl = Url(OFFER_DEEP_LINK)),
+            httpClient = client,
+            metadataTrustResolver = { candidate, expectedIssuer ->
+                assertEquals(compactJwt, candidate)
+                assertEquals(ISSUER, expectedIssuer)
+                key.getPublicKey().verifyJws(candidate).getOrThrow()
+                MetadataSigner(key.getKeyId(), "EdDSA", MetadataSignerTrustType.TRUSTED_ISSUER)
+            },
+        )
+
+        val signed = assertIs<ResolvedCredentialIssuerMetadata.Signed>(preview.resolvedIssuerMetadata)
+        assertEquals(compactJwt, signed.compactJwt)
+        assertEquals(
+            MetadataSigner(key.getKeyId(), "EdDSA", MetadataSignerTrustType.TRUSTED_ISSUER),
+            signed.signer,
+        )
+        assertEquals(ISSUER, signed.metadata.credentialIssuer)
     }
 
     @Test
@@ -290,6 +341,14 @@ class WalletIssuanceHandlerPreviewTest {
           "response_types_supported": ["code"]
         }
     """
+
+    private fun signedIssuerMetadata() = CredentialIssuerMetadata(
+        credentialIssuer = ISSUER,
+        credentialEndpoint = "$ISSUER/credential",
+        credentialConfigurationsSupported = mapOf(
+            "pid" to CredentialConfiguration(CredentialFormat.SD_JWT_VC),
+        ),
+    )
 
     private companion object {
         const val ISSUER = "https://issuer.example"

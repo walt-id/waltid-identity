@@ -180,6 +180,44 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(preview.credentialRequirements.single?.options, [["pid"]])
     }
 
+    func testAuthenticatedRequestAuthenticationRetainsExactSecurityFacts() {
+        let authentication = PresentationRequestAuthentication.authenticated(
+            compactRequestObject: "signed-request-object",
+            algorithm: "ES256",
+            keyID: "verifier-kid",
+            clientIDScheme: .preRegistered
+        )
+
+        guard case let .authenticated(compactRequestObject, algorithm, keyID, clientIDScheme) = authentication else {
+            return XCTFail("Expected authenticated request object")
+        }
+
+        XCTAssertEqual(compactRequestObject, "signed-request-object")
+        XCTAssertEqual(algorithm, "ES256")
+        XCTAssertEqual(keyID, "verifier-kid")
+        XCTAssertEqual(clientIDScheme, .preRegistered)
+    }
+
+    func testSignedIssuerMetadataProvenanceRetainsTrustResolverFacts() {
+        let provenance = MetadataProvenance.signed(
+            SignedMetadataProvenance(
+                compactJWT: "signed-metadata-jwt",
+                algorithm: "EdDSA",
+                keyID: "issuer-key",
+                trustType: .trustedIssuer
+            )
+        )
+
+        guard case let .signed(signed) = provenance else {
+            return XCTFail("Expected signed issuer metadata provenance")
+        }
+
+        XCTAssertEqual(signed.compactJWT, "signed-metadata-jwt")
+        XCTAssertEqual(signed.algorithm, "EdDSA")
+        XCTAssertEqual(signed.keyID, "issuer-key")
+        XCTAssertEqual(signed.trustType, .trustedIssuer)
+    }
+
     func testWalletHasAsyncFacadeShape() async {
         let wallet = Wallet(configuration: .init(), bridge: FakeWalletCoreBridge())
 

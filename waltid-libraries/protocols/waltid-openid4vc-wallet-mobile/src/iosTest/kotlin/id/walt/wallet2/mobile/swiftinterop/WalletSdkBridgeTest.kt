@@ -12,6 +12,7 @@ import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.MobileWalletClientIdScheme
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletMetadataDisplay
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
@@ -185,6 +186,34 @@ class WalletSdkBridgeTest {
         assertEquals(true, preview.credentialOptions.single().multiple)
         assertEquals(listOf(listOf("pid")), preview.credentialRequirements.single().options)
         assertEquals("openid4vp://request", operations.previewRequestUrl)
+    }
+
+    @Test
+    fun bridgePresentationPreviewPreservesAuthenticatedRequestFacts() = runTest {
+        val operations = FakeWalletSdkBridgeOperations(
+            requestAuthentication = MobileWalletRequestAuthentication.Authenticated(
+                compactRequestObject = "signed-request-object",
+                algorithm = "ES256",
+                keyId = "verifier-kid",
+                clientIdScheme = MobileWalletClientIdScheme.PRE_REGISTERED,
+            ),
+        )
+        val bridge = WalletSdkBridge.forOperations(operations)
+
+        val result = bridge.previewPresentation("openid4vp://request")
+
+        val preview = assertIs<MobileWalletPresentationPreviewResult.Ready>(
+            assertIs<WalletBridgeResult.Success<MobileWalletPresentationPreviewResult>>(result).value,
+        ).preview
+        assertEquals(
+            MobileWalletRequestAuthentication.Authenticated(
+                compactRequestObject = "signed-request-object",
+                algorithm = "ES256",
+                keyId = "verifier-kid",
+                clientIdScheme = MobileWalletClientIdScheme.PRE_REGISTERED,
+            ),
+            preview.request.requestAuthentication,
+        )
     }
 
     @Test
@@ -566,6 +595,8 @@ class WalletSdkBridgeTest {
 
     private class FakeWalletSdkBridgeOperations(
         private val previewResult: MobileWalletPresentationPreviewResult? = null,
+        private val requestAuthentication: MobileWalletRequestAuthentication =
+            MobileWalletRequestAuthentication.Unauthenticated,
     ) : WalletSdkBridgeOperations {
         var bootstrapKeyType: MobileWalletKeyType? = null
             private set
@@ -683,7 +714,7 @@ class WalletSdkBridgeTest {
                         policyUri = null,
                         termsOfServiceUri = null,
                     ),
-                    requestAuthentication = MobileWalletRequestAuthentication.Unauthenticated,
+                    requestAuthentication = requestAuthentication,
                     responseUri = "https://verifier.example/direct-post",
                     state = "state-1",
                     nonce = "nonce-1",
