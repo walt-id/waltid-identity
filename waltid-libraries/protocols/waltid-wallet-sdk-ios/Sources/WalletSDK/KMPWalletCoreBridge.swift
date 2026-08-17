@@ -724,7 +724,6 @@ private extension Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationU
         case .unsupportedCombination: return .unsupportedCombination
         case .biometricUnavailable: return .biometricUnavailable
         case .biometricNotEnrolled: return .biometricNotEnrolled
-        case .interactionContextUnavailable: return .interactionContextUnavailable
         }
     }
 }
