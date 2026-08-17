@@ -582,6 +582,7 @@ object WalletIssuanceHandler {
                 onDeferredTransactionId = onDeferredTransactionId,
                 beforeCredentialsStored = beforeCredentialsStored,
                 onCredentialStored = onCredentialStored,
+                metadataTrustResolver = null,
             ).collect(::send)
         }
     }
