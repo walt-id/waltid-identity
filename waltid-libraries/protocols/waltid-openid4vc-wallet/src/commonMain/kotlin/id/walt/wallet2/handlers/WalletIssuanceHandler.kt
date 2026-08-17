@@ -414,6 +414,19 @@ data class ReceiveAuthorizedCredentialRequest(
     val nonceEndpoint: Url? = null,
     val clientId: String = DEFAULT_CLIENT_ID,
     val redirectUri: Url = Url("openid://"),
+    /**
+     * Sender constrain the token and credential requests with DPoP (RFC 9449).
+     *
+     * Opt-in, because there is no metadata that says whether the *credential endpoint* accepts
+     * DPoP-bound tokens - `dpop_signing_alg_values_supported` describes the authorization server only.
+     * Enabling it on that signal alone broke working issuance: an authorization server advertising DPoP
+     * duly issued a DPoP-bound token, and the Credential Issuer then rejected it as `invalid_token`
+     * because its credential endpoint expects a Bearer token.
+     *
+     * Turn it on for issuers known to accept DPoP end to end, such as FAPI 2.0 / HAIP deployments.
+     */
+    val useDpop: Boolean = false,
+
     /** Inline holder key for proof of possession; takes precedence over [keyId]. */
     val key: DirectSerializedKey? = null,
     val keyId: String? = null,
@@ -1604,7 +1617,14 @@ object WalletIssuanceHandler {
         val authBuilder = AuthorizationRequestBuilder(clientConfig)
         val credentialConfigurationId = offer.credentialConfigurationIds.first()
 
+        // Engaged only when the authorization server *requires* PAR, not merely advertises an
+        // endpoint. RFC 9126 makes PAR optional for the client, and pushing to an endpoint that does
+        // not expect this client's authentication fails the whole flow - an issuer that advertises the
+        // endpoint but does not require it answered our pushed request with HTTP 401 and broke
+        // authorization-code issuance that previously worked. Same failure mode as engaging DPoP on
+        // advertisement alone.
         val parEndpoint = asMetadata.pushedAuthorizationRequestEndpoint
+            ?.takeIf { asMetadata.requirePushedAuthorizationRequests == true }
         require(asMetadata.requirePushedAuthorizationRequests != true || parEndpoint != null) {
             "Authorization server requires PAR but advertises no pushed_authorization_request_endpoint"
         }
@@ -1668,6 +1688,19 @@ object WalletIssuanceHandler {
         attestationAssembler: ClientAttestationAssembler? = null,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         onAttestationObtained: suspend () -> Unit = {},
+        /**
+         * Key to client authenticate and sender constrain this exchange with, when the caller already
+         * resolved one.
+         *
+         * Must be the same key the subsequent credential request proves possession of: a DPoP access
+         * token is bound to the `jkt` of the key that requested it (RFC 9449 Section 6), so resolving
+         * the wallet default here while the flow proceeds with a `keyReference`-selected key binds the
+         * token to one key and proves possession of another - which the credential endpoint correctly
+         * rejects as `invalid_token`.
+         */
+        keyMaterial: WalletKeyStoreEntry? = null,
+        /** See [ReceiveAuthorizedCredentialRequest.useDpop]. Client authentication is unaffected. */
+        useDpop: Boolean = false,
     ): RequestTokenResult {
         val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
             ?: error("credentialIssuerBaseUrl must be provided")
@@ -1689,7 +1722,8 @@ object WalletIssuanceHandler {
             attestationHeaders = attestationHeaders,
             httpClient = httpClient,
             asMetadata = asMetadata,
-            keyMaterial = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)),
+            keyMaterial = keyMaterial ?: wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)),
+            useDpop = useDpop,
         )
     }
 
@@ -1705,6 +1739,7 @@ object WalletIssuanceHandler {
          */
         asMetadata: AuthorizationServerMetadata? = null,
         keyMaterial: WalletKeyStoreEntry? = null,
+        useDpop: Boolean = false,
     ): RequestTokenResult {
         val clientConfig = ClientConfiguration(
             clientId = request.clientId,
@@ -1722,7 +1757,7 @@ object WalletIssuanceHandler {
 
         // Sender constraining (RFC 9449), engaged only when the key can sign an advertised algorithm;
         // DPoP is optional for the wallet, so an unusable key must fall back to Bearer, not fail.
-        val senderConstraining = if (asMetadata != null && keyMaterial != null) {
+        val senderConstraining = if (useDpop && asMetadata != null && keyMaterial != null) {
             usableDpopAlgorithms(asMetadata, keyMaterial)?.let { algorithms -> keyMaterial to algorithms }
         } else {
             null
@@ -1851,6 +1886,12 @@ object WalletIssuanceHandler {
         did: String? = null,
         /** Optional sidecar metadata merged with resolved issuer display when storing. */
         metadata: JsonObject? = null,
+        /**
+         * Sender constrain the token and credential requests with DPoP (RFC 9449); see
+         * [ReceiveAuthorizedCredentialRequest.useDpop] for why this is opt-in rather than derived from
+         * the authorization server's advertised algorithms.
+         */
+        useDpop: Boolean = false,
         /** Optional credential label override; otherwise derived from credential configuration display. */
         label: String? = null,
         attestationAssembler: ClientAttestationAssembler? = null,
@@ -1876,6 +1917,8 @@ object WalletIssuanceHandler {
             attestationAssembler = attestationAssembler,
             httpClient = httpClient,
             onAttestationObtained = { onEvent(WalletSessionEvent.issuance_attestation_obtained) },
+            keyMaterial = keyMaterial,
+            useDpop = useDpop,
         )
         onEvent(WalletSessionEvent.issuance_token_obtained)
 
@@ -1918,7 +1961,7 @@ object WalletIssuanceHandler {
             // per-request proof at the credential endpoint too, not only at the token endpoint. The
             // pre-authorized-code flow already did this; omitting it here meant the issuer answered a
             // successfully DPoP-bound token exchange with "Couldn't find DPoP Proof header".
-            dpop = dpopAlgorithmsForToken(
+            dpop = if (!useDpop) null else dpopAlgorithmsForToken(
                 tokenType = tokenResult.tokenType ?: "Bearer",
                 advertisedAlgorithms = usableDpopAlgorithms(
                     resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient),
@@ -1976,6 +2019,7 @@ object WalletIssuanceHandler {
             credentialIssuerBaseUrl = request.credentialIssuer,
             credentialEndpoint = request.credentialEndpoint,
             credentialConfigurationId = request.credentialConfigurationId,
+            useDpop = request.useDpop,
             nonceEndpoint = request.nonceEndpoint?.toString(),
             clientId = request.clientId,
             redirectUri = request.redirectUri,

@@ -308,6 +308,11 @@ class VciWalletConformanceAdapter(
                     put("redirectUri", getRedirectUri())
                     testDid?.let { put("did", it) }
                     testKeyId?.let { put("keyId", it) }
+                    // The suite drives sender_constrain=dpop and requires a DPoP proof at both the
+                    // token and credential endpoints. Opt in explicitly: the wallet defaults to off,
+                    // because an authorization server advertising DPoP does not imply the Credential
+                    // Issuer's credential endpoint accepts DPoP-bound tokens.
+                    put("useDpop", true)
                 }.toString()
             )
         }
