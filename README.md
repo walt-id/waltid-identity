@@ -1,7 +1,4 @@
-<div align="center">
-<img src="assets/walt-banner.png" alt="walt.id banner" />
 
-  <p>Multi-Platform libraries, powerful APIs and easy-to-use white label apps to build identity and wallet solutions <span>by </span><a href="https://walt.id">walt.id</a></p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
@@ -27,12 +24,13 @@ own solutions, depending on if you're trying to....
 ### Test out the Walt product line
 
 All of our apis are hosted at demo.walt.id. Depending on the service you are interested in, you can visit the following links:
-- **Issuer API** - ([Portal](https://portal2.demo.walt.id) | [Swagger](https://issuer2.demo.walt.id/swagger)| [Docs](https://docs.walt.id/community-stack/issuer2/getting-started)  | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-issuer-api2)) - enable apps to issue credentials (W3C JWTs, SD-JWTs, mdoc) via OID4VCI 1.0.
+
+- **Issuer API** - ([Portal](https://portal2.demo.walt.id) | [Swagger](https://issuer2.demo.walt.id/swagger) | [Docs](https://docs.walt.id/community-stack/issuer2/getting-started)  | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-issuer-api2)) - enable apps to issue credentials (W3C JWTs, SD-JWTs, mdoc) via OID4VCI 1.0.
 - **Verifier API** - ([Portal](https://portal2.demo.walt.id) | [Swagger](https://verifier2.demo.walt.id/swagger) | [Docs](https://docs.walt.id/community-stack/verifier2/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-verifier-api2)) - enable apps to verify credentials (W3C JWTs, SD-JWTs, mdoc) via OID4VP/SIOPv2 1.0.
 - **Wallet API** - ([Portal (coming soon)] | [Swagger](https://wallet2.demo.walt.id/swagger) | [Docs](https://docs.walt.id/community-stack/wallet2/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-wallet-api2)) - extend apps with wallet capabilities to collect, store, manage and share identity credentials and tokens.
 - **Wallet SDK** - ([Docs (coming soon)] | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc-wallet)) - a complete wallet library supporting both OpenID4VCI 1.0 and OpenID4VP 1.0.
-    - **Compose Wallet** - ([apk (coming soon)] | [source code](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-wallet-demo-compose))
-    - **iOS Wallet** - ([testflight (coming soon)] | [source code](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-wallet-demo-ios))
+  - **Compose Wallet** - ([APK via GH Releases](https://github.com/walt-id/waltid-identity/releases) | [Github](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-wallet-demo-compose))
+  - **iOS Wallet** - (Reach out to [contact@walt.id](mailto:contact@walt.id) for access | [Github](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-wallet-demo-ios))
 
 We are still in the process of building new open source portals to allow you to quickly test out the products!
 
@@ -63,45 +61,43 @@ multiplatform libraries so you can build application running on JVM, JavaScript 
 Some popular libraries you may want to look at are:
 
 - **Crypto** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto)) -
-  create and use keys based on different algorithms and KMS backends (in-memory, AWS, Hashicorp TSE,
-  OCI)
+create and use keys based on different algorithms and KMS backends (in-memory, AWS, Hashicorp TSE,
+OCI)
 - **DID** ([GitHub](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-did/README.md)) -
-  create, register, and resolve DIDs on different ecosystems.
+create, register, and resolve DIDs on different ecosystems.
 - **W3C Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-w3c-credentials)) -
-  issue and verify W3C credentials as JWTs and SD-JWTs.
+issue and verify W3C credentials as JWTs and SD-JWTs.
 - **mdoc Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-mdoc-credentials2)) -
-  issue and verify mdoc credentials (mDL ISO/IEC 18013-5).
+issue and verify mdoc credentials (mDL ISO/IEC 18013-5).
 - **SD-JWT** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/sdjwt/waltid-sdjwt)) -
-  create and verify Selective Disclosure JWTs.
+create and verify Selective Disclosure JWTs.
 - **OpenID4VCI** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vci)) -
-  implementation of the OID4VCI 1.0 protocol.
-  protocols. Results
-  from [OpenID Foundation's Conformance Suite (coming soon)]
+implementation of the OID4VCI 1.0 protocol.
+protocols. Results
+from [OpenID Foundation's Conformance Suite (coming soon)]
 - **OpenID4VP** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vp)) -
-  implementation of the OpenID4VP 1.0 protocol. Results
-  from [OpenID Foundation's Conformance Suite](https://conformance.waltid.cloud/logs.html)
+implementation of the OpenID4VP 1.0 protocol. Results
+from [OpenID Foundation's Conformance Suite](https://conformance.waltid.cloud/logs.html)
 - **Core Wallet** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc-wallet)) -
-  implementation of the Core Wallet library supporting both OpenID4VCI 1.0 and OpenID4VP 1.0.
+implementation of the Core Wallet library supporting both OpenID4VCI 1.0 and OpenID4VP 1.0.
 
 ## Architecture
 
-<img src="./assets/OSS-Architecture.png" alt="walt.id architecture" />
 
 
 ## Product Editions
 
-<img src="./assets/Product-Editions.png" alt="walt.id product editions" />
+
 
 If you want to learn more about the enterprise stack, reach out to us via our [contact form](https://walt.id/contact)
 
-
 ## Join the community
 
-* Connect and get the latest
-  updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
-* Get help, request features and report
-  bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
-* Find more indepth documentation on our [docs site](https://docs.walt.id)
+- Connect and get the latest
+updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
+- Get help, request features and report
+bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
+- Find more indepth documentation on our [docs site](https://docs.walt.id)
 
 ## License
 
