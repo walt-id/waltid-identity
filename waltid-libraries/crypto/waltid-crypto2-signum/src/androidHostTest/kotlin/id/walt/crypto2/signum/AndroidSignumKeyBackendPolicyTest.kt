@@ -34,7 +34,7 @@ class AndroidSignumKeyBackendPolicyTest {
                 isInsideSecureHardware = false,
                 securityLevel = KeyProperties.SECURITY_LEVEL_SOFTWARE,
                 isUserAuthenticationRequired = true,
-                userAuthenticationValidityDurationSeconds = 0,
+                userAuthenticationValidityDurationSeconds = -1,
                 isInvalidatedByBiometricEnrollment = true,
                 userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
             )
@@ -86,7 +86,7 @@ class AndroidSignumKeyBackendPolicyTest {
     }
 
     @Test
-    fun `biometric current set rejects missing auth per use`() {
+    fun `biometric current set rejects inexact native policy`() {
         val policy = SignumKeyPolicy(
             hardware = SignumHardwarePolicy.REQUIRED,
             authentication = SignumAuthenticationPolicy.UserPresence(
@@ -117,7 +117,7 @@ class AndroidSignumKeyBackendPolicyTest {
                 securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
                 isUserAuthenticationRequired = true,
                 userAuthenticationValidityDurationSeconds = 0,
-                isInvalidatedByBiometricEnrollment = false,
+                isInvalidatedByBiometricEnrollment = true,
                 userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
             )
         }
@@ -128,9 +128,33 @@ class AndroidSignumKeyBackendPolicyTest {
                 isInsideSecureHardware = true,
                 securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
                 isUserAuthenticationRequired = true,
-                userAuthenticationValidityDurationSeconds = 0,
+                userAuthenticationValidityDurationSeconds = -1,
                 isInvalidatedByBiometricEnrollment = true,
                 userAuthenticationType = KeyProperties.AUTH_DEVICE_CREDENTIAL,
+            )
+        }
+        assertFailsWith<SignumKeyPolicyMismatchException> {
+            validateAndroidNativePolicy(
+                alias = "biometric",
+                policy = policy,
+                isInsideSecureHardware = true,
+                securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
+                isUserAuthenticationRequired = false,
+                userAuthenticationValidityDurationSeconds = -1,
+                isInvalidatedByBiometricEnrollment = true,
+                userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
+            )
+        }
+        assertFailsWith<SignumKeyPolicyMismatchException> {
+            validateAndroidNativePolicy(
+                alias = "biometric",
+                policy = policy,
+                isInsideSecureHardware = true,
+                securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
+                isUserAuthenticationRequired = true,
+                userAuthenticationValidityDurationSeconds = -1,
+                isInvalidatedByBiometricEnrollment = false,
+                userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
             )
         }
     }
@@ -151,7 +175,7 @@ class AndroidSignumKeyBackendPolicyTest {
             isInsideSecureHardware = true,
             securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
             isUserAuthenticationRequired = true,
-            userAuthenticationValidityDurationSeconds = 0,
+            userAuthenticationValidityDurationSeconds = -1,
             isInvalidatedByBiometricEnrollment = true,
             userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
         )

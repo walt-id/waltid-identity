@@ -182,7 +182,7 @@ internal fun validateAndroidNativePolicy(
     }
     if (policy.authentication.isBiometricCurrentSetEveryUse()) {
         if (!isUserAuthenticationRequired ||
-            userAuthenticationValidityDurationSeconds > 0 ||
+            userAuthenticationValidityDurationSeconds != -1 ||
             !isInvalidatedByBiometricEnrollment
         ) {
             throw SignumKeyPolicyMismatchException(

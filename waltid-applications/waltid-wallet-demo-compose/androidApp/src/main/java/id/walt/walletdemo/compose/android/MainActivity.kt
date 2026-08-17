@@ -95,6 +95,7 @@ class MainActivity : FragmentActivity() {
                 val created = createAndroidDemoMobileWallet(
                     context = applicationContext,
                     config = demoWalletConfig(),
+                    interactionContextProvider = { this@MainActivity },
                 )
                 created.wallet.bootstrap()
                 created.wallet.continueAuthorizationIssuance(

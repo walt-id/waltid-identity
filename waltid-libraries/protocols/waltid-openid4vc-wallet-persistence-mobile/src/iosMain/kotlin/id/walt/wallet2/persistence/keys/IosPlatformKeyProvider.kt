@@ -76,7 +76,7 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
 
     override suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration {
         val policy = try {
-            signumProvider.storedPolicy(stored).toWalletPolicy()
+            signumProvider.storedPolicy(stored).toWalletPolicy(stored)
         } catch (cause: Throwable) {
             throw cause.toKeyUseAuthorizationException(stored.id.value) ?: cause
         }
@@ -135,25 +135,6 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
         )
     }
 }
-
-private fun SignumKeyPolicy.toWalletPolicy(): KeyUseAuthorizationPolicy = when (val authentication = authentication) {
-    SignumAuthenticationPolicy.None -> KeyUseAuthorizationPolicy.None
-    else -> if (hardware == SignumHardwarePolicy.REQUIRED && authentication.isWalletBiometricCurrentSet()) {
-        KeyUseAuthorizationPolicy.BiometricCurrentSet
-    } else {
-        throw KeyUseAuthorizationException(
-            KeyUseAuthorizationFailure.InvalidStoredKeyMetadata,
-            "Stored Signum key uses an unsupported wallet authorization policy",
-        )
-    }
-}
-
-private fun SignumAuthenticationPolicy.isWalletBiometricCurrentSet(): Boolean =
-    this is SignumAuthenticationPolicy.UserPresence &&
-        biometric &&
-        !allowNewBiometrics &&
-        !deviceCredential &&
-        timeoutSeconds == 0
 
 private val isSimulator: Boolean by lazy {
     NSProcessInfo.processInfo.environment.keys.any { it == "SIMULATOR_UDID" || it == "SIMULATOR_DEVICE_NAME" }
