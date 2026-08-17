@@ -337,7 +337,7 @@ internal object WalletComposeE2EHelper {
     private fun claimTag(path: String): String =
         "wallet.claim.${path.map { if (it.isLetterOrDigit()) it else '_' }.joinToString("")}"
 
-    private fun UiDevice.scrollDown() {
+    internal fun UiDevice.scrollDown() {
         swipe(
             displayWidth / 2,
             (displayHeight * 0.72).toInt(),
@@ -348,7 +348,7 @@ internal object WalletComposeE2EHelper {
         waitForIdle()
     }
 
-    private fun UiDevice.scrollUp() {
+    internal fun UiDevice.scrollUp() {
         swipe(
             displayWidth / 2,
             (displayHeight * 0.36).toInt(),

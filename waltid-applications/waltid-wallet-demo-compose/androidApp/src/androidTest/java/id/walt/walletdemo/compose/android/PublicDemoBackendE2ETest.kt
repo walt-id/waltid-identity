@@ -249,10 +249,10 @@ class PublicDemoBackendE2ETest {
         )
         assertClaimValueVisibleAfterScrolling(
             device = device,
-            path = "transactionData[0].details.payee",
-            label = "Payee",
+            path = "transactionData[0].details.merchant_name",
+            label = "Merchant name",
             expectedValues = listOf("ACME Corp"),
-            message = "Payment payee missing",
+            message = "Payment merchant name missing",
         )
     }
 

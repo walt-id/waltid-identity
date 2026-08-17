@@ -85,9 +85,9 @@ object MdocsSchemaMappingFunction {
         return when (schemaType.type) {
             STRING, DATE, DATETIME -> JsonPrimitive((this as CborString).value)
             INT, LONG -> JsonPrimitive((this as CborInteger).long)
-            UINT -> JsonPrimitive((this as CborInteger).value.toUInt())
+            UINT -> JsonPrimitive((this as CborInteger).absoluteValue.toUInt())
             BOOLEAN -> JsonPrimitive((this as CborBoolean).value)
-            BYTES -> JsonArray((this as CborByteString).value.map { JsonPrimitive(it) })
+            BYTES -> JsonArray((this as CborByteString).toByteArray().map { JsonPrimitive(it) })
             ARRAY -> JsonArray((this as CborArray).map { it.schemafulToJsonElement(schemaType.generic!!) })
             MAP -> JsonObject((this as CborMap).entries.associate { (k, v) ->
                 (k as CborString).value to v.schemafulToJsonElement(schemaType.generic!!)

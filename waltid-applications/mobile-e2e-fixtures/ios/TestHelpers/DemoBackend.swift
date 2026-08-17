@@ -24,7 +24,7 @@ public final class DemoBackend {
     private static let eudiPidSdJwtVct = "https://issuer2.demo.walt.id/openid4vci/urn:eudi:pid:1"
     public static let transactionDataProfilesURL = URL(string: "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles")!
     private static let paymentAuthorizationType = "org.waltid.transaction-data.payment-authorization"
-    private static let requiredPaymentAuthorizationFields: Set<String> = ["amount", "currency", "payee"]
+    private static let requiredPaymentAuthorizationFields: Set<String> = ["merchant_name", "amount", "currency"]
 
     public static let scenarios: [DemoCredentialScenario] = [
         DemoCredentialScenario(
@@ -358,9 +358,9 @@ public final class DemoBackend {
             "require_cryptographic_holder_binding": true,
             "transaction_data_hashes_alg": ["sha-256"],
         ]
+        payload.putProfileField(fields: fields, key: "merchant_name", value: "ACME Corp")
         payload.putProfileField(fields: fields, key: "amount", value: "42.00")
         payload.putProfileField(fields: fields, key: "currency", value: "EUR")
-        payload.putProfileField(fields: fields, key: "payee", value: "ACME Corp")
         return payload
     }
 }
