@@ -379,13 +379,15 @@ The EUDI PID root certificate can only be used if the attester JWK also has a le
 HAIP validates the `x5c` certificate chain in the issued credential. The
 credential trust anchor is separate from the client-attestation trust root.
 
-The committed test certificates are:
+The committed AT test certificates are:
 
 - [HAIP credential root](../src/test/resources/certs/issuer2-haip-root-ca.pem), supplied to the conformance suite as a trust anchor
 - [HAIP credential leaf](../src/test/resources/certs/issuer2-haip-leaf.pem), placed in issuer2's `defaultHaipIssuerX5chain`
 
 Do not put the root certificate into issuer2's `x5Chain`. It must contain the
-leaf and any intermediates only. The leaf key must match `defaultHaipIssuerKey`.
+leaf and any intermediates only. The SD-JWT leaf key matches
+`defaultHaipIssuerKey`; HAIP mdoc uses a separate Document Signer leaf for the
+same key because the mdoc EKU must not be reused for SD-JWT.
 
 From the runner directory, verify the committed chain before a HAIP run:
 
@@ -397,40 +399,9 @@ openssl verify \
 
 The command must print `issuer2-haip-leaf.pem: OK`.
 
-If the original HAIP root is unavailable in a local test setup, generate a new
-test-only root and a leaf certificate for the existing `defaultHaipIssuerKey`
-JWK. This optional regeneration command requires Node.js in addition to the
-normal prerequisites:
-
-```bash
-CERT_DIR="$PWD/src/test/resources/certs" && \
-WORK_DIR="$PWD/build/conformance/issuer2-haip-ca" && \
-mkdir -p "$CERT_DIR" "$WORK_DIR" && \
-node -e 'const { createPublicKey } = require("crypto"); console.log(createPublicKey({ key: { kty: "EC", crv: "P-256", x: "4GbYM-GfrL8u9J4bPUMd21CiXH2t6PDWVcepxhPtopU", y: "a2Z7QWgvLz0nl4KOjstBcowX47VmhUQgaJi_8cMCqas" }, format: "jwk" }).export({ type: "spki", format: "pem" }));' > "$WORK_DIR/issuer2-haip-public-key.pem" && \
-openssl ecparam -name prime256v1 -genkey -noout -out "$WORK_DIR/issuer2-haip-root-ca.key" && \
-openssl req -x509 -new -sha256 -days 3650 \
-  -key "$WORK_DIR/issuer2-haip-root-ca.key" \
-  -out "$CERT_DIR/issuer2-haip-root-ca.pem" \
-  -subj '/C=UT/O=walt.id/CN=walt.id HAIP Conformance Root CA' \
-  -addext 'basicConstraints=critical,CA:true' \
-  -addext 'keyUsage=critical,keyCertSign,cRLSign' && \
-openssl x509 -new -sha256 -days 3650 \
-  -force_pubkey "$WORK_DIR/issuer2-haip-public-key.pem" \
-  -CA "$CERT_DIR/issuer2-haip-root-ca.pem" \
-  -CAkey "$WORK_DIR/issuer2-haip-root-ca.key" \
-  -CAcreateserial \
-  -out "$CERT_DIR/issuer2-haip-leaf.pem" \
-  -subj '/C=UT/O=walt.id/CN=issuer2-haip-conformance' \
-  -extfile <(printf '%s\n' \
-    'basicConstraints=critical,CA:false' \
-    'keyUsage=critical,digitalSignature' \
-    'extendedKeyUsage=clientAuth') && \
-openssl verify -CAfile "$CERT_DIR/issuer2-haip-root-ca.pem" "$CERT_DIR/issuer2-haip-leaf.pem"
-```
-
-Replace issuer2's leaf PEM with the regenerated leaf, and pass the regenerated
-root only to the conformance runner. The generated root private key remains
-under `build/conformance` and must not be committed.
+The CA private key is intentionally not committed. When these test
+certificates expire, generate a new test CA and purpose-specific leaves
+offline, then update issuer2's inline chains and these public runner fixtures.
 
 ### Full HAIP Run Without Dedicated FAPI Modules
 
