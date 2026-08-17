@@ -29,7 +29,7 @@ object JsonUtils {
                 is CborInteger -> JsonPrimitive(this.long)
                 is CborFloat -> JsonPrimitive(this.value)
                 is CborString -> JsonPrimitive(this.value)
-                is CborByteString -> JsonArray(this.value.map { JsonPrimitive(it) })
+                is CborByteString -> JsonArray(this.toByteArray().map { JsonPrimitive(it) })
                 is CborArray -> JsonArray(this.map { it.toJsonElement() })
                 is CborMap -> {
                     // We must unwrap the CborElement key into a standard Kotlin String
