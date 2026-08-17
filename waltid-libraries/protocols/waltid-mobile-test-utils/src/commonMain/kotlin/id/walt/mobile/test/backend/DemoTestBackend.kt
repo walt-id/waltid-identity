@@ -48,7 +48,7 @@ object DemoTestBackend {
     // https://issuer2.demo.walt.id/openid4vci/jwks. This is an independent trust anchor;
     // it must not be learned from the signed metadata JWT itself.
     private const val ISSUER_METADATA_SIGNING_KEY_THUMBPRINT =
-        "XVz5i-iLcVBvjz5X4LGc6dA-VFNSyzWMW32LAHF8fss"
+        "gzGuLAZEJ5AsVMZ3mRQ1jsRQbbaS78mpHzQmTFytwF0"
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
 
     const val TRANSACTION_DATA_PROFILES_URL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
