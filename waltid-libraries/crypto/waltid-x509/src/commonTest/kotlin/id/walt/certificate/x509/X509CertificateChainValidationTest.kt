@@ -8,8 +8,7 @@ import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
-import id.walt.crypto.keys.KeyManager
-import id.walt.crypto.keys.TypedKeyGenerationRequest
+import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
@@ -71,78 +70,86 @@ class X509CertificateChainValidationTest {
 
     @Test
     fun shouldValidateCertChainWithTrustAnchorInTheMiddle() = runTest {
-        val rootCaKey = KeyManager.createKey(TypedKeyGenerationRequest.Jwk())
-        val rootCaCert = X509CertificateUtil.createSelfSignedCertificate(rootCaKey) {
-            subjectDn = "CN=Root CA, OU=Walt.id"
-            extensionBasicConstraints {
-                cA = true
+        withCertificateTestKey(KeyType.secp256r1) { rootCaKey ->
+            val rootCaCert = X509CertificateUtil.createSelfSignedCertificate(rootCaKey) {
+                subjectDn = "CN=Root CA, OU=Walt.id"
+                extensionBasicConstraints {
+                    cA = true
+                }
             }
-        }
-        val intermediateCaKey = KeyManager.createKey(TypedKeyGenerationRequest.Jwk())
-        val intermediateCaCert = X509CertificateUtil.createCertificate(rootCaKey, rootCaCert) {
-            subjectDn = "CN=Intermediate CA, OU=Walt.id"
-            subjectPublicKey(intermediateCaKey)
-            extensionBasicConstraints {
-                cA = true
-            }
-        }
 
-        val leafKey = KeyManager.createKey(TypedKeyGenerationRequest.Jwk())
-        val leafCert = X509CertificateUtil.createCertificate(intermediateCaKey, intermediateCaCert) {
-            subjectDn = "CN=Leaf, OU=Walt.id"
-            subjectPublicKey(leafKey)
-        }
-        val trust = InMemoryTrustStore(listOf(rootCaCert, intermediateCaCert))
-        certUtil.validateCertificateChain(listOf(leafCert), trust).also {
-            assertTrue(it.valid)
-        }
-        certUtil.validateCertificateChain(listOf(intermediateCaCert, leafCert), trust).also {
-            assertTrue(it.valid)
-        }
-        certUtil.validateCertificateChain(listOf(intermediateCaCert, leafCert, rootCaCert), trust).also {
-            assertTrue(it.valid)
+            withCertificateTestKey(KeyType.secp256r1) { intermediateCaKey ->
+                val intermediateCaCert = X509CertificateUtil.createCertificate(rootCaKey, rootCaCert) {
+                    subjectDn = "CN=Intermediate CA, OU=Walt.id"
+                    subjectPublicKey(intermediateCaKey)
+                    extensionBasicConstraints {
+                        cA = true
+                    }
+                }
+
+                withCertificateTestKey(KeyType.secp256r1) { leafKey ->
+                    val leafCert = X509CertificateUtil.createCertificate(intermediateCaKey, intermediateCaCert) {
+                        subjectDn = "CN=Leaf, OU=Walt.id"
+                        subjectPublicKey(leafKey)
+                    }
+                    val trust = InMemoryTrustStore(listOf(rootCaCert, intermediateCaCert))
+                    certUtil.validateCertificateChain(listOf(leafCert), trust).also {
+                        assertTrue(it.valid)
+                    }
+                    certUtil.validateCertificateChain(listOf(intermediateCaCert, leafCert), trust).also {
+                        assertTrue(it.valid)
+                    }
+                    certUtil.validateCertificateChain(listOf(intermediateCaCert, leafCert, rootCaCert), trust).also {
+                        assertTrue(it.valid)
+                    }
+                }
+            }
         }
     }
 
     @Test
     fun trustOverrideShouldReplaceBaseTrustStoreNotMergeWithIt() = runTest {
-        val baseRootKey = KeyManager.createKey(TypedKeyGenerationRequest.Jwk())
-        val baseRootCert = X509CertificateUtil.createSelfSignedCertificate(baseRootKey) {
-            subjectDn = "CN=Base Trusted Root, OU=Walt.id"
-            extensionBasicConstraints {
-                cA = true
+        withCertificateTestKey(KeyType.secp256r1) { baseRootKey ->
+            val baseRootCert = X509CertificateUtil.createSelfSignedCertificate(baseRootKey) {
+                subjectDn = "CN=Base Trusted Root, OU=Walt.id"
+                extensionBasicConstraints {
+                    cA = true
+                }
+            }
+
+            withCertificateTestKey(KeyType.secp256r1) { leafKey ->
+                val leafCert = X509CertificateUtil.createCertificate(baseRootKey, baseRootCert) {
+                    subjectDn = "CN=Leaf, OU=Walt.id"
+                    subjectPublicKey(leafKey)
+                }
+
+                // A util whose configured (base) trust store trusts baseRootCert - simulating e.g. a
+                // platform/system trust store configured once for the util.
+                val utilWithBaseTrust = X509CertificateUtil {
+                    setTrust(InMemoryTrustStore(listOf(baseRootCert)))
+                }
+
+                // Sanity check: without a trustOverride, the base trust store is used and the chain validates.
+                assertTrue(utilWithBaseTrust.validateCertificateChain(listOf(leafCert)).valid)
+
+                withCertificateTestKey(KeyType.secp256r1) { unrelatedRootKey ->
+                    // An unrelated root, with no relation to baseRootCert/leafCert.
+                    val unrelatedRootCert = X509CertificateUtil.createSelfSignedCertificate(unrelatedRootKey) {
+                        subjectDn = "CN=Unrelated Root, OU=Walt.id"
+                        extensionBasicConstraints {
+                            cA = true
+                        }
+                    }
+
+                    // Passing a trustOverride must use ONLY that override, not merge it with the base trust
+                    // store - otherwise a chain that is only trusted via the base store would incorrectly
+                    // validate here too, silently reintroducing whatever trust the base store carries (e.g.
+                    // the platform's system CA store) into a call meant to be scoped to the given anchors.
+                    val result = utilWithBaseTrust.validateCertificateChain(listOf(leafCert), InMemoryTrustStore(listOf(unrelatedRootCert)))
+                    assertFalse(result.valid, "trustOverride must replace the base trust store, not merge with it: ${result.log}")
+                }
             }
         }
-        val leafKey = KeyManager.createKey(TypedKeyGenerationRequest.Jwk())
-        val leafCert = X509CertificateUtil.createCertificate(baseRootKey, baseRootCert) {
-            subjectDn = "CN=Leaf, OU=Walt.id"
-            subjectPublicKey(leafKey)
-        }
-
-        // A util whose configured (base) trust store trusts baseRootCert - simulating e.g. a
-        // platform/system trust store configured once for the util.
-        val utilWithBaseTrust = X509CertificateUtil {
-            setTrust(InMemoryTrustStore(listOf(baseRootCert)))
-        }
-
-        // Sanity check: without a trustOverride, the base trust store is used and the chain validates.
-        assertTrue(utilWithBaseTrust.validateCertificateChain(listOf(leafCert)).valid)
-
-        // An unrelated root, with no relation to baseRootCert/leafCert.
-        val unrelatedRootKey = KeyManager.createKey(TypedKeyGenerationRequest.Jwk())
-        val unrelatedRootCert = X509CertificateUtil.createSelfSignedCertificate(unrelatedRootKey) {
-            subjectDn = "CN=Unrelated Root, OU=Walt.id"
-            extensionBasicConstraints {
-                cA = true
-            }
-        }
-
-        // Passing a trustOverride must use ONLY that override, not merge it with the base trust
-        // store - otherwise a chain that is only trusted via the base store would incorrectly
-        // validate here too, silently reintroducing whatever trust the base store carries (e.g.
-        // the platform's system CA store) into a call meant to be scoped to the given anchors.
-        val result = utilWithBaseTrust.validateCertificateChain(listOf(leafCert), InMemoryTrustStore(listOf(unrelatedRootCert)))
-        assertFalse(result.valid, "trustOverride must replace the base trust store, not merge with it: ${result.log}")
     }
 
     companion object {
