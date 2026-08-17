@@ -96,6 +96,11 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await Wallet(
             configuration: WalletConfiguration(
                 walletID: walletId,
+                clientIDTrustConfiguration: WalletClientIDTrustConfiguration(
+                    preRegisteredClientMetadataJSON: [
+                        DemoBackend.verifierClientID: DemoBackend.verifierRequestObjectClientMetadataJSON,
+                    ]
+                ),
                 issuerMetadataTrustResolver: PublicDemoIssuerMetadataTrustResolver(),
                 transactionDataProfiles: Self.demoTransactionDataProfiles
             )

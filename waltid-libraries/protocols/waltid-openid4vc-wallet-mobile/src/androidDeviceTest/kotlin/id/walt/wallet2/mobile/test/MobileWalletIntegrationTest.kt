@@ -11,6 +11,7 @@ import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.wallet2.handlers.WalletIssuanceMetadataProvenance
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
@@ -74,6 +75,15 @@ class MobileWalletIntegrationTest {
 
         private val DEMO_TRANSACTION_DATA_PROFILES = demoTransactionDataProfiles(
             paymentAuthorizationFields = listOf("merchant_name", "amount", "currency"),
+        )
+
+        @OptIn(ExperimentalSerializationApi::class)
+        private val DEMO_VERIFIER_TRUST = ClientIdTrustConfiguration(
+            preRegisteredClients = mapOf(
+                DemoTestBackend.PUBLIC_DEMO_VERIFIER_CLIENT_ID to ClientMetadata(
+                    jwks = ClientMetadata.Jwks(listOf(DemoTestBackend.publicDemoVerifierRequestObjectSigningJwk)),
+                ),
+            ),
         )
 
         private fun demoTransactionDataProfiles(
@@ -145,6 +155,7 @@ class MobileWalletIntegrationTest {
             walletConfig("signed-${scenario.id}").copy(
                 credentialIssuerMetadataTrustResolver = DemoTestBackend.publicDemoIssuerMetadataTrustResolver,
             ),
+            DEMO_VERIFIER_TRUST,
         )
         val bootstrap = client.bootstrap()
         val offer = DemoTestBackend.createOffer(scenario)

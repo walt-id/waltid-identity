@@ -82,8 +82,13 @@ public final class DemoBackend {
     public static let issuerIdentifier = "https://issuer2.demo.walt.id/openid4vci"
     // RFC 7638 thumbprint of the public issuer2 signing key from /openid4vci/jwks.
     // This independent pin must not be learned from the signed metadata JWT.
-    private static let issuerMetadataSigningKeyThumbprint = "XVz5i-iLcVBvjz5X4LGc6dA-VFNSyzWMW32LAHF8fss"
+    private static let issuerMetadataSigningKeyThumbprint = "gzGuLAZEJ5AsVMZ3mRQ1jsRQbbaS78mpHzQmTFytwF0"
     private static let verifierBaseURL = URL(string: "https://verifier2.demo.walt.id")!
+    /// The public verifier requires this explicit client ID for signed request objects.
+    public static let verifierClientID = "verifier2"
+    /// Pre-registered metadata for the ES256 request-object signing key currently served by verifier2.
+    /// This key is an independent trust anchor and must not be learned from the request object.
+    public static let verifierRequestObjectClientMetadataJSON = #"{"jwks":{"keys":[{"kty":"EC","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}]}}"#
 
     private let client: WalletE2EClient
 
@@ -250,6 +255,10 @@ public final class DemoBackend {
         bindClientIDToResponseURI: Bool = false,
         signedRequest: Bool = false
     ) async throws -> DemoVerifierSession {
+        precondition(
+            !(bindClientIDToResponseURI && signedRequest),
+            "A signed verifier request cannot use a response-bound redirect_uri client ID"
+        )
         let endpoint = Self.verifierBaseURL
             .appendingPathComponent("verification-session")
             .appendingPathComponent("create")
@@ -261,6 +270,7 @@ public final class DemoBackend {
         ]
         if signedRequest {
             coreFlow["signed_request"] = true
+            coreFlow["clientId"] = Self.verifierClientID
         }
         if let requestedSessionID {
             let responseURI = Self.verifierBaseURL

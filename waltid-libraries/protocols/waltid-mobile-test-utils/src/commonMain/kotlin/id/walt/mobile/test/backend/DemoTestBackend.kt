@@ -50,6 +50,13 @@ object DemoTestBackend {
     private const val ISSUER_METADATA_SIGNING_KEY_THUMBPRINT =
         "gzGuLAZEJ5AsVMZ3mRQ1jsRQbbaS78mpHzQmTFytwF0"
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
+    // The demo verifier only accepts signed requests for an explicitly configured client ID.
+    const val PUBLIC_DEMO_VERIFIER_CLIENT_ID = "verifier2"
+    // `kid`, `x`, and `y` of the ES256 request-object signing key served by verifier2's x5c header.
+    // This is a pre-registered trust anchor: it must not be learned from the request object itself.
+    private const val VERIFIER_REQUEST_OBJECT_SIGNING_KEY_ID = "_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug"
+    private const val VERIFIER_REQUEST_OBJECT_SIGNING_KEY_X = "G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0"
+    private const val VERIFIER_REQUEST_OBJECT_SIGNING_KEY_Y = "VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"
 
     const val TRANSACTION_DATA_PROFILES_URL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
     private const val EUDI_PID_SD_JWT_VCT = "$ISSUER_BASE_URL/openid4vci/urn:eudi:pid:1"
@@ -278,6 +285,15 @@ object DemoTestBackend {
         signedRequest = signedRequest,
     )
 
+    /** Public key that authenticates signed request objects served by the public verifier2 demo. */
+    val publicDemoVerifierRequestObjectSigningJwk = buildJsonObject {
+        put("kty", "EC")
+        put("crv", "P-256")
+        put("kid", VERIFIER_REQUEST_OBJECT_SIGNING_KEY_ID)
+        put("x", VERIFIER_REQUEST_OBJECT_SIGNING_KEY_X)
+        put("y", VERIFIER_REQUEST_OBJECT_SIGNING_KEY_Y)
+    }
+
     /** Trust resolver for signed metadata served by the public issuer2 demo. */
     val publicDemoIssuerMetadataTrustResolver = CredentialIssuerMetadataTrustResolver { compactJwt, expectedCredentialIssuer ->
         require(expectedCredentialIssuer == ISSUER_IDENTIFIER) {
@@ -424,12 +440,16 @@ object DemoTestBackend {
         bindClientIdToResponseUri: Boolean = false,
         signedRequest: Boolean = false,
     ): VerifierSession {
+        require(!(bindClientIdToResponseUri && signedRequest)) {
+            "A signed verifier request cannot use a response-bound redirect_uri client ID"
+        }
         val requestedSessionId = Uuid.random().toString().takeIf { bindClientIdToResponseUri }
         val payload = buildJsonObject {
             put("flow_type", "cross_device")
             putJsonObject("core_flow") {
                 if (signedRequest) {
                     put("signed_request", true)
+                    put("clientId", PUBLIC_DEMO_VERIFIER_CLIENT_ID)
                 }
                 requestedSessionId?.let { sessionId ->
                     val responseUri = "$VERIFIER_BASE_URL/verification-session/$sessionId/response"
