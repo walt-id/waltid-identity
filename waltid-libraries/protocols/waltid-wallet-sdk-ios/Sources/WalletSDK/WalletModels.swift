@@ -8,6 +8,12 @@ public struct WalletConfiguration: Sendable {
     /// Default key type used when bootstrapping a new wallet DID.
     public var defaultKeyType: WalletKeyType
 
+    /// Default authorization policy for newly created wallet signing keys.
+    public var defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+
+    /// Prompt text used for protected signing operations.
+    public var keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt
+
     /// Optional enterprise attestation configuration.
     public var attestation: WalletAttestationConfiguration?
 
@@ -43,6 +49,9 @@ public struct WalletConfiguration: Sendable {
     ///     credential, and verifier display metadata.
     ///   - crossProcessAccess: Optional shared app/extension storage and Keychain configuration
     ///     for IdentityDocumentServices.
+    ///   - defaultKeyUseAuthorizationPolicy: Default authorization policy for newly
+    ///     created wallet signing keys.
+    ///   - keyUseAuthorizationPrompt: Prompt text used for protected signing operations.
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
@@ -51,10 +60,14 @@ public struct WalletConfiguration: Sendable {
         persistence: WalletPersistence = WalletPersistence(),
         transactionDataProfiles: [WalletTransactionDataProfile] = [],
         preferredLocales: [String] = Locale.preferredLanguages,
-        crossProcessAccess: WalletCrossProcessAccess? = nil
+        crossProcessAccess: WalletCrossProcessAccess? = nil,
+        defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .biometricCurrentSet,
+        keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt = .init()
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
+        self.defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy
+        self.keyUseAuthorizationPrompt = keyUseAuthorizationPrompt
         self.attestation = attestation
         self.clientIDTrustConfiguration = clientIDTrustConfiguration
         self.persistence = persistence
@@ -82,6 +95,74 @@ public struct WalletCrossProcessAccess: Equatable, Sendable {
         self.appGroupIdentifier = appGroupIdentifier
         self.keychainAccessGroup = keychainAccessGroup
     }
+}
+
+/// Authorization policy for private-key use selected when a wallet key is created.
+public enum WalletKeyUseAuthorizationPolicy: Equatable, Sendable {
+    /// Ordinary non-interactive private-key operations.
+    case none
+
+    /// Strong biometric authentication for every operation; new biometric enrollment invalidates the key.
+    case biometricCurrentSet
+}
+
+/// Prompt text supplied to the operating-system-owned authorization UI.
+public struct WalletKeyUseAuthorizationPrompt: Equatable, Sendable {
+    /// Human-readable reason shown by the platform authorization UI.
+    public var message: String
+    /// Action label shown for cancelling the platform authorization UI.
+    public var cancelText: String
+
+    /// Creates prompt text for protected signing operations.
+    ///
+    /// - Parameters:
+    ///   - message: Human-readable authorization reason.
+    ///   - cancelText: Cancellation action label.
+    public init(
+        message: String = "Please authorize cryptographic signature",
+        cancelText: String = "Cancel"
+    ) {
+        self.message = message
+        self.cancelText = cancelText
+    }
+}
+
+/// Stable protected-key failure reasons exposed by the wallet SDK.
+public enum WalletKeyUseAuthorizationFailure: Equatable, Sendable {
+    /// The key type or usage set cannot satisfy the selected policy.
+    case unsupportedCombination
+    /// The platform cannot provide the required biometric capability.
+    case biometricUnavailable
+    /// No biometric is enrolled on the device.
+    case biometricNotEnrolled
+    /// The host application did not provide a usable interaction context.
+    case interactionContextUnavailable
+    /// The user cancelled or did not complete authorization.
+    case authorizationNotCompleted
+    /// The protected native key is missing or invalidated.
+    case protectedKeyUnavailable
+    /// Persisted key metadata is malformed or inconsistent.
+    case invalidStoredKeyMetadata
+}
+
+/// Stable reasons an exact protected-key preflight cannot currently be supported.
+public enum WalletKeyUseAuthorizationUnsupportedReason: Equatable, Sendable {
+    /// The key type or usage set cannot satisfy the selected protected-key policy.
+    case unsupportedCombination
+    /// The platform cannot provide the required biometric capability.
+    case biometricUnavailable
+    /// No biometric is enrolled on the device.
+    case biometricNotEnrolled
+    /// The host application did not provide a usable interaction context.
+    case interactionContextUnavailable
+}
+
+/// Result of checking whether an exact protected-key request can be enforced.
+public enum WalletKeyUseAuthorizationPreflight: Equatable, Sendable {
+    /// The exact requested protected-key policy can be enforced.
+    case supported
+    /// The exact requested policy cannot currently be enforced; the reason explains why.
+    case unsupported(WalletKeyUseAuthorizationUnsupportedReason)
 }
 
 /// Trust configuration used to authenticate verifier Request Objects.

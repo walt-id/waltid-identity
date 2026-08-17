@@ -43,10 +43,15 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         }
     }
 
-    func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult {
+    func bootstrap(
+        keyType: WalletKeyType,
+        didMethod: String,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy?
+    ) async throws -> WalletBootstrapResult {
         let result = try await bridge.bootstrap(
             keyType: keyType.toKMPKeyType(),
-            didMethod: didMethod
+            didMethod: didMethod,
+            keyUseAuthorizationPolicy: keyUseAuthorizationPolicy?.toKMPAuthorizationPolicy()
         )
         let value = try Self.successValue(
             result,
@@ -55,6 +60,26 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
 
         return .init(keyID: value.keyId, did: value.did)
+    }
+
+    func keyUseAuthorizationPreflight(
+        keyType: WalletKeyType,
+        policy: WalletKeyUseAuthorizationPolicy
+    ) async throws -> WalletKeyUseAuthorizationPreflight {
+        let result = try await bridge.keyUseAuthorizationPreflight(
+            keyType: keyType.toKMPKeyType(),
+            policy: policy.toKMPAuthorizationPolicy()
+        )
+        let value = try Self.successValue(
+            result,
+            as: WalletBridgeKeyPreflight.self,
+            operation: "key authorization preflight"
+        )
+        switch (value.supported, value.failure) {
+        case (true, nil): return .supported
+        case (false, let failure?): return .unsupported(failure.toSwiftAuthorizationUnsupportedReason())
+        default: throw WalletError.internalFailure("Invalid key authorization preflight result")
+        }
     }
 
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
@@ -463,7 +488,12 @@ private extension WalletConfiguration {
             transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
             clientIdTrustConfiguration: clientIDTrustConfiguration.toKMPClientIDTrustConfiguration(),
             appGroupIdentifier: crossProcessAccess?.appGroupIdentifier,
-            keychainAccessGroup: crossProcessAccess?.keychainAccessGroup
+            keychainAccessGroup: crossProcessAccess?.keychainAccessGroup,
+            defaultKeyUseAuthorizationPolicy: defaultKeyUseAuthorizationPolicy.toKMPAuthorizationPolicy(),
+            keyUseAuthorizationPrompt: Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPrompt(
+                reason: keyUseAuthorizationPrompt.message,
+                cancelText: keyUseAuthorizationPrompt.cancelText
+            )
         )
     }
 }
@@ -673,6 +703,42 @@ private extension WalletKeyType {
             return .rsa3072
         case .rsa4096:
             return .rsa4096
+        }
+    }
+}
+
+private extension WalletKeyUseAuthorizationPolicy {
+    func toKMPAuthorizationPolicy() -> Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPolicy {
+        switch self {
+        case .none:
+            return .none
+        case .biometricCurrentSet:
+            return .biometricCurrentSet
+        }
+    }
+}
+
+private extension Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationUnsupportedReason {
+    func toSwiftAuthorizationUnsupportedReason() -> WalletKeyUseAuthorizationUnsupportedReason {
+        switch self {
+        case .unsupportedCombination: return .unsupportedCombination
+        case .biometricUnavailable: return .biometricUnavailable
+        case .biometricNotEnrolled: return .biometricNotEnrolled
+        case .interactionContextUnavailable: return .interactionContextUnavailable
+        }
+    }
+}
+
+private extension Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationFailure {
+    func toSwiftAuthorizationFailure() -> WalletKeyUseAuthorizationFailure {
+        switch self {
+        case .unsupportedCombination: return .unsupportedCombination
+        case .biometricUnavailable: return .biometricUnavailable
+        case .biometricNotEnrolled: return .biometricNotEnrolled
+        case .interactionContextUnavailable: return .interactionContextUnavailable
+        case .authorizationNotCompleted: return .authorizationNotCompleted
+        case .protectedKeyUnavailable: return .protectedKeyUnavailable
+        case .invalidStoredKeyMetadata: return .invalidStoredKeyMetadata
         }
     }
 }
@@ -1073,6 +1139,11 @@ private extension WalletBridgeError {
             return .crypto(message)
         case .credentialNotFound:
             return .credentialNotFound(message)
+        case .authorization:
+            guard let authorizationFailure else {
+                return .internalFailure("Authorization error did not include a failure reason")
+            }
+            return .keyUseAuthorization(authorizationFailure.toSwiftAuthorizationFailure())
         case .cancelled:
             return .cancelled
         case .internalFailure:

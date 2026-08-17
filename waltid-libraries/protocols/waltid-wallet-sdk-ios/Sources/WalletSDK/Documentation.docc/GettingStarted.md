@@ -17,7 +17,12 @@ import WalletSDK
 let wallet = try await Wallet(
     configuration: WalletConfiguration(
         walletID: "consumer-wallet",
-        defaultKeyType: .secp256r1
+        defaultKeyType: .secp256r1,
+        defaultKeyUseAuthorizationPolicy: .biometricCurrentSet,
+        keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt(
+            message: "Authorize wallet signing",
+            cancelText: "Cancel"
+        )
     )
 )
 ```
@@ -53,13 +58,21 @@ let wallet = try await Wallet(
 
 ### Bootstrap DID State
 
-Call ``Wallet/bootstrap(keyType:didMethod:)`` before issuance or presentation
+Call ``Wallet/bootstrap(keyType:didMethod:keyUseAuthorizationPolicy:)`` before issuance or presentation
 flows that need wallet key material.
 
 ```swift
 let bootstrap = try await wallet.bootstrap(didMethod: "key")
 print(bootstrap.did)
 ```
+
+Use ``Wallet/keyUseAuthorizationPreflight(keyType:policy:)`` to check a
+protected request before creating a key. `biometricCurrentSet` is immutable per
+key, P-256 only, requires strong biometrics without passcode fallback, and is
+supported only on a physical Secure Enclave device. Changing the default does
+not change an existing key. The host app must also declare
+`NSFaceIDUsageDescription` in `Info.plist` before using this policy; the
+simulator cannot validate Secure Enclave or Face ID behavior.
 
 Use the returned ``WalletBootstrapResult/did`` when a verifier flow needs an
 explicit wallet DID.
